@@ -122,7 +122,10 @@ function MainMenu:createMainMenu()
 
   local menu = ui.Menu.createCenteredMenu(menuItems)
 
-  if DebugSettings.showDebugServers() then
+  -- run_client.sh exports PA_SHOW_LOCAL=true so local dev always sees the Localhost option
+  -- without having to toggle the in-game debug setting.
+  local showLocalEnv = os.getenv("PA_SHOW_LOCAL") == "true"
+  if DebugSettings.showDebugServers() or showLocalEnv then
     menu:addMenuItem(#menu.menuItems + 1, ui.MenuItem.createButtonMenuItem("Replay Browser", nil, false, function() switchToScene(ReplayBrowser()) end))
     menu:addMenuItem(#menu.menuItems + 1, ui.MenuItem.createButtonMenuItem("Beta Server", nil, false, function() switchToScene(Lobby({serverIp = "betaserver.panelattack.com", serverPort = 59569})) end))
     menu:addMenuItem(#menu.menuItems + 1, ui.MenuItem.createButtonMenuItem("Localhost Server", nil, false, function() switchToScene(Lobby({serverIp = "Localhost"})) end))

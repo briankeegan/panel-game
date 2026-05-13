@@ -79,12 +79,6 @@ function(self, roomNumber, players, gameMode, leaderboard)
   -- to maxPlayers. Used by open FFA (dynamic-roster) modes only.
   self.pendingJoiners = {}
 
-  -- Loose-sync KO arbitration state — populated by broadcastDeathEvent, drained
-  -- by tickArbitration when the 200ms window closes.
-  self.arbitrationDeaths = {}
-  self.arbitrationWindowEndsAtMs = nil
-  self.arbitrationEmitted = false
-
   -- Wall-clock timestamp of the last player-driven activity in this room
   -- (input, death, settings/ready change, match start, character select reset).
   -- The server's update loop closes rooms that have been idle for too long so
@@ -323,15 +317,6 @@ function Room:onPlayerSettingsUpdate(player)
       end
     end
 
-    -- Diagnostic: print every player's readiness flags after every settings update so we
-    -- can see exactly which player is blocking the match-start handshake.
-    local readyParts = {}
-    for i, p in self:eachPlayer() do
-      readyParts[#readyParts + 1] = string.format("slot%d:%s[wantsReady=%s loaded=%s ready=%s isReady=%s]",
-        i, tostring(p.name), tostring(p.wantsReady), tostring(p.loaded), tostring(p.ready), tostring(ServerPlayer.isReady(p)))
-    end
-    logger.info("Room " .. self.roomNumber .. " readiness after " .. tostring(player.name) .. " update: " .. table.concat(readyParts, " "))
-
     -- Match start: every player currently in the room must be ready, and the
     -- roster must meet the mode's minimum. Open-FFA and invite games share the
     -- same rule — "everyone in the waiting room readies up before we go". If a
@@ -370,6 +355,18 @@ function Room:start_match()
     return false
   end
 
+  -- TEAM_VERSUS modes (other than FFA, where playersPerTeam == 1) need the roster
+  -- to fit cleanly into teams of `playersPerTeam`. An odd roster (e.g. 3 in a 2v2)
+  -- would leave a player team-less with empty enemy lists — a degenerate match.
+  if self.gameMode
+      and type(self.gameMode.playersPerTeam) == "number"
+      and self.gameMode.playersPerTeam > 1
+      and playerCount % self.gameMode.playersPerTeam ~= 0 then
+    logger.warn("Cannot start match in room " .. self.roomNumber .. " - " .. playerCount ..
+      " players doesn't divide evenly into teams of " .. self.gameMode.playersPerTeam)
+    return false
+  end
+
   self:noteActivity()
   self.matchCount = self.matchCount + 1
   logger.info("Starting match " .. self.matchCount .. " for " .. self.roomNumber .. " " .. self.name)
@@ -381,9 +378,18 @@ function Room:start_match()
   -- createTeams with a too-large teamCount and assign team slots to non-existent
   -- player indices, which then crashes the client when it tries to wire up
   -- garbage targets for those phantom recipients.
+  -- createTeams builds teamCount * playersPerTeam slots, so teamCount must be
+  -- playerCount / playersPerTeam — which is playerCount for FFA (playersPerTeam == 1)
+  -- and playerCount/2 for a 2-per-team mode. Using playerCount unconditionally would
+  -- invent phantom team slots.
   if self.gameMode and self:isDynamicRoster() then
     self.gameMode.playerCount = playerCount
-    self.gameMode.teamCount = playerCount
+    local perTeam = self.gameMode.playersPerTeam
+    if type(perTeam) == "number" and perTeam >= 1 then
+      self.gameMode.teamCount = math.max(1, math.floor(playerCount / perTeam))
+    else
+      self.gameMode.teamCount = playerCount
+    end
   elseif self.gameMode and not self.gameMode.playerCount then
     self.gameMode.playerCount = playerCount
     self.gameMode.teamCount = self.gameMode.teamCount or playerCount
@@ -414,13 +420,6 @@ function Room:start_match()
   self.stageId = activePlayers[stageIndex].stage
 
   self.game = ServerGame.createFromRoomState(self)
-  -- Reset KO arbitration state for the new match.
-  self.arbitrationDeaths = {}
-  self.arbitrationWindowEndsAtMs = nil
-  self.arbitrationEmitted = false
-  -- Reset diagnostic flags so dropped-input warnings can fire once per slot per match.
-  self._loggedInputDropDisconnect = nil
-  self._loggedInputDropEliminated = nil
 
   local replay = self.game:getPartialReplay(false)
   -- games generated via createFromRoomState always have a replay
@@ -443,7 +442,7 @@ end
 function Room:prepare_character_select()
   logger.debug("Called Server.lua Room.character_select")
   self:noteActivity()
-  for _, player in ipairs(self.players) do
+  for _, player in self:eachPlayer() do
     player.state = "character select"
     player.cursor = "__Ready"
     player.ready = false
@@ -624,44 +623,19 @@ function Room:broadcastInput(input, sender)
 
   self:noteActivity()
   local senderNum = sender.player_number
-  -- Loose-sync: skip inputs from eliminated/disconnected slots so they don't pollute the replay log.
-  if self.game.disconnectedPlayers[senderNum] then
-    -- Log the FIRST dropped input per disconnect so we can diagnose "P2 sees their own game
-    -- but P1 never sees P2's moves" without spamming for every dropped frame.
-    if not self._loggedInputDropDisconnect then
-      self._loggedInputDropDisconnect = {}
-    end
-    if not self._loggedInputDropDisconnect[senderNum] then
-      self._loggedInputDropDisconnect[senderNum] = true
-      logger.warn(string.format(
-        "%d: dropping input from %s (slot %d) — player is marked disconnected server-side",
-        self.roomNumber, sender.name, senderNum))
-    end
-    return
-  end
-  if self.game.eliminatedPlayers[senderNum] then
-    if not self._loggedInputDropEliminated then
-      self._loggedInputDropEliminated = {}
-    end
-    if not self._loggedInputDropEliminated[senderNum] then
-      self._loggedInputDropEliminated[senderNum] = true
-      logger.warn(string.format(
-        "%d: dropping input from %s (slot %d) — player is marked eliminated at frame %s",
-        self.roomNumber, sender.name, senderNum,
-        tostring(self.game.eliminatedPlayers[senderNum])))
-    end
+  -- Skip inputs from eliminated/disconnected slots so they don't pollute the replay log.
+  if self.game.disconnectedPlayers[senderNum] or self.game.eliminatedPlayers[senderNum] then
     return
   end
 
   -- Record for replay
   self.game:receiveInput(sender, input)
 
-  -- Relay immediately to every other player + every spectator, tagged with the sender's slot prefix.
-  local inputPrefix = NetworkProtocol.getInputPrefixForPlayer(senderNum)
-      or NetworkProtocol.getInputPrefixForPlayer(1)
-  local inputMessage = NetworkProtocol.markedMessageForTypeAndBody(inputPrefix, input)
+  -- Relay immediately to every other player + every spectator, tagged with the
+  -- sender's player number so the receiving client routes it to the right stack.
+  local inputMessage = NetworkProtocol.encodeInput(senderNum, input)
 
-  for i, player in ipairs(self.players) do
+  for i, player in self:eachPlayer() do
     if i ~= senderNum then
       player:send(inputMessage)
     end
@@ -674,318 +648,10 @@ function Room:broadcastInput(input, sender)
   end
 end
 
----Walk forward through the sender's enemy team list to find a recipient that
----hasn't been eliminated. Returns nil if every member of the sender's enemy
----team is dead (the team is done; the garbage can be dropped on the floor).
----@param senderSlot integer
----@param originalRecipient integer the slot the client picked, may be dead
----@return integer? alive recipient slot, or nil if none
-function Room:_redirectIfDead(senderSlot, originalRecipient)
-  if not self.game then return nil end
-  if not self.game.eliminatedPlayers[originalRecipient] then
-    return originalRecipient
-  end
-
-  -- Original recipient is dead; walk forward looking for any living enemy.
-  -- For FFA / no-teams, every-non-sender is an enemy. For teams, only the
-  -- sender's enemy team members.
-  local enemySlots
-  if self.teams then
-    enemySlots = TeamUtils.getEnemyPlayerIndices(self.teams, senderSlot)
-  else
-    enemySlots = {}
-    for i = 1, #self.players do
-      if i ~= senderSlot then
-        enemySlots[#enemySlots + 1] = i
-      end
-    end
-  end
-
-  if #enemySlots == 0 then return nil end
-
-  -- Find the original recipient's position in the enemy list, walk forward
-  -- (with wrap) to find the next living. Walking from the original position
-  -- (rather than from slot 1) is deterministic and matches the round-robin
-  -- semantic — "if my pick is dead, give it to the next-living after them."
-  local startIdx = 1
-  for i, slot in ipairs(enemySlots) do
-    if slot == originalRecipient then
-      startIdx = i
-      break
-    end
-  end
-
-  for offset = 1, #enemySlots do
-    local idx = ((startIdx - 1 + offset) % #enemySlots) + 1
-    local candidate = enemySlots[idx]
-    if not self.game.eliminatedPlayers[candidate] then
-      return candidate
-    end
-  end
-
-  return nil
-end
-
----Relay a loose-sync GarbageEvent. Body is JSON sent from the client; we
----stamp serverWallClockMs, record it on the game for the replay log,
----redirect dead recipients to the next-living enemy (round-robin walk-
----forward), then forward to EVERY player (including the sender, so their
----view-of-the-target only renders the drop after the server confirms) and
----to all spectators.
----@param sender ServerPlayer
----@param body string raw JSON body from the client
-function Room:broadcastGarbageEvent(sender, body)
-  if not self.game or self.game.complete then
-    return
-  end
-
-  local ok, parsed = pcall(json.decode, body)
-  if not ok or type(parsed) ~= "table" then
-    logger.warn(self.roomNumber .. ": malformed GarbageEvent from " .. (sender.name or sender.userId or "?"))
-    return
-  end
-
-  parsed.sender = sender.player_number
-  parsed.serverWallClockMs = math.floor(socket.gettime() * 1000)
-
-  -- Authoritative dead-target redirect. Clients don't see the death
-  -- before they emit, so we fix it server-side. If nobody alive remains in
-  -- the sender's enemy pool, drop the event (the match will end shortly
-  -- via the natural game-end check).
-  if type(parsed.recipients) == "table" then
-    local redirected = {}
-    for _, originalRecipient in ipairs(parsed.recipients) do
-      local actual = self:_redirectIfDead(sender.player_number, originalRecipient)
-      if actual then
-        redirected[#redirected + 1] = actual
-        if actual ~= originalRecipient then
-          logger.info(string.format(
-            "%d: G from %s: recipient %d eliminated; redirected to %d",
-            self.roomNumber, sender.name or "?", originalRecipient, actual))
-        end
-      end
-    end
-    parsed.recipients = redirected
-    if #redirected == 0 then
-      logger.info(string.format(
-        "%d: G from %s: no living recipients, dropping",
-        self.roomNumber, sender.name or "?"))
-      return
-    end
-  end
-
-  self.game:recordGarbageEvent(sender, parsed)
-
-  do
-    local rstr = {}
-    for _, r in ipairs(parsed.recipients) do rstr[#rstr + 1] = tostring(r) end
-    logger.info(string.format(
-      "%d: G relay: sender=%d recipients=[%s] garbageCount=%d",
-      self.roomNumber, sender.player_number,
-      table.concat(rstr, ","),
-      (type(parsed.garbage) == "table") and #parsed.garbage or 0))
-  end
-
-  local stamped = json.encode(parsed)
-  local message = NetworkProtocol.markedMessageForTypeAndBody(
-    NetworkProtocol.serverMessageTypes.garbageEvent.prefix, stamped)
-
-  -- Send to EVERY player (including sender) and every spectator. The sender
-  -- needs the relay back to drive the visual on their view-stack of the
-  -- recipient. This is the only path that produces the visual, so nobody
-  -- sees an unconfirmed hit.
-  for _, player in ipairs(self.players) do
-    player:send(message)
-  end
-
-  for _, spec in pairs(self.spectators) do
-    if spec then
-      spec:send(message)
-    end
-  end
-end
-
--- Default arbitration window if the gameMode didn't supply one (e.g. offline
--- modes, older clients pre-loose-sync). The room host's latencyTolerance
--- choice overrides this via resolveLatencySettings.
-local DEFAULT_ARBITRATION_WINDOW_MS = 200
-
----@return integer arbitration window in milliseconds for this room
-function Room:_arbitrationWindowMs()
-  return (self.gameMode and self.gameMode.arbitrationWindowMs) or DEFAULT_ARBITRATION_WINDOW_MS
-end
-
----Relay a loose-sync DeathEvent. Same wire shape as GarbageEvent.
----Also marks the sender as eliminated server-side so we stop relaying their
----now-absent inputs (replacing the legacy J{stackEliminated} path) and starts
----(or extends) the KO arbitration window — see Room:tickArbitration.
----@param sender ServerPlayer
----@param body string raw JSON body from the client
-function Room:broadcastDeathEvent(sender, body)
-  if not self.game or self.game.complete then
-    return
-  end
-
-  local ok, parsed = pcall(json.decode, body)
-  if not ok or type(parsed) ~= "table" then
-    logger.warn(self.roomNumber .. ": malformed DeathEvent from " .. (sender.name or sender.userId or "?"))
-    return
-  end
-
-  parsed.sender = sender.player_number
-  parsed.serverWallClockMs = math.floor(socket.gettime() * 1000)
-
-  self.game:recordDeathEvent(sender, parsed)
-  self.game:markPlayerEliminated(sender, parsed.senderFrame)
-  logger.info(self.roomNumber .. ": " .. sender.name .. " died at frame " .. tostring(parsed.senderFrame))
-
-  -- Start or extend the simultaneous-KO arbitration window. Each new death
-  -- pushes the close-time another arbitration window into the future so a
-  -- burst of nearly-simultaneous deaths is all captured. Window size is
-  -- driven by the room's latencyTolerance (strict=100ms, normal=200ms,
-  -- relaxed=400ms) — see resolveLatencySettings.
-  self.arbitrationDeaths[#self.arbitrationDeaths + 1] = {
-    slot = sender.player_number,
-    senderFrame = parsed.senderFrame,
-    serverArrivalMs = parsed.serverWallClockMs,
-  }
-  self.arbitrationWindowEndsAtMs = parsed.serverWallClockMs + self:_arbitrationWindowMs()
-
-  local stamped = json.encode(parsed)
-  local message = NetworkProtocol.markedMessageForTypeAndBody(
-    NetworkProtocol.serverMessageTypes.deathEvent.prefix, stamped)
-
-  for _, player in ipairs(self.players) do
-    if player ~= sender then
-      player:send(message)
-    end
-  end
-
-  for _, spec in pairs(self.spectators) do
-    if spec then
-      spec:send(message)
-    end
-  end
-end
-
----Returns the set of living team indices: teams with at least one player who
----is neither eliminated nor disconnected. For FFA (no teams) each slot is
----treated as its own team.
----@return integer[] # team indices (or slot indices in FFA) that still have a living member
----@return integer[] # representative slot for each living team (first survivor)
-function Room:_livingTeams()
-  if not self.game then
-    return {}, {}
-  end
-  local livingTeams = {}
-  local representatives = {}
-  local seen = {}
-  for slot = 1, #self.players do
-    local dead = self.game.disconnectedPlayers[slot] or self.game.eliminatedPlayers[slot]
-    if not dead then
-      local teamKey
-      if self.teams then
-        teamKey = TeamUtils.getPlayerTeamIndex(self.teams, slot)
-      else
-        teamKey = slot
-      end
-      if not seen[teamKey] then
-        seen[teamKey] = true
-        livingTeams[#livingTeams + 1] = teamKey
-        representatives[#representatives + 1] = slot
-      end
-    end
-  end
-  return livingTeams, representatives
-end
-
----Drain the arbitration window if it has closed. Called from Server:update.
----Emits a single K message with the authoritative outcome and resets state.
----@param nowMs integer current wall-clock time in milliseconds
-function Room:tickArbitration(nowMs)
-  if not self.arbitrationWindowEndsAtMs or self.arbitrationEmitted then
-    return
-  end
-  if nowMs < self.arbitrationWindowEndsAtMs then
-    return
-  end
-  if not self.game or self.game.complete then
-    -- Match already concluded via another path (outcomeReports); skip K.
-    self.arbitrationDeaths = {}
-    self.arbitrationWindowEndsAtMs = nil
-    return
-  end
-
-  local livingTeams, representatives = self:_livingTeams()
-  local arbitration = {
-    deaths = self.arbitrationDeaths,
-  }
-
-  if #livingTeams == 1 then
-    arbitration.tie = false
-    arbitration.winnerSlot = representatives[1]
-  elseif #livingTeams == 0 then
-    arbitration.tie = true
-    arbitration.winnerSlot = nil
-  else
-    -- More than one team is still alive — KO arbitration is informational
-    -- only; the natural game-end logic will produce the final outcome.
-    arbitration.tie = false
-    arbitration.winnerSlot = nil
-  end
-
-  logger.info(string.format(
-    "%d: KO arbitration: %d death(s) within %dms window, livingTeams=%d, winnerSlot=%s, tie=%s",
-    self.roomNumber, #self.arbitrationDeaths, self:_arbitrationWindowMs(),
-    #livingTeams, tostring(arbitration.winnerSlot), tostring(arbitration.tie)))
-
-  local message = ServerProtocol.koArbitration(arbitration)
-  local encoded = NetworkProtocol.markedMessageForTypeAndBody(
-    message.messageType.prefix, json.encode(message.messageText))
-
-  for _, player in ipairs(self.players) do
-    player:send(encoded)
-  end
-  for _, spec in pairs(self.spectators) do
-    if spec then
-      spec:send(encoded)
-    end
-  end
-
-  self.arbitrationEmitted = true
-  self.arbitrationDeaths = {}
-  self.arbitrationWindowEndsAtMs = nil
-
-  -- Server-authoritative match end. The server already knows who's alive
-  -- (eliminatedPlayers from DeathEvents + disconnectedPlayers). When only one
-  -- team remains, that team wins; if everyone died inside the same window,
-  -- it's a true tie. Don't wait for client outcome votes — for FFA those
-  -- never converge anyway (each player reports their own perspective), and
-  -- a vote from a player whose stack already lost can otherwise overrule
-  -- the actual survivor (the "DRAW with 2 players still alive" bug).
-  if #livingTeams == 1 then
-    local winnerSlot = representatives[1]
-    self.game.winnerIndex = winnerSlot
-    self.game.winnerId = self.players[winnerSlot].publicPlayerID
-    if self.teams then
-      self.game.winnerTeamIndex = livingTeams[1]
-    end
-    self.game.aborted = false
-    self.game.complete = true
-    self.game:finalizeReplay(winnerSlot)
-    self:_finalizeMatch()
-  elseif #livingTeams == 0 then
-    self.game.aborted = false
-    self.game.complete = true
-    self.game:finalizeReplay(0)
-    self:_finalizeMatch()
-  end
-end
-
 -- broadcasts the message to everyone in the room
 -- if an optional sender is specified, they are excluded from the broadcast
 function Room:broadcastJson(message, sender)
-  for _, player in ipairs(self.players) do
+  for _, player in self:eachPlayer() do
     if player ~= sender then
       player:sendJson(message)
     end
@@ -1005,7 +671,7 @@ function Room:rating_adjustment_approved()
     return false, {"Room has no leaderboard"}
   end
 
-  for _, player in ipairs(self.players) do
+  for _, player in self:eachPlayer() do
     if not player.wants_ranked_match then
       return false, {player.name .. " doesn't want ranked"}
     end
@@ -1019,7 +685,7 @@ function Room:toString()
   local info = self.name
   info = info .. "\nRoom number:" .. self.roomNumber
   info = info .. "\nWin Counts" .. table_to_string(self.win_counts)
-  for _, player in ipairs(self.players) do
+  for _, player in self:eachPlayer() do
     info = info .. "\n" .. player.name .. " settings:"
     info = info .. "\n" .. table_to_string(player:getSettings())
   end
@@ -1037,9 +703,8 @@ end
 ---Post-game work: update win tracking, broadcast the result, prepare the
 ---next character-select round, run any deferred leaver removals. Assumes the
 ---game object has already had winnerIndex / winnerId / winnerTeamIndex (or
----aborted = true) populated, and `complete` set. Used by both the legacy
----client-vote path (handleGameOverOutcome) and the server-authoritative
----arbitration path (tickArbitration → _finalizeMatchFromLivingTeams).
+---aborted = true) populated, and `complete` set. Driven by the client-vote
+---path (handleGameOverOutcome).
 function Room:_finalizeMatch()
   if not self.game or not self.game.complete then
     return
@@ -1051,8 +716,10 @@ function Room:_finalizeMatch()
 
   if self.game.ranked and self.game.winnerId then
     local ratingUpdates = self.leaderboard:processGameResult(self.game)
-    for i, _ in ipairs(self.players) do
-      ratingUpdates[i].userId = nil
+    for i, _ in self:eachPlayer() do
+      if ratingUpdates[i] then
+        ratingUpdates[i].userId = nil
+      end
     end
     self.ratings = ratingUpdates
   end
@@ -1086,9 +753,9 @@ end
 ---@param message { outcome: integer, [any]: any }
 ---@param sender ServerPlayer
 function Room:handleGameOverOutcome(message, sender)
-  -- A late vote arriving after the server already finalized the match (e.g.
-  -- arbitration declared the survivor while a dead-and-rejoined client's stale
-  -- outcome was in flight) is a no-op — the game state is already gone.
+  -- A late vote arriving after the match was already finalized (e.g. a
+  -- dead-and-rejoined client's stale outcome in flight) is a no-op — the
+  -- game state is already gone.
   if not self.game then
     logger.debug(self.roomNumber .. ": Ignoring late game result from " .. sender.name .. "; match already finalized")
     return
@@ -1137,18 +804,25 @@ end
 
 ---@param sender ServerPlayer
 function Room:handleGameAbort(sender)
-  local isPlayerInRoom = tableUtils.trueForAny(self.players, function(p) return p.publicPlayerID == sender.publicPlayerID end)
+  -- self.players is sparse (keyed by slot 1..maxPlayers, holes after mid-room
+  -- leaves), so use countPlayers/eachPlayer rather than ipairs / `#`.
+  local playerCount = self:countPlayers()
+  local isPlayerInRoom = false
+  for _, p in self:eachPlayer() do
+    if p.publicPlayerID == sender.publicPlayerID then
+      isPlayerInRoom = true
+      break
+    end
+  end
 
-  if #self.players == 1 and self.players[1] == sender then
+  if playerCount == 1 and isPlayerInRoom then
     logger.debug(sender.name .. " aborted the game")
     self:abortGame(sender)
-  elseif #self.players >= 2 and isPlayerInRoom then
+  elseif playerCount >= 2 and isPlayerInRoom then
     logger.info(sender.name .. " aborted the game")
 
-    -- Loose-sync: per-player input counts diverge naturally with clock drift,
-    -- so we can't distinguish a "latency timeout" from "user gave up" from the
-    -- gap alone. Treat all aborts the same: eliminate the aborter and let the
-    -- survivors finish.
+    -- Treat all aborts the same: eliminate the aborter and let the survivors
+    -- finish.
     if self.game then
       self.game:markPlayerEliminated(sender, sender.player_number)
     end
@@ -1158,7 +832,7 @@ function Room:handleGameAbort(sender)
     -- - Team game: report self-team loss (2)
     -- - 3+p FFA: report self-loss using own player_number (no hardcoded winner)
     local outcome
-    if #self.players == 2 then
+    if playerCount == 2 then
       outcome = (sender.player_number == 1) and 2 or 1
     elseif self.teams then
       outcome = 2
@@ -1199,8 +873,8 @@ function Room:handlePlayerDisconnect(sender, reason)
   -- Force-close in that case so server state cannot drift.
   if self.game then
     local allDisconnected = true
-    for i = 1, #self.players do
-      if not self.game.disconnectedPlayers[i] then
+    for slot, _ in self:eachPlayer() do
+      if not self.game.disconnectedPlayers[slot] then
         allDisconnected = false
         break
       end
@@ -1251,38 +925,16 @@ function Room:voidByLeave(leaver, reason)
     logger.info(self.roomNumber .. ": voiding room (" .. self.voidReason .. ")")
   end
 
-  -- Mid-match disconnect → treat as "death by timeout" so the rest of the room
-  -- can play on. The leaver loses; the survivors finish the match. We synthesize
-  -- a DeathEvent at the leaver's last-confirmed input frame so every remaining
-  -- client pins game_over_clock on the leaver's stack and stops waiting for
-  -- inputs that will never come.
+  -- Mid-match disconnect → mark the leaver eliminated server-side so we stop
+  -- relaying their (now-absent) inputs. The room is either voided above (no one
+  -- cares) or the leaver was already eliminated (peers derived game over from
+  -- the sim) — so there is nothing to broadcast to the remaining clients.
   if not self.game.eliminatedPlayers[leaver.player_number] then
     local leaverInputs = #self.game.inputs[leaver.player_number]
     local deathFrame = math.max(leaverInputs, 1)
     self.game:markPlayerEliminated(leaver, deathFrame)
     logger.info(self.roomNumber .. ": " .. leaver.name ..
-      " disconnected while alive — synthesizing DeathEvent at frame " .. deathFrame)
-
-    local synthBody = {
-      sender = leaver.player_number,
-      senderFrame = deathFrame,
-      serverWallClockMs = math.floor(socket.gettime() * 1000),
-      reason = "disconnect",
-    }
-    self.game:recordDeathEvent(leaver, synthBody)
-    local stamped = json.encode(synthBody)
-    local message = NetworkProtocol.markedMessageForTypeAndBody(
-      NetworkProtocol.serverMessageTypes.deathEvent.prefix, stamped)
-    for _, player in ipairs(self.players) do
-      if player ~= leaver then
-        player:send(message)
-      end
-    end
-    for _, spec in pairs(self.spectators) do
-      if spec then
-        spec:send(message)
-      end
-    end
+      " disconnected while alive — eliminated at frame " .. deathFrame)
   end
 
   -- Mid-match: every leaver is marked eliminated above (either by their own
@@ -1308,8 +960,8 @@ function Room:voidByLeave(leaver, reason)
     -- outcome report and handleGameOverOutcome won't fire to clean the room.
     -- Close it now so it doesn't sit as a ghost in the lobby.
     local allDisconnected = true
-    for i = 1, #self.players do
-      if not self.game.disconnectedPlayers[i] then
+    for slot, _ in self:eachPlayer() do
+      if not self.game.disconnectedPlayers[slot] then
         allDisconnected = false
         break
       end
@@ -1379,11 +1031,18 @@ function Room:abortGame(sender, reason)
 end
 
 function Room:togglePause(sender, paused)
-  if #self.players == 1 and self.players[1] == sender and paused ~= (self:state() == "paused") then
+  -- Solo pause: only meaningful in a 1-player room where the requester is the sole
+  -- occupant. Use countPlayers (sparse-safe) instead of `#self.players`.
+  local count = self:countPlayers()
+  local isOnlyPlayer = false
+  if count == 1 then
+    for _, p in self:eachPlayer() do isOnlyPlayer = (p == sender); break end
+  end
+  if isOnlyPlayer and paused ~= (self:state() == "paused") then
     self:broadcastJson(ServerProtocol.sendPauseNotification(self.roomNumber, sender, paused), sender)
     self:emitSignal("pauseToggled")
 
-    for i, player in ipairs(self.players) do
+    for _, player in self:eachPlayer() do
       if paused then
         player:setState("paused")
       else

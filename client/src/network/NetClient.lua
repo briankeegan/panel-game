@@ -648,60 +648,14 @@ local function processMenuStateMessage(player, message)
 end
 
 local function processInputMessages(self)
-  -- Pop input messages for all 8 player slots. Stopping at 4 silently dropped
-  -- inputs for slots 5-8 — each non-slot-5 client would wait indefinitely on
-  -- the 5th stack until the connection watchdog finally fired.
+  -- Relayed input is a single message type carrying an integer playerNumber +
+  -- the input payload — works for any player count.
   local messages = self.tcpClient.receivedMessageQueue:pop_all_with(
-    NetworkProtocol.serverMessageTypes.opponentInput.prefix,
-    NetworkProtocol.serverMessageTypes.secondOpponentInput.prefix,
-    NetworkProtocol.serverMessageTypes.thirdOpponentInput.prefix,
-    NetworkProtocol.serverMessageTypes.fourthOpponentInput.prefix,
-    NetworkProtocol.serverMessageTypes.fifthOpponentInput.prefix,
-    NetworkProtocol.serverMessageTypes.sixthOpponentInput.prefix,
-    NetworkProtocol.serverMessageTypes.seventhOpponentInput.prefix,
-    NetworkProtocol.serverMessageTypes.eighthOpponentInput.prefix
-  )
+    NetworkProtocol.serverMessageTypes.input.prefix)
   if self.room and self.room.match then
     for _, msg in ipairs(messages) do
-      for type, data in pairs(msg) do
-        self.room.match:receiveInput(type, data)
-      end
-    end
-  end
-end
-
----@param self NetClient
-local function processGarbageEvents(self)
-  local messages = self.tcpClient.receivedMessageQueue:pop_all_with(
-    NetworkProtocol.serverMessageTypes.garbageEvent.prefix)
-  for _, msg in ipairs(messages) do
-    local body = msg[NetworkProtocol.serverMessageTypes.garbageEvent.prefix]
-    if self.room and self.room.match then
-      self.room.match:applyGarbageEvent(body)
-    end
-  end
-end
-
----@param self NetClient
-local function processDeathEvents(self)
-  local messages = self.tcpClient.receivedMessageQueue:pop_all_with(
-    NetworkProtocol.serverMessageTypes.deathEvent.prefix)
-  for _, msg in ipairs(messages) do
-    local body = msg[NetworkProtocol.serverMessageTypes.deathEvent.prefix]
-    if self.room and self.room.match then
-      self.room.match:applyDeathEvent(body)
-    end
-  end
-end
-
----@param self NetClient
-local function processKOArbitrations(self)
-  local messages = self.tcpClient.receivedMessageQueue:pop_all_with(
-    NetworkProtocol.serverMessageTypes.koArbitration.prefix)
-  if self.room and self.room.match then
-    for _, msg in ipairs(messages) do
-      local body = msg[NetworkProtocol.serverMessageTypes.koArbitration.prefix]
-      self.room.match:applyKOArbitration(body)
+      local body = msg[NetworkProtocol.serverMessageTypes.input.prefix]
+      self.room.match:receiveInput(body.playerNumber, body.input)
     end
   end
 end
@@ -979,27 +933,6 @@ function NetClient:sendInput(input)
   end
 end
 
----Loose-sync: send a GarbageEvent from the local sim. body is JSON-encoded inline
----(no Request wrapper — these are fire-and-forget like inputs).
----@param body table parsed event payload
-function NetClient:sendGarbageEvent(body)
-  if self:isConnected() then
-    local message = NetworkProtocol.markedMessageForTypeAndBody(
-      NetworkProtocol.clientMessageTypes.garbageEvent.prefix, json.encode(body))
-    self.tcpClient:send(message)
-  end
-end
-
----Loose-sync: send a DeathEvent from the local sim.
----@param body table parsed event payload
-function NetClient:sendDeathEvent(body)
-  if self:isConnected() then
-    local message = NetworkProtocol.markedMessageForTypeAndBody(
-      NetworkProtocol.clientMessageTypes.deathEvent.prefix, json.encode(body))
-    self.tcpClient:send(message)
-  end
-end
-
 ---@param clientMatch ClientMatch
 function NetClient:sendPauseToggle(clientMatch)
   if self:isConnected() and self.room and self.room.roomNumber then
@@ -1087,8 +1020,7 @@ function NetClient:requestJoinRoom(roomNumber, slotNumber)
 end
 
 ---@param gameMode GameMode|GameModeID|string
----@param latencyTolerance ("strict"|"normal"|"relaxed")?
-function NetClient:requestRoom(gameMode, latencyTolerance)
+function NetClient:requestRoom(gameMode)
   if self:isConnected() then
     if type(gameMode) == "string" then
       local ok, resolvedGameMode = pcall(GameModes.getPreset, gameMode)
@@ -1105,7 +1037,7 @@ function NetClient:requestRoom(gameMode, latencyTolerance)
       return
     end
 
-    self.tcpClient:sendRequest(ClientMessages.sendRoomRequest(gameMode, latencyTolerance))
+    self.tcpClient:sendRequest(ClientMessages.sendRoomRequest(gameMode))
   end
 end
 
@@ -1271,9 +1203,6 @@ function NetClient:update()
     end
   elseif self.state == states.INGAME then
     processInputMessages(self)
-    processGarbageEvents(self)
-    processDeathEvents(self)
-    processKOArbitrations(self)
 
     for _, listener in pairs(self.matchListeners) do
       listener:listen()

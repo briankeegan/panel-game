@@ -1,4 +1,5 @@
 local logger = require("common.lib.logger")
+local json = require("common.lib.dkjson")
 
 local NetworkProtocol = {}
 
@@ -6,7 +7,9 @@ local NetworkProtocol = {}
 -- Version 002 we supported unicode JSON
 -- Version 003 we updated login requirements and started sending the network version
 -- Version 004 server communicates replays in a new standardised format
-NetworkProtocol.NETWORK_VERSION = "006"
+-- Version 007 relayed input is a single JSON message carrying an explicit playerNumber
+--             (replaces the fixed per-slot input prefixes; no cap on player count)
+NetworkProtocol.NETWORK_VERSION = "007"
 
 local messageEndMarker = "←J←"
 
@@ -16,9 +19,7 @@ local messageEndMarker = "←J←"
 -- if size is nil then a variable utf8 byte sequence follows terminated by messageEndMarker
 NetworkProtocol.clientMessageTypes = {
   jsonMessage = {prefix="J", size=nil}, -- Generic JSON message sent from the client
-  playerInput = {prefix="I", size=nil}, -- Player input (touch or controller) from the client
-  garbageEvent = {prefix="G", size=nil}, -- Loose-sync: sender-emitted garbage delivery event (JSON body)
-  deathEvent = {prefix="D", size=nil}, -- Loose-sync: sender-emitted death notification (JSON body)
+  playerInput = {prefix="I", size=nil}, -- Player input (touch or controller) from the client; raw payload, server knows the sender's slot
   acknowledgedPing = {prefix="E", size=1}, -- Respond back from the servers ping to confirm we are still connected
   versionCheck = {prefix="H", size=4} -- Sent on initial connection with the NETWORK_VERSION number to confirm client and server agree
 }
@@ -27,23 +28,9 @@ for _, value in pairs(NetworkProtocol.clientMessageTypes) do
   NetworkProtocol.clientPrefixToMessageType[value.prefix] = value
 end
 
--- Input prefixes for each player slot (server → client). Reserves I,U,V,W for slots 1-4
--- and extends with X,Y,Z,Q for slots 5-8. Non-input prefixes in use: J,E,H,N,G,D,K.
-NetworkProtocol.playerInputPrefixes = {"I", "U", "V", "W", "X", "Y", "Z", "Q"}
-
 NetworkProtocol.serverMessageTypes = {
   jsonMessage = {prefix="J", size=nil}, -- Generic JSON message sent from the server
-  opponentInput = {prefix="I", size=nil, verbose = true}, -- Player input (touch or controller) sent to the client about it's opponent
-  secondOpponentInput = {prefix="U", size=nil, verbose = true}, -- Player input (touch or controller) sent to the client for player two if spectating
-  thirdOpponentInput = {prefix="V", size=nil, verbose = true}, -- Player input for player three in 3-4 player games
-  fourthOpponentInput = {prefix="W", size=nil, verbose = true}, -- Player input for player four in 4 player games
-  fifthOpponentInput = {prefix="X", size=nil, verbose = true},
-  sixthOpponentInput = {prefix="Y", size=nil, verbose = true},
-  seventhOpponentInput = {prefix="Z", size=nil, verbose = true},
-  eighthOpponentInput = {prefix="Q", size=nil, verbose = true},
-  garbageEvent = {prefix="G", size=nil, verbose = true}, -- Loose-sync: relayed sender-emitted garbage delivery event
-  deathEvent = {prefix="D", size=nil}, -- Loose-sync: relayed sender-emitted death notification
-  koArbitration = {prefix="K", size=nil}, -- Loose-sync: server-authored simultaneous-KO arbitration result
+  input = {prefix="I", size=nil, verbose = true}, -- Relayed player input: JSON body {playerNumber = <n>, input = <payload>}
   versionCorrect = {prefix="H", size=1}, -- Sent to the client if the NETWORK_VERSION they sent is allowed
   versionWrong = {prefix="N", size=1}, -- Sent to the client if the NETWORK_VERSION they sent is not allowed
   ping = {prefix="E", size=1, verbose = true} -- Sent to the client to confirm they are still connected
@@ -53,31 +40,39 @@ for _, value in pairs(NetworkProtocol.serverMessageTypes) do
   NetworkProtocol.serverPrefixToMessageType[value.prefix] = value
 end
 
-local inputPrefixSet = {}
-for _, p in ipairs(NetworkProtocol.playerInputPrefixes) do
-  inputPrefixSet[p] = true
-end
-
-NetworkProtocol.playerIndexForInputPrefix = {}
-for i, p in ipairs(NetworkProtocol.playerInputPrefixes) do
-  NetworkProtocol.playerIndexForInputPrefix[p] = i
-end
-
-function NetworkProtocol.isInputPrefix(prefix)
-  return inputPrefixSet[prefix] == true
-end
-
-function NetworkProtocol.getInputPrefixForPlayer(playerNumber)
-  return NetworkProtocol.playerInputPrefixes[playerNumber]
-end
-
 function NetworkProtocol.isMessageTypeVerbose(type)
-  return type == NetworkProtocol.serverMessageTypes.ping.prefix or NetworkProtocol.isInputPrefix(type)
+  return type == NetworkProtocol.serverMessageTypes.ping.prefix
+      or type == NetworkProtocol.serverMessageTypes.input.prefix
 end
 
 -- Creates a UTF8 message string with the type at the beginning and the end marker at the end
 function NetworkProtocol.markedMessageForTypeAndBody(type, body)
   return type .. body .. messageEndMarker
+end
+
+---Build a relayed-input message: a JSON-bodied message tagged with the sender's
+---player number so the receiving client can route the input to the right stack.
+---@param playerNumber integer
+---@param input string the raw input payload
+---@return string # the marked message string ready to send
+function NetworkProtocol.encodeInput(playerNumber, input)
+  return NetworkProtocol.markedMessageForTypeAndBody(
+    NetworkProtocol.serverMessageTypes.input.prefix,
+    json.encode({playerNumber = playerNumber, input = input}))
+end
+
+---Decode a relayed-input message body produced by NetworkProtocol.encodeInput.
+---Returns nil, nil if the body is malformed (caller should drop the message).
+---@param body string the JSON body (without the prefix / end marker)
+---@return integer? playerNumber
+---@return string? input
+function NetworkProtocol.decodeInput(body)
+  local decoded = json.decode(body)
+  if type(decoded) ~= "table" or type(decoded.playerNumber) ~= "number" then
+    logger.warn("decodeInput: malformed relayed-input body, dropping: " .. tostring(body))
+    return nil, nil
+  end
+  return decoded.playerNumber, decoded.input
 end
 
 -- Returns the next message in the queue, or nil if none / error

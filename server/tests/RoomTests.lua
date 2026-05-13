@@ -98,13 +98,10 @@ local function basicTest()
   end
 end
 
--- abortTest1 removed in the loose-sync rewrite.
--- It exercised the OLD "legitimate latency abort" path (large input gap →
--- handlePlayerDisconnect → game ends immediately) which Step 3 collapsed into
--- the unified "mark eliminated, game continues" path. This was the explicit
--- "more forgiving to disconnects" design goal. The replacement positive test
--- lives in server/tests/LooseSyncServerTests.lua as
--- test_abort_marks_eliminated_keeps_game_alive.
+-- abortTest1 (the old "legitimate latency abort" path that ended the game
+-- immediately on a large input gap) was removed: aborts now always mark the
+-- aborting player eliminated and let the survivors finish — see abortTest2 below
+-- and Room:handleGameAbort.
 
 -- p1 aborts for no reason while p2 reports a win
 local function abortTest2()
@@ -211,7 +208,7 @@ local function pauseTest()
 end
 
 basicTest()
--- abortTest1 removed; replaced by test_abort_marks_eliminated_keeps_game_alive in LooseSyncServerTests
+-- abortTest1 removed (the old latency-abort path); abortTest2 covers the current behavior
 abortTest2()
 abortTest3()
 pauseTest()

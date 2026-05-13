@@ -81,54 +81,6 @@ local function resolveRequestedGameMode(requestedGameMode)
   return nil
 end
 
--- Resolve all per-match latency-tolerance knobs from the host's strict/normal/
--- relaxed selection. In the loose-sync world there are four things this dial
--- controls, all rolled into one resolution function so server.lua + Room.lua
--- + clients see consistent values:
---
---   1. connectionTimeoutSeconds — how long the TCP watchdog tolerates silence
---      from a player before declaring the connection dead. Larger in the
---      relaxed setting so flaky internet can recover.
---   2. sendRetryLimit — how many times to retry a send before giving up.
---   3. arbitrationWindowMs — the simultaneous-KO arbitration window. Larger
---      values catch more "almost simultaneous" deaths as ties (favors fair
---      ties); smaller values resolve faster (favors decisive outcomes).
---   4. minReactionFrames — floor on the adaptive telegraph compression on
---      the receiver. Larger values guarantee more telegraph window before
---      garbage lands, at the cost of overall tempo. Smaller values let
---      gameplay stay tight even under heavy latency.
---
--- Strict / normal / relaxed are knobs the room host picks in the lobby; they
--- apply to the whole match. All clients see the same resolved values via the
--- gameMode payload, so the experience matches the host's choice.
----@return {connectionTimeoutSeconds:integer, sendRetryLimit:integer, arbitrationWindowMs:integer, minReactionFrames:integer}
-local function resolveLatencySettings(latencyTolerance, playerCount)
-  local count = tonumber(playerCount) or 2
-  local tolerance = latencyTolerance
-  if tolerance ~= "strict" and tolerance ~= "normal" and tolerance ~= "relaxed" then
-    tolerance = "normal"
-  end
-
-  local settings = {}
-  if tolerance == "strict" then
-    settings.connectionTimeoutSeconds = (count >= 3) and 30 or 20
-    settings.sendRetryLimit            = (count >= 3) and 10 or 8
-    settings.arbitrationWindowMs       = 100
-    settings.minReactionFrames         = 30
-  elseif tolerance == "relaxed" then
-    settings.connectionTimeoutSeconds = (count >= 3) and 120 or 90
-    settings.sendRetryLimit            = (count >= 3) and 20 or 15
-    settings.arbitrationWindowMs       = 400
-    settings.minReactionFrames         = 60
-  else
-    settings.connectionTimeoutSeconds = (count >= 3) and 60 or 45
-    settings.sendRetryLimit            = (count >= 3) and 15 or 10
-    settings.arbitrationWindowMs       = 200
-    settings.minReactionFrames         = 45
-  end
-  return settings
-end
-
 local pairs = pairs
 local ipairs = ipairs
 local time = os.time
@@ -918,7 +870,7 @@ function Server:handleJoinRoom(player, roomNumber, slotNumber)
     -- Send addToRoom message to the joining player
     player:sendJson(ServerProtocol.addToRoom(room, nil))
 
-    logger.info("Player " .. player.name .. " joined room " .. roomNumber .. " as player " .. actualSlot)
+    logger.info("Player " .. player.name .. " joined room " .. roomNumber .. " as player " .. tostring(player.player_number))
   end
 
   return success
@@ -974,7 +926,6 @@ function Server:update()
 
   self:updateConnections()
   self:processMessages()
-  self:tickArbitrations()
 
   -- Only check once a second to avoid over checking
   -- (we are relying on time() returning a number rounded to the second)
@@ -988,16 +939,6 @@ function Server:update()
 
   -- If the lobby changed tell everyone
   self:broadCastLobbyIfChanged()
-end
-
----Drain KO arbitration windows for any rooms whose window has closed.
-function Server:tickArbitrations()
-  local nowMs = math.floor(socket.gettime() * 1000)
-  for _, room in pairs(self.rooms) do
-    if room then
-      room:tickArbitration(nowMs)
-    end
-  end
 end
 
 ---Disconnect lobby players who haven't sent any message since being
@@ -1163,34 +1104,6 @@ function Server:processMessages()
       q:shallowClear()
     end
 
-    if connection.incomingGarbageQueue.last ~= -1 then
-      local q = connection.incomingGarbageQueue
-      local player = self.connectionToPlayer[connection]
-      if player then
-        local room = self.playerToRoom[player]
-        if room then
-          for i = q.first, q.last do
-            room:broadcastGarbageEvent(player, q[i])
-          end
-        end
-      end
-      q:shallowClear()
-    end
-
-    if connection.incomingDeathQueue.last ~= -1 then
-      local q = connection.incomingDeathQueue
-      local player = self.connectionToPlayer[connection]
-      if player then
-        local room = self.playerToRoom[player]
-        if room then
-          for i = q.first, q.last do
-            room:broadcastDeathEvent(player, q[i])
-          end
-        end
-      end
-      q:shallowClear()
-    end
-
     if connection.incomingMessageQueue.last ~= -1 then
       local q = connection.incomingMessageQueue
       local player = self.connectionToPlayer[connection]
@@ -1271,7 +1184,7 @@ function Server:processMessage(message, connection)
         return true
       end
     elseif message.roomRequest and (player.state == "lobby" or (player.state == "character select" and self.playerToRoom[player] and not self.playerToRoom[player]:isFull() and not self.playerToRoom[player].game)) then
-      logger.warn("roomRequest received from " .. player.name .. " state=" .. player.state .. " mode=" .. tostring(message.gameMode and message.gameMode.name) .. " latency=" .. tostring(message.latencyTolerance))
+      logger.debug("roomRequest received from " .. player.name .. " state=" .. player.state .. " mode=" .. tostring(message.gameMode and message.gameMode.name))
       local requestedGameMode = resolveRequestedGameMode(message.gameMode)
       if requestedGameMode then
         -- If the player is in a partial (not-yet-full, no match started) room with
@@ -1289,17 +1202,6 @@ function Server:processMessage(message, connection)
           self:closeRoom(existingRoom, "host changed room settings")
         end
 
-        requestedGameMode.latencyTolerance = message.latencyTolerance
-        -- For dynamic-roster modes (open_ffa) playerCount is nil at request time;
-        -- fall back to maxPlayers. latencyTolerance now drives four match-wide
-        -- knobs: TCP-watchdog timeout/retry, the simultaneous-KO arbitration
-        -- window, and the receiver-side adaptive-telegraph reaction floor.
-        local effectiveCount = requestedGameMode.playerCount or requestedGameMode.maxPlayers or 2
-        local latencySettings = resolveLatencySettings(message.latencyTolerance, effectiveCount)
-        requestedGameMode.connectionTimeoutSeconds = latencySettings.connectionTimeoutSeconds
-        requestedGameMode.sendRetryLimit           = latencySettings.sendRetryLimit
-        requestedGameMode.arbitrationWindowMs      = latencySettings.arbitrationWindowMs
-        requestedGameMode.minReactionFrames        = latencySettings.minReactionFrames
         self:create_room(requestedGameMode, player)
         return true
       else
@@ -1592,7 +1494,7 @@ function Server:handleLeaveRoom(player, reason)
     if room:countPlayers() >= 3 or room.voided or hadMatch then
       self.playerToRoom[player] = nil
       -- Order matters: voidByLeave reads leaver.player_number (to look up
-      -- eliminatedPlayers and to seed the synthesized DeathEvent), but
+      -- and update eliminatedPlayers for the leaver), but
       -- removeFromRoom clears player_number on graceful leaves with a live
       -- socket. Run voidByLeave first so it sees the intact slot index;
       -- removeFromRoom then sends the leaver their own leaveRoom message.

@@ -3,6 +3,7 @@ source ~/.zshrc 2>/dev/null
 eval "$(luarocks path --local --lua-version 5.1)"
 set -o pipefail
 cd "$(dirname "$0")"
+mkdir -p logs
 
 # Kill any previous server process and any process still holding the server port.
 pkill -f serverLauncher.lua 2>/dev/null || true

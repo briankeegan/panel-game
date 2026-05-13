@@ -19,7 +19,6 @@ local Telegraph = require("client.src.graphics.Telegraph")
 local unpack = table.unpack or unpack
 local MatchParticipant = require("client.src.MatchParticipant")
 local ChallengeModePlayerStack = require("client.src.ChallengeModePlayerStack")
-local NetworkProtocol = require("common.network.NetworkProtocol")
 local DebugSettings = require("client.src.debug.DebugSettings")
 local TeamUtils = require("common.data.TeamUtils")
 ---@module "client.src.ChallengeModePlayerStack"
@@ -1059,107 +1058,13 @@ function ClientMatch:getWinners()
   end
 end
 
----@param prefix string input prefix indicating sender
+---@param playerNumber integer the player whose input this is
 ---@param input string
-function ClientMatch:receiveInput(prefix, input)
-  local senderIndex = NetworkProtocol.playerIndexForInputPrefix[prefix]
-  if senderIndex and self.stacks[senderIndex] then
+function ClientMatch:receiveInput(playerNumber, input)
+  if self.stacks[playerNumber] then
     ---@diagnostic disable-next-line: param-type-mismatch
-    self.stacks[senderIndex]:receiveConfirmedInput(input)
+    self.stacks[playerNumber]:receiveConfirmedInput(input)
   end
-end
-
----Loose-sync: handle an incoming GarbageEvent from the server.
----
----The server is the single source of truth: it relays G to every player
----including the sender, so the visual on the sender's view of the recipient
----only fires after the server confirms (and possibly redirects) the
----delivery. This function applies the garbage to whichever stack the server
----said is the recipient — local-authoritative for gameplay on the actual
----player's machine, view-stack for visual on everyone else's screens. No
----is_local filter; the server already redirected if needed and the
----sender's machine no longer does a local visual push in
----deliverOutgoingGarbage.
----@param body table parsed event payload: {sender, senderFrame, serverWallClockMs, recipients, garbage}
-function ClientMatch:applyGarbageEvent(body)
-  if not body or type(body.recipients) ~= "table" or type(body.garbage) ~= "table" then
-    logger.warn("applyGarbageEvent: malformed body, dropping")
-    return
-  end
-
-  for _, recipientIndex in ipairs(body.recipients) do
-    local stack = self.stacks[recipientIndex]
-    if stack and stack.engine then
-      logger.info(string.format(
-        "G apply: sender=%s senderFrame=%s -> stack[%d] (is_local=%s) garbageCount=%d",
-        tostring(body.sender), tostring(body.senderFrame), recipientIndex,
-        tostring(stack.is_local),
-        (type(body.garbage) == "table") and #body.garbage or 0))
-      -- self.stacks[i] is a ClientStack wrapper; the actual engine stack
-      -- (and the receiveGarbage method) lives on stack.engine.
-      -- Copy the garbage table per recipient so chain-flag mutations in
-      -- correctChainingFlag don't leak between recipients sharing one event.
-      local garbageCopy = {}
-      for j, g in ipairs(body.garbage) do
-        garbageCopy[j] = shallowcpy(g)
-      end
-      stack.engine:receiveGarbage(garbageCopy)
-    end
-  end
-end
-
----Loose-sync: handle an incoming DeathEvent from the server.
----Marks the (remote) sender's stack as game-ended at body.senderFrame.
----Skips local-authoritative stacks — those set their own game_over_clock via
----the engine's natural top-out detection, no override needed.
----@param body table parsed event payload: {sender, senderFrame, serverWallClockMs, reason}
-function ClientMatch:applyDeathEvent(body)
-  if not body or type(body.sender) ~= "number" or type(body.senderFrame) ~= "number" then
-    logger.warn("applyDeathEvent: malformed body, dropping")
-    return
-  end
-
-  local stack = self.stacks[body.sender]
-  if not stack or not stack.engine then
-    logger.warn("applyDeathEvent: no stack/engine at slot " .. tostring(body.sender))
-    return
-  end
-
-  if stack.is_local then
-    -- Our own death — we already set game_over_clock when the local sim hit it.
-    return
-  end
-
-  -- ClientStack wraps the engine stack; game_over_clock lives on engine.
-  local engine = stack.engine
-  if engine.game_over_clock <= 0 then
-    engine.game_over_clock = body.senderFrame
-    logger.info(string.format("DeathEvent applied: stack[%d] game_over_clock=%d (reason=%s)",
-      body.sender, body.senderFrame, tostring(body and body.reason)))
-  end
-end
-
----Loose-sync: handle a server-authored KOArbitration result.
----Stores the authoritative outcome on the match so the end-of-match UI can
----show "Draw" or the right winner regardless of what the local sim derived.
----Does not force-end the match — if the server's natural outcomeReport path
----is also in flight, it will land on the same result.
----@param body table parsed payload: {winnerSlot, tie, deaths}
-function ClientMatch:applyKOArbitration(body)
-  if not body then
-    logger.warn("applyKOArbitration: nil body, dropping")
-    return
-  end
-
-  self.koArbitration = {
-    winnerSlot = body.winnerSlot,
-    tie = body.tie == true,
-    deaths = body.deaths,
-  }
-
-  logger.info(string.format("KOArbitration applied: winnerSlot=%s tie=%s deaths=%d",
-    tostring(body.winnerSlot), tostring(body.tie),
-    body.deaths and #body.deaths or 0))
 end
 
 return ClientMatch

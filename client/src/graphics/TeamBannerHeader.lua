@@ -146,17 +146,14 @@ local function garbageModeLabel(gameMode)
   return nil
 end
 
--- Draws the garbage-mode label (team modes) and latency tolerance label centered
--- just under the banner header. Two-pass shadow+text so it reads on any background.
+-- Draws the garbage-mode label (team modes) centered just under the banner
+-- header. Two-pass shadow+text so it reads on any background.
 function TeamBannerHeader.drawGarbageModeBelowBanner(gameMode, canvasWidth, context)
   if not gameMode then return end
 
   local gLabel = garbageModeLabel(gameMode)
-  local latLabel = gameMode.latencyTolerance
-    and (gameMode.latencyTolerance:sub(1,1):upper() .. gameMode.latencyTolerance:sub(2) .. " latency")
-    or nil
 
-  if not gLabel and not latLabel then return end
+  if not gLabel then return end
 
   -- Shared-team modes have the pink/purple banner at y=4-46, so labels sit
   -- below it at y=48. FFA waiting room has no banner above and no top-of-screen
@@ -170,16 +167,8 @@ function TeamBannerHeader.drawGarbageModeBelowBanner(gameMode, canvasWidth, cont
   else
     y = 4
   end
-  if gLabel then
-    GraphicsUtil.printf(gLabel, 0, y + 2, canvasWidth, "center", {0.1, 0.05, 0.15, 0.85}, nil, 6)
-    GraphicsUtil.printf(gLabel, 0, y,     canvasWidth, "center", {1, 0.9, 0.7, 1},          nil, 6)
-    y = y + 16
-  end
-
-  if latLabel then
-    GraphicsUtil.printf(latLabel, 0, y + 2, canvasWidth, "center", {0.1, 0.05, 0.15, 0.85}, nil, 6)
-    GraphicsUtil.printf(latLabel, 0, y,     canvasWidth, "center", {0.75, 0.92, 1, 0.9},     nil, 6)
-  end
+  GraphicsUtil.printf(gLabel, 0, y + 2, canvasWidth, "center", {0.1, 0.05, 0.15, 0.85}, nil, 6)
+  GraphicsUtil.printf(gLabel, 0, y,     canvasWidth, "center", {1, 0.9, 0.7, 1},          nil, 6)
 end
 
 TeamBannerHeader.colors = TEAM_COLORS

@@ -104,83 +104,25 @@ function Lobby:initLobbyMenu()
     end
   })
 
-  -- Latency tolerance menu — final step for all 3+P games
-  local function openLatencyMenu(parentMenu, parentButton, gameModeOrId, closeAll)
-    if self.latencyMenu then
-      self.latencyMenu:yieldFocus()
-      return
-    end
-
-    local bx, by = parentButton:getScreenPos()
-    local latMenu = ui.ScrollMenu({
-      x = bx + parentButton.width + 3,
-      y = by,
-      hAlign = "left",
-      vAlign = "top",
-      height = 160,
-      width = 160,
-      padding = 0,
-      childGap = 8,
-    })
-
-    local function latButton(text, tolerance, description)
-      local btn = ui.TextButton({
-        label = ui.Label({text = text, translate = false}),
-        onClick = function()
-          local gameMode = nil
-          local gameModeId = nil
-          if type(gameModeOrId) == "string" then
-            gameModeId = gameModeOrId
-            local ok, resolved = pcall(GameModes.getPreset, gameModeId)
-            if ok then
-              gameMode = resolved
-            end
-          elseif type(gameModeOrId) == "table" and type(gameModeOrId.getGameModeJSONData) == "function" then
-            gameMode = gameModeOrId
-            gameModeId = gameMode.gameModeId or gameMode.id or GameModes.nameToGameModeId[gameMode.name]
-          end
-
-          if gameMode then
-            logger.warn("latButton onClick: tolerance=" .. tostring(tolerance) .. " gameModeId=" .. tostring(gameModeId) .. " gameMode=" .. tostring(gameMode.name))
-            GAME.netClient:requestRoom(gameMode, tolerance)
-          else
-            logger.error("latButton failed to resolve game mode payload")
-          end
-          latMenu:yieldFocus()
-          if closeAll then closeAll() end
-        end,
-      })
-      local origSetSelected = btn.setSelected
-      btn.setSelected = function(b, selected)
-        origSetSelected(b, selected)
-        self.garbageTooltip = selected and description or ""
+  -- Final step for the 3+P garbage-mode flows: resolve the picked game mode and
+  -- request the room.
+  local function requestRoomMode(gameModeOrId, closeAll)
+    local gameMode = nil
+    if type(gameModeOrId) == "string" then
+      local ok, resolved = pcall(GameModes.getPreset, gameModeOrId)
+      if ok then
+        gameMode = resolved
       end
-      return btn
+    elseif type(gameModeOrId) == "table" and type(gameModeOrId.getGameModeJSONData) == "function" then
+      gameMode = gameModeOrId
     end
 
-    latMenu:addChild(latButton("Strict",  "strict",
-      "Strict: tight timing. 100ms simultaneous-KO window, 500ms reaction floor on incoming garbage, 20-30s before a silent connection is declared dead. Best on stable connections (LAN, same-region fiber)."))
-    latMenu:addChild(latButton("Normal",  "normal",
-      "Normal: balanced. 200ms simultaneous-KO window, 750ms reaction floor on incoming garbage, 45-60s before a silent connection is declared dead. Sensible default for most matches."))
-    latMenu:addChild(latButton("Relaxed", "relaxed",
-      "Relaxed: forgiving. 400ms simultaneous-KO window, 1s reaction floor on incoming garbage, 90-120s before a silent connection is declared dead. Best for international or unstable connections."))
-    latMenu:addChild(ui.TextButton({
-      label = ui.Label({text = "back"}),
-      onClick = function()
-        GAME.theme:playCancelSfx()
-        latMenu:yieldFocus()
-      end,
-    }))
-    latMenu:select(latMenu.children[2])
-
-    self.latencyMenu = latMenu
-    parentMenu:setFocus(latMenu, function()
-      self.garbageTooltip = ""
-      parentMenu:select(parentButton)
-      self.latencyMenu:detach()
-      self.latencyMenu = nil
-    end)
-    self.uiRoot:addChild(latMenu)
+    if gameMode then
+      GAME.netClient:requestRoom(gameMode)
+    else
+      logger.error("requestRoomMode failed to resolve game mode payload")
+    end
+    if closeAll then closeAll() end
   end
 
   ---Resolve a game mode and apply lobby-selected roster behavior.
@@ -260,14 +202,14 @@ function Lobby:initLobbyMenu()
       "Broadcast",
       "Your attack is cloned and sent to every enemy simultaneously. Total damage scales with enemy count — in a 2v2 your combos deal twice the total damage of a 1v1.",
       function(b)
-        openLatencyMenu(garbageMenu, b, getRoomModeWithRosterBounds(options.allMode, options.openRoom == true), closeChain)
+        requestRoomMode(getRoomModeWithRosterBounds(options.allMode, options.openRoom == true), closeChain)
       end
     ))
     garbageMenu:addChild(garbageButton(
       "Round Robin",
       "Attacks rotate through enemies one at a time. Your team shares one rotation counter, so attacks fan out evenly — total output rate stays the same regardless of enemy count.",
       function(b)
-        openLatencyMenu(garbageMenu, b, getRoomModeWithRosterBounds(options.sharedMode, options.openRoom == true), closeChain)
+        requestRoomMode(getRoomModeWithRosterBounds(options.sharedMode, options.openRoom == true), closeChain)
       end
     ))
     garbageMenu:addChild(ui.TextButton({
@@ -357,10 +299,6 @@ function Lobby:initLobbyMenu()
 
     self.teamCompositionMenu = compositionMenu
     self.teamPlayerCountMenu:setFocus(compositionMenu, function()
-      if self.latencyMenu then
-        self.latencyMenu:detach()
-        self.latencyMenu = nil
-      end
       if self.teamGarbageMenu then
         self.teamGarbageMenu:detach()
         self.teamGarbageMenu = nil
@@ -408,10 +346,6 @@ function Lobby:initLobbyMenu()
     self.teamPlayerCountMenu = playerCountMenu
     parentMenu = parentMenu or self.lobbyMenu
     parentMenu:setFocus(playerCountMenu, function()
-      if self.latencyMenu then
-        self.latencyMenu:detach()
-        self.latencyMenu = nil
-      end
       if self.teamGarbageMenu then
         self.teamGarbageMenu:detach()
         self.teamGarbageMenu = nil
@@ -481,10 +415,6 @@ function Lobby:initLobbyMenu()
     self.teamTypeMenu = typeMenu
     self.lobbyMenu:setFocus(typeMenu, function()
       self.garbageTooltip = ""
-      if self.latencyMenu then
-        self.latencyMenu:detach()
-        self.latencyMenu = nil
-      end
       if self.teamGarbageMenu then
         self.teamGarbageMenu:detach()
         self.teamGarbageMenu = nil
@@ -578,10 +508,6 @@ function Lobby:initLobbyMenu()
 
     self.ffaPlayerCountMenu = ffaMenu
     self.ffaTypeMenu:setFocus(ffaMenu, function()
-      if self.latencyMenu then
-        self.latencyMenu:detach()
-        self.latencyMenu = nil
-      end
       self.ffaPlayerCountMenu:detach()
       self.ffaPlayerCountMenu = nil
     end)
@@ -642,10 +568,6 @@ function Lobby:initLobbyMenu()
     self.ffaTypeMenu = typeMenu
     self.lobbyMenu:setFocus(typeMenu, function()
       self.garbageTooltip = ""
-      if self.latencyMenu then
-        self.latencyMenu:detach()
-        self.latencyMenu = nil
-      end
       if self.ffaPlayerCountMenu then
         self.ffaPlayerCountMenu:detach()
         self.ffaPlayerCountMenu = nil

@@ -1,6 +1,5 @@
 -- TeamRoomTests.lua
--- E2E tests for Room with 3-4 players in team modes
--- These tests will FAIL until team room logic is implemented (TDD red phase)
+-- E2E tests for Room with 3-4 players in team modes.
 
 ---@diagnostic disable: undefined-field, invisible, inject-field
 local Room = require("server.Room")
@@ -8,6 +7,7 @@ local ServerTesting = require("server.tests.ServerTesting")
 local GameModes = require("common.data.GameModes")
 local json = require("common.lib.dkjson")
 local ClientProtocol = require("common.network.ClientProtocol")
+local NetworkProtocol = require("common.network.NetworkProtocol")
 local logger = require("common.lib.logger")
 
 COMPRESS_REPLAYS_ENABLED = true
@@ -235,34 +235,53 @@ local function test2v2Room_inputBroadcastToAll()
   assert(p1.connection.outgoingInputQueue:len() == 0, "P1 should NOT receive own input")
 end
 
-local function test2v2Room_inputPrefixes()
-  logger.info("test2v2Room_inputPrefixes")
+-- Decode one relayed-input message (the full marked string a MockConnection received)
+-- into (playerNumber, input).
+local function decodeRelayedInput(message)
+  local type, body = NetworkProtocol.getMessageFromString(message, true)
+  assert(type == NetworkProtocol.serverMessageTypes.input.prefix, "relayed input must use the input message type")
+  return NetworkProtocol.decodeInput(body)
+end
+
+local function test2v2Room_inputCarriesPlayerNumber()
+  logger.info("test2v2Room_inputCarriesPlayerNumber")
 
   local room, p1, p2, p3, p4, gameCatcher = get2v2Room()
+
+  -- A spectator should see every player's stream with its player number intact.
+  local spectator = ServerTesting.players[1]  -- Bob
+  spectator.state = "lobby"
+  spectator.room = nil
+  assert(room:add_spectator(spectator) == true)
 
   -- Start match
   for _, player in ipairs(room.players) do
     player:updateSettings({wants_ready = true, loaded = true, ready = true})
   end
   clearMessages({p1, p2, p3, p4})
+  spectator.connection.outgoingInputQueue:clear()
+  spectator.connection.outgoingMessageQueue:clear()
 
-  -- P1 (player_number 1) sends input - should use prefix "I"
-  room:broadcastInput("A", p1)
-
-  -- P2 (player_number 2) sends input - should use prefix "U"
-  room:broadcastInput("B", p2)
-
-  -- P3 (player_number 3) sends input - should use prefix "V"
+  -- Player 3 sends an input.
   room:broadcastInput("C", p3)
 
-  -- P4 (player_number 4) sends input - should use prefix "W"
-  room:broadcastInput("D", p4)
+  -- Every OTHER player + the spectator gets exactly one relayed-input message
+  -- tagged with playerNumber 3 and payload "C". The sender gets nothing.
+  for _, peer in ipairs({p1, p2, p4, spectator}) do
+    assert(peer.connection.outgoingInputQueue:len() == 1, "peer should receive exactly one relayed input")
+    local n, payload = decodeRelayedInput(peer.connection.outgoingInputQueue:pop())
+    assert(n == 3, "relayed input must carry playerNumber 3, got " .. tostring(n))
+    assert(payload == "C", "relayed input payload mismatch")
+  end
+  assert(p3.connection.outgoingInputQueue:len() == 0, "sender should not receive its own input back")
 
-  -- Verify prefixes by checking what other players received
-  -- This depends on implementation - inputs are prefixed for identification
-  -- The test verifies the infrastructure supports 4 player inputs
-  local totalInputs = p1.connection.outgoingInputQueue:len()
-  assert(totalInputs == 3, "P1 should have received 3 inputs (from P2, P3, P4)")
+  -- And a different player number routes correctly too.
+  room:broadcastInput("A", p1)
+  for _, peer in ipairs({p2, p3, p4, spectator}) do
+    local n, payload = decodeRelayedInput(peer.connection.outgoingInputQueue:pop())
+    assert(n == 1 and payload == "A", "relayed input from player 1 must carry playerNumber 1")
+  end
+  assert(p1.connection.outgoingInputQueue:len() == 0)
 end
 
 --------------------------------------------------
@@ -331,49 +350,6 @@ local function test2v2Room_teamBWins()
   assert(gameCatcher.game.winnerTeamIndex == 2, "Team B should be the winner")
 end
 
--- TODO: These tests require real-time elimination tracking (handlePlayerEliminated)
--- which is handled client-side. For now, skip these tests.
--- The elimination logic would need to be implemented if the server needs to track
--- individual player deaths rather than just final game outcomes.
-
---[[
-local function test2v2Room_partialElimination_matchContinues()
-  logger.info("test2v2Room_partialElimination_matchContinues")
-
-  local room, p1, p2, p3, p4, gameCatcher = get2v2Room()
-
-  -- Start match
-  for _, player in ipairs(room.players) do
-    player:updateSettings({wants_ready = true, loaded = true, ready = true})
-  end
-
-  -- P1 dies but P2 still alive
-  room:handlePlayerEliminated(p1)
-
-  -- Match should continue
-  assert(room.game ~= nil, "Game should still exist")
-  assert(room.game.complete ~= true, "Game should not be complete")
-end
-
-local function test2v2Room_lastTeamMemberDies_matchEnds()
-  logger.info("test2v2Room_lastTeamMemberDies_matchEnds")
-
-  local room, p1, p2, p3, p4, gameCatcher = get2v2Room()
-
-  -- Start match
-  for _, player in ipairs(room.players) do
-    player:updateSettings({wants_ready = true, loaded = true, ready = true})
-  end
-
-  -- Both Team A members die
-  room:handlePlayerEliminated(p1)
-  room:handlePlayerEliminated(p2)
-
-  -- Match should end
-  assert(gameCatcher.game ~= nil, "Game should have ended")
-  assert(gameCatcher.game.winnerTeamIndex == 2, "Team B should win")
-end
---]]
 
 --------------------------------------------------
 -- Game outcome tests - 1v2
@@ -655,9 +631,8 @@ local function testPartialRoom_addPlayerFull()
 end
 
 -- testPartialRoom_noSpectators removed: commit b2bda5cf intentionally inverted
--- the behavior — spectators ARE now allowed in partial rooms. The positive
--- replacement test lives in server/tests/LooseSyncServerTests.lua as
--- test_partialRoom_spectators_allowed. See docs/PRE_EXISTING_TEST_AUDIT.md.
+-- the behavior — spectators ARE now allowed in partial rooms.
+-- testPartialRoom_spectatorsAllowedWhenFull below covers the spectator path.
 
 local function testPartialRoom_spectatorsAllowedWhenFull()
   logger.info("testPartialRoom_spectatorsAllowedWhenFull")
@@ -755,13 +730,11 @@ test2v2Room_allPlayersReceiveMatchStart()
 
 -- Input broadcast
 test2v2Room_inputBroadcastToAll()
-test2v2Room_inputPrefixes()
+test2v2Room_inputCarriesPlayerNumber()
 
 -- Game outcomes - 2v2
 test2v2Room_teamAWins()
 test2v2Room_teamBWins()
--- test2v2Room_partialElimination_matchContinues()  -- Requires handlePlayerEliminated
--- test2v2Room_lastTeamMemberDies_matchEnds()       -- Requires handlePlayerEliminated
 
 -- Game outcomes - 1v2
 test1v2Room_soloWins()
@@ -784,7 +757,7 @@ testPartialRoom_notFull()
 testPartialRoom_noTeamsUntilFull()
 testPartialRoom_addPlayer()
 testPartialRoom_addPlayerFull()
--- testPartialRoom_noSpectators removed; see LooseSyncServerTests for the positive replacement.
+-- testPartialRoom_noSpectators removed; testPartialRoom_spectatorsAllowedWhenFull covers spectators.
 testPartialRoom_spectatorsAllowedWhenFull()
 testPartialRoom_noMatchStart()
 testPartialRoom_playerJoinedMessage()

@@ -165,17 +165,9 @@ function ClientProtocol.sendTaunt(direction, index)
 end
 
 ---@param gameMode GameMode
----@param latencyTolerance ("strict"|"normal"|"relaxed")? optional room abort-latency tolerance
-function ClientProtocol.sendRoomRequest(gameMode, latencyTolerance)
+function ClientProtocol.sendRoomRequest(gameMode)
   local gameModeData = gameMode:getGameModeJSONData()
-  local roomRequestMessage = {
-    recipient = "server",
-    type = "roomRequest",
-    content = {
-      gameMode = gameModeData,
-      latencyTolerance = latencyTolerance,
-    }
-  }
+  local roomRequestMessage = { recipient = "server", type = "roomRequest", content = { gameMode = gameModeData } }
   return {
     messageType = msgTypes.jsonMessage,
     messageText = roomRequestMessage
@@ -202,26 +194,6 @@ function ClientProtocol.sendStackEliminated(frame)
   return {
     messageType = msgTypes.jsonMessage,
     messageText = { stackEliminated = true, frame = frame }
-  }
-end
-
----Loose-sync: send a GarbageEvent — sender's local sim has resolved garbage
----for one or more remote targets. Body is wrapped as a marked G-prefix message,
----not a JSON envelope.
----@param body table parsed payload (will be JSON-encoded on send)
-function ClientProtocol.sendGarbageEvent(body)
-  return {
-    messageType = msgTypes.garbageEvent,
-    messageText = body,
-  }
-end
-
----Loose-sync: send a DeathEvent — sender's local sim has reached game over.
----@param body table parsed payload (will be JSON-encoded on send)
-function ClientProtocol.sendDeathEvent(body)
-  return {
-    messageType = msgTypes.deathEvent,
-    messageText = body,
   }
 end
 

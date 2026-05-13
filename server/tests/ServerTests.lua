@@ -153,10 +153,12 @@ local function testGameplay()
   alice.connection:receiveInput("A")
   ben.connection:receiveInput("g")
   server:update()
-  local _, input = NetworkProtocol.getMessageFromString(alice.connection.outgoingInputQueue:pop(), true)
-  assert(input and input == "g")
-  _, input = NetworkProtocol.getMessageFromString(ben.connection.outgoingInputQueue:pop(), true)
-  assert(input and input == "A")
+  local _, body = NetworkProtocol.getMessageFromString(alice.connection.outgoingInputQueue:pop(), true)
+  local senderNum, input = NetworkProtocol.decodeInput(body)
+  assert(input == "g" and senderNum == ben.player_number)
+  _, body = NetworkProtocol.getMessageFromString(ben.connection.outgoingInputQueue:pop(), true)
+  senderNum, input = NetworkProtocol.decodeInput(body)
+  assert(input == "A" and senderNum == alice.player_number)
 
   bob.connection:receiveMessage(json.encode(ClientProtocol.requestSpectate("Bob", 1).messageText))
   server:update()
@@ -229,22 +231,18 @@ local function testGameplay()
   ben.connection:receiveMessage(json.encode(ClientProtocol.leaveRoom().messageText))
   server:update()
 
-  -- the others get informed about the room closing
+  -- A player leaving a multiplayer match voids the room but keeps it open so the
+  -- remaining player(s) and spectators can wrap up / rematch. They get a
+  -- playerLeftRoom notification; the leaver gets their own leaveRoom back plus a
+  -- fresh lobby state (the voided room is still listed).
   message = alice.connection.outgoingMessageQueue:pop().messageText
-  assert(message.type == "leaveRoom" and message.content.reason == "Ben left")
+  assert(message.type == "playerLeftRoom")
   message = bob.connection.outgoingMessageQueue:pop().messageText
-  assert(message.type == "leaveRoom" and message.content.reason == "Ben left")
-  -- this was an active quit so ben should get the leave back as well
+  assert(message.type == "playerLeftRoom")
   message = ben.connection.outgoingMessageQueue:pop().messageText
   assert(message.type == "leaveRoom" and message.content.reason == "Ben left")
-
-  -- everyone is back to lobby
-  message = alice.connection.outgoingMessageQueue:pop().messageText.content
-  assert(message.players and tableUtils.length(message.players) == 3 and tableUtils.length(message.rooms) == 0)
-  message = bob.connection.outgoingMessageQueue:pop().messageText.content
-  assert(message.players and tableUtils.length(message.players) == 3 and tableUtils.length(message.rooms) == 0)
   message = ben.connection.outgoingMessageQueue:pop().messageText.content
-  assert(message.players and tableUtils.length(message.players) == 3 and tableUtils.length(message.rooms) == 0)
+  assert(message.players and tableUtils.length(message.players) == 3 and tableUtils.length(message.rooms) == 1)
 end
 
 local function testDisconnect()
@@ -258,23 +256,19 @@ local function testDisconnect()
 
   server:closeConnection(ben.connection, "Ben's connection failed")
 
+  -- A mid-match disconnect voids the room but keeps it open; the remaining
+  -- player and the spectator get a playerLeftRoom notification.
   local message = alice.connection.outgoingMessageQueue:pop().messageText
-  assert(message.type == "leaveRoom" and message.content.reason == "Ben's connection failed")
+  assert(message.type == "playerLeftRoom")
   message = bob.connection.outgoingMessageQueue:pop().messageText
-  assert(message.type == "leaveRoom" and message.content.reason == "Ben's connection failed")
+  assert(message.type == "playerLeftRoom")
   -- we closed the connection server side which under normal circumstances only happens in case of a disconnect
-  -- so the server should no longer try to send them a message
+  -- so the server should no longer track ben or try to send him a message
   assert(ben.connection.outgoingMessageQueue:len() == 0)
   assert(ben.connection.loggedIn == false)
   assert(server.connectionToPlayer[ben.connection] == nil)
-
-  server:update()
-
-  -- the people that got kicked out get the new lobby state
-  message = alice.connection.outgoingMessageQueue:pop().messageText
-  assert(message and message.type == "lobbyStateV2" and message.content.players and message.content.players[5].name == "Alice" and message.content.players[5].state == "lobby")
-  message = bob.connection.outgoingMessageQueue:pop().messageText
-  assert(message and message.type == "lobbyStateV2" and message.content.players and message.content.players[4].name == "Bob" and message.content.players[4].state == "lobby")
+  -- the voided room is still here for the remaining player
+  assert(server.playerToRoom[alice] ~= nil)
 end
 
 
@@ -357,12 +351,11 @@ local function testSinglePlayer()
   assertHasMessage(bob.connection, "spectatorUpdate")
   assertHasMessage(alice.connection, "spectateRequestGranted", function(msg)
     assert(msg.content.replay == nil)
-    -- Compare gameMode.name only — room.gameMode is mutated with transport-layer
-    -- fields (latencyTolerance, connectionTimeoutSeconds, sendRetryLimit) that
-    -- the bare preset doesn't carry, so deep_content_equal would fail. The
-    -- behavior we actually care about is that the spectated room's mode matches.
-    -- gameMode.name carries the canonical mode identifier (e.g. "vsSelf"),
-    -- which gameModeIdToName maps the IDs constant to.
+    -- Compare gameMode.name only — the bare preset and the room's gameMode may
+    -- still differ in incidental fields, so a deep equality check would be
+    -- brittle. The behavior we actually care about is that the spectated room's
+    -- mode matches; gameMode.name carries the canonical mode identifier (e.g.
+    -- "vsSelf"), which gameModeIdToName maps the IDs constant to.
     return msg.content.gameMode.name == GameModes.gameModeIdToName[GameModes.IDs.ONE_PLAYER_VS_SELF]
   end)
   assertHasMessage(alice.connection, "spectatorUpdate")

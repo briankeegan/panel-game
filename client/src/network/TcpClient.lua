@@ -209,11 +209,12 @@ end
 
 -- Adds the message to the network queue or processes it immediately in a couple cases
 function TcpClient:queueMessage(type, data)
-  if NetworkProtocol.isInputPrefix(type) then
-    local dataMessage = {}
-    dataMessage[type] = data
-    logger.trace("Queuing: " .. type .. " with data:" .. data)
-    self.receivedMessageQueue:push(dataMessage)
+  if type == NetworkProtocol.serverMessageTypes.input.prefix then
+    -- Relayed input: JSON body {playerNumber = <n>, input = <payload>}.
+    local playerNumber, input = NetworkProtocol.decodeInput(data)
+    if playerNumber then
+      self.receivedMessageQueue:push({[type] = {playerNumber = playerNumber, input = input}})
+    end
   elseif type == NetworkProtocol.serverMessageTypes.versionCorrect.prefix then
     -- make responses to client H messages processable by treating them like a json response
     self.receivedMessageQueue:push({versionCompatible = true})
@@ -223,19 +224,6 @@ function TcpClient:queueMessage(type, data)
   elseif type == NetworkProtocol.serverMessageTypes.ping.prefix then
     self:send(NetworkProtocol.clientMessageTypes.acknowledgedPing.prefix)
     self.connectionUptime = self.connectionUptime + 1
-  elseif type == NetworkProtocol.serverMessageTypes.garbageEvent.prefix
-      or type == NetworkProtocol.serverMessageTypes.deathEvent.prefix
-      or type == NetworkProtocol.serverMessageTypes.koArbitration.prefix then
-    -- Loose-sync: decode the JSON body and queue under the prefix key.
-    -- NetClient pops these with pop_all_with("G"), pop_all_with("D"), pop_all_with("K").
-    local body = json.decode(data)
-    if not body then
-      logger.warn("Failed to decode " .. type .. " body: " .. (data or "nil"))
-      return
-    end
-    local dataMessage = {}
-    dataMessage[type] = body
-    self.receivedMessageQueue:push(dataMessage)
   elseif type == NetworkProtocol.serverMessageTypes.jsonMessage.prefix then
     logger.trace("Queuing JSON: " .. dump(data))
     local current_message = json.decode(data)
@@ -253,13 +241,7 @@ function TcpClient:dropOldInputMessages()
       break
     end
 
-    local isInputMessage = false
-    for key in pairs(message) do
-      if NetworkProtocol.isInputPrefix(key) then
-        isInputMessage = true
-        break
-      end
-    end
+    local isInputMessage = message[NetworkProtocol.serverMessageTypes.input.prefix] ~= nil
     if not isInputMessage then
       break -- Found a non user input message. Stop. Future data is for next game
     else

@@ -36,10 +36,6 @@ function(self, players, id)
   self.outcomeReports = {}
   self.disconnectedPlayers = {}
   self.eliminatedPlayers = {}
-  ---@type table[] loose-sync GarbageEvent payloads, in arrival order
-  self.garbageEvents = {}
-  ---@type table[] loose-sync DeathEvent payloads, in arrival order
-  self.deathEvents = {}
   self.complete = false
   self.creationTime = os.time()
 end)
@@ -160,25 +156,6 @@ function Game:receiveInput(player, input)
   end
 end
 
----Append a loose-sync GarbageEvent body to the replay log.
----The body has already been stamped with sender + serverWallClockMs by the room.
----@param player ServerPlayer
----@param body table parsed JSON event body
-function Game:recordGarbageEvent(player, body)
-  if not self.complete then
-    self.garbageEvents[#self.garbageEvents + 1] = body
-  end
-end
-
----Append a loose-sync DeathEvent body to the replay log.
----@param player ServerPlayer
----@param body table parsed JSON event body
-function Game:recordDeathEvent(player, body)
-  if not self.complete then
-    self.deathEvents[#self.deathEvents + 1] = body
-  end
-end
-
 ---@param compressInputs boolean
 ---@return ReplayV3?
 function Game:getPartialReplay(compressInputs)
@@ -202,17 +179,15 @@ end
 function Game:receiveOutcomeReport(player, outcome)
   local idx = player.player_number
 
-  -- Only living players get a vote. A dead stack has already lost — its
-  -- vote can't decide who won (most importantly, can't unilaterally declare
-  -- a tie). Discard at the door. The arbitration path in Room:tickArbitration
-  -- is the authoritative match-end for any case the server already knows
-  -- (livingTeams <= 1); this filter is a belt-and-suspenders for the vote
-  -- path so a stale "I think it's a tie" can't slip in and poison things.
-  if self.eliminatedPlayers[idx] or self.disconnectedPlayers[idx] then
-    return
+  -- Only living players get a vote. A dead/disconnected stack has already lost
+  -- — its vote can't decide who won (most importantly, can't unilaterally
+  -- declare a tie), so we don't record it. We still fall through to the
+  -- completeness check, though: if every remaining player is now out (e.g. the
+  -- last survivor topped out, or both players aborted), the match resolves to a
+  -- tie here rather than hanging forever.
+  if not (self.eliminatedPlayers[idx] or self.disconnectedPlayers[idx]) then
+    self.outcomeReports[idx] = outcome
   end
-
-  self.outcomeReports[idx] = outcome
 
   -- cannot compare #self.outcomeReports == #self.players because # is undefined regarding gaps near 0
   -- so if we have the report for player 2 but not player 1, #self.outcomeReports may return 2 instead of 0
@@ -285,7 +260,9 @@ function Game.getOutcome(outcomeReports, teams, disconnectedPlayers, eliminatedP
     -- (a single 0 is NOT a tie veto — a real tie only happens when no team reports outcome == 1)
     local teamOutcomes = {}
 
-    for playerIndex, outcome in ipairs(outcomeReports) do
+    -- outcomeReports may be sparse (a slot with no living/connected player has
+    -- no entry), so iterate with pairs, not ipairs (which stops at the first gap).
+    for playerIndex, outcome in pairs(outcomeReports) do
       if not isOut(playerIndex) then
         local teamIndex = TeamUtils.getPlayerTeamIndex(teams, playerIndex)
         if teamIndex then
@@ -321,24 +298,23 @@ function Game.getOutcome(outcomeReports, teams, disconnectedPlayers, eliminatedP
 
     return 0, nil  -- No team claimed victory → tie
   else
-    -- Non-team game: all players must agree on the same winner
-    for i, outcomeA in ipairs(outcomeReports) do
+    -- Non-team game: all reporting (non-excluded) players must agree on the same
+    -- winner. outcomeReports may be sparse (e.g. only slot 2 reported because
+    -- slot 1 was eliminated), so iterate with pairs, not ipairs.
+    local agreed = nil
+    local sawReport = false
+    for i, outcome in pairs(outcomeReports) do
       if not isOut(i) then
-        for j, outcomeB in ipairs(outcomeReports) do
-          if i ~= j and not isOut(j) then
-            if outcomeA ~= outcomeB then
-              return nil, nil
-            end
-          end
+        if not sawReport then
+          sawReport = true
+          agreed = outcome
+        elseif outcome ~= agreed then
+          return nil, nil
         end
       end
     end
-
-    -- everyone agrees on the outcome — take the first non-excluded report
-    for i, outcome in ipairs(outcomeReports) do
-      if not isOut(i) then
-        return outcome, nil
-      end
+    if sawReport then
+      return agreed, nil
     end
     return 0, nil  -- everyone excluded → tie
   end
@@ -357,14 +333,6 @@ function Game:finalizeReplay(result)
         stack.inputs = table.concat(self.inputs[i])
       end
     end
-  end
-
-  -- Loose-sync V4: persist the authoritative cross-player event log so
-  -- playback can apply the exact garbage + death events that happened
-  -- during the live match.
-  if self.replay.crossPlayerEvents then
-    self.replay.crossPlayerEvents.garbage = self.garbageEvents
-    self.replay.crossPlayerEvents.deaths = self.deathEvents
   end
 
   for i, player in ipairs(self.players) do

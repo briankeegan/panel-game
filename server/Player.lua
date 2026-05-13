@@ -143,10 +143,6 @@ function Player:addToRoom(room)
   self.room = room
   self.wantsReady = false
   self.ready = false
-  if self.connection then
-    self.connection.timeoutSeconds = room.gameMode and room.gameMode.connectionTimeoutSeconds or self.connection.timeoutSeconds
-    self.connection.sendRetryLimit = room.gameMode and room.gameMode.sendRetryLimit or self.connection.sendRetryLimit
-  end
 end
 
 function Player:removeFromRoom(room, reason)
@@ -165,10 +161,6 @@ function Player:removeFromRoom(room, reason)
   self.room = nil
   self.wantsReady = false
   self.ready = false
-  if self.connection then
-    self.connection.timeoutSeconds = nil
-    self.connection.sendRetryLimit = 5
-  end
 end
 
 function Player:sendJson(message)

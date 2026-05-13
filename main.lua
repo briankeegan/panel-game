@@ -1,461 +1,210 @@
-local logger = require("common.lib.logger")
+---@diagnostic disable: duplicate-set-field
+-- with love 12 you can pass the name of a lua file as an argument when starting love
+-- this will cause that file to be used in place of main.lua
+-- so by passing "./testLauncher.lua" as the first arg this becomes a testrunner that shares the game's conf.lua
+-- Usage: 
+--   love ./testLauncher.lua [debug] [test_name]
+--   Examples:
+--     love ./testLauncher.lua debug PuzzleSetIteratorTests
+--     love ./testLauncher.lua PuzzleSetIteratorTests
+--     love ./testLauncher.lua debug
+if arg[2] == "debug" then
+  require("client.src.developer")
+end
+local t = love.timer.getTime()
+--jit.off()
+print("jit version: " .. require("jit").version)
+-- for luajit's built-in profiler to run, luajit with the version matching love's has to be installed
+-- jit.version yields the timestamp of the commit that was used to build as its patch number
+-- clone the luajit repo, checkout the commit belonging to the time stamp and compile and jit.p should "just work"
+-- assuming it is in the lua path which on linux may require this next line to be used
+--package.path = package.path .. ";/usr/local/share/luajit-2.1/?.lua"
+--require("jit.p").start("vFi1m1", "profiling/jitProfile.log")
+
 require("common.lib.mathExtensions")
-local utf8 = require("common.lib.utf8Additions")
-local DebugSettings = require("client.src.debug.DebugSettings")
-local inputManager = require("client.src.inputManager")
-require("client.src.globals")
-local touchHandler = require("client.src.ui.touchHandler")
-local inputFieldManager = require("client.src.ui.inputFieldManager")
-local RunTimeGraph = require("client.src.RunTimeGraph")
-local CustomRun = require("client.src.CustomRun")
-local GraphicsUtil = require("client.src.graphics.graphics_util")
-local prof = require("common.lib.zoneProfiler")
-local ReplayV3 = require("common.data.ReplayV3")
-require("common.lib.util")
-local consts = require("common.engine.consts")
-local system = require("client.src.system")
+local util = require("common.lib.util")
+util.addToCPath("./common/lib/??")
+util.addToCPath("./server/lib/??")
+local logger = require("common.lib.logger")
 
-local Game = require("client.src.Game")
--- move to load once global dependencies have been resolved
-GAME = Game()
-
--- We override love.run with a function that refers to `runInternal` for its gameloop function
--- so by overwriting that, the new runInternal will get used on the next iteration
-love.runInternal = CustomRun.innerRun
-
--- Intentional override
----@diagnostic disable-next-line: duplicate-set-field
-function love.run()
-  return CustomRun.run()
-end
-
--- Called at the beginning to load the game
--- Either called directly or from auto_updater
--- Intentional override
----@diagnostic disable-next-line: duplicate-set-field
-function love.load(args, rawArgs)
-  love.keyboard.setTextInput(false)
-
-  -- there is a bug on windows that causes the game to start with a size equal to the desktop causing the window handle to be offscreen
-  -- check for that and restore the window if that's the case:
-  local x, y, displayIndex = love.window.getPosition()
-  local desktopWidth, desktopHeight = love.window.getDesktopDimensions(displayIndex)
-  local w, windowHeight, flags = love.window.getMode()
-
-  if not flags.fullscreen and not flags.borderless and not system.isMobileOS() then
-    if y == 0 and windowHeight >= desktopHeight then
-      if love.window.isMaximized() then
-        love.window.restore()
-      end
-      local offset = math.ceil(desktopHeight / 32)
-      love.window.updateMode(desktopWidth, desktopHeight - offset, flags)
-      love.window.setPosition(x, offset, displayIndex)
-    end
-
-    if config.maximizeOnStartup and not love.window.isMaximized() then
-      love.window.maximize()
-    end
-  end
-
-  local newPixelWidth, newPixelHeight = love.graphics.getWidth(), love.graphics.getHeight()
-  logger.debug("Updating canvas scale from love.load")
-  GAME:updateCanvasPositionAndScale(newPixelWidth, newPixelHeight)
-
-  GAME:load()
-  if not PROFILE_MEMORY then
-    prof.enable(DebugSettings.getProfileFrameTimes())
-    prof.setDurationFilter(DebugSettings.getProfileThreshold() / 1000)
-  end
-end
-
--- Intentional override
----@diagnostic disable-next-line: duplicate-set-field
-function love.focus(f)
-  GAME.focused = f
-end
-
--- Called every few fractions of a second to update the game
--- dt is the amount of time in seconds that has passed.
--- Intentional override
----@diagnostic disable-next-line: duplicate-set-field
-function love.update(dt)
-  if DebugSettings.showRuntimeGraph() then
-    if CustomRun.runTimeGraph == nil then
-      CustomRun.runTimeGraph = RunTimeGraph()
-    end
-  else
-    CustomRun.runTimeGraph = nil
-  end
-
-  inputManager:update(dt)
-  inputFieldManager.update()
-  touchHandler:update(dt)
-
-  GAME:update(dt)
-end
-
-local statOrder -- in reverse of the desired display order
-
-if system.meetsLoveVersionRequirement(12, 0) then
-  statOrder = {
-    "buffermemory",
-    "texturememory",
-    "buffers",
-    "textures",
-    "fonts",
-    "shaderswitches",
-    "canvasswitches",
-    "drawcallsbatched",
-    "drawcalls",
-  }
+-- Set log level based on debug argument
+if arg[2] == "debug" then
+  logger.setLogLevel(logger.levels.DEBUG)
 else
-  statOrder = {
-    "texturememory",
-    "canvases",
-    "images",
-    "fonts",
-    "shaderswitches",
-    "canvasswitches",
-    "drawcallsbatched",
-    "drawcalls",
-  }
+  logger.setLogLevel(logger.levels.INFO)
 end
 
--- Called whenever the game needs to draw.
--- Intentional override
----@diagnostic disable-next-line: duplicate-set-field
+require("client.src.globals")
+local system = require("client.src.system")
+local Game = require("client.src.Game")
+local fileUtils = require("client.src.FileUtils")
+
+function love.load()
+  -- this is necessary setup of globals while non-client tests still depend on client components
+  GAME = Game()
+  GAME:load()
+  GAME.muteSound = true
+
+  local cr = coroutine.create(GAME.setupRoutine)
+  while coroutine.status(cr) ~= "dead" do
+    local success, status = coroutine.resume(cr, GAME)
+    if not success then
+      GAME.crashTrace = debug.traceback(cr)
+      error(status)
+    end
+  end
+end
+
+local allTests = {
+  "common.tests.lib.JsonPrecisionTests",
+  "common.tests.engine.PanelGenTests",
+  "common.tests.engine.HealthTests",
+  "common.tests.engine.RollbackBufferTests",
+  "common.tests.engine.StackTests",
+  "common.tests.engine.ReplayTests",
+  "common.tests.engine.StackReplayTests",
+  "common.tests.engine.GarbageQueueTests",
+  "common.tests.engine.PuzzleTests",
+  "common.tests.PuzzleHintHelperTests",
+  "common.tests.engine.StackTouchReplayTests",
+  "common.tests.engine.StackRollbackReplayTests",
+  -- disabled for testLauncher because it needs the client love callbacks
+  --"common.tests.lib.InputTests",
+  "common.tests.lib.JsonEncodingTests",
+  "common.tests.lib.tableUtilsTest",
+  "common.tests.lib.utf8AdditionsTests",
+  "common.tests.lib.utilTests",
+  "common.tests.network.NetworkProtocolTests",
+  "common.tests.network.TouchDataEncodingTests",
+  "common.tests.data.InputCompressionTests",
+  -- Team mode tests (TDD - will fail until implemented)
+  "common.tests.TeamUtilsTests",
+  "common.tests.data.TeamGameModeTests",
+  "common.tests.engine.TeamMatchTests",
+  "common.tests.engine.TeamGarbageTests",
+  -- Loose-sync TDD tests
+  "common.tests.engine.LooseSyncTests",
+  "common.tests.engine.LooseSyncContractTests",
+  "common.tests.engine.CrashReplayRegressionTests",
+  "server.tests.CrashReportsTests",
+  "server.tests.LooseSyncServerTests",
+  "server.tests.LoginTests",
+  "server.tests.LeaderboardTests",
+  "server.tests.RoomTests",
+  "server.tests.TeamRoomTests",
+  "server.tests.ServerTests",
+  "server.tests.RealSocketPartialSendTest",
+  "client.tests.FileUtilsTests",
+  "client.tests.ModControllerTests",
+  "client.tests.QueueTests",
+  "client.tests.PuzzleSetTests",
+  "client.tests.PuzzleSetIteratorTests",
+  "client.tests.PuzzleLibraryTests",
+  "client.tests.graphics_PuzzleHierarchyDisplayTests",
+  "client.tests.ServerQueueTests",
+  "client.tests.SoundGroupTests",
+  -- TcpClientTests is an integration test that needs a live server on
+  -- localhost:49569 (port from consts.SERVER_LOCATION). Disabled in the
+  -- default test run; re-enable manually when running it against a real
+  -- server. Has been broken in CI-style runs for years.
+  -- "client.tests.TcpClientTests",
+  "client.tests.ThemeTests",
+  "client.tests.StackGraphicsTests",
+  "client.tests.InputConfigurationTests",
+  "client.tests.DiscreteImageSliderTests",
+  "client.tests.PlayerSettingsTests",
+}
+
+-- Check for specific test name argument
+local testFilter = nil
+if arg[2] == "debug" and arg[3] then
+  testFilter = arg[3]
+elseif arg[2] and arg[2] ~= "debug" then
+  testFilter = arg[2]
+end
+
+local tests = {}
+if testFilter then
+  -- Filter tests to only run the specified test
+  for _, testName in ipairs(allTests) do
+    if string.find(testName, testFilter) then
+      table.insert(tests, testName)
+    end
+  end
+  if #tests == 0 then
+    logger.error("No tests found matching filter: " .. testFilter)
+    os.exit(1)
+  else
+    logger.info("Running " .. #tests .. " test(s) matching filter: " .. testFilter)
+  end
+else
+  tests = allTests
+end
+
+local updateCount = 0
+local testsFailed = false
+
+function love.update(dt)
+  if tests[updateCount] then
+    logger.info("running test file " .. tests[updateCount])
+    local success, err = true, nil
+    if lldebugger then
+      require(tests[updateCount])
+    else
+      success, err = pcall(require, tests[updateCount])
+    end
+    if not success then
+      -- Check if the error is due to missing file
+      if err and string.find(err, "module.*not found") then
+        logger.error("Test file does not exist: " .. tests[updateCount] .. " - " .. tostring(err))
+        logger.error("Make sure the test file exists at the correct path and is properly named")
+      else
+        logger.error("Test failed: " .. tests[updateCount] .. " - " .. tostring(err))
+      end
+      testsFailed = true
+    end
+  end
+  updateCount = updateCount + 1
+end
+
+-- the drawing somehow doesn't really work because the update does not wait for the require to finish?
 function love.draw()
-  GAME:draw()
-
-  if DebugSettings.drawGraphicsStats() then
-    local stats = love.graphics.getStats()
-    local width, height = love.graphics.getDimensions()
-
-    for i = #statOrder, 1, -1 do
-      local key = statOrder[i]
-      local value = stats[key]
-      if value then
-        if string.find(key, "memory") then
-          value = string.format("%.2f MB", value / 1024 / 1024)
-        end
-        love.graphics.printf(key .. ": " .. value, 0, height - i * 16, width, "right")
-      end
-    end
+  local width, height = love.window.getMode()
+  if tests[updateCount + 1] then
+    love.graphics.printf("Running " .. tests[updateCount + 1], 0, height / 2, width, "center")
+  elseif updateCount > #tests then
+    love.graphics.printf("All tests completed", 0, height / 2, width, "center")
+    love.event.quit()
   end
 end
 
--- Handle a mouse or touch press
--- Intentional override
----@diagnostic disable-next-line: duplicate-set-field
-function love.mousepressed(x, y, button)
-  x, y = GAME:transform_coordinates(x, y)
-  if button == 1 then
-    touchHandler:touch(x, y)
-  end
-  inputManager:mousePressed(x, y, button)
-end
-
--- Intentional override
----@diagnostic disable-next-line: duplicate-set-field
-function love.mousereleased(x, y, button)
-  x, y = GAME:transform_coordinates(x, y)
-  if button == 1 then
-    touchHandler:release(x, y)
-  end
-  inputManager:mouseReleased(x, y, button)
-end
-
--- Intentional override
----@diagnostic disable-next-line: duplicate-set-field
-function love.mousemoved( x, y, dx, dy, istouch )
-  x, y = GAME:transform_coordinates(x, y)
-  if love.mouse.isDown(1) then
-    touchHandler:drag(x, y)
-  end
-  inputManager:mouseMoved(x, y)
-end
-
--- Intentional override
----@diagnostic disable-next-line: duplicate-set-field
-function love.joystickpressed(joystick, button)
-  inputManager:joystickPressed(joystick, button)
-end
-
--- Intentional override
----@diagnostic disable-next-line: duplicate-set-field
-function love.joystickreleased(joystick, button)
-  inputManager:joystickReleased(joystick, button)
-end
-
--- Intentional override
----@diagnostic disable-next-line: duplicate-set-field
-function love.joystickadded(joystick)
-  GAME:onJoystickAdded(joystick)
-end
-
--- Intentional override
----@diagnostic disable-next-line: duplicate-set-field
-function love.joystickremoved(joystick)
-  GAME:onJoystickRemoved(joystick)
-end
-
--- Handle a touch press
--- Note we are specifically not implementing this because mousepressed above handles mouse and touch
--- function love.touchpressed(id, x, y, dx, dy, pressure)
--- local _x, _y = GAME:transform_coordinates(x, y)
--- click_or_tap(_x, _y, {id = id, x = _x, y = _y, dx = dx, dy = dy, pressure = pressure})
--- end
-
--- quit handling
--- Intentional override
----@diagnostic disable-next-line: duplicate-set-field
 function love.quit()
-  if prof.enabled then
-    prof.write()
-  end
-  if GAME.netClient and GAME.netClient:isConnected() then
-    GAME.netClient:logout()
-  end
-  love.audio.stop()
-  config.fullscreen = love.window.getFullscreen()
-  local x, y, displayIndex = love.window.getPosition()
-  config.display = displayIndex
-  if not config.fullscreen then
-    config.windowX = math.max(x, 0)
-    config.windowY = math.max(y, 0)
-    if config.windowY == 0 then
-      --don't let 'y' be zero, or the title bar will not be visible on next launch.
-      config.windowY = 30
-    end
-    config.windowWidth, config.windowHeight, _ = love.window.getMode()
-    config.maximizeOnStartup = love.window.isMaximized()
+  logger.info("Tests completed in " .. love.timer.getTime() - t .. "s seconds")
+  --require("jit.p").stop()
+  love.filesystem.write("test.log", tostring(logger.messageBuffer))
+  
+  if testsFailed then
+    logger.error("Tests failed!")
+    os.exit(1)
   else
-    -- don't save the other values so the settings from previous windowed mode usage are preserved
-  end
-
-  write_conf_file()
-  pcall(love.filesystem.write, "debug.log", tostring(logger.messageBuffer))
-
-  if GAME.updater then
-    while GAME.updater.state ~= GAME_UPDATER_STATES.idle do
-      GAME.updater:update()
-    end
+    logger.info("All tests passed!")
+    os.exit(0)
   end
 end
 
--- Intentional override
----@diagnostic disable-next-line: duplicate-set-field
+local love_errorhandler = love.errorhandler
 function love.errorhandler(msg)
+  logger.error(msg)
+  testsFailed = true
+  pcall(love.filesystem.write, "test-crash.log", tostring(logger.messageBuffer))
   if lldebugger then
-    pcall(love.filesystem.write, "debug.log", tostring(logger.messageBuffer))
     error(msg, 2)
-  end
-
-  if not love.window or not love.graphics or not love.event then
-    return
-  end
-
----@diagnostic disable-next-line: undefined-field
-  if not love.graphics.isCreated() or not love.window.isOpen() then
-    local success, status = pcall(love.window.setMode, 800, 600)
-    if not success or not status then
-      return
-    end
-  end
-
-  -- if we crashed during a match that is likely cause of the issue
-  -- we want it logged in a digestable form
-  if GAME.battleRoom and GAME.battleRoom.match then
-    pcall(function()
-      local match = GAME.battleRoom.match
-      match.engine.aborted = true
-      ReplayV3.finalizeReplay(match.engine, match.replay)
-      logger.info("Replay of match during crash:\n" .. json.encode(match.replay))
-    end)
-  end
-
-  msg = tostring(msg)
-  local sanitizedMessageLines = {}
-  for char in msg:gmatch(utf8.charpattern) do
-    table.insert(sanitizedMessageLines, char)
-  end
-  local sanitizedMessage = table.concat(sanitizedMessageLines)
-
-  local trace = GAME.crashTrace or debug.traceback("", 3)
-  local traceLines = {}
-  for l in trace:gmatch("(.-)\n") do
-    if not l:match("boot.lua") and not l:match("stack traceback:") then
-      table.insert(traceLines, l)
-    end
-  end
-  local sanitizedTrace = table.concat(traceLines, "\n")
-
-  local function getGameErrorData(sanitizedMessage, sanitizedTrace)
-    local errorData = Game.errorData(sanitizedMessage, sanitizedTrace)
-    local detailedErrorLogString = Game.detailedErrorLogString(errorData)
-    errorData.detailedErrorLogString = detailedErrorLogString
-    if GAME.updater and not DEBUG_ENABLED and not os.getenv("LOCAL_LUA_DEBUGGER_VSCODE") then
-      -- crash reporting disabled on this branch (bramp/multi-player uses a separate server)
-    end
-    return detailedErrorLogString
-  end
-
-  local success, detailedErrorLogString = pcall(getGameErrorData, sanitizedMessage, sanitizedTrace)
-  local errorLines = {}
-  table.insert(errorLines, "Unofficial build notice: Do NOT report this to official Panel Attack / Discord developers.")
-  table.insert(errorLines, "Contact bramp and share your crash.log to get help with this!\n")
-  if success then
-    table.insert(errorLines, detailedErrorLogString)
-    logger.info(detailedErrorLogString)
   else
-    table.insert(errorLines, sanitizedMessage)
-    logger.info(sanitizedMessage)
-  end
-  if logger.messageBuffer then
-    logger.info("config during crash: " .. table_to_string(config))
-    pcall(love.filesystem.write, "crash.log", tostring(logger.messageBuffer))
-  end
-  if #sanitizedMessage ~= #msg then
-    table.insert(errorLines, "Invalid UTF-8 string in error message.")
-  end
-  table.insert(errorLines, "\n")
-
-  local messageToDraw = table.concat(errorLines, "\n")
-  messageToDraw = messageToDraw:gsub("\t", "    ")
-  messageToDraw = messageToDraw:gsub("%[string \"(.-)\"%]", "%1")
-
-  print(messageToDraw)
-
-  -- Reset state.
-  if love.mouse then
-    love.mouse.setVisible(true)
-    love.mouse.setGrabbed(false)
-    love.mouse.setRelativeMode(false)
-    if love.mouse.isCursorSupported() then
-      love.mouse.setCursor()
+    local crashInfo = fileUtils.exists("test-crash.log")
+    if crashInfo and system.supportsFileBrowserOpen() then
+      local sep = package.config:sub(1, 1)
+      love.system.openURL("file://"..love.filesystem.getRealDirectory("test-crash.log") .. sep .. "test-crash.log")
     end
+    return love_errorhandler(msg)
   end
-  if love.joystick then
-    -- Stop all joystick vibrations.
-    for i, v in ipairs(love.joystick.getJoysticks()) do
-      v:setVibration()
-    end
-  end
-  if love.audio then
-    love.audio.stop()
-  end
-
-  love.graphics.reset()
-  local s, font = pcall(GraphicsUtil.getGlobalFontWithSize, GraphicsUtil.fontSize + 4)
-  if s then
-    love.graphics.setFont(font)
-  else
-    love.graphics.setNewFont(16)
-  end
-  love.graphics.setColor(1, 1, 1)
-  love.graphics.origin()
-
-  if GAME then
-    local success, canvasScale = pcall(GAME.newCanvasSnappedScale, GAME)
-    if success then
-      love.graphics.scale(canvasScale)
-    end
-  end
-
-  local function draw()
-    if not love.graphics.isActive() then
-      return
-    end
-
-    love.graphics.clear(love.graphics.getBackgroundColor())
-    local positionX = 40
-    local positionY = positionX
-    love.graphics.printf(messageToDraw, positionX, positionY, love.graphics.getWidth() - positionX)
-
-    love.graphics.present()
-  end
-
-  local fullErrorText = messageToDraw
-  local function copyToClipboard()
-    if not love.system then
-      return
-    end
-    love.system.setClipboardText(fullErrorText)
-    messageToDraw = messageToDraw .. "\nCopied to clipboard!"
-  end
-
-  if love.system then
-    messageToDraw = messageToDraw .. "\n\nPress Ctrl+C or tap to copy this error"
-  end
-
-  return function()
-    love.event.pump()
-
-    for e, a, b, c in love.event.poll() do
-      if e == "quit" then
-        return 1
-      elseif e == "keypressed" and a == "escape" then
-        return 1
-      elseif e == "keypressed" and a == "c" and love.keyboard.isDown("lctrl", "rctrl") then
-        copyToClipboard()
-      elseif e == "touchpressed" then
-        local name = love.window.getTitle()
-        if #name == 0 or name == "Untitled" then
-          name = "Game"
-        end
-        local buttons = {"OK", "Cancel"}
-        if love.system then
-          buttons[3] = "Copy to clipboard"
-        end
-        local pressed = love.window.showMessageBox("Quit " .. name .. "?", "", buttons)
-        if pressed == 1 then
-          return 1
-        elseif pressed == 3 then
-          copyToClipboard()
-        end
-      end
-    end
-
-    draw()
-
-    if love.timer then
-      love.timer.sleep(0.1)
-    end
-  end
-end
-
--- Intentional override
----@diagnostic disable-next-line: duplicate-set-field
-function love.resize(newWidth, newHeight)
-  if GAME then
-    logger.debug("Updating canvas scale from love.resize")
-    GAME:handleResize(newWidth, newHeight)
-  end
-end
-
--- Intentional override
----@diagnostic disable-next-line: duplicate-set-field
-function love.keypressed(key, scancode, rep)
-  logger.trace("key pressed: " .. key)
-  if scancode then
-    inputManager:keyPressed(key, scancode, rep)
-  end
-end
-
--- Intentional override
----@diagnostic disable-next-line: duplicate-set-field
-function love.textinput(text)
-  inputFieldManager.textInput(text)
-end
-
--- Intentional override
----@diagnostic disable-next-line: duplicate-set-field
-function love.keyreleased(key, unicode)
-  inputManager:keyReleased(key, unicode)
-end
-
--- Intentional override
----@diagnostic disable-next-line: duplicate-set-field
-function love.joystickaxis(joystick, axisIndex, value)
-  inputManager:joystickaxis(joystick, axisIndex, value)
 end

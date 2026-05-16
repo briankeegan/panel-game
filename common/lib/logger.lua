@@ -19,6 +19,16 @@ if love then
   local sourceDir = love.filesystem.getSourceBaseDirectory()
   local logPath = sourceDir .. "/logs/client.log"
   logger.logFile = io.open(logPath, "w")
+
+  -- Per-identity live debug.log under love.filesystem (Application Support/
+  -- LOVE/<identity>/debug.log). main.lua only flushes the buffer at quit
+  -- time, so without this you can't tail a running session. setBuffer("none")
+  -- writes through immediately on each :write.
+  local ok, file = pcall(love.filesystem.newFile, "debug.log", "w")
+  if ok and file then
+    pcall(function() file:setBuffer("none") end)
+    logger.loveLogFile = file
+  end
 end
 
 ---@enum LogLevel
@@ -86,6 +96,9 @@ function direct_log(prefix, msg)
     if logger.logFile then
       logger.logFile:write(message .. "\n")
       logger.logFile:flush()
+    end
+    if logger.loveLogFile then
+      pcall(function() logger.loveLogFile:write(message .. "\n") end)
     end
     if prefix == "ERROR" or prefix == " WARN" then
       love.filesystem.append("warnings.txt", message .. "\n")

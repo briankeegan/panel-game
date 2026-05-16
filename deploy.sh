@@ -7,6 +7,21 @@ BRANCH=$(git rev-parse --abbrev-ref HEAD)
 
 cd "$(dirname "$0")"
 
+# Refuse to deploy with a dirty working tree. The version-bump step
+# below adds a commit; if there are unstaged or untracked-but-staged
+# changes already, they'd get mixed in (or `git commit` would error
+# halfway through). Either commit/stash first, or set
+# PANEL_ALLOW_DIRTY=1 to override (use sparingly — typically only when
+# you've intentionally pre-committed and just have untracked artifacts).
+if [[ "${PANEL_ALLOW_DIRTY:-0}" != "1" ]]; then
+  if ! git diff --quiet || ! git diff --cached --quiet; then
+    echo "==> ERROR: working tree is dirty. Commit or stash your changes first." >&2
+    echo "    (set PANEL_ALLOW_DIRTY=1 to override; untracked files are ignored.)" >&2
+    git status --short >&2
+    exit 1
+  fi
+fi
+
 # Snapshot pre-deploy state first. Restarting the service rotates the
 # journal cursor and may also clear in-memory state we'd want for
 # post-mortems — grab journal + on-disk logs + any crash_reports before
@@ -45,6 +60,11 @@ if [[ "${PANEL_SKIP_VERSION_BUMP:-0}" != "1" ]]; then
   rm "${CONSTS_FILE}.bak"
   git add "$CONSTS_FILE"
   git commit -m "deploy: bump BUILD_VERSION to $NEW_VERSION"
+  # Empty marker commit on top — purely a `git log --oneline` waypoint so
+  # it's obvious at a glance which commits got deployed and when. The
+  # bump commit above already encodes the version, but this gives you a
+  # clear "DEPLOY POINT" landmark to align against journal timestamps.
+  git commit --allow-empty -m "deploy: build $NEW_VERSION"
 else
   echo "==> Skipping version bump (PANEL_SKIP_VERSION_BUMP=1)"
 fi

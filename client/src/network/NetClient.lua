@@ -601,10 +601,14 @@ local function processTauntMessage(self, message)
   -- player.playerNumber is the lobby seatId; wire's player_number is stackIndex
   -- during a match. Prefer the seatId field which the server stamps explicitly.
   local senderKey = message.seatId or message.player_number
-  local characterId = tableUtils.first(self.room.players, function(player)
+  local sender = tableUtils.first(self.room.players, function(player)
     return player.playerNumber == senderKey
-  end).settings.characterId
-  characters[characterId]:playTaunt(message.type, message.index)
+  end)
+  if not sender or not sender.settings or not sender.settings.characterId then
+    logger.warn("taunt: no player at seatId/player_number=" .. tostring(senderKey) .. " (left mid-match?)")
+    return
+  end
+  characters[sender.settings.characterId]:playTaunt(message.type, message.index)
 end
 
 ---@param self NetClient

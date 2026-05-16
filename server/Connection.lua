@@ -76,6 +76,19 @@ function Connection:getMaxRecentRttMs()
   return m
 end
 
+---@return integer? minimum RTT in ms across recent samples, or nil if none
+-- For per-client one-way-latency correction (startInMs computation): min RTT
+-- is the cleanest sample, hence the best estimate of actual one-way delay.
+-- Max would over-correct and start fast clients too late.
+function Connection:getMinRecentRttMs()
+  if not self.rttSamples or #self.rttSamples == 0 then return nil end
+  local m = self.rttSamples[1]
+  for i = 2, #self.rttSamples do
+    if self.rttSamples[i] < m then m = self.rttSamples[i] end
+  end
+  return m
+end
+
 function Connection:_recordRttSample(rttMs)
   if not self.rttSamples then self.rttSamples = {} end
   table.insert(self.rttSamples, 1, rttMs)

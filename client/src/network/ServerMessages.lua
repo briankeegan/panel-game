@@ -108,6 +108,7 @@ function ServerMessages.sanitizeRoomMessage(message)
       replay = replay,
       match_start = true,
       startAtMs = message.startAtMs,
+      startInMs = message.startInMs,
     }
   elseif message.type == "spectatorUpdate" then
     return { spectators = message.content }

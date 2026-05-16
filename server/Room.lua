@@ -573,12 +573,10 @@ function Room:start_match()
   -- games generated via createFromRoomState always have a replay
   ---@cast replay -nil
   local message = ServerProtocol.startMatch(self.roomNumber, replay)
-  -- Scheduled start time. Clients translate via serverOffsetMs; without an
-  -- offset they fall back to "start on receive". The grace window must exceed
-  -- the slowest server→client trip in this room, else that client starts
-  -- late and has to fast-forward to catch up. Use the WORST recent RTT (not
-  -- the best) — best-case underestimates budget for jittery clients. Use
-  -- full RTT (not /2) so asymmetric server↔client latencies stay covered.
+  -- Budget must exceed the slowest server→client trip so the latest client
+  -- still receives matchStart before their scheduled start. Worst-case RTT
+  -- (not best) so jittery clients aren't under-budgeted. Full RTT, not /2,
+  -- to cover asymmetric directions.
   local budgetMs = 500
   local worstRttMs = 0
   local rttDiag = {}
@@ -595,9 +593,31 @@ function Room:start_match()
   if worstRttMs > 0 then
     budgetMs = math.max(budgetMs, worstRttMs + 200)
   end
-  message.messageText.startAtMs = math.floor(self.clock() * 1000) + budgetMs
-  logger.info(self.roomNumber .. ": start budget=" .. budgetMs .. "ms (worstRtt=" .. worstRttMs .. "ms, samples=[" .. table.concat(rttDiag, ",") .. "])")
-  self:broadcastJson(message)
+  local serverNowMs = math.floor(self.clock() * 1000)
+  message.messageText.startAtMs = serverNowMs + budgetMs  -- kept for legacy clients
+
+  -- Per-client startInMs: each player gets a different countdown-from-receive
+  -- value, subtracting their own estimated one-way delivery delay from the
+  -- budget. Aligns all clients on the SAME wall-clock instant regardless of
+  -- their individual link latency, without relying on client-side offset
+  -- estimation (which can't distinguish clock skew from constant one-way lag).
+  -- minRTT/2 is the cleanest estimate of one-way delay.
+  local startDiag = {}
+  for _, player in self:eachPlayer() do
+    local conn = player.gameplayConnection
+    local minRtt = conn and conn.getMinRecentRttMs and conn:getMinRecentRttMs() or 0
+    local startInMs = budgetMs - math.floor(minRtt / 2)
+    if startInMs < 0 then startInMs = 0 end
+    startDiag[#startDiag + 1] = player.name .. "=" .. startInMs .. "(minRtt=" .. minRtt .. ")"
+    message.messageText.startInMs = startInMs
+    player:sendJson(message)
+  end
+  -- Spectators don't get a per-spec correction; send canonical budget.
+  message.messageText.startInMs = budgetMs
+  self:sendJsonToSpectators(message)
+
+  logger.info(self.roomNumber .. ": start budget=" .. budgetMs .. "ms (worstRtt=" .. worstRttMs
+    .. "ms, samples=[" .. table.concat(rttDiag, ",") .. "], startInMs=[" .. table.concat(startDiag, ",") .. "])")
 
   for _, player in self:eachPlayer() do
     player:setup_game()

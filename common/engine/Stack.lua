@@ -232,8 +232,12 @@ local Stack = class(
       end
     end
 
-    -- Local=3 for brief render hitches; view=1 so opponent catch-up can't starve local play.
-    s.max_runs_per_frame = args.is_local and 3 or 1
+    -- Local=3 for brief render hitches. View=4 so buffer backlog (e.g. after a
+    -- network stall) actually drains: with cap=1, smoothing.targetRate's ramp
+    -- to maxRate is a no-op and the view stays permanently behind by however
+    -- much pending input ever queued up. 4 lets the existing smoothDamp ramp
+    -- catch up gracefully without flooding any single frame.
+    s.max_runs_per_frame = args.is_local and 3 or 4
 
     s.displacement = 16
     s.wasToppedOut = false

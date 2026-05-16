@@ -771,13 +771,32 @@ local function processMatchStartMessage(self, message)
   if match.supportsPause and match:hasLocalPlayer() then
     match:connectSignal("pauseChanged", self, self.sendPauseToggle)
   end
-  -- Translate the server's scheduled start moment to our local clock if we have
-  -- a server-time-offset estimate. GameBase:runGame holds engine ticks until then.
-  -- Client-driven solo opts out (isClientDrivenSolo declared at top of function):
-  -- no remote stacks to synchronize with, so don't let server clock drift gate
-  -- the start.
-  if not isClientDrivenSolo and message.startAtMs and self.lobbyClient and self.lobbyClient.serverOffsetMs then
-    match.scheduledStartLocalMs = message.startAtMs - self.lobbyClient.serverOffsetMs
+  -- Schedule local start moment. GameBase:runGame holds engine ticks until then.
+  -- Client-driven solo (isClientDrivenSolo declared at top of function) opts out:
+  -- no remote stacks to synchronize with.
+  --
+  -- Prefer server-stamped startInMs (a per-client countdown-from-receive that
+  -- already accounts for our own RTT — schedule wall-now + startInMs and we
+  -- converge with everyone else on the same instant, no offset math needed).
+  -- Fall back to the legacy offset-translation path for old servers that only
+  -- send absolute startAtMs.
+  if not isClientDrivenSolo then
+    local nowMs = math.floor(socket.gettime() * 1000)
+    if message.startInMs then
+      match.scheduledStartLocalMs = nowMs + message.startInMs
+      logger.info("matchStart: scheduled in " .. message.startInMs .. "ms (server-stamped startInMs)")
+    elseif message.startAtMs then
+      local offsetMs
+      for _, client in ipairs(self.clients or {}) do
+        local s = client.serverOffsetMs
+        if s and (not offsetMs or s > offsetMs) then offsetMs = s end
+      end
+      if offsetMs then
+        match.scheduledStartLocalMs = message.startAtMs - offsetMs
+        local holdMs = match.scheduledStartLocalMs - nowMs
+        logger.info("matchStart: scheduled in " .. holdMs .. "ms (legacy offset path, offset=" .. offsetMs .. ")")
+      end
+    end
   end
 end
 

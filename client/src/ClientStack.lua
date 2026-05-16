@@ -788,6 +788,7 @@ function ClientStack:drawWall(displacement, rowCount)
 end
 
 function ClientStack:drawCountdown()
+  if not self.is_local then return end
   if self.engine.in_countdown and self.engine.countdown_timer and self.engine.countdown_timer > 0 then
     local ready_x = 16
     local initial_ready_y = 4

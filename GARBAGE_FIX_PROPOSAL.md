@@ -1,22 +1,24 @@
-# Garbage System Fix Proposals
+# Garbage System Fix Proposals (v2)
 
-Companion to `GARBAGE_AUDIT.md`. The audit catalogued findings phase-by-phase
-and at the cross-cutting level. This document proposes fixes for each
-finding, with tradeoffs surfaced rather than hidden, organized into two
-parts:
+Companion to `GARBAGE_AUDIT.md`. This revision incorporates fact-check
+(stale line numbers in `Room.lua`, S1↔1c inconsistency), architecture
+review (PR sequencing, the real structural fix), and gap analysis
+(disconnect path, rewind cursor reset, shock-garbage rotation, shared-
+mode silently disabled on single-target senders).
 
-- **Part 1 — Per-section proposals.** One subsection per audit phase. Treats
-  each finding in isolation.
-- **Part 2 — Structural / cross-cutting proposals.** Looks at the system as
-  a whole. Several individual findings collapse to a single structural fix
-  here.
+**Test additions are deliberately out of scope** per user direction.
+Where a proposal's safety hinges on a test that doesn't exist, the
+proposal notes "needs test coverage" but doesn't specify tests.
 
-Each proposal carries a **Cost** estimate (touch surface), a **Risk** call
-(what could break), and a **Verdict** (recommended / optional / skip).
-"Recommended" means I'd ship it; "Optional" means it's a real improvement
-but a judgment call; "Skip" means the cure is worse than the disease or
-the issue is design-intentional. **Nothing in this document is a decided
-plan** — pick, defer, or reject per your priorities.
+Each proposal carries:
+- **Cost** — touch surface
+- **Risk** — what could break
+- **Verdict** — Recommended / Optional / Skip
+- **Closes** — which audit findings it addresses
+
+"Recommended" means I'd ship it. "Optional" means real improvement but
+judgment call (often gated on observability data). "Skip" means cure is
+worse than disease or issue is design-intentional.
 
 ---
 
@@ -25,69 +27,48 @@ plan** — pick, defer, or reject per your priorities.
 ## Phase 1 — Team 1v1 (`TwoPlayerVersus`, VERSUS interaction)
 
 Findings recap:
-- **1a**: `setupFromReplay` doesn't re-wire `addTarget` for VERSUS — mid-
-  match spectator's engine has empty `garbageTargets`. Masked by server-
-  relayed G driving visuals.
+- **1a**: `setupFromReplay` doesn't re-wire `addTarget` for VERSUS —
+  mid-match spectator's engine has empty `garbageTargets`.
 - **1b**: Survivor's post-death combos emit G that the server drops with
-  "no living recipients" log spam during the arbitration window.
+  "no living recipients" log spam.
 - **1c**: Server `_redirectIfDead` walks a 1-element list (`getEnemy…`
   fallback) every time a 1v1 recipient is dead.
 
 ### Proposal 1.1 — Wire VERSUS in `setupFromReplay`
 
-**What**: Add a VERSUS branch to `ClientMatch:setupFromReplay` (mirror of
-`setupFromGameMode:295-302`):
+**What**: Add a VERSUS branch to `ClientMatch:setupFromReplay` mirroring
+`setupFromGameMode:295-302`. ~6 lines.
 
-```lua
-elseif matchGameMode.stackInteraction == GameModes.StackInteractions.VERSUS then
-  for i, _ in ipairs(clientMatch.engine.stacks) do
-    for j, _ in ipairs(clientMatch.engine.stacks) do
-      if i ~= j then
-        clientMatch.engine:addTarget(clientMatch.engine.stacks[i], clientMatch.engine.stacks[j])
-      end
-    end
-  end
-end
-```
+**Closes**: 1a (in isolation).
+**Cost**: 6 lines, one file.
+**Risk**: Low. Spectator engine doesn't originate garbage today; wiring
+is idempotent.
+**Verdict**: **Skip in favor of S1.5** (extract shared dispatch helper).
+1.1 patches one branch; S1.5 closes the duplication that makes 1a
+possible in the first place.
 
-**Why**: Closes 1a. Spectator's engine ends up with the same
-`garbageTargets`/`garbageSources` shape as the players'. Currently masked,
-but the divergence is a latent foot-gun — any future feature that reads
-those tables on a spectator will behave differently from a player.
-
-**Cost**: ~6 lines in one file.
-**Risk**: Low. Spectator engine doesn't *originate* garbage today
-(`is_local` is false on view-stacks); the wiring is idempotent.
-**Verdict**: Recommended — but subsumed by S1 if you take that.
-
-### Proposal 1.2 — Quiet the post-death G log spam
+### Proposal 1.2 — Quiet post-death G log spam
 
 **What**: In `Room:broadcastGarbageEvent`, downgrade the
-"no living recipients, dropping" log (L1048-1051) from `info` to `debug`,
-or only log once per (sender, match).
+"no living recipients, dropping" log at **`Room.lua:1040-1042`** from
+`info` to `debug`, or rate-limit per (sender, match).
 
-**Why**: Closes 1b. Pure cosmetic — log noise in 1v1 arbitration windows.
-Doesn't help anything to log per-G.
+**Closes**: 1b.
+**Cost**: 1 line.
+**Risk**: Lose visibility if the case starts firing in unexpected modes.
+Mitigation: log first occurrence per match at info, suppress rest.
+**Verdict**: **Optional**. Pure cosmetic; defer unless logs are noisy.
 
-**Cost**: 1 line change.
-**Risk**: Lose visibility if this case starts happening in unexpected
-modes. Mitigation: log the *first* drop per sender per match at info,
-suppress subsequent drops.
-**Verdict**: Optional. Cosmetic. Defer unless logs are actively noisy.
+### Proposal 1.3 — Skip redirect machinery on 1-element list
 
-### Proposal 1.3 — Skip redirect machinery on trivially-dead targets
+**What**: Micro-perf in `_redirectIfDead` (`Room.lua:925`). Already
+early-returns at L927 if recipient alive; could also early-return for
+1-element enemy list.
 
-**What**: `_redirectIfDead` already early-returns if recipient is alive
-(L936-938). Add an early return if the sender has only one possible
-enemy (1v1) and that enemy is dead — return nil immediately without
-walking. Saves a `getEnemyPlayerIndices` call + `findNextLiving` walk.
-
-**Why**: Closes 1c. Micro-perf. The walk is O(1) on a 1-element list,
-so the saving is "skip one function call and a 1-iteration loop."
-
-**Cost**: ~4 lines.
-**Risk**: None.
-**Verdict**: Skip. Not worth the code. The work being saved is trivial.
+**Closes**: 1c (cosmetically).
+**Verdict**: **Skip**. Not worth the code. Subsumed by S1.5 + the
+optional S1 mode flip (which would remove the `self.teams == nil`
+fallback at L935-944 entirely if pursued).
 
 ---
 
@@ -99,6 +80,12 @@ Findings recap:
 - **2b**: Shared mode emits one `G` event per garbage piece.
 - **2c**: garbageMode does not equalize team-vs-solo throughput
   (documented in source).
+- **NEW 2d** (from gap analysis): `pushGarbageTo` skip-gate at
+  `Match.lua:411` is shape-only, not mode-aware. Single-target senders
+  bypass `distributeGarbageToTargets` regardless of `garbageMode` —
+  meaning **`garbageMode = "shared"` is silently a no-op for any sender
+  with one enemy** (e.g., 1v2 team members). The "shared" rotation
+  semantics never apply on a single-target sender, by construction.
 
 ### Proposal 2.1 — Guard `teamGarbageState` allocation
 
@@ -118,92 +105,83 @@ for i = 1, #self.stacks do
 end
 ```
 
-Update `distribute` and self-heal to tolerate nil entries (they already
-check `if teamState` — verify on a quick read).
+Existing read sites at `Match.lua:341` (guards with
+`self.teamGarbageState and self.teamGarbageState[senderIndex]`) and
+`ClientMatch.lua:1750` (guards with `engine.teamGarbageState and
+engine.teamGarbageState[body.sender]`) already tolerate nil.
 
-**Why**: Closes 2a. Removes dead state. Clarifies intent: "this stack
-participates in shared rotation" reads as `teamGarbageState[i] ~= nil`.
+**Closes**: 2a.
+**Cost**: 5 lines.
+**Risk**: Low. Both read sites already nil-guard.
+**Verdict**: **Recommended**. Cheap and clarifying.
 
-**Cost**: 5 lines + verify two read sites tolerate nil.
-**Risk**: Low. The reads at `Match.lua:341` and `ClientMatch.lua:1741`
-already guard with `if teamState`.
-**Verdict**: Recommended. Cheap, clarifying.
+### Proposal 2.2 — Batch per-destination in shared mode
 
-### Proposal 2.2 — Batch per-piece G by destination (shared mode)
+**What**: Refactor `Match:distributeGarbageToTargets` shared branch
+(L340-381) to accumulate pieces by destination and emit one G per
+destination per combo. Cursor advance and per-piece rotation are
+preserved (still calls `findNextLiving` per piece) — only the *grouping
+of emits* changes.
 
-**What**: Currently shared mode's per-piece loop emits one G per piece.
-Refactor `Match:distributeGarbageToTargets` so it accumulates pieces by
-destination, then emits one G per destination per combo:
+**Closes**: 2b.
+**Cost**: ~25 lines in `Match.lua`, self-contained.
+**Risk**: **Not as low as v1 claimed.** Three concerns surfaced in
+review:
+1. **Telegraph visual changes** — `refreshSharedModeTelegraphTargets`
+   reads `currentTargetIndex` each tick to draw the arrow. Per-piece
+   self-heal advances the cursor N times per chain; batched self-heal
+   advances K times (K = distinct destinations). The arrow's
+   intermediate swings shape changes — less per-piece twitch, same
+   final destination distribution. User-visible.
+2. **Replay byte format changes** — `crossPlayerEvents.garbage`
+   shrinks. Replays recorded under the new code, played back on old
+   code, would deliver pieces in a different per-frame application
+   order on the recipient's stack. `correctChainingFlag` and the
+   incoming queue ordering depend on this. **Needs replay round-trip
+   verification before shipping.**
+3. **Server fast-path interaction (S4 / 6.1)** — fewer Gs per chain
+   reduces the per-G fixed cost (redirect, dedupe, log) that 6.1 is
+   trying to fast-path. The two changes compound; measure 6.1 first.
 
-```lua
--- Per-piece rotation, but accumulate by destination
-local piecesByDest = {}
-local destOrder = {}
-for _, g in ipairs(garbageDelivery) do
-  local _, pickedSlot, nextLivingIndex = TeamUtils.findNextLiving(
-    teamState.enemyIndices, teamState.currentTargetIndex, alive)
-  if not pickedSlot then ... break end
-  if nextLivingIndex then teamState.currentTargetIndex = nextLivingIndex end
-  if not piecesByDest[pickedSlot] then
-    piecesByDest[pickedSlot] = {}
-    destOrder[#destOrder + 1] = pickedSlot
-  end
-  piecesByDest[pickedSlot][#piecesByDest[pickedSlot] + 1] = shallowcpy(g)
-end
-for _, slot in ipairs(destOrder) do
-  self:deliverOutgoingGarbage(sender, stacks[slot], piecesByDest[slot])
-end
-```
-
-**Why**: Closes 2b. A 4-piece chain alternating P2/P3 goes from 4 G
-events to 2. Reduces server redirect/dedupe/log work and TCP packet
-count proportionally to chain depth.
-
-Cursor advance and self-heal semantics are preserved (cursor goes to
-next-living-after-last-piece regardless of grouping). End-state of
-`teamGarbageState[i].currentTargetIndex` is identical.
-
-**Cost**: ~25 lines in `Match.lua`. Self-contained.
-**Risk**: Behavioral change is the *intermediate cursor positions*
-between piece deliveries (only matters for the telegraph
-arrow's per-piece swing, which becomes per-destination swing). Visually:
-slightly less arrow-twitch, same final destination distribution.
-Replay determinism: server's `garbageEvents` log changes shape (2
-entries instead of 4 per chain). Replays from BEFORE this change must
-keep parsing the old shape — easy since they're just lists of G bodies.
-**Verdict**: Recommended. Real network-load win.
+**Verdict**: **Optional, gated on observability**. Land S7 first to
+measure per-piece amplification. If actual chains are mostly 1-2
+pieces, the win is marginal.
 
 ### Proposal 2.3 — Equalize 1v2 throughput
 
-**What**: Currently solo deals 1× per combo and takes 2× per tick
-(see audit Finding 2c). Either:
+**Closes**: 2c. **Verdict**: **Skip**. Gameplay design decision, not a
+code fix. Separate discussion with player base.
 
-- **(a)** Scale solo's output ×2 in 1v2 (combos and chains both).
-- **(b)** Rate-limit team members' output to 50% in 1v2.
-- **(c)** New `garbageMode` value: `"split-output"` that divides each
-  team member's output by team size, hitting the solo with 1× total
-  from team.
+### Proposal 2.4 (NEW) — Address single-target shared-mode no-op
 
-**Why**: 1v2 is widely considered unbalanced in classic
-panel-attack — the solo is at a meaningful disadvantage. The current
-"garbageMode" framing only changes *who* gets hit, not how much.
+**What**: Finding 2d. Three options:
 
-**Cost**: (a) needs a per-stack output multiplier in `Stack:outputGarbage`
-or similar — non-trivial, ~50 lines. (b) similar in shape but reversed.
-(c) is a new code path, ~100 lines plus UI.
-**Risk**: Gameplay change. Veterans of unbalanced 1v2 might dislike.
-Needs playtest.
-**Verdict**: Skip in scope of this proposal — design decision, not a
-correctness fix. Worth a separate design discussion with the player base.
+- **(a) Document**: Add a comment at `Match.lua:411` explaining that
+  `pushGarbageTo` bypasses `distributeGarbageToTargets` for
+  single-target senders regardless of mode, so `garbageMode = "shared"`
+  is meaningless for them by construction (and that's fine because
+  with 1 enemy there's nothing to rotate over).
+- **(b) Route through `distribute`**: Remove the L411 skip gate and
+  the L335 `#targets > 1` gate, have `distribute` handle all senders.
+  Same code path for single-target as multi-target. But this changes
+  timing — `distribute` runs *after* all stacks tick, vs `pushGarbageTo`
+  *before*. See S2; this is the same trap.
+- **(c) Move the mode check earlier**: Have `setupTeamGarbageTargets`
+  pre-resolve single-target senders into the `pushGarbageTo` path
+  explicitly, with a comment that shared-vs-all is a no-op for them.
+  Effectively (a) but encoded structurally.
+
+**Verdict**: **Recommended (a)**. Document. (b) and (c) are
+overengineering for behavior that's correct as-is. Add the comment so
+the next reader doesn't think it's a bug.
+**Cost**: 3 lines of comment.
 
 ---
 
 ## Phase 3 — Team 2v2
 
-No phase-specific findings. Carry-forwards: 2b (network amplification
-worst per-tick here), spectate-channel volume.
-
-Covered by proposals 2.2 and S3 (below). No new proposals.
+No phase-specific findings. Carry-forwards: 2b (worst per-tick load),
+spectate-channel volume. Covered by 2.2/S3. No new proposals.
 
 ---
 
@@ -211,45 +189,44 @@ Covered by proposals 2.2 and S3 (below). No new proposals.
 
 Finding recap:
 - **4a**: G/D ordering at server determines whether late G is redirected
-  (good) or silently absorbed by corpse (waste). No fairness bug but
-  wire-timing nondeterminism.
+  (good) or silently absorbed by corpse (waste). Wire-timing
+  nondeterminism, fairness-neutral, cumulative in FFA.
 
-### Proposal 4.1 — Add observability for late-G silent absorption
+### Proposal 4.1 — Observability for late-G silent absorption
 
-**What**: In `Room:broadcastGarbageEvent`, detect the case where a G's
-recipient is alive at the time of relay but the sender's `senderFrame`
-is at-or-after the recipient's *eventual* `eliminatedPlayers` mark.
-Currently can't detect — D hasn't arrived yet at that point. Better:
-when D arrives at server, scan the recent G log for any G that targeted
-the now-dead player at `senderFrame >= deathFrame - tolerance` and log
-them.
+**What**: In `Room:broadcastDeathEvent` (`Room.lua:1101`), after marking
+`eliminatedPlayers[slot] = senderFrame`, scan the recent G log on the
+match for any G targeting the now-dead player at
+`senderFrame >= deathFrame - tolerance`. Log them. Pure visibility.
 
-**Why**: 4a is harmless but invisible. Making it visible lets us
-*decide* whether to do anything about it. Without observability we
-don't even know how often it happens.
-
-**Cost**: ~30 lines in `Room.lua`. New scan in `broadcastDeathEvent`.
+**Closes**: 4a (visibility, not behavior).
+**Cost**: ~30 lines in `Room.lua`. New scan in death-event handler.
 **Risk**: Negligible. Pure logging.
-**Verdict**: Optional. Worth doing once if there's any suspicion the
-silent absorption is non-negligible; can be removed after.
+**Verdict**: **Recommended** (PROMOTED from Optional in v1). Two
+log lines, zero gameplay risk. Single highest-value item; unblocks
+informed decisions on 4.2/4.3/2.2.
 
-### Proposal 4.2 — Buffer G when a D is pending
+### Proposal 4.2 — Buffer G when D is pending
 
-**What**: When the server has received a death event but hasn't yet
-finished broadcasting it, defer relaying any G targeting that player
-by ~50ms (or until the D is fully broadcast). Gives the death enough
-time to be considered when redirecting.
+**What**: Defer G targeting a player whose D is in-flight by ~50ms.
 
-**Why**: Closes 4a properly. Late G after D is no longer absorbed by
-corpse — redirected to living teammate.
+**Verdict**: **Skip**. Adds latency for a fairness-neutral edge. Run
+4.1 first to measure; only consider 4.2 if data shows silent absorption
+is meaningful.
 
-**Cost**: ~80 lines. Needs a per-recipient pending-buffer + drain logic
-on the server.
-**Risk**: Adds latency to garbage delivery in the (rare) window of a
-death-tick. Risk of buffering bug stalling the queue.
-**Verdict**: Skip. Adds latency and complexity for a fairness-neutral
-edge case. Run 4.1 first to measure; only consider 4.2 if data shows
-the silent absorption is meaningful.
+### Proposal 4.3 (NEW) — Client backchannel for absorbed Gs
+
+**What**: When `_applyGarbageEventNow` lands a G on a stack whose
+`game_over_clock > 0` (locally dead), the client could send a small
+"absorbed" notification back to the server. Server rewrites the
+`garbageEvents` replay log to reflect the absorption.
+
+**Closes**: 4a (replay determinism aspect).
+**Cost**: ~80 lines. New wire message; server-side log mutation.
+**Risk**: Medium. New message type, message-ordering concerns, log
+mutation risk.
+**Verdict**: **Skip** (cheaper than 4.2 but still not justified pre-
+data). Revisit after 4.1 metrics if absorption count is non-trivial.
 
 ---
 
@@ -257,18 +234,11 @@ the silent absorption is meaningful.
 
 Finding recap:
 - **5a**: Two distinct code paths for the same 2-player game.
-  (`TwoPlayerVersus` VERSUS vs `OpenFFA` TEAM_VERSUS.) Engine state
-  observably different (`teams`, `garbageMode`, `teamGarbageState`).
 
-### Proposal 5.1 — Collapse 1v1 onto the team pipeline
-
-See **S1 (structural)** for the full proposal. Per-phase recap: convert
-`TwoPlayerVersus` from `VERSUS` to `TEAM_VERSUS` with `teamCount=2,
-playersPerTeam=1, garbageMode="all"`. Replay compatibility for legacy
-VERSUS replays stays via ReplayV3's existing VERSUS branch (just for
-read-side interpretation).
-
-**Verdict**: Recommended at structural level. See S1.
+**Verdict**: See **S1 + S1.5** (structural). Per-phase recap: collapse
+`TwoPlayerVersus` onto the TEAM_VERSUS pipeline. S1.5 (extract shared
+dispatch helper) is the real fix for the underlying duplication; S1
+(mode flip) removes the legacy enum branch as a consequence.
 
 ---
 
@@ -280,30 +250,30 @@ Finding recap:
 
 ### Proposal 6.1 — Fast-path `broadcastGarbageEvent` when no eliminations
 
-**What**: At top of `Room:broadcastGarbageEvent` (after the early-out at
-L1005-1010), check `if not next(self.game.eliminatedPlayers) then` and
-skip the redirect/dedupe loop entirely:
+**What**: Gate the entire redirect/dedupe block at
+**`Room.lua:1008-1054`** behind a `next(self.game.eliminatedPlayers)`
+check. When no eliminations exist, the block is a no-op — recipients
+pass through unchanged. Critically, the *entire* block (including the
+`parsed.recipients = redirected` rebuild at L1033 and the `#redirected
+== 0` empty-list drop at L1039-1043) is conditional:
 
 ```lua
 if type(parsed.recipients) == "table" and next(self.game.eliminatedPlayers) then
-  -- existing redirect loop L1017-1054
-else
-  -- no deaths yet: recipients pass through unchanged
+  -- existing block L1014-1044 unchanged: redirect loop, dedupe,
+  -- recipients rewrite, empty-list drop
+  ...
 end
+-- common-case path: parsed.recipients untouched, fall through to relay
 ```
 
-**Why**: Closes 6a. Steady-state common path becomes a single-loop check
-instead of a per-recipient `_redirectIfDead` call. Saves a per-G CPU
-budget on the server in the all-alive case (which is most of the match).
-
-**Cost**: ~6 lines.
-**Risk**: Low. The redirect loop is a no-op anyway in the all-alive
-case; this just skips the no-op faster. Care with the dedupe pass —
-in shared mode each G has one recipient already, so dedupe is also
-a no-op when recipients are originally distinct. In all-mode the
-recipient list is already deduplicated by construction
-(`getEnemyPlayerIndices` returns distinct slots).
-**Verdict**: Recommended. Cheap perf win on the hot path.
+**Closes**: 6a.
+**Cost**: ~10 lines (the indent + the gate).
+**Risk**: Low *if* dedupe is verified to be a no-op when no
+eliminations exist. `getEnemyPlayerIndices` returns distinct slots by
+construction, so all-mode recipients are originally distinct; nothing
+to dedupe. Verify before shipping.
+**Verdict**: **Recommended**. Hot-path perf win. Sequence after S1
+(which changes which branch `_redirectIfDead` takes for 1v1).
 
 ---
 
@@ -311,422 +281,479 @@ recipient list is already deduplicated by construction
 
 Finding recap:
 - **7a**: `garbageMode` is the dominant balance lever at FFA scale.
-  "all" → quick-death bloodbath; "shared" → attritional. Most player-
-  visible balance lever in the audit.
 
-### Proposal 7.1 — Document mode behavior at mode-selection time
+### Proposal 7.1 — Lobby tooltip explaining mode behavior
 
-**What**: Surface the difference at the lobby / room-create UI. Today
-the UI labels them "Broadcast" vs "Round Robin"
-(`TeamBannerHeader.lua:111-114`). Add a short tooltip / subtitle that
-spells out the consequence at scale, e.g.:
-
+**What**: Today the UI labels them "Broadcast" vs "Round Robin"
+(`TeamBannerHeader.lua:111-114`). Add a short subtitle/tooltip:
 - Broadcast: "Every chain hits all enemies — quick games."
 - Round Robin: "Each chain hits one enemy at a time — longer games."
 
-**Why**: 7a is design-intentional but invisible to first-time players
-of larger FFA modes. Players reach for "shared" expecting team-shared-
-damage semantics (the name suggests it) and get something else.
+**Closes**: 7a (UX side).
+**Cost**: ~10 lines + localization strings.
+**Verdict**: **Recommended**. Pure UX.
 
-**Cost**: ~10 lines in lobby UI + localization strings.
-**Risk**: None.
-**Verdict**: Recommended. Pure UX.
+### Proposal 7.2 — Rename `"shared"` → `"round-robin"`
 
-### Proposal 7.2 — Rename `"shared"` → `"rotate"` / `"round-robin"`
+**What**: Rename the engine constant + GameModes presets.
 
-**What**: `garbageMode == "shared"` is misleading — it doesn't mean
-"shared damage" (would imply N→1 routing or pooled HP). It's per-sender
-round-robin targeting. Rename to `"round-robin"` (or `"rotate"`) in
-GameModes presets, with backwards compatibility in the engine:
+**Cost**: ~30 lines (presets + engine alias + downstream comparisons at
+`Match.lua:1138, 1144, 1155, 340`). The v1 alias-only snippet was
+**incomplete** — the engine compares against `"all"` and `"shared"`
+directly, so an alias on `setGarbageMode` would still leave the
+downstream comparisons checking `"shared"`. Either flip the
+comparisons too, or alias in *both* directions (new→old for
+comparisons, old→new for storage), which is ugly.
 
-```lua
-function Match:setGarbageMode(mode)
-  if mode == "shared" then mode = "round-robin" end  -- legacy alias
-  self.garbageMode = mode
-end
-```
+**Risk**: Wire-coupled. New clients sending `"round-robin"` to old
+servers wouldn't parse. Old replays carry `"shared"`. Needs coordinated
+rollout.
 
-**Why**: Clearer mental model. Audit-of-the-audit: I had to re-read
-the engine to confirm "shared" meant rotation, not damage-share.
-
-**Cost**: ~30 lines (GameModes preset renames + alias). Localized
-labels already say "Round Robin", so UI is fine.
-**Risk**: Older replays carry `"shared"` in metadata. Alias handles it.
-Older clients connecting to a new server: if a client sends
-`garbageMode="round-robin"` to an old server, the old server may not
-understand. Stick with `"shared"` on the wire until a coordinated
-client+server upgrade.
-**Verdict**: Optional. Wait for a natural deploy window where a wire-
-breaking rename is safe.
+**Verdict**: **Defer**. Cosmetic name change is the wrong PR to slip a
+wire-affecting rename into. Wait for a natural deploy window. Also:
+memory `[[feedback_server_deploy_scope]]` says don't touch server
+without explicit ask — this would touch server-readable preset values.
 
 ---
 
 ## Phase 8 — FFA as players die
 
 Finding recap:
-- **8a**: When all enemies die, the dying-but-not-yet-recorded player's
-  combo's transit bundle parks in `outgoingGarbage` indefinitely.
+- **8a**: Outgoing transit bundle parks in `outgoingGarbage` when no
+  living enemies exist.
 
-### Proposal 8.1 — Discard transit bundle when no living enemies exist
+### Proposal 8.1 — Discard transit bundle when no living enemies
 
-**What**: In both branches of `distributeGarbageToTargets`:
+**v1 verdict was Recommended. v2 verdict is Skip.**
 
-- shared mode (`Match.lua:351-380`): if pre-flight `findNextLiving`
-  returns no live slot, *still* pop the transit bundle and discard it.
-  Today it's left in the queue.
-- "all" mode (`Match.lua:386-398`): same — if `#livingTargets == 0`,
-  pop and discard.
+Reviewer caught two problems:
+1. **The drafted snippet introduced a queue-mutation bug** — calling
+   `sender:getReadyGarbageAt(oldestTransitTime)` in the discard branch
+   duplicates the pop pattern that the pre-flight check exists to
+   avoid (`Match.lua:347-350`).
+2. **Finding 8a is overstated.** When all enemies are dead, match-end
+   fires within a tick or two via `TEAMS_ACTIVE == 1`. "Indefinitely"
+   means "milliseconds." The parked transit bundle is cleaned up by
+   teardown; there's no observable consequence.
+
+**Verdict**: **Skip**. Leave the bundle alone; teardown cleans it up.
+If you really want it cleaner, add a `discardAt(oldestTransitTime)`
+helper that doesn't return the popped data — but that's adding code
+for no behavior change.
+
+### Proposal 8.2 — Skip cursor self-heal for single-enemy senders
+
+**Verdict**: **Skip**. Micro-perf only.
+
+---
+
+## Phase 9 (NEW) — Rewind and disconnect paths
+
+The audit didn't cover these. Both are real correctness issues.
+
+### Finding 9a — `_redirectIfDead` ignores `disconnectedPlayers`
+
+`Room:_redirectIfDead` (`Room.lua:925-968`) keys redirect strictly on
+`self.game.eliminatedPlayers`. But disconnect/forfeit goes through
+`Game:markPlayerDisconnected` (`Game.lua:348`) — a *different* table.
+Until the disconnect triggers match-end finalization, garbage routed at
+a disconnected-but-not-eliminated slot is **not redirected** — it
+lands on the absent recipient's view-stack (no visible effect) while
+the living teammate gets nothing.
+
+Same shape as 4a but on the disconnect path; arguably worse because
+disconnect windows are longer than death-tick windows.
+
+### Proposal 9.1 — Redirect should consult `disconnectedPlayers`
+
+**What**: Either (a) extend the predicate in `_redirectIfDead` at
+`Room.lua:927` and `:964` to consult `disconnectedPlayers` too, or
+(b) have `markPlayerDisconnected` synthesize an
+`eliminatedPlayers[slot] = currentFrame` entry.
+
+Option (a) is more honest:
 
 ```lua
-if firstSlot then
-  -- existing per-piece delivery
-else
-  -- no living enemies: pop and discard to prevent queue stall
-  local discarded = sender:getReadyGarbageAt(oldestTransitTime)
-  if discarded then
-    logger.info(string.format(
-      "shared-mode: dropped %d pieces from sender %d (no living enemies)",
-      #discarded, senderIndex))
+-- L927:
+if not self.game.eliminatedPlayers[originalRecipient]
+    and not self.game.disconnectedPlayers[originalRecipient] then
+  return originalRecipient
+end
+-- L963-965:
+local eliminatedPlayers = self.game.eliminatedPlayers
+local disconnectedPlayers = self.game.disconnectedPlayers
+local _, pickedSlot = TeamUtils.findNextLiving(enemySlots, startIdx, function(slot)
+  return not eliminatedPlayers[slot] and not disconnectedPlayers[slot]
+end)
+```
+
+**Closes**: 9a.
+**Cost**: ~6 lines.
+**Risk**: Low. Same code shape as the existing eliminated check.
+Caveat: the deathFrame guard at `Room.lua:996-1002` checks
+`eliminatedPlayers[sender]` only — disconnects don't have a "death
+frame" so the guard doesn't fire on disconnected senders, but
+`broadcastInput` at `Room.lua:764` already drops inputs from
+disconnected senders so they shouldn't be emitting G in the first
+place. Verify.
+**Verdict**: **Recommended**. Real correctness fix.
+
+### Finding 9b — Rewind doesn't reset `teamGarbageState[i].currentTargetIndex`
+
+`ClientMatch:applyRewindEvent` (`ClientMatch.lua:1078-1101`) resets
+`stack.game_over_clock = 0` for stacks whose recorded death was past
+the rewind frame (L1094-1100), correctly resurrecting them. But it
+does NOT roll `teamGarbageState[i].currentTargetIndex` back. After a
+rewind that crosses a death boundary, the cursor sits at its post-
+death position while the world is back in the pre-death state.
+Telegraph and `distribute`'s next pre-flight will skip the
+(now-alive-again) enemy until the next G self-heals the cursor.
+
+Phase 8's audit said "topology is purely additive — no structures
+mutate as players die." Rewind violates that.
+
+### Proposal 9.2 — Reset cursor on rewind
+
+**What**: In `ClientMatch:applyRewindEvent` (L1094-1100), after
+resurrecting stacks, reset every `teamGarbageState[i].currentTargetIndex
+= 1`:
+
+```lua
+if self.engine and self.engine.teamGarbageState then
+  for _, teamState in pairs(self.engine.teamGarbageState) do
+    teamState.currentTargetIndex = 1
   end
 end
 ```
 
-**Why**: Closes 8a. Queue stays drained; sender's `outgoingGarbage` never
-accumulates orphaned bundles. Match-end teardown still cleans up, but
-behavior is now defined-and-logged instead of "stuck-and-cleaned-up-on-
-the-way-out."
+Cheap and correct. The self-heal on next G receipt will re-anchor;
+starting from position 1 is fine because cursor self-heal only
+advances "next-after-hit," and a fresh cursor at 1 just picks the
+first living enemy on the next emit.
 
-**Cost**: ~10 lines in two branches.
-**Risk**: Low. The "all enemies dead" case means match-end is imminent;
-the discarded garbage couldn't land anywhere anyway.
-**Verdict**: Recommended. Defensive cleanup, removes a latent invariant
-trap.
+**Closes**: 9b.
+**Cost**: 5 lines.
+**Risk**: Minimal. Cursor reset is monotonically safer than leaving it
+post-death-stale.
+**Verdict**: **Recommended**.
 
-### Proposal 8.2 — Skip cursor self-heal for single-enemy senders
+### Edge case — shock garbage in shared mode
 
-**What**: In `_applyGarbageEventNow` cursor self-heal (L1739-1769),
-short-circuit if `#teamState.enemyIndices == 1` (impossible to advance
-a 1-element cursor anyway).
-
-**Why**: Micro-perf. Phase 4/5/8 all noted that the self-heal degenerates
-correctly to "no-op" when only one enemy exists, but the walk still runs.
-Skip the call.
-
-**Cost**: 3 lines.
-**Risk**: None.
-**Verdict**: Skip. Saves a microsecond. Not worth the code.
+Not a proposal, just a note for the audit. `Stack:pushGarbage`
+(`checkMatches.lua:756-792`) enqueues metal/shock garbage *before*
+combo garbage in the transit bundle. The per-piece loop in shared
+mode alternates targets regardless of metal/non-metal, so a 4-link
+chain with a metal panel can drop the shock at P2 and combos at P3,
+splitting what the player perceives as a single attack. Telegraph
+reflects this (arrow points where the next piece goes), but the visual
+"this player's attack" feels fragmented. Worth a note in the audit;
+not a fix.
 
 ---
 
 # Part 2 — Structural / cross-cutting proposals
 
-Looking at the system as a whole, several findings collapse onto a small
-number of structural choices. These are bigger than per-phase fixes and
-some are competing — picking one might obviate another.
+Several individual findings collapse onto a small number of structural
+choices. v1 had one structural fix (S1) that the architecture review
+correctly identified as routing-around the actual duplication. v2
+splits it.
 
 ---
 
-## S1 — Collapse 1v1 onto the team pipeline
+## S1 — Mode flip: `TwoPlayerVersus` → TEAM_VERSUS
 
-**Problem solved**: 5a (two paths for 1v1), 1a (spectator shape divergence),
-1c (redirect on 1-element list). All three are symptoms of `VERSUS` being
-a separate enum value with a separate setup branch.
+**Closes**: 5a; with S1.5 also closes 1a and 1c.
 
 ### What
 
-Replace `TwoPlayerVersus`'s setup with the team pipeline:
+Change `TwoPlayerVersus` (`GameModes.lua:172`) to TEAM_VERSUS with
+`teamCount=2, playersPerTeam=1, garbageMode="all"`. Then:
 
-```lua
--- common/data/GameModes.lua
-local TwoPlayerVersus = GameMode({
-  ...
-  playerCount = 2,
-  teamCount = 2,
-  playersPerTeam = 1,
-  garbageMode = "all",
-  stackInteraction = StackInteractions.TEAM_VERSUS,  -- was VERSUS
-  ...
-})
-```
-
-Then:
-
-- **Remove** `ClientMatch:setupFromGameMode`'s VERSUS branch (L295-302).
-  TEAM_VERSUS branch handles it.
-- **Remove** `ClientMatch:setupFromReplay`'s implicit VERSUS-missing
-  (currently no branch; just falls through with no setup). Same TEAM_VERSUS
-  branch.
-- **Remove** `Server/Game.lua:156-168` VERSUS branch — TEAM_VERSUS branch
-  L169-193 handles it.
-- **Keep** `Room:_redirectIfDead`'s `self.teams==nil` fallback at L946-953
-  — it might still be exercised by some non-VERSUS non-TEAM_VERSUS path.
-  Audit-confirm before removing.
-- **Keep** `ReplayV3.lua`'s VERSUS handling (L539, L561) for read-side
+- **If S1.5 also lands**: Remove `setupFromGameMode`'s VERSUS branch
+  at `ClientMatch.lua:295-302`. Remove `_redirectIfDead`'s
+  `self.teams == nil` fallback at `Room.lua:935-944`. Remove
+  `server/Game.lua:156-168` VERSUS branch.
+- **Keep** `ReplayV3.lua:539, 561` VERSUS handling for read-side
   legacy replay interpretation.
-- **Optionally remove** the `StackInteractions.VERSUS` enum entirely if
-  no other modes use it (they don't, per audit).
 
 ### Why
 
-- One pipeline for all PvP. Fewer divergent code paths.
-- 1v1 spectators get the same engine shape as players (1a closed).
-- The `_redirectIfDead` self.teams==nil fallback can eventually go away
-  (1c closed).
-- `garbageMode` becomes universally meaningful, even if it doesn't do
-  anything in 1v1 (consistent with current OpenFFA-1v1 behavior).
+Closes the 1v1 path bifurcation (5a). After S1.5, also closes the
+spectator shape divergence (1a — because both setup paths now go
+through the same helper) and the 1-element redirect machinery (1c —
+because the fallback can be removed once VERSUS rooms no longer exist
+at runtime).
 
 ### Cost & risk
 
-- ~40 lines changed across 4 files.
-- Replay backwards-compat: legacy replays with `stackInteraction = VERSUS`
-  in metadata must still play. ReplayV3 has explicit branches for that.
-  Keep them.
-- Server-client version compatibility: if server upgrades but client
-  doesn't, an old client receiving a TEAM_VERSUS 1v1 might initialize
-  differently than expected. Minor — both paths produce identical
-  delivery. Verify with `run_tests.sh` / `run_server_tests.sh`.
+- ~40 lines across 4 files (assumes S1.5 lands first).
+- **Replay back-compat**: A legacy VERSUS replay played mid-match by a
+  post-S1 spectator hits `setupFromReplay` L210-218 which checks
+  `stackInteraction == TEAM_VERSUS`. The legacy replay carries
+  `stackInteraction = VERSUS` in metadata → falls through, no setup
+  runs. Post-S1.5, the dispatch helper should handle VERSUS metadata
+  by mapping it to the team setup path (read-side compat). **This is
+  the case v1 hand-waved.** Verify before shipping.
+- Server-client mismatch: A 0.49 client connecting to a 0.50 server
+  (or vice-versa) — gameMode info comes from the room/preset. Need
+  coordinated deploy.
 
 ### Verdict
 
-**Recommended.** Closes three findings with one refactor. Branch is
-already focused on multiplayer (`bramp/multi-player`); good timing.
+**Recommended, but ONLY together with S1.5**. S1 alone changes preset
+shape without fixing the duplicated dispatch logic — pointless. S1.5
+is the load-bearing change.
 
 ---
 
-## S2 — Should `pushGarbageTo` and `distributeGarbageToTargets` be unified?
+## S1.5 (NEW) — Extract shared setup-dispatch helper
 
-**Problem considered**: Two delivery functions doing similar work
-(`pushGarbageTo` for single-target, `distribute` for multi-target).
-Selection is by `#garbageTargets > 1`. Worth combining?
+**Closes**: 1a structurally. Prerequisite for S1.
 
-### Analysis
+### What
 
-Inspecting `Match:run` (L268-296):
+`ClientMatch:setupFromGameMode` (L259-309) and `ClientMatch:setupFromReplay`
+(L210-218) both dispatch on `stackInteraction` to wire up `addTarget`
+relationships. They duplicate logic. The duplication is why 1a exists:
+`setupFromReplay`'s `if matchGameMode.stackInteraction == TEAM_VERSUS`
+gate is narrower than `setupFromGameMode`'s `elseif`-chain — VERSUS
+falls through with no wiring.
+
+Extract:
 
 ```lua
-for i, stack in ipairs(self.stacks) do
-  if stack and self:shouldRun(stack, runsSoFar) then
-    self:pushGarbageTo(stack)  -- BEFORE stack runs
-    stack:run()
+function ClientMatch:_setupTargetsByStackInteraction(stackInteraction, gameMode, players)
+  if stackInteraction == GameModes.StackInteractions.ATTACK_ENGINE then
+    -- ATTACK_ENGINE setup (today: setupFromGameMode L278-290)
+  elseif stackInteraction == GameModes.StackInteractions.SELF then
+    -- SELF setup
+  elseif stackInteraction == GameModes.StackInteractions.VERSUS then
+    -- VERSUS pairwise addTarget loop
+  elseif stackInteraction == GameModes.StackInteractions.TEAM_VERSUS then
+    -- createTeams + setGarbageMode + setupTeamGarbageTargets
   end
 end
-self:updateClock()
-self:distributeGarbageToTargets()  -- AFTER all stacks ran
 ```
 
-`pushGarbageTo` runs **inside** the per-stack loop, **before** the stack
-runs — so the stack can apply incoming garbage in the same tick.
-`distribute` runs **after** all stacks have run — so multi-target senders
-deliver based on the *post-run* state.
+Call from both `setupFromGameMode` and `setupFromReplay`.
 
-This is a timing difference, not just dispatch sugar. Unifying them
-would push single-target deliveries to *after* the stack runs — which
-would delay them by one tick.
+### Why
+
+One dispatch site. New stackInteractions land in one place.
+`setupFromReplay`'s "VERSUS falls through silently" bug (1a) becomes
+impossible by construction.
+
+### Cost & risk
+
+- ~50 lines: extract function + two call-site changes.
+- Risk: Low if both call sites pass the same shape of `players` and
+  `gameMode`. Verify each branch's inputs match.
 
 ### Verdict
 
-**Skip.** The two functions encode an intentional timing distinction.
-Unifying would shift per-tick latency for single-target deliveries by
-one tick and break replay determinism. Keep the split.
+**Recommended**. This is the real fix the v1 proposal missed.
 
-(If you really want one function, *both* could be called from a
-single `Match:processGarbage(phase, stack?)` helper that dispatches by
-phase — but that's pure sugar, no real benefit.)
+---
+
+## S2 — Unify `pushGarbageTo` and `distributeGarbageToTargets`?
+
+**Verdict**: **Skip**. The two functions encode an intentional timing
+distinction (`pushGarbageTo` runs before stack tick; `distribute` after).
+Unifying breaks replay determinism. Keep the split.
 
 ---
 
 ## S3 — Batch per-destination in shared mode
 
-**Problem solved**: 2b (per-piece amplification).
-
-See Proposal 2.2 above. Extracted here because it's structural in scope
-— affects shared mode in every phase (2, 3, 4, 6, 7, 8).
-
-**Verdict**: Recommended. See 2.2 for details.
+Same as 2.2. **Verdict: Optional, gated on S7 data.**
 
 ---
 
-## S4 — Server perf fast-path: skip redirect when no eliminations
+## S4 — Server perf: skip redirect when no eliminations
 
-**Problem solved**: 6a.
-
-See Proposal 6.1 above. Extracted here because it's a server-wide hot-
-path optimization.
-
-**Verdict**: Recommended. See 6.1 for details.
+Same as 6.1. **Verdict: Recommended**, sequenced after S1+S1.5.
 
 ---
 
-## S5 — Naming: `"all"` / `"shared"` → `"broadcast"` / `"round-robin"`
+## S5 — Rename `"shared"` → `"round-robin"`
 
-**Problem considered**: `"shared"` is a misleading mode name (audit
-Finding 7.2 / Proposal 7.2). The UI already calls them "Broadcast" and
-"Round Robin" (`TeamBannerHeader.lua:111-114`); the engine and presets
-still say `"all"` and `"shared"`.
+Same as 7.2. **Verdict: Defer**. Server-side coupling + wire impact.
+
+---
+
+## S6 — `teamGarbageState` shape
+
+**Problem**: Mixes static topology (`enemyIndices` — list of slot
+integers, derivable from `garbageTargets[i]` which holds stack objects)
+and live state (`currentTargetIndex`).
+
+**Verdict**: **Skip**. Saves a few bytes per match. Revisit only if
+rollback semantics for shared mode become a problem.
+
+---
+
+## S7 — Observability: instrument garbage events
+
+**Promoted from Optional to "ship first"** based on architecture review:
+multiple downstream proposals (4.2, 4.3, 2.2/S3) are gated on data we
+don't have.
 
 ### What
 
-Three layers to align:
+Add lightweight counters to the server, emitted at match end (and/or to
+the replay metadata blob):
 
-1. **GameModes presets** (`common/data/GameModes.lua`): `garbageMode = "shared"`
-   → `"round-robin"`. ~10 sites.
-2. **Engine** (`Match.lua:1138, 1144, 1155, 1165, 340`): accept both for
-   backwards compat (alias `"shared"` → `"round-robin"`).
-3. **Wire format**: anything sent over the network with the mode value
-   must agree. The server doesn't currently send mode in G/D events
-   (it's in the gameMode preset that both client and server know), so
-   no wire change needed if presets are consistent.
-
-### Cost & risk
-
-- ~30 lines across the engine and presets.
-- Legacy replays: ReplayV3 reads `gameMode.garbageMode` from metadata.
-  Alias handles that.
-- Cross-version: a 0.49 client connecting to a 0.50 server (or vice-
-  versa) — gameMode info comes from the room/preset which both versions
-  need to know. Hard to deploy without a coordinated rollout.
-
-### Verdict
-
-**Optional.** Cosmetic but real clarity win. Wait for a natural deploy
-window. Not urgent.
-
----
-
-## S6 — `teamGarbageState` mixes topology and live state
-
-**Problem considered**: `teamGarbageState[i]` has two fields:
-
-- `enemyIndices` — *static* topology (copy of what's in `garbageTargets`).
-- `currentTargetIndex` — *live* cursor state.
-
-The duplicated topology data is small (a few ints per sender) but
-duplicates exist in `garbageTargets`. Worth collapsing?
-
-### Options
-
-- **(a)** Drop `enemyIndices`, recompute on-demand via
-  `getEnemyPlayerIndices(self.teams, i)` or by walking `garbageTargets[i]`.
-- **(b)** Keep it (current). Avoids recomputing on the hot path
-  (per-piece in shared mode).
-- **(c)** Move `currentTargetIndex` to live on the stack itself
-  (`stack.shareModeCursor`) and drop `teamGarbageState` entirely.
-
-### Analysis
-
-(a) saves a few bytes per match, costs `O(stacks)` per
-`findNextLiving` call instead of `O(1)`. Negligible.
-
-(c) is cleaner but means cursor state lives on a stack — meaning rollback
-saves it. That's probably correct (rolling back garbage delivery should
-roll back cursor too) but might not be today.
-
-### Verdict
-
-**Skip** for now. Not enough payoff. Revisit if rollback semantics for
-shared mode become a problem.
-
----
-
-## S7 — Observability: instrument the late-G race + per-piece amplification
-
-**Problem considered**: 4a (silent absorption) and 2b (per-piece
-amplification) both have a "we don't know how often this happens" flavor.
-
-### What
-
-Add lightweight counters to the server log on match end (or to a per-
-match metrics blob recorded in the replay):
-
-- `garbage_events_total` (count)
-- `garbage_events_redirected` (count, with reason: original-dead vs same-
-  enemy-team-dead)
-- `garbage_events_dropped_no_living` (count)
-- `garbage_events_silently_absorbed` (count — only knowable per 4.1)
-- `garbage_pieces_per_event_distribution` (histogram bucketed 1, 2-4, 5+)
+- `garbage_events_total`
+- `garbage_events_redirected` (with reason)
+- `garbage_events_dropped_no_living`
+- `garbage_pieces_per_event_distribution` (histogram)
+- `late_g_absorbed_count` (per 4.1 — late G whose recipient is now
+  dead by death-frame check)
 
 ### Why
 
-Per-fix decisions about whether 4a and 2b matter need real data. Today
-all we know is "the code allows it."
+Decisions about 4.2/4.3/2.2 need real data. Today all we know is "the
+code allows this." A few weeks of metrics from real matches tell us
+which fixes actually matter.
 
 ### Cost & risk
 
-- ~50 lines for the counters + a final emit at match end.
-- Persisted to the replay log or server log.
-- No gameplay risk.
+- ~50 lines. No gameplay impact.
+- Persisted to server log or replay metadata.
 
 ### Verdict
 
-**Optional but cheap.** Worth shipping ahead of any decision about 4.2
-or 2.2 sizing. Six weeks of metrics from real matches would tell you
-which fixes actually matter.
+**Recommended (ship first)**. Cheap. Unblocks subsequent decisions.
 
 ---
 
-## S8 — Cursor self-heal: extend to "all" mode for symmetry
+## S8 — Extend cursor self-heal to "all" mode for symmetry
 
-**Problem considered**: Cursor self-heal currently only fires for
-`#body.recipients == 1` (`_applyGarbageEventNow` L1739). All-mode Gs
-have multiple recipients → self-heal skipped. This is fine today because
-all-mode doesn't use a cursor — but it's an asymmetry between modes.
+**Verdict**: **Skip**. Hypothetical future mode. No use case today.
 
-### Analysis
+---
 
-If we ever add a new mode that has both multi-recipient and
-cursor-driven behavior (e.g., a "team-coordinated round-robin"), the
-single-recipient gate breaks the self-heal invariant for that mode.
+## S9 — Remove `garbageSources` reverse-index
+
+**Verdict**: **Skip**. Tied to S2 outcome.
+
+---
+
+## S10 (NEW) — `MatchTopology` object
+
+**Direction**, not a concrete proposal.
+
+Architecture review noted that `garbageTargets`, `garbageSources`,
+`teams`, `teamGarbageState`, and (server-side) `eliminatedPlayers` +
+`disconnectedPlayers` are five overlapping representations of the same
+N-player graph + live state. Many findings (1a, 2a, 2d, 5a, 6a, 8a,
+9a, 9b) trace to "which of these gets read on which path."
+
+A `MatchTopology` (or `EnemyGraph`) object owning the graph and the
+liveness predicate would:
+- Be the single place to add a new aliveness condition (e.g., 9a's
+  `disconnectedPlayers`).
+- Own the `findNextLiving`-rule-of-three (today coordinated across
+  three callsites by convention).
+- Make `pushGarbageTo` vs `distribute` dispatch a topology property
+  (`topology:isSenderMultiTarget(i)`) instead of `#garbageTargets > 1`.
+- Subsume S1, S6, S9.
+
+### Cost & risk
+
+- Large refactor. ~300-500 lines. Touches engine, server, client.
+- Risk: high if not staged. Would need its own multi-PR plan.
 
 ### Verdict
 
-**Skip.** Hypothetical future mode. Not worth adding code for a use
-case that doesn't exist.
+**Skip for now; track as long-term direction**. v2's PR plan
+incrementally chips at the symptoms; if findings keep proliferating in
+this area, revisit S10 as a multi-quarter project.
 
 ---
 
-## S9 — Consider removing the `garbageSources` reverse-index
+# Recommended PR sequence
 
-**Problem considered**: `Match:addTarget` (L1060-1093) maintains both
-`garbageTargets[source]` and `garbageSources[target]` — the latter is
-strictly derivable from the former.
+The v1 single-bundle is replaced with a sequenced 3-PR plan that
+addresses the architecture review's calibration concerns and the gap
+analysis's correctness items.
 
-### Analysis
+### PR 1 — Observability + cheap cleanups + correctness fixes (low-risk)
 
-`garbageSources` is used by `Match:pushGarbageTo(stack)` to iterate
-"who sends to this stack." If we collapse all delivery into
-`distribute` (which iterates senders, not receivers), we don't need
-`garbageSources` at all.
+Ship first. Unblocks data-gated decisions in subsequent PRs.
 
-But per S2, we're keeping `pushGarbageTo`. So we need `garbageSources`.
-
-### Verdict
-
-**Skip.** Tied to S2's outcome. If S2 ever becomes "yes, unify,"
-revisit. Otherwise no.
-
----
-
-# Recommended fix bundle
-
-If picking a short list to actually ship in one PR:
-
-| # | Proposal | Impact | Cost |
+| # | Proposal | Closes | Cost |
 |---|---|---|---|
-| 1 | **S1**: collapse 1v1 onto team pipeline | Closes 1a, 1c, 5a (3 findings) | ~40 lines, 4 files |
-| 2 | **2.1**: guard `teamGarbageState` allocation | Closes 2a | ~5 lines |
-| 3 | **6.1 / S4**: server fast-path for no-deaths | Closes 6a | ~6 lines |
-| 4 | **8.1**: discard transit bundle when no living enemies | Closes 8a | ~10 lines |
-| 5 | **2.2 / S3**: batch per-destination in shared mode | Closes 2b | ~25 lines |
-| 6 | **7.1**: lobby tooltip explaining mode behavior | Closes 7a (UX side) | ~10 lines + L10n |
+| 1 | **S7** — match-end metrics blob | gates 4.2/4.3/2.2 | ~50 lines |
+| 2 | **4.1** — late-G absorption logging | 4a (visibility) | ~30 lines |
+| 3 | **2.1** — guard `teamGarbageState` allocation | 2a | ~5 lines |
+| 4 | **2.4(a)** — comment single-target no-op semantics | 2d | ~3 lines |
+| 5 | **7.1** — lobby tooltip for mode behavior | 7a (UX) | ~10 lines |
+| 6 | **9.1** — `_redirectIfDead` consults `disconnectedPlayers` | 9a | ~6 lines |
+| 7 | **9.2** — reset cursor on rewind | 9b | ~5 lines |
 
-That bundle resolves 7 of 11 numbered findings, costs ~100 lines, and
-touches 5–6 files. Skips 2c (gameplay design call) and 4a (observability-
-first via optional S7 before deciding).
+**Total**: ~110 lines, 5-6 files. No determinism risk, no protocol change.
 
-Findings deferred / accepted as design:
-- **2c** (1v2 throughput asymmetry) — design discussion, not a fix.
-- **4a** (G/D ordering nondeterminism) — accept; add S7 first if data
-  warrants 4.2.
-- **1b** (log spam) — cosmetic; defer.
-- **S5** (rename `"shared"`) — wait for natural deploy window.
-- **S6, S8, S9** — skip outright.
+### PR 2 — 1v1 path unification (structural)
+
+Gated on PR 1 shipping clean.
+
+| # | Proposal | Closes | Cost |
+|---|---|---|---|
+| 1 | **S1.5** — extract shared dispatch helper | 1a structurally | ~50 lines |
+| 2 | **S1** — `TwoPlayerVersus` → TEAM_VERSUS | 5a (and 1c via S1.5) | ~40 lines |
+| 3 | **6.1 / S4** — server fast-path when no eliminations | 6a | ~10 lines |
+
+**Total**: ~100 lines, 4-5 files. Replay back-compat must be verified
+(audit existing replays' metadata before shipping).
+
+### PR 3 — Network optimization (gated on PR 1 data)
+
+Only ship if S7 metrics show per-piece amplification (2b) is actually
+material. If real chains average 1-2 pieces, the win is marginal and
+not worth the telegraph behavior shift.
+
+| # | Proposal | Closes | Cost |
+|---|---|---|---|
+| 1 | **2.2 / S3** — batch per-destination in shared mode | 2b | ~25 lines |
+
+**Total**: ~25 lines, 1 file. Replay round-trip verification needed
+(per-frame application order on recipient changes).
+
+### Deferred / skipped
+
+- **1.1** — superseded by S1.5
+- **1.2** — cosmetic log; defer
+- **1.3, 8.2, S2, S6, S8, S9** — skip outright
+- **2.3** — gameplay design call (separate discussion)
+- **4.2, 4.3** — defer until S7 data warrants
+- **5.1** — covered by S1+S1.5
+- **7.2 / S5** — wait for coordinated deploy window
+- **8.1** — v1 was wrong (queue-mutation bug + overstated finding); skip
+- **S10** — long-term direction, not a near-term plan
+
+---
+
+# Findings coverage matrix
+
+| Finding | Proposal | Recommended PR |
+|---|---|---|
+| 1a (spectator shape) | S1.5 (structural) | PR 2 |
+| 1b (log spam) | 1.2 (cosmetic) | deferred |
+| 1c (1-element redirect) | S1 (via S1.5) | PR 2 |
+| 2a (dead state alloc) | 2.1 | PR 1 |
+| 2b (per-piece G) | 2.2 / S3 | PR 3 (gated) |
+| 2c (1v2 throughput) | 2.3 | skip (design) |
+| 2d (shared no-op on single-target) | 2.4(a) | PR 1 |
+| 4a (G/D ordering) | 4.1 visibility | PR 1; 4.2/4.3 deferred |
+| 5a (1v1 bifurcation) | S1+S1.5 | PR 2 |
+| 6a (redirect per G) | 6.1 / S4 | PR 2 |
+| 7a (mode at scale) | 7.1 (UX) | PR 1; 7.2/S5 deferred |
+| 8a (parked transit bundle) | 8.1 was wrong | skip |
+| 9a (disconnect ignored) | 9.1 | PR 1 |
+| 9b (rewind cursor) | 9.2 | PR 1 |
+
+11 of 14 findings get addressed across the 3 PRs. The 3 unaddressed:
+- 1b (cosmetic log spam — defer)
+- 2c (gameplay design — separate)
+- 8a (the finding itself is overstated — skip)

@@ -376,6 +376,14 @@ function GameBase:_initScrubState()
 end
 
 function GameBase:_scrubMinCursor()
+  -- Scrub cursor is in engine-clock space. Floor at the end of the countdown
+  -- when one is configured so rewind can reach gameplay-frame 0 but not
+  -- before "GO!" — there's nothing to render in countdown frames and the
+  -- engine's pre-countdown state isn't meaningful to scrub into.
+  local engine = self.match and self.match.engine
+  if engine and engine.doCountdown then
+    return consts.COUNTDOWN_START + consts.COUNTDOWN_LENGTH
+  end
   return 0
 end
 

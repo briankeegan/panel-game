@@ -434,6 +434,7 @@ function Stack:rollbackCopy()
   copy.metalPanelsQueued = self.metalPanelsQueued
   copy.panels_cleared = self.panels_cleared
   copy.game_over_clock = self.game_over_clock
+  copy.game_over_stopWatch = self.game_over_stopWatch
   copy.highestGarbageIdMatched = self.highestGarbageIdMatched
   copy.swapCount = self.swapCount
 
@@ -490,6 +491,7 @@ local function internalRollbackToFrame(stack, clock)
   stack.metalPanelsQueued = copy.metalPanelsQueued
   stack.panels_cleared = copy.panels_cleared
   stack.game_over_clock = copy.game_over_clock
+  stack.game_over_stopWatch = copy.game_over_stopWatch
   stack.highestGarbageIdMatched = copy.highestGarbageIdMatched
   stack.queuedSwapColumn = copy.queuedSwapColumn
   stack.queuedSwapRow = copy.queuedSwapRow
@@ -1264,6 +1266,14 @@ function Stack:recordDeath(clock)
   end
 
   self.game_over_clock = clock
+  -- Capture the gameplay-frame at death (clock minus countdown) so display
+  -- code reads the value in the same time domain as the in-game timer without
+  -- repeating the conversion on every frame. Local deaths and loose-sync
+  -- D-event-driven deaths share the same formula — the senderFrame the server
+  -- relays IS clock from the dying player's engine.
+  local countdownOffset = self.do_countdown
+      and (consts.COUNTDOWN_START + consts.COUNTDOWN_LENGTH) or 0
+  self.game_over_stopWatch = math.max(0, clock - countdownOffset)
 
   self:emitSignal("gameOver", self)
 end

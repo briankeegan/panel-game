@@ -893,15 +893,11 @@ function ClientStack:drawPlayerName()
   local fontDelta = 8                                          -- bump default font size
   GraphicsUtil.printf(username, chipX, chipY + 6, chipWidth, "center", nil, nil, fontDelta)
 
-  local deathClock = self.engine and self.engine.game_over_clock
-  if deathClock and deathClock > 0 then
-    -- game_over_clock is engine-clock frames (countdown included); the visible
-    -- in-game timer is stopWatch (gameplay-start = 0). Subtract the countdown
-    -- so the death marker reads in the same time domain as the on-screen clock
-    -- — otherwise it shows ~3s ahead.
-    local countdownOffset = (self.engine.do_countdown
-        and (consts.COUNTDOWN_START + consts.COUNTDOWN_LENGTH)) or 0
-    local seconds = math.max(0, math.floor((deathClock - countdownOffset) / 60))
+  if self.engine and (self.engine.game_over_clock or 0) > 0 then
+    -- Engine captures game_over_stopWatch at recordDeath in the in-game-timer
+    -- domain (countdown already subtracted). Read it directly — no per-frame
+    -- conversion, no risk of drift between this marker and drawTimer.
+    local seconds = math.floor((self.engine.game_over_stopWatch or 0) / 60)
     local marker = string.format("OUT %d:%02d", math.floor(seconds / 60), seconds % 60)
     local markerHeight = 20
     local markerY = chipY - markerHeight - 2

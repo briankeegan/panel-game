@@ -1095,6 +1095,7 @@ function ClientMatch:applyRewindEvent(body)
     for _, stack in ipairs(self.engine.stacks) do
       if stack.game_over_clock and stack.game_over_clock > targetFrame then
         stack.game_over_clock = 0
+        stack.game_over_stopWatch = 0
       end
     end
   end

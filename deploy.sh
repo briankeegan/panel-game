@@ -20,11 +20,50 @@ else
   echo "==> Skipping gather (PANEL_SKIP_GATHER=1)"
 fi
 
+# Bump the build patch number so every deploy stamps a new version that
+# both the running server and any freshly-launched client print on
+# startup. Mismatch between them = somebody is on a stale build.
+# Set PANEL_SKIP_VERSION_BUMP=1 to redeploy without bumping (e.g. server
+# config change with no code delta).
+if [[ "${PANEL_SKIP_VERSION_BUMP:-0}" != "1" ]]; then
+  CONSTS_FILE="common/engine/consts.lua"
+  CURRENT_VERSION=$(grep -E 'consts\.BUILD_VERSION\s*=' "$CONSTS_FILE" | sed -E 's/.*"([^"]+)".*/\1/')
+  if [[ -z "$CURRENT_VERSION" ]]; then
+    echo "==> ERROR: couldn't find consts.BUILD_VERSION in $CONSTS_FILE; aborting." >&2
+    exit 1
+  fi
+  ENGINE_PART="${CURRENT_VERSION%.*}"
+  PATCH_PART="${CURRENT_VERSION##*.}"
+  # 10# prefix forces base-10 so leading-zero patch numbers don't get
+  # interpreted as octal by $(( )).
+  PATCH_INT=$((10#$PATCH_PART))
+  NEW_PATCH=$(printf "%04d" $((PATCH_INT + 1)))
+  NEW_VERSION="${ENGINE_PART}.${NEW_PATCH}"
+  echo "==> Bumping BUILD_VERSION: $CURRENT_VERSION → $NEW_VERSION"
+  # macOS sed needs -i '' or -i.bak; use the latter for portability with Linux.
+  sed -i.bak -E "s/(consts\.BUILD_VERSION[[:space:]]*=[[:space:]]*)\"[^\"]+\"/\\1\"$NEW_VERSION\"/" "$CONSTS_FILE"
+  rm "${CONSTS_FILE}.bak"
+  git add "$CONSTS_FILE"
+  git commit -m "deploy: bump BUILD_VERSION to $NEW_VERSION"
+else
+  echo "==> Skipping version bump (PANEL_SKIP_VERSION_BUMP=1)"
+fi
+
 echo "==> Pushing branch '$BRANCH' to origin..."
 git push origin "$BRANCH"
 
 echo "==> Deploying to $SERVER..."
 ssh "$SERVER" "git config --global --add safe.directory $INSTALL_DIR; cd $INSTALL_DIR && git pull && systemctl restart panel-attack"
+
+# Loud reminder so you don't keep playing on a stale client. Both sides
+# read consts.BUILD_VERSION from the same file; if the running client
+# was launched before this deploy, it's still on the old version.
+if [[ "${PANEL_SKIP_VERSION_BUMP:-0}" != "1" ]]; then
+  echo ""
+  echo "==> Build is now $NEW_VERSION on both sides of the wire."
+  echo "    Restart any running client (zsh run_client.sh) to load the new version."
+  echo ""
+fi
 
 echo "==> Tailing logs (Ctrl+C to exit)..."
 ssh "$SERVER" "journalctl -u panel-attack -f --no-pager"

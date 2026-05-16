@@ -23,6 +23,7 @@ local utf8 = require("common.lib.utf8Additions")
 local tableUtils = require("common.lib.tableUtils")
 local Player = require("server.Player")
 local util = require("common.lib.util")
+local consts = require("common.engine.consts")
 local FileIO = require("server.FileIO")
 local TraceWriter = require("server.TraceWriter")
 local GameModes = require("common.data.GameModes")
@@ -270,6 +271,8 @@ function Server:start()
   local gameplayPort = SERVER_PORT or 49569
   local lobbyPort = LOBBY_PORT or 49570
   local spectatePort = SPECTATE_PORT or 49571
+  logger.info("Panel Attack server build " .. consts.BUILD_VERSION
+    .. " (engine " .. ENGINE_VERSION .. ")")
   logger.info("Starting server: gameplay " .. gameplayPort .. ", lobby " .. lobbyPort .. ", spectate " .. spectatePort)
   self.socket = bindWithRetry(gameplayPort, "gameplay")
   self.lobbyListenSocket = bindWithRetry(lobbyPort, "lobby")

@@ -34,6 +34,13 @@ consts.ENGINE_VERSIONS.WIGGLE_PUNISH = "049"
 consts.ENGINE_VERSION = consts.ENGINE_VERSIONS.WIGGLE_PUNISH -- The current engine version
 consts.VERSION_MIN_VIEW = consts.ENGINE_VERSIONS.LEVELDATA -- The lowest version number that can be watched
 
+-- Build/patch version: informational only (NOT a protocol gate — changes
+-- here don't kick clients off). Bumped by deploy.sh so the running server
+-- and the locally-launched client print the same thing on startup; if
+-- they don't match, it tells you somebody is on a stale build.
+-- Format: "<ENGINE_VERSION>.<patch>" so it sorts naturally.
+consts.BUILD_VERSION = "049.0001"
+
 consts.COUNTDOWN_CURSOR_SPEED = 4 --one move every this many frames
 consts.COUNTDOWN_START = 8
 consts.COUNTDOWN_LENGTH = 180 --3 seconds at 60 fps

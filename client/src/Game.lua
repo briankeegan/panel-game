@@ -131,7 +131,8 @@ function Game:load()
 
   -- Unofficial build: disable updater integration to avoid upstream network calls.
   self.updater = nil
-  logger.debug("Launching game without updater (unofficial build)")
+  logger.info("Panel Attack client build " .. consts.BUILD_VERSION
+    .. " (engine " .. consts.ENGINE_VERSION .. ")")
 
   inputManager:load()
 
@@ -452,7 +453,10 @@ function Game.errorData(errorString, traceBack)
   if GAME.updater then
     buildVersion = GAME.updater.activeReleaseStream.name .. " " .. GAME.updater.activeVersion.version
   else
-    buildVersion = "Unknown"
+    -- Unofficial build: no updater. Use the consts.BUILD_VERSION constant
+    -- (bumped by deploy.sh) so crash reports show which build the player
+    -- was actually running instead of just "Unknown".
+    buildVersion = consts.BUILD_VERSION or "Unknown"
   end
 
   local name, version, vendor, device = love.graphics.getRendererInfo()

@@ -59,7 +59,10 @@ if [[ "${PANEL_SKIP_VERSION_BUMP:-0}" != "1" ]]; then
   sed -i.bak -E "s/(consts\.BUILD_VERSION[[:space:]]*=[[:space:]]*)\"[^\"]+\"/\\1\"$NEW_VERSION\"/" "$CONSTS_FILE"
   rm "${CONSTS_FILE}.bak"
   git add "$CONSTS_FILE"
-  git commit -m "deploy: build $NEW_VERSION"
+  # --allow-empty: if sed didn't actually change anything (e.g. file was
+  # already at $NEW_VERSION from a manual edit), still create the commit
+  # so the deploy point lands as a marker in git log.
+  git commit --allow-empty -m "deploy: build $NEW_VERSION"
 else
   echo "==> Skipping version bump (PANEL_SKIP_VERSION_BUMP=1)"
 fi

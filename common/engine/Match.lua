@@ -541,26 +541,6 @@ function Match:shouldSaveRollback(stack)
   end
 end
 
--- attempt to rollback the specified stack to the specified stopWatch
----@param stack BaseStack
----@param stopWatch integer
----@return boolean success
-function Match:rollbackToStopWatch(stack, stopWatch)
-  return self:rollbackToFrame(stack, stopWatch + (stack.clock - stack.stopWatch))
-end
-
--- attempt to rollback the specified stack to the specified frame
----@param stack BaseStack
----@param clock integer
----@return boolean success
-function Match:rollbackToFrame(stack, clock)
-  if stack:rollbackToFrame(clock) then
-    return true
-  end
-
-  return false
-end
-
 -- rewind is ONLY to be used for replay playback as it relies on all stacks being at the same clock time
 -- and also uses slightly different data required only in a both-sides rollback scenario that would never occur for online rollback
 ---@param clock integer

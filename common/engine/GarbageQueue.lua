@@ -331,6 +331,23 @@ function GarbageQueue:processStagedGarbageForClock(clock)
     if garbage.isChain then
       ---@cast garbage ChainGarbage
       if not garbage.finalized or garbage.frameEarned + STAGING_DURATION > clock then
+        -- Unfinalized chains block all lower-priority garbage from shipping.
+        -- Normally chains finalize within a few seconds, so this break is
+        -- harmless. If a chain stays unfinalized for >10s though, that's a
+        -- bug — outgoing garbage halts entirely until the chain finalizes,
+        -- which (if it never does) means the player can't produce offense
+        -- for the rest of the match. Warn so we can root-cause when it
+        -- happens instead of silently halting.
+        if not garbage.finalized
+           and garbage.frameEarned and clock
+           and (clock - garbage.frameEarned) > 600 then
+          if not self._stuckChainWarned then
+            logger.warn(string.format(
+              "GarbageQueue: unfinalized chain stuck for %d frames (frameEarned=%d, clock=%d) — outgoing garbage halted until finalize. Investigate!",
+              clock - garbage.frameEarned, garbage.frameEarned, clock))
+            self._stuckChainWarned = true
+          end
+        end
         break
       else
         if not poppedGarbage then
@@ -351,6 +368,9 @@ function GarbageQueue:processStagedGarbageForClock(clock)
   end
 
   if poppedGarbage then
+    -- Cleared a popable backlog — drop the stuck-chain warn latch so a
+    -- future stuck state warns again.
+    self._stuckChainWarned = nil
     local deliveryTime = clock + GARBAGE_DELAY_LAND_TIME
     self.garbageInTransit[deliveryTime] = poppedGarbage
     Queue.push(self.transitTimers, deliveryTime)

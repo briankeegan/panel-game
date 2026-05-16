@@ -71,7 +71,11 @@ echo "==> Pushing branch '$BRANCH' to origin..."
 git push origin "$BRANCH"
 
 echo "==> Deploying to $SERVER..."
-ssh "$SERVER" "git config --global --add safe.directory $INSTALL_DIR; cd $INSTALL_DIR && git pull && systemctl restart panel-attack"
+# Hard-reset to origin rather than `git pull`: the server checkout is a
+# pure deploy target, no local work lives there, and a force-push at
+# origin (or any divergence) otherwise wedges the pull with "divergent
+# branches". Resetting also discards anything that snuck in on the box.
+ssh "$SERVER" "git config --global --add safe.directory $INSTALL_DIR; cd $INSTALL_DIR && git fetch origin && git reset --hard origin/$BRANCH && systemctl restart panel-attack"
 
 # Loud reminder so you don't keep playing on a stale client. Both sides
 # read consts.BUILD_VERSION from the same file; if the running client

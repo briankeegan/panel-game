@@ -296,8 +296,8 @@ function Game:receiveOutcomeReport(player, outcome)
 
   -- Only living players get a vote. A dead stack has already lost — its
   -- vote can't decide who won (most importantly, can't unilaterally declare
-  -- a tie). Discard at the door. The arbitration path in Room:tickArbitration
-  -- is the authoritative match-end for any case the server already knows
+  -- a tie). Discard at the door. Room:maybeFinalizeFromLivingTeams is the
+  -- authoritative match-end for any case the server already knows
   -- (livingTeams <= 1); this filter is a belt-and-suspenders for the vote
   -- path so a stale "I think it's a tie" can't slip in and poison things.
   -- Do NOT early-return — we still need to run the all-reported-in check

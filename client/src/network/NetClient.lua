@@ -553,6 +553,14 @@ local function processPauseNotification(self, message)
   if not (self.room and self.room.match) then return end
   local body = message.pauseNotification
   if type(body) ~= "table" then return end
+  -- Spectators never enter paused state. The player's pause is internal to them;
+  -- our view should keep rendering the frozen frame they're stuck on. Applying
+  -- isPaused here used to (a) make specs sit on a black screen, because spec
+  -- entry routes through GameBase directly so renderDuringPause is false and
+  -- the game stops drawing under the pause overlay, and (b) get stuck there if
+  -- the unpause notification dropped or the player rewound without unpausing
+  -- in the way the spec expected.
+  if self.room.spectating then return end
   self.room.match.isPaused = body.paused and true or false
 end
 
@@ -673,6 +681,16 @@ local function processMatchStartMessage(self, message)
     return
   end
 
+  -- Client-driven solo (vsSelf, endless): the local player is the source of
+  -- truth for level/levelData/inputMethod — server is just echoing back what
+  -- we sent. Skip the sync loop so a stale server payload (settings changed
+  -- between requestRoom and match_start) can't overwrite local with old
+  -- values. Touch input claim doesn't apply either — no second player to
+  -- contend with. Time Attack stays server-gated (leaderboard validation).
+  local modeName = self.room.mode and self.room.mode.name
+  local isClientDrivenSolo = (modeName == "vsSelf" or modeName == "endless")
+      and #self.room.players == 1 and self.room.players[1].isLocal
+
   -- player.playerNumber is the lobby seatId; the replay is stackIndex-keyed.
   -- Match via metadata.seatId (preferred) or stackIndex (legacy replays).
   for j, player in ipairs(self.room.players) do
@@ -681,7 +699,7 @@ local function processMatchStartMessage(self, message)
       local key = metadata.seatId or metadata.stackIndex
       if player.playerNumber == key then
         matchedStackIdx = i
-        if player.human then
+        if player.human and not isClientDrivenSolo then
           ---@cast metadata StackMetadata
           if metadata.level and metadata.level ~= player.settings.level then
             player:setLevel(metadata.level)
@@ -694,19 +712,21 @@ local function processMatchStartMessage(self, message)
       if matchedStackIdx == i then
         if player.human then
           ---@cast stackSettings ReplayStack
-          if LevelData.validate(stackSettings.levelData) and not LevelData.__eq(stackSettings.levelData, player.settings.levelData) then
-            setmetatable(stackSettings.levelData, LevelData)
-            player:setLevelData(stackSettings.levelData)
-          end
+          if not isClientDrivenSolo then
+            if LevelData.validate(stackSettings.levelData) and not LevelData.__eq(stackSettings.levelData, player.settings.levelData) then
+              setmetatable(stackSettings.levelData, LevelData)
+              player:setLevelData(stackSettings.levelData)
+            end
 
-          if stackSettings.inputMethod ~= player.settings.inputMethod then
-            -- since only one player can claim touch, touch is unclaimed every time we return to character select
-            -- this also means they will send controller as their input method until they ready up
-            -- if the remote touch player readies up AFTER the local client, we never get informed about the change in input method
-            -- besides for the match start message itself
-            -- likewise if the local player readies up with touch and then unreadies their inputMethod will flip back to controller so we even have to overwrite the local player setting
-            -- so it's very important to set this here
-            player:setInputMethod(stackSettings.inputMethod)
+            if stackSettings.inputMethod ~= player.settings.inputMethod then
+              -- since only one player can claim touch, touch is unclaimed every time we return to character select
+              -- this also means they will send controller as their input method until they ready up
+              -- if the remote touch player readies up AFTER the local client, we never get informed about the change in input method
+              -- besides for the match start message itself
+              -- likewise if the local player readies up with touch and then unreadies their inputMethod will flip back to controller so we even have to overwrite the local player setting
+              -- so it's very important to set this here
+              player:setInputMethod(stackSettings.inputMethod)
+            end
           end
 
           if player.isLocal then
@@ -753,7 +773,10 @@ local function processMatchStartMessage(self, message)
   end
   -- Translate the server's scheduled start moment to our local clock if we have
   -- a server-time-offset estimate. GameBase:runGame holds engine ticks until then.
-  if message.startAtMs and self.lobbyClient and self.lobbyClient.serverOffsetMs then
+  -- Client-driven solo opts out (isClientDrivenSolo declared at top of function):
+  -- no remote stacks to synchronize with, so don't let server clock drift gate
+  -- the start.
+  if not isClientDrivenSolo and message.startAtMs and self.lobbyClient and self.lobbyClient.serverOffsetMs then
     match.scheduledStartLocalMs = message.startAtMs - self.lobbyClient.serverOffsetMs
   end
 end

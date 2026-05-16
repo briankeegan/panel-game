@@ -145,12 +145,12 @@ function GameBase.buildTeamResultText(match, winners)
 
   local winnerTeamIndex = nil
 
-  -- Server is authoritative for online matches. Its arbitration considers
-  -- a simultaneous-KO across all teams (everyone dead in the same window)
-  -- as a draw — something the engine's local getWinners heuristic ("highest
-  -- game_over_clock") can't see, so it would otherwise crown the team that
-  -- died last. Trust the server's verdict; fall back to engine winners only
-  -- when there is no server (offline / replay).
+  -- Server is authoritative for online matches. Its per-tick living-teams
+  -- check resolves a simultaneous-KO across all teams (everyone dead before
+  -- the tick) as a draw — something the engine's local getWinners heuristic
+  -- ("highest game_over_clock") can't see, so it would otherwise crown the
+  -- team that died last. Trust the server's verdict; fall back to engine
+  -- winners only when there is no server (offline / replay).
   if match.hasServerOutcome and match:hasServerOutcome() then
     winnerTeamIndex = match:getServerWinnerTeamIndex()
   else
@@ -348,9 +348,9 @@ function GameBase:handlePause()
   else
     self:_handleScrubInput()
     -- Only the player who can act on the menu (resume / quit) should focus
-    -- it. Specs receive isPaused=true via pauseNotification but have no
-    -- agency over pause — focusing the invisible menu let them activate
-    -- the resume callback on a non-pausable match, which crashed.
+    -- it. supportsPause is false for spectator matches and pauseNotification
+    -- is now suppressed for spectators upstream (NetClient:processPause-
+    -- Notification) so this branch is player-only — defensive guard kept.
     if self.match.supportsPause
         and (self.pauseMenu.hasFocus == nil or self.pauseMenu.hasFocus == false)
         and playerPressingStart(self.match) == false then
@@ -495,6 +495,24 @@ function GameBase:setupGameOver()
   end
 
   self:customGameOverSetup()
+end
+
+-- Build a short subtitle if any non-local stack died for a reason other than
+-- a normal top-out. Surfaces server-synthesized deaths (silent watchdog,
+-- mid-match disconnect) so the player understands they won by default rather
+-- than by their opponent actually losing. Returns nil for the all-topOut case.
+function GameBase:_buildDeathReasonSubtitle()
+  if not self.match or not self.match.stacks then return nil end
+  local reasons = {}
+  for _, stack in ipairs(self.match.stacks) do
+    local reason = stack and stack._deathReason
+    if reason and reason ~= "topOut" and not stack.is_local then
+      reasons[reason] = true
+    end
+  end
+  if reasons["disconnect"] then return "Opponent disconnected" end
+  if reasons["silent"] then return "Opponent stalled (server inferred)" end
+  return nil
 end
 
 -- Build the per-frame placement list. Computed fresh each draw so it picks
@@ -721,11 +739,6 @@ function GameBase:changeMusic(useDangerMusic)
   end
 end
 
--- 10 seconds of zero engine.clock progress while the match should be running.
--- Real network stalls are absorbed by stack:shouldRun's catch-up well before this.
--- Conservative on purpose to avoid false-positives from any path I haven't audited.
-local FREEZE_THRESHOLD_SECONDS = 10
-
 function GameBase:update(dt)
   if self.match.ended then
     local ok, err = xpcall(function() self:runGameOver() end, debug.traceback)
@@ -797,33 +810,6 @@ function GameBase:update(dt)
         self.match:cycleSpectatorFocus(-1)
       elseif input:isPressedWithRepeat("MenuRight") then
         self.match:cycleSpectatorFocus(1)
-      end
-    end
-
-    -- Freeze watchdog: bail to lobby if engine.clock stops advancing for too
-    -- long. Pause is excluded — we reset the baseline while paused so unpause
-    -- starts fresh, otherwise an idle pause would trip the watchdog.
-    -- Pure spectators / pending joiners are excluded: their engine is
-    -- input-driven and will stall naturally when the real match ends (inputs
-    -- stop arriving). A stalled clock is expected, not a bug, for them.
-    local nowSeconds = love.timer.getTime()
-    if isPureSpectator then
-      self._lastClockProgressTime = nowSeconds
-      self._lastObservedClock = self.match.engine and self.match.engine.clock or 0
-    elseif self.match.isPaused then
-      self._lastClockProgressTime = nowSeconds
-      self._lastObservedClock = self.match.engine and self.match.engine.clock or 0
-    else
-      local engineClock = self.match.engine and self.match.engine.clock or 0
-      if engineClock ~= self._lastObservedClock then
-        self._lastObservedClock = engineClock
-        self._lastClockProgressTime = nowSeconds
-      elseif self._lastClockProgressTime
-          and (nowSeconds - self._lastClockProgressTime) > FREEZE_THRESHOLD_SECONDS then
-        self:bailOnFrozenMatch(string.format(
-          "engine clock stalled %.1fs at %s", nowSeconds - self._lastClockProgressTime,
-          tostring(engineClock)))
-        return
       end
     end
 
@@ -987,6 +973,7 @@ function GameBase:drawEndGameText()
 
     local message = self.text or ""
     local continueText = loc("continue_button")
+    local subtitle = self:_buildDeathReasonSubtitle()
 
     local gameOverPosition = themes[config.theme].gameover_text_Pos
     local font = GraphicsUtil.getGlobalFont()
@@ -997,13 +984,17 @@ function GameBase:drawEndGameText()
 
     -- Width is max across every drawn line.
     local maxWidth = math.max(font:getWidth(message), font:getWidth(continueText))
+    if subtitle then
+      local sw = font:getWidth(subtitle)
+      if sw > maxWidth then maxWidth = sw end
+    end
     for _, line in ipairs(placementLines) do
       local w = font:getWidth(line)
       if w > maxWidth then maxWidth = w end
     end
 
-    -- Height: message + N placement lines + continue prompt + padding between each.
-    local totalLines = 2 + #placementLines
+    -- Height: message + optional subtitle + N placement lines + continue prompt + padding between each.
+    local totalLines = 2 + #placementLines + (subtitle and 1 or 0)
     local height = lineHeight * totalLines + (totalLines + 1) * padding
     local drawY = gameOverPosition[2]
 
@@ -1012,6 +1003,11 @@ function GameBase:drawEndGameText()
     local cursorY = drawY + padding
     GraphicsUtil.print(message, gameOverPosition[1] - font:getWidth(message)/2, cursorY)
     cursorY = cursorY + lineHeight + padding
+    if subtitle then
+      GraphicsUtil.print(subtitle, gameOverPosition[1] - font:getWidth(subtitle)/2, cursorY,
+        {0.85, 0.85, 0.5, 1})
+      cursorY = cursorY + lineHeight + padding
+    end
     for _, line in ipairs(placementLines) do
       GraphicsUtil.print(line, gameOverPosition[1] - font:getWidth(line)/2, cursorY)
       cursorY = cursorY + lineHeight + padding

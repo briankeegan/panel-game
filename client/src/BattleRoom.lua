@@ -515,7 +515,24 @@ end
 ---@return ClientMatch match
 function BattleRoom:startMatch(replay)
   local match
-  if replay then
+  -- Client-driven solo (vsSelf, endless): always build the match locally, even
+  -- when the server handed us a replay. The local sim owns its own engine —
+  -- server can't drive panel seeds, garbage flows, fromReplay flag flipping
+  -- hasEnded, or pendingHistoricalGarbage onto a game with no remote inputs to
+  -- wait for. We do adopt the server's seed when present so spectators (who
+  -- build from the server's replay) generate matching panels; everything else
+  -- local-side. Scope: vsSelf + endless only — Time Attack stays server-gated
+  -- because its leaderboard depends on server-validated timing.
+  local modeName = self.mode and self.mode.name
+  local isClientDrivenSolo = (modeName == "vsSelf" or modeName == "endless")
+      and #self.players == 1 and self.players[1].isLocal
+  if replay and isClientDrivenSolo then
+    local rps = replay.panelSource
+    if rps and rps.seed then
+      self.panelSource = GeneratorSource(rps.seed, rps.shockEnabled)
+    end
+    match = ClientMatch.createFromBattleRoom(self)
+  elseif replay then
     -- Pass self.mode through so createFromReplay can restore the team config on the
     -- engine (otherwise Match:hasEnded's TEAMS_ACTIVE check is silently skipped on
     -- online team/FFA games and the match never ends until everyone dies).

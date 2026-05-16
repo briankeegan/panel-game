@@ -86,7 +86,7 @@ local function resolveRequestedGameMode(requestedGameMode)
 end
 
 -- Resolve all per-match latency-tolerance knobs from the host's strict/normal/
--- relaxed selection. In the loose-sync world there are four things this dial
+-- relaxed selection. In the loose-sync world there are three things this dial
 -- controls, all rolled into one resolution function so server.lua + Room.lua
 -- + clients see consistent values:
 --
@@ -94,10 +94,7 @@ end
 --      from a player before declaring the connection dead. Larger in the
 --      relaxed setting so flaky internet can recover.
 --   2. sendRetryLimit — how many times to retry a send before giving up.
---   3. arbitrationWindowMs — the simultaneous-KO arbitration window. Larger
---      values catch more "almost simultaneous" deaths as ties (favors fair
---      ties); smaller values resolve faster (favors decisive outcomes).
---   4. minReactionFrames — floor on the adaptive telegraph compression on
+--   3. minReactionFrames — floor on the adaptive telegraph compression on
 --      the receiver. Larger values guarantee more telegraph window before
 --      garbage lands, at the cost of overall tempo. Smaller values let
 --      gameplay stay tight even under heavy latency.
@@ -105,7 +102,7 @@ end
 -- Strict / normal / relaxed are knobs the room host picks in the lobby; they
 -- apply to the whole match. All clients see the same resolved values via the
 -- gameMode payload, so the experience matches the host's choice.
----@return {connectionTimeoutSeconds:integer, sendRetryLimit:integer, arbitrationWindowMs:integer, minReactionFrames:integer}
+---@return {connectionTimeoutSeconds:integer, sendRetryLimit:integer, minReactionFrames:integer}
 local function resolveLatencySettings(latencyTolerance, playerCount)
   local count = tonumber(playerCount) or 2
   local tolerance = latencyTolerance
@@ -117,17 +114,14 @@ local function resolveLatencySettings(latencyTolerance, playerCount)
   if tolerance == "strict" then
     settings.connectionTimeoutSeconds = (count >= 3) and 30 or 20
     settings.sendRetryLimit            = (count >= 3) and 10 or 8
-    settings.arbitrationWindowMs       = 100
     settings.minReactionFrames         = 30
   elseif tolerance == "relaxed" then
     settings.connectionTimeoutSeconds = (count >= 3) and 120 or 90
     settings.sendRetryLimit            = (count >= 3) and 20 or 15
-    settings.arbitrationWindowMs       = 400
     settings.minReactionFrames         = 60
   else
     settings.connectionTimeoutSeconds = (count >= 3) and 60 or 45
     settings.sendRetryLimit            = (count >= 3) and 15 or 10
-    settings.arbitrationWindowMs       = 200
     settings.minReactionFrames         = 45
   end
   return settings
@@ -190,8 +184,8 @@ local Server = class(
     self._shuttingDown = false
 
     -- Single Clock instance for the server. Two surfaces:
-    --   * clockInstance:monotonicSeconds() / monotonicMs() — for arbitration
-    --     windows, watchdog deadlines, anything comparing elapsed time.
+    --   * clockInstance:monotonicSeconds() / monotonicMs() — for watchdog
+    --     deadlines, anything comparing elapsed time.
     --   * clockInstance:wallSeconds() — for stamping events that need to
     --     round-trip through replays / disk / human display.
     -- self.clock is kept as the legacy field referenced by Room and elsewhere:
@@ -1059,11 +1053,11 @@ function Server:update()
 
   self:updateConnections()
   self:processMessages()
-  self:tickArbitrations()
+  self:tickRoomMatchEnd()
   -- Belt-and-suspenders watchdog for stuck matches: if a slot stops sending
-  -- inputs for >10s without sending a D, synthesize an inferred death so
-  -- arbitration can proceed. The client-side onGameOver immediate-notify
-  -- fix is the actual cure; this exists for legacy clients, future
+  -- inputs for >10s without sending a D, synthesize an inferred death so the
+  -- living-teams check can resolve. The client-side onGameOver immediate-
+  -- notify fix is the actual cure; this exists for legacy clients, future
   -- regressions, and any other path that silences a slot without telling us.
   self:tickSilentDeathWatchdogs()
 
@@ -1098,16 +1092,13 @@ function Server:tickSilentDeathWatchdogs()
   end
 end
 
----Drain KO arbitration windows for any rooms whose window has closed.
----Also runs the living-teams invariant check so a match where the survivor
----was determined by something other than a real DeathEvent (mid-match leave
----synth, silent-death watchdog synth) still resolves promptly.
-function Server:tickArbitrations()
-  local nowMs = math.floor(self.clock() * 1000)
+---Per-tick living-teams invariant check across all rooms. Resolves matches
+---no matter which path eliminated the loser (real D, mid-match leave synth,
+---silent-death watchdog synth).
+function Server:tickRoomMatchEnd()
   for _, room in pairs(self.rooms) do
     if room then
-      room:tickArbitration(nowMs)
-      room:maybeFinalizeFromLivingTeams()
+      pcall(function() room:maybeFinalizeFromLivingTeams() end)
     end
   end
 end
@@ -1523,14 +1514,13 @@ function Server:processMessage(message, connection)
 
         requestedGameMode.latencyTolerance = message.latencyTolerance
         -- For dynamic-roster modes (open_ffa) playerCount is nil at request time;
-        -- fall back to maxPlayers. latencyTolerance now drives four match-wide
-        -- knobs: TCP-watchdog timeout/retry, the simultaneous-KO arbitration
-        -- window, and the receiver-side adaptive-telegraph reaction floor.
+        -- fall back to maxPlayers. latencyTolerance now drives three match-wide
+        -- knobs: TCP-watchdog timeout/retry, and the receiver-side adaptive-
+        -- telegraph reaction floor.
         local effectiveCount = requestedGameMode.playerCount or requestedGameMode.maxPlayers or 2
         local latencySettings = resolveLatencySettings(message.latencyTolerance, effectiveCount)
         requestedGameMode.connectionTimeoutSeconds = latencySettings.connectionTimeoutSeconds
         requestedGameMode.sendRetryLimit           = latencySettings.sendRetryLimit
-        requestedGameMode.arbitrationWindowMs      = latencySettings.arbitrationWindowMs
         requestedGameMode.minReactionFrames        = latencySettings.minReactionFrames
         -- Carry through to Room construction. Decouples join-style (direct vs
         -- invite handshake) from roster shape (fixed vs dynamic): an Open Team

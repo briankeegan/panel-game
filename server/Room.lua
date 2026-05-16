@@ -78,8 +78,8 @@ function(self, roomNumber, players, gameMode, leaderboard, clock)
   self.game = nil
   self.paused = false
 
-  -- Monotonic seconds source for arbitration windows, watchdog deadlines,
-  -- and serverWallClockMs stamping. In production this is a closure over
+  -- Monotonic seconds source for watchdog deadlines and serverWallClockMs
+  -- stamping on relayed events. In production this is a closure over
   -- Server.clockInstance:monotonicSeconds so every room shares one Clock
   -- (see server/server.lua). Tests instantiate Room directly without a
   -- Server and either accept the socket.gettime default or override
@@ -97,13 +97,6 @@ function(self, roomNumber, players, gameMode, leaderboard, clock)
   -- to maxPlayers. Used by open FFA (dynamic-roster) modes only.
   self.pendingJoiners = {}
 
-  -- Loose-sync KO arbitration state — populated by broadcastDeathEvent, drained
-  -- by tickArbitration when the 200ms window closes.
-  self.arbitrationDeaths = {}
-  self.arbitrationWindowEndsAtMs = nil
-  self.arbitrationEmitted = false
-
-  -- Loose-sync idle-fill state. After a player is marked eliminated, the
   -- Wall-clock timestamp of the last player-driven activity in this room
   -- (input, death, settings/ready change, match start, character select reset).
   -- The server's update loop closes rooms that have been idle for too long so
@@ -177,9 +170,6 @@ end
 -- Clear per-match transient room state. Owns the full set so adding a new
 -- per-match field doesn't require finding all the reset sites.
 function Room:resetForNewMatch()
-  self.arbitrationDeaths = {}
-  self.arbitrationWindowEndsAtMs = nil
-  self.arbitrationEmitted = false
   -- lastInputMs keyed by stackIndex (engine view); broadcastInput stamps
   -- via sender.player_number == stackIndex during a match.
   self.lastInputMs = {}
@@ -859,8 +849,9 @@ end
 local SILENT_DEATH_THRESHOLD_MS = 10000
 
 ---Watchdog for stuck matches: if any non-eliminated slot has been silent
----for SILENT_DEATH_THRESHOLD_MS, synthesize an inferred death so arbitration
----can proceed and the match can resolve. pcall-wrapped at the call site.
+---for SILENT_DEATH_THRESHOLD_MS, synthesize an inferred death so
+---maybeFinalizeFromLivingTeams can resolve the match. pcall-wrapped at
+---the call site.
 ---@param nowMs integer current wall-clock ms (server-injected)
 function Room:tickSilentDeathWatchdog(nowMs)
   if not self.game or self.game.complete then return end
@@ -1101,20 +1092,10 @@ function Room:broadcastGarbageEvent(sender, body)
   end
 end
 
--- Default arbitration window if the gameMode didn't supply one (e.g. offline
--- modes, older clients pre-loose-sync). The room host's latencyTolerance
--- choice overrides this via resolveLatencySettings.
-local DEFAULT_ARBITRATION_WINDOW_MS = 200
-
----@return integer arbitration window in milliseconds for this room
-function Room:_arbitrationWindowMs()
-  return (self.gameMode and self.gameMode.arbitrationWindowMs) or DEFAULT_ARBITRATION_WINDOW_MS
-end
-
 ---Relay a loose-sync DeathEvent. Same wire shape as GarbageEvent.
----Also marks the sender as eliminated server-side so we stop relaying their
----now-absent inputs (replacing the legacy J{stackEliminated} path) and starts
----(or extends) the KO arbitration window — see Room:tickArbitration.
+---Marks the sender as eliminated server-side so we stop relaying their
+---now-absent inputs (replacing the legacy J{stackEliminated} path).
+---Match-end resolution is handled per-tick by maybeFinalizeFromLivingTeams.
 ---@param sender ServerPlayer
 ---@param body string raw JSON body from the client
 function Room:broadcastDeathEvent(sender, body)
@@ -1134,27 +1115,6 @@ function Room:broadcastDeathEvent(sender, body)
   self.game:recordDeathEvent(sender, parsed)
   self.game:markPlayerEliminated(sender, parsed.senderFrame)
   logger.info(self.roomNumber .. ": " .. sender.name .. " died at frame " .. tostring(parsed.senderFrame))
-
-  -- Start or extend the simultaneous-KO arbitration window. Each new death
-  -- pushes the close-time another arbitration window into the future so a
-  -- burst of nearly-simultaneous deaths is all captured. Window size is
-  -- driven by the room's latencyTolerance (strict=100ms, normal=200ms,
-  -- relaxed=400ms) — see resolveLatencySettings.
-  self.arbitrationDeaths[#self.arbitrationDeaths + 1] = {
-    slot = sender.player_number,
-    senderFrame = parsed.senderFrame,
-    serverArrivalMs = parsed.serverWallClockMs,
-  }
-  self.arbitrationWindowEndsAtMs = parsed.serverWallClockMs + self:_arbitrationWindowMs()
-  -- Reset the "already emitted" sentinel so this new death's window actually
-  -- gets to fire. Without this, tickArbitration's early-return guard at the
-  -- arbitrationEmitted check would silently drop every arbitration window
-  -- after the first one in a match — exactly the symptom seen in the
-  -- Amber/Bev/Koozie hung-match (Bevy died → arbitration fired, Koozie died
-  -- 5 seconds later → arbitration window opened but tickArbitration kept
-  -- returning early because arbitrationEmitted stayed true from Bevy's
-  -- earlier fire).
-  self.arbitrationEmitted = false
 
   local stamped = json.encode(parsed)
   local message = NetworkProtocol.markedMessageForTypeAndBody(
@@ -1236,99 +1196,16 @@ function Room:_livingTeams()
   end)
 end
 
----Drain the arbitration window if it has closed. Called from Server:update.
----Emits a single K message with the authoritative outcome and resets state.
----@param nowMs integer current wall-clock time in milliseconds
-function Room:tickArbitration(nowMs)
-  if not self.arbitrationWindowEndsAtMs or self.arbitrationEmitted then
-    return
-  end
-  if nowMs < self.arbitrationWindowEndsAtMs then
-    return
-  end
-  if not self.game or self.game.complete then
-    -- Match already concluded via another path (outcomeReports); skip K.
-    self.arbitrationDeaths = {}
-    self.arbitrationWindowEndsAtMs = nil
-    return
-  end
-
-  local livingTeams, representatives = self:_livingTeams()
-  local arbitration = {
-    deaths = self.arbitrationDeaths,
-  }
-
-  -- representatives[] are seatIds; engine/replay want stackIndex.
-  local function toStackIndex(seatId)
-    local p = self.players[seatId]
-    return (p and (p.stackIndex or p.player_number)) or seatId
-  end
-
-  if #livingTeams == 1 then
-    arbitration.tie = false
-    arbitration.winnerSlot = toStackIndex(representatives[1])
-  elseif #livingTeams == 0 then
-    arbitration.tie = true
-    arbitration.winnerSlot = nil
-  else
-    -- More than one team is still alive — KO arbitration is informational
-    -- only; the natural game-end logic will produce the final outcome.
-    arbitration.tie = false
-    arbitration.winnerSlot = nil
-  end
-
-  logger.info(string.format(
-    "%d: KO arbitration: %d death(s) within %dms window, livingTeams=%d, winnerSlot=%s, tie=%s",
-    self.roomNumber, #self.arbitrationDeaths, self:_arbitrationWindowMs(),
-    #livingTeams, tostring(arbitration.winnerSlot), tostring(arbitration.tie)))
-
-  self.arbitrationEmitted = true
-  self.arbitrationDeaths = {}
-  self.arbitrationWindowEndsAtMs = nil
-
-  -- Server-authoritative match end. The server already knows who's alive
-  -- (eliminatedPlayers from DeathEvents + disconnectedPlayers). When only one
-  -- team remains, that team wins; if everyone died inside the same window,
-  -- it's a true tie. Don't wait for client outcome votes — for FFA those
-  -- never converge anyway (each player reports their own perspective), and
-  -- a vote from a player whose stack already lost can otherwise overrule
-  -- the actual survivor (the "DRAW with 2 players still alive" bug).
-  if #livingTeams == 1 then
-    local winnerSeatId = representatives[1]
-    local winnerStack = toStackIndex(winnerSeatId)
-    self.game.winnerIndex = winnerStack
-    self.game.winnerId = self.players[winnerSeatId].publicPlayerID
-    if self.teams then
-      self.game.winnerTeamIndex = livingTeams[1]
-    end
-    self.game.aborted = false
-    self.game.complete = true
-    self.game:finalizeReplay(winnerStack)
-    self:_finalizeMatch()
-  elseif #livingTeams == 0 then
-    self.game.aborted = false
-    self.game.complete = true
-    self.game:finalizeReplay(0)
-    self:_finalizeMatch()
-  end
-end
-
----Per-tick check: if the surviving-team count has dropped to <= 1, finalize
----the match. Independent of the KO arbitration window — arbitration only
----fires after a real DeathEvent, but the "2 died, 1 alive => 1 alive wins"
----invariant has to hold no matter HOW the others died (top-out, leave-
----mid-match synth death, silent-death watchdog synth death). Without this,
----the survivor stalls in INGAME state until the natural game-end logic
----trips, which for an unopposed survivor is "never."
+---Per-tick check: if the surviving-team count has dropped to <= threshold,
+---finalize the match. Authoritative source for match-end resolution; covers
+---every elimination path (top-out via D, leave-mid-match synth death,
+---silent-death watchdog synth death). Without this the survivor stalls in
+---INGAME state until the natural game-end logic trips — for an unopposed
+---survivor that's "never."
 ---@return boolean true if the match was finalized this tick
 function Room:maybeFinalizeFromLivingTeams()
   if not self.game or self.game.complete then return false end
   if self.voided then return false end
-  -- Let arbitration handle simultaneous-KO windows: if a death just landed,
-  -- defer to tickArbitration so the K message + outcome are tied together.
-  if self.arbitrationWindowEndsAtMs and not self.arbitrationEmitted then
-    return false
-  end
 
   -- Respect the gameMode's match-end threshold. For VS/team modes the rule
   -- is "last team standing wins" (STACKS_ACTIVE=1 or TEAMS_ACTIVE=1), so 1
@@ -1434,7 +1311,7 @@ end
 ---game object has already had winnerIndex / winnerId / winnerTeamIndex (or
 ---aborted = true) populated, and `complete` set. Used by both the legacy
 ---client-vote path (handleGameOverOutcome) and the server-authoritative
----arbitration path (tickArbitration → _finalizeMatchFromLivingTeams).
+---path (maybeFinalizeFromLivingTeams).
 function Room:_finalizeMatch()
   if not self.game or not self.game.complete then
     return
@@ -1481,8 +1358,9 @@ end
 ---@param sender ServerPlayer
 function Room:handleGameOverOutcome(message, sender)
   -- A late vote arriving after the server already finalized the match (e.g.
-  -- arbitration declared the survivor while a dead-and-rejoined client's stale
-  -- outcome was in flight) is a no-op — the game state is already gone.
+  -- maybeFinalizeFromLivingTeams declared the survivor while a dead-and-
+  -- rejoined client's stale outcome was in flight) is a no-op — the game
+  -- state is already gone.
   if not self.game then
     logger.debug(self.roomNumber .. ": Ignoring late game result from " .. sender.name .. "; match already finalized")
     return

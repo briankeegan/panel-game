@@ -269,7 +269,7 @@ end
 -- Pick the destination connection for a raw prefixed message. J → lobby,
 -- everything else → gameplay, with cross-channel fallback during rollout.
 -- NOTE: this default routing is appropriate for YOUR critical data
--- (outgoing inputs, KO arbitration). For OPPONENT-relayed I/G/D, callers
+-- (outgoing inputs, gameResult). For OPPONENT-relayed I/G/D, callers
 -- should use Player:sendSpectate explicitly to keep the gameplay socket lean.
 -- Helper: extract the prefix byte from a wire message. v009 framing is
 -- [4-byte BE length][prefix][body], so the prefix sits at byte 5. Tests

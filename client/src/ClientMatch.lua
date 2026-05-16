@@ -435,14 +435,23 @@ end
 
 ---Decide whether the match is authoritatively over and should finalize.
 ---Live online: only the server's gameResult (or an abort) is authoritative.
----Offline / replay: the local engine:hasEnded() is authoritative — there's
----no server to wait for.
+---Offline / replay / client-driven solo: the local engine:hasEnded() is
+---authoritative — no remote players to wait for.
 ---@return boolean
 function ClientMatch:shouldFinalize()
   if self.engine.aborted then return true end
   if self._serverConfirmedEnd then return true end
   if self.fromReplay then return self.engine:isLocallyEnded() end
   if not (GAME.battleRoom and GAME.battleRoom.online) then
+    return self.engine:isLocallyEnded()
+  end
+  -- Client-driven solo (vsSelf, endless): local sim is authoritative — server
+  -- confirmation is nice-to-have for replay storage but never gates the
+  -- player's experience. Time Attack stays server-gated (leaderboard depends
+  -- on server-validated timing).
+  local modeName = self.gameMode and self.gameMode.name
+  if (modeName == "vsSelf" or modeName == "endless")
+      and #self.players == 1 and self.players[1].isLocal then
     return self.engine:isLocallyEnded()
   end
   -- Live online: wait for server. _serverConfirmedEnd is set when
@@ -1825,6 +1834,9 @@ function ClientMatch:_applyDeathEventNow(body, stack)
   local engine = stack.engine
   if engine.game_over_clock <= 0 then
     engine:recordDeath(body.senderFrame)
+    -- Stamp the reason on the stack so the match-end UI can distinguish
+    -- "opponent topped out" from "opponent disconnected / went silent".
+    stack._deathReason = body and body.reason
     logger.info(string.format("DeathEvent applied: stack[%d] game_over_clock=%d (reason=%s)",
       body.sender, body.senderFrame, tostring(body and body.reason)))
 

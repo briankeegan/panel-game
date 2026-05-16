@@ -195,7 +195,7 @@ function Game:writeReleaseStreamDefinition()
           versioningType = "timestamp",
           serverEndPoint = {
             type = "filesystem",
-            url = "https://panelattack.com/downloads/updates/stable", -- official upstream endpoint; this branch build is unofficial
+            url = "https://poolsuite.net/downloads/updates/stable", -- unused: GAME.updater is nil for source builds on bramp/multi-player
             prefix = "panel-"
           }
         },
@@ -204,7 +204,7 @@ function Game:writeReleaseStreamDefinition()
           versioningType = "timestamp",
           serverEndPoint = {
             type = "filesystem",
-            url = "https://panelattack.com/downloads/updates/beta", -- official upstream endpoint; this branch build is unofficial
+            url = "https://poolsuite.net/downloads/updates/beta", -- unused: GAME.updater is nil for source builds on bramp/multi-player
             prefix = "panel-beta-"
           }
         }

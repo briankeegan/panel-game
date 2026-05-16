@@ -1,8 +1,9 @@
 -- LooseSyncServerTests.lua
 --
 -- TDD tests for server-side loose-sync behavior: input relay, G/D event
--- relay, replay log recording, and KO arbitration. Each test states the
--- expected behavior; if the impl doesn't match, the impl is wrong.
+-- relay, replay log recording, and match-end resolution via the per-tick
+-- maybeFinalizeFromLivingTeams check. Each test states the expected
+-- behavior; if the impl doesn't match, the impl is wrong.
 
 ---@diagnostic disable: undefined-field, invisible, inject-field
 -- Load ServerTesting *first* so its module-level singleton players claim the
@@ -142,18 +143,16 @@ local function test_broadcastGarbageEvent_relay()
 end
 
 ----------------------------------------------------------------------
--- Test 14: Server broadcastDeathEvent marks eliminated + starts arbitration
+-- Test 14: Server broadcastDeathEvent marks eliminated and relays
 ----------------------------------------------------------------------
 -- Expected: D event from P1 →
 --   (a) game.eliminatedPlayers[1] = senderFrame
 --   (b) game.deathEvents has 1 entry
---   (c) arbitrationDeaths has 1 entry
---   (d) arbitrationWindowEndsAtMs is set in the future
---   (e) P2 receives a "D" prefix message
---   (f) P1 does not receive an echo
+--   (c) P2 receives a "D" prefix message
+--   (d) P1 does not receive an echo
 
-local function test_broadcastDeathEvent_eliminate_and_arbitrate()
-  logger.info("test_broadcastDeathEvent_eliminate_and_arbitrate")
+local function test_broadcastDeathEvent_eliminate_and_relay()
+  logger.info("test_broadcastDeathEvent_eliminate_and_relay")
   local room, p1, p2 = get2pMatchInProgress()
 
   local body = json.encode({ senderFrame = 1000, reason = "topOut" })
@@ -162,9 +161,6 @@ local function test_broadcastDeathEvent_eliminate_and_arbitrate()
   assert(room.game.eliminatedPlayers[1] == 1000,
     "P1 should be marked eliminated at frame 1000, got " .. tostring(room.game.eliminatedPlayers[1]))
   assert(#room.game.deathEvents == 1, "1 D event should be recorded")
-  assert(#room.arbitrationDeaths == 1, "arbitration should have 1 death captured")
-  assert(room.arbitrationWindowEndsAtMs and room.arbitrationWindowEndsAtMs > 0,
-    "arbitration window end-time should be set")
 
   local p2DCount = countByPrefix(p2.connection.outgoingInputQueue, "D")
   assert(p2DCount == 1, "P2 should receive 1 D, got " .. p2DCount)
@@ -175,220 +171,136 @@ local function test_broadcastDeathEvent_eliminate_and_arbitrate()
 end
 
 ----------------------------------------------------------------------
--- Test 15: KO arbitration single death → K with surviving winner
+-- NOTE: Tests 15-18 below were rewritten when the KO arbitration window
+-- was deleted in favor of per-tick maybeFinalizeFromLivingTeams. They
+-- preserve the original scenarios (single-death survivor, simultaneous-KO
+-- tie, 2v2 team wipe, Amber/Bev/Koozie sequential-death regression) but
+-- assert through the new code path. Sweep the surrounding comment text
+-- if it still references arbitration internals.
 ----------------------------------------------------------------------
--- Expected: P1 dies, window closes after 200ms, server emits K with
--- winnerSlot = 2 and tie = false. Both players receive K. arbitrationEmitted
--- is set so further ticks don't re-emit.
 
-local function test_arbitration_singleDeath_emits_winner()
-  logger.info("test_arbitration_singleDeath_emits_winner")
-  local advance, restore = withMockSocketGetTime(1000.0)
-  local ok, err = pcall(function()
-    local room, p1, p2 = get2pMatchInProgress()
+----------------------------------------------------------------------
+-- Test 15: Single death → maybeFinalizeFromLivingTeams crowns the survivor
+----------------------------------------------------------------------
+-- Expected: P1 dies, P2 is the last team alive, the per-tick living-teams
+-- check finalizes the match with P2 as winner.
 
-    -- Bake current mock time into the D event
-    room:broadcastDeathEvent(p1, json.encode({ senderFrame = 500, reason = "topOut" }))
+local function test_singleDeath_finalizes_to_winner()
+  logger.info("test_singleDeath_finalizes_to_winner")
+  local room, p1, p2 = get2pMatchInProgress()
 
-    -- Window opened at T=1000.0s, ends at T=1000.2s.
-    -- Tick at T=1000.1s → should NOT emit yet.
-    advance(0.1)
-    room:tickArbitration(math.floor(socket.gettime() * 1000))
-    assert(not room.arbitrationEmitted, "K should not be emitted before window closes")
+  room:broadcastDeathEvent(p1, json.encode({ senderFrame = 500, reason = "topOut" }))
+  local finalized = room:maybeFinalizeFromLivingTeams()
+  assert(finalized, "match should finalize once a survivor is alone")
+  assert(room.game.complete, "game.complete should be true after finalize")
+  assert(room.game.winnerIndex == 2,
+    "winnerIndex should be P2's stackIndex (2), got " .. tostring(room.game.winnerIndex))
 
-    -- Tick at T=1000.25s → window closed, should emit K.
-    advance(0.15)
-    room:tickArbitration(math.floor(socket.gettime() * 1000))
-    assert(room.arbitrationEmitted, "arbitration should be marked emitted after window expiry")
-
-    -- K wire path was deleted in commit abfd5d4c ("remove dead K wire path") —
-    -- clients now derive the outcome from the subsequent gameResult. The
-    -- arbitration logic still runs to set arbitrationEmitted; it just no
-    -- longer fires a separate K broadcast. So we only verify the flag.
-
-    -- A second tick should not re-emit.
-    advance(0.1)
-    room:tickArbitration(math.floor(socket.gettime() * 1000))
-    assert(room.arbitrationEmitted, "arbitrationEmitted should remain true (no re-emit)")
-
-    room:close()
-  end)
-  restore()
-  if not ok then error(err) end
+  room:close()
 end
 
 ----------------------------------------------------------------------
--- Test 16: KO arbitration simultaneous double-death → K with tie
+-- Test 16: Same-tick double death → finalize as tie
 ----------------------------------------------------------------------
--- Expected: P1 dies at T=0, P2 dies at T=50ms (within 200ms window). After
--- window closes, K has tie=true, winnerSlot=nil, deaths has 2 entries.
+-- Expected: P1 and P2 both die before maybeFinalizeFromLivingTeams runs;
+-- livingTeams = 0, the match finalizes with no winner (tie).
 
-local function test_arbitration_doubleDeath_tie()
-  logger.info("test_arbitration_doubleDeath_tie")
-  local advance, restore = withMockSocketGetTime(2000.0)
-  local ok, err = pcall(function()
-    local room, p1, p2 = get2pMatchInProgress()
+local function test_sameTick_doubleDeath_tie()
+  logger.info("test_sameTick_doubleDeath_tie")
+  local room, p1, p2 = get2pMatchInProgress()
 
-    room:broadcastDeathEvent(p1, json.encode({ senderFrame = 500, reason = "topOut" }))
-    advance(0.05)
-    room:broadcastDeathEvent(p2, json.encode({ senderFrame = 510, reason = "topOut" }))
+  room:broadcastDeathEvent(p1, json.encode({ senderFrame = 500, reason = "topOut" }))
+  room:broadcastDeathEvent(p2, json.encode({ senderFrame = 510, reason = "topOut" }))
+  local finalized = room:maybeFinalizeFromLivingTeams()
+  assert(finalized, "match should finalize when both teams are dead")
+  assert(room.game.complete, "game.complete should be true after finalize")
+  assert(room.game.winnerIndex == nil,
+    "winnerIndex should be nil (tie), got " .. tostring(room.game.winnerIndex))
 
-    -- Both deaths within the window. Tick after window expiry.
-    advance(0.3)
-    room:tickArbitration(math.floor(socket.gettime() * 1000))
-    assert(room.arbitrationEmitted, "arbitration should fire after window expiry")
-
-    -- K wire path was removed (abfd5d4c); previously this test decoded the
-    -- K body to verify tie=true / winnerSlot=nil. The tie outcome is now
-    -- communicated via gameResult. We verify arbitration ran via the
-    -- arbitrationEmitted flag set above.
-
-    room:close()
-  end)
-  restore()
-  if not ok then error(err) end
+  room:close()
 end
 
 ----------------------------------------------------------------------
--- Test 17: KO arbitration window extends with new death
+-- Test 17: 2v2 — wiping one team finalizes with the other team as winner
 ----------------------------------------------------------------------
--- Expected: P1 dies at T=0 (window ends T=200ms). P2 dies at T=150ms (window
--- extends to T=350ms). Tick at T=250ms must NOT emit K (still within
--- extended window). Tick at T=400ms emits K.
+-- Expected: both members of team 1 are eliminated; the per-tick living-teams
+-- check declares team 2 the winner.
 
-local function test_arbitration_window_extends()
-  logger.info("test_arbitration_window_extends")
-  local advance, restore = withMockSocketGetTime(3000.0)
-  local ok, err = pcall(function()
-    local room, p1, p2 = get2pMatchInProgress()
-
-    -- D1 at T=0 → window ends at T=200ms
-    room:broadcastDeathEvent(p1, json.encode({ senderFrame = 500, reason = "topOut" }))
-    -- D2 at T=150ms → window extends to T=350ms
-    advance(0.15)
-    room:broadcastDeathEvent(p2, json.encode({ senderFrame = 510, reason = "topOut" }))
-
-    -- Tick at T=250ms → window not yet closed (extended to T=350ms)
-    advance(0.10)
-    room:tickArbitration(math.floor(socket.gettime() * 1000))
-    assert(not room.arbitrationEmitted,
-      "K should NOT be emitted yet — D2 extended the window past current time")
-
-    -- Tick at T=400ms → window now closed
-    advance(0.15)
-    room:tickArbitration(math.floor(socket.gettime() * 1000))
-    assert(room.arbitrationEmitted, "K should be emitted after extended window closes")
-
-    room:close()
-  end)
-  restore()
-  if not ok then error(err) end
-end
-
-----------------------------------------------------------------------
--- Test 18: KO arbitration in 2v2 — both same-team die → other team wins
-----------------------------------------------------------------------
--- Expected: in 2v2, if both members of one team die within the window and
--- the other team still has survivors, the K declares the survivors win.
--- (winnerSlot = first surviving slot in the winning team, tie = false.)
-
-local function test_arbitration_2v2_team_wipe()
-  logger.info("test_arbitration_2v2_team_wipe")
+local function test_2v2_team_wipe_finalizes()
+  logger.info("test_2v2_team_wipe_finalizes")
   local p1 = makePlayer("ls-2v2-1", "LSP1", 2001)
   local p2 = makePlayer("ls-2v2-2", "LSP2", 2002)
   local p3 = makePlayer("ls-2v2-3", "LSP3", 2003)
   local p4 = makePlayer("ls-2v2-4", "LSP4", 2004)
 
-  local advance, restore = withMockSocketGetTime(4000.0)
-  local ok, err = pcall(function()
-    local room = Room(1, { p1, p2, p3, p4 }, GameModes.getPreset(GameModes.IDs.FOUR_PLAYER_TEAM_VS_ALL))
-    -- Drive ready for all 4
-    for _, p in ipairs({ p1, p2, p3, p4 }) do
-      p:updateSettings({ wants_ready = true, loaded = true, ready = true })
-    end
-    assert(room.game, "team match should have started")
-    assert(room.teams and #room.teams == 2, "team match should have 2 teams, got " .. (room.teams and #room.teams or 0))
+  local room = Room(1, { p1, p2, p3, p4 }, GameModes.getPreset(GameModes.IDs.FOUR_PLAYER_TEAM_VS_ALL))
+  for _, p in ipairs({ p1, p2, p3, p4 }) do
+    p:updateSettings({ wants_ready = true, loaded = true, ready = true })
+  end
+  assert(room.game, "team match should have started")
+  assert(room.teams and #room.teams == 2, "team match should have 2 teams, got " .. (room.teams and #room.teams or 0))
 
-    -- Clear startup messages
-    for _, p in ipairs({ p1, p2, p3, p4 }) do
-      p.connection.outgoingMessageQueue:clear()
-      p.connection.outgoingInputQueue:clear()
-    end
+  for _, p in ipairs({ p1, p2, p3, p4 }) do
+    p.connection.outgoingMessageQueue:clear()
+    p.connection.outgoingInputQueue:clear()
+  end
 
-    -- Both team-1 members die within window
-    room:broadcastDeathEvent(p1, json.encode({ senderFrame = 500, reason = "topOut" }))
-    advance(0.05)
-    room:broadcastDeathEvent(p2, json.encode({ senderFrame = 510, reason = "topOut" }))
+  room:broadcastDeathEvent(p1, json.encode({ senderFrame = 500, reason = "topOut" }))
+  room:broadcastDeathEvent(p2, json.encode({ senderFrame = 510, reason = "topOut" }))
+  local finalized = room:maybeFinalizeFromLivingTeams()
+  assert(finalized, "match should finalize once team 1 is wiped")
+  assert(room.game.complete, "game.complete should be true after finalize")
+  assert(room.game.winnerTeamIndex == 2,
+    "winnerTeamIndex should be 2 (team 2), got " .. tostring(room.game.winnerTeamIndex))
 
-    advance(0.3)
-    room:tickArbitration(math.floor(socket.gettime() * 1000))
-    assert(room.arbitrationEmitted, "arbitration should fire after window")
-    -- K wire removed (abfd5d4c); team-wipe outcome now goes via gameResult.
-
-    room:close()
-  end)
-  restore()
-  if not ok then error(err) end
+  room:close()
 end
 
 ----------------------------------------------------------------------
--- Test: KO arbitration fires for sequential deaths in separate windows
+-- Test 18: Sequential deaths in separate ticks each get a chance to finalize
 ----------------------------------------------------------------------
--- Regression for the sticky-flag bug from the Amber/Bev/Koozie hung match
--- (and bug #10 generally). Pre-fix: arbitrationEmitted set on the first
--- death's window and never reset, so any subsequent death's window opened
--- but tickArbitration silently returned early at the "already emitted"
--- guard. The match never got its server-authoritative end signal even
--- though every other team was eliminated.
+-- Regression for the Amber/Bev/Koozie hung-match (bug #10): before the
+-- arbitration code was deleted, an arbitrationEmitted sticky-flag could
+-- prevent second-window arbitration. Now maybeFinalizeFromLivingTeams runs
+-- every tick, so any death in a teammate-of-survivor scenario keeps the
+-- match alive until the final wipe. After the second team-1 death, team 2
+-- should win.
 
-local function test_arbitration_sequentialDeaths_each_window_fires()
-  logger.info("test_arbitration_sequentialDeaths_each_window_fires")
+local function test_sequentialDeaths_each_tick_evaluates()
+  logger.info("test_sequentialDeaths_each_tick_evaluates")
   local p1 = makePlayer("ls-seq-1", "LSseq1", 2101)
   local p2 = makePlayer("ls-seq-2", "LSseq2", 2102)
   local p3 = makePlayer("ls-seq-3", "LSseq3", 2103)
   local p4 = makePlayer("ls-seq-4", "LSseq4", 2104)
 
-  local advance, restore = withMockSocketGetTime(5000.0)
-  local ok, err = pcall(function()
-    local room = Room(1, { p1, p2, p3, p4 }, GameModes.getPreset(GameModes.IDs.FOUR_PLAYER_TEAM_VS_ALL))
-    for _, p in ipairs({ p1, p2, p3, p4 }) do
-      p:updateSettings({ wants_ready = true, loaded = true, ready = true })
-    end
-    assert(room.game, "team match should have started")
+  local room = Room(1, { p1, p2, p3, p4 }, GameModes.getPreset(GameModes.IDs.FOUR_PLAYER_TEAM_VS_ALL))
+  for _, p in ipairs({ p1, p2, p3, p4 }) do
+    p:updateSettings({ wants_ready = true, loaded = true, ready = true })
+  end
+  assert(room.game, "team match should have started")
 
-    for _, p in ipairs({ p1, p2, p3, p4 }) do
-      p.connection.outgoingMessageQueue:clear()
-      p.connection.outgoingInputQueue:clear()
-    end
+  for _, p in ipairs({ p1, p2, p3, p4 }) do
+    p.connection.outgoingMessageQueue:clear()
+    p.connection.outgoingInputQueue:clear()
+  end
 
-    -- First death: p1 (team 1) at T=5000.0s. Arbitration window 200ms.
-    room:broadcastDeathEvent(p1, json.encode({ senderFrame = 500, reason = "topOut" }))
-    advance(0.25) -- past the 200ms window
-    room:tickArbitration(math.floor(socket.gettime() * 1000))
-    assert(room.arbitrationEmitted, "first arbitration should fire (team 1 has p2 alive)")
+  -- First death: p1 (team 1). Team 1 still has p2 alive → tick does NOT finalize.
+  room:broadcastDeathEvent(p1, json.encode({ senderFrame = 500, reason = "topOut" }))
+  local finalizedAfterFirst = room:maybeFinalizeFromLivingTeams()
+  assert(not finalizedAfterFirst, "match must not finalize while team 1 still has p2 alive")
+  assert(not room.game.complete, "game.complete must be false after only one death")
 
-    -- K wire was removed (commit abfd5d4c); we now verify that arbitration
-    -- LOGIC fires (arbitrationEmitted flag flips, deaths get arbitrated) on
-    -- both windows, even though no K broadcast goes out. The match outcome
-    -- still reaches clients via the subsequent gameResult.
+  -- Second death: p2 (also team 1). Team 1 is now wiped → tick finalizes,
+  -- team 2 wins. The bug this guards against: a sticky flag from arbitration
+  -- swallowing the second death evaluation.
+  room:broadcastDeathEvent(p2, json.encode({ senderFrame = 1500, reason = "topOut" }))
+  local finalizedAfterSecond = room:maybeFinalizeFromLivingTeams()
+  assert(finalizedAfterSecond, "match should finalize after both team-1 deaths")
+  assert(room.game.complete, "game.complete should be true after team 1 wiped")
+  assert(room.game.winnerTeamIndex == 2,
+    "winnerTeamIndex should be 2 (team 2), got " .. tostring(room.game.winnerTeamIndex))
 
-    -- Second death: p2 (also team 1) at T=5005s — 5 seconds later, well past
-    -- the first arbitration's window. With team 1 wiped, team 2 should win.
-    advance(5.0)
-    room:broadcastDeathEvent(p2, json.encode({ senderFrame = 1500, reason = "topOut" }))
-    advance(0.25)
-    room:tickArbitration(math.floor(socket.gettime() * 1000))
-
-    -- The bug this test guards against: arbitrationEmitted sticky-flag
-    -- preventing second-window arbitration. After the second tick, the
-    -- match should be resolvable (game complete or all stacks eliminated).
-    assert(room.game == nil or room.game.complete,
-      "after two deaths in team 1, game should be resolved")
-
-    room:close()
-  end)
-  restore()
-  if not ok then error(err) end
+  room:close()
 end
 
 ----------------------------------------------------------------------
@@ -695,12 +607,11 @@ end
 
 test_broadcastInput_relays_immediately()
 test_broadcastGarbageEvent_relay()
-test_broadcastDeathEvent_eliminate_and_arbitrate()
-test_arbitration_singleDeath_emits_winner()
-test_arbitration_doubleDeath_tie()
-test_arbitration_window_extends()
-test_arbitration_2v2_team_wipe()
-test_arbitration_sequentialDeaths_each_window_fires()
+test_broadcastDeathEvent_eliminate_and_relay()
+test_singleDeath_finalizes_to_winner()
+test_sameTick_doubleDeath_tie()
+test_2v2_team_wipe_finalizes()
+test_sequentialDeaths_each_tick_evaluates()
 test_abort_marks_eliminated_keeps_game_alive()
 test_partialRoom_spectators_allowed()
 test_voidByLeave_flags_crash_incident()

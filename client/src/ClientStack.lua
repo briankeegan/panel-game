@@ -895,7 +895,13 @@ function ClientStack:drawPlayerName()
 
   local deathClock = self.engine and self.engine.game_over_clock
   if deathClock and deathClock > 0 then
-    local seconds = math.floor(deathClock / 60)
+    -- game_over_clock is engine-clock frames (countdown included); the visible
+    -- in-game timer is stopWatch (gameplay-start = 0). Subtract the countdown
+    -- so the death marker reads in the same time domain as the on-screen clock
+    -- — otherwise it shows ~3s ahead.
+    local countdownOffset = (self.engine.do_countdown
+        and (consts.COUNTDOWN_START + consts.COUNTDOWN_LENGTH)) or 0
+    local seconds = math.max(0, math.floor((deathClock - countdownOffset) / 60))
     local marker = string.format("OUT %d:%02d", math.floor(seconds / 60), seconds % 60)
     local markerHeight = 20
     local markerY = chipY - markerHeight - 2

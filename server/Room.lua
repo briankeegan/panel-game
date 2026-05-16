@@ -167,18 +167,30 @@ function(self, roomNumber, players, gameMode, leaderboard, clock)
 end
 )
 
+---Canonical slot accessor: returns the engine-side stackIndex for a player,
+---falling back to the lobby seat number pre-match. All game-state maps
+---keyed by "which player slot is this" (eliminatedPlayers, disconnectedPlayers,
+---lastInputMs, lastGarbageToMs) MUST go through this so renumberings never
+---desync between maps.
+---@param player ServerPlayer?
+---@return integer?
+function Room:_slotIdFor(player)
+  if not player then return nil end
+  return player.stackIndex or player.player_number
+end
+
 -- Clear per-match transient room state. Owns the full set so adding a new
 -- per-match field doesn't require finding all the reset sites.
 function Room:resetForNewMatch()
-  -- lastInputMs keyed by stackIndex (engine view); broadcastInput stamps
-  -- via sender.player_number == stackIndex during a match.
+  -- lastInputMs / lastGarbageToMs keyed by stackIndex (engine view); broadcastInput
+  -- stamps via sender.player_number == stackIndex during a match.
   self.lastInputMs = {}
+  self.lastGarbageToMs = {}
+  self._lastWatchdogTickMs = nil
   local nowMs = math.floor(self.clock() * 1000)
   for _, player in pairs(self.players) do
-    if player then
-      local stackIdx = player.stackIndex or player.player_number
-      if stackIdx then self.lastInputMs[stackIdx] = nowMs end
-    end
+    local stackIdx = self:_slotIdFor(player)
+    if stackIdx then self.lastInputMs[stackIdx] = nowMs end
   end
   self._loggedInputDropDisconnect = nil
   self._loggedInputDropEliminated = nil
@@ -835,39 +847,94 @@ function Room:broadcastInput(input, sender)
 end
 
 -- How long a non-eliminated, non-disconnected slot may go without sending
--- inputs before the server synthesizes an inferred D for it. The bug this
--- protects against (3p FFA Koozie/Bevy/Lala stuck-match) was a client that
--- topped out locally but never told the server. The actual fix lives in
--- PlayerStack:onGameOver (immediate notifyServerStackEliminated); this
--- watchdog is belt-and-suspenders for legacy clients, future regressions,
--- and any other path that lets a slot fall silent without sending a D.
+-- inputs before the server synthesizes an inferred D for it. The actual fix
+-- lives in PlayerStack:onGameOver (immediate notifyServerStackEliminated);
+-- this watchdog is belt-and-suspenders for any path that lets a slot fall
+-- silent without sending a D — covers legacy clients and future regressions.
 --
--- Threshold is generous (10s) so normal network jitter or a brief stall
--- doesn't false-positive. The cost of a false positive is high — we'd
--- declare a live player dead and they'd lose the match — so we err on
--- the side of "definitely stuck."
+-- Threshold is short (10s) for snappy match resolution. False-positive risk
+-- is mitigated by the per-tick guards below (pause, server-hiccup, garbage-
+-- sent gate), not by extending the threshold.
 local SILENT_DEATH_THRESHOLD_MS = 10000
 
+-- If more than this much wall-clock elapses between watchdog ticks, the
+-- server itself was paused (GC, host migration, NTP step, blocking I/O).
+-- We reset baselines and bail instead of mass-killing players whose
+-- silence is really our own stall.
+local WATCHDOG_HICCUP_THRESHOLD_MS = 1000
+
+---Reset every slot's recency baselines to nowMs. Called when we detect a
+---server-side stall — none of the silence we'd observe is the players' fault.
+---@param nowMs integer
+function Room:_resetWatchdogBaselines(nowMs)
+  if self.lastInputMs then
+    for k in pairs(self.lastInputMs) do
+      self.lastInputMs[k] = nowMs
+    end
+  end
+  if self.lastGarbageToMs then
+    for k in pairs(self.lastGarbageToMs) do
+      self.lastGarbageToMs[k] = nowMs
+    end
+  end
+end
+
+---@param stackIdx integer
+---@return boolean
+function Room:_slotEligibleForWatchdog(stackIdx)
+  if not self.game then return false end
+  return not self.game.eliminatedPlayers[stackIdx]
+     and not self.game.disconnectedPlayers[stackIdx]
+end
+
+---True only when a slot is past the silence threshold AND there's
+---unacknowledged garbage in flight to them (i.e., their stall is actually
+---blocking match progress). A player who's idle but isn't being attacked
+---just sits there — no synth-D needed.
+---@param stackIdx integer
+---@param nowMs integer
+---@return boolean
+function Room:_slotIsStalledWithPendingGarbage(stackIdx, nowMs)
+  local lastInput = self.lastInputMs and self.lastInputMs[stackIdx]
+  if not lastInput or (nowMs - lastInput) <= SILENT_DEATH_THRESHOLD_MS then
+    return false
+  end
+  local lastGarbage = self.lastGarbageToMs and self.lastGarbageToMs[stackIdx]
+  return lastGarbage and lastGarbage > lastInput
+end
+
 ---Watchdog for stuck matches: if any non-eliminated slot has been silent
----for SILENT_DEATH_THRESHOLD_MS, synthesize an inferred death so
----maybeFinalizeFromLivingTeams can resolve the match. pcall-wrapped at
----the call site.
+---for SILENT_DEATH_THRESHOLD_MS AND has unacknowledged garbage waiting,
+---synthesize an inferred death so maybeFinalizeFromLivingTeams can resolve
+---the match. pcall-wrapped at the call site.
 ---@param nowMs integer current wall-clock ms (server-injected)
 function Room:tickSilentDeathWatchdog(nowMs)
   if not self.game or self.game.complete then return end
   if self.voided then return end
+  if self.paused then return end
   if not self.lastInputMs then return end
+
+  -- Server-hiccup guard: if the wall-clock gap between ticks is suspiciously
+  -- large, the server (not the clients) was stalled. Reset baselines so we
+  -- don't mass-fire on the next tick, and skip this round.
+  if self._lastWatchdogTickMs
+     and (nowMs - self._lastWatchdogTickMs) > WATCHDOG_HICCUP_THRESHOLD_MS then
+    logger.warn(string.format(
+      "%d: server hiccup detected (%dms since last watchdog tick); resetting silence baselines",
+      self.roomNumber, nowMs - self._lastWatchdogTickMs))
+    self:_resetWatchdogBaselines(nowMs)
+    self._lastWatchdogTickMs = nowMs
+    return
+  end
+  self._lastWatchdogTickMs = nowMs
 
   -- self.players is seatId-keyed; game-state maps are stackIndex-keyed.
   for _, player in pairs(self.players) do
-    local stackIdx = player and (player.stackIndex or player.player_number)
+    local stackIdx = self:_slotIdFor(player)
     if stackIdx
-       and not self.game.eliminatedPlayers[stackIdx]
-       and not self.game.disconnectedPlayers[stackIdx] then
-      local lastMs = self.lastInputMs[stackIdx]
-      if lastMs and (nowMs - lastMs) > SILENT_DEATH_THRESHOLD_MS then
-        self:_synthesizeSilentDeath(player, stackIdx, nowMs)
-      end
+       and self:_slotEligibleForWatchdog(stackIdx)
+       and self:_slotIsStalledWithPendingGarbage(stackIdx, nowMs) then
+      self:_synthesizeSilentDeath(player, stackIdx, nowMs)
     end
   end
 end
@@ -1046,6 +1113,16 @@ function Room:broadcastGarbageEvent(sender, body)
 
   self.game:recordGarbageEvent(sender, parsed)
 
+  -- Stamp each (post-redirect) recipient's last-incoming-garbage timestamp.
+  -- The silent-death watchdog uses this as the "is this slot's silence
+  -- actually blocking the match?" gate — a player who's idle but isn't
+  -- being attacked stays alive; only forfeit when they have pending hits.
+  if self.lastGarbageToMs and type(parsed.recipients) == "table" then
+    for _, recipient in ipairs(parsed.recipients) do
+      self.lastGarbageToMs[recipient] = parsed.serverWallClockMs
+    end
+  end
+
   do
     local rstr = {}
     for _, r in ipairs(parsed.recipients) do rstr[#rstr + 1] = tostring(r) end
@@ -1190,8 +1267,9 @@ function Room:_livingTeams()
   local game = self.game
   -- game.eliminatedPlayers / disconnectedPlayers are stackIndex-keyed (engine
   -- view), so we ask via player.stackIndex. self.players stays seatId-keyed.
+  local slotIdFor = function(p) return self:_slotIdFor(p) end
   return TeamUtils.livingTeams(self.players, self.teams, function(_, player)
-    local stackIdx = player.stackIndex or player.player_number
+    local stackIdx = slotIdFor(player)
     return not (game.disconnectedPlayers[stackIdx] or game.eliminatedPlayers[stackIdx])
   end)
 end
@@ -1221,8 +1299,7 @@ function Room:maybeFinalizeFromLivingTeams()
   if #livingTeams > threshold then return false end
 
   local function toStackIndex(seatId)
-    local p = self.players[seatId]
-    return (p and (p.stackIndex or p.player_number)) or seatId
+    return self:_slotIdFor(self.players[seatId]) or seatId
   end
 
   if #livingTeams == 1 and threshold >= 1 then
@@ -1325,7 +1402,7 @@ function Room:_finalizeMatch()
     local ratingUpdates = self.leaderboard:processGameResult(self.game)
     -- ratingUpdates keyed by stackIndex (engine view, like game.players).
     for _, player in self:eachPlayer() do
-      local stackIdx = player.stackIndex or player.player_number
+      local stackIdx = self:_slotIdFor(player)
       if stackIdx and ratingUpdates[stackIdx] then
         ratingUpdates[stackIdx].userId = nil
       end

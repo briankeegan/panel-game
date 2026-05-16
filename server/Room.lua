@@ -1313,15 +1313,25 @@ function Room:maybeFinalizeFromLivingTeams()
     return false
   end
 
+  -- Respect the gameMode's match-end threshold. For VS/team modes the rule
+  -- is "last team standing wins" (STACKS_ACTIVE=1 or TEAMS_ACTIVE=1), so 1
+  -- living team means match over. For solo endless the rule is
+  -- STACKS_ACTIVE=0 — the only way to end is for the lone player to die.
+  -- Without this gate, a 1-player endless room finalizes on the first tick
+  -- because livingTeams=1 from match start.
+  local mec = (self.gameMode and self.gameMode.matchRules
+               and self.gameMode.matchRules.matchEndConditions) or {}
+  local threshold = mec.TEAMS_ACTIVE or mec.STACKS_ACTIVE or 1
+
   local livingTeams, representatives = self:_livingTeams()
-  if #livingTeams > 1 then return false end
+  if #livingTeams > threshold then return false end
 
   local function toStackIndex(seatId)
     local p = self.players[seatId]
     return (p and (p.stackIndex or p.player_number)) or seatId
   end
 
-  if #livingTeams == 1 then
+  if #livingTeams == 1 and threshold >= 1 then
     local winnerSeatId = representatives[1]
     local winnerStack = toStackIndex(winnerSeatId)
     self.game.winnerIndex = winnerStack

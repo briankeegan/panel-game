@@ -990,8 +990,12 @@ function Stack:runPhysics()
 
   --prof.push("passive raise")
   -- Phase 0 //////////////////////////////////////////////////////////////
-  -- Stack automatic rising
-  if self.behaviours.passiveRaise then
+  -- Stack automatic rising. Also fires while prevent_manual_raise is set
+  -- so the deferred final tick of a manual raise (displacement 1 → 0 +
+  -- new_row, see handleManualRaise / issue #663) still completes when
+  -- passiveRaise is off. Without this, no-raise endless gets stuck at
+  -- displacement 1 after one raise and blocks all subsequent input.
+  if self.behaviours.passiveRaise or self.prevent_manual_raise then
     if self:advancePassiveRaise() then
       if self:checkDeath() then
         self:recordDeath()

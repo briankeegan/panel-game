@@ -165,13 +165,10 @@ function Player:addToRoom(room)
   self.room = room
   self.wantsReady = false
   self.ready = false
-  -- Apply game-mode timeouts to both sockets so neither prematurely closes.
-  local timeoutSeconds = room.gameMode and room.gameMode.connectionTimeoutSeconds
   local sendRetryLimit = room.gameMode and room.gameMode.sendRetryLimit
   for _, conn in ipairs({self.gameplayConnection, self.lobbyConnection}) do
-    if conn then
-      if timeoutSeconds then conn.timeoutSeconds = timeoutSeconds end
-      if sendRetryLimit then conn.sendRetryLimit = sendRetryLimit end
+    if conn and sendRetryLimit then
+      conn.sendRetryLimit = sendRetryLimit
     end
   end
 end
@@ -188,10 +185,8 @@ function Player:removeFromRoom(room, reason)
   self.room = nil
   self.wantsReady = false
   self.ready = false
-  -- Restore default per-connection timeouts on both sockets.
   for _, conn in ipairs({self.gameplayConnection, self.lobbyConnection}) do
     if conn then
-      conn.timeoutSeconds = nil
       conn.sendRetryLimit = 5
     end
   end

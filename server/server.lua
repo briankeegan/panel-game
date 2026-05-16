@@ -85,24 +85,10 @@ local function resolveRequestedGameMode(requestedGameMode)
   return nil
 end
 
--- Resolve all per-match latency-tolerance knobs from the host's strict/normal/
--- relaxed selection. In the loose-sync world there are three things this dial
--- controls, all rolled into one resolution function so server.lua + Room.lua
--- + clients see consistent values:
---
---   1. connectionTimeoutSeconds — how long the TCP watchdog tolerates silence
---      from a player before declaring the connection dead. Larger in the
---      relaxed setting so flaky internet can recover.
---   2. sendRetryLimit — how many times to retry a send before giving up.
---   3. minReactionFrames — floor on the adaptive telegraph compression on
---      the receiver. Larger values guarantee more telegraph window before
---      garbage lands, at the cost of overall tempo. Smaller values let
---      gameplay stay tight even under heavy latency.
---
--- Strict / normal / relaxed are knobs the room host picks in the lobby; they
--- apply to the whole match. All clients see the same resolved values via the
--- gameMode payload, so the experience matches the host's choice.
----@return {connectionTimeoutSeconds:integer, sendRetryLimit:integer, minReactionFrames:integer}
+-- Two per-match knobs derived from the host's strict/normal/relaxed pick:
+--   sendRetryLimit    — TCP send-retry budget on outgoing frames.
+--   minReactionFrames — floor on adaptive telegraph compression at the receiver.
+---@return {sendRetryLimit:integer, minReactionFrames:integer}
 local function resolveLatencySettings(latencyTolerance, playerCount)
   local count = tonumber(playerCount) or 2
   local tolerance = latencyTolerance
@@ -112,17 +98,14 @@ local function resolveLatencySettings(latencyTolerance, playerCount)
 
   local settings = {}
   if tolerance == "strict" then
-    settings.connectionTimeoutSeconds = (count >= 3) and 30 or 20
-    settings.sendRetryLimit            = (count >= 3) and 10 or 8
-    settings.minReactionFrames         = 30
+    settings.sendRetryLimit    = (count >= 3) and 10 or 8
+    settings.minReactionFrames = 30
   elseif tolerance == "relaxed" then
-    settings.connectionTimeoutSeconds = (count >= 3) and 120 or 90
-    settings.sendRetryLimit            = (count >= 3) and 20 or 15
-    settings.minReactionFrames         = 60
+    settings.sendRetryLimit    = (count >= 3) and 20 or 15
+    settings.minReactionFrames = 60
   else
-    settings.connectionTimeoutSeconds = (count >= 3) and 60 or 45
-    settings.sendRetryLimit            = (count >= 3) and 15 or 10
-    settings.minReactionFrames         = 45
+    settings.sendRetryLimit    = (count >= 3) and 15 or 10
+    settings.minReactionFrames = 45
   end
   return settings
 end
@@ -1514,14 +1497,11 @@ function Server:processMessage(message, connection)
 
         requestedGameMode.latencyTolerance = message.latencyTolerance
         -- For dynamic-roster modes (open_ffa) playerCount is nil at request time;
-        -- fall back to maxPlayers. latencyTolerance now drives three match-wide
-        -- knobs: TCP-watchdog timeout/retry, and the receiver-side adaptive-
-        -- telegraph reaction floor.
+        -- fall back to maxPlayers.
         local effectiveCount = requestedGameMode.playerCount or requestedGameMode.maxPlayers or 2
         local latencySettings = resolveLatencySettings(message.latencyTolerance, effectiveCount)
-        requestedGameMode.connectionTimeoutSeconds = latencySettings.connectionTimeoutSeconds
-        requestedGameMode.sendRetryLimit           = latencySettings.sendRetryLimit
-        requestedGameMode.minReactionFrames        = latencySettings.minReactionFrames
+        requestedGameMode.sendRetryLimit    = latencySettings.sendRetryLimit
+        requestedGameMode.minReactionFrames = latencySettings.minReactionFrames
         -- Carry through to Room construction. Decouples join-style (direct vs
         -- invite handshake) from roster shape (fixed vs dynamic): an Open Team
         -- 2v2 has min==max==4 but should accept drop-in joiners.

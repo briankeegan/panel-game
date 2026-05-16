@@ -11,7 +11,6 @@ local Queue = require("common.lib.Queue")
 -- 8 samples × ~1 ping/sec = ~8s of recent history; min filters jitter.
 local RTT_SAMPLE_WINDOW = 8
 
-local DEFAULT_TIMEOUT_SECONDS = 10
 local DEFAULT_SEND_RETRY_LIMIT = 5
 -- Cap on un-parsed inbound leftovers. With length-prefixed v009 framing a
 -- peer could announce a huge frame length and never deliver the body; this
@@ -38,7 +37,6 @@ local MAX_LEFTOVERS_BYTES = 4 * 1024 * 1024
 ---@field incomingRewindQueue Queue pause-mode RewindEvent bodies awaiting room relay
 ---@field sendRetryCount integer
 ---@field sendRetryLimit integer
----@field timeoutSeconds integer
 ---@field inputProcessor InputProcessor?
 ---@overload fun(socket: any, index: integer) : Connection
 local Connection = class(
@@ -61,17 +59,19 @@ local Connection = class(
     self.incomingRewindQueue = Queue()
     self.sendRetryCount = 0
     self.sendRetryLimit = DEFAULT_SEND_RETRY_LIMIT
-    self.timeoutSeconds = DEFAULT_TIMEOUT_SECONDS
     self.rttSamples = nil
   end
 )
 
----@return integer? minimum RTT in ms across recent samples, or nil if none
-function Connection:getMinRecentRttMs()
+---@return integer? maximum RTT in ms across recent samples, or nil if none
+-- For start-budget sizing we need the worst-case round-trip we've recently
+-- observed, not the best — a cleanest-path estimate (min) leaves the budget
+-- too tight for jittery clients, and their matchStart arrives late.
+function Connection:getMaxRecentRttMs()
   if not self.rttSamples or #self.rttSamples == 0 then return nil end
   local m = self.rttSamples[1]
   for i = 2, #self.rttSamples do
-    if self.rttSamples[i] < m then m = self.rttSamples[i] end
+    if self.rttSamples[i] > m then m = self.rttSamples[i] end
   end
   return m
 end

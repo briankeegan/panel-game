@@ -34,12 +34,16 @@ function PlayerStack:notifyServerStackEliminated()
   if self._stackEliminationSent then
     return
   end
-  if not GAME.netClient or not GAME.netClient:isConnected() then
-    logger.warn("Local stack topped out but netClient not connected; D event NOT sent")
+  if not GAME.netClient then
+    -- No NetClient at all (offline-shaped match somehow live online). Nothing
+    -- we can do; skip without the warn since this isn't a recoverable case.
     return
   end
   self._stackEliminationSent = true
-  logger.info(string.format("Local stack topped out at frame %d; sending D event", self.engine.game_over_clock))
+  logger.info(string.format("Local stack topped out at frame %d; queueing D event", self.engine.game_over_clock))
+  -- Always queue. NetClient.sendDeathEvent is now queue-then-flush — if the
+  -- gameplay socket is mid-flap, the per-tick retry in NetClient:update will
+  -- get the D through once the socket is healthy again. Don't lose the death.
   GAME.netClient:sendDeathEvent({
     senderFrame = self.engine.game_over_clock,
     reason = "topOut",

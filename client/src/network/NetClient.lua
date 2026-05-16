@@ -46,6 +46,9 @@ local function _clearMatchInputState(self)
   self._deferredInputMsgs = nil
   self._deferredGarbageMsgs = nil
   self._deferredDeathMsgs = nil
+  -- Drop any unflushed outbound D — match is over, the death no longer
+  -- applies. Stale resend into a fresh match would mis-eliminate a slot.
+  self._pendingDeathSends = nil
 end
 
 -- One place to send a gameplay-channel fire-and-forget message (inputs / G / D).
@@ -1298,8 +1301,32 @@ end
 
 ---Loose-sync: send a DeathEvent from the local sim.
 ---@param body table parsed event payload
+---
+---DeathEvent is THE load-bearing message of a match — without it the server
+---never marks the player eliminated, `livingTeams` never resolves, and the
+---survivors stall. Don't fire-and-forget: queue it AND try to send. The
+---per-tick flush in update() will keep retrying as long as we're still in
+---the match. Cleared on match end via _clearMatchInputState so a stale D
+---can't bleed into the next match.
 function NetClient:sendDeathEvent(body)
-  _sendGameplay(self, NetworkProtocol.clientMessageTypes.deathEvent.prefix, json.encode(body))
+  self._pendingDeathSends = self._pendingDeathSends or {}
+  self._pendingDeathSends[#self._pendingDeathSends + 1] = body
+  self:_flushPendingDeathSends()
+end
+
+---Try to flush queued DeathEvents. Idempotent — anything we successfully
+---hand to the socket stays handed; anything that can't go now stays queued
+---for the next tick. We don't get application-level acks (TCP is the
+---delivery contract), but if the socket dies mid-send the disconnect path
+---will see it and we won't be wasting cycles re-sending into nothing.
+function NetClient:_flushPendingDeathSends()
+  if not self._pendingDeathSends or #self._pendingDeathSends == 0 then return end
+  if not self:isConnected() then return end
+  local prefix = NetworkProtocol.clientMessageTypes.deathEvent.prefix
+  for _, body in ipairs(self._pendingDeathSends) do
+    self.gameplayClient:send(NetworkProtocol.markedMessageForTypeAndBody(prefix, json.encode(body)))
+  end
+  self._pendingDeathSends = nil
 end
 
 ---Pause-mode rewind committed; tell the server to truncate its input record.
@@ -1608,6 +1635,11 @@ function NetClient:update(dt)
     processGarbageEvents(self)
     processDeathEvents(self)
     processRewindEvents(self)
+
+    -- Retry any DeathEvent that couldn't flush earlier (gameplay socket
+    -- mid-flap when the local stack topped out). The match can't end on
+    -- the server side until this gets through.
+    self:_flushPendingDeathSends()
 
     for _, listener in pairs(self.matchListeners) do
       listener:listen()

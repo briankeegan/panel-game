@@ -573,10 +573,27 @@ function Room:start_match()
   -- games generated via createFromRoomState always have a replay
   ---@cast replay -nil
   local message = ServerProtocol.startMatch(self.roomNumber, replay)
-  -- Scheduled start time. Clients with a serverOffsetMs estimate translate this
-  -- to their local clock; clients without one fall back to "start on receive".
-  -- 500ms grace window absorbs typical network jitter across all clients.
-  message.messageText.startAtMs = math.floor(self.clock() * 1000) + 500
+  -- Scheduled start time. Clients translate via serverOffsetMs; without an
+  -- offset they fall back to "start on receive". The grace window must exceed
+  -- the slowest server→client one-way trip in this room, else that client
+  -- starts late. Widen the floor (500ms) using recent ping RTT from each
+  -- player's gameplay connection (the channel matchStart rides on).
+  local budgetMs = 500
+  local worstRttMs = 0
+  for _, player in self:eachPlayer() do
+    local conn = player.gameplayConnection
+    if conn and conn.getMinRecentRttMs then
+      local rtt = conn:getMinRecentRttMs()
+      if rtt and rtt > worstRttMs then worstRttMs = rtt end
+    end
+  end
+  if worstRttMs > 0 then
+    -- RTT + 300ms jitter margin; full RTT (not /2) keeps us conservative
+    -- when client→server and server→client latencies are asymmetric.
+    budgetMs = math.max(budgetMs, worstRttMs + 300)
+  end
+  message.messageText.startAtMs = math.floor(self.clock() * 1000) + budgetMs
+  logger.info(self.roomNumber .. ": start budget=" .. budgetMs .. "ms (worstRtt=" .. worstRttMs .. "ms)")
   self:broadcastJson(message)
 
   for _, player in self:eachPlayer() do

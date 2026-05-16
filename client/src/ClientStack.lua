@@ -746,7 +746,7 @@ end
 
 function ClientStack:drawCharacter()
   -- Update portrait fade if needed
-  if self.engine.do_countdown then
+  if self.engine.in_countdown then
     -- self.portraitFade starts at 0 (no fade)
     if self.engine.clock and self.engine.clock > 0 then
       local desiredFade = config.portrait_darkness / 100
@@ -788,7 +788,7 @@ function ClientStack:drawWall(displacement, rowCount)
 end
 
 function ClientStack:drawCountdown()
-  if self.engine.do_countdown and self.engine.countdown_timer and self.engine.countdown_timer > 0 then
+  if self.engine.in_countdown and self.engine.countdown_timer and self.engine.countdown_timer > 0 then
     local ready_x = 16
     local initial_ready_y = 4
     local ready_y_drop_speed = 6

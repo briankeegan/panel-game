@@ -101,8 +101,24 @@ local handlers = {
     self.receivedMessageQueue:push({versionCompatible = false})
   end,
 
-  [NP.serverMessageTypes.ping.prefix] = function(self, _)
-    self:send(NP.markedMessageForTypeAndBody(NP.clientMessageTypes.acknowledgedPing.prefix, ""))
+  [NP.serverMessageTypes.ping.prefix] = function(self, data)
+    -- v009+: ping body carries `{serverTimeMs}`. Sample it into the offset
+    -- estimate (same max-of rule as J) so waiting-room idle clients keep a
+    -- fresh estimate without depending on lobby chatter. Echo the stamp back
+    -- in the ack so the server can compute RTT for adaptive start-budget.
+    local ackBody = ""
+    if data and #data > 0 then
+      local decoded = json.decode(data)
+      if type(decoded) == "table" and type(decoded.serverTimeMs) == "number" then
+        local localReceiveMs = math.floor(socket.gettime() * 1000)
+        local sample = decoded.serverTimeMs - localReceiveMs
+        if not self.serverOffsetMs or sample > self.serverOffsetMs then
+          self.serverOffsetMs = sample
+        end
+        ackBody = '{"echoedServerTimeMs":' .. decoded.serverTimeMs .. '}'
+      end
+    end
+    self:send(NP.markedMessageForTypeAndBody(NP.clientMessageTypes.acknowledgedPing.prefix, ackBody))
     self.connectionUptime = self.connectionUptime + 1
   end,
 }

@@ -1380,7 +1380,7 @@ function PlayerStack:playSfx()
       -- I have no idea why this makes a distinction for vs, like what?
       -- On scouring historical chats it seems like cursor move sounds did not play during swap sounds ONLY in vs in TA
       -- people suspected a lack in sound channels in TA; might just be sensible to overall keep the amount of SFX low
-      if not (self.stackInteraction ~= GameModes.StackInteractions.NONE and themes[config.theme].sounds.swap:isPlaying()) and not self.engine.do_countdown then
+      if not (self.stackInteraction ~= GameModes.StackInteractions.NONE and themes[config.theme].sounds.swap:isPlaying()) and not self.engine.in_countdown then
         SoundController:playSfx(themes[config.theme].sounds.cur_move)
       end
       self.sfxCursorMove = false

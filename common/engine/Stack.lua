@@ -429,7 +429,7 @@ function Stack:rollbackCopy()
   copy.shake_time = self.shake_time
   copy.peak_shake_time = self.peak_shake_time
   copy.shake_time_on_frame = self.shake_time_on_frame
-  copy.do_countdown = self.do_countdown
+  copy.in_countdown = self.in_countdown
   copy.has_risen = self.has_risen
   copy.metalPanelsQueued = self.metalPanelsQueued
   copy.panels_cleared = self.panels_cleared
@@ -486,7 +486,7 @@ local function internalRollbackToFrame(stack, clock)
   stack.shake_time = copy.shake_time
   stack.peak_shake_time = copy.peak_shake_time
   stack.shake_time_on_frame = copy.shake_time_on_frame
-  stack.do_countdown = copy.do_countdown
+  stack.in_countdown = copy.in_countdown
   stack.has_risen = copy.has_risen
   stack.metalPanelsQueued = copy.metalPanelsQueued
   stack.panels_cleared = copy.panels_cleared
@@ -664,7 +664,7 @@ function Stack:controls()
     local cursorColumn, cursorRow
     raise, cursorRow, cursorColumn = TouchDataEncoding.latinStringToTouchData(sdata, self.width)
     local canSetCursor = true
-    if self.do_countdown then
+    if self.in_countdown then
       if self.animatingCursorDuringCountdown then
         canSetCursor = false
       end
@@ -1193,7 +1193,7 @@ function Stack:advancePassiveRaise()
 end
 
 function Stack:runCountdown()
-  self.do_countdown = true
+  self.in_countdown = true
   self.rise_lock = true
   if self.clock == 0 then
     self.animatingCursorDuringCountdown = true
@@ -1232,7 +1232,7 @@ function Stack:runCountdown()
     end
     if self.countdown_timer == 0 then
       --we are done counting down
-      self.do_countdown = false
+      self.in_countdown = false
       self.countdown_timer = nil
     end
     if self.countdown_timer then
@@ -1266,14 +1266,9 @@ function Stack:recordDeath(clock)
   end
 
   self.game_over_clock = clock
-  -- Capture the gameplay-frame at death (clock minus countdown) so display
-  -- code reads the value in the same time domain as the in-game timer without
-  -- repeating the conversion on every frame. Local deaths and loose-sync
-  -- D-event-driven deaths share the same formula — the senderFrame the server
-  -- relays IS clock from the dying player's engine. Use countdownOffsetFrames
-  -- (set once in setCountdown), NOT do_countdown — the latter gets toggled
-  -- false when the countdown finishes, so by death-time it's always falsy and
-  -- the subtraction would no-op (death marker would read ~3s ahead of timer).
+  -- Capture the gameplay-frame at death once, so display reads a value already
+  -- in the in-game-timer domain. Local deaths and loose-sync D-event-driven
+  -- deaths share this formula — senderFrame IS clock from the dying engine.
   self.game_over_stopWatch = math.max(0, clock - (self.countdownOffsetFrames or 0))
 
   self:emitSignal("gameOver", self)
@@ -1306,7 +1301,7 @@ function Stack:canSwap(panel1, panel2)
   if math.abs(panel1.column - panel2.column) ~= 1 or panel1.row ~= panel2.row then
     -- panels are not horizontally adjacent, can't swap
     return false
-  elseif self.do_countdown or self.clock <= 1 then
+  elseif self.in_countdown or self.clock <= 1 then
     -- swapping is not possible during countdown and on the first frame
     return false
   elseif self.stackOverConditions[MatchRules.StackOverConditions.SWAPS] and self.stackOverConditions[MatchRules.StackOverConditions.SWAPS] <= self.swapCount then
@@ -1844,12 +1839,8 @@ end
 
 ---@param doCountdown boolean
 function Stack:setCountdown(doCountdown)
-  self.do_countdown = doCountdown
-  -- do_countdown is a TOGGLE (cleared when the countdown finishes ticking,
-  -- see ~line 1235), so it's useless for "does this match have a countdown"
-  -- queries after gameplay starts. Cache the offset once here so anything
-  -- that needs clock-to-stopWatch conversion later (e.g. recordDeath's
-  -- game_over_stopWatch capture) has a persistent source of truth.
+  self.in_countdown = doCountdown
+  -- Persistent offset for clock→stopWatch conversion (recordDeath uses it).
   self.countdownOffsetFrames = doCountdown
       and (consts.COUNTDOWN_START + consts.COUNTDOWN_LENGTH) or 0
   if doCountdown then

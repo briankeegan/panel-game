@@ -3,7 +3,13 @@ local logger = require("common.lib.logger")
 local NetworkProtocol = require("common.network.NetworkProtocol")
 local consts = require("common.engine.consts")
 local time = os.time
+local socket = require("common.lib.socket")
 local Queue = require("common.lib.Queue")
+
+-- Per-connection RTT samples kept for adaptive start-budget sizing
+-- (Room:start_match widens the +500ms grace using max-RTT-in-room).
+-- 8 samples × ~1 ping/sec = ~8s of recent history; min filters jitter.
+local RTT_SAMPLE_WINDOW = 8
 
 local DEFAULT_TIMEOUT_SECONDS = 10
 local DEFAULT_SEND_RETRY_LIMIT = 5
@@ -56,8 +62,28 @@ local Connection = class(
     self.sendRetryCount = 0
     self.sendRetryLimit = DEFAULT_SEND_RETRY_LIMIT
     self.timeoutSeconds = DEFAULT_TIMEOUT_SECONDS
+    self.rttSamples = nil
+    self.lastPingStampMs = nil
   end
 )
+
+---@return integer? minimum RTT in ms across recent samples, or nil if none
+function Connection:getMinRecentRttMs()
+  if not self.rttSamples or #self.rttSamples == 0 then return nil end
+  local m = self.rttSamples[1]
+  for i = 2, #self.rttSamples do
+    if self.rttSamples[i] < m then m = self.rttSamples[i] end
+  end
+  return m
+end
+
+function Connection:_recordRttSample(rttMs)
+  if not self.rttSamples then self.rttSamples = {} end
+  table.insert(self.rttSamples, 1, rttMs)
+  if #self.rttSamples > RTT_SAMPLE_WINDOW then
+    table.remove(self.rttSamples)
+  end
+end
 
 -- dedicated method for sending JSON messages
 function Connection:sendJson(messageInfo)
@@ -228,8 +254,14 @@ function Connection:update(t, canRead, canSend)
     -- Pings still fire to elicit acks; an actually-dead socket gets detected
     -- via socket:receive returning "closed" (DISCONNECT-PATH-1).
     if t > self.lastPingTime and timeSinceLastComm > 1 then
+      -- Body carries serverTimeMs so clients can refine their server-time
+      -- offset even when no lobby chatter is flowing. The client echoes it
+      -- back in its E ack; we diff against now to compute RTT.
+      local nowMs = math.floor(socket.gettime() * 1000)
+      self.lastPingStampMs = nowMs
+      local body = '{"serverTimeMs":' .. nowMs .. '}'
       self:send(NetworkProtocol.markedMessageForTypeAndBody(
-        NetworkProtocol.serverMessageTypes.ping.prefix, ""))
+        NetworkProtocol.serverMessageTypes.ping.prefix, body))
       self.lastPingTime = t
     end
   end
@@ -254,7 +286,19 @@ function Connection:processMessage(messageType, data)
   elseif messageType == "H" then
     H(self, data)
   elseif messageType == "E" then
-    -- Nothing to do here, the fact we got a message from the client updates the lastCommunicationTime
+    -- E ack: client echoes back the serverTimeMs we stamped on our ping.
+    -- Diff against now to record RTT. Empty body (legacy clients) → no sample.
+    if data and #data > 0 then
+      local ok, decoded = pcall(json.decode, data)
+      if ok and type(decoded) == "table" and type(decoded.echoedServerTimeMs) == "number" then
+        local nowMs = math.floor(socket.gettime() * 1000)
+        local rttMs = nowMs - decoded.echoedServerTimeMs
+        -- Sanity-bound: drop nonsense samples (clock skew, replay).
+        if rttMs >= 0 and rttMs < 10000 then
+          self:_recordRttSample(rttMs)
+        end
+      end
+    end
   end
 end
 

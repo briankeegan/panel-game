@@ -41,7 +41,7 @@ end
 function SimulatedStack:run()
   if self.stopWatchIsRunning then
     self:runPhysics()
-  elseif self.do_countdown and self.countdown_timer > 0 then
+  elseif self.in_countdown and self.countdown_timer > 0 then
     if self.healthEngine then
       self.healthEngine.clock = self.clock
     end
@@ -49,7 +49,7 @@ function SimulatedStack:run()
       self.countdown_timer = self.countdown_timer - 1
     end
     if self.countdown_timer == 0 then
-      self.do_countdown = nil
+      self.in_countdown = nil
       self.stopWatchIsRunning = true
     end
   else
@@ -218,7 +218,7 @@ function SimulatedStack:rewindToFrame(clock)
 end
 
 function SimulatedStack:starting_state()
-  if self.do_countdown then
+  if self.in_countdown then
     self.countdown_timer = consts.COUNTDOWN_LENGTH
   end
 end

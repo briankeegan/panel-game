@@ -14,7 +14,7 @@ local consts = require("common.engine.consts")
 ---@field stopWatch integer how many times the game physics have run; unlike a clock and just like a stopWatch this frame timer only runs when the simulation is running
 ---@field stopWatchIsRunning boolean if the stack is running the game physics during runs
 ---@field game_over_clock integer What the clock time was when the Stack went game over
----@field do_countdown boolean if the stack is currently performing a countdown / will perform a countdown at the start of the match;<br> this is state, the value will change at the end of countdown
+---@field in_countdown boolean runtime toggle — true while the pre-match countdown is pending/ticking, cleared when it hits zero. NOT a mode flag (use Match.doCountdown for "does this match have a countdown"). For clock→stopWatch conversions use `countdownOffsetFrames`.
 ---@field countdown_timer boolean? ephemeral timer used for tracking countdown progress at the start of the game
 ---@field outgoingGarbage GarbageQueue
 ---@field incomingGarbage GarbageQueue
@@ -116,14 +116,11 @@ end
 
 ---@param doCountdown boolean
 function BaseStack:setCountdown(doCountdown)
-  self.do_countdown = doCountdown
-  -- Cache the static offset (Stack:setCountdown does the same). do_countdown
-  -- itself is a TOGGLE — the countdown loop clears it — so it's useless as
-  -- "does this match have a countdown" later. Keep this field for any
-  -- subsequent clock→stopWatch conversions (mirrors Stack.lua).
+  self.in_countdown = doCountdown
+  -- Persistent offset for clock→stopWatch conversion (recordDeath uses it).
   self.countdownOffsetFrames = doCountdown
       and (consts.COUNTDOWN_START + consts.COUNTDOWN_LENGTH) or 0
-  self.stopWatchIsRunning = not self.do_countdown
+  self.stopWatchIsRunning = not self.in_countdown
 end
 
 ---@param maxRunsPerFrame integer

@@ -1270,10 +1270,11 @@ function Stack:recordDeath(clock)
   -- code reads the value in the same time domain as the in-game timer without
   -- repeating the conversion on every frame. Local deaths and loose-sync
   -- D-event-driven deaths share the same formula — the senderFrame the server
-  -- relays IS clock from the dying player's engine.
-  local countdownOffset = self.do_countdown
-      and (consts.COUNTDOWN_START + consts.COUNTDOWN_LENGTH) or 0
-  self.game_over_stopWatch = math.max(0, clock - countdownOffset)
+  -- relays IS clock from the dying player's engine. Use countdownOffsetFrames
+  -- (set once in setCountdown), NOT do_countdown — the latter gets toggled
+  -- false when the countdown finishes, so by death-time it's always falsy and
+  -- the subtraction would no-op (death marker would read ~3s ahead of timer).
+  self.game_over_stopWatch = math.max(0, clock - (self.countdownOffsetFrames or 0))
 
   self:emitSignal("gameOver", self)
 end
@@ -1844,6 +1845,13 @@ end
 ---@param doCountdown boolean
 function Stack:setCountdown(doCountdown)
   self.do_countdown = doCountdown
+  -- do_countdown is a TOGGLE (cleared when the countdown finishes ticking,
+  -- see ~line 1235), so it's useless for "does this match have a countdown"
+  -- queries after gameplay starts. Cache the offset once here so anything
+  -- that needs clock-to-stopWatch conversion later (e.g. recordDeath's
+  -- game_over_stopWatch capture) has a persistent source of truth.
+  self.countdownOffsetFrames = doCountdown
+      and (consts.COUNTDOWN_START + consts.COUNTDOWN_LENGTH) or 0
   if doCountdown then
     self.behaviours.delaySimulationUntil = "countdownEnded"
     self.stopWatchIsRunning = false

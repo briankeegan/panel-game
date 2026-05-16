@@ -582,6 +582,17 @@ end
 function BattleRoom:startLoadingNewAssets()
   if ModLoader.loading_mod == nil then
     for _, player in ipairs(self.players) do
+      -- If characterId/stageId isn't a concrete known mod, resolve via the
+      -- player's selectedCharacterId/selectedStageId (defaults to the random
+      -- sentinel) so refresh* picks ONCE and sticks. Going straight to
+      -- ModController with an empty/invalid id re-randomizes every frame —
+      -- mod-loader churns, allAssetsLoaded flaps, ready handshake never settles.
+      if not characters[player.settings.characterId] then
+        player:refreshCharacter()
+      end
+      if not stages[player.settings.stageId] then
+        player:refreshStage()
+      end
       logger.debug("Loading stage " .. tostring(player.settings.stageId) .. " for player " .. tostring(player.name))
       ModController:loadStageIdFor(player, player.settings.stageId)
       logger.debug("Loading character " .. tostring(player.settings.characterId) .. " for player " .. tostring(player.name))

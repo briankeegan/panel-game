@@ -50,18 +50,13 @@ local TeamUtils = require("common.data.TeamUtils")
 ---
 --- INVARIANT (read before indexing match.players or match.stacks):
 --- Both arrays are DENSE 1..N indexed by stackIndex (engine slot), NOT by
---- seatId (lobby slot). The two are aliased in the common 1v1 case but
---- diverge after a mid-room leave creates a seat gap. The densification
---- happens implicitly on the client (BattleRoom.players uses table.remove
---- which shifts down) and explicitly on the server (TeamUtils.assignStackIndices
---- sorts seats ascending and reassigns player.stackIndex). Both sides sort
---- by seatId asc, so stack[i] on the client and server refer to the same
---- player.
+--- seatId (lobby slot). setupFromGameMode and createFromReplay both call
+--- TeamUtils.assignStackIndices at match start so player.stackIndex /
+--- player.player_number agree with the server during a live match.
+--- player.playerNumber and player.seatId still carry the lobby seatId.
 ---
 --- Network events (I, G, D from the server) carry stackIndex on the wire —
---- index directly into self.stacks / self.engine.stacks. Do NOT index
---- match.players by player.playerNumber: that field still carries the
---- player's original seatId on the client side.
+--- index directly into self.stacks / self.engine.stacks.
 ---@class ClientMatch : Signal
 ---@overload fun(players: MatchParticipant[], ranked: boolean): ClientMatch
 local ClientMatch = class(
@@ -192,6 +187,12 @@ function ClientMatch.createFromReplay(replay, players, gameMode)
 
   clientMatch.players = players
 
+  -- Same lock-in as the live path so replay playback / spectator joins also
+  -- see player.stackIndex set. The replay-keyed assignment above already put
+  -- each player at their stackIndex position, so this re-derives the same
+  -- index — it just stamps it onto the player object too.
+  TeamUtils.assignStackIndices(clientMatch.players)
+
   -- Resolve gameMode from the replay metadata when the caller didn't pass one
   -- (saved-replay viewing via ReplayBrowser, etc). This way every match constructed
   -- via createFromReplay gets the correct end-condition / team behavior automatically.
@@ -265,6 +266,11 @@ end
 
 function ClientMatch:setupFromGameMode()
   self.engine = Match(self.panelSource, self.matchRules)
+
+  -- Lock in stackIndex (engine slot) on each player. Mirrors the server's
+  -- start_match compaction so player.stackIndex / .player_number line up
+  -- with the BE during a live match — no more "FE has nil stackIndex" gap.
+  TeamUtils.assignStackIndices(self.players)
 
   self.stacks = {}
 

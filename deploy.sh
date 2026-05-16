@@ -59,12 +59,7 @@ if [[ "${PANEL_SKIP_VERSION_BUMP:-0}" != "1" ]]; then
   sed -i.bak -E "s/(consts\.BUILD_VERSION[[:space:]]*=[[:space:]]*)\"[^\"]+\"/\\1\"$NEW_VERSION\"/" "$CONSTS_FILE"
   rm "${CONSTS_FILE}.bak"
   git add "$CONSTS_FILE"
-  git commit -m "deploy: bump BUILD_VERSION to $NEW_VERSION"
-  # Empty marker commit on top — purely a `git log --oneline` waypoint so
-  # it's obvious at a glance which commits got deployed and when. The
-  # bump commit above already encodes the version, but this gives you a
-  # clear "DEPLOY POINT" landmark to align against journal timestamps.
-  git commit --allow-empty -m "deploy: build $NEW_VERSION"
+  git commit -m "deploy: build $NEW_VERSION"
 else
   echo "==> Skipping version bump (PANEL_SKIP_VERSION_BUMP=1)"
 fi

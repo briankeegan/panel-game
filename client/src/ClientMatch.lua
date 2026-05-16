@@ -47,6 +47,21 @@ local TeamUtils = require("common.data.TeamUtils")
 ---@field gameMode GameMode
 
 --- The ClientMatch is a way to create a match that will run with graphics and sounds on a client.
+---
+--- INVARIANT (read before indexing match.players or match.stacks):
+--- Both arrays are DENSE 1..N indexed by stackIndex (engine slot), NOT by
+--- seatId (lobby slot). The two are aliased in the common 1v1 case but
+--- diverge after a mid-room leave creates a seat gap. The densification
+--- happens implicitly on the client (BattleRoom.players uses table.remove
+--- which shifts down) and explicitly on the server (TeamUtils.assignStackIndices
+--- sorts seats ascending and reassigns player.stackIndex). Both sides sort
+--- by seatId asc, so stack[i] on the client and server refer to the same
+--- player.
+---
+--- Network events (I, G, D from the server) carry stackIndex on the wire —
+--- index directly into self.stacks / self.engine.stacks. Do NOT index
+--- match.players by player.playerNumber: that field still carries the
+--- player's original seatId on the client side.
 ---@class ClientMatch : Signal
 ---@overload fun(players: MatchParticipant[], ranked: boolean): ClientMatch
 local ClientMatch = class(
@@ -1649,10 +1664,12 @@ function ClientMatch:getWinners()
   return self.winners or {}
 end
 
----@param playerNumber integer 1-based slot number of the sender
+---@param stackIndex integer dense engine slot of the sender (NOT a seatId).
+---  Server-relayed input frames carry stackIndex (see common/engine/Match
+---  invariant: stacks[i].player_number == i during a match).
 ---@param input string encoded input string
-function ClientMatch:receiveInput(playerNumber, input)
-  local stack = playerNumber and self.stacks[playerNumber]
+function ClientMatch:receiveInput(stackIndex, input)
+  local stack = stackIndex and self.stacks[stackIndex]
   if not stack or stack.is_local then return end
   ---@diagnostic disable-next-line: param-type-mismatch
   stack:receiveConfirmedInput(input)

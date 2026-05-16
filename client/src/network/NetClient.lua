@@ -946,7 +946,9 @@ local function processInputMessages(self)
   local inputPrefix = NetworkProtocol.serverMessageTypes.input.prefix
   local messages = _drainBoth(self, inputPrefix)
   if not (self.room and self.room.match) then return end
-  -- All I are visual: server never echoes your own inputs.
+  -- All I are visual: server never echoes your own inputs. body.playerNumber
+  -- on the wire is the engine-side stackIndex (server compacted at match
+  -- start), NOT a lobby seatId — pass straight through.
   _drainBudgeted(self, "_deferredInputMsgs", messages, function(msg)
     local body = msg[inputPrefix]
     if body then self.room.match:receiveInput(body.playerNumber, body.input) end

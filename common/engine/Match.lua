@@ -318,6 +318,18 @@ end
 --- rotation itself only advances over LIVING enemies. Dead players are
 --- skipped for both selection and advancement so the next delivery always
 --- rotates to the next living opponent for that sender.
+-- Aliveness predicate for recipient selection. Uses game_over_clock > 0
+-- (death has been recorded) instead of stack:game_ended() (sim clock has
+-- caught up past death). For a remote view-stack in loose-sync the clock
+-- is permanently pinned below game_over_clock once input stops, so
+-- game_ended() stays false forever — without this predicate the sender
+-- would keep listing dead remotes as recipients every combo, forcing
+-- the server's _redirectIfDead path on every emit. Same trap noted at
+-- ClientMatch.lua:419-424.
+local function isStackAlive(s)
+  return s and (s.game_over_clock or -1) <= 0
+end
+
 function Match:distributeGarbageToTargets()
   for senderIndex, targets in ipairs(self.garbageTargets) do
     if #targets > 1 then
@@ -325,43 +337,62 @@ function Match:distributeGarbageToTargets()
       local sender = self.stacks[senderIndex]
       local oldestTransitTime = sender:getOldestFinishedGarbageTransitTime()
       if oldestTransitTime and sender.stopWatch >= oldestTransitTime then
-        local garbageDelivery = sender:getReadyGarbageAt(oldestTransitTime)
-        if garbageDelivery then
-          if self.garbageMode == "shared" then
-            local teamState = self.teamGarbageState and self.teamGarbageState[senderIndex]
+        if self.garbageMode == "shared" then
+          local teamState = self.teamGarbageState and self.teamGarbageState[senderIndex]
 
-            if teamState and #teamState.enemyIndices > 0 then
-              local stacks = self.stacks
-              local alive = function(slot)
-                local s = stacks[slot]
-                return s and not s:game_ended()
-              end
-              -- Per-piece rotation: a chain/combo that lands multiple pieces
-              -- at the same transit time would otherwise dump the entire
-              -- batch on a single enemy with one cursor advance, leaving the
-              -- other enemy untouched until the first dies. Rotating per
-              -- piece spreads the batch across living enemies in order.
-              for _, g in ipairs(garbageDelivery) do
-                local _, pickedSlot, nextLivingIndex = TeamUtils.findNextLiving(
-                  teamState.enemyIndices, teamState.currentTargetIndex, alive)
-                if not pickedSlot then break end
-                if nextLivingIndex then
-                  teamState.currentTargetIndex = nextLivingIndex
+          if teamState and #teamState.enemyIndices > 0 then
+            local stacks = self.stacks
+            local alive = function(slot) return isStackAlive(stacks[slot]) end
+
+            -- Pre-flight: confirm at least one living enemy BEFORE popping
+            -- the transit bundle. getReadyGarbageAt mutates the queue, so
+            -- a pop followed by no-living-enemies would silently drop the
+            -- whole batch on the floor.
+            local _, firstSlot = TeamUtils.findNextLiving(
+              teamState.enemyIndices, teamState.currentTargetIndex, alive)
+            if firstSlot then
+              local garbageDelivery = sender:getReadyGarbageAt(oldestTransitTime)
+              if garbageDelivery then
+                -- Per-piece rotation: a chain/combo that lands multiple pieces
+                -- at the same transit time would otherwise dump the entire
+                -- batch on a single enemy with one cursor advance, leaving the
+                -- other enemy untouched until the first dies. Rotating per
+                -- piece spreads the batch across living enemies in order.
+                for _, g in ipairs(garbageDelivery) do
+                  local _, pickedSlot, nextLivingIndex = TeamUtils.findNextLiving(
+                    teamState.enemyIndices, teamState.currentTargetIndex, alive)
+                  if not pickedSlot then
+                    -- Defensive: within a single engine tick no sim runs
+                    -- between iterations so liveness can't change mid-loop.
+                    -- Warn loudly if that invariant ever breaks so the
+                    -- dropped pieces don't go silent.
+                    logger.warn(string.format(
+                      "shared-mode garbage dropped mid-batch: sender=%d ran out of living enemies",
+                      senderIndex))
+                    break
+                  end
+                  if nextLivingIndex then
+                    teamState.currentTargetIndex = nextLivingIndex
+                  end
+                  self:deliverOutgoingGarbage(sender, stacks[pickedSlot], { shallowcpy(g) })
                 end
-                self:deliverOutgoingGarbage(sender, stacks[pickedSlot], { shallowcpy(g) })
               end
             end
-          else
-            -- "All" mode: collect all living targets and send a single batched event
-            -- with all recipients (instead of multiple separate events).
-            local livingTargets = {}
-            for _, target in ipairs(targets) do
-              if not target:game_ended() then
-                livingTargets[#livingTargets + 1] = target
-              end
+          end
+        else
+          -- "All" mode: collect all living targets BEFORE popping the
+          -- transit bundle (same silent-drop risk as the shared branch
+          -- above), then send one batched event with every recipient.
+          local livingTargets = {}
+          for _, target in ipairs(targets) do
+            if isStackAlive(target) then
+              livingTargets[#livingTargets + 1] = target
             end
+          end
 
-            if #livingTargets > 0 then
+          if #livingTargets > 0 then
+            local garbageDelivery = sender:getReadyGarbageAt(oldestTransitTime)
+            if garbageDelivery then
               self:deliverOutgoingGarbageToMultiple(sender, livingTargets, garbageDelivery)
             end
           end

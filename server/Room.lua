@@ -1015,11 +1015,23 @@ function Room:broadcastGarbageEvent(sender, body)
   -- the sender's enemy pool, drop the event (the match will end shortly
   -- via the natural game-end check).
   if type(parsed.recipients) == "table" then
+    -- Dedup as we go: when multiple originally-distinct recipients are dead,
+    -- _redirectIfDead walks each forward to the next-living and they can
+    -- collapse onto the same survivor. Without dedup the survivor receives
+    -- N× the garbage on the client (no dedup at apply time either) AND the
+    -- duplicates get baked into the recorded replay.
     local redirected = {}
+    local seen = {}
+    local collapseCount = 0
     for _, originalRecipient in ipairs(parsed.recipients) do
       local actual = self:_redirectIfDead(sender.player_number, originalRecipient)
       if actual then
-        redirected[#redirected + 1] = actual
+        if seen[actual] then
+          collapseCount = collapseCount + 1
+        else
+          seen[actual] = true
+          redirected[#redirected + 1] = actual
+        end
         if actual ~= originalRecipient then
           logger.info(string.format(
             "%d: G from %s: recipient %d eliminated; redirected to %d",
@@ -1028,6 +1040,11 @@ function Room:broadcastGarbageEvent(sender, body)
       end
     end
     parsed.recipients = redirected
+    if collapseCount > 0 then
+      logger.info(string.format(
+        "%d: G from %s: %d recipient(s) collapsed via redirect (deduped)",
+        self.roomNumber, sender.name or "?", collapseCount))
+    end
     if #redirected == 0 then
       logger.info(string.format(
         "%d: G from %s: no living recipients, dropping",

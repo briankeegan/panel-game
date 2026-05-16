@@ -63,7 +63,6 @@ local Connection = class(
     self.sendRetryLimit = DEFAULT_SEND_RETRY_LIMIT
     self.timeoutSeconds = DEFAULT_TIMEOUT_SECONDS
     self.rttSamples = nil
-    self.lastPingStampMs = nil
   end
 )
 
@@ -256,9 +255,10 @@ function Connection:update(t, canRead, canSend)
     if t > self.lastPingTime and timeSinceLastComm > 1 then
       -- Body carries serverTimeMs so clients can refine their server-time
       -- offset even when no lobby chatter is flowing. The client echoes it
-      -- back in its E ack; we diff against now to compute RTT.
+      -- back in its E ack; we diff against now to compute RTT. Using the
+      -- echoed value (rather than a stored send-time) makes multi-in-flight
+      -- pings self-correlate without per-ping bookkeeping.
       local nowMs = math.floor(socket.gettime() * 1000)
-      self.lastPingStampMs = nowMs
       local body = '{"serverTimeMs":' .. nowMs .. '}'
       self:send(NetworkProtocol.markedMessageForTypeAndBody(
         NetworkProtocol.serverMessageTypes.ping.prefix, body))

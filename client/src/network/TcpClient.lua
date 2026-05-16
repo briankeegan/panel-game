@@ -108,8 +108,10 @@ local handlers = {
     -- in the ack so the server can compute RTT for adaptive start-budget.
     local ackBody = ""
     if data and #data > 0 then
-      local decoded = json.decode(data)
-      if type(decoded) == "table" and type(decoded.serverTimeMs) == "number" then
+      -- json.decode can throw on malformed input; ack must still go out
+      -- so the server's keepalive doesn't time us out.
+      local ok, decoded = pcall(json.decode, data)
+      if ok and type(decoded) == "table" and type(decoded.serverTimeMs) == "number" then
         local localReceiveMs = math.floor(socket.gettime() * 1000)
         local sample = decoded.serverTimeMs - localReceiveMs
         if not self.serverOffsetMs or sample > self.serverOffsetMs then

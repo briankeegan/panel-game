@@ -1042,7 +1042,16 @@ function Room:broadcastGarbageEvent(sender, body)
   -- before they emit, so we fix it server-side. If nobody alive remains in
   -- the sender's enemy pool, drop the event (the match will end shortly
   -- via the natural game-end check).
-  if type(parsed.recipients) == "table" then
+  --
+  -- Fast-path: when nobody has been eliminated yet (the common case for
+  -- most of every match), no recipient can be dead. Skip the whole
+  -- redirect/dedupe loop. The recipient list passes through unchanged.
+  -- Safe because: (a) _redirectIfDead is a no-op when its recipient is
+  -- alive (so the loop would already pass-through anyway), and (b) the
+  -- dedupe pass is also a no-op — getEnemyPlayerIndices returns distinct
+  -- slots and the engine's addTarget already dedups, so no two
+  -- originally-distinct recipients can be identical pre-redirect.
+  if type(parsed.recipients) == "table" and next(self.game.eliminatedPlayers) then
     -- Dedup as we go: when multiple originally-distinct recipients are dead,
     -- _redirectIfDead walks each forward to the next-living and they can
     -- collapse onto the same survivor. Without dedup the survivor receives

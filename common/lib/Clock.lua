@@ -3,8 +3,8 @@
 -- Single abstraction for "what time is it?" Two surfaces, by intent:
 --
 --   * monotonicMs() / monotonicSeconds()
---       Forward-only clock for arbitration windows, watchdog deadlines,
---       elapsed-time math. Backed by socket.gettime with a forward-only
+--       Forward-only clock for watchdog deadlines, elapsed-time math.
+--       Backed by socket.gettime with a forward-only
 --       guard so an NTP slew (which can move socket.gettime BACKWARD)
 --       can't make a window appear to close prematurely or never close.
 --

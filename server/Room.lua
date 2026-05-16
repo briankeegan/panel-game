@@ -167,11 +167,8 @@ function(self, roomNumber, players, gameMode, leaderboard, clock)
 end
 )
 
----Canonical slot accessor: returns the engine-side stackIndex for a player,
----falling back to the lobby seat number pre-match. All game-state maps
----keyed by "which player slot is this" (eliminatedPlayers, disconnectedPlayers,
----lastInputMs, lastGarbageToMs) MUST go through this so renumberings never
----desync between maps.
+---Canonical slot key for game-state maps (eliminatedPlayers, lastInputMs,
+---lastGarbageToMs, etc.) — go through this so renumberings can't desync.
 ---@param player ServerPlayer?
 ---@return integer?
 function Room:_slotIdFor(player)
@@ -846,25 +843,14 @@ function Room:broadcastInput(input, sender)
   end
 end
 
--- How long a non-eliminated, non-disconnected slot may go without sending
--- inputs before the server synthesizes an inferred D for it. The actual fix
--- lives in PlayerStack:onGameOver (immediate notifyServerStackEliminated);
--- this watchdog is belt-and-suspenders for any path that lets a slot fall
--- silent without sending a D — covers legacy clients and future regressions.
---
--- Threshold is short (10s) for snappy match resolution. False-positive risk
--- is mitigated by the per-tick guards below (pause, server-hiccup, garbage-
--- sent gate), not by extending the threshold.
+-- Belt-and-suspenders for any path that lets a slot fall silent without
+-- sending a D. Real fix is PlayerStack:onGameOver's immediate notify.
 local SILENT_DEATH_THRESHOLD_MS = 10000
 
--- If more than this much wall-clock elapses between watchdog ticks, the
--- server itself was paused (GC, host migration, NTP step, blocking I/O).
--- We reset baselines and bail instead of mass-killing players whose
--- silence is really our own stall.
+-- Gap > this between watchdog ticks means the server stalled (GC, host
+-- pause, NTP step). Reset baselines instead of mass-firing on the clients.
 local WATCHDOG_HICCUP_THRESHOLD_MS = 1000
 
----Reset every slot's recency baselines to nowMs. Called when we detect a
----server-side stall — none of the silence we'd observe is the players' fault.
 ---@param nowMs integer
 function Room:_resetWatchdogBaselines(nowMs)
   if self.lastInputMs then
@@ -887,10 +873,6 @@ function Room:_slotEligibleForWatchdog(stackIdx)
      and not self.game.disconnectedPlayers[stackIdx]
 end
 
----True only when a slot is past the silence threshold AND there's
----unacknowledged garbage in flight to them (i.e., their stall is actually
----blocking match progress). A player who's idle but isn't being attacked
----just sits there — no synth-D needed.
 ---@param stackIdx integer
 ---@param nowMs integer
 ---@return boolean
@@ -903,20 +885,14 @@ function Room:_slotIsStalledWithPendingGarbage(stackIdx, nowMs)
   return lastGarbage and lastGarbage > lastInput
 end
 
----Watchdog for stuck matches: if any non-eliminated slot has been silent
----for SILENT_DEATH_THRESHOLD_MS AND has unacknowledged garbage waiting,
----synthesize an inferred death so maybeFinalizeFromLivingTeams can resolve
----the match. pcall-wrapped at the call site.
----@param nowMs integer current wall-clock ms (server-injected)
+---Synth an inferred D for any slot whose silence is blocking the match.
+---@param nowMs integer
 function Room:tickSilentDeathWatchdog(nowMs)
   if not self.game or self.game.complete then return end
   if self.voided then return end
   if self.paused then return end
   if not self.lastInputMs then return end
 
-  -- Server-hiccup guard: if the wall-clock gap between ticks is suspiciously
-  -- large, the server (not the clients) was stalled. Reset baselines so we
-  -- don't mass-fire on the next tick, and skip this round.
   if self._lastWatchdogTickMs
      and (nowMs - self._lastWatchdogTickMs) > WATCHDOG_HICCUP_THRESHOLD_MS then
     logger.warn(string.format(
@@ -928,7 +904,6 @@ function Room:tickSilentDeathWatchdog(nowMs)
   end
   self._lastWatchdogTickMs = nowMs
 
-  -- self.players is seatId-keyed; game-state maps are stackIndex-keyed.
   for _, player in pairs(self.players) do
     local stackIdx = self:_slotIdFor(player)
     if stackIdx
@@ -1113,10 +1088,7 @@ function Room:broadcastGarbageEvent(sender, body)
 
   self.game:recordGarbageEvent(sender, parsed)
 
-  -- Stamp each (post-redirect) recipient's last-incoming-garbage timestamp.
-  -- The silent-death watchdog uses this as the "is this slot's silence
-  -- actually blocking the match?" gate — a player who's idle but isn't
-  -- being attacked stays alive; only forfeit when they have pending hits.
+  -- Watchdog gate: idle players only forfeit when they have pending garbage.
   if self.lastGarbageToMs and type(parsed.recipients) == "table" then
     for _, recipient in ipairs(parsed.recipients) do
       self.lastGarbageToMs[recipient] = parsed.serverWallClockMs

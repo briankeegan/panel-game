@@ -225,7 +225,7 @@ local Server = class(
 
 -- Seconds of "nothing happened in this room" before the per-second sweep
 -- closes it. Players in the room get kicked back to lobby via leaveRoom.
-Server.ROOM_IDLE_TIMEOUT = 60 * 60
+Server.ROOM_IDLE_TIMEOUT = 30 * 60
 
 -- Seconds of "no gameplay progress in this room's active game" before the
 -- stuck-match watchdog flags it via CrashReports. Live gameplay updates

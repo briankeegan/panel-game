@@ -1,6 +1,7 @@
 local class = require("common.lib.class")
 local Response = require("client.src.network.Response")
 local NetworkProtocol = require("common.network.NetworkProtocol")
+local consts = require("common.engine.consts")
 local logger = require("common.lib.logger")
 
 local Request = class(function(self, tcpClient, messageType, messageText, responseTypes)
@@ -25,9 +26,12 @@ function Request:send()
   if self.messageType.prefix == "J" then
     message = Request.toJsonMessage(self.messageText)
   elseif self.messageType.prefix == "H" then
+    -- Handshake body: "<NETWORK_VERSION>/<BUILD_VERSION>" so the server can
+    -- reject stale clients on the same wire protocol. Older clients that
+    -- send just NETWORK_VERSION fail the server's strict-match check.
     message = NetworkProtocol.markedMessageForTypeAndBody(
       NetworkProtocol.clientMessageTypes.versionCheck.prefix,
-      NetworkProtocol.NETWORK_VERSION)
+      NetworkProtocol.NETWORK_VERSION .. "/" .. consts.BUILD_VERSION)
   else
     error("Trying to send a message with message type " .. table_to_string(self.messageType) .. " that has no interaction defined")
   end

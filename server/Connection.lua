@@ -1,6 +1,7 @@
 local class = require("common.lib.class")
 local logger = require("common.lib.logger")
 local NetworkProtocol = require("common.network.NetworkProtocol")
+local consts = require("common.engine.consts")
 local time = os.time
 local Queue = require("common.lib.Queue")
 
@@ -96,8 +97,18 @@ function Connection:close()
 end
 
 -- Handle NetworkProtocol.clientMessageTypes.versionCheck
+-- Body is "<NETWORK_VERSION>/<BUILD_VERSION>". Both halves must match the
+-- server exactly — strict patch-level enforcement so freshly-deployed
+-- servers kick off clients on older builds.
 local function H(connection, version)
-  if version ~= NetworkProtocol.NETWORK_VERSION then
+  local clientNet, clientBuild = version:match("^([^/]+)/(.+)$")
+  local netOk = clientNet == NetworkProtocol.NETWORK_VERSION
+  local buildOk = clientBuild == consts.BUILD_VERSION
+  if not netOk or not buildOk then
+    logger.info(string.format(
+      "Connection %d: rejecting handshake (client sent %q, server is %s/%s)",
+      connection.index, tostring(version),
+      NetworkProtocol.NETWORK_VERSION, consts.BUILD_VERSION))
     connection:send(NetworkProtocol.markedMessageForTypeAndBody(
       NetworkProtocol.serverMessageTypes.versionWrong.prefix, ""))
   else

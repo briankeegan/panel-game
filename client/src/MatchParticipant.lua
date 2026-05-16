@@ -145,9 +145,8 @@ function MatchParticipant:setStage(stageId)
   if stageId ~= self.settings.selectedStageId then
     self.settings.selectedStageId = StageLoader.resolveStageSelection(stageId)
     self:emitSignal("selectedStageIdChanged", self.settings.selectedStageId)
+    self:refreshStage()
   end
-  -- even if it's the same stage as before, refresh the pick, cause it could be bundle or random
-  self:refreshStage()
 end
 
 function MatchParticipant:refreshStage()
@@ -170,9 +169,8 @@ function MatchParticipant:setCharacter(characterId)
       self.settings.selectedCharacterId = consts.RANDOM_CHARACTER_SPECIAL_VALUE
     end
     self:emitSignal("selectedCharacterIdChanged", self.settings.selectedCharacterId)
+    self:refreshCharacter()
   end
-  -- even if it's the same character as before, refresh the pick, cause it could be bundle or random
-  self:refreshCharacter()
 end
 
 function MatchParticipant:refreshCharacter()

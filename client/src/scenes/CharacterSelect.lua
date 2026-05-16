@@ -347,6 +347,7 @@ function CharacterSelect:createStageCarousel(player, width)
 
   stageCarousel.onPassengerUpdateCallback = function(carousel, selectedPassenger)
     player:setStage(selectedPassenger.id)
+    player:refreshStage()
   end
 
   stageCarousel:setPassengerById(player.settings.selectedStageId)
@@ -523,6 +524,7 @@ function CharacterSelect:getCharacterButtons()
       end
 
       player:setCharacter(selfElement.characterId)
+      player:refreshCharacter()
       player.cursor:updatePosition(9, 2, true)
     end
 

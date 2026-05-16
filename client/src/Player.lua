@@ -320,8 +320,6 @@ function Player:updateSettings(settings)
         self:emitSignal("selectedCharacterIdChanged", self.settings.selectedCharacterId)
       end
     elseif settings.selectedCharacterId and characters[settings.selectedCharacterId] then
-      -- if we don't have their character rolled from their bundle, but the bundle itself, use that
-      -- very unlikely tbh
       self:setCharacter(settings.selectedCharacterId)
     elseif self.settings.characterId == "" then
       -- we don't have their character and we didn't roll them a random character yet
@@ -339,8 +337,6 @@ function Player:updateSettings(settings)
         self:emitSignal("selectedStageIdChanged", self.settings.selectedStageId)
       end
     elseif settings.selectedStageId and stages[settings.selectedStageId] then
-      -- if we don't have their stage rolled from their bundle, but the bundle itself, use that
-      -- very unlikely tbh
       self:setStage(settings.selectedStageId)
     elseif self.settings.stageId == "" then
       -- we don't have their stage and we didn't roll them a random stage yet

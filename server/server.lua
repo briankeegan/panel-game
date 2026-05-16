@@ -1096,11 +1096,15 @@ function Server:tickSilentDeathWatchdogs()
 end
 
 ---Drain KO arbitration windows for any rooms whose window has closed.
+---Also runs the living-teams invariant check so a match where the survivor
+---was determined by something other than a real DeathEvent (mid-match leave
+---synth, silent-death watchdog synth) still resolves promptly.
 function Server:tickArbitrations()
   local nowMs = math.floor(self.clock() * 1000)
   for _, room in pairs(self.rooms) do
     if room then
       room:tickArbitration(nowMs)
+      room:maybeFinalizeFromLivingTeams()
     end
   end
 end

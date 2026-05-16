@@ -1296,6 +1296,54 @@ function Room:tickArbitration(nowMs)
   end
 end
 
+---Per-tick check: if the surviving-team count has dropped to <= 1, finalize
+---the match. Independent of the KO arbitration window — arbitration only
+---fires after a real DeathEvent, but the "2 died, 1 alive => 1 alive wins"
+---invariant has to hold no matter HOW the others died (top-out, leave-
+---mid-match synth death, silent-death watchdog synth death). Without this,
+---the survivor stalls in INGAME state until the natural game-end logic
+---trips, which for an unopposed survivor is "never."
+---@return boolean true if the match was finalized this tick
+function Room:maybeFinalizeFromLivingTeams()
+  if not self.game or self.game.complete then return false end
+  if self.voided then return false end
+  -- Let arbitration handle simultaneous-KO windows: if a death just landed,
+  -- defer to tickArbitration so the K message + outcome are tied together.
+  if self.arbitrationWindowEndsAtMs and not self.arbitrationEmitted then
+    return false
+  end
+
+  local livingTeams, representatives = self:_livingTeams()
+  if #livingTeams > 1 then return false end
+
+  local function toStackIndex(seatId)
+    local p = self.players[seatId]
+    return (p and (p.stackIndex or p.player_number)) or seatId
+  end
+
+  if #livingTeams == 1 then
+    local winnerSeatId = representatives[1]
+    local winnerStack = toStackIndex(winnerSeatId)
+    self.game.winnerIndex = winnerStack
+    self.game.winnerId = self.players[winnerSeatId].publicPlayerID
+    if self.teams then
+      self.game.winnerTeamIndex = livingTeams[1]
+    end
+    self.game.aborted = false
+    self.game.complete = true
+    self.game:finalizeReplay(winnerStack)
+    self:_finalizeMatch()
+    return true
+  end
+
+  -- livingTeams == 0: everyone eliminated/disconnected; finalize as tie.
+  self.game.aborted = false
+  self.game.complete = true
+  self.game:finalizeReplay(0)
+  self:_finalizeMatch()
+  return true
+end
+
 -- broadcasts the message to everyone in the room
 -- if an optional sender is specified, they are excluded from the broadcast
 function Room:broadcastJson(message, sender)

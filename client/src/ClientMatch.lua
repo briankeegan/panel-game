@@ -207,15 +207,7 @@ function ClientMatch.createFromReplay(replay, players, gameMode)
     clientMatch.gameMode = matchGameMode
     clientMatch.stackInteraction = matchGameMode.stackInteraction
     clientMatch.matchRules = matchGameMode.matchRules
-    if matchGameMode.stackInteraction == GameModes.StackInteractions.TEAM_VERSUS
-        and matchGameMode.teamCount and (compactedPpt or matchGameMode.playersPerTeam) then
-      local teams = TeamUtils.createTeams(#players, matchGameMode.teamCount, compactedPpt or matchGameMode.playersPerTeam)
-      clientMatch.engine:setTeams(teams)
-      if matchGameMode.garbageMode then
-        clientMatch.engine:setGarbageMode(matchGameMode.garbageMode)
-      end
-      clientMatch.engine:setupTeamGarbageTargets()
-    end
+    clientMatch:_wireGarbageTargets(matchGameMode.stackInteraction, matchGameMode, compactedPpt)
   end
 
   -- and assign their stacks from the engine
@@ -276,6 +268,7 @@ function ClientMatch:setupFromGameMode()
   end
 
   if self.stackInteraction == GameModes.StackInteractions.ATTACK_ENGINE then
+    -- Inline: creates additional simulated stacks beyond the player stacks.
     for _, player in ipairs(self.players) do
       local engineStack = self.engine:createSimulatedStackWithSettings(player.settings.attackEngineSettings)
       local attackEngineHost = ChallengeModePlayerStack({
@@ -288,24 +281,8 @@ function ClientMatch:setupFromGameMode()
       self.engine:addTarget(engineStack, player.stack.engine)
       self.stacks[#self.stacks+1] = attackEngineHost
     end
-  elseif self.stackInteraction == GameModes.StackInteractions.SELF then
-    for _, stack in ipairs(self.stacks) do
-      self.engine:addTarget(stack.engine, stack.engine)
-    end
-  elseif self.stackInteraction == GameModes.StackInteractions.VERSUS then
-    for i, stack1 in ipairs(self.stacks) do
-      for j, stack2 in ipairs(self.stacks) do
-        if i ~= j then
-          self.engine:addTarget(stack1.engine, stack2.engine)
-        end
-      end
-    end
-  elseif self.stackInteraction == GameModes.StackInteractions.TEAM_VERSUS then
-    local gm = self.gameMode
-    local teams = TeamUtils.createTeams(#self.players, gm.teamCount, gm.playersPerTeam)
-    self.engine:setTeams(teams)
-    self.engine:setGarbageMode(gm.garbageMode)
-    self.engine:setupTeamGarbageTargets()
+  else
+    self:_wireGarbageTargets(self.stackInteraction, self.gameMode, nil)
   end
 
   self:sharedSetup()
@@ -316,6 +293,42 @@ end
 
 function ClientMatch:sharedSetup()
   self.engine.debug.vsFramesBehind = DebugSettings.getVSFramesBehind()
+end
+
+---Target-wiring dispatch shared by setupFromGameMode and createFromReplay.
+---Sets up engine garbage relationships (addTarget calls / team setup) based on
+---stackInteraction. ATTACK_ENGINE is NOT handled here — it also creates new
+---simulated stacks, so it stays inline in setupFromGameMode.
+---@param stackInteraction integer GameModes.StackInteractions value
+---@param gameMode table? required for TEAM_VERSUS
+---@param compactedPlayersPerTeam integer|integer[]|nil per-match compacted shape from replay metadata (overrides gameMode.playersPerTeam when present)
+function ClientMatch:_wireGarbageTargets(stackInteraction, gameMode, compactedPlayersPerTeam)
+  local engine = self.engine
+  if not engine then return end
+
+  if stackInteraction == GameModes.StackInteractions.SELF then
+    for _, engineStack in ipairs(engine.stacks) do
+      engine:addTarget(engineStack, engineStack)
+    end
+  elseif stackInteraction == GameModes.StackInteractions.VERSUS then
+    for i, stack1 in ipairs(engine.stacks) do
+      for j, stack2 in ipairs(engine.stacks) do
+        if i ~= j then
+          engine:addTarget(stack1, stack2)
+        end
+      end
+    end
+  elseif stackInteraction == GameModes.StackInteractions.TEAM_VERSUS then
+    if not (gameMode and gameMode.teamCount) then return end
+    local ppt = compactedPlayersPerTeam or gameMode.playersPerTeam
+    if not ppt then return end
+    local teams = TeamUtils.createTeams(#engine.stacks, gameMode.teamCount, ppt)
+    engine:setTeams(teams)
+    if gameMode.garbageMode then
+      engine:setGarbageMode(gameMode.garbageMode)
+    end
+    engine:setupTeamGarbageTargets()
+  end
 end
 
 function ClientMatch:run()
@@ -465,11 +478,9 @@ function ClientMatch:serverConfirmedEnd()
   self._serverConfirmedEnd = true
 end
 
----Records the server-authoritative outcome (winner team / winner slot,
----both nil for a tie). Online consumers should prefer these over the
----engine's local `getWinners` heuristic, which only sees game_over_clock
----and can't distinguish "died last on the same arbitration tick" from
----"team won the round."
+---Records the server-authoritative outcome. Online consumers prefer this
+---over the engine's local getWinners (which only sees game_over_clock and
+---can't tell "team won" from "all dead on the same tick").
 ---@param outcome { winnerTeamIndex: integer?, winnerIndex: integer? }
 function ClientMatch:setServerOutcome(outcome)
   self._hasServerOutcome = true

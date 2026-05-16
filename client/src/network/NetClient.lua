@@ -46,16 +46,59 @@ local function _clearMatchInputState(self)
   self._deferredInputMsgs = nil
   self._deferredGarbageMsgs = nil
   self._deferredDeathMsgs = nil
-  -- Drop any unflushed outbound D — match is over, the death no longer
-  -- applies. Stale resend into a fresh match would mis-eliminate a slot.
+  -- Drop any unflushed outbound D/G — match is over, these no longer apply.
+  -- Stale resend into a fresh match would mis-eliminate a slot or land
+  -- garbage on a freshly-mapped player.
   self._pendingDeathSends = nil
+  self._pendingGarbageSends = nil
+  self._pendingDeathDeferWarned = nil
+  self._pendingGarbageDeferWarned = nil
 end
 
--- One place to send a gameplay-channel fire-and-forget message (inputs / G / D).
+-- One place to send a gameplay-channel fire-and-forget message (inputs / R).
 -- These bypass the JSON Request/Response handshake — they're unacked frames.
+-- For inputs the next tick re-sends an updated delta, so a missed write self-
+-- heals. Event-driven messages (G, D) MUST go through the queue+retry path
+-- below — a missed write there is a permanent loss.
 local function _sendGameplay(self, prefix, body)
   if not self:isConnected() then return end
   self.gameplayClient:send(NetworkProtocol.markedMessageForTypeAndBody(prefix, body))
+end
+
+-- Drain a pending-sends queue once. Returns the new queue value to assign
+-- back to the field (nil if everything went out, the original queue if a
+-- disconnect blocked the flush — caller retries on the next tick).
+--
+-- For event-driven messages (G, D) where a missed write is permanent loss.
+-- A one-shot warn fires the first tick a flush gets blocked, and a matching
+-- info fires when it resumes — so a brief socket flap is bracketed in the
+-- log without spamming every tick of the disconnect.
+---@param self NetClient
+---@param queue table[]? array of unsent payloads (each a parsed body table)
+---@param prefix string single-char message-type prefix
+---@param deferLabel string human-readable name for the warn/info pair
+---@param warnedFlag string field on `self` used as the one-shot dedupe flag
+---@return table[]? newQueue
+local function _drainPendingSends(self, queue, prefix, deferLabel, warnedFlag)
+  if not queue or #queue == 0 then return nil end
+  if not self:isConnected() then
+    if not self[warnedFlag] then
+      logger.warn(string.format(
+        "%s send deferred: %d pending (gameplay socket not connected)",
+        deferLabel, #queue))
+      self[warnedFlag] = true
+    end
+    return queue
+  end
+  if self[warnedFlag] then
+    logger.info(string.format(
+      "%s send resumed: flushing %d deferred", deferLabel, #queue))
+    self[warnedFlag] = false
+  end
+  for _, body in ipairs(queue) do
+    self.gameplayClient:send(NetworkProtocol.markedMessageForTypeAndBody(prefix, json.encode(body)))
+  end
+  return nil
 end
 
 -- One place to send a JSON request over the lobby socket. Returns the Response
@@ -428,6 +471,18 @@ local function start2pVsOnlineMatch(self, createRoomMessage)
   TraceWriter.beginMatch(self.room and self.room.roomNumber or 0, os.time())
   love.window.requestAttention()
   SoundController:playSfx(themes[config.theme].sounds.notification)
+
+  -- Mid-match resume: BattleRoom already built the in-progress match from
+  -- the partial replay. Go straight to the game scene instead of CharacterSelect.
+  if self.room.state == BattleRoom.states.MatchInProgress and self.room.match then
+    resetLobbyData(self)
+    local gameScene = self.room:createScene(self.room.match)
+    if gameScene then
+      GAME.navigationStack:push(gameScene)
+      self:setState(states.INGAME)
+      return
+    end
+  end
 
   local function tryEnterWaitingRoom()
     local playerCount = #self.room.players
@@ -1296,11 +1351,18 @@ function NetClient:sendInput(input)
   _sendGameplay(self, NetworkProtocol.clientMessageTypes.playerInput.prefix, input)
 end
 
----Loose-sync: send a GarbageEvent from the local sim. body is JSON-encoded inline
----(no Request wrapper — these are fire-and-forget like inputs).
+---Loose-sync: send a GarbageEvent from the local sim.
 ---@param body table parsed event payload
+---
+---GarbageEvent is event-driven — fired on combos/chains, not re-sent next
+---tick like inputs. A missed write during a socket flap is permanent loss
+---of damage, so we queue + retry. Cleared on match end via
+---_clearMatchInputState so a stale G can't land on a freshly-mapped slot
+---in the next match.
 function NetClient:sendGarbageEvent(body)
-  _sendGameplay(self, NetworkProtocol.clientMessageTypes.garbageEvent.prefix, json.encode(body))
+  self._pendingGarbageSends = self._pendingGarbageSends or {}
+  self._pendingGarbageSends[#self._pendingGarbageSends + 1] = body
+  self:_flushPendingGarbageSends()
 end
 
 ---Loose-sync: send a DeathEvent from the local sim.
@@ -1318,19 +1380,24 @@ function NetClient:sendDeathEvent(body)
   self:_flushPendingDeathSends()
 end
 
+---Try to flush queued GarbageEvents. Idempotent.
+function NetClient:_flushPendingGarbageSends()
+  self._pendingGarbageSends = _drainPendingSends(
+    self, self._pendingGarbageSends,
+    NetworkProtocol.clientMessageTypes.garbageEvent.prefix,
+    "GarbageEvent", "_pendingGarbageDeferWarned")
+end
+
 ---Try to flush queued DeathEvents. Idempotent — anything we successfully
 ---hand to the socket stays handed; anything that can't go now stays queued
 ---for the next tick. We don't get application-level acks (TCP is the
 ---delivery contract), but if the socket dies mid-send the disconnect path
 ---will see it and we won't be wasting cycles re-sending into nothing.
 function NetClient:_flushPendingDeathSends()
-  if not self._pendingDeathSends or #self._pendingDeathSends == 0 then return end
-  if not self:isConnected() then return end
-  local prefix = NetworkProtocol.clientMessageTypes.deathEvent.prefix
-  for _, body in ipairs(self._pendingDeathSends) do
-    self.gameplayClient:send(NetworkProtocol.markedMessageForTypeAndBody(prefix, json.encode(body)))
-  end
-  self._pendingDeathSends = nil
+  self._pendingDeathSends = _drainPendingSends(
+    self, self._pendingDeathSends,
+    NetworkProtocol.clientMessageTypes.deathEvent.prefix,
+    "DeathEvent", "_pendingDeathDeferWarned")
 end
 
 ---Pause-mode rewind committed; tell the server to truncate its input record.
@@ -1640,10 +1707,13 @@ function NetClient:update(dt)
     processDeathEvents(self)
     processRewindEvents(self)
 
-    -- Retry any DeathEvent that couldn't flush earlier (gameplay socket
-    -- mid-flap when the local stack topped out). The match can't end on
-    -- the server side until this gets through.
+    -- Retry any DeathEvent / GarbageEvent that couldn't flush earlier
+    -- (gameplay socket mid-flap mid-match). DeathEvent is what unblocks
+    -- match-end on the server; GarbageEvents are individually small but
+    -- collectively are the damage the local player dealt — losing them
+    -- silently makes the player look like they did less than they did.
     self:_flushPendingDeathSends()
+    self:_flushPendingGarbageSends()
 
     for _, listener in pairs(self.matchListeners) do
       listener:listen()

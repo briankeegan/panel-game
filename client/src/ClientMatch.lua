@@ -1697,14 +1697,14 @@ end
 ---Called by applyGarbageEvent (in-sync path) and by drainPendingHistoricalEvents.
 ---@param body table parsed event payload
 function ClientMatch:_applyGarbageEventNow(body)
+  local garbageCount = (type(body.garbage) == "table") and #body.garbage or 0
   for _, recipientIndex in ipairs(body.recipients) do
     local stack = self.stacks[recipientIndex]
     if stack and stack.engine then
       logger.info(string.format(
         "G apply: sender=%s senderFrame=%s -> stack[%d] (is_local=%s) garbageCount=%d",
         tostring(body.sender), tostring(body.senderFrame), recipientIndex,
-        tostring(stack.is_local),
-        (type(body.garbage) == "table") and #body.garbage or 0))
+        tostring(stack.is_local), garbageCount))
       -- self.stacks[i] is a ClientStack wrapper; the actual engine stack
       -- (and the receiveGarbage method) lives on stack.engine.
       -- Copy the garbage table per recipient so chain-flag mutations in
@@ -1714,6 +1714,16 @@ function ClientMatch:_applyGarbageEventNow(body)
         garbageCopy[j] = shallowcpy(g)
       end
       stack.engine:receiveGarbage(garbageCopy)
+    else
+      -- Recipient not landable: slot was emptied (mid-match leave) or the
+      -- engine hasn't booted yet (mod still loading on a spectator/rejoiner).
+      -- Without this warn the drop is invisible — the only existing log on
+      -- this path was the success-path `G apply` line above.
+      local reason = (not stack) and "stack_not_present" or "engine_not_initialized"
+      logger.warn(string.format(
+        "G apply DROPPED: sender=%s senderFrame=%s -> stack[%d] reason=%s garbageCount=%d",
+        tostring(body.sender), tostring(body.senderFrame), recipientIndex,
+        reason, garbageCount))
     end
   end
 

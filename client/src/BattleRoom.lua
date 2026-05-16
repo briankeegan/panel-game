@@ -151,6 +151,36 @@ function BattleRoom.createFromServerMessage(message)
       battleRoom:setWinCounts(message.winCounts)
     end
     battleRoom.spectating = true
+  elseif message.replay then
+    -- Player reconnecting mid-match. Build the match from the partial replay;
+    -- pass GAME.localPlayer so createFromReplay's publicId match grafts us
+    -- into the right slot (preserves input config, signal subscriptions, etc.).
+    local match = ClientMatch.createFromReplay(message.replay, {GAME.localPlayer}, gameMode)
+    for i = 1, #match.players do
+      battleRoom:addPlayer(match.players[i])
+    end
+    -- All stacks need catchup to fast-forward to the server's frame. The
+    -- spectator path only enables it on remote stacks (because hasLocalPlayer
+    -- is false for spectators) — here the local stack needs it too or it'll
+    -- crawl at 1x and the silent-death watchdog will synth a death.
+    for _, stack in ipairs(match.stacks) do
+      if stack.enableCatchup then stack:enableCatchup(true) end
+    end
+    battleRoom.match = match
+    battleRoom.match:start()
+    battleRoom.state = BattleRoom.states.MatchInProgress
+
+    local payloadPlayers = orderedPayloadPlayers(message.players)
+    for i = 1, #battleRoom.players do
+      if payloadPlayers[i] and payloadPlayers[i].ratingInfo then
+        local ratingInfo = payloadPlayers[i].ratingInfo
+        battleRoom.players[i]:setRating(ratingInfo.placement_match_progress or ratingInfo.new)
+        battleRoom.players[i]:setLeague(ratingInfo.league)
+      end
+    end
+    if message.winCounts then
+      battleRoom:setWinCounts(message.winCounts)
+    end
   else
     local gameMode = message.gameMode
     local payloadPlayers = orderedPayloadPlayers(message.players)

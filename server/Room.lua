@@ -575,25 +575,28 @@ function Room:start_match()
   local message = ServerProtocol.startMatch(self.roomNumber, replay)
   -- Scheduled start time. Clients translate via serverOffsetMs; without an
   -- offset they fall back to "start on receive". The grace window must exceed
-  -- the slowest server→client one-way trip in this room, else that client
-  -- starts late. Widen the floor (500ms) using recent ping RTT from each
-  -- player's gameplay connection (the channel matchStart rides on).
+  -- the slowest server→client trip in this room, else that client starts
+  -- late and has to fast-forward to catch up. Use the WORST recent RTT (not
+  -- the best) — best-case underestimates budget for jittery clients. Use
+  -- full RTT (not /2) so asymmetric server↔client latencies stay covered.
   local budgetMs = 500
   local worstRttMs = 0
+  local rttDiag = {}
   for _, player in self:eachPlayer() do
     local conn = player.gameplayConnection
-    if conn and conn.getMinRecentRttMs then
-      local rtt = conn:getMinRecentRttMs()
-      if rtt and rtt > worstRttMs then worstRttMs = rtt end
+    if conn and conn.getMaxRecentRttMs then
+      local rtt = conn:getMaxRecentRttMs()
+      if rtt then
+        rttDiag[#rttDiag + 1] = player.name .. "=" .. rtt
+        if rtt > worstRttMs then worstRttMs = rtt end
+      end
     end
   end
   if worstRttMs > 0 then
-    -- RTT + 300ms jitter margin; full RTT (not /2) keeps us conservative
-    -- when client→server and server→client latencies are asymmetric.
-    budgetMs = math.max(budgetMs, worstRttMs + 300)
+    budgetMs = math.max(budgetMs, worstRttMs + 200)
   end
   message.messageText.startAtMs = math.floor(self.clock() * 1000) + budgetMs
-  logger.info(self.roomNumber .. ": start budget=" .. budgetMs .. "ms (worstRtt=" .. worstRttMs .. "ms)")
+  logger.info(self.roomNumber .. ": start budget=" .. budgetMs .. "ms (worstRtt=" .. worstRttMs .. "ms, samples=[" .. table.concat(rttDiag, ",") .. "])")
   self:broadcastJson(message)
 
   for _, player in self:eachPlayer() do

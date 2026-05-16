@@ -926,9 +926,13 @@ function Room:_synthesizeSilentDeath(player, slot, nowMs)
   local inputs = self.game.inputs and self.game.inputs[slot] or {}
   local deathFrame = math.max(#inputs, 1)
   self.game:markPlayerEliminated(player, deathFrame)
+  local lastInput = self.lastInputMs and self.lastInputMs[slot]
+  local lastGarbage = self.lastGarbageToMs and self.lastGarbageToMs[slot]
   logger.warn(string.format(
-    "%d: slot %d (%s) silent for >%dms — synthesizing inferred DeathEvent at frame %d",
-    self.roomNumber, slot, player.name or "?", SILENT_DEATH_THRESHOLD_MS, deathFrame))
+    "%d: synthesizing inferred D for slot %d (%s) at frame %d — silentFor=%sms, lastGarbageInbound=%sms ago",
+    self.roomNumber, slot, player.name or "?", deathFrame,
+    lastInput and tostring(nowMs - lastInput) or "?",
+    lastGarbage and tostring(nowMs - lastGarbage) or "n/a"))
 
   local body = {
     sender = slot,

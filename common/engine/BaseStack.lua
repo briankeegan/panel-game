@@ -2,6 +2,7 @@ local class = require("common.lib.class")
 local Signal = require("common.lib.signal")
 local GarbageQueue = require("common.engine.GarbageQueue")
 local MatchRules = require("common.data.MatchRules")
+local consts = require("common.engine.consts")
 
 ---@class BaseStack : canRollback
 ---@field engineVersion string
@@ -116,6 +117,12 @@ end
 ---@param doCountdown boolean
 function BaseStack:setCountdown(doCountdown)
   self.do_countdown = doCountdown
+  -- Cache the static offset (Stack:setCountdown does the same). do_countdown
+  -- itself is a TOGGLE — the countdown loop clears it — so it's useless as
+  -- "does this match have a countdown" later. Keep this field for any
+  -- subsequent clock→stopWatch conversions (mirrors Stack.lua).
+  self.countdownOffsetFrames = doCountdown
+      and (consts.COUNTDOWN_START + consts.COUNTDOWN_LENGTH) or 0
   self.stopWatchIsRunning = not self.do_countdown
 end
 

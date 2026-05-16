@@ -1376,8 +1376,11 @@ function ClientMatch:drawTimer()
 
   local timeString = frames_to_time_string(frames, self.engine.ended)
 
-  self:drawMatchLabel(themes[config.theme].images.IMG_time, themes[config.theme].timeLabel_Pos, themes[config.theme].timeLabel_Scale)
-  self:drawMatchTime(timeString, themes[config.theme].time_Pos, themes[config.theme].time_Scale)
+  local timePos = themes[config.theme].time_Pos
+  if #self.stacks > 2 then
+    timePos = {timePos[1], timePos[2] + 120}
+  end
+  self:drawMatchTime(timeString, timePos, themes[config.theme].time_Scale)
 end
 
 local teamColors = TeamUtils.TEAM_COLORS
@@ -1521,7 +1524,7 @@ end
 
 function ClientMatch:render()
   if config.show_fps and #self.stacks > 1 then
-    local drawY = 23
+    local drawY = #self.stacks > 2 and 90 or 23
     for i = 1, #self.stacks do
       local stack = self.stacks[i]
       GraphicsUtil.print("P" .. stack.layoutSlot .." Average Latency: " .. stack.engine.framesBehind, 1, drawY)

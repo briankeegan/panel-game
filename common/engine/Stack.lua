@@ -1693,6 +1693,19 @@ end
 
 function Stack:checkDeath()
   if self.game_over_clock <= 0 then
+    -- Live loose-sync: only the authoritative (local) player decides their own
+    -- death. Remote view-stacks get game_over_clock set via _applyDeathEventNow
+    -- when the source player's D arrives. Running checkDeath on a view-stack
+    -- lets the two engines conclude death at different frames, which
+    -- (a) shows mismatched OUT timestamps on each side and (b) silently drops
+    -- outbound garbage because Match:distributeGarbageToTargets skips targets
+    -- whose view-stack game_over_clock > 0. Replays and offline play don't have
+    -- D events on the wire, so they keep running checkDeath normally.
+    if self.is_local == false
+       and LOOSE_SYNC_GARBAGE
+       and GAME and GAME.netClient and GAME.netClient:isConnected() then
+      return false
+    end
     for stackOverCondition, value in pairs(self.stackOverConditions) do
       if stackOverCondition == MatchRules.StackOverConditions.HEALTH then
         if self.health <= value and self.shake_time <= 0 then

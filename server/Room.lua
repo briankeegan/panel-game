@@ -975,19 +975,10 @@ function Room:_redirectIfDead(senderSlot, originalRecipient)
   end
 
   -- Original recipient is dead; walk forward looking for any living enemy.
-  -- For FFA / no-teams, every-non-sender is an enemy. For teams, only the
-  -- sender's enemy team members.
-  local enemySlots
-  if self.teams then
-    enemySlots = TeamUtils.getEnemyPlayerIndices(self.teams, senderSlot)
-  else
-    enemySlots = {}
-    for slot, _ in self:eachPlayer() do
-      if slot ~= senderSlot then
-        enemySlots[#enemySlots + 1] = slot
-      end
-    end
-  end
+  -- Every server-side room uses TEAM_VERSUS (FFA is TEAM_VERSUS with 1
+  -- player per team), so self.teams is always set when a match is running.
+  if not self.teams then return nil end
+  local enemySlots = TeamUtils.getEnemyPlayerIndices(self.teams, senderSlot)
 
   if #enemySlots == 0 then return nil end
 

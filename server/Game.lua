@@ -153,19 +153,6 @@ function Game.createFromRoomState(room, densePlayers)
     end
   elseif room.gameMode.stackInteraction == GameModes.StackInteractions.ATTACK_ENGINE then
     logger.error("Attack engine game modes are not implemented yet")
-  elseif room.gameMode.stackInteraction == GameModes.StackInteractions.VERSUS then
-    for i = 1, #replay.stacks do
-      local recipients = {}
-      for j = 1, #replay.stacks do
-        if i ~= j then
-          recipients[#recipients+1] = j
-        end
-      end
-      replay.garbageFlows[#replay.garbageFlows+1] = {
-        source = i,
-        recipients = recipients,
-      }
-    end
   elseif room.gameMode.stackInteraction == GameModes.StackInteractions.TEAM_VERSUS then
     -- Team versus: each player sends garbage to enemies only (not teammates)
     if room.teams then

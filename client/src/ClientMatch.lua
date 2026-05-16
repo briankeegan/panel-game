@@ -310,14 +310,6 @@ function ClientMatch:_wireGarbageTargets(stackInteraction, gameMode, compactedPl
     for _, engineStack in ipairs(engine.stacks) do
       engine:addTarget(engineStack, engineStack)
     end
-  elseif stackInteraction == GameModes.StackInteractions.VERSUS then
-    for i, stack1 in ipairs(engine.stacks) do
-      for j, stack2 in ipairs(engine.stacks) do
-        if i ~= j then
-          engine:addTarget(stack1, stack2)
-        end
-      end
-    end
   elseif stackInteraction == GameModes.StackInteractions.TEAM_VERSUS then
     if not (gameMode and gameMode.teamCount) then return end
     local ppt = compactedPlayersPerTeam or gameMode.playersPerTeam

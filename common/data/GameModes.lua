@@ -176,9 +176,12 @@ local TwoPlayerVersus = GameMode({
 
   -- already known match properties
   playerCount = 2,
-  stackInteraction = StackInteractions.VERSUS,
+  teamCount = 2,
+  playersPerTeam = 1,
+  garbageMode = "all",
+  stackInteraction = StackInteractions.TEAM_VERSUS,
   matchRules = {
-    matchEndConditions = { [MatchRules.MatchEndConditions.STACKS_ACTIVE] = 1 },
+    matchEndConditions = { [MatchRules.MatchEndConditions.TEAMS_ACTIVE] = 1 },
     matchWinRuleset = { { [MatchRules.MatchWinCriterias.GAME_OVER_CLOCK] = MatchRules.orders.HIGHEST} },
     stackOverConditions = { [MatchRules.StackOverConditions.HEALTH] = 0 },
     stackWinConditions = {},

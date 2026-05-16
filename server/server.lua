@@ -1789,37 +1789,45 @@ function Server:login(connection, userId, name, ipAddress, port, engineVersion, 
       and self.playerbase.players[userId] then
     local existingPlayer = self.nameToPlayer[self.playerbase.players[userId]]
     if existingPlayer then
-      local slotEmpty =
-        (connection.channel == "lobby" and not existingPlayer.lobbyConnection)
-        or (connection.channel == "gameplay" and not existingPlayer.gameplayConnection)
-        or (connection.channel == "spectate" and not existingPlayer.spectateConnection)
-      if slotEmpty then
-        existingPlayer:attachConnection(connection)
-        self.connectionToPlayer[connection] = existingPlayer
-        logger.info("Attached " .. (connection.channel or "?") .. " socket to existing player " .. existingPlayer.name)
-        connection:sendJson(ServerProtocol.approveLogin(existingPlayer.publicPlayerID, nil, nil, nil, nil))
-
-        -- A gameplay-socket reconnect for a player who's still in a room
-        -- KEEPS the slot (lag is a gameplay condition, not an authority one).
-        -- Push current state so the reconnecting client can resume.
-        -- lobbyStateV2 always — partial/waiting rooms render in the lobby UI
-        -- with the room overlaid, so the client needs both. Add addToRoom on
-        -- top if the player still holds a room slot, carrying the in-progress
-        -- replay when a match is live so the client can catch up mid-match
-        -- (same partial-replay payload used by spectate / mid-match queue).
-        if connection.channel == "gameplay" then
-          local lobbyStateV2 = self:lobbyStateV2()
-          connection:sendJson(ServerProtocol.lobbyStateV2(lobbyStateV2.players, lobbyStateV2.rooms))
-          if existingPlayer.room then
-            local partialReplay = existingPlayer.room.game
-              and existingPlayer.room.game:getPartialReplay(COMPRESS_REPLAYS_ENABLED)
-              or nil
-            connection:sendJson(ServerProtocol.addToRoom(existingPlayer.room, partialReplay))
-          end
-        end
-
-        return true
+      local existingSocket
+      if connection.channel == "lobby" then
+        existingSocket = existingPlayer.lobbyConnection
+      elseif connection.channel == "spectate" then
+        existingSocket = existingPlayer.spectateConnection
+      else
+        existingSocket = existingPlayer.gameplayConnection
       end
+
+      -- Replace stale socket inline; closeConnection would run leaveRoom + nil
+      -- nameToPlayer for no-room players, but we only want this channel swapped.
+      if existingSocket and existingSocket ~= connection then
+        logger.info("Replacing " .. (connection.channel or "?") .. " socket "
+          .. existingSocket.index .. " for " .. existingPlayer.name)
+        self.socketToConnectionIndex[existingSocket.socket] = nil
+        self.connections[existingSocket.index] = nil
+        self.connectionToPlayer[existingSocket] = nil
+        existingSocket.loggedIn = false
+        existingSocket:close()
+      end
+
+      existingPlayer:attachConnection(connection)
+      self.connectionToPlayer[connection] = existingPlayer
+      self.nameToConnectionIndex[existingPlayer.name] = connection.index
+      logger.info("Attached " .. (connection.channel or "?") .. " socket to existing player " .. existingPlayer.name)
+      connection:sendJson(ServerProtocol.approveLogin(existingPlayer.publicPlayerID, nil, nil, nil, nil))
+
+      if connection.channel == "gameplay" then
+        local lobbyStateV2 = self:lobbyStateV2()
+        connection:sendJson(ServerProtocol.lobbyStateV2(lobbyStateV2.players, lobbyStateV2.rooms))
+        if existingPlayer.room then
+          local partialReplay = existingPlayer.room.game
+            and existingPlayer.room.game:getPartialReplay(COMPRESS_REPLAYS_ENABLED)
+            or nil
+          connection:sendJson(ServerProtocol.addToRoom(existingPlayer.room, partialReplay))
+        end
+      end
+
+      return true
     end
   end
 
@@ -1927,7 +1935,8 @@ function Server:canLogin(userID, name, IP_logging_in, engineVersion)
   elseif self.playerbase.players[userID] ~= name and self.playerbase:nameTaken(userID, name) then
     denyReason = "That player name is already taken"
     logger.warn("Login failure: Player (" .. userID .. ") tried to use already taken name: " .. name)
-  elseif self.nameToConnectionIndex[name] then
+  elseif self.nameToConnectionIndex[name]
+      and self.connections[self.nameToConnectionIndex[name]] then
     denyReason = "Cannot login with the same name twice"
   end
 

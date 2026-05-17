@@ -5,6 +5,14 @@ local class = require("common.lib.class")
 local TOUCH_SWAP_COOLDOWN = 5  -- default number of cooldown frames between touch-input swaps, applied after the first 2 swaps after a touch is initiated, to prevent excessive or accidental stealths
 
 -- An object that manages touches on the screen and translates them to swaps on a stack
+---@class TouchInputController
+---@field stack Stack actually the *engine* Stack (see PlayerStack ctor: `TouchInputController(self.engine)`), not the ClientStack wrapper
+---@field touchTargetColumn integer
+---@field lingeringTouchCursor { row: integer, col: integer }
+---@field swapsThisTouch integer
+---@field touchSwapCooldownTimer integer
+---@field handleTouch fun(self, touchedCell: { row: integer, col: integer }, previousTouchedCell: { row: integer, col: integer }): integer, integer
+---@field debugString fun(self): string
 local TouchInputController =
   class(
   function(self, stack)

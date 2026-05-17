@@ -21,6 +21,9 @@ function developerTools.processArgs(args)
     elseif value == "profileFrameTimes" then
       enableProfiler()
 
+      -- "isrunning" is a LuaJIT extension to collectgarbage not in the Lua 5.1
+      -- enum the bundled love stubs use; safe at runtime.
+      ---@diagnostic disable-next-line: param-type-mismatch
       if not collectgarbage("isrunning") then
         collectgarbage("restart")
       end

@@ -147,6 +147,7 @@ local DIRECTION_ROW = {up = 1, down = -1, left = 0, right = 0}
 ---@field cursorDirection CursorDirection? direction of the current movement key
 ---@field cur_row integer row the cursor is on
 ---@field cur_col integer the column the left half of the cursor is on (or just the cursor in case of touch)
+---@field cursorLock boolean? true while a swap is locking the cursor in place
 ---@field queuedSwapRow integer row in which a swap for next frame has been queued; 0 if none queued
 ---@field queuedSwapColumn integer column of the left (or in case of touch the "target") panel for which a swap has been queued for next frame; 0 if none queued
 ---@field top_cur_row integer the maximum row index the cursor is allowed to go at the moment

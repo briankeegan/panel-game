@@ -50,7 +50,6 @@ local FIXTURE_DIR = "common/tests/fixtures/crash_replays"
 local function die(fmt, ...)
   io.stderr:write("server_trace_to_fixture: " .. string.format(fmt, ...) .. "\n")
   os.exit(1)
-  error("unreachable")  -- LuaLS doesn't model os.exit as never-returns; error() does
 end
 
 local function info(fmt, ...)
@@ -59,7 +58,7 @@ end
 
 local function readAll(path)
   local f, err = io.open(path, "rb")
-  if not f then die("cannot read %s: %s", path, err) end
+  assert(f, string.format("cannot read %s: %s", path, err or "unknown"))
   local data = f:read("*a")
   f:close()
   return data
@@ -67,7 +66,7 @@ end
 
 local function writeAll(path, data)
   local f, err = io.open(path, "wb")
-  if not f then die("cannot write %s: %s", path, err) end
+  assert(f, string.format("cannot write %s: %s", path, err or "unknown"))
   f:write(data)
   f:close()
 end

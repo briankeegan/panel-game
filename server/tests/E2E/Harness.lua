@@ -1,3 +1,6 @@
+-- E2E harness assembles ad-hoc table shapes (xpcall capture tables, server
+-- error sinks) and reaches into Server internals — these are tests, not the
+-- production API surface. File-wide disable rather than ~30 inline annotations.
 ---@diagnostic disable: undefined-field, need-check-nil
 -- End-to-end harness: orchestrates a real Server + N scripted TCP clients
 -- inside a single LuaJIT process, with cooperative pumping.

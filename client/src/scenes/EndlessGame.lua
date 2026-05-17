@@ -13,7 +13,6 @@ EndlessGame.name = "EndlessGame"
 EndlessGame.supportsScrub = true
 
 function EndlessGame:customLoad()
-  self.match.renderDuringPause = true
   self.match:connectSignal("matchEnded", self, self.onMatchEnded)
 end
 

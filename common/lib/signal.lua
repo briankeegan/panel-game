@@ -5,6 +5,11 @@ local tableUtils = require("common.lib.tableUtils")
 ---@class Signal
 ---@field emitsSignals boolean Marker that the table is a signal emitter
 ---@field signalSubscriptions table subscribers as key and a list of callbacks to execute on emission
+---@field emitSignal fun(self, signalName: string, ...) fire a signal to subscribers
+---@field createSignal fun(self, signalName: string) register a signal channel
+---@field connectSignal fun(self, signalName: string, subscriber: any, callback: fun(...))
+---@field disconnectSignal fun(self, signalName: string, subscriber: any, callback: function?)
+---@field disconnectSubscriber fun(self, subscriber: any)
 
 ---@class Signal
 local Signal = {}

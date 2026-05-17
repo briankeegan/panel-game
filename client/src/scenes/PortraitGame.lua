@@ -3,6 +3,7 @@ local class = require("common.lib.class")
 local consts = require("common.engine.consts")
 local Telegraph = require("client.src.graphics.Telegraph")
 local GameModes = require("common.data.GameModes")
+local TeamUtils = require("common.data.TeamUtils")
 local GraphicsUtil = require("client.src.graphics.graphics_util")
 local ui = require("client.src.ui")
 local input = require("client.src.inputManager")
@@ -231,7 +232,7 @@ function PortraitGame:draw()
     local winners = self.match:getWinners()
     local pos = themes[config.theme].gameover_text_Pos
     local message
-    if isFFA(self.match.gameMode) then
+    if TeamUtils.isFFA(self.match.gameMode) then
       if self.match:hasLocalPlayer() then
         local localWon = false
         for _, winner in ipairs(winners) do
@@ -253,7 +254,7 @@ function PortraitGame:draw()
         message = loc("ss_draw")
       end
     elseif self.match.gameMode and self.match.gameMode.stackInteraction == GameModes.StackInteractions.TEAM_VERSUS then
-      message = buildTeamResultText(self.match, winners)
+      message = GameBase.buildTeamResultText(self.match, winners)
     elseif #winners == 1 then
       message = loc("ss_p_wins", winners[1].name)
     else

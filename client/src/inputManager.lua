@@ -19,7 +19,7 @@ require("client.src.input.JoystickProvider")
 --   inputConfigurations: raw key inputs mapped to internal aliases for that configuration
 --   base (top level): the union of all inputConfigurations not already claimed by a player
 --   mouse: all mouse buttons and the position of the mouse
----@class InputManager
+---@class InputManager : Signal
 local inputManager = {
   isDown = {},
   isPressed = {},

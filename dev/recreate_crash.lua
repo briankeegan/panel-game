@@ -1,3 +1,7 @@
+---@diagnostic disable: undefined-field
+-- Local dev script (stubs out love + socket, exercises an in-process Match).
+-- Calls a `simulateEvent` API that doesn't exist on Match in this branch;
+-- left for historical reference, type checker would otherwise yell.
 love = { math = { newRandomGenerator = function() return { setSeed = function() end, random = function() return 0 end , filesystem = { getSourceBaseDirectory = function() return "." end } } end } }
 package.preload["socket"] = function() return { gettime = function() return 0 end } end
 -- Lua script to recreate the crash using replay data

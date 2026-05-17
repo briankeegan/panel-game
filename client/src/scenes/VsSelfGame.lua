@@ -12,7 +12,6 @@ VsSelfGame.name = "VsSelfGame"
 VsSelfGame.supportsScrub = true
 
 function VsSelfGame:customLoad()
-  self.match.renderDuringPause = true
   self.match:connectSignal("matchEnded", self, self.onMatchEnded)
 end
 

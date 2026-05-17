@@ -1,3 +1,8 @@
+-- Tests reach into Server/Room internals (invisible), assert on mock-shaped
+-- payloads that don't match production wire types (undefined-field), and use
+-- `local x = next(...); assert(x.foo)` patterns that LuaLS can't narrow
+-- through (need-check-nil). All three are file-wide invariants for tests
+-- against MockPersistence + ServerTesting fixtures.
 ---@diagnostic disable: invisible, undefined-field, need-check-nil
 local MockPersistence = require("server.tests.MockPersistence")
 local ClientProtocol = require("common.network.ClientProtocol")

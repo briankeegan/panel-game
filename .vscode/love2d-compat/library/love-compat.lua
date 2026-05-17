@@ -55,3 +55,22 @@ love.arg = love.arg
 love.parsedGameArguments = {}
 ---@type string[]
 love.rawGameArguments = {}
+
+-- love.Canvas:newImageData — exists on love 11 / love 12 but missing from the
+-- bundled stubs (they only declare Image:newImageData).
+---@param x integer?
+---@param y integer?
+---@param w integer?
+---@param h integer?
+---@return love.ImageData
+function love.Canvas:newImageData(x, y, w, h) return nil end
+
+-- love.Image:getDimensions — used by MultibarElement; missing from stubs.
+---@return integer width
+---@return integer height
+function love.Image:getDimensions() return 0, 0 end
+
+-- LuaJIT `collectgarbage("isrunning")` extension. The love 12 type stubs
+-- enumerate only the standard Lua 5.1 options; LuaJIT also supports
+-- "isrunning" which returns a boolean. Used by the GC watchdog code.
+---@alias gcoption "collect"|"count"|"isrunning"|"restart"|"setpause"|"setstepmul"|"step"|"stop"

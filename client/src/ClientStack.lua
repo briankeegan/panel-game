@@ -44,6 +44,8 @@ end
 ---@field player_number integer used for display ordering
 ---@field level integer? modern-style level; set by PlayerStack subclass
 ---@field difficulty integer? classic-style difficulty; set by PlayerStack subclass
+---@field _teamColor [number, number, number, number?]? team tint cached at match-start (nil in non-team modes)
+---@field _deathReason ("topOut"|"disconnect"|"matchAbort")? stamped by ClientMatch when the death event arrives
 
 ---@class ClientStack
 local ClientStack = class(

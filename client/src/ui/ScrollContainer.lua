@@ -6,6 +6,8 @@ local GraphicsUtil = require("client.src.graphics.graphics_util")
 
 ---@class ScrollContainerOptions : UiElementOptions
 ---@field scrollOrientation ("vertical" | "horizontal" | nil)
+---@field childGap integer? gap (px) between rendered children — defaulted by ScrollMenu
+---@field padding integer? outer padding (px) before the first child — defaulted by ScrollMenu
 
 ---@class ScrollContainer : UiElement
 ---@field scrollOrientation string "vertical" or "horizontal"

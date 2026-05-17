@@ -191,7 +191,7 @@ function ReplayBrowser:draw()
     end
 
     GraphicsUtil.print(loc("rp_browser_info_header"), menu_x + 170, menu_y - 40)
-    GraphicsUtil.print(filename, menu_x - 150, menu_y - 40 + menu_h)
+    GraphicsUtil.print(filename or "", menu_x - 150, menu_y - 40 + menu_h)
 
     local modeText
     if selectedReplay.metadata.gameModeName == "VS" then

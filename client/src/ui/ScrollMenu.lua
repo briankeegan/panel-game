@@ -118,7 +118,7 @@ end
 -- with a back button whose onClick calls `menu:yieldFocus()`. Without one,
 -- escaping on the last item fires whatever action that item has — e.g. a
 -- "Relaxed" button would start a game instead of cancelling out.
----@param inputs InputConfiguration
+---@param inputs InputConfiguration | InputManager structurally compatible — both expose isDown/isPressed/isPressedWithRepeat
 ---@param dt number?
 function ScrollMenu:receiveInputs(inputs, dt)
   if not self.isEnabled or not self.selectedIndex then

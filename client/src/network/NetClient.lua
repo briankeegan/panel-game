@@ -208,9 +208,12 @@ local function resetLobbyData(self)
   self.lobbyDataV2 = {
     ---@type table<PublicPlayerID, LobbyPlayerV2>
     players = {},
-    ---@type table<PublicPlayerID, table<GameModeID, boolean>>
+    -- Inner keys are either GameModeID strings ("TWO_PLAYER_VS") for direct
+    -- challenges or room-invite strings ("room_<roomNumber>_<slotNumber>")
+    -- for slot-specific invites. Typed as `string` to cover both.
+    ---@type table<PublicPlayerID, table<string, boolean>>
     outgoingChallenges = {},
-    ---@type table<PublicPlayerID, table<GameModeID, boolean>>
+    ---@type table<PublicPlayerID, table<string, boolean>>
     incomingChallenges = {},
     ---@type table<roomNumber, LobbyRoomV2>
     rooms = {}
@@ -494,6 +497,7 @@ local function start2pVsOnlineMatch(self, createRoomMessage)
       self.state = states.ONLINE
       if self.lobbyDataV2 and self.room.roomNumber then
         local roomNumber = self.room.roomNumber
+        assert(roomNumber)
         local playerIds = {}
         local playerSlots = {}
         local occupied = {}
@@ -553,14 +557,10 @@ local function processPauseNotification(self, message)
   if not (self.room and self.room.match) then return end
   local body = message.pauseNotification
   if type(body) ~= "table" then return end
-  -- Spectators never enter paused state. The player's pause is internal to them;
-  -- our view should keep rendering the frozen frame they're stuck on. Applying
-  -- isPaused here used to (a) make specs sit on a black screen, because spec
-  -- entry routes through GameBase directly so renderDuringPause is false and
-  -- the game stops drawing under the pause overlay, and (b) get stuck there if
-  -- the unpause notification dropped or the player rewound without unpausing
-  -- in the way the spec expected.
-  if self.room.spectating then return end
+  -- Spectators receive the same pauseNotification and apply it. Scrub-eligible
+  -- modes (endless / vsSelf) set renderDuringPause at match construction so
+  -- the playfield keeps rendering under the overlay — no spec black screen.
+  -- draw_pause already has a spec-only branch (dim instead of pause menu).
   self.room.match.isPaused = body.paused and true or false
 end
 
@@ -1365,7 +1365,7 @@ function NetClient:reportLocalGameResult(winners)
   local gameMode = self.room and self.room.mode
   local isTeamGame = gameMode and gameMode.teamCount
 
-  if isTeamGame then
+  if isTeamGame and gameMode and self.room then
     local totalPlayers = gameMode.playerCount or #self.room.players
     if #winners >= totalPlayers then
       -- all players tied (everyone died simultaneously)

@@ -14,6 +14,7 @@ local consts = require("common.engine.consts")
 ---@field stopWatch integer how many times the game physics have run; unlike a clock and just like a stopWatch this frame timer only runs when the simulation is running
 ---@field stopWatchIsRunning boolean if the stack is running the game physics during runs
 ---@field game_over_clock integer What the clock time was when the Stack went game over
+---@field game_over_stopWatch integer? in-game timer at death (countdown excluded); set by Stack subclass when game_over_clock fires
 ---@field in_countdown boolean runtime toggle — true while the pre-match countdown is pending/ticking, cleared when it hits zero. NOT a mode flag (use Match.doCountdown for "does this match have a countdown"). For clock→stopWatch conversions use `countdownOffsetFrames`.
 ---@field countdown_timer boolean? ephemeral timer used for tracking countdown progress at the start of the game
 ---@field outgoingGarbage GarbageQueue

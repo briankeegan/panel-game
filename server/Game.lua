@@ -17,7 +17,7 @@ local TeamUtils = require("common.data.TeamUtils")
 ---@field teams Team[]?
 ---@field ranked boolean
 ---@field package inputs string[][]
----@field package outcomeReports integer[]
+---@field package outcomeReports table<integer, false|integer> per-slot outcome: false = pending/disconnected, integer = winner-team or game-over frame
 ---@field package disconnectedPlayers table<integer, boolean>
 ---@field package eliminatedPlayers table<integer, integer> player_number -> game_over_clock frame
 ---@field complete boolean
@@ -220,6 +220,7 @@ end
 ---@param targetFrame integer
 function Game:applyRewind(player, targetFrame)
   local idx = player.player_number
+  if not idx then return end
   local inputs = self.inputs[idx]
   if inputs and #inputs > targetFrame then
     for i = #inputs, targetFrame + 1, -1 do

@@ -437,7 +437,7 @@ local loginResponseTemplate = {
 }
 
 ---@param publicId integer
----@param notice string
+---@param notice string?
 ---@param newId privateUserId?
 ---@param newName string?
 ---@param oldName string?

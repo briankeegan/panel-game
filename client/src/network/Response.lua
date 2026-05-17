@@ -12,8 +12,12 @@ local function createResponseCoroutine(client, responseTypes)
   local cr = coroutine.create(
     function ()
       local response
-      local queue = client and client.receivedMessageQueue
-                    or GAME.netClient.tcpClient.receivedMessageQueue
+      -- Fallback through GAME.netClient.tcpClient was retained from an earlier
+      -- refactor but `tcpClient` no longer exists on NetClient. All real
+      -- callers pass `client` (see Request.lua:45). Assert so a future caller
+      -- that drops the arg fails loud instead of hitting a now-nil field.
+      assert(client, "Response: client (TcpClient) is required")
+      local queue = client.receivedMessageQueue
 
       while not response and love.timer.getTime() < startTime + REQUEST_TIMEOUT do
         coroutine.yield()

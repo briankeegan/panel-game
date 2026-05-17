@@ -50,6 +50,7 @@ local TeamUtils = require("common.data.TeamUtils")
 ---@field fromReplay boolean? true when this match was reconstructed from a saved replay
 ---@field _serverConfirmedEnd boolean? set by NetClient when the server's gameResult arrives
 ---@field _scheduledOverlayLocalMs integer? wall-clock ms anchor for the match-end overlay (scheduledStartLocalMs + endTick/60s)
+---@field noRaiseMode boolean? endless rewind/no-raise practice flag; suppresses score save and tweaks engine pacing
 
 --- The ClientMatch is a way to create a match that will run with graphics and sounds on a client.
 ---
@@ -87,6 +88,14 @@ end)
 
 local countdownEnd = consts.COUNTDOWN_START + consts.COUNTDOWN_LENGTH
 
+-- Modes whose game scene supports pause-mode scrubbing. These render the
+-- playfield underneath the pause overlay so the player (and now spectators)
+-- can see the frozen frame. Mode-level so player + spectator + replay paths
+-- all derive the same answer instead of each customLoad setting it ad hoc.
+local function _scrubEligibleScene(gameScene)
+  return gameScene == "EndlessGame" or gameScene == "VsSelfGame"
+end
+
 ---@param battleRoom BattleRoom
 function ClientMatch.createFromBattleRoom(battleRoom)
   local clientMatch = ClientMatch.createFromGameMode(battleRoom.players, battleRoom.mode, battleRoom:createPanelSource(), battleRoom.ranked, battleRoom.preferredStageId)
@@ -121,6 +130,7 @@ function ClientMatch.createFromGameMode(players, gameMode, panelSource, ranked, 
 
   clientMatch.panelSource = panelSource
   clientMatch.supportsPause = #players == 1 and players[1].isLocal
+  clientMatch.renderDuringPause = _scrubEligibleScene(gameMode.gameScene)
 
   clientMatch:setupFromGameMode()
 
@@ -229,6 +239,7 @@ function ClientMatch.createFromReplay(replay, players, gameMode)
     clientMatch.gameMode = matchGameMode
     clientMatch.stackInteraction = matchGameMode.stackInteraction
     clientMatch.matchRules = matchGameMode.matchRules
+    clientMatch.renderDuringPause = _scrubEligibleScene(matchGameMode.gameScene)
     clientMatch:_wireGarbageTargets(matchGameMode.stackInteraction, matchGameMode, compactedPpt)
   end
 
@@ -1698,11 +1709,13 @@ end
 
   -- Draw the pause menu
 function ClientMatch:draw_pause()
+  local isSpectatorView = not self:hasLocalPlayer()
+
   -- Spec view of a scrub-eligible match (endless / vs-self) only: the
   -- player may be rewinding, so dim the playfield instead of layering a
   -- menu — specs have no menu. Other spec views and the player keep their
   -- existing look.
-  if not self:hasLocalPlayer()
+  if isSpectatorView
       and self.gameMode
       and (self.gameMode.gameScene == "EndlessGame"
         or self.gameMode.gameScene == "VsSelfGame") then
@@ -1723,7 +1736,11 @@ function ClientMatch:draw_pause()
   end
   local y = 260
   GraphicsUtil.printf(loc("pause"), 0, y, consts.CANVAS_WIDTH, "center", nil, 1, 10)
-  GraphicsUtil.printf(loc("pl_pause_help"), 0, y + 30, consts.CANVAS_WIDTH, "center", nil, 1)
+  -- Scrub keybind hint is player-only. Specs have no controls; showing
+  -- "← / → to rewind" would be misleading.
+  if not isSpectatorView then
+    GraphicsUtil.printf(loc("pl_pause_help"), 0, y + 30, consts.CANVAS_WIDTH, "center", nil, 1)
+  end
 end
 
 -- Self.winners here is the ClientMatch cache (MatchParticipant[]). The engine
@@ -1815,6 +1832,22 @@ end
 ---Called by applyGarbageEvent (in-sync path) and by drainPendingHistoricalEvents.
 ---@param body table parsed event payload
 function ClientMatch:_applyGarbageEventNow(body)
+  -- Self-attack echo guard. Match:deliverOutgoingGarbage emits a G for vsSelf
+  -- (local source → local target) so spectators see the drop, but it also
+  -- direct-pushes locally for responsiveness. The server's relay of that G
+  -- lands back on the sender. Without this guard the bounce would apply
+  -- garbage a second time on the player's own stack.
+  if body.sender and type(body.recipients) == "table" and #body.recipients == 1
+      and body.recipients[1] == body.sender then
+    local senderStack = self.stacks[body.sender]
+    if senderStack and senderStack.is_local then
+      logger.info(string.format(
+        "G skip echo: stack[%d] self-attack already applied locally",
+        body.sender))
+      return
+    end
+  end
+
   local garbageCount = (type(body.garbage) == "table") and #body.garbage or 0
   for _, recipientIndex in ipairs(body.recipients) do
     local stack = self.stacks[recipientIndex]

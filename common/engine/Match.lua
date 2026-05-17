@@ -476,13 +476,22 @@ end
 ---  * If the source is remote and the target is local-authoritative, SUPPRESS
 ---    the local-sim push — the authoritative G event from the source's machine
 ---    will deliver. Without this, garbage would land twice on the local player.
----  * Otherwise (local↔local self-attack, or remote↔remote on spectator), keep
----    the existing direct push.
+---  * If the source is local AND the target is local (vsSelf self-attack) while
+---    a server connection is active, direct-push for responsiveness AND emit a
+---    G so spectators see the drop. The server bounces the G back to us; the
+---    echo guard in ClientMatch:_applyGarbageEventNow prevents double-apply.
+---  * Offline / replay playback: direct push, no server in the loop.
 ---@param source BaseStack
 ---@param target BaseStack
 ---@param garbageDelivery table garbage payload (array of Garbage records)
 function Match:deliverOutgoingGarbage(source, target, garbageDelivery)
+  -- Replay-driven engines (saved replays, the pause-mode scrub preview) must
+  -- skip the loose-sync routing entirely. Their stacks are is_local=false, so
+  -- the "remote source → suppress local push" branch would erase their garbage
+  -- — exactly the "blocks vanish on rewind" symptom the scrub preview comment
+  -- in ClientMatch:scrubToFrame mentions. They're local re-sim, not network.
   local looseSyncActive = LOOSE_SYNC_GARBAGE
+      and not self.fromReplay
       and GAME and GAME.netClient and GAME.netClient:isConnected()
 
   if looseSyncActive then
@@ -520,12 +529,29 @@ function Match:deliverOutgoingGarbage(source, target, garbageDelivery)
       -- producing garbage in the local sim, and again when the server relays
       -- the G — causing 2× visual garbage on view-of-non-self-recipient.
       return
+    else
+      -- Local source → local target (vsSelf self-attack online). Push locally
+      -- so the player's own screen reacts immediately (no RTT delay on their
+      -- own garbage), AND emit a G so the server can relay to spectators.
+      -- The echo guard in ClientMatch:_applyGarbageEventNow skips the bounced
+      -- G on the sender's machine so it doesn't apply twice.
+      target:receiveGarbage(garbageDelivery)
+      local senderIndex = tableUtils.indexOf(self.stacks, source)
+      local recipientIndex = tableUtils.indexOf(self.stacks, target)
+      logger.info(string.format(
+        "G emit (self): stack[%d] -> stack[%d] frame=%d count=%d",
+        senderIndex or -1, recipientIndex or -1, source.stopWatch or -1,
+        garbageDelivery and #garbageDelivery or 0))
+      GAME.netClient:sendGarbageEvent({
+        senderFrame = source.stopWatch,
+        recipients = { recipientIndex },
+        garbage = garbageDelivery,
+      })
+      return
     end
   end
 
-  -- Local↔local (vsSelf, puzzle, training, AI bots) and any case where loose
-  -- sync isn't active (offline modes, replay playback): direct push, no server
-  -- in the loop.
+  -- Offline / replay playback: direct push, no server in the loop.
   target:receiveGarbage(garbageDelivery)
 end
 
@@ -535,7 +561,10 @@ end
 ---@param targets BaseStack[] array of target stacks
 ---@param garbageDelivery table garbage payload (array of Garbage records)
 function Match:deliverOutgoingGarbageToMultiple(source, targets, garbageDelivery)
+  -- Same fromReplay carve-out as deliverOutgoingGarbage: replay/preview engines
+  -- aren't network-connected sims, so loose-sync routing doesn't apply.
   local looseSyncActive = LOOSE_SYNC_GARBAGE
+      and not self.fromReplay
       and GAME and GAME.netClient and GAME.netClient:isConnected()
 
   if looseSyncActive and source.is_local then

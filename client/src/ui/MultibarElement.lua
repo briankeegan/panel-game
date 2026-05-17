@@ -79,7 +79,7 @@ local MultibarElement = class(
 MultibarElement.TYPE = "MultibarElement"
 
 ---Draws a bar at the specified relative position within the element
----@param image love.Drawable The bar image
+---@param image love.graphics.Texture The bar image (Image or Canvas; both expose Texture:getDimensions)
 ---@param quad love.Quad The quad for the bar
 ---@param relativeBarPos {[1]: number, [2]: number} Position relative to the element
 ---@param height number Height of the bar

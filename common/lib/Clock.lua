@@ -36,7 +36,7 @@ Clock.__index = Clock
 
 ---Construct a real clock backed by socket.gettime + os.time. Pass nothing
 ---in production; pass `{ mono = ..., wall = ... }` in tests.
----@param sources {mono: fun():number, wall: fun():integer}?
+---@param sources {mono: (fun():number)?, wall: (fun():integer)?}?
 ---@return Clock
 function Clock.new(sources)
   local self = setmetatable({}, Clock)

@@ -82,6 +82,7 @@ end
 
 ---@param stackMetadata SimulatedStackMetadata
 ---@return ChallengeModePlayer
+---@param stackMetadata SimulatedStackMetadata
 function ChallengeModePlayer.createFromReplayMetadata(stackMetadata)
   -- seatId preferred for consistency with Player.createFromReplayMetadata;
   -- challenge mode is single-player so stackIndex always equals seatId in

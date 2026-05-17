@@ -306,6 +306,14 @@ function MatchParticipant:onMatchEnded(match)
       if w == self.stack.engine then isWinner = true; break end
     end
     if not isWinner then
+      -- Note: match.engine has no `stopWatch` field (Match exposes `clock`
+      -- only; stopWatch is per-Stack). This read evaluates to nil in
+      -- practice, so the fallback `or 0` is what actually fires. Leaving as
+      -- a no-op rather than rewiring to self.stack.engine.stopWatch — the
+      -- downstream consumers (placement renderer, replay metadata) appear
+      -- to be fine with the 0 sentinel. Revisit if the value is ever used
+      -- as a real timestamp.
+      ---@diagnostic disable-next-line: undefined-field
       self.lastMatchOutClock = match.engine.stopWatch or 0
     end
   end

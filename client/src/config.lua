@@ -54,6 +54,7 @@ require("client.src.globals")
 ---@field discordCommunityShown boolean
 ---@field lobbyTeamPrefs { type: string, playerCount: integer, composition: string, garbage: string, latency: string }
 ---@field lobbyFfaPrefs  { type: string, playerCount: integer, garbage: string, latency: string }
+---@field max_lag_frames integer? developer override for the desync-tolerance window (defaults to 230 when absent)
 config = {
     -- The last used engine version
     version                       = consts.ENGINE_VERSION,

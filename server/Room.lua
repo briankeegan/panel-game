@@ -844,7 +844,7 @@ function Room:broadcastInput(input, sender)
   self:noteActivity()
   local senderNum = sender.player_number
   local game = self.game
-  if not game then return end
+  if not game or not senderNum then return end
   -- Loose-sync: skip inputs from eliminated/disconnected slots so they don't pollute the replay log.
   if game.disconnectedPlayers[senderNum] then
     -- Log the FIRST dropped input per disconnect so we can diagnose "P2 sees their own game

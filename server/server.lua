@@ -855,7 +855,11 @@ function Server:closeRoom(room, reason)
 
   for _, player in ipairs(room.spectators) do
     self.spectatorToRoom[player] = nil
-    player.spectatedRoom = nil
+    -- Do NOT clear player.spectatedRoom here. Room:close uses
+    -- `spectator.spectatedRoom == self` to gate the per-spectator leaveRoom
+    -- send; clearing it first makes the gate always fail and silently strands
+    -- spectators in the closed room. Room:close nils spectatedRoom after the
+    -- send.
   end
 
   if self.rooms[room.roomNumber] then
@@ -868,7 +872,7 @@ end
 
 ---@param player ServerPlayer
 ---@param roomNumber integer
----@param slotNumber integer
+---@param slotNumber integer? nil means "any open slot" (used by the dynamic-roster open-FFA join path)
 ---@return boolean success
 function Server:handleJoinRoom(player, roomNumber, slotNumber)
   roomNumber = tonumber(roomNumber)
@@ -1479,6 +1483,7 @@ function Server:processMessage(message, connection)
   elseif not connection.loggedIn then
     if message.login_request then
       local IP_logging_in, port = connection.socket:getpeername()
+      ---@cast message ServerIncomingLoginMessage
       if self:login(connection, message.user_id, message.name, IP_logging_in, port, message.engine_version, message) then
         return true
       else

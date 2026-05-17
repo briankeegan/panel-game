@@ -55,7 +55,7 @@ local ClientMessages = {}
 ---@field openRoom boolean?
 ---@field matchAbort any?
 
----@return ClientIncomingMessage
+---@return ClientIncomingMessage|ServerIncomingLoginMessage|{menu_state: ServerIncomingPlayerSettings}
 function ClientMessages.parseMessage(clientMessage)
   if clientMessage.login_request then
     return ClientMessages.parseLoginRequest(clientMessage)
@@ -117,6 +117,7 @@ end
 ---@field loaded boolean?
 ---@field publicId integer?
 ---@field levelData LevelData?
+---@field endless_no_raise boolean?
 
 local function parsePlayerSettingsFields(settings)
   local out = {}

@@ -298,7 +298,8 @@ end
 ---@param room table the Room whose game just went weird
 ---@param reason string e.g. "server_disconnect" or "client_crash"
 ---@param traceHash string? optional dedup key for client-nominated flags
----@return boolean, string accepted, incidentId|rejectionReason
+---@return boolean accepted
+---@return string incidentIdOrRejectionReason
 function CrashReports:flagGame(room, reason, traceHash)
   local ok, a, b = pcall(flagGameImpl, self, room, reason, traceHash)
   if not ok then

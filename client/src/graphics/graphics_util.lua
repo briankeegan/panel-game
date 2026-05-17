@@ -22,7 +22,7 @@ local quadReference = {}
 ---@class PixelFontMap
 ---@field charWidth number
 ---@field charHeight number
----@field atlas love.Texture
+---@field atlas love.Texture? nil only for the placeholder map Theme uses when blankAtlas failed to load
 ---@field charToQuad table<string, love.Quad>
 
 ---@param characters string

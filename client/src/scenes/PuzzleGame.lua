@@ -329,7 +329,7 @@ function PuzzleGame:recordPuzzleSolution()
       -- Navigate to the target puzzle set using the adjusted path
       local targetPuzzleSet = sourceRootPuzzleSet
       for _, index in ipairs(adjustedPath) do
-        if targetPuzzleSet.puzzleSets and targetPuzzleSet.puzzleSets[index] then
+        if targetPuzzleSet and targetPuzzleSet.puzzleSets and targetPuzzleSet.puzzleSets[index] then
           targetPuzzleSet = targetPuzzleSet.puzzleSets[index]
         end
       end

@@ -105,6 +105,7 @@ function AssetDecodeClient.decodeImage(path)
   end
   local id = nextRequestId
   nextRequestId = nextRequestId + 1
+  assert(inputChannel, "workerHealthy implies inputChannel was set in ensureWorker")
   local ok = pcall(function()
     inputChannel:push({id = id, type = "image", path = path})
   end)

@@ -15,6 +15,14 @@
 #   zsh run_lua_check.sh --files <scope>
 #   zsh run_lua_check.sh --fields       # show TOP undefined-field names
 #   zsh run_lua_check.sh --quiet        # summary only, no per-diag dump
+#   zsh run_lua_check.sh --code <code>  # filter to a single diagnostic code
+#                                       # (e.g. need-check-nil, undefined-field)
+#   zsh run_lua_check.sh --field <name> # filter to warnings mentioning a
+#                                       # specific Undefined field `<name>`
+#   zsh run_lua_check.sh --include-tests # include tests / fixtures (off by
+#                                       # default — production code matters
+#                                       # for prod stability; tests use mocks
+#                                       # that confuse the type checker)
 #   zsh run_lua_check.sh --help
 #
 # Cache lives at .luals-check/output.raw.txt. Auto-refresh if cache is empty,
@@ -33,14 +41,29 @@ DONE_MARKER="$LOG_DIR/output.raw.done"
 REFRESH=0
 SCOPE=""
 MODE="diag"   # diag | files | fields | quiet
+FILTER_CODE=""
+FILTER_FIELD=""
+INCLUDE_TESTS=0
+expect_value=""
 for arg in "$@"; do
+  if [[ -n "$expect_value" ]]; then
+    case "$expect_value" in
+      code)  FILTER_CODE="$arg" ;;
+      field) FILTER_FIELD="$arg" ;;
+    esac
+    expect_value=""
+    continue
+  fi
   case "$arg" in
     --refresh|-r) REFRESH=1 ;;
     --files|-F) MODE="files" ;;
     --fields)   MODE="fields" ;;
     --quiet|-q) MODE="quiet" ;;
+    --code)     expect_value="code" ;;
+    --field)    expect_value="field" ;;
+    --include-tests) INCLUDE_TESTS=1 ;;
     --help|-h)
-      sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'
+      sed -n '2,30p' "$0" | sed 's/^# \{0,1\}//'
       exit 0
       ;;
     -*)
@@ -57,6 +80,10 @@ for arg in "$@"; do
       ;;
   esac
 done
+if [[ -n "$expect_value" ]]; then
+  echo "Flag --$expect_value requires a value" >&2
+  exit 2
+fi
 
 # Cache validity: must have completion marker AND be newer than any tracked
 # .lua source. Otherwise refresh.
@@ -133,6 +160,8 @@ fi
 # Filter to crash-risk diagnostics (and optionally scope). Uses python because
 # raw output spans multiple lines per diagnostic.
 SCOPE="$SCOPE" MODE="$MODE" CACHED=$([[ $NEED_RUN -eq 0 ]] && echo 1 || echo 0) \
+FILTER_CODE="$FILTER_CODE" FILTER_FIELD="$FILTER_FIELD" \
+INCLUDE_TESTS="$INCLUDE_TESTS" \
 python3 - "$RAW_OUTPUT" <<'PY'
 import os, re, sys, collections
 
@@ -151,6 +180,15 @@ CRASH_RISK = {
 scope = os.environ.get("SCOPE", "")
 mode  = os.environ.get("MODE", "diag")
 cached = os.environ.get("CACHED") == "1"
+filter_code  = os.environ.get("FILTER_CODE", "")
+filter_field = os.environ.get("FILTER_FIELD", "")
+include_tests = os.environ.get("INCLUDE_TESTS") == "1"
+
+# Test-file path regex. Test code uses mocked types that don't match the
+# production wire contracts, so warnings there are typically noise. Skip
+# unless explicitly requested via --include-tests OR a scope that lands
+# directly inside a tests/ dir (since the user clearly asked for it).
+TEST_PATH = re.compile(r"(?:^|/)tests?/|Tests?\.lua$|TraceReplay\.lua$|MockPersistence\.lua$")
 
 with open(sys.argv[1]) as f:
   raw = f.read()
@@ -177,6 +215,19 @@ for idx, start in enumerate(header_positions):
 
 # Apply scope filter.
 in_scope = [r for r in records if (not scope) or r[1].startswith(scope)]
+
+# Skip tests/fixtures unless --include-tests was passed, OR the user explicitly
+# scoped into a tests directory (they clearly want to see them).
+scope_targets_tests = bool(scope and TEST_PATH.search(scope))
+if not include_tests and not scope_targets_tests:
+  in_scope = [r for r in in_scope if not TEST_PATH.search(r[1])]
+
+if filter_code:
+  in_scope = [r for r in in_scope if r[0] == filter_code]
+
+if filter_field:
+  needle = "Undefined field `" + filter_field + "`"
+  in_scope = [r for r in in_scope if needle in r[2]]
 
 # Tallies.
 by_code = collections.Counter()
@@ -207,10 +258,12 @@ elif mode == "fields":
 
 print('-' * 60)
 src_tag = " (cached)" if cached else ""
-if scope:
-  print(f"Scope: {scope}{src_tag}")
-else:
-  print(f"Scope: <full workspace>{src_tag}")
+filters = []
+if scope:        filters.append(f"path={scope}")
+if filter_code:  filters.append(f"code={filter_code}")
+if filter_field: filters.append(f"field={filter_field}")
+filter_str = " ".join(filters) if filters else "<full workspace>"
+print(f"Scope: {filter_str}{src_tag}")
 print(f"Total diagnostics in scope: {sum(by_code.values())}")
 print(f"Crash-risk diagnostics:     {len(crash)}")
 print()

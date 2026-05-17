@@ -259,7 +259,7 @@ function util.addToCPath(path)
   --  luaopen_socket_core
   -- meaning it has to be required as "socket.core", otherwise it cannot be opened
   local cPathDirs = util.split(package.cpath, ";")
-  local fileExtension = string.sub(cPathDirs[1], -4)
+  local fileExtension = string.sub(cPathDirs[1] or "", -4)
   if fileExtension == "?.so" then
     path = path:gsub("%?%?", "?.so")
   else

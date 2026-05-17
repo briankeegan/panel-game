@@ -51,6 +51,7 @@ local REPLAY_VERSION = 4
 ---@class SimulatedStackMetadata : BaseStackMetadata
 ---@field challengeModeDifficulty integer?
 ---@field stageIndex integer?
+---@field seatId integer? canonical team seat assignment (single-player modes default to stackIndex)
 
 ---@class ReplayMetadata
 ---@field timestamp integer The time the replay got created as a system dependent timestamp; this denotes the start time

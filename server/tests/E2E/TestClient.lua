@@ -1,3 +1,8 @@
+-- Test client wraps a raw luasocket — many methods (settimeout/connect/send/
+-- receive/close) are real but the TcpSocket stub in common/interface/Socket.lua
+-- doesn't expose them on the connection object as the LSP sees it. Test code
+-- also uses asserted-but-not-narrowed patterns like `local s = self.sock;
+-- s:send(...)` after a connect check.
 ---@diagnostic disable: undefined-field, need-check-nil
 -- Scripted protocol-level client for end-to-end multiplayer tests.
 --

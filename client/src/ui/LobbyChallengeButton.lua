@@ -48,9 +48,9 @@ IconTextButton, "LobbyChallengeButton")
 -- remains visible against the team tint.
 function LobbyChallengeButton:drawBackground()
   if self.teamTint and not (self.selected or self.currentlyPressed) then
-    local t = self.teamTint
+    local r, g, b, a = self.teamTint[1], self.teamTint[2], self.teamTint[3], self.teamTint[4]
     GraphicsUtil.drawRectangle("fill", self.x, self.y, self.width, self.height,
-      t[1], t[2], t[3], t[4] or 0.85,
+      r or 1, g or 1, b or 1, a or 0.85,
       self.CORNER_RADIUS, self.CORNER_RADIUS)
     GraphicsUtil.setColor(1, 1, 1, 1)
   else

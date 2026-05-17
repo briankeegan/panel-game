@@ -191,6 +191,7 @@ function SimulatedStack:rollbackToFrame(clock)
     if self.attackEngine then
       self.attackEngine:rollbackToFrame(self.stopWatch)
     end
+    self:markNetworkGarbageNeedsReplay(self.stopWatch)
 
     self.lastRollbackFrame = self.clock
     self.clock = clock

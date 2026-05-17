@@ -83,6 +83,16 @@ function(self, args)
   self.rollbackCopyPool = Queue()
   self.rollbackCount = 0
   self.lastRollbackFrame = -1 -- the last frame we had to rollback from
+
+  -- Frame-stamped log of network-injected garbage (loose-sync G events).
+  -- These calls land outside the engine's deterministic input pipeline, so
+  -- rollbackToFrame would otherwise erase their effect on staged garbage
+  -- and the forward re-sim would have no way to recover them. Each entry:
+  --   { frame = stopWatch at receive, garbage = snapshot, applied = bool }
+  -- On rollback, entries with frame > rollbackTarget are flipped to
+  -- applied=false; Match:pushGarbageTo drains them at their original frame
+  -- during forward re-sim, so state converges back to what was on screen.
+  self._networkGarbageLog = {}
 end)
 
 BaseStack.TYPE = "BaseStack"
@@ -113,6 +123,75 @@ end
 
 function BaseStack:receiveGarbage(garbageDelivery)
   self.incomingGarbage:pushTable(garbageDelivery)
+end
+
+---Apply garbage that arrived via a network G event AND record it for rollback
+---replay. Use this from the loose-sync receive path; do NOT use it for
+---engine-internal garbage (Match:deliverOutgoingGarbage already replays those
+---deterministically via the input-driven forward sim).
+---@param garbageArray Garbage[] wire-form garbage records from the G payload
+function BaseStack:applyNetworkGarbage(garbageArray)
+  -- Snapshot is immutable; correctChainingFlag will mutate `finalized` on
+  -- whichever copy reaches the queue, so keep our log copy separate.
+  local snapshot = {}
+  for i, g in ipairs(garbageArray) do
+    snapshot[i] = shallowcpy(g)
+  end
+  -- Trim entries older than the maximum rollback window — they can never
+  -- be replayed (rollback can't reach that far back).
+  local cutoff = self.stopWatch - (MAX_LAG or 0) - 60
+  local log = self._networkGarbageLog
+  local writeIdx = 0
+  for i = 1, #log do
+    if log[i].frame >= cutoff then
+      writeIdx = writeIdx + 1
+      if writeIdx ~= i then log[writeIdx] = log[i] end
+    end
+  end
+  for i = #log, writeIdx + 1, -1 do log[i] = nil end
+  log[#log + 1] = { frame = self.stopWatch, garbage = snapshot, applied = true }
+
+  local workingCopy = {}
+  for i, g in ipairs(garbageArray) do
+    workingCopy[i] = shallowcpy(g)
+  end
+  self:receiveGarbage(workingCopy)
+end
+
+---Called from Stack/SimulatedStack:rollbackToFrame after the garbage queues
+---have been restored. Any network-applied garbage whose receive frame is
+---past the rollback target had its effect on stagedGarbage erased by the
+---queue restore, so flag it for re-application during forward re-sim.
+---@param rollbackFrame integer
+function BaseStack:markNetworkGarbageNeedsReplay(rollbackFrame)
+  local log = self._networkGarbageLog
+  for i = #log, 1, -1 do
+    if log[i].frame > rollbackFrame then
+      log[i].applied = false
+    else
+      break -- log is appended in frame order, so we're done
+    end
+  end
+end
+
+---Called from Match:pushGarbageTo once per about-to-tick frame. Replays
+---any network garbage marked needs-replay whose frame matches stopWatch,
+---so the staging state mirrors what was there originally at this frame.
+---@param frame integer
+function BaseStack:drainNetworkGarbageForFrame(frame)
+  local log = self._networkGarbageLog
+  for i = 1, #log do
+    local entry = log[i]
+    if entry.frame > frame then return end
+    if entry.frame == frame and not entry.applied then
+      local workingCopy = {}
+      for j, g in ipairs(entry.garbage) do
+        workingCopy[j] = shallowcpy(g)
+      end
+      self:receiveGarbage(workingCopy)
+      entry.applied = true
+    end
+  end
 end
 
 ---@param doCountdown boolean

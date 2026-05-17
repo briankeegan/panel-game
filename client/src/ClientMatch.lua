@@ -646,9 +646,38 @@ function ClientMatch:handleMatchEnd()
   -- late D leaves game_over_clock unset and no OUT marker appears.
   -- Stamp those with the match-end frame so every survivor at least sees
   -- "OUT at <match-end>" rather than nothing.
-  local engineWinners = self.engine and self.engine:getWinners() or {}
+  --
+  -- Prefer the server's authoritative winner (winnerIndex / winnerTeamIndex,
+  -- set by processGameResult before serverConfirmedEnd unblocks shouldFinalize
+  -- in the online path). The engine's FFA getWinners can incorrectly include
+  -- the runner-up as a co-winner when their D event hadn't applied yet —
+  -- their game_over_clock stays 0 so the "highest game_over_clock" rule
+  -- doesn't filter them out, and the backfill then skips them, leaving no
+  -- OUT marker either in-game or in the post-match card.
   local winnerSet = {}
-  for _, ws in ipairs(engineWinners) do winnerSet[ws] = true end
+  local hasDefinitiveServerWinner = self._hasServerOutcome
+    and (self._serverWinnerIndex or self._serverWinnerTeamIndex)
+  if hasDefinitiveServerWinner then
+    for _, stack in ipairs(self.stacks) do
+      local engine = stack.engine
+      if engine then
+        local snum = (stack.player and stack.player.playerNumber) or stack.player_number
+        local steam = nil
+        if self._serverWinnerTeamIndex and self.engine and stack.player then
+          steam = TeamUtils.teamIndexForOrNil(self.engine, stack.player.playerNumber)
+        end
+        local isServerWinner =
+          (self._serverWinnerIndex and snum == self._serverWinnerIndex)
+          or (self._serverWinnerTeamIndex and steam and steam == self._serverWinnerTeamIndex)
+        if isServerWinner then winnerSet[engine] = true end
+      end
+    end
+  else
+    -- Tie (server outcome present but no winner) or offline/replay path.
+    for _, ws in ipairs(self.engine and self.engine:getWinners() or {}) do
+      winnerSet[ws] = true
+    end
+  end
   local endFrame = self.engine and self.engine.clock or 0
   if endFrame > 0 then
     for _, stack in ipairs(self.stacks) do
@@ -1858,13 +1887,10 @@ function ClientMatch:_applyGarbageEventNow(body)
         tostring(stack.is_local), garbageCount))
       -- self.stacks[i] is a ClientStack wrapper; the actual engine stack
       -- (and the receiveGarbage method) lives on stack.engine.
-      -- Copy the garbage table per recipient so chain-flag mutations in
-      -- correctChainingFlag don't leak between recipients sharing one event.
-      local garbageCopy = {}
-      for j, g in ipairs(body.garbage) do
-        garbageCopy[j] = shallowcpy(g)
-      end
-      stack.engine:receiveGarbage(garbageCopy)
+      -- applyNetworkGarbage snapshots + receives and records a frame-stamped
+      -- entry so a later Stack rollback past this frame can replay it; without
+      -- that, the queue restore wipes the staged push and view-stacks diverge.
+      stack.engine:applyNetworkGarbage(body.garbage)
     else
       -- Recipient not landable: slot was emptied (mid-match leave) or the
       -- engine hasn't booted yet (mod still loading on a spectator/rejoiner).

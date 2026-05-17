@@ -342,9 +342,18 @@ function BattleRoom:setTeamWins(teamWins)
 end
 
 function BattleRoom:updateWinrates()
+  -- matchesPlayed increments in BattleRoom:onMatchEnded, which fires from the
+  -- engine's matchEnded signal AFTER NetClient:processGameResult has already
+  -- called setWinCount + updateWinrates for the just-finished match. Using
+  -- matchesPlayed alone would lag by one — so a player with 2 wins after 2
+  -- matches would brief-render as 200% (2 / 1) before the lag closes.
+  -- max(matchesPlayed, totalGames) papers over the gap: totalGames sums the
+  -- now-current per-player win counts, which equals matchesPlayed in a non-
+  -- draw scenario; draws keep matchesPlayed ahead (no per-player win for the
+  -- match), so the max still gives the right denominator.
   local gamesPlayed
   if tableUtils.trueForAny(self.players, function(p) return p.isLocal end) then
-    gamesPlayed = self.matchesPlayed
+    gamesPlayed = math.max(self.matchesPlayed, self:totalGames())
   else
     gamesPlayed = self:totalGames()
   end
@@ -431,6 +440,17 @@ function BattleRoom:addPlayer(player)
     -- created without a server-assigned seat.
     TeamUtils.assignSeatIdentity(player, #self.players + 1)
   end
+
+  -- GAME.localPlayer is reused across rooms, so its lastPlacement /
+  -- lastMatchOutClock from a previous room can leak into this one
+  -- (manifests as a "Position: 4 / Out: 0:10" panel on the local player's
+  -- card when they walk into a fresh waiting room). Remote players come
+  -- in as fresh constructions per addToRoom and don't have this problem.
+  -- Clear ONLY the stale fields — don't call clearPerMatchState, since
+  -- spectator/mid-match-reconnect paths build the match (attaching a
+  -- stack to GAME.localPlayer) BEFORE addPlayer, so we'd nil that here.
+  player.lastPlacement = nil
+  player.lastMatchOutClock = nil
 
   -- Dedupe by publicId — addToRoom timing vs. login timing can cause the
   -- local user to be created twice in self.players: once as a fresh remote-

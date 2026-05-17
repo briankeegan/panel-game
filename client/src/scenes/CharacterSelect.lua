@@ -1350,6 +1350,24 @@ function CharacterSelect:createPlayerInfo(player, labelX)
     stackPanel:insertElementAtIndex(stackPanel.nameLabel, topIdx)
   end
 
+  -- StackPanel positions children by accumulating `pixelsTaken` at addElement
+  -- time and never reconciles when a child's height changes later. When the
+  -- placementLabel transitions from a multi-line wrapped quote to a single-
+  -- line "Position: N", its height shrinks but matchOutLabel stays parked at
+  -- the original y — visible as a big gap between Position and Out. Walk the
+  -- children once and re-stack them based on current heights.
+  local function relayoutStack()
+    local y = 0
+    for _, child in ipairs(stackPanel.children) do
+      if child.isVisible ~= false then
+        child.y = y
+        y = y + (child.height or 0)
+      end
+    end
+    stackPanel.pixelsTaken = y
+    stackPanel.height = y
+  end
+
   stackPanel.placementLabel.updateLabel = function(self, placement, outClock)
     self:setText(placementText(placement), nil, false)
     stackPanel.matchOutLabel:setText(formatMatchOut(outClock), nil, false)
@@ -1357,6 +1375,7 @@ function CharacterSelect:createPlayerInfo(player, labelX)
       promoteNameToTop()
       mountStatsAbovePlacement()
     end
+    relayoutStack()
   end
 
   if stackPanel.ratingLabel then

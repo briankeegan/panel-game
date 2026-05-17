@@ -567,6 +567,10 @@ function Stack:rollbackToFrame(clock)
     self.incomingGarbage:rollbackToFrame(self.stopWatch)
     self.outgoingGarbage:rollbackToFrame(self.stopWatch)
     self.panelSource:rollbackToFrame(clock)
+    -- Garbage queue restore only reverts stagedGarbage to its frame-F shape;
+    -- network-injected G events from frames after F have to be re-played
+    -- through the forward re-sim or they vanish from staging permanently.
+    self:markNetworkGarbageNeedsReplay(self.stopWatch)
 
     self.rollbackCount = self.rollbackCount + 1
     -- match will try to fast forward this stack to that frame

@@ -436,6 +436,11 @@ end
 
 ---@param stack BaseStack
 function Match:pushGarbageTo(stack)
+  -- Replay network-injected garbage at the same frame it was originally
+  -- received, so a rollback past the receive frame doesn't permanently
+  -- lose the staging push.
+  stack:drainNetworkGarbageForFrame(stack.stopWatch)
+
   -- check if anyone wants to push garbage into the stack's queue
   for _, st in ipairs(self.garbageSources[stack]) do
     -- Skip multi-target senders (handled by distributeGarbageToTargets)

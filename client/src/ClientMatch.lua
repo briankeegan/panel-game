@@ -46,6 +46,10 @@ local TeamUtils = require("common.data.TeamUtils")
 ---@field winners MatchParticipant[]
 ---@field panelSource PanelSource
 ---@field gameMode GameMode
+---@field scheduledStartLocalMs integer? wall-clock ms (socket.gettime()*1000) target for engine tick 0; set by NetClient from server-stamped startInMs
+---@field fromReplay boolean? true when this match was reconstructed from a saved replay
+---@field _serverConfirmedEnd boolean? set by NetClient when the server's gameResult arrives
+---@field _scheduledOverlayLocalMs integer? wall-clock ms anchor for the match-end overlay (scheduledStartLocalMs + endTick/60s)
 
 --- The ClientMatch is a way to create a match that will run with graphics and sounds on a client.
 ---

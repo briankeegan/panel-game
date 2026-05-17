@@ -734,13 +734,10 @@ function Stack:controls()
   end
 end
 
----@param runsSoFar integer
----@param remoteCapTight boolean? when true and this is a non-local stack,
----  the per-cycle iteration cap is reduced to 1 — set by Match:run when
----  the local engine is racing to catch up with wall-clock, so heavy
----  view-stack catch-up doesn't starve the local sim's CPU budget.
 -- Sub-tick lerp of animated render fields against rollbackBuffer's prev tick.
 -- Returns a saved-state table for restoreRenderInterp; nil = no interp applied.
+---@param alpha number? sub-tick fraction in [0,1]; nil/>=1 = no interp
+---@return table? saved
 function Stack:applyRenderInterp(alpha)
   if self.is_local or not alpha or alpha >= 1 then return nil end
   if not self.rollbackBuffer then return nil end
@@ -756,6 +753,7 @@ function Stack:applyRenderInterp(alpha)
   return saved
 end
 
+---@param saved table?
 function Stack:restoreRenderInterp(saved)
   if not saved then return end
   self.displacement = saved.displacement
@@ -763,6 +761,9 @@ function Stack:restoreRenderInterp(saved)
   self.cur_row = saved.cur_row
 end
 
+---@param runsSoFar integer
+---@param remoteCapTight boolean? when true and this is a non-local stack,
+---  the per-cycle iteration cap is reduced to 1
 function Stack:shouldRun(runsSoFar, remoteCapTight)
   if self:game_ended() then
     return false

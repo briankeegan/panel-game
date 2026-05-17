@@ -187,8 +187,9 @@ function BaseStack:game_ended()
 end
 
 ---@param runsSoFar integer how many runs the Stack already did this frame
+---@param remoteCapTight boolean? non-local stacks cap planning to 1 this cycle when true
 ---@return boolean
-function BaseStack:shouldRun(runsSoFar)
+function BaseStack:shouldRun(runsSoFar, remoteCapTight)
   error("did not implement shouldRun")
 end
 

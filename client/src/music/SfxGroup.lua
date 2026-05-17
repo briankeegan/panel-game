@@ -23,23 +23,15 @@ function(self, fileGroup, volumeMultiplier)
   -- if there are gaps in indexedFiles, tough luck, they'll get ignored
   for i, filename in ipairs(continuouslyIndexedFiles) do
     local fullPath = fileGroup.path .. "/" .. filename
-    -- Threaded decode when called from inside a coroutine (ModLoader bulk
-    -- load path). Falls back to direct on-main load elsewhere.
+    local source = nil
     if coroutine.running() ~= nil then
-      local data = AssetDecodeClient.decodeSound(fullPath, false)
-      if data and type(data) ~= "table" then
-        local ok, source = pcall(love.audio.newSource, data, "static")
-        if ok then
-          self.sources[i] = source
-        else
-          self.sources[i] = love.audio.newSource(fullPath, "static")
-        end
-      else
-        self.sources[i] = love.audio.newSource(fullPath, "static")
+      local result = AssetDecodeClient.decodeSound(fullPath, false)
+      if result and result.soundData then
+        local ok, s = pcall(love.audio.newSource, result.soundData, "static")
+        if ok then source = s end
       end
-    else
-      self.sources[i] = love.audio.newSource(fullPath, "static")
     end
+    self.sources[i] = source or love.audio.newSource(fullPath, "static")
   end
 end)
 

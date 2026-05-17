@@ -20,10 +20,14 @@ local logger = require("common.lib.logger")
 
 local AssetDecodeClient = {}
 
+---@type love.Thread?
 local thread = nil
+---@type love.Channel?
 local inputChannel = nil
+---@type love.Channel?
 local outputChannel = nil
 local nextRequestId = 1
+---@type table<integer, table>
 local pendingResults = {}
 local workerHealthy = true
 
@@ -118,39 +122,52 @@ function AssetDecodeClient.decodeImage(path)
   return result.imageData
 end
 
----Decodes a sound to SoundData when `streamed` is false (call site can then
----build a static Source). Returns a {streamed = true, path = ...} marker
----when `streamed` is true — streaming Sources can only be constructed
----directly from a path, so the worker just confirms the path round-tripped.
+---@class AssetDecodeSoundResult
+---@field soundData love.SoundData? populated for static (non-streamed) decodes
+---@field streamed boolean true when caller requested streaming
+---@field path string? populated for streamed decodes (caller builds Source(path, "stream"))
+
+-- Streamed Sources can only be constructed from a path, not SoundData, so for
+-- streamed requests the worker round-trips just the path and the caller does
+-- love.audio.newSource(result.path, "stream") on main. Static decodes go
+-- through the worker and return SoundData for love.audio.newSource(data, "static").
 ---@param path string
 ---@param streamed boolean?
----@return love.SoundData?|{streamed: true, path: string}
+---@return AssetDecodeSoundResult?
 function AssetDecodeClient.decodeSound(path, streamed)
   ensureWorker()
   if not workerHealthy then
     if streamed then
       return {streamed = true, path = path}
     end
-    return syncDecodeSound(path)
+    local data = syncDecodeSound(path)
+    if not data then return nil end
+    return {streamed = false, soundData = data}
   end
   local id = nextRequestId
   nextRequestId = nextRequestId + 1
   local ok = pcall(function()
-    inputChannel:push({id = id, type = "sound", path = path, streamed = streamed and true or false})
+    if inputChannel then
+      inputChannel:push({id = id, type = "sound", path = path, streamed = streamed and true or false})
+    end
   end)
   if not ok then
     workerHealthy = false
     if streamed then
       return {streamed = true, path = path}
     end
-    return syncDecodeSound(path)
+    local data = syncDecodeSound(path)
+    if not data then return nil end
+    return {streamed = false, soundData = data}
   end
   local result = awaitResult(id)
   if not result then
     if streamed then
       return {streamed = true, path = path}
     end
-    return syncDecodeSound(path)
+    local data = syncDecodeSound(path)
+    if not data then return nil end
+    return {streamed = false, soundData = data}
   end
   if result.error then
     return nil
@@ -158,7 +175,7 @@ function AssetDecodeClient.decodeSound(path, streamed)
   if result.streamed then
     return {streamed = true, path = result.path}
   end
-  return result.soundData
+  return {streamed = false, soundData = result.soundData}
 end
 
 return AssetDecodeClient

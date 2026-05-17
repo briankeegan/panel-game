@@ -166,17 +166,16 @@ function fileUtils.loadSoundFromSupportExtensions(path_and_filename, streamed)
   for k, extension in ipairs(fileUtils.SUPPORTED_SOUND_FORMATS) do
     local fullPath = path_and_filename .. extension
     if fileUtils.exists(fullPath) then
-      -- Threaded decode when called from inside a coroutine (the ModLoader
-      -- bulk load path). One-shot loads outside a coroutine fall through
-      -- to direct on-main construction.
       if coroutine.running() ~= nil then
         local result = AssetDecodeClient.decodeSound(fullPath, streamed and true or false)
         if result then
-          if type(result) == "table" and result.streamed then
+          if result.streamed and result.path then
             return love.audio.newSource(result.path, "stream")
           end
-          local ok, source = pcall(love.audio.newSource, result, "static")
-          if ok then return source end
+          if result.soundData then
+            local ok, source = pcall(love.audio.newSource, result.soundData, "static")
+            if ok then return source end
+          end
         end
         return nil
       end

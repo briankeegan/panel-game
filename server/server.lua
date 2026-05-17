@@ -376,7 +376,7 @@ function Server:setLobbyChanged()
 end
 
 ---@alias LobbyPlayerV2 { publicId: PublicPlayerID, name: string, state: string, ratings: table<GameModeID, number?>, roomNumber: roomNumber? }
----@alias LobbyRoomV2 { roomNumber: roomNumber, state: string, gameModeId: GameModeID, players: PublicPlayerID[], playerSlots: integer[], spectators: PublicPlayerID[], wins: integer[], teamWins: integer[]?, gameStartTime: integer?, openRoom: boolean? }
+---@alias LobbyRoomV2 { roomNumber: roomNumber, state: string, gameModeId: GameModeID, players: PublicPlayerID[], playerSlots: integer[], spectators: PublicPlayerID[], wins: integer[], teamWins: integer[]?, gameStartTime: integer?, openRoom: boolean?, ownerId: PublicPlayerID?, minPlayers: integer?, maxPlayers: integer?, openSlots: integer[]?, heldSlots: integer[]?, slotRequests: table<integer, PublicPlayerID>?, pendingJoinerCount: integer? }
 ---@alias LobbyStateV2 { players: table<PublicPlayerID, LobbyPlayerV2>, rooms: table<roomNumber, LobbyRoomV2> }
 
 ---@return LobbyStateV2
@@ -1553,6 +1553,13 @@ function Server:processMessage(message, connection)
       -- correctly wraps as "Ben left (connection lost)".
       self:handleLeaveRoom(player, nil)
       return true
+    elseif player.state == "character select" and message.kick_player then
+      -- Host-only eviction in open rooms (waiting-room context). Restricted to
+      -- "character select" because mid-match kicks would orphan a live engine —
+      -- if needed later, expand cautiously (handleLeaveRoom does handle the
+      -- mid-match path via voidByLeave, but the UX implications differ).
+      self:handleKickPlayer(player, message.publicId)
+      return true
     elseif (player.state == "playing" or player.state == "paused") and message.type == "pauseToggle" then
       if player.room then
         player.room:togglePause(player, message.content)
@@ -2021,6 +2028,59 @@ function Server:handleLeaveRoom(player, reason)
       self.spectatorToRoom[player] = nil
     end
   end
+end
+
+---Host-only eviction for open-room sessions. Validates that `host` is the
+---owner of an openRoom and that `targetPublicId` resolves to a different
+---player in the same room, then bounces the target via the existing
+---handleLeaveRoom path (which sends them a leaveRoom message, broadcasts
+---playerLeftRoom, and handles room-viability cleanup). Kicked player can
+---rejoin immediately — this is not a ban.
+---@param host ServerPlayer the requesting player (must be the room owner)
+---@param targetPublicId PublicPlayerID? publicId of the player to evict
+function Server:handleKickPlayer(host, targetPublicId)
+  local room = self.playerToRoom[host]
+  if not room then
+    logger.warn("kick_player from " .. tostring(host.name) .. " who is not in a room")
+    return
+  end
+  if not room.openRoom then
+    logger.warn("kick_player rejected: room " .. tostring(room.roomNumber) .. " is not an open room")
+    return
+  end
+  -- Authorization: only the room owner can kick. Owner is the first
+  -- still-present player in slot order, matching the lobbyDataV2 ownerId
+  -- broadcast at server.lua:412.
+  local owner = room.players[1]
+  if not owner then
+    local _, firstPlayer = room:eachPlayer()()
+    owner = firstPlayer
+  end
+  if not owner or owner ~= host then
+    logger.warn("kick_player rejected: " .. tostring(host.name) .. " is not the host of room " .. tostring(room.roomNumber))
+    return
+  end
+  if not targetPublicId then
+    logger.warn("kick_player rejected: missing target publicId")
+    return
+  end
+  local target = nil
+  for _, p in room:eachPlayer() do
+    if p.publicPlayerID == targetPublicId then
+      target = p
+      break
+    end
+  end
+  if not target then
+    logger.warn("kick_player target publicId=" .. tostring(targetPublicId) .. " not found in room " .. tostring(room.roomNumber))
+    return
+  end
+  if target == host then
+    logger.warn("kick_player rejected: host " .. tostring(host.name) .. " tried to self-kick")
+    return
+  end
+  logger.info("Host " .. host.name .. " kicked " .. target.name .. " from room " .. tostring(room.roomNumber))
+  self:handleLeaveRoom(target, "kicked by host")
 end
 
 ---@param connection Connection

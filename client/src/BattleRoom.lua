@@ -43,6 +43,10 @@ end
 ---@field roomNumber integer?
 ---@field sceneParameters table?
 ---@field preferredStageId string? if set, this stage will be used for all matches in the session
+---@field heldSlots integer[] slots reserved for invited players (invite rooms only)
+---@field ownerId PublicPlayerID? room owner's publicId; nil only for legacy payloads
+---@field teamWins integer[]? per-team win counts indexed by team_index; nil in non-team modes
+---@field publicId PublicPlayerID? (compatibility alias used by some payloads)
 ---@overload fun(mode: GameMode, gameScene: table?): BattleRoom
 BattleRoom = class(
 function(self, mode, gameScene)

@@ -627,6 +627,26 @@ end
 function ClientMatch:handleMatchEnd()
   if self.ended then return end -- idempotent: shouldFinalize can flip true multiple ways
   self.ended = true
+
+  -- Backfill OUT markers for any non-winning stack whose D event never landed.
+  -- 3p+ FFA: the last dying player's D event and the server's match-end signal
+  -- can race — if match-end is processed first on a survivor's client, the
+  -- late D leaves game_over_clock unset and no OUT marker appears.
+  -- Stamp those with the match-end frame so every survivor at least sees
+  -- "OUT at <match-end>" rather than nothing.
+  local engineWinners = self.engine and self.engine:getWinners() or {}
+  local winnerSet = {}
+  for _, ws in ipairs(engineWinners) do winnerSet[ws] = true end
+  local endFrame = self.engine and self.engine.clock or 0
+  if endFrame > 0 then
+    for _, stack in ipairs(self.stacks) do
+      local engine = stack.engine
+      if engine and (engine.game_over_clock or 0) <= 0 and not winnerSet[engine] then
+        engine:recordDeath(endFrame)
+      end
+    end
+  end
+
   -- this prepares everything about the replay except the save location
   self:finalizeReplay()
   -- Trace capture: mark when the local match-end fired. Lets the trace

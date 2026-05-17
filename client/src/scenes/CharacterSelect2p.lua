@@ -113,6 +113,21 @@ function CharacterSelect2p:setupRoster()
     cursor.raise2Callback = function()
       self.ui.characterGrid:turnPage(1)
     end
+    -- Default activeArea is rows 2-5 (character grid + selectors row).
+    -- For the local host in an open room, widen to row 6 so they can arrow-key
+    -- onto the boot buttons added by _setupHostBootButtons. Other row-6
+    -- widgets (pageIndicator/changeInput/leave) get keyboard reachability as
+    -- a side effect — they already have onClick handlers so this is harmless.
+    if player.isLocal and cursor.activeArea then
+      local mode = self.battleRoom and self.battleRoom.mode
+      local ownerId = self.battleRoom and self.battleRoom.ownerId
+      local isOpenRoom = mode and mode.minPlayers and mode.maxPlayers
+        and mode.minPlayers < mode.maxPlayers
+      local localPlayer = GAME and GAME.localPlayer
+      if isOpenRoom and ownerId and localPlayer and localPlayer.publicId == ownerId then
+        cursor.activeArea.y2 = 6
+      end
+    end
     self.ui.cursors[i] = cursor
 
     self.ui.characterIcons[i] = self:createPlayerIcon(player)
@@ -124,6 +139,61 @@ function CharacterSelect2p:setupRoster()
     local infoX = iconX + 1
     self.ui.iconRow:createElementAt(iconX, 1, 1, 1, "p" .. i .. " icon", self.ui.characterIcons[i])
     self.ui.iconRow:createElementAt(infoX, 1, 1, 1, "player " .. i .. " info", self.ui.playerInfos[i])
+  end
+
+  self:_setupHostBootButtons()
+end
+
+---Tear down any boot buttons from a previous setupRoster pass so refreshRoster
+---(open-FFA drop-in/out) doesn't leave stale widgets attached to the main grid.
+function CharacterSelect2p:_clearHostBootButtons()
+  if self.ui.bootButtons then
+    for _, btn in pairs(self.ui.bootButtons) do
+      if btn and btn.detach then btn:detach() end
+    end
+  end
+  self.ui.bootButtons = {}
+end
+
+---Add a Boot button to the main grid for each non-host non-local player when
+---the local player is host on an open-room session. Buttons go in row 6 cells
+---1..4 (next to leave at col 9) so the existing GridCursor can navigate to
+---them with arrow keys, same as ready/leave. Invite rooms have fixed slots —
+---booting makes no sense there. Cap at 4 buttons to stay clear of the
+---pageIndicator/changeInput/leave widgets at cols 5/8/9.
+function CharacterSelect2p:_setupHostBootButtons()
+  self:_clearHostBootButtons()
+  if not self.battleRoom then return end
+  local mode = self.battleRoom.mode
+  local isOpenRoom = mode and mode.minPlayers and mode.maxPlayers
+    and mode.minPlayers < mode.maxPlayers
+  if not isOpenRoom then return end
+  local ownerId = self.battleRoom.ownerId
+  local localPlayer = GAME and GAME.localPlayer
+  if not (ownerId and localPlayer and localPlayer.publicId == ownerId) then return end
+
+  local col = 1
+  for _, player in ipairs(self.battleRoom.players) do
+    if col > 4 then break end
+    if player.publicId ~= ownerId and not player.isLocal then
+      local pubId = player.publicId
+      local labelText = "Boot " .. ((player.name or "?"):sub(1, 8))
+      local btn = ui.TextButton({
+        label = ui.Label({text = labelText, translate = false}),
+        backgroundColor = {0.4, 0.05, 0.05, 0.85},
+        outlineColor = {1, 0.4, 0.4, 1},
+        onClick = function()
+          GAME.theme:playCancelSfx()
+          if GAME.netClient and GAME.netClient.kickPlayer then
+            GAME.netClient:kickPlayer(pubId)
+          end
+        end,
+      })
+      btn.onSelect = btn.onClick
+      self.ui.bootButtons[col] = btn
+      self.ui.grid:createElementAt(col, 6, 1, 1, "bootButton" .. col, btn)
+      col = col + 1
+    end
   end
 end
 

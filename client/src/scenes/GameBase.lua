@@ -27,6 +27,14 @@ local socket = require("common.lib.socket")
 -- than "I died and can now watch teammates".
 local DEAD_LOCAL_GRACE_SECONDS = 3
 
+-- Shorter wall-clock window before the dead local's MenuEsc → waiting-room
+-- exit is honored. Without this, a player who was holding Esc when they died
+-- (or who reflexively jams it on death) bails out before they realize what
+-- happened. Same dt-accumulator pattern as DEAD_LOCAL_GRACE_SECONDS, just a
+-- tighter window — exiting is a smaller commitment than swapping into
+-- spectator UI.
+local DEAD_LOCAL_EXIT_GRACE_SECONDS = 0.5
+
 -- Chip-background uses the canonical palette with translucency (alpha 0.85).
 local CHIP_ALPHA = 0.85
 
@@ -777,6 +785,17 @@ function GameBase:update(dt)
     local isPureSpectator = not self.match:hasLocalPlayer()
     local isDeadLocal = self.match:isLocalPlayerEliminated()
 
+    -- Real-time grace timer after local death. Accumulates in wall-clock dt
+    -- (not engine frames) so a paused or laggy game still progresses through
+    -- the window. Reset whenever we aren't a dead local — covers respawn
+    -- between rounds and the pure-spectator path. Accumulated before the
+    -- MenuEsc check below so the exit grace can read it.
+    if isDeadLocal then
+      self.deathGraceTimer = (self.deathGraceTimer or 0) + dt
+    else
+      self.deathGraceTimer = nil
+    end
+
     if isPureSpectator then
       if input.isDown["MenuEsc"] then
         GAME.theme:playCancelSfx()
@@ -793,21 +812,12 @@ function GameBase:update(dt)
       -- aborting the match. Teammates keep playing on the server; this client
       -- just unmounts the game scene. The match stays on BattleRoom so they
       -- can re-enter to spectate by clicking ready in CharacterSelect.
-      if input.isDown["MenuEsc"] then
+      local exitGraceMet = (self.deathGraceTimer or 0) >= DEAD_LOCAL_EXIT_GRACE_SECONDS
+      if exitGraceMet and input.isDown["MenuEsc"] then
         GAME.theme:playCancelSfx()
         self:exitToWaitingRoom()
         return
       end
-    end
-
-    -- Real-time grace timer after local death. Accumulates in wall-clock dt
-    -- (not engine frames) so a paused or laggy game still progresses through
-    -- the window. Reset whenever we aren't a dead local — covers respawn
-    -- between rounds and the pure-spectator path.
-    if isDeadLocal then
-      self.deathGraceTimer = (self.deathGraceTimer or 0) + dt
-    else
-      self.deathGraceTimer = nil
     end
 
     -- Spectator focus cycling: available to pure spectators immediately, and
@@ -1027,7 +1037,9 @@ function GameBase:drawEndGameText()
     -- Height: message + optional subtitle + N placement lines + continue prompt + padding between each.
     local totalLines = 2 + #placementLines + (subtitle and 1 or 0)
     local height = lineHeight * totalLines + (totalLines + 1) * padding
-    local drawY = gameOverPosition[2]
+    -- Center the block vertically on the canvas — theme's gameover_text_Pos
+    -- sits at y=60 which covers the stack's name chip / OUT marker / timer.
+    local drawY = (consts.CANVAS_HEIGHT - height) / 2
 
     GraphicsUtil.drawRectangle("fill", gameOverPosition[1] - maxWidth/2 - padding, drawY, maxWidth + 2*padding, height, 0, 0, 0, 0.8)
 

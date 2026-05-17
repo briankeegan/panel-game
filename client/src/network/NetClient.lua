@@ -1151,7 +1151,8 @@ end
 ---@field gameplayClient TcpClient
 ---@field lobbyClient TcpClient
 ---@field spectateClient TcpClient
----@field leaderboard table
+---@field clients TcpClient[] all three TCP clients in one list for iteration
+---@field leaderboard table?
 ---@field pendingResponses table
 ---@field state NetClientStates
 ---@field lobbyListeners table
@@ -1306,6 +1307,18 @@ function NetClient:maybeEnterRoomFromLobby()
   GAME.navigationStack:push(roomScene)
   self.state = states.ROOM
   return true
+end
+
+---Send a host-only request to evict another player from an open-room session.
+---Server validates and bounces the target via the standard leaveRoom path —
+---the target's client transitions back to the lobby (no ban, can rejoin).
+---No-op if we're not in a room or not connected.
+---@param publicId integer the publicId of the player to kick
+function NetClient:kickPlayer(publicId)
+  if not (self:isConnected() and self.room and publicId) then
+    return
+  end
+  _sendLobby(self, ClientMessages.kickPlayer(publicId))
 end
 
 function NetClient:leaveRoom()

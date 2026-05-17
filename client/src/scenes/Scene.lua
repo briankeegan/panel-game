@@ -13,6 +13,7 @@ local DebugSettings = require("client.src.debug.DebugSettings")
 -- Each scene should have a field called <Scene>.name = <Scene> (for identification in errors and debugging)
 -- Each scene must add its UiElements as children to its uiRoot property
 ---@class Scene
+---@field name string scene identifier set by subclasses; used for logging and NavigationStack lookups
 ---@field uiRoot UiElement
 ---@field music sceneMusic
 ---@field fallbackMusic sceneMusic

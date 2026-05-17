@@ -37,6 +37,8 @@ function ClientMessages.parseMessage(clientMessage)
     return ClientMessages.parseLeaderboardRequest(clientMessage)
   elseif clientMessage.leave_room then
     return ClientMessages.parseLeaveRoom(clientMessage)
+  elseif clientMessage.kick_player then
+    return ClientMessages.parseKickPlayer(clientMessage)
   elseif clientMessage.taunt then
     return ClientMessages.parseTaunt(clientMessage)
   elseif clientMessage.game_over then
@@ -222,6 +224,18 @@ function ClientMessages.parseLeaveRoom(leaveRoom)
   local sanitized =
   {
     leave_room = leaveRoom.leave_room
+  }
+
+  return sanitized
+end
+
+function ClientMessages.parseKickPlayer(kickPlayer)
+  -- publicId comes in as a number from JSON. Coerce defensively in case a
+  -- legacy or malformed client ships it as a string.
+  local sanitized =
+  {
+    kick_player = kickPlayer.kick_player,
+    publicId = tonumber(kickPlayer.publicId)
   }
 
   return sanitized

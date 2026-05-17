@@ -23,6 +23,7 @@ local TeamUtils = require("common.data.TeamUtils")
 ---@field style Styles
 ---@field wantsRanked boolean
 ---@field inputMethod InputMethod
+---@field endlessNoRaise boolean?
 
 
 -- A player is mostly a data representation of a Panel Attack player
@@ -360,16 +361,23 @@ function Player:updateSettings(settings)
     self:setInputMethod(settings.inputMethod)
   end
 
-  -- these are both simply not sent by the server for some messages so make sure they are there
-  if settings.wantsReady ~= nil then
-    self:setWantsReady(settings.wantsReady)
-  end
-  if settings.hasLoaded ~= nil then
-    self:setLoaded(settings.hasLoaded)
-  end
-
-  if settings.ready ~= nil then
-    self:setReady(settings.ready)
+  -- wantsReady / hasLoaded / ready are CLIENT-authoritative for the local
+  -- player — they reflect "did the user click ready" and "are my mods loaded
+  -- on this machine," neither of which the server can know better than we do.
+  -- The server's menu_state echo of our own state arrives stale (we already
+  -- moved on locally) and previously stomped wantsReady → false the moment we
+  -- clicked ready, leaving the user stuck in the waiting room. For REMOTE
+  -- players the server stays authoritative — they're the only source.
+  if not self.isLocal then
+    if settings.wantsReady ~= nil then
+      self:setWantsReady(settings.wantsReady)
+    end
+    if settings.hasLoaded ~= nil then
+      self:setLoaded(settings.hasLoaded)
+    end
+    if settings.ready ~= nil then
+      self:setReady(settings.ready)
+    end
   end
 
   if settings.endlessNoRaise ~= nil then

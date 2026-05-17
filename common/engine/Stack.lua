@@ -161,9 +161,19 @@ local DIRECTION_ROW = {up = 1, down = -1, left = 0, right = 0}
 ---@field panelTemplate (Panel | fun(row: integer, column: integer, id: integer?): Panel) A template class based on Panel enriched by tailor made closures containing references to the Stack
 ---@field swapStallingBackLog table tracks swaps that will incur a health cost for stalling if not swapping would have resulted in health loss
 ---@field swappingPanelCount integer how many panels are swapping on this frame
----@field panelSource PanelSource where the Stack gets its panels from 
+---@field panelSource PanelSource where the Stack gets its panels from
 ---@field swapCount integer
 ---@field wasToppedOut boolean if the stack was topped out at the start of the frame
+---@field clock integer engine tick counter (includes countdown frames)
+---@field stopWatch integer in-game timer in frames (excludes countdown)
+---@field stopWatchIsRunning boolean true once gameplay starts (after countdown)
+---@field countdownOffsetFrames integer? frames the countdown consumed; subtracted from clock to derive stopWatch
+---@field game_over_clock integer engine clock at which this stack died (0 if still alive)
+---@field game_over_stopWatch integer in-game timer value at death (countdown excluded); 0 if alive
+---@field receivedGarbage table received-garbage queue keyed by frame
+---@field garbageMode integer? garbage targeting mode for multi-opponent stacks
+---@field incomingGarbage GarbageQueue
+---@field outgoingGarbage GarbageQueue
 
 
 -- Represents the full panel stack for one player

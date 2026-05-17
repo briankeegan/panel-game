@@ -14,6 +14,9 @@ local tableUtils = require("common.lib.tableUtils")
 ---@class LobbyScene : Scene
 ---@field lobbyMenu ScrollMenu
 ---@field lobbyMessage Label
+---@field leaderboard Leaderboard
+---@field leaderboardToggleLabel Label
+---@field degradedChannels table<string, boolean>?
 local Lobby = class(
 function(self, sceneParams)
   self.music = "main"

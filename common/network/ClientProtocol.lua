@@ -157,6 +157,19 @@ function ClientProtocol.leaveRoom()
   }
 end
 
+---Host-only request to evict another player from an open-room session.
+---Server validates the sender is the room owner and the room is openRoom;
+---rejects otherwise. The target is bounced via the standard leaveRoom path
+---(server sends them a leaveRoom message) — they can rejoin immediately.
+---@param publicId PublicPlayerID
+function ClientProtocol.kickPlayer(publicId)
+  local kickMessage = {kick_player = true, publicId = publicId}
+  return {
+    messageType = msgTypes.jsonMessage,
+    messageText = kickMessage,
+  }
+end
+
 function ClientProtocol.reportLocalGameResult(outcome)
   local gameResultMessage = {game_over = true, outcome = outcome}
   return {

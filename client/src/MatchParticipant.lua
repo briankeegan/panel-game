@@ -30,6 +30,14 @@ local ModController = require("client.src.mods.ModController")
 ---@field isLocal boolean if the participant is controlled by a local player
 ---@field playerNumber integer the (external) id for the player within the room; used to assign server messages to the correct player when spectating
 ---@field stack ClientStack?
+---@field stackIndex integer? dense engine slot for the active match; only meaningful while a match is live
+---@field seatId integer? authoritative seat id assigned by the server (TeamUtils.assignSeatIdentity)
+---@field publicId PublicPlayerID? server's stable public id for this participant
+---@field lastPlacement integer? ordinal placement from the just-ended match (1 = winner). nil until first match completes
+---@field lastMatchOutClock integer? death stopWatch (frames, countdown excluded) from the just-ended match; 0 if this participant didn't die
+---@field rating (number|string)? current ELO; can be a placement-progress string in early ranked play
+---@field league string? league tier ("none", "bronze", ...) derived from rating
+---@field cursor table? CharacterSelect-scoped GridCursor widget; scene-bound
 
 -- ============================================================================
 -- Field lifecycle classification
@@ -99,6 +107,7 @@ function(self)
   self:createSignal("readyChanged")
   self:createSignal("hasLoadedChanged")
   self:createSignal("attackEngineSettingsChanged")
+  self:createSignal("placementChanged")
 end)
 
 function MatchParticipant:reset()
@@ -129,6 +138,9 @@ end
 -- server's gameResult payload. Nil until first match completes.
 function MatchParticipant:setPlacement(placement)
   self.lastPlacement = placement
+  -- Fired after onMatchEnded already captured lastMatchOutClock from the engine,
+  -- so subscribers can read both fields atomically.
+  self:emitSignal("placementChanged", placement, self.lastMatchOutClock)
 end
 
 function MatchParticipant:setWinrate(winrate)
@@ -264,11 +276,18 @@ function MatchParticipant:clearPerMatchState()
   self.stack = nil
   self.stackIndex = nil
   self.lastPlacement = nil
+  self.lastMatchOutClock = nil
 end
 
 -- a callback that runs whenever a match ended
 ---@param match ClientMatch
 function MatchParticipant:onMatchEnded(match)
+  -- Captured before clearPerMatchState nils self.stack. stopWatch excludes the
+  -- countdown so it lines up with the in-game timer. 0 = never died (winner).
+  if self.stack and self.stack.engine then
+    self.lastMatchOutClock = self.stack.engine.game_over_stopWatch or 0
+  end
+
   self:resetMatchTransientState()
   -- Skip refresh if character and stage are locked (e.g., in puzzle mode)
   if not self.settings.lockCharacterAndStage then

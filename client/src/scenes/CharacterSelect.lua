@@ -12,11 +12,183 @@ local TeamUtils = require("common.data.TeamUtils")
 local LevelPresets = require("common.data.LevelPresets")
 local InputDeviceOverlay = require("client.src.scenes.components.InputDeviceOverlay")
 
+-- Flavor text shown under each player's name before they've played a match
+-- this session, in place of the (still-empty) position / match-out rows.
+-- Deterministic per player via a name-byte-sum hash so it doesn't flicker.
+local FLAVOR_QUOTES = {
+  -- general
+  "Stack high, fall slow.",
+  "When in doubt, swap it out.",
+  "Every chain starts small.",
+  "Patience builds combos.",
+  "Garbage in, garbage out.",
+  "Look before you swap.",
+  "Slow is smooth. Smooth is chain.",
+  "Don't take it for granite.",
+  "Be the panel.",
+  "Keep calm and clear on.",
+  "Two panels, one match.",
+  "Climb every column.",
+  "Today's stack, tomorrow's combo.",
+  "Even level 8 starts at 1.",
+  "Mind the gap.",
+  "Drop. Match. Repeat.",
+  "Chains over matches.",
+  "The early swap catches the combo.",
+  "It's not the stack, it's the chain.",
+  "Block by block.",
+  "Find your chain.",
+  "Swap fast, think faster.",
+  "A combo a day.",
+  "Stay grounded.",
+  "Rome wasn't stacked in a day.",
+  "Top out? More like top wow.",
+  "Panel in haste, repent at topout.",
+  "Behind every chain is a swap.",
+  "Don't just clear — combo.",
+  "The best time to swap was a frame ago.",
+  -- catch
+  "Always be catching.",
+  "Catch you on the swap side.",
+  "A good catch is half the chain.",
+  "Catch flights, not feelings. Also catch panels.",
+  -- chain
+  "Mystery chains: when the game stops counting.",
+  "Chains heavier than your stack.",
+  "x13 or bust.",
+  "Forge your chains. Drop them on others.",
+  "Chain reactions. Zero regrets.",
+  "Skill chains? More like skill thrills.",
+  -- clear
+  "Clear conscience, clear panels.",
+  "The path is clear. (Mostly.)",
+  "Clearance sale: everything must combo.",
+  -- combo
+  "Combo, ergo sum.",
+  "Five combos and chill.",
+  "Combo see, combo do.",
+  "+5 makes the heart grow fonder.",
+  -- combo storm
+  "Forecast: combo storm. Pack a chain.",
+  "Eye of the combo storm.",
+  "When it storms, it combos.",
+  -- DAS
+  "Hold the direction, hold the dream.",
+  "DAS-tardly fast.",
+  "DAS-ing through the rows.",
+  -- downstacking
+  "What goes up must downstack.",
+  "Downstack or down go you.",
+  "Downstacking: gravity's wingman.",
+  -- factory
+  "Factory settings: full pressure.",
+  "Open the factory. Close the lid on hope.",
+  "The factory never sleeps.",
+  -- frame trick
+  "Frame-perfect, frame-perfectionist.",
+  "One frame from glory.",
+  "Live by the frame, die by the frame.",
+  -- garbage
+  "Garbage in, garbage chain out.",
+  "Treasure your garbage. It chains.",
+  "One player's garbage, another player's combo.",
+  "Wasting garbage is just waste.",
+  -- ghost
+  "Believe in ghost matches.",
+  "Who you gonna call? Ghost matches.",
+  "Ghosts in the panel.",
+  -- insert
+  "Insert chain here.",
+  "Insert coin, receive combo.",
+  -- locked out
+  "Locked out? Read the panels.",
+  "No moves? Make some.",
+  "Locked out of luck.",
+  -- shake time
+  "Shake it off. Shake time off.",
+  "Shake, rattle, and clear.",
+  "Shake what your garbage gave you.",
+  "Shake time, fake time.",
+  -- shogun
+  "Shogun: chains with honor.",
+  "Tier chain, never tear change.",
+  -- slide
+  "Slide into your opponent's garbage.",
+  "Slide right, swap left.",
+  "Slide to win.",
+  -- stealth
+  "Stealth swap, loud impact.",
+  "Now you see the panel, now you don't.",
+  "Stealth chain, no shame.",
+  "Two spaces. One vibe.",
+  -- stop time
+  "Stop time, smell the panels.",
+  "Stop time is god mode lite.",
+  "Time stops for combos.",
+  -- tier
+  "Top tier, top fear.",
+  "Build tiers, not fears.",
+  "Tier and present danger.",
+  "Tiers of joy.",
+  -- time delay
+  "Time delays favor the patient.",
+  "Lag is just slow strategy.",
+  "Time delay, chain replay.",
+  -- topped out
+  "Topped out? Top OFF first.",
+  "Don't get topped out. Get topped in.",
+  "Topped out is a state of mind.",
+  -- tornado
+  "Tornado warning: chains incoming.",
+  "Eye of the tornado, peace in the panels.",
+  "There's no place like combo.",
+  -- tower
+  "Towers fall. Stacks rise.",
+  "A tower a day keeps the garbage away.",
+  "Towers above, garbage beneath.",
+  "The Tower of Panel.",
+  -- transition
+  "Mind the transition.",
+  "Transition clear: the gentleman's chain.",
+  -- general (puns)
+  "Panel-mony in motion.",
+  "Stack to the future.",
+  "May the swaps be with you.",
+  "Live, laugh, panel.",
+  "Carpe panel.",
+  "Stop and smell the chains.",
+  "Speak softly, carry a big chain.",
+  "Easy come, easy combo.",
+  "Don't panel-ic.",
+  "Keep your friends close, your garbage closer.",
+  "Panel, set, match.",
+  "Stack-tical genius.",
+  "Better swap than sorry.",
+  "Mind over panels.",
+  "Chain of thought, chain of panels.",
+  "Panel pals, garbage rivals.",
+  "Panel up. Swap forward.",
+  "Combo-pendium of wisdom.",
+  "Practice makes panel.",
+  "It's a panel-demic.",
+}
+
+local function pickFlavorQuote(name)
+  local h = 0
+  for i = 1, #name do
+    h = h + string.byte(name, i)
+  end
+  return FLAVOR_QUOTES[(h % #FLAVOR_QUOTES) + 1]
+end
+
 -- The character select screen scene
 ---@class CharacterSelect : Scene
 ---@field backgroundImg table
 ---@field players Player[]
 ---@field battleRoom BattleRoom
+---@field refreshRoster fun(self: CharacterSelect)? duck-typed in subclasses (open-FFA drop-in)
+---@field lastScore any? set in CharacterSelectVsSelf to display the last-match score
+---@field record any? set in CharacterSelectVsSelf to display the personal record
 local CharacterSelect = class(
 ---@param self CharacterSelect
 function(self, sceneParams)
@@ -997,75 +1169,204 @@ function CharacterSelect:createPlayerInfo(player, labelX)
     stackPanel:addElement(stackPanel.hostLabel)
   end
 
-  stackPanel.leagueLabel = ui.Label({
+  stackPanel.nameLabel = ui.Label({
     x = labelX,
-    text = loc("ss_rating") .. " " .. ((player.league) or "none"),
+    text = player.name or "",
     translate = false
   })
-  stackPanel.leagueLabel.updateLabel = function(self, league)
-    self:setText(loc("ss_rating") .. " " .. (league or "none"))
-  end
 
-  stackPanel.ratingLabel = ui.Label({
-    x = labelX,
-    text = player.rating or "",
-    translate = false
-  })
-  stackPanel.ratingLabel.updateLabel = function(self, rating, ratingDiff)
-    if ratingDiff > 0 then
-      self:setText(tostring(rating) .. " (+" .. ratingDiff .. ")", nil, false)
-    elseif ratingDiff < 0 then
-      self:setText(tostring(rating) .. " (" .. ratingDiff .. ")", nil, false)
-    else
-      self:setText(tostring(rating), nil, false)
+  -- Mode flags drive every conditional below: rating is hidden in team / FFA
+  -- (individual ELO doesn't track meaningfully there), wins/winrate are also
+  -- hidden in shared-team mode, and ranked-only sub-rows gate on showExpected.
+  local isTeamGame = TeamUtils.isSharedTeamMode(self.battleRoom.mode)
+  local isFFA = TeamUtils.isFFA(self.battleRoom.mode)
+  local showRating = not isTeamGame and not isFFA
+  local showExpected = self.battleRoom.ranked and not isTeamGame
+
+  if showRating then
+    stackPanel.ratingLabel = ui.Label({
+      x = labelX,
+      text = player.rating or "",
+      translate = false
+    })
+    stackPanel.ratingLabel.updateLabel = function(self, rating, ratingDiff)
+      if ratingDiff > 0 then
+        self:setText(tostring(rating) .. " (+" .. ratingDiff .. ")", nil, false)
+      elseif ratingDiff < 0 then
+        self:setText(tostring(rating) .. " (" .. ratingDiff .. ")", nil, false)
+      else
+        self:setText(tostring(rating), nil, false)
+      end
     end
   end
 
-  stackPanel.winsLabel = ui.Label({
+  -- Wins / winrate per-room stats are unreliable for shared-team modes
+  -- (team_win_counts isn't reflected back into player.wins), so hide them
+  -- there. FFA and 1v1 still get the existing block.
+  --
+  -- Stat labels are built upfront so signal wiring stays simple, but they are
+  -- NOT mounted to the panel until this participant's first match completes —
+  -- otherwise their empty placeholder rows still claim StackPanel space and
+  -- shove the quote down. The placementChanged callback inserts them above
+  -- the placement row on the same frame the quote disappears.
+
+  if not isTeamGame then
+    stackPanel.winsLabel = ui.Label({
+      x = labelX,
+      text = loc("ss_wins") .. " " .. player:getWinCountForDisplay(),
+      translate = false
+    })
+    stackPanel.winsLabel.updateLabel = function(self, winCount)
+      self:setText(loc("ss_wins") .. " " .. winCount, nil, false)
+    end
+
+    if showExpected then
+      stackPanel.winrateLabel = ui.Label({
+        x = labelX,
+        text = "ss_winrate"
+      })
+
+      stackPanel.winrateValueLabel = ui.Label({
+        x = labelX,
+        text = "  " .. loc("ss_current_rating") .. " " .. tostring(player.winrate) .. "%",
+        translate = false
+      })
+      stackPanel.winrateValueLabel.updateLabel = function(self, winrate)
+        self:setText("  " .. loc("ss_current_rating") .. tostring(winrate) .. "%", nil, false)
+      end
+
+      stackPanel.winrateExpectedLabel = ui.Label({
+        x = labelX,
+        text = loc("ss_expected_rating") .. " " .. player.expectedWinrate .. "%",
+        translate = false
+      })
+      stackPanel.winrateExpectedLabel.updateLabel = function(self, expectedWinrate)
+        self:setText("  " .. loc("ss_expected_rating") .. tostring(expectedWinrate) .. "%", nil, false)
+      end
+    else
+      stackPanel.winrateValueLabel = ui.Label({
+        x = labelX,
+        text = loc("ss_winrate") .. " " .. tostring(player.winrate) .. "%",
+        translate = false
+      })
+      stackPanel.winrateValueLabel.updateLabel = function(self, winrate)
+        self:setText(loc("ss_winrate") .. " " .. tostring(winrate) .. "%", nil, false)
+      end
+    end
+  end
+
+  -- Previous-match summary. Labels are always created — their text is updated
+  -- via placementChanged because CharacterSelect mounts BEFORE the first match
+  -- (when lastPlacement is still nil), and the GameBase pop on match-end
+  -- doesn't re-run :load(). Without the signal, the labels would stay blank
+  -- forever.
+  local function formatMatchOut(outClock)
+    if not outClock or outClock <= 0 then return "" end
+    local totalSeconds = math.floor(outClock / 60)
+    return string.format("Match out: %d:%02d", math.floor(totalSeconds / 60), totalSeconds % 60)
+  end
+  -- Quotes are wrapped in literal " marks and wrap to fit the info-card column.
+  -- iconRow.unitSize shrinks for high player counts (8p → 75, 12p → 50), so we
+  -- pull the wrap width from there; the label auto-grows vertically to fit.
+  local flavor = '"' .. pickFlavorQuote(player.name or "") .. '"'
+  local cardWidth = (self.ui and self.ui.iconRow and self.ui.iconRow.unitSize) or 100
+  local QUOTE_WRAP_PX = math.max(60, cardWidth - 8)
+  local function placementText(placement)
+    return placement and ("Position: " .. tostring(placement)) or flavor
+  end
+
+  stackPanel.placementLabel = ui.Label({
     x = labelX,
-    text = loc("ss_wins") .. " " .. player:getWinCountForDisplay(),
+    text = placementText(player.lastPlacement),
+    translate = false,
+    wrapWidth = QUOTE_WRAP_PX,
+  })
+  stackPanel.matchOutLabel = ui.Label({
+    x = labelX,
+    text = formatMatchOut(player.lastMatchOutClock),
     translate = false
   })
-  stackPanel.winsLabel.updateLabel = function(self, winCount)
-    self:setText(loc("ss_wins") .. " " .. winCount, nil, false)
+  -- Lazy mount: insert each stat label just above placementLabel. Each
+  -- insertion pushes placementLabel down by one, so we recompute its index
+  -- each time. Guarded by _statsMounted so re-fires (next match's
+  -- placementChanged) don't re-insert duplicates.
+  local function mountStatsAbovePlacement()
+    if stackPanel._statsMounted then return end
+    stackPanel._statsMounted = true
+    local function insertBeforePlacement(label)
+      if not label then return end
+      local idx = tableUtils.indexOf(stackPanel.children, stackPanel.placementLabel)
+      stackPanel:insertElementAtIndex(label, idx)
+    end
+    insertBeforePlacement(stackPanel.winsLabel)
+    insertBeforePlacement(stackPanel.winrateLabel)
+    insertBeforePlacement(stackPanel.winrateValueLabel)
+    insertBeforePlacement(stackPanel.winrateExpectedLabel)
   end
 
-  stackPanel.winrateLabel = ui.Label({
-    x = labelX,
-    text = "ss_winrate"
-  })
-
-  stackPanel.winrateValueLabel = ui.Label({
-    x = labelX,
-    text = "  " .. loc("ss_current_rating") .. " " .. tostring(player.winrate) .. "%",
-    translate = false
-  })
-  stackPanel.winrateValueLabel.updateLabel = function(self, winrate)
-    self:setText("  " .. loc("ss_current_rating") .. tostring(winrate) .. "%", nil, false)
+  -- Pre-first-match the nameLabel rides UNDER the quote as a "~ Name"
+  -- attribution; once placement is known it slides back to its normal
+  -- top-of-card slot. setText switches the prefix; we relocate via
+  -- remove + insertElementAtIndex.
+  local function setNameAttributed(attributed)
+    local txt = player.name or ""
+    stackPanel.nameLabel:setText(attributed and ("~ " .. txt) or txt, nil, false)
+  end
+  local function promoteNameToTop()
+    if stackPanel._namePromoted then return end
+    stackPanel._namePromoted = true
+    stackPanel:remove(stackPanel.nameLabel)
+    setNameAttributed(false)
+    local topIdx = 1
+    if stackPanel.hostLabel then topIdx = topIdx + 1 end
+    if stackPanel.bootButton then topIdx = topIdx + 1 end
+    stackPanel:insertElementAtIndex(stackPanel.nameLabel, topIdx)
   end
 
-  stackPanel.winrateExpectedLabel = ui.Label({
-    x = labelX,
-    text = ""
-  })
-  if self.battleRoom.ranked then
-    stackPanel.winrateExpectedLabel:setText(loc("ss_expected_rating") .. " " .. player.expectedWinrate .. "%")
-  end
-  stackPanel.winrateExpectedLabel.updateLabel = function(self, expectedWinrate)
-    self:setText("  " .. loc("ss_expected_rating") .. tostring(expectedWinrate) .. "%", nil, false)
+  stackPanel.placementLabel.updateLabel = function(self, placement, outClock)
+    self:setText(placementText(placement), nil, false)
+    stackPanel.matchOutLabel:setText(formatMatchOut(outClock), nil, false)
+    if placement then
+      promoteNameToTop()
+      mountStatsAbovePlacement()
+    end
   end
 
-  player:connectSignal("leagueChanged", stackPanel.leagueLabel, stackPanel.leagueLabel.updateLabel)
-  player:connectSignal("ratingChanged", stackPanel.ratingLabel, stackPanel.ratingLabel.updateLabel)
-  player:connectSignal("winsChanged", stackPanel.winsLabel, stackPanel.winsLabel.updateLabel)
-  player:connectSignal("winrateChanged", stackPanel.winrateValueLabel, stackPanel.winrateValueLabel.updateLabel)
-  player:connectSignal("expectedWinrateChanged", stackPanel.winrateExpectedLabel, stackPanel.winrateExpectedLabel.updateLabel)
+  if stackPanel.ratingLabel then
+    player:connectSignal("ratingChanged", stackPanel.ratingLabel, stackPanel.ratingLabel.updateLabel)
+  end
+  if stackPanel.winsLabel then
+    player:connectSignal("winsChanged", stackPanel.winsLabel, stackPanel.winsLabel.updateLabel)
+  end
+  if stackPanel.winrateValueLabel then
+    player:connectSignal("winrateChanged", stackPanel.winrateValueLabel, stackPanel.winrateValueLabel.updateLabel)
+  end
+  if stackPanel.winrateExpectedLabel then
+    player:connectSignal("expectedWinrateChanged", stackPanel.winrateExpectedLabel, stackPanel.winrateExpectedLabel.updateLabel)
+  end
+  player:connectSignal("placementChanged", stackPanel.placementLabel, stackPanel.placementLabel.updateLabel)
 
-  stackPanel:addElement(stackPanel.leagueLabel)
-  stackPanel:addElement(stackPanel.ratingLabel)
-  stackPanel:addElement(stackPanel.winsLabel)
-  stackPanel:addElement(stackPanel.winrateLabel)
-  stackPanel:addElement(stackPanel.winrateValueLabel)
+  if player.lastPlacement then
+    -- Returning to a session where this player already has placement info:
+    -- name at top (no tilde), stats above placement, position+match-out below.
+    stackPanel._namePromoted = true
+    stackPanel:addElement(stackPanel.nameLabel)
+    if stackPanel.ratingLabel then
+      stackPanel:addElement(stackPanel.ratingLabel)
+    end
+    stackPanel:addElement(stackPanel.placementLabel)
+    stackPanel:addElement(stackPanel.matchOutLabel)
+    mountStatsAbovePlacement()
+  else
+    -- Pre-first-match: rating, quote, "~ Name" as attribution, (empty matchOut).
+    setNameAttributed(true)
+    if stackPanel.ratingLabel then
+      stackPanel:addElement(stackPanel.ratingLabel)
+    end
+    stackPanel:addElement(stackPanel.placementLabel)
+    stackPanel:addElement(stackPanel.nameLabel)
+    stackPanel:addElement(stackPanel.matchOutLabel)
+  end
 
   return stackPanel
 end
@@ -1220,6 +1521,7 @@ function CharacterSelect:drawSelf()
   self:customDraw()
   self:drawWaitingForPlayersBanner()
   self:drawVoidedRoomBanner()
+  self:drawLeaveBlockedBanner()
 end
 
 -- Dynamic-roster modes (open FFA) need a hint that the match is gated on more
@@ -1257,6 +1559,23 @@ function CharacterSelect:drawVoidedRoomBanner()
   GraphicsUtil.printf(text, 0, bannerY + 10, consts.CANVAS_WIDTH, "center", {1, 0.85, 0.4, 1})
 end
 
+-- Brief banner shown when leave is gated because the local player is dead
+-- and teammates' match is still resolving server-side.
+function CharacterSelect:drawLeaveBlockedBanner()
+  if not self.leaveBlockedUntil then return end
+  local now = love.timer.getTime()
+  if now >= self.leaveBlockedUntil then
+    self.leaveBlockedUntil = nil
+    return
+  end
+  local GraphicsUtil = require("client.src.graphics.graphics_util")
+  local consts = require("common.engine.consts")
+  local text = "Wait for the match to end before leaving."
+  local bannerY = math.floor(consts.CANVAS_HEIGHT / 2) + 24
+  GraphicsUtil.drawRectangle("fill", 0, bannerY, consts.CANVAS_WIDTH, 36, 0, 0, 0, 0.7)
+  GraphicsUtil.printf(text, 0, bannerY + 10, consts.CANVAS_WIDTH, "center", {1, 0.85, 0.4, 1})
+end
+
 -- Top-of-screen pink/purple banner pair (same component as in-game).
 function CharacterSelect:drawTeamBannerHeader()
   if not (self.battleRoom and self.battleRoom.mode) then return end
@@ -1285,6 +1604,17 @@ function CharacterSelect:teamBorderColorForPlayer(player)
 end
 
 function CharacterSelect:leave()
+  -- Dead-local mid-match: server keeps the slot in pendingLeaverRemovals until
+  -- match end, so the lobby keeps re-pinning us back in the room — the client
+  -- pops to Lobby but the next lobbyStateV2 broadcast undoes that. Block the
+  -- leave with a banner and let the match wrap up.
+  if self.battleRoom and self.battleRoom.match
+      and self.battleRoom.match.isLocalPlayerEliminated
+      and self.battleRoom.match:isLocalPlayerEliminated() then
+    self.leaveBlockedUntil = love.timer.getTime() + 3
+    return
+  end
+
   -- Explicit user-initiated leave: announce to the server first so the room
   -- knows we're gone, then tear down local match state on scene unmount.
   -- BattleRoom:shutdown is local-only; it doesn't talk to the server.

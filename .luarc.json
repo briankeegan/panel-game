@@ -71,6 +71,7 @@
         "common/lib/luaLsPlugin.lua"
     ],
     "workspace.library": [
-        ".vscode/love2d-12/library"
+        ".vscode/love2d-12/library",
+        ".vscode/love2d-compat/library"
     ]
 }

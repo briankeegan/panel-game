@@ -9,8 +9,11 @@ local class = require("common.lib.class")
 ---@field height integer panel grid height (mirrors engine.height)
 ---@field touchInputController TouchInputController
 ---@field touchingStack boolean true while a touch is held (even if dragged off the stack)
+---@field touchingRaise boolean? true while the raise area is being touched
 ---@field touchedCell { row: integer, col: integer } cell under the current touch ({0,0} = none)
 ---@field previousTouchedCell { row: integer, col: integer } cell touched last frame; used for press/drag/release detection
+---@field handleTouch fun(self, screenX: number, screenY: number)? optional touch handler set by ClientStack
+---@field debugString string? developer overlay text set by debug code
 local TouchInputDetector =
   class(
   function(self, stack)

@@ -43,7 +43,7 @@ end
 ---@field roomNumber integer?
 ---@field sceneParameters table?
 ---@field preferredStageId string? if set, this stage will be used for all matches in the session
----@field heldSlots integer[] slots reserved for invited players (invite rooms only)
+---@field heldSlots { publicId: integer, name: string, slotNumber: integer }[] slots reserved for invited players (invite rooms only)
 ---@field ownerId PublicPlayerID? room owner's publicId; nil only for legacy payloads
 ---@field teamWins integer[]? per-team win counts indexed by team_index; nil in non-team modes
 ---@field publicId PublicPlayerID? (compatibility alias used by some payloads)
@@ -201,14 +201,22 @@ function BattleRoom.createFromServerMessage(message)
   else
     local gameMode = message.gameMode
     local payloadPlayers = orderedPayloadPlayers(message.players)
+    -- Server tells us authoritatively which slot is the local player via
+    -- localPlayerNumber. Older servers (or replay/spectate payloads that don't
+    -- have a recipient) omit it; fall back to the historical
+    -- publicId-then-name heuristic in that case. The heuristic raced login
+    -- completion and broke for renamed accounts — the field eliminates that
+    -- whole class of "stuck on Loading because we orphaned ourselves" bugs.
+    local serverLocalPlayerNumber = message.localPlayerNumber
     for i = 1, #payloadPlayers do
       local player = payloadPlayers[i]
       local p
+      local isLocalByServer = serverLocalPlayerNumber
+        and player.playerNumber == serverLocalPlayerNumber
       local samePublicId = (player.publicId and GAME.localPlayer.publicId and GAME.localPlayer.publicId > 0 and player.publicId == GAME.localPlayer.publicId)
       local sameName = (player.name == GAME.localPlayer.name)
 
-      -- Match local player by publicId when available; fallback to name for dev/self-play setups.
-      if samePublicId or sameName then
+      if isLocalByServer or (not serverLocalPlayerNumber and (samePublicId or sameName)) then
         logger.debug("Local player is player number " .. player.playerNumber)
         p = GAME.localPlayer
         if GAME.localPlayer.publicId < 0 and player.publicId > 0 then
@@ -217,6 +225,7 @@ function BattleRoom.createFromServerMessage(message)
       else
         p = Player(player.name, player.publicId or -i, false)
       end
+      assert(p, "BattleRoom.fromServerMessage: failed to resolve Player for slot " .. tostring(i))
 
       -- updateSettings will set levelData which triggers levelDataChanged signal
       -- which will automatically update style based on the levelData
@@ -422,6 +431,31 @@ function BattleRoom:addPlayer(player)
     -- created without a server-assigned seat.
     TeamUtils.assignSeatIdentity(player, #self.players + 1)
   end
+
+  -- Dedupe by publicId — addToRoom timing vs. login timing can cause the
+  -- local user to be created twice in self.players: once as a fresh remote-
+  -- flagged Player (when GAME.localPlayer.publicId is still -1 at addToRoom
+  -- time and config.name doesn't match the server's name for this account)
+  -- and again as GAME.localPlayer via a later path. The duplicate's stale
+  -- hasLoaded gates BattleRoom:refreshReadyStates, leaving the user stuck
+  -- on "Loading" after they click Ready. Prefer the local-flagged version,
+  -- otherwise keep the first one in place.
+  if player.publicId and player.publicId > 0 then
+    for i = 1, #self.players do
+      local existing = self.players[i]
+      if existing.publicId == player.publicId then
+        if player.isLocal and not existing.isLocal then
+          self.players[i] = player
+          if player.isLocal then
+            self:connectSignal("allAssetsLoadedChanged", player, player.setLoaded)
+          end
+          self:emitSignal("rosterChanged")
+        end
+        return
+      end
+    end
+  end
+
   -- Insert sorted by playerNumber (== server seatId for online). The server's
   -- replay.stacks come in ascending-seatId order; ClientMatch pairs
   -- battleRoom.players[i] with engine.stacks[i] positionally. Appending in

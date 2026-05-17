@@ -1,3 +1,4 @@
+---@diagnostic disable: undefined-field, need-check-nil
 -- End-to-end harness: orchestrates a real Server + N scripted TCP clients
 -- inside a single LuaJIT process, with cooperative pumping.
 --

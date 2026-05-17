@@ -308,6 +308,11 @@ function GraphicsUtil.setShader(shader)
 end
 
 -- Draws text at the given spot
+---@param str string|number text to print (numbers stringified by love.graphics.print)
+---@param x number?
+---@param y number?
+---@param color table?
+---@param scale number?
 function GraphicsUtil.print(str, x, y, color, scale)
   x = x or 0
   y = y or 0

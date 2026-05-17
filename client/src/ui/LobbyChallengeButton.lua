@@ -13,7 +13,7 @@ local GraphicsUtil = require("client.src.graphics.graphics_util")
 ---@field roomNumber integer?
 ---@field slotNumber integer?
 ---@field challengeState ChallengeState?
----@field teamTint number[]? RGBA tint for the button background; matches the team being joined
+---@field teamTint [number, number, number, number?]? RGBA tint for the button background; matches the team being joined
 ---@field icon nil
 
 ---@class LobbyChallengeButton : IconTextButton

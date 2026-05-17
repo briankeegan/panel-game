@@ -113,11 +113,11 @@ function CharacterSelect2p:setupRoster()
     cursor.raise2Callback = function()
       self.ui.characterGrid:turnPage(1)
     end
-    -- Default activeArea is rows 2-5 (character grid + selectors row).
-    -- For the local host in an open room, widen to row 6 so they can arrow-key
-    -- onto the boot buttons added by _setupHostBootButtons. Other row-6
-    -- widgets (pageIndicator/changeInput/leave) get keyboard reachability as
-    -- a side effect — they already have onClick handlers so this is harmless.
+    -- Local host on an open room: widen the cursor's active area to include
+    -- row 6 so they can arrow-key onto the Boot buttons that _setupHostBoot
+    -- Buttons places there. Other row-6 widgets (pageIndicator/changeInput/
+    -- leave) gain keyboard reach as a side effect — harmless, they already
+    -- have onClick handlers.
     if player.isLocal and cursor.activeArea then
       local mode = self.battleRoom and self.battleRoom.mode
       local ownerId = self.battleRoom and self.battleRoom.ownerId
@@ -144,32 +144,40 @@ function CharacterSelect2p:setupRoster()
   self:_setupHostBootButtons()
 end
 
+-- Row-6 cells available for Boot buttons. Cells 5 (pageIndicator), 8
+-- (changeInputButton), and 9 (leaveButton) are owned by other widgets.
+-- 6 slots = open_ffa's maxPlayers (7) minus the host themselves.
+local BOOT_BUTTON_COLUMNS = {1, 2, 3, 4, 6, 7}
+
 ---Tear down any boot buttons from a previous setupRoster pass so refreshRoster
 ---(open-FFA drop-in/out) doesn't leave stale widgets attached to the main grid.
+---
+---Must go through Grid:removeElementsIn — calling btn:detach() only detaches
+---the button from its wrapping GridElement, leaving the GridElement itself in
+---self.grid[row][col]. The next createElementAt then collides ("already
+---element X at coordinate 6|1"). removeElementsIn detaches the GridElement
+---AND clears the grid cells.
 function CharacterSelect2p:_clearHostBootButtons()
-  if self.ui.bootButtons then
-    for _, btn in pairs(self.ui.bootButtons) do
-      if btn and btn.detach then btn:detach() end
+  if self.ui.grid and self.ui.grid.removeElementsIn then
+    for _, col in ipairs(BOOT_BUTTON_COLUMNS) do
+      self.ui.grid:removeElementsIn(col, 6, 1, 1)
     end
   end
   self.ui.bootButtons = {}
 end
 
 ---Add a Boot button to the main grid for each non-host non-local player when
----the local player is host on an open-room session. Buttons go in row 6 cells
----1..4 (next to leave at col 9) so the existing GridCursor can navigate to
----them with arrow keys, same as ready/leave. Invite rooms have fixed slots —
----booting makes no sense there. Cap at 4 buttons to stay clear of the
----pageIndicator/changeInput/leave widgets at cols 5/8/9.
+---the local player is host on an open-room session. Buttons fill the
+---available row-6 cells in BOOT_BUTTON_COLUMNS order. setupRoster widens the
+---host cursor's activeArea.y2 to 6 so they're keyboard-reachable. Invite
+---rooms have fixed slots — booting makes no sense there.
 function CharacterSelect2p:_setupHostBootButtons()
   self:_clearHostBootButtons()
   if not self.battleRoom then return end
   local mode = self.battleRoom.mode
   -- Trust the explicit openRoom flag (set by server when the room was created
   -- with openRoom=true) first; fall back to the min<max heuristic for safety
-  -- against payload drift. The heuristic alone was flaky after server restart —
-  -- room.gameMode mutates playerCount mid-life, which can leak into the
-  -- addToRoom payload and make a refreshed open room look invite-shaped.
+  -- against payload drift.
   local isOpenRoom = mode and (mode.openRoom == true
     or (mode.minPlayers and mode.maxPlayers and mode.minPlayers < mode.maxPlayers))
   if not isOpenRoom then return end
@@ -177,10 +185,11 @@ function CharacterSelect2p:_setupHostBootButtons()
   local localPlayer = GAME and GAME.localPlayer
   if not (ownerId and localPlayer and localPlayer.publicId == ownerId) then return end
 
-  local col = 1
+  local slotIdx = 1
   for _, player in ipairs(self.battleRoom.players) do
-    if col > 4 then break end
+    if slotIdx > #BOOT_BUTTON_COLUMNS then break end
     if player.publicId ~= ownerId and not player.isLocal then
+      local col = BOOT_BUTTON_COLUMNS[slotIdx]
       local pubId = player.publicId
       local labelText = "Boot " .. ((player.name or "?"):sub(1, 8))
       local btn = ui.TextButton({
@@ -188,7 +197,7 @@ function CharacterSelect2p:_setupHostBootButtons()
         backgroundColor = {0.4, 0.05, 0.05, 0.85},
         outlineColor = {1, 0.4, 0.4, 1},
         onClick = function()
-          GAME.theme:playCancelSfx()
+          if GAME.theme and GAME.theme.playCancelSfx then GAME.theme:playCancelSfx() end
           if GAME.netClient and GAME.netClient.kickPlayer then
             GAME.netClient:kickPlayer(pubId)
           end
@@ -197,7 +206,7 @@ function CharacterSelect2p:_setupHostBootButtons()
       btn.onSelect = btn.onClick
       self.ui.bootButtons[col] = btn
       self.ui.grid:createElementAt(col, 6, 1, 1, "bootButton" .. col, btn)
-      col = col + 1
+      slotIdx = slotIdx + 1
     end
   end
 end

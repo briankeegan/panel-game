@@ -8,6 +8,7 @@ local logger = require("common.lib.logger")
 function PlayerStack.handle_input_taunt(self)
   if self.inputMethod ~= "touch" then
     local input = self.player.inputConfiguration
+    if not input then return end
     if input.isDown["TauntUp"] and self:can_taunt() and self.character.sounds.taunt_up then
       self.taunt_up = math.random(#self.character.sounds.taunt_up.sources)
       GAME.netClient:sendTauntUp(self.taunt_up)
@@ -59,6 +60,7 @@ function PlayerStack:send_controls()
   local to_send
   if self.inputMethod == "controller" then
     local input = self.player.inputConfiguration
+    if not input then return end
     to_send = KeyDataEncoding.base64encode[
       ((input.isDown["Raise1"] or input.isDown["Raise2"] or input.isPressed["Raise1"] or input.isPressed["Raise2"]) and 32 or 0) +
       ((input.isDown["Swap1"] or input.isDown["Swap2"]) and 16 or 0) +

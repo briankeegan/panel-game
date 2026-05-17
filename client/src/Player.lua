@@ -285,6 +285,7 @@ end
 
 ---@param stackMetadata StackMetadata
 ---@return Player
+---@param stackMetadata StackMetadata
 function Player.createFromReplayMetadata(stackMetadata)
   local player = Player(stackMetadata.name, stackMetadata.publicId, false)
   -- seatId is canonical. A missing seatId in a team-mode replay will cause

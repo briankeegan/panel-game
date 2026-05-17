@@ -207,11 +207,17 @@ end
 
 ---@param room Room
 ---@param replay ReplayV3?
-function ServerProtocol.addToRoom(room, replay)
+---@param recipient ServerPlayer? the player receiving this message; when provided,
+---  the payload includes their player_number so the client can identify itself
+---  authoritatively without relying on the publicId/name heuristic (which races
+---  with login completion and breaks for renamed accounts).
+function ServerProtocol.addToRoom(room, replay, recipient)
   local addToRoomMessage = addToRoomTemplate
   local content = addToRoomMessage.content
   content.roomNumber = room.roomNumber
   content.gameMode = room.gameMode
+  -- Authoritative "which slot is you" — see recipient docstring above.
+  content.localPlayerNumber = recipient and recipient.player_number or nil
   content.ranked = (replay and replay.metadata.ranked or room.ranked)
   content.replay = replay
   content.stage = (replay and replay.metadata.stageId or nil)

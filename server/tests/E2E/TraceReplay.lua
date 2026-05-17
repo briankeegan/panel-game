@@ -1,3 +1,4 @@
+---@diagnostic disable: undefined-field, need-check-nil
 -- TraceReplay — fixture-bundle loader for end-to-end regression tests.
 --
 -- One bundle directory holds the trace files captured from every
@@ -137,7 +138,7 @@ end
 ---Convenience: load + merge in one call. Returns the bundle table
 ---plus the merged stream.
 ---@param bundleDir string
----@return table<string, {blobs: string[]}>, {publicId, ts, prefix, body}[]
+---@return table<string, {blobs: string[]}>, {publicId: integer, ts: integer, prefix: string, body: string}[]
 function M.loadAndMerge(bundleDir)
   local bundle = M.loadBundle(bundleDir)
   return bundle, M.mergedSendsByTs(bundle)

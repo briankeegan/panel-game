@@ -167,7 +167,7 @@ end
 
 -- Gets the localized string for a loc key
 ---@param textKey string
----@param ... string?
+---@param ... string|number|nil
 function loc(textKey, ...)
   local code = Localization.codes[Localization.lang_index]
 
@@ -221,7 +221,7 @@ end
 
 ---@param languageCode LanguageCode
 ---@param textKey string
----@param ... string?
+---@param ... string|number|nil
 ---@return string
 function Localization.localize(languageCode, textKey, ...)
   if not languageCode or not Localization.data[languageCode] then

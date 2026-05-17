@@ -42,6 +42,8 @@ end
 ---@field assets IngameAssetPack
 ---@field layoutSlot integer determines the position of the stack and how some elements are rendered
 ---@field player_number integer used for display ordering
+---@field level integer? modern-style level; set by PlayerStack subclass
+---@field difficulty integer? classic-style difficulty; set by PlayerStack subclass
 
 ---@class ClientStack
 local ClientStack = class(

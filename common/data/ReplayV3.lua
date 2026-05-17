@@ -46,6 +46,7 @@ local REPLAY_VERSION = 4
 ---@field level integer?
 ---@field difficulty integer?
 ---@field analytics AnalyticsData?
+---@field seatId integer? canonical team seat assignment for team-mode replays
 
 ---@class SimulatedStackMetadata : BaseStackMetadata
 ---@field challengeModeDifficulty integer?

@@ -70,6 +70,7 @@ end
 ---@field connected_server_ip string?
 ---@field connected_server_port integer?
 ---@field localPlayer Player?
+---@field uiRoot UiElement root UI element scaled to the canvas (drawn last each frame)
 ---@overload fun(): PanelAttack
 local Game = class(
   function(self)

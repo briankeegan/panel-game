@@ -1,3 +1,4 @@
+---@diagnostic disable: undefined-field, need-check-nil
 local logger = require("common.lib.logger")
 local separator = package.config:sub(1, 1) --determines os directory separator (i.e. "/" or "\")
 local fileUtils = require("client.src.FileUtils")

@@ -1,3 +1,4 @@
+---@diagnostic disable: undefined-field, need-check-nil
 -- TeamGameModeTests.lua
 -- Tests for team-based game mode configurations
 -- These tests will FAIL until team game modes are implemented (TDD red phase)

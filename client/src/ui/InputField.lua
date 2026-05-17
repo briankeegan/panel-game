@@ -7,6 +7,14 @@ local inputFieldManager = require(PATH .. ".inputFieldManager")
 local class = require("common.lib.class")
 local GraphicsUtil = require("client.src.graphics.graphics_util")
 
+---@class InputField : UiElement
+---@field value string
+---@field charLimit integer
+---@field filterAlphanumeric boolean
+---@field isEnabled boolean
+---@field onBackspace fun(self)
+---@field onMoveCursor fun(self, delta: integer)
+---@field textInput fun(self, text: string)
 local InputField = class(
   function(self, options)
     local currentFont = love.graphics.getFont()

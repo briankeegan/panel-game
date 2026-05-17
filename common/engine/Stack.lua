@@ -74,6 +74,7 @@ local PANELS_TO_NEXT_SPEED =
   45, 45, 45, 45, 45, 45, 45, 45, math.huge}
 
 ---@class PanelSource : canRollback
+---@field rollbackBuffer RollbackBuffer per-source rollback memory (set by subclasses)
 ---@field generateStartingBoard fun(self: PanelSource, stack: Stack): string
 ---@field generateGarbagePanels fun(self: PanelSource, stack:Stack): string
 ---@field getStartingBoardHeight fun(self: PanelSource, stack: Stack): integer how many rows are to be generated at the start

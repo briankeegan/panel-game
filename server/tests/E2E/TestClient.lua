@@ -1,3 +1,4 @@
+---@diagnostic disable: undefined-field, need-check-nil
 -- Scripted protocol-level client for end-to-end multiplayer tests.
 --
 -- One TestClient owns one luasocket TCP connection and speaks the real

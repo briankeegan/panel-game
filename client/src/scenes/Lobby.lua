@@ -17,6 +17,9 @@ local tableUtils = require("common.lib.tableUtils")
 ---@field leaderboard Leaderboard
 ---@field leaderboardToggleLabel Label
 ---@field degradedChannels table<string, boolean>?
+---@field backgroundImg table background image set at construction
+---@field lobbyMenuXoffsetMap table<boolean, integer> menu x-offset by leaderboard-visibility
+---@field notice table<boolean, string> bottom notice text by player-presence state
 local Lobby = class(
 function(self, sceneParams)
   self.music = "main"
@@ -203,6 +206,7 @@ function Lobby:initLobbyMenu()
   ---@param gameModeOrId GameMode|GameModeID|string
   ---@param openRoom boolean
   ---@return GameMode?
+  ---@param gameModeOrId string | { gameModeId: GameModeID?, id: GameModeID?, name: string? }
   local function getRoomModeWithRosterBounds(gameModeOrId, openRoom)
     local modeId = nil
     if type(gameModeOrId) == "string" then

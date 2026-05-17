@@ -488,6 +488,7 @@ function CharacterSelect:createReadyButton()
     else
       player = GAME.localPlayer
     end
+    if not player then return end
     player:setWantsReady(not player.settings.wantsReady)
     GAME.theme:playValidationSfx()
   end
@@ -692,6 +693,7 @@ function CharacterSelect:getCharacterButtons()
       else
         return
       end
+      if not player then return end
 
       if character then
         if character:canSuperSelect() and holdTime > consts.SUPER_SELECTION_START + consts.SUPER_SELECTION_DURATION then

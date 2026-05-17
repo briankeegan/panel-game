@@ -204,6 +204,34 @@ local function login(gameplayClient, ip, gameplayPort, lobbyClient, lobbyPort, s
 
   if gameplayResult.publicId then
     GAME.localPlayer.publicId = gameplayResult.publicId
+    -- Recovery: addToRoom can arrive before login finishes (server eagerly
+    -- pushes the room snapshot when a known user reconnects). At that point
+    -- GAME.localPlayer.publicId is still -1 and config.name may not match the
+    -- server's name for this account, so the local-player match in
+    -- BattleRoom.createFromServerMessage fails and a remote-flagged stub is
+    -- created in our slot. The stub's stale hasLoaded/wantsReady then gates
+    -- refreshReadyStates and the user gets stuck on "Loading" forever after
+    -- clicking Ready. Now that we know our publicId, swap the stub back to
+    -- GAME.localPlayer so signals + isLocal short-circuit refreshReadyStates
+    -- work correctly.
+    if GAME.battleRoom and GAME.battleRoom.players then
+      for i, p in ipairs(GAME.battleRoom.players) do
+        if p ~= GAME.localPlayer and not p.isLocal and p.publicId == gameplayResult.publicId then
+          GAME.localPlayer.playerNumber = p.playerNumber
+          GAME.battleRoom.players[i] = GAME.localPlayer
+          if GAME.battleRoom.connectSignal then
+            GAME.battleRoom:connectSignal("allAssetsLoadedChanged", GAME.localPlayer, GAME.localPlayer.setLoaded)
+          end
+          if GAME.battleRoom.emitSignal then
+            GAME.battleRoom:emitSignal("rosterChanged")
+          end
+          if GAME.netClient and GAME.netClient.registerPlayerUpdates then
+            GAME.netClient:registerPlayerUpdates(GAME.battleRoom)
+          end
+          break
+        end
+      end
+    end
   end
 
   TraceWriter.beginSession(os.time())

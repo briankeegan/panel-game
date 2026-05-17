@@ -148,6 +148,7 @@ function ClientMatch.createFromReplay(replay, players, gameMode)
   players = {}
 
   for _, stackMetadata in ipairs(replay.metadata.stacks) do
+    ---@cast stackMetadata StackMetadata
     local stackData = replay.stacks[stackMetadata.stackIndex]
 
     if not stackData then
@@ -690,6 +691,7 @@ function ClientMatch:start()
         { type = "matchStart", content = self.replay })
       local slots = {}
       for _, m in ipairs(self.replay.metadata.stacks or {}) do
+        ---@cast m StackMetadata
         slots[#slots + 1] = {
           stackIndex  = m.stackIndex,
           name        = m.name,
@@ -1939,6 +1941,7 @@ function ClientMatch:_applyDeathEventNow(body, stack)
   -- Previously this wrote game_over_clock directly, bypassing the signal and
   -- leaving remote stacks with no death animation.
   local engine = stack.engine
+  ---@cast engine Stack
   if engine.game_over_clock <= 0 then
     -- Sender's stopWatch is authoritative for display; receiver-side derivation
     -- only matters for legacy clients that don't ship it. Mismatch between the

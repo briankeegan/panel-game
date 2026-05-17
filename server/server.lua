@@ -208,6 +208,13 @@ local Server = class(
 -- closes it. Players in the room get kicked back to lobby via leaveRoom.
 Server.ROOM_IDLE_TIMEOUT = 30 * 60
 
+-- Seconds every seated player can be disconnected from gameplay before the
+-- room is closed. Short enough that ghost rooms don't linger after the
+-- whole party leaves; long enough that a network blip / quick app restart
+-- still gets their slot back. Mid-match all-disconnected is handled in
+-- Room.lua immediately (no grace).
+Server.ALL_DISCONNECTED_GRACE = 60
+
 -- Seconds of "no gameplay progress in this room's active game" before the
 -- stuck-match watchdog flags it via CrashReports. Live gameplay updates
 -- lastActivityTime at input/death/garbage receive points, so 30s of
@@ -380,7 +387,7 @@ function Server:setLobbyChanged()
 end
 
 ---@alias LobbyPlayerV2 { publicId: PublicPlayerID, name: string, state: string, ratings: table<GameModeID, number?>, roomNumber: roomNumber? }
----@alias LobbyRoomV2 { roomNumber: roomNumber, state: string, gameModeId: GameModeID, players: PublicPlayerID[], playerSlots: integer[], spectators: PublicPlayerID[], wins: integer[], teamWins: integer[]?, gameStartTime: integer?, openRoom: boolean?, ownerId: PublicPlayerID?, minPlayers: integer?, maxPlayers: integer?, openSlots: integer[]?, heldSlots: integer[]?, slotRequests: table<integer, PublicPlayerID>?, pendingJoinerCount: integer? }
+---@alias LobbyRoomV2 { roomNumber: roomNumber, state: string, gameModeId: GameModeID, players: PublicPlayerID[], playerSlots: integer[], spectators: PublicPlayerID[], wins: integer[], teamWins: integer[]?, gameStartTime: integer?, openRoom: boolean?, ownerId: PublicPlayerID?, minPlayers: integer?, maxPlayers: integer?, openSlots: integer[]?, heldSlots: { publicId: integer, name: string, slotNumber: integer }[]?, slotRequests: table<integer, PublicPlayerID>?, pendingJoinerCount: integer? }
 ---@alias LobbyStateV2 { players: table<PublicPlayerID, LobbyPlayerV2>, rooms: table<roomNumber, LobbyRoomV2> }
 
 ---@return LobbyStateV2
@@ -764,7 +771,7 @@ function Server:create_room(gameMode, ...)
   for _, player in ipairs(players) do
     self:clearProposals(player)
     self.playerToRoom[player] = newRoom
-    player:sendJson(ServerProtocol.addToRoom(newRoom, nil))
+    player:sendJson(ServerProtocol.addToRoom(newRoom, nil, player))
   end
 end
 
@@ -803,7 +810,7 @@ function Server:drainPendingJoiners(room)
         self.playerToRoom[player] = room
         self:setLobbyChanged()
         room.reservedSlots[player.publicPlayerID] = nil
-        player:sendJson(ServerProtocol.addToRoom(room, nil))
+        player:sendJson(ServerProtocol.addToRoom(room, nil, player))
         logger.info("Player " .. player.name .. " promoted from queue to room " .. room.roomNumber
           .. " as player " .. player.player_number)
       else
@@ -982,7 +989,7 @@ function Server:handleJoinRoom(player, roomNumber, slotNumber)
     room.reservedSlots[player.publicPlayerID] = nil
 
     -- Send addToRoom message to the joining player
-    player:sendJson(ServerProtocol.addToRoom(room, nil))
+    player:sendJson(ServerProtocol.addToRoom(room, nil, player))
 
     logger.info("Player " .. player.name .. " joined room " .. roomNumber .. " as player " .. player.player_number)
   end
@@ -1128,23 +1135,50 @@ end
 ---match transitions) for longer than ROOM_IDLE_TIMEOUT seconds. closeRoom
 ---moves any remaining players/spectators back to the lobby. Runs once per
 ---second from Server:update.
+---
+---Also tears down abandoned rooms: if every seated player has lost their
+---gameplay socket and nobody reconnects within ALL_DISCONNECTED_GRACE,
+---the room is closed. Tracked via room.allDisconnectedSince which gets
+---set when transitioning into the all-disconnected state and cleared on
+---any reconnect. The mid-match all-disconnected paths inside Room.lua
+---already fire roomShouldClose without a grace; this sweep handles the
+---pre-match / character-select / post-match lobby states where the room
+---would otherwise sit until the 30-minute idle timeout.
 ---@param currentTime integer wall-clock seconds (from os.time())
 function Server:sweepIdleRooms(currentTime)
   local closures = nil
   for roomNumber, room in pairs(self.rooms) do
-    if room and room.lastActivityTime then
-      local idleFor = currentTime - room.lastActivityTime
-      if idleFor > Server.ROOM_IDLE_TIMEOUT then
+    if room then
+      -- Track abandoned-room state. Skip during an active match — the
+      -- mid-match disconnect paths in Room.lua have authority there.
+      if not room.game and not room:hasAnyConnectedPlayer() then
+        if not room.allDisconnectedSince then
+          room.allDisconnectedSince = currentTime
+          logger.info("Room " .. roomNumber ..
+            " has no connected players; grace " .. Server.ALL_DISCONNECTED_GRACE .. "s started")
+        end
+      else
+        room.allDisconnectedSince = nil
+      end
+
+      local abandonedFor = room.allDisconnectedSince and (currentTime - room.allDisconnectedSince)
+      if abandonedFor and abandonedFor > Server.ALL_DISCONNECTED_GRACE then
         closures = closures or {}
-        closures[#closures + 1] = { room = room, idleFor = idleFor }
+        closures[#closures + 1] = { room = room, reason = "all players disconnected", idleFor = abandonedFor }
+      elseif room.lastActivityTime then
+        local idleFor = currentTime - room.lastActivityTime
+        if idleFor > Server.ROOM_IDLE_TIMEOUT then
+          closures = closures or {}
+          closures[#closures + 1] = { room = room, reason = "room idle timeout", idleFor = idleFor }
+        end
       end
     end
   end
   if closures then
     for _, entry in ipairs(closures) do
       logger.info("Closing room " .. entry.room.roomNumber ..
-        " — idle for " .. entry.idleFor .. "s (limit " .. Server.ROOM_IDLE_TIMEOUT .. "s)")
-      self:closeRoom(entry.room, "room idle timeout")
+        " — " .. entry.reason .. " (after " .. entry.idleFor .. "s)")
+      self:closeRoom(entry.room, entry.reason)
     end
   end
 end
@@ -1807,7 +1841,7 @@ function Server:login(connection, userId, name, ipAddress, port, engineVersion, 
           local partialReplay = existingPlayer.room.game
             and existingPlayer.room.game:getPartialReplay(COMPRESS_REPLAYS_ENABLED)
             or nil
-          connection:sendJson(ServerProtocol.addToRoom(existingPlayer.room, partialReplay))
+          connection:sendJson(ServerProtocol.addToRoom(existingPlayer.room, partialReplay, existingPlayer))
         end
       end
 

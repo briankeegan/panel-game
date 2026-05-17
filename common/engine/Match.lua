@@ -41,6 +41,8 @@ local TeamUtils = require("common.data.TeamUtils")
 ---@field aborted boolean the game stopped in the middle because of crash, desync, game leave, online player left, etc.
 ---@field desyncError boolean? the match stopped because the other stack became too out of sync
 ---@field debug MatchDebugConfig internal debug configuration that defaults to non-debug values
+---@field fromReplay boolean? true when the Match was constructed via createFromReplay
+---@field stackInteraction StackInteractions? mirror of rules.stackInteraction, set during initialization
 
 ---@class MatchDebugConfig
 ---@field vsFramesBehind integer

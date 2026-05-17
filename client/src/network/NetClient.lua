@@ -703,6 +703,7 @@ local function processMatchStartMessage(self, message)
   for j, player in ipairs(self.room.players) do
     local matchedStackIdx = nil
     for i, metadata in ipairs(message.replay.metadata.stacks) do
+      ---@cast metadata StackMetadata
       local key = metadata.seatId or metadata.stackIndex
       if player.playerNumber == key then
         matchedStackIdx = i

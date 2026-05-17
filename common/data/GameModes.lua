@@ -13,6 +13,8 @@ local GameModes = {}
 ---@field playersPerTeam (integer | integer[])? per-team size; integer for symmetric teams, array for asymmetric (e.g. {1,2} for 1v2)
 ---@field minPlayers integer? minimum players required to start (open/team-open rooms)
 ---@field maxPlayers integer? maximum players allowed (open/team-open rooms)
+---@field garbageMode ("targeted"|"shared"|"rotating"|nil)? how multi-target garbage routing is resolved in team/FFA modes
+---@field openRoom boolean? true if room accepts direct lobby join (open FFA / open team); false / nil for invite
 --- the following properties should be strictly client side rather than universal
 --- but since they're just magic strings without dependencies it's not like they ruin anything for now
 ---@field gameScene string

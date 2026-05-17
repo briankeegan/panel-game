@@ -1,3 +1,4 @@
+---@diagnostic disable: undefined-field, need-check-nil
 -- Regression for the 2026-05-13 wrong-draw incident. Built from the
 -- captured Bevy/Koozie/Lala/Amber team_vs_all match where one team
 -- was fully eliminated but the UI showed "DRAW".

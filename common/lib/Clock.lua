@@ -30,6 +30,9 @@ Clock.__index = Clock
 ---@field _monoSource fun(): number   monotonic source (returns seconds)
 ---@field _wallSource fun(): integer  wall-clock source (returns seconds)
 ---@field _lastMonoSeconds number     forward-only guard
+---@field monotonicSeconds fun(self: Clock): number
+---@field monotonicMs fun(self: Clock): integer
+---@field wallSeconds fun(self: Clock): integer
 
 ---Construct a real clock backed by socket.gettime + os.time. Pass nothing
 ---in production; pass `{ mono = ..., wall = ... }` in tests.

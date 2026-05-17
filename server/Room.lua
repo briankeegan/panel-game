@@ -242,6 +242,16 @@ function Room:isFull()
   return self:countPlayers() >= self.maxPlayers
 end
 
+---@return boolean true if any seated player still has a live gameplay socket
+function Room:hasAnyConnectedPlayer()
+  for _, player in self:eachPlayer() do
+    if player.gameplayConnection then
+      return true
+    end
+  end
+  return false
+end
+
 ---Check whether the room still has a viable match composition.
 ---For all modes: requires countPlayers >= minPlayers (or playerCount).
 ---For dynamic-roster open team modes: additionally requires every team to
@@ -833,8 +843,10 @@ function Room:broadcastInput(input, sender)
 
   self:noteActivity()
   local senderNum = sender.player_number
+  local game = self.game
+  if not game then return end
   -- Loose-sync: skip inputs from eliminated/disconnected slots so they don't pollute the replay log.
-  if self.game.disconnectedPlayers[senderNum] then
+  if game.disconnectedPlayers[senderNum] then
     -- Log the FIRST dropped input per disconnect so we can diagnose "P2 sees their own game
     -- but P1 never sees P2's moves" without spamming for every dropped frame.
     if not self._loggedInputDropDisconnect then
@@ -848,7 +860,7 @@ function Room:broadcastInput(input, sender)
     end
     return
   end
-  if self.game.eliminatedPlayers[senderNum] then
+  if game.eliminatedPlayers[senderNum] then
     if not self._loggedInputDropEliminated then
       self._loggedInputDropEliminated = {}
     end
@@ -857,13 +869,13 @@ function Room:broadcastInput(input, sender)
       logger.warn(string.format(
         "%d: dropping input from %s (slot %d) — player is marked eliminated at frame %s",
         self.roomNumber, sender.name, senderNum,
-        tostring(self.game.eliminatedPlayers[senderNum])))
+        tostring(game.eliminatedPlayers[senderNum])))
     end
     return
   end
 
   -- Record for replay
-  self.game:receiveInput(sender, input)
+  game:receiveInput(sender, input)
 
   -- Bump per-slot recency for the silent-death watchdog. Done after the
   -- elimination/disconnect gates above so a dropped input from an
@@ -1339,6 +1351,7 @@ function Room:_livingTeams()
   if not self.game then
     return {}, {}
   end
+  ---@type ServerGame
   local game = self.game
   -- game.eliminatedPlayers / disconnectedPlayers are stackIndex-keyed (engine
   -- view), so we ask via player.stackIndex. self.players stays seatId-keyed.

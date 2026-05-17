@@ -36,6 +36,9 @@ local socket = require("common.lib.socket")
 ---@field player_number integer?
 ---@field state PlayerState
 ---@field challengedAt integer? wall-clock seconds when this player was last challenged; nil = not challenged
+---@field seatId integer? authoritative seat id assigned via TeamUtils.assignSeatIdentity; nil in non-team modes
+---@field publicId integer? legacy alias for publicPlayerID, set by some payload paths
+---@field stackIndex integer? dense engine slot for the active match; only meaningful while a match is live
 ---@overload fun(privatePlayerID: privateUserId, connection: Connection, name: string, publicId: integer): ServerPlayer
 local Player = class(
 ---@param self ServerPlayer

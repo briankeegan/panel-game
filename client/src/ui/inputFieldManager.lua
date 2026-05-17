@@ -1,6 +1,9 @@
 local input = require("client.src.inputManager")
 
 -- receives love events and passes them to the correct inputField object
+---@class InputFieldManager
+---@field inputFields table
+---@field selectedInputField InputField?
 local inputFieldManager = {
   inputFields = {},
   selectedInputField = nil

@@ -216,6 +216,7 @@ function ReplayBrowser:draw()
 
     local offsetX = 0
     for i, player in ipairs(selectedReplay.metadata.stacks) do
+      ---@cast player StackMetadata
       local stack = selectedReplay.stacks[player.stackIndex]
       GraphicsUtil.print(loc("rp_browser_info_" .. i .. "p"), menu_x + offsetX, menu_y + 50)
       GraphicsUtil.print(loc("rp_browser_info_name", player.name or ("Player " .. i)), menu_x + offsetX, menu_y + 65)

@@ -1,4 +1,4 @@
----@diagnostic disable: invisible, undefined-field
+---@diagnostic disable: invisible, undefined-field, need-check-nil
 local MockPersistence = require("server.tests.MockPersistence")
 local ClientProtocol = require("common.network.ClientProtocol")
 local json = require("common.lib.dkjson")

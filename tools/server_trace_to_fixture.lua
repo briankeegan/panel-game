@@ -50,6 +50,7 @@ local FIXTURE_DIR = "common/tests/fixtures/crash_replays"
 local function die(fmt, ...)
   io.stderr:write("server_trace_to_fixture: " .. string.format(fmt, ...) .. "\n")
   os.exit(1)
+  error("unreachable")  -- LuaLS doesn't model os.exit as never-returns; error() does
 end
 
 local function info(fmt, ...)

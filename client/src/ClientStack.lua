@@ -336,15 +336,6 @@ end
 function ClientStack:setupForLayoutSlot(layoutSlot)
   self.layoutSlot = layoutSlot
 
-  -- odd layoutSlot = left-oriented (mirror_x=1), even = right-oriented (mirror_x=-1)
-  if layoutSlot % 2 == 1 then
-    self.mirror_x = 1
-    self.multiplication = 0
-  else
-    self.mirror_x = -1
-    self.multiplication = 1
-  end
-
   if layoutSlot < 1 or layoutSlot > 7 then
     error("Invalid layoutSlot: " .. tostring(layoutSlot) .. ". Expected 1-7.")
   end
@@ -352,6 +343,23 @@ function ClientStack:setupForLayoutSlot(layoutSlot)
   -- Use modulo to map to one of 2 asset packs
   local assetIndex = ((layoutSlot - 1) % 2) + 1
   self:assignAssets(GAME.theme:getIngameAssetPack(assetIndex))
+end
+
+-- Sets which way the stack faces. "left" = HUD/analytics on the stack's left
+-- side, telegraph fires rightward (the canonical Player-1 orientation).
+-- "right" mirrors it. Each layout function decides facing per slot based on
+-- the stack's physical position — do not derive from slot parity, which only
+-- happens to work for vanilla 2p.
+function ClientStack:setFacing(direction)
+  if direction == "left" then
+    self.mirror_x = 1
+    self.multiplication = 0
+  elseif direction == "right" then
+    self.mirror_x = -1
+    self.multiplication = 1
+  else
+    error("Invalid facing direction: " .. tostring(direction) .. ". Expected 'left' or 'right'.")
+  end
 end
 
 -- Calculates the horizontal position for centering a stack around a given coordinate
@@ -377,7 +385,8 @@ end
 -- Positions the stack draw position for the given player
 function ClientStack:moveForLayoutSlot(layoutSlot)
   self:setupForLayoutSlot(layoutSlot)
-  
+  self:setFacing(layoutSlot == 1 and "left" or "right")
+
   local centerX = (GAME.globalCanvas:getWidth() / 2)
   local stackWidth = self:canvasWidth()
   local innerStackXMovement = 100
@@ -444,6 +453,7 @@ function ClientStack:moveForLayoutSlot3Player(layoutSlot)
   else
     -- Players 2 & 3 on the right with responsive scaling
     self:setupForLayoutSlot(layoutSlot)
+    self:setFacing("left")
 
     local canvasWidth = GAME.globalCanvas:getWidth()
     local topMargin = self.baseWidth + self.panelOriginXOffset
@@ -482,6 +492,7 @@ function ClientStack:moveForLayoutSlot4PlayerHorizontal(layoutSlot)
   else
     -- Players 2, 3, 4 in a 2x2-capable zone on the right
     self:setupForLayoutSlot(layoutSlot)
+    self:setFacing("left")
 
     local canvasWidth = GAME.globalCanvas:getWidth()
     local canvasHeight = GAME.globalCanvas:getHeight()
@@ -533,6 +544,7 @@ function ClientStack:moveForLayoutSlot5Player(layoutSlot)
     self:moveForLayoutSlot(1)
   else
     self:setupForLayoutSlot(layoutSlot)
+    self:setFacing("left")
 
     local canvasWidth = GAME.globalCanvas:getWidth()
     local canvasHeight = GAME.globalCanvas:getHeight()
@@ -611,6 +623,7 @@ end
 -- Maps layoutSlot 2..7 col-major top-first: 2/3 in col 1, 4/5 in col 2, 6/7 in col 3.
 function ClientStack:_positionInRightGrid3x2(layoutSlot)
   self:setupForLayoutSlot(layoutSlot)
+  self:setFacing("left")
 
   local canvasWidth = GAME.globalCanvas:getWidth()
   local canvasHeight = GAME.globalCanvas:getHeight()
@@ -665,6 +678,9 @@ end
 -- layoutSlot: 1=top-left, 2=top-right, 3=bottom-left, 4=bottom-right
 function ClientStack:moveForLayoutSlot4Player(layoutSlot)
   self:setupForLayoutSlot(layoutSlot)
+  -- 2x2 grid: slots 1 (top-left) and 3 (bottom-left) face left,
+  -- slots 2 (top-right) and 4 (bottom-right) face right.
+  self:setFacing((layoutSlot == 1 or layoutSlot == 3) and "left" or "right")
 
   local canvasWidth = GAME.globalCanvas:getWidth()
   local canvasHeight = GAME.globalCanvas:getHeight()
@@ -875,6 +891,10 @@ end
 -- Default team color used when no team assignment is available (e.g. solo / non-team modes).
 ClientStack.DEFAULT_TEAM_COLOR = {0.2, 0.2, 0.25, 0.85}
 
+-- framesBehind threshold (60fps ≈ 2 seconds) before showing the "…Ns" stall
+-- marker. Local stacks have framesBehind=0 so this only triggers on remotes.
+ClientStack.UNRESPONSIVE_FRAMES = 120
+
 -- Drawn inside withPanelTransform → coordinates are panel-local at scale 1.
 -- Renders a team-colored chip with the player's name centered above the stack.
 function ClientStack:drawPlayerName()
@@ -904,6 +924,15 @@ function ClientStack:drawPlayerName()
     local markerY = chipY - markerHeight - 2
     GraphicsUtil.drawRectangle("fill", chipX, markerY, chipWidth, markerHeight, 0, 0, 0, 0.7)
     GraphicsUtil.printf(marker, chipX, markerY + 2, chipWidth, "center", {1, 0.4, 0.4, 1}, nil, 2)
+  elseif self.engine and (self.engine.framesBehind or 0) > ClientStack.UNRESPONSIVE_FRAMES then
+    -- Stack is alive but its inputs have stopped flowing — show survivors
+    -- something before the server-side silent watchdog fires (~10s+).
+    local secondsBehind = math.floor((self.engine.framesBehind or 0) / 60)
+    local marker = string.format("…%ds", secondsBehind)
+    local markerHeight = 20
+    local markerY = chipY - markerHeight - 2
+    GraphicsUtil.drawRectangle("fill", chipX, markerY, chipWidth, markerHeight, 0, 0, 0, 0.6)
+    GraphicsUtil.printf(marker, chipX, markerY + 2, chipWidth, "center", {1, 0.85, 0.3, 1}, nil, 2)
   end
 end
 

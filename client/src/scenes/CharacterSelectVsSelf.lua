@@ -85,7 +85,7 @@ end
 
 function CharacterSelectVsSelf:refresh()
   local level
-  if self.battleRoom then
+  if self.battleRoom and self.battleRoom.players[1] then
     level = self.battleRoom.players[1].settings.level
     self.lastScore = GAME.scores:lastVsScoreForLevel(level)
     self.record = GAME.scores:recordVsScoreForLevel(level)

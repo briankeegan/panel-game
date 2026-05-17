@@ -147,12 +147,12 @@ function EndlessMenu:onStyleChanged(style, player)
   if style == GameModes.Styles.MODERN then
     self.ui.grid:removeElementsIn(6, 2, 3, 1)
     self.ui.grid:createElementAt(6, 2, 3, 1, "levelSelection", self.ui.levelSelection, nil, true)
-    self.ui.recordBox:setVisibility(false)
+    if self.ui.recordBox then self.ui.recordBox:setVisibility(false) end
   else
     self.ui.grid:removeElementsIn(6, 2, 3, 1)
     self.ui.grid:createElementAt(6, 2, 2, 1, "speedSelection", self.ui.speedSelection, nil, true)
     self.ui.grid:createElementAt(8, 2, 1, 1, "difficultySelection", self.ui.difficultySelection, nil, true)
-    self.ui.recordBox:setVisibility(true)
+    if self.ui.recordBox then self.ui.recordBox:setVisibility(true) end
   end
 end
 

@@ -734,7 +734,36 @@ function Stack:controls()
   end
 end
 
-function Stack:shouldRun(runsSoFar)
+---@param runsSoFar integer
+---@param remoteCapTight boolean? when true and this is a non-local stack,
+---  the per-cycle iteration cap is reduced to 1 — set by Match:run when
+---  the local engine is racing to catch up with wall-clock, so heavy
+---  view-stack catch-up doesn't starve the local sim's CPU budget.
+-- Sub-tick lerp of animated render fields against rollbackBuffer's prev tick.
+-- Returns a saved-state table for restoreRenderInterp; nil = no interp applied.
+function Stack:applyRenderInterp(alpha)
+  if self.is_local or not alpha or alpha >= 1 then return nil end
+  if not self.rollbackBuffer then return nil end
+  local prev = self.rollbackBuffer:peekPrevious()
+  if not prev or prev.clock ~= self.clock - 1 then return nil end
+  local saved = {displacement = self.displacement, cur_col = self.cur_col, cur_row = self.cur_row}
+  -- displacement is mod 16; skip lerp across the wrap
+  if math.abs(self.displacement - prev.displacement) < 8 then
+    self.displacement = prev.displacement + (self.displacement - prev.displacement) * alpha
+  end
+  self.cur_col = prev.cur_col + (self.cur_col - prev.cur_col) * alpha
+  self.cur_row = prev.cur_row + (self.cur_row - prev.cur_row) * alpha
+  return saved
+end
+
+function Stack:restoreRenderInterp(saved)
+  if not saved then return end
+  self.displacement = saved.displacement
+  self.cur_col = saved.cur_col
+  self.cur_row = saved.cur_row
+end
+
+function Stack:shouldRun(runsSoFar, remoteCapTight)
   if self:game_ended() then
     return false
   end
@@ -778,6 +807,7 @@ function Stack:shouldRun(runsSoFar)
       -- Race to game_over_clock. Skip smoothing.
       self._smoothedRate = self.max_runs_per_frame
       self._smoothedRateVelocity = 0
+      self._smoothedRateAccum = 0
     elseif self._smoothedRate == nil then
       -- First time we're planning for this stack: snap to target rather
       -- than ramp from zero (which would make a steady-state stack run
@@ -800,6 +830,11 @@ function Stack:shouldRun(runsSoFar)
     if planned > self.max_runs_per_frame then planned = self.max_runs_per_frame end
     if planned > buffer_len then planned = buffer_len end
     if planned < 0 then planned = 0 end
+    -- Local-prioritized tight cap: when local is racing to catch up, drop
+    -- this cycle's remote run to at most 1 so we don't steal CPU from local.
+    -- SmoothDamp accumulator carries the unspent rate forward, so remotes
+    -- still converge over many cycles — just one tick at a time.
+    if remoteCapTight and planned > 1 then planned = 1 end
     self._smoothedPlannedRuns = planned
   end
 
@@ -1258,7 +1293,12 @@ end
 -- Emits the "gameOver" signal once; subsequent calls with the same frame are no-ops.
 -- An explicit clock can be passed by external callers (e.g. loose-sync DeathEvent handler)
 -- that know the authoritative death frame before the sim has caught up to it.
-function Stack:recordDeath(clock)
+---@param clock integer? frame the stack died on (defaults to self.clock)
+---@param stopWatch integer? authoritative stopWatch value from the dying engine.
+---  When supplied (remote D-event), used verbatim instead of re-deriving via
+---  this stack's countdownOffsetFrames — the sender's offset is the source of
+---  truth for what their own timer showed.
+function Stack:recordDeath(clock, stopWatch)
   clock = clock or self.clock
 
   if self.game_over_clock > 0 then
@@ -1270,10 +1310,11 @@ function Stack:recordDeath(clock)
   end
 
   self.game_over_clock = clock
-  -- Capture the gameplay-frame at death once, so display reads a value already
-  -- in the in-game-timer domain. Local deaths and loose-sync D-event-driven
-  -- deaths share this formula — senderFrame IS clock from the dying engine.
-  self.game_over_stopWatch = math.max(0, clock - (self.countdownOffsetFrames or 0))
+  if stopWatch then
+    self.game_over_stopWatch = math.max(0, stopWatch)
+  else
+    self.game_over_stopWatch = math.max(0, clock - (self.countdownOffsetFrames or 0))
+  end
 
   self:emitSignal("gameOver", self)
 end

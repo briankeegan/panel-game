@@ -15,6 +15,17 @@ local system = require("client.src.system")
 local GeneratorSource = require("common.engine.GeneratorSource")
 local DebugSettings = require("client.src.debug.DebugSettings")
 
+-- After createFromReplay, force match.doCountdown from the live wire-shipped
+-- gameMode rather than trusting replay.rules — closes a drift window where a
+-- rejoiner/spectator's replay snapshot disagrees with the live room and stacks
+-- end up with the wrong countdownOffsetFrames (off-by-3sec OUT-time bug).
+local function _pinDoCountdownFromLiveGameMode(match, gameMode)
+  if not gameMode or not gameMode.matchRules then return end
+  if gameMode.matchRules.doCountdown == nil then return end
+  match.engine.doCountdown = gameMode.matchRules.doCountdown
+  match.engine.rules.doCountdown = gameMode.matchRules.doCountdown
+end
+
 -- A Battle Room is a session of matches, keeping track of the room number, player settings, wins / losses etc
 ---@class BattleRoom : Signal
 ---@field mode GameMode The game mode configuration defining rules, player count, and match settings for this battle room
@@ -122,6 +133,7 @@ function BattleRoom.createFromServerMessage(message)
       -- view of the match too. Without this, the spectator's local engine never ends
       -- a 4p_ffa or team match until the last surviving player dies.
       local match = ClientMatch.createFromReplay(replay, nil, gameMode)
+      _pinDoCountdownFromLiveGameMode(match, gameMode)
       for i = 1, #match.players do
         battleRoom:addPlayer(match.players[i])
       end
@@ -156,6 +168,7 @@ function BattleRoom.createFromServerMessage(message)
     -- pass GAME.localPlayer so createFromReplay's publicId match grafts us
     -- into the right slot (preserves input config, signal subscriptions, etc.).
     local match = ClientMatch.createFromReplay(message.replay, {GAME.localPlayer}, gameMode)
+    _pinDoCountdownFromLiveGameMode(match, gameMode)
     for i = 1, #match.players do
       battleRoom:addPlayer(match.players[i])
     end

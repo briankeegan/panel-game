@@ -46,6 +46,7 @@ function PlayerStack:notifyServerStackEliminated()
   -- get the D through once the socket is healthy again. Don't lose the death.
   GAME.netClient:sendDeathEvent({
     senderFrame = self.engine.game_over_clock,
+    stopWatch = self.engine.game_over_stopWatch,
     reason = "topOut",
   })
 end

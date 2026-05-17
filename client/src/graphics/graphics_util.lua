@@ -2,6 +2,7 @@ local consts = require("common.engine.consts")
 local logger = require("common.lib.logger")
 local FileUtils = require("client.src.FileUtils")
 local system = require("client.src.system")
+local AssetDecodeClient = require("client.src.mods.AssetDecodeClient")
 
 -- Utility methods for drawing
 local GraphicsUtil = {
@@ -58,6 +59,23 @@ function GraphicsUtil.privateLoadImage(path_and_name)
   return image
 end
 
+-- Decodes via the worker thread then constructs the Image on main. dpiscale
+-- must be passed explicitly — the worker returns raw ImageData with no
+-- filename context, so love.graphics.newImage(imageData) would default to 1.
+function GraphicsUtil.privateLoadImageThreaded(path_and_name, dpiscale)
+  local imageData = AssetDecodeClient.decodeImage(path_and_name)
+  if not imageData then return nil end
+  local image
+  local status = pcall(function()
+    image = love.graphics.newImage(imageData, {dpiscale = dpiscale or 1})
+  end)
+  if not image then
+    return nil
+  end
+  logger.trace("loaded asset (threaded): " .. path_and_name)
+  return image
+end
+
 function GraphicsUtil.privateLoadImageWithExtensionAndScale(pathAndName, extension, scale)
   local scaleSuffixString = "@" .. scale .. "x"
   if scale == 1 then
@@ -67,7 +85,15 @@ function GraphicsUtil.privateLoadImageWithExtensionAndScale(pathAndName, extensi
   local fileName = pathAndName .. scaleSuffixString .. extension
 
   if FileUtils.exists(fileName) then
-    local result = GraphicsUtil.privateLoadImage(fileName)
+    -- Threaded decode path when called from inside a coroutine (i.e. the
+    -- ModLoader bulk load). Direct on-main load elsewhere — fonts, UI
+    -- assets, one-shot loads — to avoid the worker round-trip overhead.
+    local result
+    if coroutine.running() ~= nil then
+      result = GraphicsUtil.privateLoadImageThreaded(fileName, scale)
+    else
+      result = GraphicsUtil.privateLoadImage(fileName)
+    end
     if result then
       assert(result:getDPIScale() == scale, "The image " .. pathAndName .. " didn't wasn't created with the scale: " .. scale .. " did you make sure the width and height are divisible by the scale?")
       -- We would like to use linear for shrinking and nearest for growing,

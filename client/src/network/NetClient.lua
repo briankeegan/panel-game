@@ -596,6 +596,13 @@ local function processGameResultMessage(self, message)
         winnerIndex = message.winnerIndex,
       })
     end
+    -- Anchor the match-end overlay to the wall-clock moment derived from
+    -- (matchStartLocalMs + endTick/60). All clients share matchStartLocalMs
+    -- via the existing startInMs path, so they all fire the overlay at the
+    -- same wall-clock instant regardless of gameResult delivery jitter.
+    if self.room.match.setServerEndTick then
+      self.room.match:setServerEndTick(message.endTick)
+    end
   end
 
   for _, roomPlayer in ipairs(self.room.players) do

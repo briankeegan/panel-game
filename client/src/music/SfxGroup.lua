@@ -1,5 +1,6 @@
 local class = require("common.lib.class")
 local tableUtils = require("common.lib.tableUtils")
+local AssetDecodeClient = require("client.src.mods.AssetDecodeClient")
 
 -- A group of SFX that belong together
 -- Only 1 SFX in the group may play at the same time
@@ -21,7 +22,24 @@ function(self, fileGroup, volumeMultiplier)
   self.sources = {}
   -- if there are gaps in indexedFiles, tough luck, they'll get ignored
   for i, filename in ipairs(continuouslyIndexedFiles) do
-    self.sources[i] = love.audio.newSource(fileGroup.path .. "/" .. filename, "static")
+    local fullPath = fileGroup.path .. "/" .. filename
+    -- Threaded decode when called from inside a coroutine (ModLoader bulk
+    -- load path). Falls back to direct on-main load elsewhere.
+    if coroutine.running() ~= nil then
+      local data = AssetDecodeClient.decodeSound(fullPath, false)
+      if data and type(data) ~= "table" then
+        local ok, source = pcall(love.audio.newSource, data, "static")
+        if ok then
+          self.sources[i] = source
+        else
+          self.sources[i] = love.audio.newSource(fullPath, "static")
+        end
+      else
+        self.sources[i] = love.audio.newSource(fullPath, "static")
+      end
+    else
+      self.sources[i] = love.audio.newSource(fullPath, "static")
+    end
   end
 end)
 

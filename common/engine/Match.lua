@@ -244,9 +244,39 @@ function Match:debugCheckDivergence()
   self.savedStackP2 = nil
 end
 
+---Called by the scene layer (GameBase) before invoking Match:run, to inform
+---the engine how many wall-clock frames the local engine is behind. Used to
+---tighten remote view-stacks' per-cycle iteration cap when local is racing
+---to catch up — so heavy remote catch-up work doesn't starve the local
+---engine's CPU budget. Safe to leave unset (nil = treat as 0).
+---@param frames integer
+function Match:setLocalWallClockDeficit(frames)
+  self._wallClockDeficitFrames = frames
+end
+
+-- Fractional [0,1] from prev tick to current. Remote view-stack renders lerp by this.
+---@param alpha number
+function Match:setRenderInterpAlpha(alpha)
+  if alpha < 0 then alpha = 0 end
+  if alpha > 1 then alpha = 1 end
+  self.renderInterpAlpha = alpha
+end
+
 ---@return integer[] runsPerStack
 function Match:run()
   local startTime = love.timer.getTime()
+
+  -- Local-prioritized hysteresis: when local is >= 2 frames behind
+  -- wall-clock AND was also behind on the previous Match:run, tighten the
+  -- remote view-stacks' per-cycle iteration cap. This keeps heavy remote
+  -- catch-up from stealing CPU from the local engine under load.
+  -- Hysteresis prevents flapping on a single slow frame. Remotes still
+  -- get to catch up over many cycles via their existing SmoothDamp accum,
+  -- just one tick at a time when this flag is set.
+  local deficit = self._wallClockDeficitFrames or 0
+  local last = self._lastWallClockDeficitFrames or 0
+  self._remoteCapTight = (deficit >= 2) and (last >= 2)
+  self._lastWallClockDeficitFrames = deficit
 
   -- Refresh the cached gameOverClock so Match:shouldRun (per-stack-per-tick
   -- below) has a current value. Previously this was a side effect of
@@ -627,6 +657,15 @@ function Match:start()
     -- always need clock 0 as a base for rollback
     stack:saveForRollback()
   end
+  -- One-shot offset audit. If OUT-time displays are wrong post-fix it's likely
+  -- because two clients disagreed on rules.doCountdown — this lets us see the
+  -- per-stack offset every client picked at match start.
+  local parts = {}
+  for i, stack in ipairs(self.stacks) do
+    parts[#parts+1] = string.format("s%d=%s", i, tostring(stack.countdownOffsetFrames))
+  end
+  logger.info(string.format("Match:start doCountdown=%s offsets[%s]",
+    tostring(self.doCountdown), table.concat(parts, " ")))
 end
 
 ---@return ReplayV3
@@ -983,12 +1022,7 @@ function Match:shouldRun(stack, runsSoFar)
   end
 
   -- and then the stack specific conditions in stack
-  return stack:shouldRun(runsSoFar)
-end
-
-function Match:setCountdown(doCountdown)
-  self.doCountdown = doCountdown
-  self.rules.doCountdown = doCountdown
+  return stack:shouldRun(runsSoFar, self._remoteCapTight)
 end
 
 function Match:setAlwaysSaveRollbacks(save)

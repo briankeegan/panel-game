@@ -349,6 +349,23 @@ function Game:markPlayerEliminated(player, frame)
   end
 end
 
+---Canonical match-end engine clock — the latest frame on which any player
+---died. Clients use it to anchor the match-end overlay to a shared wall-clock
+---moment (matchStartLocalMs + endTick/60), so the overlay fires at the same
+---instant on every client regardless of gameResult delivery jitter.
+---Returns nil when no eliminations were recorded (aborted with no deaths,
+---timeout match end); callers treat nil as "no anchor, fire on arrival."
+---@return integer?
+function Game:getEndTick()
+  local endTick = nil
+  for _, frame in pairs(self.eliminatedPlayers) do
+    if not endTick or frame > endTick then
+      endTick = frame
+    end
+  end
+  return endTick
+end
+
 ---@param outcomeReports integer[]
 ---@param teams Team[]?
 ---@param disconnectedPlayers table<integer, boolean>?

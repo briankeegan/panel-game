@@ -125,12 +125,12 @@ function TimeAttackMenu:onStyleChanged(style, player)
   if style == GameModes.Styles.MODERN then
     self.ui.grid:removeElementsIn(6, 2, 3, 1)
     self.ui.grid:createElementAt(6, 2, 3, 1, "levelSelection", self.ui.levelSelection, nil, true)
-    self.ui.recordBox:setVisibility(false)
+    if self.ui.recordBox then self.ui.recordBox:setVisibility(false) end
   else
     self.ui.grid:removeElementsIn(6, 2, 3, 1)
     self.ui.grid:createElementAt(6, 2, 2, 1, "speedSelection", self.ui.speedSelection, nil, true)
     self.ui.grid:createElementAt(8, 2, 1, 1, "difficultySelection", self.ui.difficultySelection, nil, true)
-    self.ui.recordBox:setVisibility(true)
+    if self.ui.recordBox then self.ui.recordBox:setVisibility(true) end
   end
 end
 
@@ -143,7 +143,7 @@ function TimeAttackMenu:initializeFromLocalPlayerSettings(player)
 end
 
 function TimeAttackMenu:refresh()
-  if self.battleRoom then
+  if self.battleRoom and self.battleRoom.players[1] then
     local difficulty = self.battleRoom.players[1].settings.difficulty
     self.lastScore = GAME.scores:lastTimeAttack1PForLevel(difficulty)
     self.record = GAME.scores:recordTimeAttack1PForLevel(difficulty)

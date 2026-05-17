@@ -946,15 +946,17 @@ function PlayerStack:drawDebugPanels(shakeOffset)
   end
 end
 
--- Renders the player's stack on screen
 ---@param matchEnded boolean?
----@param xOffset integer? provides an additional x offset e.g. from translation as scissors only operates in screen/canvas coordinates
----@param yOffset integer? provides an additional y offset e.g. from translation as scissors only operates in screen/canvas coordinates
-function PlayerStack:render(matchEnded, xOffset, yOffset)
+---@param xOffset integer?
+---@param yOffset integer?
+---@param alpha number? sub-tick render interp alpha [0,1]; nil = no interp
+function PlayerStack:render(matchEnded, xOffset, yOffset, alpha)
   prof.push("Stack:render")
   if self.canvas == nil then
     return
   end
+
+  local interpSaved = self.engine:applyRenderInterp(alpha)
 
   self:setDrawArea(xOffset, yOffset)
   self:drawCharacter()
@@ -983,6 +985,8 @@ function PlayerStack:render(matchEnded, xOffset, yOffset)
 
   self:drawDebugPanels(shakeOffset)
   self:drawDebug()
+
+  self.engine:restoreRenderInterp(interpSaved)
   prof.pop("Stack:render")
 end
 

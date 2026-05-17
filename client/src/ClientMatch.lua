@@ -15,6 +15,7 @@ local CharacterLoader = require("client.src.mods.CharacterLoader")
 local ReplayV3 = require("common.data.ReplayV3")
 local GraphicsUtil = require("client.src.graphics.graphics_util")
 local Telegraph = require("client.src.graphics.Telegraph")
+local socket = require("socket")
 
 -- Lua 5.1 / LuaJIT has `unpack` as a global; 5.2+ moved it to `table.unpack`.
 -- LÖVE 11.x runs on LuaJIT so call sites using `table.unpack` crash here.
@@ -466,7 +467,20 @@ end
 ---@return boolean
 function ClientMatch:shouldFinalize()
   if self.engine.aborted then return true end
-  if self._serverConfirmedEnd then return true end
+  if self._serverConfirmedEnd then
+    -- Hold finalize until the shared wall-clock anchor when we have one,
+    -- so the match-end overlay fires at the same moment on every client.
+    -- If endTick or scheduledStartLocalMs is missing (legacy server, replay
+    -- bootstrap, etc.) the anchor is nil and we finalize immediately —
+    -- matches today's behavior.
+    if self._scheduledOverlayLocalMs then
+      local nowMs = math.floor(socket.gettime() * 1000)
+      if nowMs < self._scheduledOverlayLocalMs then
+        return false
+      end
+    end
+    return true
+  end
   if self.fromReplay then return self.engine:isLocallyEnded() end
   if not (GAME.battleRoom and GAME.battleRoom.online) then
     return self.engine:isLocallyEnded()
@@ -489,6 +503,30 @@ end
 ---spoken; the match is over no matter what the local view thinks.
 function ClientMatch:serverConfirmedEnd()
   self._serverConfirmedEnd = true
+end
+
+-- ClientMatch composes Match (self.engine); delegate scene-layer setters
+-- so callers don't need to know about the composition boundary.
+function ClientMatch:setLocalWallClockDeficit(frames)
+  self.engine:setLocalWallClockDeficit(frames)
+end
+
+function ClientMatch:setRenderInterpAlpha(alpha)
+  self.engine:setRenderInterpAlpha(alpha)
+end
+
+---Records the canonical match-end engine clock from the server. Combined
+---with scheduledStartLocalMs (set at match start) this gives a shared
+---wall-clock anchor (startMs + endTick/60s) that every client uses to fire
+---the match-end overlay at the same instant, regardless of when each
+---client's gameResult message arrived.
+---@param endTick integer? nil for aborted-no-death matches; no anchor applied
+function ClientMatch:setServerEndTick(endTick)
+  if not endTick or not self.scheduledStartLocalMs then
+    return
+  end
+  self._scheduledOverlayLocalMs =
+    self.scheduledStartLocalMs + math.floor(endTick * 1000 / 60)
 end
 
 ---Records the server-authoritative outcome. Online consumers prefer this
@@ -599,6 +637,9 @@ function ClientMatch:handleMatchEnd()
 end
 
 function ClientMatch:runGameOver()
+  -- Keep ticking so view-stacks that hadn't caught up at match-end keep
+  -- draining queued inputs toward game_over_clock and play out their death.
+  self.engine:run()
   for _, stack in ipairs(self.stacks) do
     stack:runGameOver(self.engine.clock)
   end
@@ -719,6 +760,21 @@ function ClientMatch:deinit()
   end
   self.pendingHistoricalDeaths = nil
   self.pendingHistoricalGarbage = nil
+  -- Players are IMMORTAL (Lobby/CharacterSelect keep them across matches via
+  -- BattleRoom.players / GAME.localPlayer). Without releasing player.stack
+  -- here, the just-ended match's ClientStack → engine Stack (with its 43k-slot
+  -- confirmedInput) → Match graph stays reachable through every Player until
+  -- the NEXT match's createFromReplay runs clearPerMatchState. In a 7p FFA
+  -- that's tens of MB held across all of character select.
+  -- Doing this in deinit (not in MatchParticipant:onMatchEnded) avoids racing
+  -- the unordered matchEnded subscribers — GameBase.genericOnMatchEnded reads
+  -- player.stack.engine in winnerToPlayer.
+  if self.players then
+    for _, p in ipairs(self.players) do
+      p.stack = nil
+      p.stackIndex = nil
+    end
+  end
 end
 
 function ClientMatch:moveStacks()
@@ -884,11 +940,6 @@ function ClientMatch:togglePause()
     self.everPaused = true
   end
   self:emitSignal("pauseChanged", self)
-end
-
----@param doCountdown boolean if the match should have a countdown before physics start
-function ClientMatch:setCountdown(doCountdown)
-  self.engine:setCountdown(doCountdown)
 end
 
 function ClientMatch:rewindToFrame(frame)
@@ -1580,10 +1631,11 @@ function ClientMatch:render()
   end
 
   if not self.isPaused or self.renderDuringPause then
+    local alpha = self.engine.renderInterpAlpha
     for _, stack in ipairs(self.stacks) do
       -- don't render stacks that only have an attack engine
       if stack.player or stack.engine.healthEngine then
-        stack:render(self.engine.ended)
+        stack:render(self.engine.ended, nil, nil, alpha)
       end
 
       if stack.canvas and not stack:game_ended() then
@@ -1863,12 +1915,25 @@ function ClientMatch:_applyDeathEventNow(body, stack)
   -- leaving remote stacks with no death animation.
   local engine = stack.engine
   if engine.game_over_clock <= 0 then
-    engine:recordDeath(body.senderFrame)
+    -- Sender's stopWatch is authoritative for display; receiver-side derivation
+    -- only matters for legacy clients that don't ship it. Mismatch between the
+    -- two implies sender/receiver disagreed on countdownOffsetFrames (was the
+    -- "OUT time off" symptom).
+    if body.stopWatch then
+      local derived = math.max(0, body.senderFrame - (engine.countdownOffsetFrames or 0))
+      if derived ~= body.stopWatch then
+        logger.warn(string.format(
+          "DeathEvent stopWatch mismatch: stack[%d] sender=%d derived=%d offset=%s senderFrame=%d",
+          body.sender, body.stopWatch, derived,
+          tostring(engine.countdownOffsetFrames), body.senderFrame))
+      end
+    end
+    engine:recordDeath(body.senderFrame, body.stopWatch)
     -- Stamp the reason on the stack so the match-end UI can distinguish
     -- "opponent topped out" from "opponent disconnected / went silent".
     stack._deathReason = body and body.reason
-    logger.info(string.format("DeathEvent applied: stack[%d] game_over_clock=%d (reason=%s)",
-      body.sender, body.senderFrame, tostring(body and body.reason)))
+    logger.info(string.format("DeathEvent applied: stack[%d] game_over_clock=%d game_over_stopWatch=%d (reason=%s)",
+      body.sender, body.senderFrame, engine.game_over_stopWatch or -1, tostring(body and body.reason)))
 
     local needed = body.senderFrame - #engine.confirmedInput
     if needed > 0 then

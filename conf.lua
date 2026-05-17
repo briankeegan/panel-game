@@ -9,13 +9,18 @@ require("client.src.developer")
 function love.conf(t)
   -- Set the identity before loading the config file
   -- as we need it set to get to the correct load directory.
-  love.filesystem.setIdentity(os.getenv("LOVE_IDENTITY") or "Panel Attack")
+  local identity = os.getenv("LOVE_IDENTITY") or "Panel Attack"
+  love.filesystem.setIdentity(identity)
   readConfigFile(config)
   if os.getenv("PLAYER_NAME") then
     config.name = os.getenv("PLAYER_NAME")
   end
 
-  --t.identity = "" -- (already set above) -- The name of the save directory (string)
+  -- t.identity is the canonical conf-time path; setIdentity above sets the
+  -- live filesystem identity for the read above. Without setting BOTH, Love12
+  -- pre-release falls back to the project-dir basename (e.g. "panel-game") for
+  -- the save dir, so multiple per-player clients collide on one debug.log.
+  t.identity = identity
   t.appendidentity = false            -- Search files in source directory before save directory (boolean)
 
   local loveMajor = love.getVersion()

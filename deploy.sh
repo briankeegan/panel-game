@@ -71,11 +71,7 @@ echo "==> Pushing branch '$BRANCH' to origin..."
 git push origin "$BRANCH"
 
 echo "==> Deploying to $SERVER..."
-# Hard-reset to origin rather than `git pull`: the server checkout is a
-# pure deploy target, no local work lives there, and a force-push at
-# origin (or any divergence) otherwise wedges the pull with "divergent
-# branches". Resetting also discards anything that snuck in on the box.
-ssh "$SERVER" "git config --global --add safe.directory $INSTALL_DIR; cd $INSTALL_DIR && git fetch origin && git reset --hard origin/$BRANCH && systemctl restart panel-attack"
+ssh "$SERVER" "git config --global --add safe.directory $INSTALL_DIR; cd $INSTALL_DIR && git pull && systemctl restart panel-attack"
 
 # Loud reminder so you don't keep playing on a stale client. Both sides
 # read consts.BUILD_VERSION from the same file; if the running client
@@ -89,3 +85,24 @@ fi
 
 echo "==> Tailing logs (Ctrl+C to exit)..."
 ssh "$SERVER" "journalctl -u panel-attack -f --no-pager"
+
+
+ Yes to all three — here's the order it actually happens in.
+
+  When you make a combo or top out, your client tells the server, and the server just forwards that to everyone else without checking. Those messages — garbage sent, player died — land on each client and apply instantly. That's the real game state, and it's the same for everyone within a network round-trip.
+
+  The opponent boards you see on your screen are a separate thing — your client re-simulates them from the input packets they're streaming, so they can lag a little and look slightly different from one player's machine to the next. But that doesn't matter, because nothing on those boards feeds back into your game. So yes, someone might still look alive on your screen for another second after they've actually died; your game already knows and has stopped sending garbage their way. The animation just catches up after.
+
+Yes to all three.
+
+When you send garbage, top out client lets the server know - and the server forwards to everyone else. In the other direction... you recieve info about the incoming garbage, and if the game ended. 
+
+The visual representation of the opponent's board is a separate thing that is re-simulated locally, so it can lag and look different across machines, but that doesn't affect the actual game state. Its WORSE then the original - kinda on purpose.  You may see a delay... that doesn't mean the other player is actual behind. (I'm thinking of adding time info about that visually)
+
+Prioritizing the game play - to be as MUCH like offline as possible. Thats why netcode for match-start synchronization is so important - if its off - the game state will be off the whole game. 
+
+TLDR; Get ALL the games to line up at start... if communcation fails... that when timeout/deaths can happen... in those scenarios.. players will send/recieve garbage later.  At END game... player send when they died... so fits close... ist just based on that timestamp.
+
+Honestly... I've not focused on the edge case death scenarios yet... though have thought about them. I'm trying avoid server side evulation.
+
+

@@ -11,6 +11,7 @@ local Signal = require("common.lib.signal")
 local ServerGame = require("server.Game")
 local GameModes = require("common.data.GameModes")
 local TeamUtils = require("common.data.TeamUtils")
+local consts = require("common.engine.consts")
 
 ---@alias roomNumber integer
 
@@ -33,7 +34,10 @@ local TeamUtils = require("common.data.TeamUtils")
 ---@field gameModeId GameModeID
 ---@field ranked boolean if the next match is anticipated to be ranked
 ---@field rankedReasons string[]
----@field recentGameAbort boolean tracks if the most recent game was ended by an abort
+---@field recentGameAbort boolean true between match-end and the first character-select interaction —
+---  briefly suppresses "unexpected input" warnings while in-flight inputs from the just-ended
+---  match drain out of TCP buffers. Despite the name, set on *any* return to character select
+---  (normal completion, abort, or leaver), not just aborts.
 ---@field teams Team[]? teams for team-based game modes
 ---@field voided boolean if true, the room is "dead" — no new matches can start.
 ---  Set when any player leaves/disconnects in a multi-player room. Remaining players
@@ -629,6 +633,9 @@ function Room:start_match()
 
   self:emitSignal("matchStart")
   self.recentGameAbort = false
+  self._loggedInputDropNoGame = nil
+  self._loggedInputDropDisconnect = nil
+  self._loggedInputDropEliminated = nil
 end
 
 function Room:prepare_character_select()
@@ -636,6 +643,9 @@ function Room:prepare_character_select()
   self:noteActivity()
   self.game = nil
   self.paused = false
+  -- Grant a grace window for late inputs the clients still had buffered for the
+  -- just-ended match. broadcastInput swallows them silently while this is true.
+  self.recentGameAbort = true
   -- Match over: restore player_number = seatId for lobby-facing code.
   TeamUtils.clearStackIndices(self.players)
   self._seatToStack = nil
@@ -798,13 +808,21 @@ function Room:broadcastInput(input, sender)
     if self.recentGameAbort then
       -- there is latency for one player to receive the abort so they'll keep sending their inputs for a bit, just ignore them
       return
-    else
-      pcall(function()
-        logger.warn(self.roomNumber .. ": Unexpected input received from " .. sender.userId .. " " .. sender.name .. " in state " .. sender.state)
-        logger.warn("Room Info: " .. self:toString())
-      end)
-      return
     end
+    -- Rate-limit: one warn per (sender, drop-window). Without this, a client
+    -- that keeps streaming inputs after its game ended (e.g. game finalized
+    -- normally but the client hadn't processed gameResult yet) floods the log
+    -- and burns GC on Room:toString() at ~30 calls/sec.
+    if not self._loggedInputDropNoGame then
+      self._loggedInputDropNoGame = {}
+    end
+    if not self._loggedInputDropNoGame[sender] then
+      self._loggedInputDropNoGame[sender] = true
+      pcall(function()
+        logger.warn(self.roomNumber .. ": Unexpected input received from " .. sender.userId .. " " .. sender.name .. " in state " .. sender.state .. " — suppressing further drops from this sender until next match")
+      end)
+    end
+    return
   end
 
   self:noteActivity()
@@ -887,6 +905,11 @@ end
 -- sending a D. Real fix is PlayerStack:onGameOver's immediate notify.
 local SILENT_DEATH_THRESHOLD_MS = 10000
 
+-- Slow lane: orphan freezes with nothing queued at them still need to be
+-- cleaned up so the dead stack stops haunting the survivors' screens. Fires
+-- regardless of the pending-garbage gate.
+local SILENT_DEATH_ABSOLUTE_THRESHOLD_MS = 30000
+
 -- Gap > this between watchdog ticks means the server stalled (GC, host
 -- pause, NTP step). Reset baselines instead of mass-firing on the clients.
 local WATCHDOG_HICCUP_THRESHOLD_MS = 1000
@@ -915,14 +938,27 @@ end
 
 ---@param stackIdx integer
 ---@param nowMs integer
----@return boolean
-function Room:_slotIsStalledWithPendingGarbage(stackIdx, nowMs)
+---@return boolean, string? reason ("stalled" fast lane, "orphan" slow lane)
+function Room:_slotShouldSyntheticDie(stackIdx, nowMs)
   local lastInput = self.lastInputMs and self.lastInputMs[stackIdx]
-  if not lastInput or (nowMs - lastInput) <= SILENT_DEATH_THRESHOLD_MS then
+  if not lastInput then return false end
+  local silentMs = nowMs - lastInput
+  if silentMs <= SILENT_DEATH_THRESHOLD_MS then
     return false
   end
+  -- Fast lane: blocking the match (someone has queued garbage at this slot
+  -- more recently than the slot last spoke). 10s threshold.
   local lastGarbage = self.lastGarbageToMs and self.lastGarbageToMs[stackIdx]
-  return lastGarbage and lastGarbage > lastInput
+  if lastGarbage and lastGarbage > lastInput then
+    return true, "stalled"
+  end
+  -- Slow lane: orphan freeze. No one is attacking this slot but it's still
+  -- gone silent — likely a process freeze that hasn't dropped the TCP yet.
+  -- Wait the full absolute window before evicting.
+  if silentMs > SILENT_DEATH_ABSOLUTE_THRESHOLD_MS then
+    return true, "orphan"
+  end
+  return false
 end
 
 ---Synth an inferred D for any slot whose silence is blocking the match.
@@ -946,12 +982,22 @@ function Room:tickSilentDeathWatchdog(nowMs)
 
   for _, player in pairs(self.players) do
     local stackIdx = self:_slotIdFor(player)
-    if stackIdx
-       and self:_slotEligibleForWatchdog(stackIdx)
-       and self:_slotIsStalledWithPendingGarbage(stackIdx, nowMs) then
-      self:_synthesizeSilentDeath(player, stackIdx, nowMs)
+    if stackIdx and self:_slotEligibleForWatchdog(stackIdx) then
+      local shouldDie, lane = self:_slotShouldSyntheticDie(stackIdx, nowMs)
+      if shouldDie then
+        self:_synthesizeSilentDeath(player, stackIdx, nowMs, lane)
+      end
     end
   end
+end
+
+---@return integer countdownOffsetFrames for this room's match (0 if no countdown)
+function Room:_countdownOffsetFrames()
+  local mr = self.gameMode and self.gameMode.matchRules
+  if mr and mr.doCountdown then
+    return consts.COUNTDOWN_START + consts.COUNTDOWN_LENGTH
+  end
+  return 0
 end
 
 ---Synthesize an inferred D for a slot that's gone silent without sending one
@@ -962,24 +1008,31 @@ end
 ---@param player ServerPlayer
 ---@param slot integer
 ---@param nowMs integer
-function Room:_synthesizeSilentDeath(player, slot, nowMs)
+---@param lane string? "stalled" (fast lane) or "orphan" (slow lane)
+function Room:_synthesizeSilentDeath(player, slot, nowMs, lane)
   local inputs = self.game.inputs and self.game.inputs[slot] or {}
   local deathFrame = math.max(#inputs, 1)
   self.game:markPlayerEliminated(player, deathFrame)
   local lastInput = self.lastInputMs and self.lastInputMs[slot]
   local lastGarbage = self.lastGarbageToMs and self.lastGarbageToMs[slot]
   logger.warn(string.format(
-    "%d: synthesizing inferred D for slot %d (%s) at frame %d — silentFor=%sms, lastGarbageInbound=%sms ago",
-    self.roomNumber, slot, player.name or "?", deathFrame,
+    "%d: synthesizing inferred D for slot %d (%s) at frame %d lane=%s — silentFor=%sms, lastGarbageInbound=%sms ago",
+    self.roomNumber, slot, player.name or "?", deathFrame, tostring(lane or "?"),
     lastInput and tostring(nowMs - lastInput) or "?",
     lastGarbage and tostring(nowMs - lastGarbage) or "n/a"))
 
+  -- senderFrame is in clock domain (matches organic D events: count of inputs
+  -- received == clock frames the dying engine ran). Pre-compute stopWatch so
+  -- receivers don't have to derive — covers offset-disagreement edge cases.
+  local stopWatch = math.max(0, deathFrame - self:_countdownOffsetFrames())
   local body = {
     sender = slot,
     senderFrame = deathFrame,
+    stopWatch = stopWatch,
     serverWallClockMs = nowMs,
     reason = "silent",
     inferred = true,
+    lane = lane,
   }
   self.game:recordDeathEvent(player, body)
   local message = NetworkProtocol.markedMessageForTypeAndBody(
@@ -1632,6 +1685,7 @@ function Room:voidByLeave(leaver, reason)
     local synthBody = {
       sender = leaver.player_number,
       senderFrame = deathFrame,
+      stopWatch = math.max(0, deathFrame - self:_countdownOffsetFrames()),
       serverWallClockMs = math.floor(self.clock() * 1000),
       reason = "disconnect",
     }
@@ -1700,7 +1754,6 @@ function Room:voidByLeave(leaver, reason)
     self:broadcastJson(ServerProtocol.sendGameAbort(leaver, reason or "player left"), leaver)
     self:emitSignal("matchEnd", self.game)
     self:prepare_character_select()
-    self.recentGameAbort = true
     -- Abort just collapsed the match. Any earlier dead-leavers we were waiting
     -- to remove at match-end won't get that signal, so flush them now.
     if self.pendingLeaverRemovals then
@@ -1750,7 +1803,6 @@ function Room:abortGame(sender, reason)
   self:broadcastJson(ServerProtocol.sendGameAbort(sender, reason), sender)
   self:emitSignal("matchEnd", self.game)
   self:prepare_character_select()
-  self.recentGameAbort = true
 end
 
 function Room:togglePause(sender, paused)

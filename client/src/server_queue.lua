@@ -104,31 +104,41 @@ function ServerQueue.pop_next_with(self, ...)
   end
 end
 
+-- Read-only shared sentinel returned when nothing matches. Callers all iterate
+-- with ipairs and never mutate; the metatable enforces that contract so a
+-- future caller can't accidentally accumulate into it.
+local EMPTY_RESULT = setmetatable({}, {
+  __newindex = function() error("ServerQueue.pop_all_with empty sentinel is read-only") end,
+})
+
 -- Pop all messages where any of the keys in their dictionary match the specified keys
 function ServerQueue.pop_all_with(self, ...)
-  local ret = {}
+  -- Fast path: empty queue. Called every frame by every MessageListener for
+  -- every channel (17 listeners × 3 sockets × 60fps ≈ 3000 calls/sec in idle
+  -- character select). Allocating an empty table per call burned ~100KB/sec
+  -- of GC pressure for nothing.
+  if self.first > self.last then return EMPTY_RESULT end
 
-  if self.first <= self.last then
-    local still_empty = true
-    for i = self.first, self.last do
-      local msg = self.data[i]
-      if msg ~= nil then
-        still_empty = false
-        for j = 1, select("#", ...) do
-          if msg[select(j, ...)] ~= nil then
-            --print("POP "..select(j, ...))
-            ret[#ret + 1] = msg
-            self:remove(i)
-            break
-          end
+  local ret
+  local still_empty = true
+  for i = self.first, self.last do
+    local msg = self.data[i]
+    if msg ~= nil then
+      still_empty = false
+      for j = 1, select("#", ...) do
+        if msg[select(j, ...)] ~= nil then
+          ret = ret or {}
+          ret[#ret + 1] = msg
+          self:remove(i)
+          break
         end
-      elseif still_empty then
-        self.first = self.first + 1
-        self.empties = self.empties - 1
       end
+    elseif still_empty then
+      self.first = self.first + 1
+      self.empties = self.empties - 1
     end
   end
-  return ret
+  return ret or EMPTY_RESULT
 end
 
 function ServerQueue.remove(self, index)

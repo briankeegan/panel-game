@@ -520,6 +520,13 @@ function ServerProtocol.gameResult(game, room)
   gameResultMessage.winnerTeamIndex = game.winnerTeamIndex
   gameResultMessage.winnerIndex = game.winnerIndex
 
+  -- Canonical match-end engine clock. Clients anchor their match-end overlay
+  -- to (matchStartLocalMs + endTick/60) so it fires at the same wall-clock
+  -- moment everywhere regardless of gameResult delivery jitter. nil when no
+  -- eliminations exist (aborted no-death match, timeout finish) — client
+  -- falls back to firing the overlay on arrival.
+  gameResultMessage.endTick = game:getEndTick()
+
   return {
     messageType = msgTypes.jsonMessage,
     messageText = gameResultMessage,

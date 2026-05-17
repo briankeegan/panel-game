@@ -54,6 +54,9 @@ function CharacterSelect:customDraw()
 
 end
 
+function CharacterSelect:refresh()
+end
+
 -- end abstract functions
 
 -- Re-sorts self.players to match battleRoom.players, putting the local player first.

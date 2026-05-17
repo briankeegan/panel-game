@@ -160,9 +160,27 @@ end
 ---@param streamed boolean?
 ---@return love.Source?
 function fileUtils.loadSoundFromSupportExtensions(path_and_filename, streamed)
+  -- Lazily require to avoid a hard graphics_util ↔ FileUtils dependency
+  -- cycle at module load — we only need decode when actually loading a file.
+  local AssetDecodeClient = require("client.src.mods.AssetDecodeClient")
   for k, extension in ipairs(fileUtils.SUPPORTED_SOUND_FORMATS) do
-    if fileUtils.exists(path_and_filename .. extension) then
-      return love.audio.newSource(path_and_filename .. extension, streamed and "stream" or "static")
+    local fullPath = path_and_filename .. extension
+    if fileUtils.exists(fullPath) then
+      -- Threaded decode when called from inside a coroutine (the ModLoader
+      -- bulk load path). One-shot loads outside a coroutine fall through
+      -- to direct on-main construction.
+      if coroutine.running() ~= nil then
+        local result = AssetDecodeClient.decodeSound(fullPath, streamed and true or false)
+        if result then
+          if type(result) == "table" and result.streamed then
+            return love.audio.newSource(result.path, "stream")
+          end
+          local ok, source = pcall(love.audio.newSource, result, "static")
+          if ok then return source end
+        end
+        return nil
+      end
+      return love.audio.newSource(fullPath, streamed and "stream" or "static")
     end
   end
   return nil

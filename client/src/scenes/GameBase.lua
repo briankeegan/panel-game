@@ -243,7 +243,16 @@ function GameBase:getStageTrack()
 end
 
 -- unlike regular asset load, this function connects the used assets to the match so they cannot be unloaded
+--
+-- This is the canonical match-start preload gate. Each `loadModFor(_, _, true)`
+-- call invokes ModLoader.wait() which busy-pumps the load coroutine until the
+-- mod's `fullyLoaded` flag flips. With threaded asset decode, the coroutine
+-- yields between decode requests so the worker can run concurrently while
+-- main pumps; mods that were already `fullyLoaded` at scene-enter return
+-- immediately. When this function returns every match stack's character and
+-- the stage are ready — no asset streams in during play.
 function GameBase:loadAssets(match)
+  local preloadStartMs = math.floor(love.timer.getTime() * 1000)
   for i, stack in ipairs(match.stacks) do
     logger.debug("Force loading character " .. stack.character.id .. " as part of GameBase:load")
     ModController:loadModFor(stack.character, stack, true)
@@ -262,6 +271,9 @@ function GameBase:loadAssets(match)
     logger.debug("Force loading stage " .. stage.id .. " as part of GameBase:load")
     ModController:loadModFor(stage, match, true)
   end
+  local preloadElapsedMs = math.floor(love.timer.getTime() * 1000) - preloadStartMs
+  logger.info("GameBase preload: " .. preloadElapsedMs .. "ms for "
+    .. #match.stacks .. " character(s) + stage " .. tostring(match.stageId))
 end
 
 function GameBase:initializeFrameInfo()
@@ -699,6 +711,9 @@ function GameBase:runGame(dt)
     prof.push("Match:run")--, self.match.clock)
     self.frameInfo.frameCount = self.frameInfo.frameCount + 1
     framesRun = framesRun + 1
+    if self.match.setLocalWallClockDeficit then
+      self.match:setLocalWallClockDeficit(self.frameInfo.expectedFrameCount - self.frameInfo.frameCount)
+    end
     self.match:run()
     prof.pop("Match:run")
   until (self.frameInfo.frameCount >= self.frameInfo.expectedFrameCount)
@@ -836,6 +851,14 @@ function GameBase:draw()
   if not self.match.isPaused or self.match.renderDuringPause then
     prof.push("GameBase:draw")
     self:drawBackground()
+    if self.match.setRenderInterpAlpha then
+      if self.frameInfo.startTime and self.frameInfo.frameCount > 0 then
+        local elapsedFrames = (love.timer.getTime() - self.frameInfo.startTime) * 60
+        self.match:setRenderInterpAlpha(elapsedFrames - (self.frameInfo.frameCount - 1))
+      else
+        self.match:setRenderInterpAlpha(1)
+      end
+    end
     prof.push("Match:render")
     self.match:render()
     prof.pop("Match:render")

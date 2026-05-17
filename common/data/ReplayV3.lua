@@ -76,6 +76,7 @@ local REPLAY_VERSION = 4
 ---@class CrossPlayerDeathEvent
 ---@field sender integer slot of the dead player
 ---@field senderFrame integer the dead stack's game_over_clock
+---@field stopWatch integer? the dead stack's game_over_stopWatch (sender-authoritative display value; missing on old clients)
 ---@field reason string? cause of death (e.g. "topOut")
 ---@field serverWallClockMs integer? when the server relayed it
 

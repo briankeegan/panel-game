@@ -121,8 +121,8 @@ function CharacterSelect2p:setupRoster()
     if player.isLocal and cursor.activeArea then
       local mode = self.battleRoom and self.battleRoom.mode
       local ownerId = self.battleRoom and self.battleRoom.ownerId
-      local isOpenRoom = mode and mode.minPlayers and mode.maxPlayers
-        and mode.minPlayers < mode.maxPlayers
+      local isOpenRoom = mode and (mode.openRoom == true
+        or (mode.minPlayers and mode.maxPlayers and mode.minPlayers < mode.maxPlayers))
       local localPlayer = GAME and GAME.localPlayer
       if isOpenRoom and ownerId and localPlayer and localPlayer.publicId == ownerId then
         cursor.activeArea.y2 = 6
@@ -165,8 +165,13 @@ function CharacterSelect2p:_setupHostBootButtons()
   self:_clearHostBootButtons()
   if not self.battleRoom then return end
   local mode = self.battleRoom.mode
-  local isOpenRoom = mode and mode.minPlayers and mode.maxPlayers
-    and mode.minPlayers < mode.maxPlayers
+  -- Trust the explicit openRoom flag (set by server when the room was created
+  -- with openRoom=true) first; fall back to the min<max heuristic for safety
+  -- against payload drift. The heuristic alone was flaky after server restart —
+  -- room.gameMode mutates playerCount mid-life, which can leak into the
+  -- addToRoom payload and make a refreshed open room look invite-shaped.
+  local isOpenRoom = mode and (mode.openRoom == true
+    or (mode.minPlayers and mode.maxPlayers and mode.minPlayers < mode.maxPlayers))
   if not isOpenRoom then return end
   local ownerId = self.battleRoom.ownerId
   local localPlayer = GAME and GAME.localPlayer

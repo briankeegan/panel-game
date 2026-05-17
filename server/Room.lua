@@ -44,6 +44,12 @@ local consts = require("common.engine.consts")
 ---  keep the room visible until they manually leave; the Server cleans the room up
 ---  when the last player leaves.
 ---@field voidReason string? human-readable reason this room was voided (e.g. "Bev left")
+---@field clock fun(): number monotonic seconds; closure over Server.clockInstance in prod, socket.gettime in tests
+---@field minPlayers integer minimum players to start (== maxPlayers for fixed-roster modes)
+---@field openRoom boolean true if joinable from lobby (open FFA / open team), false for invite-only
+---@field reservedSlots table<integer, string> publicId → name for held slots awaiting rejoin (invite rooms only)
+---@field win_counts_by_publicId table<integer, integer> publicId → wins, room-lifetime, restored on rejoin
+---@field paused boolean true while a player has the match paused
 ---@overload fun(roomNumber: integer, players: ServerPlayer[], gameMode: GameMode, leaderboard: Leaderboard?, clock: (fun(): number)?): Room
 local Room = class(
 ---@param self Room

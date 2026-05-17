@@ -946,8 +946,9 @@ function ClientMatch:getWinningPlayerCharacter()
   local character = characters[consts.RANDOM_CHARACTER_SPECIAL_VALUE]
   local maxWins = -1
   for i = 1, #self.players do
-    if self.players[i].wins > maxWins then
-      character = self.players[i].stack.character
+    local stack = self.players[i].stack
+    if stack and self.players[i].wins > maxWins then
+      character = stack.character
       maxWins = self.players[i].wins
     end
   end

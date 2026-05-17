@@ -50,6 +50,7 @@ while i < len(raw):
   out.append(c); i += 1
 cfg = json.loads(''.join(out))
 cfg.setdefault("diagnostics.neededFileStatus", {})["undefined-field"] = "Any"
+cfg["diagnostics.neededFileStatus"]["need-check-nil"] = "Any"
 with open(dst, "w") as f:
   json.dump(cfg, f, indent=2)
 PY
@@ -77,6 +78,7 @@ CRASH_RISK = {
   "missing-return-value",  # function should return but doesn't
   "redundant-parameter",   # extra arg silently dropped
   "cast-local-type",       # bad ---@cast
+  "need-check-nil",        # accessing field on possibly-nil value
 }
 
 with open(sys.argv[1]) as f:

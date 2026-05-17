@@ -35,6 +35,7 @@ local socket = require("common.lib.socket")
 ---@field name string
 ---@field player_number integer?
 ---@field state PlayerState
+---@field challengedAt integer? wall-clock seconds when this player was last challenged; nil = not challenged
 ---@overload fun(privatePlayerID: privateUserId, connection: Connection, name: string, publicId: integer): ServerPlayer
 local Player = class(
 ---@param self ServerPlayer

@@ -31,13 +31,13 @@
         "duplicate-set-field": "Any",
         "empty-block": "Any",
         "inject-field": "Any",
-        "need-check-nil": "None", // TODO: Remove once all warnings are fixed
+        "need-check-nil": "Any",
         "param-type-mismatch": "Any",
         "redefined-local": "Any",
         "redundant-return": "Any",
         "return-type-mismatch": "Any",
         "trailing-space": "None", // Just noise, we don't particularly care
-        "undefined-field": "None", // TODO: Remove once all warnings are fixed
+        "undefined-field": "Any",
         "unreachable-code": "Any",
         "unused-function": "Any",
         "unused-label": "Any",

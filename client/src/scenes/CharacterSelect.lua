@@ -173,12 +173,17 @@ local FLAVOR_QUOTES = {
   "It's a panel-demic.",
 }
 
-local function pickFlavorQuote(name)
-  local h = 0
-  for i = 1, #name do
-    h = h + string.byte(name, i)
+-- Builds a fresh shuffled queue of flavor quotes. Drained one-per-player by
+-- pickQuoteFor; refills from a re-shuffle if exhausted (more players than
+-- quotes — fallback only).
+local function newShuffledQuoteQueue()
+  local queue = {}
+  for _, q in ipairs(FLAVOR_QUOTES) do queue[#queue + 1] = q end
+  for i = #queue, 2, -1 do
+    local j = math.random(i)
+    queue[i], queue[j] = queue[j], queue[i]
   end
-  return FLAVOR_QUOTES[(h % #FLAVOR_QUOTES) + 1]
+  return queue
 end
 
 -- The character select screen scene
@@ -251,6 +256,11 @@ function CharacterSelect:load()
   self.ui.cursors = {}
   self.ui.characterIcons = {}
   self.ui.playerInfos = {}
+  -- Per-scene-mount: fresh shuffled queue of flavor quotes, plus a map so
+  -- mid-session drop-ins reuse the same quote across re-renders. No two
+  -- players in this room get the same quote until the queue is exhausted.
+  self._quoteQueue = newShuffledQuoteQueue()
+  self._quoteByPlayerKey = {}
   self:customLoad()
 
   self:createInputDeviceOverlay()
@@ -1151,6 +1161,21 @@ function CharacterSelect:createRecordsBox(lastText)
   return stackPanel
 end
 
+---@param player MatchParticipant
+---@return string
+function CharacterSelect:pickQuoteFor(player)
+  local key = player.publicId or player.playerNumber or player.name or tostring(player)
+  if self._quoteByPlayerKey[key] then
+    return self._quoteByPlayerKey[key]
+  end
+  if #self._quoteQueue == 0 then
+    self._quoteQueue = newShuffledQuoteQueue()
+  end
+  local quote = table.remove(self._quoteQueue)
+  self._quoteByPlayerKey[key] = quote
+  return quote
+end
+
 function CharacterSelect:createPlayerInfo(player, labelX)
   labelX = labelX or 4
   local stackPanel = ui.StackPanel({alignment = "top", hFill = true, vAlign = "top"})
@@ -1263,12 +1288,12 @@ function CharacterSelect:createPlayerInfo(player, labelX)
   local function formatMatchOut(outClock)
     if not outClock or outClock <= 0 then return "" end
     local totalSeconds = math.floor(outClock / 60)
-    return string.format("Match out: %d:%02d", math.floor(totalSeconds / 60), totalSeconds % 60)
+    return string.format("Out: %d:%02d", math.floor(totalSeconds / 60), totalSeconds % 60)
   end
   -- Quotes are wrapped in literal " marks and wrap to fit the info-card column.
   -- iconRow.unitSize shrinks for high player counts (8p → 75, 12p → 50), so we
   -- pull the wrap width from there; the label auto-grows vertically to fit.
-  local flavor = '"' .. pickFlavorQuote(player.name or "") .. '"'
+  local flavor = '"' .. self:pickQuoteFor(player) .. '"'
   local cardWidth = (self.ui and self.ui.iconRow and self.ui.iconRow.unitSize) or 100
   local QUOTE_WRAP_PX = math.max(60, cardWidth - 8)
   local function placementText(placement)

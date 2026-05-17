@@ -141,6 +141,9 @@ local time = os.time
 ---@field persistence Persistence
 ---@field _shuttingDown boolean
 ---@field recentJoinRequests table<string, number> last timestamp of join request per player (key: "playerId_roomNumber")
+---@field clockInstance Clock single Clock instance; tests swap with Clock.mock()
+---@field clock fun(): number monotonic seconds closure around clockInstance:monotonicSeconds
+---@field crashReports CrashReports crash-replay incident registry
 local Server = class(
 ---@param self Server
 ---@param databaseParam ServerDB
@@ -224,6 +227,7 @@ Server.CHALLENGE_IDLE_TIMEOUT = 30 * 60
 -- tcp4() not socket.bind(): the wrapper sets reuseaddr on a lazy-fd master socket
 -- where setsockopt silently fails, leaving SO_REUSEADDR off and forcing every
 -- restart to wait out TIME_WAIT (~60s on macOS).
+---@return TcpSocket
 local function bindWithRetry(port, label)
   local attempts = 300
   for i = 1, attempts do

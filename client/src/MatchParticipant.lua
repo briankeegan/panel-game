@@ -288,6 +288,38 @@ function MatchParticipant:onMatchEnded(match)
     self.lastMatchOutClock = self.stack.engine.game_over_stopWatch or 0
   end
 
+  -- Runner-up fallback: ClientMatch's backfill stamps non-winner stacks at
+  -- match-end when their D event raced match-end, but that path can still
+  -- miss the last-to-die in some loose-sync orderings (their game_over_clock
+  -- gets recorded mid-frame, this signal fires before the next engine tick
+  -- normalizes stopWatch, or spectator view-stacks reach this callback
+  -- before _applyDeathEventNow finishes). Snap any non-winner with no
+  -- recorded out-time to the match's end stopwatch so the "Out: M:SS" row
+  -- still shows. Gated on self.stack so participants who never played
+  -- this match (e.g. mid-session joiners between matches) stay at nil.
+  if (self.lastMatchOutClock or 0) == 0
+     and match and match.engine
+     and self.stack and self.stack.engine then
+    local winners = match.engine.getWinners and match.engine:getWinners() or {}
+    local isWinner = false
+    for _, w in ipairs(winners) do
+      if w == self.stack.engine then isWinner = true; break end
+    end
+    if not isWinner then
+      self.lastMatchOutClock = match.engine.stopWatch or 0
+    end
+  end
+
+  -- If the server's gameResult beat us to setPlacement (common: server S
+  -- arrives before the local engine finalizes), placementChanged already
+  -- fired with lastMatchOutClock = nil and the match-out row stayed blank.
+  -- Re-emit so subscribers update with the now-captured value. Listeners
+  -- (promoteNameToTop, mountStatsAbovePlacement) are idempotent, so the
+  -- second fire is harmless when we got here in the natural order.
+  if self.lastPlacement then
+    self:emitSignal("placementChanged", self.lastPlacement, self.lastMatchOutClock)
+  end
+
   self:resetMatchTransientState()
   -- Skip refresh if character and stage are locked (e.g., in puzzle mode)
   if not self.settings.lockCharacterAndStage then

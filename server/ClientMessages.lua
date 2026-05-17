@@ -24,6 +24,38 @@ local GameModes = require("common.data.GameModes")
 
 local ClientMessages = {}
 
+---Incoming-message shape after parseMessage normalization. Every dispatch field
+---is optional; the server pattern-matches on whichever is present.
+---@class ClientIncomingMessage
+---@field error_report any?
+---@field login_request any?
+---@field logout any?
+---@field challengeUpdate any?
+---@field menu_state any?
+---@field spectate_request any?
+---@field leaderboard_request any?
+---@field leave_room any?
+---@field kick_player any?
+---@field taunt any?
+---@field game_over any?
+---@field joinRoomRequest any?
+---@field flagGame any?
+---@field roomRequest any?
+---@field unknown boolean?
+---@field type string?
+---@field user_id any?
+---@field name string?
+---@field engine_version string?
+---@field gameMode { name: string?, gameModeId: GameModeID?, [string]: any }?
+---@field gameModeId GameModeID?
+---@field latencyTolerance integer?
+---@field content any?
+---@field seed integer?
+---@field publicId integer?
+---@field openRoom boolean?
+---@field matchAbort any?
+
+---@return ClientIncomingMessage
 function ClientMessages.parseMessage(clientMessage)
   if clientMessage.login_request then
     return ClientMessages.parseLoginRequest(clientMessage)

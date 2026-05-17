@@ -21,11 +21,11 @@ local consts = require("common.engine.consts")
 ---@field frameScale number
 ---@field barScale number
 ---@field overtimeDecimals number
----@field frameAsset love.Drawable
----@field healthAsset love.Drawable
----@field shakeAsset love.Drawable
----@field stopAsset love.Drawable
----@field preStopAsset love.Drawable
+---@field frameAsset love.graphics.Texture
+---@field healthAsset love.graphics.Texture
+---@field shakeAsset love.graphics.Texture
+---@field stopAsset love.graphics.Texture
+---@field preStopAsset love.graphics.Texture
 ---@field healthQuad love.Quad
 ---@field shakeQuad love.Quad
 ---@field stopQuad love.Quad
@@ -79,7 +79,7 @@ local MultibarElement = class(
 MultibarElement.TYPE = "MultibarElement"
 
 ---Draws a bar at the specified relative position within the element
----@param image love.graphics.Texture The bar image (Image or Canvas; both expose Texture:getDimensions)
+---@param image love.graphics.Texture The bar image
 ---@param quad love.Quad The quad for the bar
 ---@param relativeBarPos {[1]: number, [2]: number} Position relative to the element
 ---@param height number Height of the bar

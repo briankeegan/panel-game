@@ -173,7 +173,7 @@ end
 -- split the input string on some separator, returns table
 ---@param inputstr string
 ---@param sep string?
----@return string[]?
+---@return string[]
 function util.split(inputstr, sep)
   sep = sep or "%s"
   local t = {}
@@ -183,6 +183,7 @@ function util.split(inputstr, sep)
       return t
     end
   end
+  return t
 end
 
 -- Remove white space from the ends of a string

@@ -56,19 +56,25 @@ love.parsedGameArguments = {}
 ---@type string[]
 love.rawGameArguments = {}
 
--- love.Canvas:newImageData — exists on love 11 / love 12 but missing from the
--- bundled stubs (they only declare Image:newImageData).
----@param x integer?
----@param y integer?
----@param w integer?
----@param h integer?
----@return love.ImageData
-function love.Canvas:newImageData(x, y, w, h) return nil end
+-- love.Canvas: bundled love 12 stubs only declare `love.graphics.Texture` and
+-- the newCanvas() overloads return Texture rather than a Canvas subclass. The
+-- code path under `loveMajor < 12` calls `canvas:newImageData()` on the result
+-- — declare a Canvas class with that method and redeclare newCanvas's return
+-- so callers get the narrower type without ad-hoc @cast.
+---@class love.Canvas : love.graphics.Texture
+---@field newImageData fun(self, x: integer?, y: integer?, w: integer?, h: integer?): love.ImageData
 
--- love.Image:getDimensions — used by MultibarElement; missing from stubs.
----@return integer width
----@return integer height
-function love.Image:getDimensions() return 0, 0 end
+---@return love.Canvas
+function love.graphics.newCanvas() return nil end
+---@param width integer
+---@param height integer
+---@return love.Canvas
+function love.graphics.newCanvas(width, height) return nil end
+---@param width integer
+---@param height integer
+---@param settings table?
+---@return love.Canvas
+function love.graphics.newCanvas(width, height, settings) return nil end
 
 -- LuaJIT `collectgarbage("isrunning")` extension. The love 12 type stubs
 -- enumerate only the standard Lua 5.1 options; LuaJIT also supports

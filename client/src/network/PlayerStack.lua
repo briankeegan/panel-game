@@ -62,12 +62,18 @@ function PlayerStack:send_controls(isFreshFrame)
   if self.inputMethod == "controller" then
     local input = self.player.inputConfiguration
     if not input then return end
-    -- Swap is edge-triggered: only encode on the first send per love.update.
-    -- isDown stays truthy for the entire love.update, so catch-up iterations
-    -- would otherwise duplicate a single tap into multiple swap bytes.
-    local swapEdge = isFreshFrame and (input.isDown["Swap1"] or input.isDown["Swap2"])
+    -- Edge-triggered bits (Swap, Raise's isDown) only encode on the first
+    -- send per love.update. isDown stays truthy for the entire love.update,
+    -- so without this filter catch-up iterations would duplicate a single
+    -- tap into multiple input bytes. Held-state bits (isPressed for raise
+    -- and movement) are NOT filtered — they correctly stay truthy across
+    -- iterations, since the player IS holding the key on each engine tick
+    -- represented by those iterations.
+    local raiseEdge = isFreshFrame and (input.isDown["Raise1"] or input.isDown["Raise2"])
+    local raiseHeld = input.isPressed["Raise1"] or input.isPressed["Raise2"]
+    local swapEdge  = isFreshFrame and (input.isDown["Swap1"] or input.isDown["Swap2"])
     to_send = KeyDataEncoding.base64encode[
-      ((input.isDown["Raise1"] or input.isDown["Raise2"] or input.isPressed["Raise1"] or input.isPressed["Raise2"]) and 32 or 0) +
+      ((raiseEdge or raiseHeld) and 32 or 0) +
       (swapEdge and 16 or 0) +
       ((input.isDown["Up"] or input.isPressed["Up"]) and 8 or 0) +
       ((input.isDown["Down"] or input.isPressed["Down"]) and 4 or 0) +

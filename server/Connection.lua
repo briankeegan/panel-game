@@ -137,7 +137,9 @@ end
 -- Handle NetworkProtocol.clientMessageTypes.versionCheck
 -- Body is "<NETWORK_VERSION>/<BUILD_VERSION>". Both halves must match the
 -- server exactly — strict patch-level enforcement so freshly-deployed
--- servers kick off clients on older builds.
+-- servers kick off clients on older builds. Rejection body carries the
+-- server's expected BUILD_VERSION so the client can tell the user which
+-- patch + .love file they need.
 local function H(connection, version)
   local clientNet, clientBuild = version:match("^([^/]+)/(.+)$")
   local netOk = clientNet == NetworkProtocol.NETWORK_VERSION
@@ -148,7 +150,7 @@ local function H(connection, version)
       connection.index, tostring(version),
       NetworkProtocol.NETWORK_VERSION, consts.BUILD_VERSION))
     connection:send(NetworkProtocol.markedMessageForTypeAndBody(
-      NetworkProtocol.serverMessageTypes.versionWrong.prefix, ""))
+      NetworkProtocol.serverMessageTypes.versionWrong.prefix, consts.BUILD_VERSION))
   else
     connection:send(NetworkProtocol.markedMessageForTypeAndBody(
       NetworkProtocol.serverMessageTypes.versionCorrect.prefix, ""))

@@ -96,9 +96,11 @@ local handlers = {
     self.receivedMessageQueue:push({versionCompatible = true})
   end,
 
-  [NP.serverMessageTypes.versionWrong.prefix] = function(self, _)
+  [NP.serverMessageTypes.versionWrong.prefix] = function(self, data)
     TraceWriter.recv(NP.serverMessageTypes.versionWrong.prefix, false)
-    self.receivedMessageQueue:push({versionCompatible = false})
+    -- Body carries the server's expected BUILD_VERSION (empty for older
+    -- servers); LoginRoutine uses it to tell the user which patch to grab.
+    self.receivedMessageQueue:push({versionCompatible = false, serverBuildVersion = data})
   end,
 
   [NP.serverMessageTypes.ping.prefix] = function(self, data)

@@ -1,5 +1,6 @@
 local class = require("common.lib.class")
 local ClientMessages = require("common.network.ClientProtocol")
+local consts = require("common.engine.consts")
 local save = require("client.src.save")
 local TraceWriter = require("client.src.network.TraceWriter")
 local logger = require("common.lib.logger")
@@ -55,6 +56,26 @@ local function fullLogin(client, ip, port, userId)
 
   if not value.versionCompatible then
     result.message = loc("nt_ver_err")
+    -- Tell the user which patch the server is on + a direct download link.
+    -- Server's BUILD_VERSION is either "<engine>.<patch>" or
+    -- "<engine>.<patch>-<patch-name>". Tag is "build-<BUILD_VERSION>"
+    -- (set by .github/workflows/unofficial-team-release.yml).
+    if type(value.serverBuildVersion) == "string" and value.serverBuildVersion ~= "" then
+      local serverBuild = value.serverBuildVersion
+      local patchName = serverBuild:match("%-(.+)$")
+      local loveFile
+      if patchName then
+        loveFile = "unofficial-panel-attack-patch-" .. patchName .. ".love"
+      else
+        loveFile = "unofficial-panel-attack-team-vs.love"
+      end
+      local downloadUrl = "https://github.com/briankeegan/panel-game/releases/download/build-"
+        .. serverBuild .. "/" .. loveFile
+      result.message = result.message
+        .. "\n\nServer build: " .. serverBuild
+        .. "\nYour build:   " .. consts.BUILD_VERSION
+        .. "\n\nDownload: " .. downloadUrl
+    end
     return result
   end
 

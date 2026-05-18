@@ -4,6 +4,48 @@ set -e
 SERVER="root@104.156.250.136"
 INSTALL_DIR="/opt/panel-attack"
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
+PATCH_NAME=""
+
+# --patch-name labels this deploy. When set, BUILD_VERSION becomes
+# "<engine>.<NNNN>-<name>" and the GitHub Action ships
+# unofficial-panel-attack-patch-<name>.love. When omitted, BUILD_VERSION
+# is just "<engine>.<NNNN>" and the action ships the default
+# unofficial-panel-attack-team-vs.love. The patch number always bumps.
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --patch-name)
+      PATCH_NAME="$2"
+      shift 2
+      ;;
+    --patch-name=*)
+      PATCH_NAME="${1#*=}"
+      shift
+      ;;
+    -h|--help)
+      echo "Usage: zsh deploy.sh [--patch-name <kebab-case-name>]"
+      echo ""
+      echo "Env vars:"
+      echo "  PANEL_ALLOW_DIRTY=1        — allow deploy with uncommitted changes"
+      echo "  PANEL_SKIP_GATHER=1        — skip pre-deploy log gather"
+      echo "  PANEL_SKIP_VERSION_BUMP=1  — redeploy without bumping the patch number"
+      exit 0
+      ;;
+    *)
+      echo "==> ERROR: unknown argument: $1" >&2
+      echo "    Usage: zsh deploy.sh [--patch-name <kebab-case-name>]" >&2
+      exit 1
+      ;;
+  esac
+done
+
+if [[ -n "$PATCH_NAME" ]]; then
+  # Kebab-case only — anything else breaks the .love filename or the
+  # version-string parser on the client side.
+  if ! [[ "$PATCH_NAME" =~ ^[a-z0-9]+(-[a-z0-9]+)*$ ]]; then
+    echo "==> ERROR: --patch-name must be kebab-case (a-z, 0-9, single hyphens). Got: $PATCH_NAME" >&2
+    exit 1
+  fi
+fi
 
 cd "$(dirname "$0")"
 
@@ -42,23 +84,39 @@ fi
 # config change with no code delta).
 if [[ "${PANEL_SKIP_VERSION_BUMP:-0}" != "1" ]]; then
   CONSTS_FILE="common/engine/consts.lua"
+  WORKFLOW_FILE=".github/workflows/unofficial-team-release.yml"
   CURRENT_VERSION=$(grep -E 'consts\.BUILD_VERSION\s*=' "$CONSTS_FILE" | sed -E 's/.*"([^"]+)".*/\1/')
   if [[ -z "$CURRENT_VERSION" ]]; then
     echo "==> ERROR: couldn't find consts.BUILD_VERSION in $CONSTS_FILE; aborting." >&2
     exit 1
   fi
-  ENGINE_PART="${CURRENT_VERSION%.*}"
-  PATCH_PART="${CURRENT_VERSION##*.}"
+  # Strip any trailing -patchname so we recover just "<engine>.<patch>"
+  # to bump. Bare versions (no suffix) are unchanged by this.
+  CORE_VERSION="${CURRENT_VERSION%%-*}"
+  ENGINE_PART="${CORE_VERSION%.*}"
+  PATCH_PART="${CORE_VERSION##*.}"
   # 10# prefix forces base-10 so leading-zero patch numbers don't get
   # interpreted as octal by $(( )).
   PATCH_INT=$((10#$PATCH_PART))
   NEW_PATCH=$(printf "%04d" $((PATCH_INT + 1)))
-  NEW_VERSION="${ENGINE_PART}.${NEW_PATCH}"
+  if [[ -n "$PATCH_NAME" ]]; then
+    NEW_VERSION="${ENGINE_PART}.${NEW_PATCH}-${PATCH_NAME}"
+    LOVE_FILENAME="unofficial-panel-attack-patch-${PATCH_NAME}.love"
+  else
+    NEW_VERSION="${ENGINE_PART}.${NEW_PATCH}"
+    LOVE_FILENAME="unofficial-panel-attack-team-vs.love"
+  fi
   echo "==> Bumping BUILD_VERSION: $CURRENT_VERSION → $NEW_VERSION"
+  echo "==> .love artifact filename: $LOVE_FILENAME"
   # macOS sed needs -i '' or -i.bak; use the latter for portability with Linux.
   sed -i.bak -E "s/(consts\.BUILD_VERSION[[:space:]]*=[[:space:]]*)\"[^\"]+\"/\\1\"$NEW_VERSION\"/" "$CONSTS_FILE"
   rm "${CONSTS_FILE}.bak"
-  git add "$CONSTS_FILE"
+  # Rewrite all unofficial-panel-attack-*.love references in the workflow
+  # so the GitHub Action publishes the artifact under the new name.
+  # Matches the current default (-team-vs) AND any prior -patch-<name>.
+  sed -i.bak -E "s|unofficial-panel-attack[a-z0-9-]*\.love|${LOVE_FILENAME}|g" "$WORKFLOW_FILE"
+  rm "${WORKFLOW_FILE}.bak"
+  git add "$CONSTS_FILE" "$WORKFLOW_FILE"
   # --allow-empty: if sed didn't actually change anything (e.g. file was
   # already at $NEW_VERSION from a manual edit), still create the commit
   # so the deploy point lands as a marker in git log.
@@ -85,24 +143,4 @@ fi
 
 echo "==> Tailing logs (Ctrl+C to exit)..."
 ssh "$SERVER" "journalctl -u panel-attack -f --no-pager"
-
-
- Yes to all three — here's the order it actually happens in.
-
-  When you make a combo or top out, your client tells the server, and the server just forwards that to everyone else without checking. Those messages — garbage sent, player died — land on each client and apply instantly. That's the real game state, and it's the same for everyone within a network round-trip.
-
-  The opponent boards you see on your screen are a separate thing — your client re-simulates them from the input packets they're streaming, so they can lag a little and look slightly different from one player's machine to the next. But that doesn't matter, because nothing on those boards feeds back into your game. So yes, someone might still look alive on your screen for another second after they've actually died; your game already knows and has stopped sending garbage their way. The animation just catches up after.
-
-Yes to all three.
-
-When you send garbage, top out client lets the server know - and the server forwards to everyone else. In the other direction... you recieve info about the incoming garbage, and if the game ended. 
-
-The visual representation of the opponent's board is a separate thing that is re-simulated locally, so it can lag and look different across machines, but that doesn't affect the actual game state. Its WORSE then the original - kinda on purpose.  You may see a delay... that doesn't mean the other player is actual behind. (I'm thinking of adding time info about that visually)
-
-Prioritizing the game play - to be as MUCH like offline as possible. Thats why netcode for match-start synchronization is so important - if its off - the game state will be off the whole game. 
-
-TLDR; Get ALL the games to line up at start... if communcation fails... that when timeout/deaths can happen... in those scenarios.. players will send/recieve garbage later.  At END game... player send when they died... so fits close... ist just based on that timestamp.
-
-Honestly... I've not focused on the edge case death scenarios yet... though have thought about them. I'm trying avoid server side evulation.
-
 

@@ -361,7 +361,8 @@ function ClientMatch:_wireGarbageTargets(stackInteraction, gameMode, compactedPl
   end
 end
 
-function ClientMatch:run()
+function ClientMatch:run(isFreshFrame)
+  if isFreshFrame == nil then isFreshFrame = true end
   -- Architectural rule: engine ticks until WE have finalized (self.ended set
   -- by handleMatchEnd), not until Match:hasEnded thinks the match is over.
   -- The old code early-returned on engine:hasEnded(), which is a LOCAL
@@ -399,7 +400,7 @@ function ClientMatch:run()
     local willPoll = stack.is_local and stack.send_controls and not stack:game_ended() --[[and not stack.cpu]]
     if willPoll then
       ---@cast stack PlayerStack
-      stack:send_controls()
+      stack:send_controls(isFreshFrame)
     end
 
     -- Trace capture: per-stack poll-state transitions. Emit only when

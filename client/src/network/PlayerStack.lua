@@ -52,18 +52,23 @@ function PlayerStack:notifyServerStackEliminated()
   })
 end
 
-function PlayerStack:send_controls()
+function PlayerStack:send_controls(isFreshFrame)
   if self.engine.game_over_clock and self.engine.game_over_clock > 0 then
     return
   end
+  if isFreshFrame == nil then isFreshFrame = true end
 
   local to_send
   if self.inputMethod == "controller" then
     local input = self.player.inputConfiguration
     if not input then return end
+    -- Swap is edge-triggered: only encode on the first send per love.update.
+    -- isDown stays truthy for the entire love.update, so catch-up iterations
+    -- would otherwise duplicate a single tap into multiple swap bytes.
+    local swapEdge = isFreshFrame and (input.isDown["Swap1"] or input.isDown["Swap2"])
     to_send = KeyDataEncoding.base64encode[
       ((input.isDown["Raise1"] or input.isDown["Raise2"] or input.isPressed["Raise1"] or input.isPressed["Raise2"]) and 32 or 0) +
-      ((input.isDown["Swap1"] or input.isDown["Swap2"]) and 16 or 0) +
+      (swapEdge and 16 or 0) +
       ((input.isDown["Up"] or input.isPressed["Up"]) and 8 or 0) +
       ((input.isDown["Down"] or input.isPressed["Down"]) and 4 or 0) +
       ((input.isDown["Left"] or input.isPressed["Left"]) and 2 or 0) +
@@ -74,7 +79,9 @@ function PlayerStack:send_controls()
   end
   GAME.netClient:sendInput(to_send)
 
-  self:handle_input_taunt()
+  if isFreshFrame then
+    self:handle_input_taunt()
+  end
 
   self.engine:receiveConfirmedInput(to_send)
 

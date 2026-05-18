@@ -715,6 +715,7 @@ function GameBase:runGame(dt)
   local framesRun = 0
   self.frameInfo.currentTime = love.timer.getTime()
   self.frameInfo.expectedFrameCount = math.ceil((self.frameInfo.currentTime - self.frameInfo.startTime) * 60)
+  local isFreshFrame = true
   repeat
     prof.push("Match:run")--, self.match.clock)
     self.frameInfo.frameCount = self.frameInfo.frameCount + 1
@@ -722,7 +723,8 @@ function GameBase:runGame(dt)
     if self.match.setLocalWallClockDeficit then
       self.match:setLocalWallClockDeficit(self.frameInfo.expectedFrameCount - self.frameInfo.frameCount)
     end
-    self.match:run()
+    self.match:run(isFreshFrame)
+    isFreshFrame = false
     prof.pop("Match:run")
   until (self.frameInfo.frameCount >= self.frameInfo.expectedFrameCount)
   self.droppedFrameCount = self.droppedFrameCount + (framesRun - 1)

@@ -37,6 +37,8 @@ local TeamUtils = require("common.data.TeamUtils")
 ---@field playerNumber integer?
 ---@field inputConfiguration InputConfiguration?
 ---@field lastUsedInputConfiguration InputConfiguration?
+---@field _netClientSettingsHooked boolean? guard set by NetClient.registerPlayerUpdates so re-registration after a disconnect doesn't double-subscribe
+---@field _charSelectLevelHooked boolean? guard set by CharacterSelect:onRosterChanged so mid-session drop-ins don't double-subscribe the levelDataChanged listener
 ---@overload fun(name: string, publicId: integer, isLocal: boolean?): Player
 local Player = class(
 ---@param self Player

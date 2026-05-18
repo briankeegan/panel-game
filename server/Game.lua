@@ -22,6 +22,7 @@ local TeamUtils = require("common.data.TeamUtils")
 ---@field package eliminatedPlayers table<integer, integer> player_number -> game_over_clock frame
 ---@field complete boolean
 ---@field creationTime integer
+---@field _stuckMatchFlagged boolean? set by Server:sweepStuckMatches after this game is reported to crashReports; idempotency guard so the same incident doesn't re-flag every tick
 local Game = class(
 ---@param players ServerPlayer[]
 ---@param id integer?

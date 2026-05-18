@@ -177,6 +177,30 @@ CRASH_RISK = {
   "need-check-nil",        # accessing field on possibly-nil value
 }
 
+# Non-blocking codes shown as a counter (and exit code is unaffected).
+# Worth seeing because each one is annotation drift — "this field is
+# assigned but isn't declared on the @class" — which weakens future
+# crash-risk detection on that class. Annotations should track the code
+# they describe; this counter ratchets that gap downward over time.
+WATCH_RISK = {
+  "inject-field",
+}
+
+# Codes that LuaLS emits but we don't act on. These are mostly noise
+# given this codebase's annotation conventions (loose @package, partial
+# table literals, intentional subclass field overrides, etc.) — they
+# clutter output without producing actionable bug-finding signal.
+# Suppressed entirely from the printed report; remain in the raw output
+# file for anyone who wants to grep.
+NOISE = {
+  "invisible",             # @package field accessed from outside
+  "duplicate-set-field",   # field declared twice (usually legit overrides)
+  "missing-fields",        # partial table literal vs strict @class
+  "duplicate-doc-param",   # annotation typo
+  "luadoc-miss-symbol",    # annotation typo
+  "different-requires",    # cross-file import-style nit
+}
+
 scope = os.environ.get("SCOPE", "")
 mode  = os.environ.get("MODE", "diag")
 cached = os.environ.get("CACHED") == "1"
@@ -229,19 +253,28 @@ if filter_field:
   needle = "Undefined field `" + filter_field + "`"
   in_scope = [r for r in in_scope if needle in r[2]]
 
-# Tallies.
+# Tallies. Only crash-risk + watch-risk codes are reported; everything
+# else (NOISE) is summarized as a single "suppressed" count for
+# transparency without flooding the report.
 by_code = collections.Counter()
 by_file = collections.Counter()
 by_field = collections.Counter()
 crash = []
+watch = []
+suppressed = 0
 for code, path, chunk in in_scope:
-  by_code[code] += 1
   if code in CRASH_RISK:
+    by_code[code] += 1
     by_file[path] += 1
     crash.append((code, path, chunk))
     fm = FIELD.search(chunk)
     if fm:
       by_field[fm.group(1)] += 1
+  elif code in WATCH_RISK:
+    by_code[code] += 1
+    watch.append((code, path, chunk))
+  else:
+    suppressed += 1
 
 # Render.
 if mode == "diag":
@@ -264,13 +297,16 @@ if filter_code:  filters.append(f"code={filter_code}")
 if filter_field: filters.append(f"field={filter_field}")
 filter_str = " ".join(filters) if filters else "<full workspace>"
 print(f"Scope: {filter_str}{src_tag}")
-print(f"Total diagnostics in scope: {sum(by_code.values())}")
-print(f"Crash-risk diagnostics:     {len(crash)}")
+print(f"Crash-risk:  {len(crash)}")
+print(f"Watch:       {len(watch)}")
+if suppressed:
+  print(f"Suppressed:  {suppressed}  (annotation-only noise: invisible / duplicate-set-field / missing-fields / luadoc typos)")
 print()
-print("By code (crash-risk in scope):")
-for code, n in by_code.most_common():
-  if code in CRASH_RISK:
-    print(f"  {n:4d}  {code}")
+if by_code:
+  print("By code:")
+  for code, n in by_code.most_common():
+    tag = "  [crash-risk]" if code in CRASH_RISK else "  [watch]"
+    print(f"  {n:4d}  {code}{tag}")
 if mode != "files" and len(by_file) > 0:
   print()
   print("Top files (crash-risk):")

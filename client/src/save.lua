@@ -36,6 +36,26 @@ function save.read_user_id_file(serverIP)
   return userID
 end
 
+-- Moves user_id.txt → user_id.txt.bak so a stale credential doesn't permanently
+-- block login while leaving a manual-restore breadcrumb if we cleared in error.
+-- Returns true if a file was moved (or no file existed to begin with).
+---@param serverIP string
+---@return boolean
+function save.backup_user_id_file(serverIP)
+  local path = "servers/" .. serverIP .. "/user_id.txt"
+  local bakPath = path .. ".bak"
+  local content = love.filesystem.read(path)
+  if not content then return true end
+  local ok = pcall(function()
+    love.filesystem.write(bakPath, content)
+    love.filesystem.remove(path)
+  end)
+  if not ok then
+    logger.warn("Failed to back up " .. path)
+  end
+  return ok
+end
+
 -- I think this is unnecessary as we use the path with love.filesystem.read which assumes / as the separator
 -- But testing attack file generation seemed a bit out of scope for the intended changes, so leaving it for another time
 local sep = package.config:sub(1, 1) --determines os directory separator (i.e. "/" or "\")

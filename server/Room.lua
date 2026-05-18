@@ -50,6 +50,8 @@ local consts = require("common.engine.consts")
 ---@field reservedSlots table<integer, string> publicId → name for held slots awaiting rejoin (invite rooms only)
 ---@field win_counts_by_publicId table<integer, integer> publicId → wins, room-lifetime, restored on rejoin
 ---@field paused boolean true while a player has the match paused
+---@field allDisconnectedSince integer? wall-clock seconds at the start of the "all players disconnected" grace; set by sweepIdleRooms when no seated player has a live gameplay socket, cleared on any reconnect
+---@field lastActivityTime integer? wall-clock seconds at the last match-state-changing event in this room; drives the long idle-timeout sweep
 ---@overload fun(roomNumber: integer, players: ServerPlayer[], gameMode: GameMode, leaderboard: Leaderboard?, clock: (fun(): number)?): Room
 local Room = class(
 ---@param self Room

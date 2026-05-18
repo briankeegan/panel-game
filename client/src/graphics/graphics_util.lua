@@ -88,8 +88,10 @@ function GraphicsUtil.privateLoadImageWithExtensionAndScale(pathAndName, extensi
     -- Threaded decode path when called from inside a coroutine (i.e. the
     -- ModLoader bulk load). Direct on-main load elsewhere — fonts, UI
     -- assets, one-shot loads — to avoid the worker round-trip overhead.
+    -- Gated on AssetDecodeClient.enabled so boot's setupRoutine doesn't pay
+    -- a frame round-trip per asset.
     local result
-    if coroutine.running() ~= nil then
+    if AssetDecodeClient.enabled and coroutine.running() ~= nil then
       result = GraphicsUtil.privateLoadImageThreaded(fileName, scale)
     else
       result = GraphicsUtil.privateLoadImage(fileName)

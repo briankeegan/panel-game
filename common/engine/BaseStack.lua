@@ -32,6 +32,7 @@ local consts = require("common.engine.consts")
 ---@field supportedStackWinConditions StackWinCondition[]
 ---@field stackOverConditions table<StackOverCondition, any> Array of enumerated values signifying ways of going game over
 ---@field stackWinConditions table<StackWinCondition, any> Array of enumerated values signifying ways of ending the game without going game over
+---@field _networkGarbageLog { frame: integer, garbage: any, applied: boolean }[] Frame-stamped log of network-injected garbage (loose-sync G events) that lands outside the deterministic input pipeline. Entries are flipped applied=false on rollback and re-drained during forward re-sim by Match:pushGarbageTo.
 
 ---@class BaseStack : Signal
 local BaseStack = class(

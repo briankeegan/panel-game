@@ -2505,11 +2505,38 @@ function Lobby:draw()
   end
 end
 
+-- Min seconds between auto-relogin attempts kicked off from a transient
+-- disconnect. Server-side stale-socket cleanup races have been seen to fire
+-- the disconnect signal at ~250ms intervals during a socket replacement
+-- storm; without backoff this handler would happily kick a fresh
+-- LoginRoutine each time, keeping the storm alive.
+local AUTO_RELOGIN_COOLDOWN_SECONDS = 1.0
+
 function Lobby:onDisconnect(voluntary)
-  if not GAME.navigationStack.transition and not voluntary then
-    -- automatic reconnect if we're not about to switch scene
-    GAME.netClient:login(GAME.connected_server_ip, GAME.connected_server_port)
+  if voluntary or GAME.navigationStack.transition then return end
+
+  -- Only auto-relogin while Lobby is the active scene. The signal handler
+  -- is installed in Lobby:load and persists for the scene's lifetime in
+  -- the navigation stack, so without this guard the relogin would fire
+  -- even when the user is in CharacterSelect / GameBase — turning a
+  -- single transient disconnect into a reconnect storm because each
+  -- new login arrival triggers another server-side stale-socket close
+  -- which the client interprets as another disconnect.
+  local nav = GAME.navigationStack
+  local activeScene = nav and nav.scenes and nav.scenes[#nav.scenes]
+  if activeScene ~= self then return end
+
+  -- Cooldown — multiple rapid disconnect events shouldn't all kick off
+  -- fresh LoginRoutines. NetClient:login is itself guarded by isConnected,
+  -- but a half-completed login can still race; the cooldown is the
+  -- belt to that suspenders.
+  local now = love.timer.getTime()
+  if self._lastAutoReloginAt and (now - self._lastAutoReloginAt) < AUTO_RELOGIN_COOLDOWN_SECONDS then
+    return
   end
+  self._lastAutoReloginAt = now
+
+  GAME.netClient:login(GAME.connected_server_ip, GAME.connected_server_port)
 end
 
 function Lobby:onLoginFinish(result)

@@ -39,6 +39,7 @@ local socket = require("common.lib.socket")
 ---@field seatId integer? authoritative seat id assigned via TeamUtils.assignSeatIdentity; nil in non-team modes
 ---@field publicId integer? legacy alias for publicPlayerID, set by some payload paths
 ---@field stackIndex integer? dense engine slot for the active match; only meaningful while a match is live
+---@field spectatedRoom Room? room this player is currently spectating; nil for active players or unattached
 ---@overload fun(privatePlayerID: privateUserId, connection: Connection, name: string, publicId: integer): ServerPlayer
 local Player = class(
 ---@param self ServerPlayer

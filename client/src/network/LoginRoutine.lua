@@ -74,6 +74,7 @@ local function fullLogin(client, ip, port, userId)
     if value.ban_duration then
       result.message = result.message .. "\n" .. value.ban_duration
     end
+    result.reason = value.reason
     return result
   end
 
@@ -149,6 +150,26 @@ local function login(gameplayClient, ip, gameplayPort, lobbyClient, lobbyPort, s
 
   local storedUserId = save.read_user_id_file(ip) or "need a new user id"
   local gameplayResult = fullLogin(gameplayClient, ip, gameplayPort, storedUserId)
+
+  -- One-shot recovery: if the server rejects our stored userId as unknown
+  -- (e.g. a wiped/rebuilt server and our name has since been claimed by
+  -- someone else, so the server-side accept-unknown path can't help), back
+  -- up the stale id and retry as a new registration. Strict reason match
+  -- keeps this from firing on any other deny — losing user_id.txt to a
+  -- transient bug would silently orphan the account.
+  local recoveredFromStaleId = false
+  if not gameplayResult.loggedIn
+      and storedUserId ~= "need a new user id"
+      and type(gameplayResult.reason) == "string"
+      and gameplayResult.reason:find("user ID", 1, true)
+      and gameplayResult.reason:find("not found", 1, true) then
+    logger.warn("Server rejected stored user_id as unknown — backing up and retrying as new user.")
+    save.backup_user_id_file(ip)
+    gameplayClient:resetNetwork()
+    gameplayResult = fullLogin(gameplayClient, ip, gameplayPort, "need a new user id")
+    recoveredFromStaleId = gameplayResult.loggedIn
+  end
+
   if not gameplayResult.loggedIn then
     return gameplayResult
   end
@@ -197,6 +218,11 @@ local function login(gameplayClient, ip, gameplayPort, lobbyClient, lobbyPort, s
     message = loc("lb_user_update", gameplayResult.old_name, gameplayResult.new_name)
   else
     message = loc("lb_welcome_back", config.name)
+  end
+  if recoveredFromStaleId then
+    message = message
+      .. "\n\nNote: the server didn't recognize your previous account, so a new one was registered."
+      .. "\nYour old user id is backed up at servers/" .. ip .. "/user_id.txt.bak"
   end
   if gameplayResult.server_notice then
     message = message .. "\n" .. gameplayResult.server_notice:gsub("\\n", "\n")

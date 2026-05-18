@@ -24,7 +24,7 @@ function(self, fileGroup, volumeMultiplier)
   for i, filename in ipairs(continuouslyIndexedFiles) do
     local fullPath = fileGroup.path .. "/" .. filename
     local source = nil
-    if coroutine.running() ~= nil then
+    if AssetDecodeClient.enabled and coroutine.running() ~= nil then
       local result = AssetDecodeClient.decodeSound(fullPath, false)
       if result and result.soundData then
         local ok, s = pcall(love.audio.newSource, result.soundData, "static")

@@ -61,6 +61,8 @@ end
 ---@field senderId (string | integer | nil)
 ---@field type string
 ---@field content (table | string)
+---@field startAtMs integer? wall-clock server time at which the match should start; injected by Room.startGame onto start_match messages for legacy clients. Newer clients prefer startInMs.
+---@field startInMs integer? per-client countdown-from-receive in ms; injected by Room.startGame per-player so each client lands on the same wall-clock instant regardless of one-way delay. Computed as budgetMs - minRtt/2 for players, budgetMs for spectators.
 
 local settingsUpdateTemplate = {
   sender = "player",

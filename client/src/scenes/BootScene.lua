@@ -5,6 +5,7 @@ local GraphicsUtil = require("client.src.graphics.graphics_util")
 local logger = require("common.lib.logger")
 local fileUtils = require("client.src.FileUtils")
 local ModLoader = require("client.src.mods.ModLoader")
+local AssetDecodeClient = require("client.src.mods.AssetDecodeClient")
 
 local BootScene = class(function(scene, sceneParams)
   scene.migrationRoutine = coroutine.create(scene.migrate)
@@ -40,6 +41,7 @@ function BootScene:updateSelf(dt)
   else
     if coroutine.status(self.setupRoutine) == "dead" then
       love.graphics.setFont(GraphicsUtil.getGlobalFont())
+      AssetDecodeClient.enabled = true
 
       -- we need the late require for all scenes here because localization is only initialized by the coroutine and all scenes depend on it being loaded
       if themes[config.theme].images.bg_title then

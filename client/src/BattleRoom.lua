@@ -47,6 +47,9 @@ end
 ---@field ownerId PublicPlayerID? room owner's publicId; nil only for legacy payloads
 ---@field teamWins integer[]? per-team win counts indexed by team_index; nil in non-team modes
 ---@field publicId PublicPlayerID? (compatibility alias used by some payloads)
+---@field pendingPromotion boolean? spectator joined while queued for promotion to player at next match
+---@field voided boolean? set when a match was aborted because a player left; blocks ready until everyone leaves
+---@field voidReason string? human-readable reason surfaced to UI when self.voided
 ---@overload fun(mode: GameMode, gameScene: table?): BattleRoom
 BattleRoom = class(
 function(self, mode, gameScene)

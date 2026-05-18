@@ -166,7 +166,7 @@ function fileUtils.loadSoundFromSupportExtensions(path_and_filename, streamed)
   for k, extension in ipairs(fileUtils.SUPPORTED_SOUND_FORMATS) do
     local fullPath = path_and_filename .. extension
     if fileUtils.exists(fullPath) then
-      if coroutine.running() ~= nil then
+      if AssetDecodeClient.enabled and coroutine.running() ~= nil then
         local result = AssetDecodeClient.decodeSound(fullPath, streamed and true or false)
         if result then
           if result.streamed and result.path then

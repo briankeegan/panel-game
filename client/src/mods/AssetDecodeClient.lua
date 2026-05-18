@@ -20,6 +20,12 @@ local logger = require("common.lib.logger")
 
 local AssetDecodeClient = {}
 
+-- Off during boot: the setupRoutine is the only coroutine running, so every
+-- per-asset yield costs a full BootScene frame round-trip (~16ms) with no
+-- parallelism gain. Flipped on once setupRoutine finishes, so mid-match
+-- ModLoader catchup still gets the off-main decode it was built for.
+AssetDecodeClient.enabled = false
+
 ---@type love.Thread?
 local thread = nil
 ---@type love.Channel?

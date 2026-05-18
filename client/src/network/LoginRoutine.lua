@@ -179,6 +179,8 @@ local function login(gameplayClient, ip, gameplayPort, lobbyClient, lobbyPort, s
   local effectiveUserId = storedUserId
   if gameplayResult.new_user_id then
     save.write_user_id_file(gameplayResult.new_user_id, ip)
+    logger.info("Persisted server-issued user_id " .. tostring(gameplayResult.new_user_id)
+      .. " to servers/" .. ip .. "/user_id.txt")
     effectiveUserId = gameplayResult.new_user_id
   end
 

@@ -596,6 +596,27 @@ function ClientMatch:drainPendingHistoricalEvents()
     local frame = ev.senderFrame or 0
     if (senderStack.stopWatch or 0) >= frame then return true end
     if senderStack.game_over_clock and senderStack.game_over_clock > 0 then return true end
+
+    -- Safety net: a G targeting the local player parked for >2s with the
+    -- view-stack of the sender still pinned behind senderFrame means catch-up
+    -- isn't coming. Force-apply rather than lose damage. Pure-visual parks
+    -- (no local recipient) stay parked so spectator catch-up replays in order.
+    if ev._parkedAtMs and love and love.timer
+       and (love.timer.getTime() * 1000 - ev._parkedAtMs) > 2000 then
+      if type(ev.recipients) == "table" then
+        for _, rIdx in ipairs(ev.recipients) do
+          local s = self.stacks[rIdx]
+          if s and s.is_local then
+            logger.warn(string.format(
+              "ClientMatch: force-applying parked G targeting local stack — sender=%s senderFrame=%d viewStopWatch=%s parkedMs=%d",
+              tostring(ev.sender), frame,
+              tostring(senderStack.stopWatch),
+              math.floor(love.timer.getTime() * 1000 - ev._parkedAtMs)))
+            return true
+          end
+        end
+      end
+    end
     return false
   end
 
@@ -1845,6 +1866,7 @@ function ClientMatch:applyGarbageEvent(body)
   local catchupDeferFrames = 60
   if senderStack and body.senderFrame
       and (senderStack.stopWatch or 0) + catchupDeferFrames < body.senderFrame then
+    body._parkedAtMs = math.floor((love.timer.getTime() or 0) * 1000)
     self.pendingHistoricalGarbage = self.pendingHistoricalGarbage or {}
     self.pendingHistoricalGarbage[#self.pendingHistoricalGarbage + 1] = body
     -- Trace capture: this G was deferred to pendingHistoricalGarbage.
@@ -1971,7 +1993,14 @@ function ClientMatch:applyDeathEvent(body)
   end
 
   if stack.is_local then
-    -- Our own death — we already set game_over_clock when the local sim hit it.
+    if body and body.inferred then
+      -- Server's silent-death watchdog timed us out. Apply locally so we
+      -- transition to game-over instead of playing-but-server-ignored.
+      logger.warn(string.format(
+        "applyDeathEvent: server synth-killed our local stack at senderFrame=%d reason=%s",
+        body.senderFrame, tostring(body.reason)))
+      self:_applyDeathEventNow(body, stack)
+    end
     return
   end
 

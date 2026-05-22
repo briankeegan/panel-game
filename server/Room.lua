@@ -1057,10 +1057,12 @@ function Room:_synthesizeSilentDeath(player, slot, nowMs, lane)
   self.game:recordDeathEvent(player, body)
   local message = NetworkProtocol.markedMessageForTypeAndBody(
     NetworkProtocol.serverMessageTypes.deathEvent.prefix, json.encode(body))
-  -- Opponent's death is "watching them" data for everyone else → spectate.
-  -- pairs not ipairs: self.players may be sparse mid-match.
+  -- Synth-death gets broadcast to the synth-killed player too. Without that
+  -- they keep playing locally while we drop all their I/G server-side — the
+  -- "ghost player" state. Organic deaths still exclude the sender (they
+  -- already recorded their own death and re-applying would be redundant).
   for _, p in pairs(self.players) do
-    if p ~= player then p:sendSpectate(message) end
+    p:sendSpectate(message)
   end
   for _, spec in pairs(self.spectators) do
     if spec then spec:sendSpectate(message) end

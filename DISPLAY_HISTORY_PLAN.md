@@ -1,0 +1,200 @@
+# Display-History Replication — Parallel System Plan
+
+> **Working doc. Not committed yet. This is a plan, not an implementation.**
+>
+> **Phase 0 design: LOCKED.** Ready to start Phase A when the time comes.
+
+---
+
+## The Goal
+
+Build a **second** way to display remote players' stacks: a new send path that ships display events from the local engine, plus a new receiver/viewer that consumes them. **The existing input-replication system is not touched.** Both systems run in parallel. The new viewer is a *gate* — it exists to be validated by comparison, not to replace anything.
+
+## Prime Directive (non-negotiable)
+
+**Do not fuck with anything that already works.**
+
+- **Zero modifications** to: `Stack`, `Match`, `ClientMatch`, `PlayerStack`, `ClientStack`, `BaseStack`, `Stack:controls`, `send_controls`, `receiveConfirmedInput`, the rollback path, the loose-sync G/D event path, or the engine-tick scheduler.
+- **Zero modifications** to existing network message handlers, existing wire prefixes, existing socket processing.
+- **Zero modifications** to server-side room logic, except *adding* a new relay path for the new message type.
+- **Zero changes** to existing rendering for non-local stacks. The view-stack engine keeps running and keeps drawing exactly as today.
+- **Zero changes** to defaults, replay format, or anything else that survives a session.
+
+If a phase ever requires touching existing code, **stop and re-design.** Everything is purely additive.
+
+---
+
+## Locked Design Decisions
+
+### Send side — always on, no gating
+- Every client emits display events while playing.
+- No per-room flag, no per-player flag, no coordination.
+- Bandwidth and CPU cost paid from day 1; gives us real measurements from production play.
+
+### Server — always relays
+- New wire prefix gets a new relay path. Same shape as I/G/D relay.
+- Existing relay paths untouched.
+
+### Receive side — always decodes
+- Every client builds DisplayClientStacks for every remote player.
+- Decode runs in production for everyone; decode bugs surface immediately.
+- No conditional logic on the decode path — it's a fixed pipeline.
+
+### Gate — render-only, per-player, set in waiting room
+- The gate is purely on the *render* step: which renderer draws each remote stack.
+- **Per-player toggle**: each remote player slot in the character-select / waiting-room scene has a toggle for "use new viewer."
+- **Local-only setting**: lives in client config; doesn't go over the wire; doesn't persist beyond the session if we don't want it to.
+- **Decided pre-match**: when `Match` starts, the per-player toggle state is read once and bound to each remote stack. Doesn't need to be flippable mid-game.
+- **Binary choice per stack**: old view-stack ClientStack OR new DisplayClientStack. No side-by-side. No overlay. One renderer per remote stack.
+- **Local player's own stack is never subject to the toggle.** It's always engine-driven (it's the source of truth for your gameplay).
+
+### Transport — piggyback on the existing gameplay socket
+- No new socket setup.
+- New wire prefix on the existing channel.
+
+### Wire prefix — `Y`
+- Confirmed free in `common/network/NetworkProtocol.lua` (was a per-slot input prefix pre-v008; freed at v009 unification).
+- Mnemonic: displa**Y**.
+
+### Spectators
+- Same toggle mechanism. Spectators have no local player, so every stack is eligible for the toggle.
+- Spectator toggle UI lives in the same per-player slot row.
+
+---
+
+## What Gets Added (purely additive)
+
+### Sender side
+- New module: `DisplayEventCapture`
+  - Subscribes (read-only) to the local engine's existing signals.
+  - Builds frame-stamped event records.
+  - Batches every ~50ms.
+- New outbound network call: `NetClient:sendDisplayEvents(batch)`
+  - Wire prefix `Y`.
+  - Rides the existing gameplay socket.
+  - Lower priority than I/G/D — droppable / coalesce-able if the queue backs up.
+
+### Network / server
+- New wire prefix `Y` registered in `NetworkProtocol`.
+- Server: new relay path forwards `Y` messages to other room members. Adds to dispatch; doesn't touch existing dispatch.
+
+### Receiver side
+- New class: `DisplayClientStack`
+  - `visualState`: panel grid, cursor pos, telegraph state, etc.
+  - `applyEvent(ev)` mutates visualState.
+  - `render()` reads visualState.
+  - No engine, no physics, no rollback, no input apply.
+  - Initially a copy-paste from `PlayerStack` rendering, modified to read `visualState` instead of `engine` state.
+
+### Waiting-room UI
+- Per-player toggle (checkbox or equivalent) for "use new viewer" in the character-select / waiting-room scene.
+- Local setting, no network roundtrip.
+
+---
+
+## Event Taxonomy (draft — to be refined during Phase A)
+
+| Local engine signal | Wire event tag | Payload |
+|---|---|---|
+| `cursorMoved` | `C` | row, col |
+| `panelsSwapped` | `S` | row, col |
+| `panelLanded` | `L` | row, col |
+| `panelPop` | `P` | row, col, color, popIndex |
+| `matched` | `M` | comboSize, chainCount |
+| `newRow` | `R` | new-row seed (8 panels) |
+| `manual_raise` toggle | `B` / `E` | on/off |
+| `gameOver` | `D` | (mirror of existing D for display-side state) |
+| `telegraphPush` | `T` | destination, transitTime |
+| `shake` | `K` | shakeTime, peak |
+| portrait fade / danger flash / score popup / chain anim | TBD | TBD |
+
+Per event: 1-byte tag + small payload. Per-player rate: ~50–100 events/sec during combat.
+
+Per-batch wire format (draft):
+```json
+{
+  "from": <playerID>,
+  "events": [
+    { "f": <frame>, "t": "C", "r": 6, "c": 3 },
+    { "f": <frame>, "t": "S", "r": 6, "c": 3 }
+  ]
+}
+```
+
+Taxonomy is **a working list, not final.** Phase A is where we audit it against the existing render path and close gaps.
+
+---
+
+## Phases
+
+Each phase ends with the OLD system still running and visually unchanged.
+
+### Phase 0 — Lock the design ✅ DONE
+- This document.
+- Decisions above are locked.
+- Exit criteria met.
+
+### Phase A — Sender capture, no consumer
+- Implement `DisplayEventCapture` as a pure observer.
+- Hook all targeted engine signals.
+- Build event records, batch every ~50ms.
+- Wire prefix `Y` registered. `NetClient:sendDisplayEvents` implemented.
+- Server relays (or initially drops) `Y` messages.
+- **Exit criteria:** messages reach other clients without errors. Bandwidth measured. Old system identical.
+- **Risk to existing:** zero. Sender is pure read-only signal observation.
+
+### Phase B — Receiver decodes, doesn't render
+- `DisplayClientStack` class created.
+- Receiver decodes incoming `Y` messages into per-player DisplayClientStacks.
+- Stacks built in memory but never rendered.
+- **Exit criteria:** decode runs without crashes. Memory footprint bounded. Receiver doesn't lag.
+- **Risk to existing:** zero. New code runs parallel; old view-stack rendering untouched.
+
+### Phase C — Gate: render new viewer when toggled
+- Waiting-room per-player toggle in the UI.
+- Toggle state read by `Match` at start; binds renderer choice per remote stack.
+- When toggle is ON for a player, that stack renders via DisplayClientStack; when OFF, it renders via the existing view-stack path.
+- Iterate on event taxonomy to close visual gaps.
+- **Exit criteria:** new viewer reproduces the visual state convincingly enough to be a real alternative.
+- **Risk to existing:** zero by default. Toggle is off by default; existing behavior unchanged unless the player flips it.
+
+### Phase D — DONE (for now)
+- Parallel system exists, is correct, validated.
+- Default rendering still uses the old view-stack.
+- Whether to ever switch defaults is **a separate decision for another day**.
+- **Risk to existing:** zero. New system is dormant unless a player flips a per-player toggle in the waiting room.
+
+---
+
+## What this plan explicitly does NOT include
+
+- **No migration.** Old system stays the default forever, as far as this plan is concerned.
+- **No refactor.** Existing code paths not touched.
+- **No feature flag on existing paths.** New system is opt-in via per-player toggle; old system has no flag.
+- **No removal of anything.** No code deleted, no behavior changed.
+- **No replay-format changes.** Replays continue to use the input stream.
+- **No protocol-breaking changes.** New prefix is additive; existing wire format unchanged.
+
+---
+
+## Remaining open questions (to resolve during Phase A)
+
+- **Event taxonomy completeness.** Does the draft cover every visible visual? Audit during Phase A — likely additions for portrait fade, danger flash, score popup, chain pop animation.
+- **Bandwidth confirmation.** Napkin says ~50–100 B/sec/player. Measure under real combat.
+- **Playback buffering depth.** How much display latency is acceptable (50ms / 100ms / 200ms)? Tune in Phase C.
+- **Game-over visuals.** D event arrival timing relative to display events from the same sender.
+- **Match-end cleanup.** DisplayClientStacks need to be deinit'd alongside view-stacks. Easy, but list it explicitly.
+
+---
+
+## Success criteria
+
+When this plan is complete:
+- A new send path exists, ships display events without affecting existing traffic.
+- A new receiver path exists, builds DisplayClientStacks in parallel with view-stack ClientStacks.
+- A per-player toggle in the waiting room renders the new viewer for validation.
+- Old behavior — input replication, view-stack engine simulation, view-stack rendering — is bit-for-bit identical to before this work started.
+- We can SEE the new viewer working in real play and compare it (across sessions) to the old.
+- We have data (bandwidth, decode cost, render cost) to inform whatever decision comes next.
+
+We do *not* "win" by replacing the old system. We *win* by having proven, in parallel, that an alternative architecture is viable — leaving the decision to ever use it for later.

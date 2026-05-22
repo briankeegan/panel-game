@@ -53,6 +53,8 @@ local function _clearMatchInputState(self)
   self._pendingGarbageSends = nil
   self._pendingDeathDeferWarned = nil
   self._pendingGarbageDeferWarned = nil
+  self._spectateBaselineMs = nil
+  self._spectateStallWarned = nil
 end
 
 -- One place to send a gameplay-channel fire-and-forget message (inputs / R).
@@ -1771,6 +1773,24 @@ function NetClient:update(dt)
     processGarbageEvents(self)
     processDeathEvents(self)
     processRewindEvents(self)
+
+    -- Spectate-channel silence watchdog. Opponent I events arrive on
+    -- spectate every few hundred ms in any active match. >5s of silence
+    -- with the socket still "connected" is a stuck TCP — force-close so
+    -- server-side falls back to gameplay channel via _spectateConnection.
+    if self.gameplayClient:isConnected() and self.spectateClient:isConnected() then
+      local nowMs = math.floor(love.timer.getTime() * 1000)
+      self._spectateBaselineMs = self._spectateBaselineMs or nowMs
+      local lastSpectateMs = self.spectateClient.lastRecvMs or self._spectateBaselineMs
+      if (nowMs - lastSpectateMs) > 5000 and not self._spectateStallWarned then
+        self._spectateStallWarned = true
+        logger.warn(string.format(
+          "Spectate channel silent for %dms during active match — resetting to force fallback",
+          nowMs - lastSpectateMs))
+        self.spectateClient:resetNetwork()
+        self:emitSignal("channelDegraded", "Spectate")
+      end
+    end
 
     -- Retry any DeathEvent / GarbageEvent that couldn't flush earlier
     -- (gameplay socket mid-flap mid-match). DeathEvent is what unblocks

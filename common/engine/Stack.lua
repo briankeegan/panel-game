@@ -1086,10 +1086,21 @@ function Stack:runPhysics()
   self:updateActivePanelCount()
   --prof.push("chain update")
   -- if at the end of the routine there are no chain panels, the chain ends.
-  if self.chain_counter ~= 0 and not self:hasChainingPanels() then
+  -- Belt-and-suspenders: also finalize if currentChain is sitting in the queue
+  -- with chain_counter already 0 — a rollback or other state-restore can leave
+  -- the two views out of sync, and an orphaned unfinalized chain at the back
+  -- of stagedGarbage permanently halts outgoing damage.
+  local hasChainInQueue = self.outgoingGarbage
+                          and self.outgoingGarbage.currentChain ~= nil
+  if (self.chain_counter ~= 0 or hasChainInQueue) and not self:hasChainingPanels() then
+    if self.chain_counter == 0 and hasChainInQueue then
+      logger.warn(string.format(
+        "Stack[%s]: finalizing orphaned chain (chain_counter=0 but currentChain present) at stopWatch=%d",
+        tostring(self.which), self.stopWatch))
+    end
     self.chain_counter = 0
 
-    if self.outgoingGarbage then
+    if hasChainInQueue then
       logger.debug("Player " .. self.which .. " chain ended at " .. self.stopWatch)
       self.outgoingGarbage:finalizeCurrentChain(self.stopWatch)
     end

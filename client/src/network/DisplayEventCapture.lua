@@ -263,12 +263,58 @@ end
 function DisplayEventCapture:_maybeSend()
   local now = love.timer.getTime()
   if (now - self.lastFlushTime) < SEND_INTERVAL_S then return end
+  -- Option F (adaptive rate): if the local engine is behind wall-clock
+  -- by 2+ frames, skip this send. The local player's main loop is
+  -- already racing to catch up; piling JSON-encode work on top makes it
+  -- worse. The next attempt fires after a wall-clock pass and reads the
+  -- deficit again. Effect: snapshots pause during render hitches; resume
+  -- naturally once the main loop is healthy. Worst case the receiver
+  -- sees a slightly older board for a few frames.
+  --
+  -- Deficit lives on the Match (top-level engine), not the per-Stack
+  -- engine we observe. Read via GAME.battleRoom.match.engine when
+  -- available.
+  local matchEngine = GAME and GAME.battleRoom
+    and GAME.battleRoom.match
+    and GAME.battleRoom.match.engine
+  if matchEngine and (matchEngine._wallClockDeficitFrames or 0) >= 2 then
+    return
+  end
   self:_send(now)
+end
+
+-- Cheap signature of an engine state — captures the scalars that change
+-- when ANYTHING visible has happened. If two consecutive ticks produce
+-- the same signature, the snapshot would be identical and we can skip
+-- the JSON encode entirely. False negatives are fine (we send more
+-- often than strictly needed); false positives would mean a missed
+-- update, so the signature must change when ANY relevant state changes.
+--
+-- engine.clock changes every tick the engine runs, so under normal play
+-- this signature changes constantly. It only stops changing when the
+-- engine ITSELF stops ticking — countdown frozen, pause, post-death.
+-- Exactly the "send is wasted" scenarios.
+local function stateSignature(engine)
+  return (engine.clock or 0) * 1000000
+       + (engine.cur_row or 0) * 100
+       + (engine.cur_col or 0)
 end
 
 function DisplayEventCapture:_send(now)
   self.lastFlushTime = now or love.timer.getTime()
   if not (GAME and GAME.netClient) then return end
+
+  -- Option A (skip-when-unchanged): bail before the expensive JSON
+  -- encode if no engine tick has happened since the last send AND
+  -- there are no one-shot triggers to ship. Saves the encode work on
+  -- the sender's main thread + wire bandwidth during pauses / dead /
+  -- between matches.
+  local sig = stateSignature(self.engine)
+  if sig == self._lastSentSig and #self._pendingEvents == 0 then
+    return
+  end
+  self._lastSentSig = sig
+
   local snapshot = buildSnapshot(self.engine)
   -- Attach any one-shot triggers collected since last send, then clear.
   -- These play once on the receiver — pop FX and score cards.

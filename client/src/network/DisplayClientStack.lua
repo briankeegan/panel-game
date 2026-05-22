@@ -138,50 +138,22 @@ function DisplayClientStack:debugSnapshot()
   }
 end
 
----Phase C render. Draws a cursor outline at the position reported by
----the event stream, using the matching view-stack's coordinate transform
----so the cursor lines up with the underlying panel grid. No background
----overlay, no border, no diagnostic readout — the new viewer is
----currently additive on top of the existing render. True full-replace
----rendering needs richer event coverage (panel grid state) which is a
----later iteration.
+---Phase C render. Intentionally a no-op for now.
+---
+---The capture → wire → decode pipeline runs end-to-end (events flow,
+---visualState updates in memory), but until the event taxonomy covers
+---enough state to fully REPLACE the existing view-stack render, drawing
+---any marker on top just clutters the screen. The old PlayerStack:render
+---draws the cursor, panels, telegraph etc. authoritatively; layering
+---debug shapes on top of that is misleading.
+---
+---When events cover panel grid state, this becomes the real renderer:
+---black out the existing stack region and draw board contents from
+---visualState (binary choice — new fully replaces old, per design).
 ---
 ---@param viewStack table|nil the matching existing ClientStack (for layout)
 function DisplayClientStack:render(viewStack)
-  if not viewStack then return end
-  if not viewStack.setDrawArea or not viewStack.resetDrawArea then return end
-
-  local vs = self.visualState
-
-  -- Drop into the view-stack's panel-coordinate system. setDrawArea
-  -- pushes a transform + scissor matching exactly what PlayerStack:render
-  -- uses, so a cursor drawn at panel coords here lines up perfectly with
-  -- the underlying panels.
-  viewStack:setDrawArea(0, 0)
-  love.graphics.push("all")
-
-  -- Match PlayerStack:render_cursor's positioning math: cur_row/cur_col
-  -- are 1-indexed engine coords; row 1 is the bottom visible row, panels
-  -- are 16x16 in panel-coord space, cursor spans two columns.
-  local panelWidth = 16
-  local visibleRows = 11
-  local cx = (vs.cursorCol - 1) * panelWidth
-  local cy = (visibleRows - vs.cursorRow) * panelWidth
-
-  -- Compute pixel size in panel-coord units. drawGfxScaled in the engine
-  -- multiplies by gfxScale; we're already inside the post-scale transform
-  -- from setDrawArea so 1 unit here == 1 pixel pre-scale.
-  local gfxScale = viewStack.gfxScale or 3
-  love.graphics.scale(gfxScale, gfxScale)
-
-  -- Cursor outline only (no fill) so the actual panels under it stay
-  -- readable. Yellow-on-dark is visible against most panel colors.
-  love.graphics.setLineWidth(1)
-  love.graphics.setColor(1.0, 0.95, 0.3, 0.95)
-  love.graphics.rectangle("line", cx, cy, panelWidth * 2, panelWidth)
-
-  love.graphics.pop()
-  viewStack:resetDrawArea()
+  -- no-op
 end
 
 return DisplayClientStack

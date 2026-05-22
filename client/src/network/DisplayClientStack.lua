@@ -138,72 +138,50 @@ function DisplayClientStack:debugSnapshot()
   }
 end
 
----Phase C minimal render. Draws a debug overlay positioned over the
----corresponding view-stack's frame: cursor crosshair (read from
----visualState), event counter, dead overlay. Enough to prove events are
----flowing — Phase C iteration extends to full panel rendering.
----
----Positioning: called by BattleRoom:renderDisplayStacks (parallel render
----pass added in GameBase:draw). Receives the matching view-stack's
----frameOriginX/Y/gfxScale via the BattleRoom layer so it draws inside
----the same scissor region as the old view-stack.
+---Phase C render. Draws a cursor outline at the position reported by
+---the event stream, using the matching view-stack's coordinate transform
+---so the cursor lines up with the underlying panel grid. No background
+---overlay, no border, no diagnostic readout — the new viewer is
+---currently additive on top of the existing render. True full-replace
+---rendering needs richer event coverage (panel grid state) which is a
+---later iteration.
 ---
 ---@param viewStack table|nil the matching existing ClientStack (for layout)
 function DisplayClientStack:render(viewStack)
   if not viewStack then return end
+  if not viewStack.setDrawArea or not viewStack.resetDrawArea then return end
 
-  -- Pull frame coordinates from the existing view-stack so this overlay
-  -- lands in the same scissor region the player already associates with
-  -- this opponent.
-  local scale = viewStack.gfxScale or 1
-  local ox = (viewStack.frameOriginX or 0) * scale
-  local oy = (viewStack.frameOriginY or 0) * scale
-  local w  = (viewStack.baseWidth   or 0) * scale
-  local h  = (viewStack.baseHeight  or 0) * scale
+  local vs = self.visualState
 
-  if w <= 0 or h <= 0 then return end
-
+  -- Drop into the view-stack's panel-coordinate system. setDrawArea
+  -- pushes a transform + scissor matching exactly what PlayerStack:render
+  -- uses, so a cursor drawn at panel coords here lines up perfectly with
+  -- the underlying panels.
+  viewStack:setDrawArea(0, 0)
   love.graphics.push("all")
 
-  -- Black-out the existing render so the new viewer fully replaces it
-  -- (per plan: binary choice, never side-by-side). Translucent so the
-  -- user can still see roughly where they are during validation.
-  love.graphics.setColor(0, 0, 0, 0.55)
-  love.graphics.rectangle("fill", ox, oy, w, h)
+  -- Match PlayerStack:render_cursor's positioning math: cur_row/cur_col
+  -- are 1-indexed engine coords; row 1 is the bottom visible row, panels
+  -- are 16x16 in panel-coord space, cursor spans two columns.
+  local panelWidth = 16
+  local visibleRows = 11
+  local cx = (vs.cursorCol - 1) * panelWidth
+  local cy = (visibleRows - vs.cursorRow) * panelWidth
 
-  -- Border indicating the new viewer is active for this stack.
-  love.graphics.setColor(0.4, 1.0, 0.4, 0.9)
-  love.graphics.setLineWidth(2)
-  love.graphics.rectangle("line", ox, oy, w, h)
+  -- Compute pixel size in panel-coord units. drawGfxScaled in the engine
+  -- multiplies by gfxScale; we're already inside the post-scale transform
+  -- from setDrawArea so 1 unit here == 1 pixel pre-scale.
+  local gfxScale = viewStack.gfxScale or 3
+  love.graphics.scale(gfxScale, gfxScale)
 
-  -- Cursor crosshair from visualState. cur_row/cur_col are 1-indexed in
-  -- the engine; project onto the stack's drawable region. We don't know
-  -- the exact panel size at this layer; approximate at 6 columns wide.
-  local vs = self.visualState
-  local cols = 6
-  local rowsVisible = 12
-  local cellW = w / cols
-  local cellH = h / rowsVisible
-  local cx = ox + (vs.cursorCol - 1) * cellW
-  -- Row 1 is bottom in the engine; flip to screen coords.
-  local cy = oy + (rowsVisible - vs.cursorRow) * cellH
-  love.graphics.setColor(1.0, 1.0, 0.4, 0.9)
-  love.graphics.rectangle("fill", cx, cy, cellW * 2, cellH)
-
-  -- Diagnostic readout in the top-left corner of the frame.
-  love.graphics.setColor(1, 1, 1, 0.95)
-  local font = love.graphics.getFont()
-  local readout = string.format(
-    "DISP id=%s evt=%d frame=%d rows=%d",
-    tostring(self.playerID), self.eventsApplied, self.lastFrame, vs.rows)
-  love.graphics.print(readout, ox + 4, oy + 4)
-
-  if vs.dead then
-    love.graphics.setColor(1, 0.2, 0.2, 0.8)
-    love.graphics.print("DEAD", ox + 4, oy + (font and font:getHeight() or 12) + 6)
-  end
+  -- Cursor outline only (no fill) so the actual panels under it stay
+  -- readable. Yellow-on-dark is visible against most panel colors.
+  love.graphics.setLineWidth(1)
+  love.graphics.setColor(1.0, 0.95, 0.3, 0.95)
+  love.graphics.rectangle("line", cx, cy, panelWidth * 2, panelWidth)
 
   love.graphics.pop()
+  viewStack:resetDrawArea()
 end
 
 return DisplayClientStack

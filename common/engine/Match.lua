@@ -979,8 +979,30 @@ end
 ---on self so Match:shouldRun (per-stack-per-tick) can use it without
 ---recomputing. Callers that need both the result AND the cache use this;
 ---callers that just want a read use evaluateEndConditions directly.
+---
+---Fast-path gate: while every stack is still alive (game_over_clock == 0),
+---no time-limit is active, and the match is neither aborted nor finalized,
+---evaluateEndConditions cannot fire any end-condition. Skipping the full
+---walk in that case reclaims love.update budget — this runs once per
+---Match:run iter, so under multi-iter catch-up it was N walks per
+---love.update for a result that's always { ended = false }.
 ---@return {ended: boolean, gameOverClock: integer?, reason: string?}
 function Match:updateMatchEndState()
+  if not (self.ended or self.aborted)
+      and self.gameOverClock == nil
+      and self.timeLimit == nil then
+    local anyDead = false
+    for i = 1, #self.stacks do
+      local s = self.stacks[i]
+      if s and s.game_over_clock and s.game_over_clock > 0 then
+        anyDead = true
+        break
+      end
+    end
+    if not anyDead then
+      return { ended = false }
+    end
+  end
   local result = self:evaluateEndConditions()
   if result.gameOverClock then
     self.gameOverClock = result.gameOverClock

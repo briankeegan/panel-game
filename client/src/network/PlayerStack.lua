@@ -91,12 +91,8 @@ function PlayerStack:send_controls(isFreshFrame)
 
   self.engine:receiveConfirmedInput(to_send)
 
-  -- Trace capture: one JSONL line per local input frame. For single-
-  -- player play this is the ONLY input record (no network traffic to
-  -- tap); for multiplayer it complements the outbound I-frame tap.
-  -- self.engine.which is the stack's 1-based index so the assembler /
-  -- replay loader knows which slot the input feeds.
-  pcall(function()
-    TraceWriter.input(to_send, self.engine.clock, self.engine.which)
-  end)
+  -- Trace capture: one JSONL line per local input frame. TraceWriter.input
+  -- has its own state.disabled early-return + internal pcall, so we skip
+  -- the outer closure allocation that would otherwise fire every tick.
+  TraceWriter.input(to_send, self.engine.clock, self.engine.which)
 end

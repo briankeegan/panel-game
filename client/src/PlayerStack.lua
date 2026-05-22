@@ -956,7 +956,14 @@ function PlayerStack:render(matchEnded, xOffset, yOffset, alpha)
     return
   end
 
-  local interpSaved = self.engine:applyRenderInterp(alpha)
+  -- Render-interp is for non-local view stacks only (applyRenderInterp
+  -- early-returns when is_local). Skipping the call entirely for local
+  -- saves a method-call + table-construction roundtrip per draw — a
+  -- small but free win on a hot path that fires every love.draw.
+  local interpSaved
+  if not self.is_local then
+    interpSaved = self.engine:applyRenderInterp(alpha)
+  end
 
   self:setDrawArea(xOffset, yOffset)
   self:drawCharacter()
@@ -986,7 +993,9 @@ function PlayerStack:render(matchEnded, xOffset, yOffset, alpha)
   self:drawDebugPanels(shakeOffset)
   self:drawDebug()
 
-  self.engine:restoreRenderInterp(interpSaved)
+  if interpSaved then
+    self.engine:restoreRenderInterp(interpSaved)
+  end
   prof.pop("Stack:render")
 end
 

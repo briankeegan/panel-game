@@ -921,9 +921,18 @@ function GameBase:drawHUD()
     -- FFA (3p/4p) falls through this and shows per-player WINS in the LSS column.
     local isTeamMode = isSharedTeamMode(self.match.gameMode)
 
-    for i, stack in ipairs(self.match.stacks) do
-      stack._teamColor = teamColorForStack(self.match, stack, i)
+    -- Team colors don't change mid-match — team composition is fixed at
+    -- match start. Cache on first draw; the per-match GameBase scene gets
+    -- torn down on match end so a new match recomputes naturally. Was
+    -- previously a per-draw recompute that burned love.update budget.
+    if not self._teamColorCached then
+      for i, stack in ipairs(self.match.stacks) do
+        stack._teamColor = teamColorForStack(self.match, stack, i)
+      end
+      self._teamColorCached = true
+    end
 
+    for i, stack in ipairs(self.match.stacks) do
       stack:withPanelTransform(function()
         if stack.engine.stackOverConditions[MatchRules.StackOverConditions.SWAPS] then
           stack:drawMoveCount()

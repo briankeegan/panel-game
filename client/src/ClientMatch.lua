@@ -410,37 +410,35 @@ function ClientMatch:run(isFreshFrame)
     -- versus polling still firing but short-circuiting internally.
     if self._tracePollState[i] ~= willPoll then
       self._tracePollState[i] = willPoll
-      pcall(function()
-        TraceWriter.localEvent("sendControlsPoll", {
-          stack   = i,
-          polling = willPoll,
-          reason  = (not willPoll) and (
-            (not stack.is_local      and "not_local") or
-            (not stack.send_controls and "no_send_controls") or
-            (stack:game_ended()      and "game_ended") or
-            "other"
-          ) or nil,
-          clock = self.engine and self.engine.clock or nil,
-        })
-      end)
+      -- TraceWriter.localEvent has its own state.disabled check + pcall,
+      -- so skip the outer pcall closure (per-tick allocation budget).
+      TraceWriter.localEvent("sendControlsPoll", {
+        stack   = i,
+        polling = willPoll,
+        reason  = (not willPoll) and (
+          (not stack.is_local      and "not_local") or
+          (not stack.send_controls and "no_send_controls") or
+          (stack:game_ended()      and "game_ended") or
+          "other"
+        ) or nil,
+        clock = self.engine and self.engine.clock or nil,
+      })
     end
   end
 
   local runs = math.max(unpack(self.engine:run()))
 
   -- Trace capture: detect per-stack game-over transitions. Emit a marker
-  -- the first frame each stack reaches game_over_clock > 0. Lets the
-  -- trace prove when each engine actually died locally — the gap that
-  -- made the 3p FFA stuck-match investigation hard.
-  pcall(function()
-    for i, stack in ipairs(self.stacks) do
-      local goc = stack.engine and stack.engine.game_over_clock or -1
-      if not self._traceGameOverEmitted[i] and goc and goc > 0 then
-        self._traceGameOverEmitted[i] = true
-        TraceWriter.localEvent("stackGameOver", { stack = i, frame = goc })
-      end
+  -- the first frame each stack reaches game_over_clock > 0. TraceWriter
+  -- handles its own protection; outer pcall closure removed so this loop
+  -- doesn't allocate a per-tick closure during normal play.
+  for i, stack in ipairs(self.stacks) do
+    local goc = stack.engine and stack.engine.game_over_clock or -1
+    if not self._traceGameOverEmitted[i] and goc and goc > 0 then
+      self._traceGameOverEmitted[i] = true
+      TraceWriter.localEvent("stackGameOver", { stack = i, frame = goc })
     end
-  end)
+  end
 
   -- Keep shared-mode telegraph targets aligned with the next living recipient
   -- selected by the engine's round-robin cursor.
@@ -582,6 +580,16 @@ end
 ---event's senderFrame, OR the sender's stack is already game-over (any
 ---remaining events for that sender can't sensibly wait any longer).
 function ClientMatch:drainPendingHistoricalEvents()
+  -- Common-case fast exit: no historical events queued. Skips the local
+  -- `isReady` closure allocation that would otherwise fire every Match:run
+  -- iter — under multi-iter catch-up this allocation was hitting on every
+  -- engine tick in offline / live-sync matches that never need draining.
+  local deaths = self.pendingHistoricalDeaths
+  local garbage = self.pendingHistoricalGarbage
+  if (not deaths or #deaths == 0) and (not garbage or #garbage == 0) then
+    return
+  end
+
   local function isReady(ev)
     local senderStack = self.engine and self.engine.stacks[ev.sender]
     if not senderStack then return true end -- nowhere to defer to; just apply
@@ -591,7 +599,6 @@ function ClientMatch:drainPendingHistoricalEvents()
     return false
   end
 
-  local deaths = self.pendingHistoricalDeaths
   if deaths and #deaths > 0 then
     local kept = {}
     for _, ev in ipairs(deaths) do
@@ -615,7 +622,6 @@ function ClientMatch:drainPendingHistoricalEvents()
     self.pendingHistoricalDeaths = kept
   end
 
-  local garbage = self.pendingHistoricalGarbage
   if garbage and #garbage > 0 then
     local kept = {}
     for _, ev in ipairs(garbage) do

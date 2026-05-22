@@ -675,6 +675,12 @@ function BattleRoom:startMatch(replay)
   self._displayCaptures = nil
   self._displayStacks   = nil
   if self.displayHistoryEnabled then
+    -- Tell the engine to skip simulating non-local stacks. The new viewer
+    -- now owns the visual representation of remote players entirely; their
+    -- engine sim, rollback, input apply are all dead-weight when this flag
+    -- is on. Local stack still ticks normally.
+    if match.engine then match.engine.displayHistoryActive = true end
+
     self._displayCaptures = {}
     self._displayStacks   = {}
     for _, player in ipairs(match.players) do
@@ -687,6 +693,11 @@ function BattleRoom:startMatch(replay)
         -- same playerID the sender stamps into its batches.
         local pid = player.publicId or player.playerNumber or 0
         self._displayStacks[pid] = DisplayClientStack.new(pid, player)
+        -- Hide the existing PlayerStack:render for this remote — its
+        -- visualization is now the DisplayClientStack's responsibility.
+        -- Setting stack.canvas = nil makes PlayerStack:render early-return
+        -- (existing skip path, no new code in PlayerStack).
+        if player.stack then player.stack.canvas = nil end
       end
     end
     match:connectSignal("matchEnded", self, self._stopDisplayCaptures)

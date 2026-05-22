@@ -43,6 +43,7 @@ local TeamUtils = require("common.data.TeamUtils")
 ---@field debug MatchDebugConfig internal debug configuration that defaults to non-debug values
 ---@field fromReplay boolean? true when the Match was constructed via createFromReplay
 ---@field stackInteraction StackInteractions? mirror of rules.stackInteraction, set during initialization
+---@field displayHistoryActive boolean? when true, Match:shouldRun skips non-local stacks — the parallel display-history viewer owns their visuals. See DISPLAY_HISTORY_PLAN.md.
 
 ---@class MatchDebugConfig
 ---@field vsFramesBehind integer
@@ -1047,6 +1048,16 @@ end
 ---@param runsSoFar integer
 ---@return boolean
 function Match:shouldRun(stack, runsSoFar)
+  -- Display-history viewer (DISPLAY_HISTORY_PLAN.md) takes over for remote
+  -- stacks when the per-room flag is on. The new viewer is then the source
+  -- of truth for what other players' boards look like; running the old
+  -- per-tick simulation for those stacks is pure waste. Skip them here so
+  -- the local stack is the ONLY engine work this client does per tick.
+  -- Local stack always ticks regardless — you still play your own game.
+  if self.displayHistoryActive and not stack.is_local then
+    return false
+  end
+
   -- check the match specific conditions in match
   if not stack:game_ended() then
     if self.timeLimit then

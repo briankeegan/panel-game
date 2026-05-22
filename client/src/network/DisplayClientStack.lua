@@ -138,22 +138,73 @@ function DisplayClientStack:debugSnapshot()
   }
 end
 
----Phase C render. Intentionally a no-op for now.
+---Phase C render. With the per-room flag on, the old PlayerStack:render
+---is suppressed (stack.canvas = nil) so this method is the ONLY source
+---of visuals for the remote player. Until the event taxonomy covers
+---full panel grid state, we draw a placeholder: solid background filling
+---the view-stack region, the cursor position from visualState, a
+---"NEW VIEWER" label, and a diagnostic line showing event flow.
 ---
----The capture → wire → decode pipeline runs end-to-end (events flow,
----visualState updates in memory), but until the event taxonomy covers
----enough state to fully REPLACE the existing view-stack render, drawing
----any marker on top just clutters the screen. The old PlayerStack:render
----draws the cursor, panels, telegraph etc. authoritatively; layering
----debug shapes on top of that is misleading.
----
----When events cover panel grid state, this becomes the real renderer:
----black out the existing stack region and draw board contents from
----visualState (binary choice — new fully replaces old, per design).
+---This is intentionally not a faithful reproduction of the old viewer
+---— it's a "this works, the new pipeline is alive" indicator. The real
+---faithful render needs events for panel landings, pops, rows, etc. to
+---reconstruct the grid.
 ---
 ---@param viewStack table|nil the matching existing ClientStack (for layout)
 function DisplayClientStack:render(viewStack)
-  -- no-op
+  if not viewStack then return end
+
+  local scale = viewStack.gfxScale or 3
+  local ox = (viewStack.frameOriginX or 0) * scale
+  local oy = (viewStack.frameOriginY or 0) * scale
+  local w  = (viewStack.baseWidth   or 0) * scale
+  local h  = (viewStack.baseHeight  or 0) * scale
+
+  if w <= 0 or h <= 0 then return end
+
+  love.graphics.push("all")
+
+  -- Solid dark background so the new viewer fully replaces the area.
+  love.graphics.setColor(0.08, 0.08, 0.12, 1.0)
+  love.graphics.rectangle("fill", ox, oy, w, h)
+
+  -- Subtle border so the player can see this is the new viewer.
+  love.graphics.setColor(0.4, 1.0, 0.4, 0.7)
+  love.graphics.setLineWidth(2)
+  love.graphics.rectangle("line", ox, oy, w, h)
+
+  -- Cursor: use the panel-coord math from PlayerStack:render_cursor.
+  -- Cursor straddles two columns (panel widths) and sits one panel tall.
+  if viewStack.setDrawArea and viewStack.resetDrawArea then
+    viewStack:setDrawArea(0, 0)
+    love.graphics.push("transform")
+    love.graphics.scale(scale, scale)
+    local panelWidth = 16
+    local visibleRows = 11
+    local vs = self.visualState
+    local cx = (vs.cursorCol - 1) * panelWidth
+    local cy = (visibleRows - vs.cursorRow) * panelWidth
+    love.graphics.setColor(1.0, 0.95, 0.3, 0.95)
+    love.graphics.setLineWidth(1)
+    love.graphics.rectangle("line", cx, cy, panelWidth * 2, panelWidth)
+    love.graphics.pop()
+    viewStack:resetDrawArea()
+  end
+
+  -- Status text confirming the new viewer is active for this stack.
+  love.graphics.setColor(0.7, 1.0, 0.7, 0.95)
+  love.graphics.print("NEW VIEWER", ox + 8, oy + 8)
+  love.graphics.setColor(0.6, 0.7, 0.85, 0.85)
+  local readout = string.format("id=%s evt=%d frame=%d",
+    tostring(self.playerID), self.eventsApplied, self.lastFrame)
+  love.graphics.print(readout, ox + 8, oy + 24)
+
+  if self.visualState.dead then
+    love.graphics.setColor(1, 0.3, 0.3, 0.9)
+    love.graphics.print("DEAD", ox + 8, oy + 42)
+  end
+
+  love.graphics.pop()
 end
 
 return DisplayClientStack

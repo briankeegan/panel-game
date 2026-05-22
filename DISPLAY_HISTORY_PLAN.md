@@ -30,6 +30,7 @@ If a phase ever requires touching existing code, **stop and re-design.** Everyth
 - **One flag per room.** When the room flag is FALSE, **nothing fires**: no signal capture, no batching, no `Y` traffic on the wire, no receiver decode work, no DisplayClientStacks built. The display-history pipeline is fully dormant.
 - When the room flag is TRUE: every client in the room captures + sends display events; receivers decode them; the render gate (also per-room) picks which renderer draws remote stacks.
 - **Default: FALSE.** Production users pay zero cost unless the flag is flipped for a specific room.
+- **No global setting drives it.** The flag is `BattleRoom.displayHistoryEnabled` on the room instance. Set it explicitly to enable. Future work: waiting-room UI to flip it per-room.
 - **Local player's own stack is never subject to any of this.** Always engine-driven.
 
 ### Send side — gated by room flag
@@ -153,12 +154,13 @@ Each phase ends with the OLD system still running and visually unchanged.
 - **Risk to existing:** zero. New code runs parallel; old view-stack rendering untouched.
 
 ### Phase C — Gate: render new viewer when toggled
-- Waiting-room per-player toggle in the UI.
-- Toggle state read by `Match` at start; binds renderer choice per remote stack.
-- When toggle is ON for a player, that stack renders via DisplayClientStack; when OFF, it renders via the existing view-stack path.
+- Per-room `BattleRoom.displayHistoryEnabled` flag (default false).
+- Flag read at room construction; when true, captures + display stacks are created; when false, the entire pipeline is dormant.
+- `GameBase:draw` calls `BattleRoom:renderDisplayStacks(match)` after the normal match render; when the flag is on, DisplayClientStacks black out and re-draw each remote stack's region (binary choice — never side-by-side).
 - Iterate on event taxonomy to close visual gaps.
 - **Exit criteria:** new viewer reproduces the visual state convincingly enough to be a real alternative.
-- **Risk to existing:** zero by default. Toggle is off by default; existing behavior unchanged unless the player flips it.
+- **Risk to existing:** zero by default. Flag is off by default; existing behavior unchanged unless something explicitly sets it true.
+- **Future work** (NOT part of this plan): waiting-room UI to flip the per-room flag without code changes.
 
 ### Phase D — DONE (for now)
 - Parallel system exists, is correct, validated.

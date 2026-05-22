@@ -111,14 +111,12 @@ function(self, mode, gameScene)
   -- (DISPLAY_HISTORY_PLAN.md). When false (default), the entire pipeline is
   -- dormant: no engine-signal capture, no `Y` traffic on the wire, no
   -- receive-side decode, no DisplayClientStacks built. Production play pays
-  -- zero overhead. Flip to true to enable the parallel viewer for this room.
+  -- zero overhead.
   --
-  -- Phase C uses the DebugSettings flag as the working toggle; the real
-  -- waiting-room UI is future work. Reading once at room creation snapshots
-  -- the value so flipping the debug setting mid-room doesn't toggle the
-  -- pipeline mid-match.
-  local ok, dbg = pcall(function() return DebugSettings.displayHistoryEnabled() end)
-  self.displayHistoryEnabled = (ok and dbg) or false
+  -- Set explicitly on the room instance to enable; no global setting drives
+  -- this. Real waiting-room UI to flip it per-room is the future work
+  -- noted in the plan.
+  self.displayHistoryEnabled = false
 end)
 
 -- Server payloads can be sparse by playerNumber (e.g. slots 1 and 3 occupied).

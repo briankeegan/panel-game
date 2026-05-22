@@ -1,44 +1,40 @@
 ---@class DisplayEventCapture
 ---
---- Phase A of the display-history replication plan
---- (see DISPLAY_HISTORY_PLAN.md). Pure observer of a local player's
---- engine signals. Builds frame-stamped event records and batches them
---- out via NetClient:sendDisplayEvents.
+--- Snapshot-based capture for the parallel "Spectator View: New" pipeline
+--- (see DISPLAY_HISTORY_PLAN.md). Periodically snapshots the local engine's
+--- *current state* (panel grid, displacement, cursor, scalars) and ships
+--- the snapshot to other clients via NetClient:sendDisplayEvents.
 ---
---- Does NOT modify any engine state, does NOT change any existing send
---- path. Old input-replication system remains the authoritative path
---- for remote view-stacks; this module's events are an independent
---- parallel stream that the receiver may or may not render.
+--- Receivers do zero simulation — they store the latest snapshot and paint
+--- from it directly. The sender does NO work beyond reading its own engine
+--- fields and serializing them.
 ---
 --- Lifecycle:
 ---   capture = DisplayEventCapture.new(engine, playerID)
----   capture:start()      -- subscribe to engine signals; begin buffering
----   capture:stop()       -- disconnect from engine; flush remaining buffer
+---   capture:start()      -- begin periodic snapshots
+---   capture:stop()       -- stop and flush
 ---
---- Wire format (per batch, JSON):
----   { from = <playerID>, events = [ { f, t, ... }, ... ] }
---- where each event has a frame stamp `f`, a 1-char type tag `t`,
---- and type-specific fields.
+--- Wire format (one batch per send):
+---   { from = <playerID>, snapshot = { f, d, cr, cc, w, h, p[..], ... } }
+--- The shape is small-key for bandwidth; the receiver expands when applying.
 
 local logger = require("common.lib.logger")
-local Signal = require("common.lib.signal")
 
 ---@class DisplayEventCapture
----@field engine Stack the local engine being observed
----@field playerID integer wire identifier stamped onto outgoing batches
----@field events table[] buffered events awaiting the next flush
----@field lastFlushTime number love.timer.getTime() at last successful flush
+---@field engine Stack the local player's engine stack being observed
+---@field playerID integer wire identifier for the sending player
+---@field lastFlushTime number love.timer.getTime() at last successful send
 ---@field started boolean idempotency flag for start()/stop()
+---@field _heartbeatSubscriber table? subscriber object connected to engine.finishedRun for the periodic flush check
 local DisplayEventCapture = {}
 DisplayEventCapture.__index = DisplayEventCapture
 
--- Flush cadence target. 50ms ≈ 20 batches/sec. Receivers buffer ~100ms
--- so a flush rate of 20Hz keeps display latency bounded without spamming
--- the gameplay socket. Flush trigger is the engine's `finishedRun` signal
--- (one per engine tick), so the real check fires at engine-tick rate
--- (≤60Hz) and the flush actually fires when wall-clock crosses the
--- threshold.
-local FLUSH_INTERVAL_S = 0.05
+-- Send cadence target: 20Hz (~50ms). The grid only meaningfully changes
+-- between ticks when panels move; 20Hz is well below 60Hz engine rate but
+-- visually smooth enough for a peer's board. The heartbeat is the engine's
+-- `finishedRun` signal (one per tick); _maybeSend gates the actual send
+-- on wall-clock elapsed so the rate is independent of tick rate.
+local SEND_INTERVAL_S = 0.05
 
 ---@param engine Stack the local player's engine stack
 ---@param playerID integer wire identifier for the sending player
@@ -49,149 +45,135 @@ function DisplayEventCapture.new(engine, playerID)
   local self = setmetatable({}, DisplayEventCapture)
   self.engine        = engine
   self.playerID      = playerID
-  self.events        = {}
   self.lastFlushTime = 0
   self.started       = false
   return self
 end
 
----Subscribe to the local engine's signals. Idempotent — calling start()
----twice is a no-op (second call returns without re-subscribing).
+----------------------------------------------------------------------
+-- Snapshot construction
+----------------------------------------------------------------------
+
+-- Compact a Panel object to the minimum needed to draw it. Skipping fields
+-- the renderer doesn't read keeps the wire payload small (the grid is the
+-- dominant cost). Nil-out empty / default values to compress further when
+-- JSON-encoded (json.encode skips nil entries).
+---@param panel Panel?
+---@return table? cell nil when panel is nil; otherwise a compact wire-cell
+local function snapshotCell(panel)
+  if not panel then return nil end
+  local cell = {
+    -- color: 0/nil = empty slot, 1-8 = panel color
+    c = panel.color,
+    -- state: short string (already short in engine; "normal", "swapping",
+    -- "popping", "matched", "landing", "hovering", "falling", "dimmed",
+    -- "dead", "popped"). Receiver picks sprite by this.
+    s = panel.state,
+  }
+  -- Timers / flags only if non-default so JSON stays small.
+  if panel.timer       and panel.timer ~= 0       then cell.t  = panel.timer end
+  if panel.isGarbage                              then cell.g  = true end
+  if panel.metal                                  then cell.m  = true end
+  if panel.chaining                               then cell.ch = true end
+  if panel.garbageId                              then cell.gi = panel.garbageId end
+  return cell
+end
+
+-- Build a wire-ready snapshot of the engine's current state. Pure read —
+-- never mutates the engine.
+---@param engine Stack
+---@return table snapshot
+local function buildSnapshot(engine)
+  local width  = engine.width  or 6
+  local height = engine.height or 12
+
+  -- Grid is a flat list indexed by (row-1)*width + (col-1), 1-based.
+  -- Why flat: nested tables JSON-encode with more punctuation; flat keeps
+  -- the wire compact. Receiver re-indexes by the same formula.
+  local panels = {}
+  local enginePanels = engine.panels
+  if enginePanels then
+    -- Walk rows 0..height+1 (engine uses row 0 for the buffer below the
+    -- play area and row height+1 for the upcoming row above) so all
+    -- visible cells are captured. Empty cells stay nil.
+    for row = 0, math.min(height + 1, #enginePanels) do
+      local enginePanelRow = enginePanels[row]
+      if enginePanelRow then
+        for col = 1, width do
+          local idx = row * width + col
+          panels[idx] = snapshotCell(enginePanelRow[col])
+        end
+      end
+    end
+  end
+
+  return {
+    f  = engine.clock                      or 0,
+    d  = engine.displacement               or 0,
+    cr = engine.cur_row                    or 1,
+    cc = engine.cur_col                    or 1,
+    w  = width,
+    h  = height,
+    sh = engine.shake_time                 or 0,
+    psh= engine.prev_shake_time            or 0,
+    ic = engine.in_countdown and true or false,
+    ct = engine.countdown_timer            or 0,
+    go = engine.game_over_clock            or 0,
+    im = engine.inputMethod                or "controller",
+    cn = engine.chain_counter              or 0,
+    p  = panels,
+  }
+end
+
+----------------------------------------------------------------------
+-- Lifecycle
+----------------------------------------------------------------------
+
+---Begin shipping periodic snapshots. Subscribes to engine's finishedRun
+---signal as the heartbeat — once per engine tick we check wall-clock and
+---send if the interval has elapsed. Idempotent.
 function DisplayEventCapture:start()
   if self.started then return end
   self.started       = true
   self.lastFlushTime = love.timer.getTime()
-
-  local engine = self.engine
-  engine:connectSignal("cursorMoved",   self, self.onCursorMoved)
-  engine:connectSignal("panelsSwapped", self, self.onPanelsSwapped)
-  engine:connectSignal("panelLanded",   self, self.onPanelLanded)
-  engine:connectSignal("panelPop",      self, self.onPanelPop)
-  engine:connectSignal("matched",       self, self.onMatched)
-  engine:connectSignal("newRow",        self, self.onNewRow)
-  engine:connectSignal("gameOver",      self, self.onGameOver)
-  -- finishedRun fires once per engine tick. We use it as the flush
-  -- heartbeat — the wall-clock interval check inside _maybeFlush keeps
-  -- the actual send rate at ~20Hz even though the heartbeat is 60Hz.
-  engine:connectSignal("finishedRun",   self, self.onFinishedRun)
+  -- finishedRun fires once per engine tick (≤60Hz); _maybeSend rate-limits
+  -- via wall-clock so we send at ~20Hz regardless.
+  self.engine:connectSignal("finishedRun", self, self.onFinishedRun)
 end
 
----Disconnect from the engine. Flushes any remaining buffered events.
+---Stop the capture and send one final snapshot so the receiver sees the
+---terminal state (e.g. a game-over board). Idempotent.
 function DisplayEventCapture:stop()
   if not self.started then return end
   self.started = false
-  -- Disconnect first to avoid any stray events landing during flush.
+  local Signal = require("common.lib.signal")
   Signal.disconnectSubscriber(self.engine, self)
-  self:_flush()
+  self:_send()
 end
 
 ----------------------------------------------------------------------
--- Internal: event capture + buffering
+-- Internal: send gating
 ----------------------------------------------------------------------
 
-function DisplayEventCapture:_pushEvent(ev)
-  -- Frame stamp is captured at emit-time so the receiver can replay at
-  -- the same in-engine timing as the sender.
-  ev.f = self.engine.clock
-  self.events[#self.events + 1] = ev
+function DisplayEventCapture:onFinishedRun()
+  self:_maybeSend()
 end
 
-function DisplayEventCapture:_maybeFlush()
+function DisplayEventCapture:_maybeSend()
   local now = love.timer.getTime()
-  if (now - self.lastFlushTime) < FLUSH_INTERVAL_S then return end
-  self:_flush(now)
+  if (now - self.lastFlushTime) < SEND_INTERVAL_S then return end
+  self:_send(now)
 end
 
-function DisplayEventCapture:_flush(now)
-  if #self.events == 0 then
-    self.lastFlushTime = now or love.timer.getTime()
-    return
-  end
-  local batch = { from = self.playerID, events = self.events }
-  self.events = {}
+function DisplayEventCapture:_send(now)
   self.lastFlushTime = now or love.timer.getTime()
-  -- Guarded so a NetClient hiccup or missing connection doesn't break
-  -- the engine pipeline. Display events are non-critical by design.
   if not (GAME and GAME.netClient) then return end
+  local snapshot = buildSnapshot(self.engine)
+  local batch = { from = self.playerID, snapshot = snapshot }
   local ok, err = pcall(GAME.netClient.sendDisplayEvents, GAME.netClient, batch)
   if not ok then
     logger.warn("[DisplayEventCapture] sendDisplayEvents failed: " .. tostring(err))
   end
-end
-
-----------------------------------------------------------------------
--- Signal handlers. Each is a *pure observer* — it inspects signal args
--- and the engine's current state and produces an event record. None
--- mutates the engine or any external state outside this capture's own
--- buffer.
-----------------------------------------------------------------------
-
----@param previousRow integer
----@param previousCol integer
-function DisplayEventCapture:onCursorMoved(previousRow, previousCol)
-  -- Only emit when the cursor actually moved. Skips the "synthetic" calls
-  -- from controls() that fire on every press even if direction blocked.
-  if self.engine.cur_row == previousRow and self.engine.cur_col == previousCol then
-    return
-  end
-  self:_pushEvent({ t = "C", r = self.engine.cur_row, c = self.engine.cur_col })
-end
-
-function DisplayEventCapture:onPanelsSwapped()
-  self:_pushEvent({ t = "S", r = self.engine.cur_row, c = self.engine.cur_col })
-end
-
----@param panel Panel
-function DisplayEventCapture:onPanelLanded(panel)
-  self:_pushEvent({ t = "L", r = panel.row, c = panel.column })
-end
-
----@param panel Panel
-function DisplayEventCapture:onPanelPop(panel)
-  self:_pushEvent({ t = "P", r = panel.row, c = panel.column, color = panel.color })
-end
-
----@param engine Stack
----@param attackGfxOrigin any
----@param isChainLink boolean
----@param comboSize integer
----@param metalCount integer
----@param garbagePanelCount integer
-function DisplayEventCapture:onMatched(engine, attackGfxOrigin, isChainLink, comboSize, metalCount, garbagePanelCount)
-  self:_pushEvent({
-    t        = "M",
-    combo    = comboSize,
-    chain    = isChainLink and true or false,
-    metal    = metalCount,
-    garbage  = garbagePanelCount,
-  })
-end
-
----@param engine Stack
-function DisplayEventCapture:onNewRow(engine)
-  -- Capture the bottom-row state so the receiver can mirror what just
-  -- appeared. Sending color IDs only (not full panel state) is enough
-  -- for display.
-  local row = engine.panels and engine.panels[1]
-  if not row then return end
-  local colors = {}
-  for col = 1, #row do
-    local p = row[col]
-    colors[col] = p and p.color or 0
-  end
-  self:_pushEvent({ t = "R", colors = colors })
-end
-
----@param engine Stack
-function DisplayEventCapture:onGameOver(engine)
-  self:_pushEvent({ t = "D" })
-  -- Force-flush on gameOver so the receiver sees the death right away
-  -- rather than waiting up to FLUSH_INTERVAL_S for the next heartbeat.
-  self:_flush()
-end
-
-function DisplayEventCapture:onFinishedRun()
-  self:_maybeFlush()
 end
 
 return DisplayEventCapture

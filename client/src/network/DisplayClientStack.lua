@@ -1,210 +1,230 @@
 ---@class DisplayClientStack
 ---
---- Phase B of the display-history replication plan
---- (see DISPLAY_HISTORY_PLAN.md). Lightweight stand-in for a remote
---- player's view-stack. Consumes display events from the wire and
---- mutates a visualState table. Has NO engine, NO physics, NO rollback,
---- NO input apply. Render is a stub until Phase C wires real drawing.
+--- Snapshot-based receiver for the parallel "Spectator View: New"
+--- pipeline (see DISPLAY_HISTORY_PLAN.md). Holds the latest snapshot
+--- shipped by a remote player's DisplayEventCapture; does NO simulation.
 ---
---- Built and routed by ClientMatch when the room flag
---- displayHistoryEnabled is true. When the flag is false, no DisplayClientStacks
---- are ever instantiated and this module is dormant.
+--- The receiver path is intentionally trivial:
+---   applyBatch({from, snapshot}) → just stores the snapshot
+---   render(viewStack)            → paints from the stored snapshot
 ---
---- Wire event tags (from DisplayEventCapture):
----   C  cursor moved      { r, c }
----   S  panels swapped    { r, c }
----   L  panel landed      { r, c }
----   P  panel pop         { r, c, color }
----   M  matched           { combo, chain, metal, garbage }
----   R  new row           { colors }
----   D  game over         {}
----
---- All event handlers are pure — they update visualState in place. The
---- renderer (Phase C) reads visualState directly.
+--- No engine, no physics, no rollback, no event log. The snapshot IS the
+--- state; we draw whatever the sender most recently said its board looks
+--- like.
 
 local logger = require("common.lib.logger")
 
----@class DisplayClientStackVisualState
----@field cursorRow integer
----@field cursorCol integer
----@field swapPulse integer increments on each swap event; renderer uses for flash effects
----@field landings { r: integer, c: integer, f: integer? }[] recent panel landings ring
----@field pops { r: integer, c: integer, color: integer?, f: integer? }[] recent panel pops ring
----@field matches { combo: integer?, chain: boolean?, metal: integer?, garbage: integer?, f: integer? }[] recent match events
----@field rows integer count of new-row events received
----@field lastRowColors integer[]? colors of the most recent new row
----@field dead boolean true after a D (gameOver) event has been applied
+---@class DisplayClientStackSnapshot
+---@field f integer engine clock at snapshot time
+---@field d integer displacement (0-15) smooth scroll offset
+---@field cr integer cursor row
+---@field cc integer cursor col
+---@field w integer board width in panels
+---@field h integer board height in panels
+---@field sh integer shake_time
+---@field psh integer prev_shake_time
+---@field ic boolean in_countdown
+---@field ct integer countdown_timer
+---@field go integer game_over_clock (0 if alive)
+---@field im string inputMethod ("controller" | "touch")
+---@field cn integer chain_counter
+---@field p table flat panels array, indexed (row-1)*width + col; empty slots = nil
 
 ---@class DisplayClientStack
----@field playerID integer wire identifier of the remote player this stack mirrors
----@field player Player? optional reference to the matching Player (for name / layout)
----@field lastFrame integer most recent frame stamp applied (engine clock of the sender)
----@field eventsApplied integer running total of events successfully applied (diagnostic)
----@field pendingEvents table[] reserved for playback-buffer use in future iterations
----@field visualState DisplayClientStackVisualState
+---@field playerID integer wire identifier of the remote player
+---@field player Player? optional reference to the local Player object (for name / layout)
+---@field snapshot DisplayClientStackSnapshot? most recent snapshot received, nil until the first arrives
+---@field snapshotsApplied integer running count of snapshots applied (diagnostic)
 local DisplayClientStack = {}
 DisplayClientStack.__index = DisplayClientStack
 
----@param playerID integer wire identifier for the remote player
----@param player Player? optional reference to the local Player object (for layout / name lookup)
+---@param playerID integer
+---@param player Player?
 ---@return DisplayClientStack
 function DisplayClientStack.new(playerID, player)
   local self = setmetatable({}, DisplayClientStack)
-  self.playerID = playerID
-  self.player   = player
-  -- Last-known frame stamp from an applied event. Lets the renderer (or
-  -- diagnostics) know how current this stack's view is.
-  self.lastFrame = 0
-  -- Counter for diagnostics; lets us know if events are flowing without
-  -- needing to attach a debugger.
-  self.eventsApplied = 0
-  -- Buffer of received-but-not-yet-applied events. Phase B applies
-  -- immediately; Phase C may add a playback-buffer delay so visuals are
-  -- smoothed against network jitter.
-  self.pendingEvents = {}
-  -- The visual state that the renderer reads. Phase B keeps this minimal;
-  -- Phase C will extend as the renderer needs more.
-  self.visualState = {
-    cursorRow   = 1,
-    cursorCol   = 1,
-    swapPulse   = 0,    -- counter incremented on each S event; used by render to flash
-    landings    = {},   -- recent panel landings (for animation hooks in Phase C)
-    pops        = {},   -- recent panel pops
-    matches     = {},   -- recent match events (combo / chain telemetry)
-    rows        = 0,    -- count of new-row events; visualizable as a raise indicator
-    dead        = false,
-  }
+  self.playerID         = playerID
+  self.player           = player
+  self.snapshot         = nil
+  self.snapshotsApplied = 0
   return self
 end
 
----Apply a single decoded event to visualState. Pure: no network IO,
----no engine state mutation, no external side effects.
----@param ev table { f, t, ... }
-function DisplayClientStack:applyEvent(ev)
-  if type(ev) ~= "table" then return end
-  local tag = ev.t
-  if not tag then return end
-  if ev.f then self.lastFrame = ev.f end
-  self.eventsApplied = self.eventsApplied + 1
-
-  local vs = self.visualState
-  if tag == "C" then
-    vs.cursorRow = ev.r or vs.cursorRow
-    vs.cursorCol = ev.c or vs.cursorCol
-  elseif tag == "S" then
-    vs.cursorRow = ev.r or vs.cursorRow
-    vs.cursorCol = ev.c or vs.cursorCol
-    vs.swapPulse = vs.swapPulse + 1
-  elseif tag == "L" then
-    vs.landings[#vs.landings + 1] = { r = ev.r, c = ev.c, f = ev.f }
-    -- Bound the landings ring to avoid unbounded growth between renders.
-    if #vs.landings > 64 then table.remove(vs.landings, 1) end
-  elseif tag == "P" then
-    vs.pops[#vs.pops + 1] = { r = ev.r, c = ev.c, color = ev.color, f = ev.f }
-    if #vs.pops > 64 then table.remove(vs.pops, 1) end
-  elseif tag == "M" then
-    vs.matches[#vs.matches + 1] = {
-      combo = ev.combo, chain = ev.chain, metal = ev.metal, garbage = ev.garbage, f = ev.f,
-    }
-    if #vs.matches > 16 then table.remove(vs.matches, 1) end
-  elseif tag == "R" then
-    vs.rows = vs.rows + 1
-    vs.lastRowColors = ev.colors
-  elseif tag == "D" then
-    vs.dead = true
-  end
-end
-
----Apply a whole batch (the wire shape is {from, events}). Convenience
----wrapper around applyEvent.
----@param batch table { from, events }
+---Apply an inbound batch. The batch is the JSON-decoded `Y` payload —
+---{ from = playerID, snapshot = {...} }. We just store the snapshot;
+---no per-field event handling.
+---@param batch table
 function DisplayClientStack:applyBatch(batch)
-  if type(batch) ~= "table" or type(batch.events) ~= "table" then return end
-  for _, ev in ipairs(batch.events) do
-    self:applyEvent(ev)
-  end
+  if type(batch) ~= "table" then return end
+  local snapshot = batch.snapshot
+  if type(snapshot) ~= "table" then return end
+  self.snapshot = snapshot
+  self.snapshotsApplied = self.snapshotsApplied + 1
 end
 
----Diagnostic snapshot. Useful from a debug overlay or test.
+---Diagnostic snapshot for tests / debug overlays.
 function DisplayClientStack:debugSnapshot()
+  local s = self.snapshot or {}
   return {
-    playerID      = self.playerID,
-    lastFrame     = self.lastFrame,
-    eventsApplied = self.eventsApplied,
-    cursorRow     = self.visualState.cursorRow,
-    cursorCol     = self.visualState.cursorCol,
-    rows          = self.visualState.rows,
-    dead          = self.visualState.dead,
+    playerID         = self.playerID,
+    snapshotsApplied = self.snapshotsApplied,
+    frame            = s.f,
+    cursorRow        = s.cr,
+    cursorCol        = s.cc,
+    gameOverClock    = s.go,
   }
 end
 
----Phase C render. With the per-room flag on, the old PlayerStack:render
----is suppressed (stack.canvas = nil) so this method is the ONLY source
----of visuals for the remote player. Until the event taxonomy covers
----full panel grid state, we draw a placeholder: solid background filling
----the view-stack region, the cursor position from visualState, a
----"NEW VIEWER" label, and a diagnostic line showing event flow.
----
----This is intentionally not a faithful reproduction of the old viewer
----— it's a "this works, the new pipeline is alive" indicator. The real
----faithful render needs events for panel landings, pops, rows, etc. to
----reconstruct the grid.
----
----@param viewStack table|nil the matching existing ClientStack (for layout)
-function DisplayClientStack:render(viewStack)
-  if not viewStack then return end
+-- Empty danger-column table reused per draw call (no per-column danger
+-- visualization in the snapshot viewer yet — keep panels visually static
+-- rather than animate danger).
+local NO_DANGER = {}
 
+-- Walk the snapshot grid, painting each non-empty cell as a panel sprite.
+-- Re-uses the same Panels:addToDraw batch system PlayerStack:drawPanels
+-- uses. Cells are drawn in their resting "normal" state regardless of
+-- their actual engine state — this gives a correct board LAYOUT and
+-- COLOR scheme without needing to ship matched/swapping/popping animation
+-- timers. Garbage cells are drawn as a generic dark block; full garbage
+-- rendering is a later iteration.
+---@param self DisplayClientStack
+---@param viewStack table the matching ClientStack (for panels_dir + gfxScale)
+---@param snapshot DisplayClientStackSnapshot
+local function paintGridFromSnapshot(self, viewStack, snapshot)
+  local panelsDir = viewStack.panels_dir
+  if not panelsDir then return end
+  local panelSet = panels and panels[panelsDir]
+  if not panelSet or not panelSet.addToDraw then return end
+
+  panelSet:prepareDraw()
+
+  local width  = snapshot.w or 6
+  local height = snapshot.h or 12
+  local displacement = snapshot.d or 0
+  local grid = snapshot.p or {}
+
+  -- Loop matches PlayerStack:drawPanels' iteration order (rows from
+  -- bottom, columns right-to-left so swap animations layer correctly).
+  for row = 0, height do
+    for col = width, 1, -1 do
+      local cell = grid[row * width + col]
+      if cell and cell.c and cell.c ~= 0 and cell.s ~= "popped" then
+        local draw_x = 4 + (col - 1) * 16
+        local draw_y = 4 + (11 - row) * 16 + displacement
+
+        if cell.g then
+          -- Garbage placeholder: dark filled rect. Full garbage block
+          -- rendering needs x_offset/y_offset/width/height in the
+          -- snapshot; track for later iteration.
+          love.graphics.push("all")
+          love.graphics.setColor(0.25, 0.20, 0.15, 1.0)
+          love.graphics.rectangle("fill",
+            draw_x * viewStack.gfxScale, draw_y * viewStack.gfxScale,
+            16 * viewStack.gfxScale, 16 * viewStack.gfxScale)
+          love.graphics.pop()
+        else
+          -- Force state="normal" — non-resting states need fields we
+          -- don't ship yet (frameTimes for matched, isSwappingFromLeft
+          -- for swapping). Drawing as normal keeps panels visible and
+          -- correctly positioned; missing animations are a known
+          -- limitation of this first cut.
+          local fakePanel = {
+            color   = cell.c,
+            state   = "normal",
+            column  = col,
+            timer   = 0,
+          }
+          panelSet:addToDraw(fakePanel, draw_x, draw_y, viewStack.gfxScale,
+            NO_DANGER, 0, 0)
+        end
+      end
+    end
+  end
+
+  panelSet:drawBatch()
+end
+
+-- Cursor sprite is fetched the same way PlayerStack:render_cursor does:
+-- alternating frame indexed by snapshot.f / 16 % 2. Position in panel
+-- coords matches the engine's (cur_col-1)*16, (11-cur_row)*16 +
+-- displacement formula.
+local function paintCursorFromSnapshot(self, viewStack, snapshot)
+  local theme = viewStack.theme or (themes and themes[config and config.theme])
+  if not theme or not theme.images or not theme.images.cursor then return end
+  local frameIndex = (math.floor((snapshot.f or 0) / 16) % 2) + 1
+  local cursor = theme.images.cursor[frameIndex]
+  if not cursor or not cursor.image then return end
+
+  -- During countdown the cursor blinks (alternating frames invisible);
+  -- mirror PlayerStack:render_cursor's behavior.
+  local countdown_timer = snapshot.ct or 0
+  if countdown_timer > 0 and ((snapshot.f or 0) % 2 ~= 0) then return end
+
+  local desiredCursorWidth = 40
+  local panelWidth = 16
+  local scale_x = desiredCursorWidth / cursor.image:getWidth()
+  local scale_y = 24 / cursor.image:getHeight()
+  local xPosition = ((snapshot.cc or 1) - 1) * panelWidth
+  local yPosition = (11 - (snapshot.cr or 1)) * panelWidth + (snapshot.d or 0)
+
+  -- Dim if the sender is dead.
+  if (snapshot.go or 0) > 0 then
+    love.graphics.setColor(1, 1, 1, 0.3)
+  end
+
+  love.graphics.draw(cursor.image,
+    xPosition * viewStack.gfxScale,
+    yPosition * viewStack.gfxScale,
+    0,
+    scale_x * viewStack.gfxScale,
+    scale_y * viewStack.gfxScale)
+  love.graphics.setColor(1, 1, 1, 1)
+end
+
+---Render this remote player's board from the stored snapshot. Uses the
+---existing Panels:addToDraw batch system so panel sprites match the
+---player's chosen panel mod. Drawn inside viewStack:setDrawArea so the
+---transform / scissor match the old viewer's coordinate system.
+---
+---No engine work. The snapshot is the state; we paint from it directly.
+---@param viewStack table the matching ClientStack (for layout)
+function DisplayClientStack:render(viewStack)
+  if not viewStack or not self.snapshot then return end
+  if not viewStack.setDrawArea or not viewStack.resetDrawArea then return end
+
+  -- Solid background so the new viewer fully replaces the old (which is
+  -- suppressed via stack.canvas = nil at match start).
   local scale = viewStack.gfxScale or 3
   local ox = (viewStack.frameOriginX or 0) * scale
   local oy = (viewStack.frameOriginY or 0) * scale
   local w  = (viewStack.baseWidth   or 0) * scale
   local h  = (viewStack.baseHeight  or 0) * scale
+  if w > 0 and h > 0 then
+    love.graphics.push("all")
+    love.graphics.setColor(0.05, 0.05, 0.08, 1.0)
+    love.graphics.rectangle("fill", ox, oy, w, h)
+    love.graphics.pop()
+  end
 
-  if w <= 0 or h <= 0 then return end
-
+  viewStack:setDrawArea(0, 0)
   love.graphics.push("all")
 
-  -- Solid dark background so the new viewer fully replaces the area.
-  love.graphics.setColor(0.08, 0.08, 0.12, 1.0)
-  love.graphics.rectangle("fill", ox, oy, w, h)
-
-  -- Subtle border so the player can see this is the new viewer.
-  love.graphics.setColor(0.4, 1.0, 0.4, 0.7)
-  love.graphics.setLineWidth(2)
-  love.graphics.rectangle("line", ox, oy, w, h)
-
-  -- Cursor: use the panel-coord math from PlayerStack:render_cursor.
-  -- Cursor straddles two columns (panel widths) and sits one panel tall.
-  if viewStack.setDrawArea and viewStack.resetDrawArea then
-    viewStack:setDrawArea(0, 0)
-    love.graphics.push("transform")
-    love.graphics.scale(scale, scale)
-    local panelWidth = 16
-    local visibleRows = 11
-    local vs = self.visualState
-    local cx = (vs.cursorCol - 1) * panelWidth
-    local cy = (visibleRows - vs.cursorRow) * panelWidth
-    love.graphics.setColor(1.0, 0.95, 0.3, 0.95)
-    love.graphics.setLineWidth(1)
-    love.graphics.rectangle("line", cx, cy, panelWidth * 2, panelWidth)
-    love.graphics.pop()
-    viewStack:resetDrawArea()
-  end
-
-  -- Status text confirming the new viewer is active for this stack.
-  love.graphics.setColor(0.7, 1.0, 0.7, 0.95)
-  love.graphics.print("NEW VIEWER", ox + 8, oy + 8)
-  love.graphics.setColor(0.6, 0.7, 0.85, 0.85)
-  local readout = string.format("id=%s evt=%d frame=%d",
-    tostring(self.playerID), self.eventsApplied, self.lastFrame)
-  love.graphics.print(readout, ox + 8, oy + 24)
-
-  if self.visualState.dead then
-    love.graphics.setColor(1, 0.3, 0.3, 0.9)
-    love.graphics.print("DEAD", ox + 8, oy + 42)
-  end
+  -- Paint the grid + cursor inside the panel-coord transform.
+  paintGridFromSnapshot(self, viewStack, self.snapshot)
+  paintCursorFromSnapshot(self, viewStack, self.snapshot)
 
   love.graphics.pop()
+  viewStack:resetDrawArea()
+
+  -- Dead overlay drawn outside setDrawArea so it sits on top of the grid.
+  if (self.snapshot.go or 0) > 0 then
+    love.graphics.push("all")
+    love.graphics.setColor(0, 0, 0, 0.5)
+    love.graphics.rectangle("fill", ox, oy, w, h)
+    love.graphics.setColor(1, 0.3, 0.3, 0.9)
+    love.graphics.print("DEAD", ox + 8, oy + 8)
+    love.graphics.pop()
+  end
 end
 
 return DisplayClientStack

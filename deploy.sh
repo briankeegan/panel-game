@@ -108,6 +108,9 @@ if [[ "${PANEL_SKIP_VERSION_BUMP:-0}" != "1" ]]; then
   fi
   echo "==> Bumping BUILD_VERSION: $CURRENT_VERSION → $NEW_VERSION"
   echo "==> .love artifact filename: $LOVE_FILENAME"
+  # Hardcoded to match LoginRoutine.lua's URL construction. If the repo
+  # path or tag scheme ever changes, both sides must change together.
+  DOWNLOAD_URL="https://github.com/briankeegan/panel-game/releases/download/build-${NEW_VERSION}/${LOVE_FILENAME}"
   # macOS sed needs -i '' or -i.bak; use the latter for portability with Linux.
   sed -i.bak -E "s/(consts\.BUILD_VERSION[[:space:]]*=[[:space:]]*)\"[^\"]+\"/\\1\"$NEW_VERSION\"/" "$CONSTS_FILE"
   rm "${CONSTS_FILE}.bak"
@@ -138,6 +141,9 @@ if [[ "${PANEL_SKIP_VERSION_BUMP:-0}" != "1" ]]; then
   echo ""
   echo "==> Build is now $NEW_VERSION on both sides of the wire."
   echo "    Restart any running client (zsh run_client.sh) to load the new version."
+  echo ""
+  echo "==> Download URL (live once the GitHub Action finishes):"
+  echo "    $DOWNLOAD_URL"
   echo ""
 fi
 

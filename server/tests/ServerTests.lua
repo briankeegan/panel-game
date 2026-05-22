@@ -659,7 +659,7 @@ local function testParseMessage_doesNotRenameTopLevelKeys()
   -- For roomRequest/matchAbort/pauseToggle the parser pulls fields out of
   -- the wire's `content` envelope to the top level (allowed by contract).
   local allowedContentPullup = {
-    roomRequest  = { gameMode = true, latencyTolerance = true, seed = true, openRoom = true },
+    roomRequest  = { gameMode = true, latencyTolerance = true, seed = true, openRoom = true, displayHistoryEnabled = true },
     matchAbort   = {},
     pauseToggle  = {},
   }

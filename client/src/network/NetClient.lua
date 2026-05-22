@@ -1593,7 +1593,11 @@ end
 ---@param gameMode GameMode|GameModeID|string
 ---@param latencyTolerance ("strict"|"normal"|"relaxed")?
 ---@param openRoom boolean? whether this room should accept direct joiners (no invite handshake)
-function NetClient:requestRoom(gameMode, latencyTolerance, openRoom)
+---@param gameMode GameMode | string
+---@param latencyTolerance string?
+---@param openRoom boolean?
+---@param displayHistoryEnabled boolean? per-room flag for the parallel display-history viewer
+function NetClient:requestRoom(gameMode, latencyTolerance, openRoom, displayHistoryEnabled)
   if self:isConnected() then
     if type(gameMode) == "string" then
       local ok, resolvedGameMode = pcall(GameModes.getPreset, gameMode)
@@ -1610,7 +1614,7 @@ function NetClient:requestRoom(gameMode, latencyTolerance, openRoom)
       return
     end
 
-    _sendLobby(self, ClientMessages.sendRoomRequest(gameMode, latencyTolerance, openRoom))
+    _sendLobby(self, ClientMessages.sendRoomRequest(gameMode, latencyTolerance, openRoom, displayHistoryEnabled))
   end
 end
 

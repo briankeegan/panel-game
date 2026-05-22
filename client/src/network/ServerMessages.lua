@@ -202,6 +202,7 @@ function ServerMessages.sanitizeServerMessage(message)
       gameMode = message.content.gameMode,
       replay = message.content.replay,
       roomNumber = message.content.roomNumber,
+      displayHistoryEnabled = message.content.displayHistoryEnabled == true,
     }
     result.spectate_request_granted = true
     if message.type == "joinQueued" then
@@ -229,6 +230,7 @@ function ServerMessages.sanitizeServerMessage(message)
       roomNumber = message.content.roomNumber,
       gameMode = message.content.gameMode,
       teamWins = message.content.teamWins,
+      displayHistoryEnabled = message.content.displayHistoryEnabled == true,
     }
   elseif message.type == "addToRoom" then
     local players = {}
@@ -251,6 +253,7 @@ function ServerMessages.sanitizeServerMessage(message)
       gameMode = message.content.gameMode,
       teamWins = message.content.teamWins,
       heldSlots = message.content.heldSlots,
+      displayHistoryEnabled = message.content.displayHistoryEnabled == true,
     }
   else
     return message

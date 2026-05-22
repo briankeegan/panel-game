@@ -52,8 +52,8 @@ require("client.src.globals")
 ---@field windowX number?
 ---@field windowY number?
 ---@field discordCommunityShown boolean
----@field lobbyTeamPrefs { type: string, playerCount: integer, composition: string, garbage: string, latency: string }
----@field lobbyFfaPrefs  { type: string, playerCount: integer, garbage: string, latency: string }
+---@field lobbyTeamPrefs { type: string, playerCount: integer, composition: string, garbage: string, latency: string, spectateView: string }
+---@field lobbyFfaPrefs  { type: string, playerCount: integer, garbage: string, latency: string, spectateView: string }
 ---@field max_lag_frames integer? developer override for the desync-tolerance window (defaults to 230 when absent)
 config = {
     -- The last used engine version
@@ -126,17 +126,19 @@ config = {
     -- versa). Each field is independently validated on read; an unknown
     -- value falls back to the default rather than rejecting the whole blob.
     lobbyTeamPrefs                = {
-      type        = "open",    -- "invite" | "open"
-      playerCount = 6,         -- 3 | 4 | 5 | 6 | 7
-      composition = "3 vs 3",  -- label from Lobby.TEAM_DIVISIONS[playerCount]
-      garbage     = "shared",  -- "all" (broadcast) | "shared" (round robin)
-      latency     = "normal",  -- "strict" | "normal" | "relaxed"
+      type         = "open",    -- "invite" | "open"
+      playerCount  = 6,         -- 3 | 4 | 5 | 6 | 7
+      composition  = "3 vs 3",  -- label from Lobby.TEAM_DIVISIONS[playerCount]
+      garbage      = "shared",  -- "all" (broadcast) | "shared" (round robin)
+      latency      = "normal",  -- "strict" | "normal" | "relaxed"
+      spectateView = "old",     -- "old" (input-replication) | "new" (display-history). Per-client choice for how OTHER players' boards are rendered to you.
     },
     lobbyFfaPrefs                 = {
-      type        = "open",
-      playerCount = 7,         -- 3 | 4 | 5 | 7
-      garbage     = "all",
-      latency     = "normal",
+      type         = "open",
+      playerCount  = 7,         -- 3 | 4 | 5 | 7
+      garbage      = "all",
+      latency      = "normal",
+      spectateView = "old",     -- per-client; see lobbyTeamPrefs.spectateView
     },
 
     -- True if we immediately want to maximize the screen on startup

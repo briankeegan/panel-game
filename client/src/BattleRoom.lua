@@ -111,14 +111,14 @@ function(self, mode, gameScene)
   self:createSignal("matchCreated")
 
   -- Per-room gate for the display-history replication system
-  -- (DISPLAY_HISTORY_PLAN.md). When false (default), the entire pipeline is
-  -- dormant: no engine-signal capture, no `Y` traffic on the wire, no
-  -- receive-side decode, no DisplayClientStacks built. Production play pays
-  -- zero overhead.
+  -- (DISPLAY_HISTORY_PLAN.md). Default false; the entire pipeline is
+  -- dormant unless every client in the room agrees the flag is on.
   --
-  -- Set explicitly on the room instance to enable; no global setting drives
-  -- this. Real waiting-room UI to flip it per-room is the future work
-  -- noted in the plan.
+  -- Server-authoritative: the host picks the value at room-create time;
+  -- the server stuffs it onto the Room and echoes it to every joiner via
+  -- ServerProtocol.addToRoom. Each client's BattleRoom.createFromServer-
+  -- Message reads it from the wire message and sets this field there.
+  -- Local-only modes (no server, no other clients) keep the default.
   self.displayHistoryEnabled = false
 end)
 
@@ -152,6 +152,12 @@ function BattleRoom.createFromServerMessage(message)
   local gameMode = GameModes.createFromServerData(message.gameMode)
   local battleRoom = BattleRoom(gameMode)
   battleRoom.roomNumber = message.roomNumber
+  -- Per-room "Spectator View" flag set by the room's host and echoed by
+  -- the server in addToRoom. Every client in the room reads it from the
+  -- same authoritative source so all clients agree.
+  if message.displayHistoryEnabled == true then
+    battleRoom.displayHistoryEnabled = true
+  end
 
   if message.spectate_request_granted then
     battleRoom.pendingPromotion = message.pendingPromotion or false

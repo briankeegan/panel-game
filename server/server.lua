@@ -1593,6 +1593,10 @@ function Server:processMessage(message, connection)
         -- invite handshake) from roster shape (fixed vs dynamic): an Open Team
         -- 2v2 has min==max==4 but should accept drop-in joiners.
         requestedGameMode.openRoom                 = message.openRoom == true
+        -- Per-room "Spectator View" flag (DISPLAY_HISTORY_PLAN.md). The host's
+        -- choice becomes the room's setting; every joiner learns about it via
+        -- ServerProtocol.addToRoom so all clients agree.
+        requestedGameMode.displayHistoryEnabled    = message.displayHistoryEnabled == true
         -- Optional seed override. Ride the requestedGameMode the rest of the
         -- way (deep-copied by GameModes.getPreset, so this won't bleed into
         -- other rooms). Consumed in Game.createFromRoomState. Sanitized to a

@@ -53,6 +53,7 @@ function RoomCreateFfaMenu:rebuildMenu()
     end, tooltipFn),
     RoomCreateRows.createGarbageRow(prefs, tooltipFn),
     RoomCreateRows.createLatencyRow(prefs, tooltipFn),
+    RoomCreateRows.createSpectateViewRow(prefs, tooltipFn),
     RoomCreateRows.createCreateButton(function() self:submit() end, tooltipFn),
     RoomCreateRows.createCancelButton(tooltipFn),
   }
@@ -97,11 +98,16 @@ function RoomCreateFfaMenu:submit()
     GAME.netClient:sendPlayerSettings(GAME.localPlayer)
   end
 
+  local displayHistoryEnabled = (prefs.spectateView == "new")
   logger.info(string.format(
-    "RoomCreateFfaMenu submit: type=%s players=%d garbage=%s latency=%s mode=%s",
-    prefs.type, prefs.playerCount, prefs.garbage, prefs.latency, modeIdName))
+    "RoomCreateFfaMenu submit: type=%s players=%d garbage=%s latency=%s spectateView=%s mode=%s",
+    prefs.type, prefs.playerCount, prefs.garbage, prefs.latency, tostring(prefs.spectateView), modeIdName))
 
-  GAME.netClient:requestRoom(gameMode, prefs.latency, openRoom)
+  -- Spectator View choice is a PER-ROOM setting now (server-authoritative).
+  -- We ship it in the room request; the server stores it on the room and
+  -- echoes it to every joiner, so every client in the room agrees on
+  -- whether the new viewer is active. See DISPLAY_HISTORY_PLAN.md.
+  GAME.netClient:requestRoom(gameMode, prefs.latency, openRoom, displayHistoryEnabled)
   GAME.navigationStack:pop()
 end
 

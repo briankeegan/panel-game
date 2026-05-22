@@ -273,6 +273,11 @@ function ServerProtocol.addToRoom(room, replay, recipient)
   end
   content.ownerId = owner and owner.publicPlayerID or nil
 
+  -- Per-room "Spectator View" flag (DISPLAY_HISTORY_PLAN.md). Echoed to
+  -- every joiner so all clients in the room agree on whether to run the
+  -- parallel display-history viewer. Default false for legacy clients.
+  content.displayHistoryEnabled = room.displayHistoryEnabled == true
+
   return {
     messageType = msgTypes.jsonMessage,
     messageText = addToRoomMessage,
@@ -331,6 +336,11 @@ function ServerProtocol.spectateRequestGranted(room, replay)
     end
   end
 
+  -- Per-room display-history flag (DISPLAY_HISTORY_PLAN.md). Spectators
+  -- need it too so the new viewer activates for them when the room is
+  -- using it.
+  content.displayHistoryEnabled = room.displayHistoryEnabled == true
+
   return {
     messageType = msgTypes.jsonMessage,
     messageText = spectateRequestGrantedMessage,
@@ -381,6 +391,9 @@ function ServerProtocol.createRoom(room)
       }
     end
   end
+
+  -- Per-room display-history flag (DISPLAY_HISTORY_PLAN.md).
+  content.displayHistoryEnabled = room.displayHistoryEnabled == true
 
   return {
     messageType = msgTypes.jsonMessage,

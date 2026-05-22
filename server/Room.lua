@@ -52,6 +52,7 @@ local consts = require("common.engine.consts")
 ---@field paused boolean true while a player has the match paused
 ---@field allDisconnectedSince integer? wall-clock seconds at the start of the "all players disconnected" grace; set by sweepIdleRooms when no seated player has a live gameplay socket, cleared on any reconnect
 ---@field lastActivityTime integer? wall-clock seconds at the last match-state-changing event in this room; drives the long idle-timeout sweep
+---@field displayHistoryEnabled boolean per-room flag for the parallel display-history viewer (DISPLAY_HISTORY_PLAN.md); set at room-create time, echoed to every joiner
 ---@overload fun(roomNumber: integer, players: ServerPlayer[], gameMode: GameMode, leaderboard: Leaderboard?, clock: (fun(): number)?): Room
 local Room = class(
 ---@param self Room
@@ -76,6 +77,10 @@ function(self, roomNumber, players, gameMode, leaderboard, clock)
   -- direct-join from the lobby. Pre-existing rooms (and tests that construct Room
   -- directly without going through the request path) default to invite-only.
   self.openRoom = (gameMode and gameMode.openRoom == true) or false
+  -- Per-room "Spectator View" flag (DISPLAY_HISTORY_PLAN.md). Set by the
+  -- host at roomRequest time, echoed to every joiner via addToRoom so the
+  -- whole room agrees. Default false for pre-display-history clients.
+  self.displayHistoryEnabled = (gameMode and gameMode.displayHistoryEnabled == true) or false
   self.spectators = {}
   self.win_counts = {}
   -- publicPlayerID → wins, room-lifetime. Restored on rejoin (open rooms).

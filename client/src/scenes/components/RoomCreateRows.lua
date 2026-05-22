@@ -198,6 +198,28 @@ function RoomCreateRows.createGarbageRow(prefs, tooltipFn)
   return item
 end
 
+-- Spectator-view toggle: controls how OTHER players' boards are rendered
+-- on your screen during a match. Your own board is unaffected. The legacy
+-- approach (Old) simulates every other player's game locally — accurate
+-- but heavy with many players. The experimental approach (New) consumes a
+-- stream of visible-event updates from each player and renders directly
+-- from those without simulating their game. Both options ship for
+-- testing so we can compare side by side across sessions.
+---@param prefs table
+---@param tooltipFn (fun(text: string))?
+---@return MenuItem
+function RoomCreateRows.createSpectateViewRow(prefs, tooltipFn)
+  local group = buttonGroup(prefs, "spectateView", {
+    { label = "Old", value = "old",
+      description = "Old: the original way of viewing other players' boards. Your computer simulates every other player's match locally so you can see what they're doing. Reliable, but the more players (3+), the harder your computer works and the choppier it gets. Both options exist side-by-side for testing — switch back here if the new one misbehaves." },
+    { label = "New", value = "new",
+      description = "New (experimental — included for testing): other players send your computer a stream of board updates and you just watch, instead of simulating their match. Much lighter on your computer with 3+ players. Still being built, so visuals may be wrong or missing. Switch back to Old if anything looks broken." },
+  }, tooltipFn)
+  local item = ui.MenuItem.createToggleButtonGroupMenuItem("Spectator View", nil, false, group)
+  attachRowTooltip(item, group, tooltipFn)
+  return item
+end
+
 ---@param prefs table
 ---@param tooltipFn (fun(text: string))?
 ---@return MenuItem

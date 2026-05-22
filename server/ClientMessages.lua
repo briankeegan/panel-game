@@ -41,6 +41,7 @@ local ClientMessages = {}
 ---@field joinRoomRequest any?
 ---@field flagGame any?
 ---@field roomRequest any?
+---@field displayHistoryEnabled boolean? per-room flag for the parallel display-history viewer
 ---@field unknown boolean?
 ---@field type string?
 ---@field user_id any?
@@ -326,12 +327,22 @@ function ClientMessages.parseRoomRequest(roomRequest)
     openRoom = true
   end
 
+  -- Per-room "Spectator View" gate for the parallel display-history pipeline.
+  -- Stored on the Room and echoed to every joiner so every client agrees on
+  -- whether to capture/render via the new viewer. Defaults false; pre-display-
+  -- history clients omit it entirely.
+  local displayHistoryEnabled = false
+  if roomRequest.content and roomRequest.content.displayHistoryEnabled == true then
+    displayHistoryEnabled = true
+  end
+
   return {
     roomRequest = true,
     gameMode = gameMode,
     latencyTolerance = latencyTolerance,
     seed = seed,
     openRoom = openRoom,
+    displayHistoryEnabled = displayHistoryEnabled,
   }
 end
 

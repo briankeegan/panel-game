@@ -200,7 +200,9 @@ end
 ---@param openRoom boolean? true if the room should accept direct joiners (no invite handshake).
 ---  Independent of min/max roster — an Open Team 2v2 has min==max==4 (team structure is fixed)
 ---  but should still accept drop-in joiners. The lobby uses this flag to choose join vs invite buttons.
-function ClientProtocol.sendRoomRequest(gameMode, latencyTolerance, openRoom)
+---@param displayHistoryEnabled boolean? per-room: when true, every client in the room runs the
+---  parallel display-history viewer (DISPLAY_HISTORY_PLAN.md). Optional / defaults to false.
+function ClientProtocol.sendRoomRequest(gameMode, latencyTolerance, openRoom, displayHistoryEnabled)
   local gameModeData = gameMode:getGameModeJSONData()
   local roomRequestMessage = {
     recipient = "server",
@@ -209,6 +211,7 @@ function ClientProtocol.sendRoomRequest(gameMode, latencyTolerance, openRoom)
       gameMode = gameModeData,
       latencyTolerance = latencyTolerance,
       openRoom = openRoom and true or false,
+      displayHistoryEnabled = displayHistoryEnabled and true or false,
     }
   }
   return {

@@ -672,6 +672,12 @@ function BattleRoom:startMatch(replay)
   -- touches the existing input-replication path. Old view-stack rendering
   -- remains the authoritative visualization until Phase C wires the
   -- new renderer.
+  -- Reset both sides of the snapshot pipeline at every match start so a
+  -- previous match's final snapshot doesn't briefly render in the new
+  -- match before the first fresh snapshot arrives. (We deliberately
+  -- keep _displayStacks alive AFTER matchEnded so the dead board stays
+  -- visible — see _stopDisplayCaptures — but at NEW-MATCH start we
+  -- want a clean slate.)
   self._displayCaptures = nil
   self._displayStacks   = nil
   if self.displayHistoryEnabled then
@@ -728,10 +734,15 @@ function BattleRoom:startMatch(replay)
   return match
 end
 
----Stop and detach all DisplayEventCaptures and clear DisplayClientStacks.
----Fired by the match's matchEnded signal so the display-history pipeline
----tears down the moment the match concludes — even before the scene
----unmounts. Idempotent.
+---Stop the DisplayEventCaptures. Fired by the match's matchEnded signal
+---so the sender stops shipping new snapshots the moment the match ends.
+---
+---IMPORTANT: we deliberately keep `_displayStacks` alive after match end
+---so the receiver's renderer keeps painting the LAST snapshot received.
+---Without this, the new viewer would disappear at the moment of death /
+---game-over, which is exactly when the player wants to LOOK at the final
+---board state. The captured snapshots are torn down later when the
+---next match starts (see startMatch reset) or when the scene unmounts.
 function BattleRoom:_stopDisplayCaptures()
   if self._displayCaptures then
     for _, capture in ipairs(self._displayCaptures) do
@@ -739,7 +750,7 @@ function BattleRoom:_stopDisplayCaptures()
     end
     self._displayCaptures = nil
   end
-  self._displayStacks = nil
+  -- _displayStacks intentionally left alive — see comment above.
 end
 
 ---Route an inbound display-event batch to the appropriate

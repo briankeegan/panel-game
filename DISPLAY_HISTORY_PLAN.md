@@ -181,6 +181,22 @@ Each phase ends with the OLD system still running and visually unchanged.
 
 ---
 
+## Garbage flow under flag-on (resolved 2026-05-22)
+
+**Concern**: when the per-room flag is on, `Match:shouldRun` returns false for remote stacks on each client, so remote engines don't tick. Did this break the garbage-delivery path?
+
+**Answer**: no. Garbage delivery in this codebase goes via the server's loose-sync G relay (`NetClient.sendGarbageEvent` → `Room:broadcastGarbageEvent` → `NetClient.processGarbageEvents` → `ClientMatch:applyGarbageEvent`). When opponent A makes a combo:
+1. A's client (flag off or on — A is local on their own machine) ticks A's engine, generates outgoing garbage, fires the G event over the wire
+2. Server relays G to the recipient client(s) via `Room:broadcastGarbageEvent`
+3. Recipient client's `NetClient.processGarbageEvents` decodes and calls `ClientMatch:applyGarbageEvent`, which appends to the recipient's `engine.incomingGarbage` keyed by `body.recipients`
+4. Recipient's local engine ticks (it's the local stack — `Match:shouldRun` always returns true for local), processes `incomingGarbage`, garbage lands on board
+
+Note step 3 doesn't depend on the *sender's* stack ticking on the recipient's client. The G payload contains all the info needed.
+
+**Verified empirically** (Lala vs Gromit 2p_ffa, session_1779475117/118): match showed zero G events in either direction. Trace analysis confirmed this was simply because neither player made a garbage-generating clear (combos <4 or chain length 1 don't send). Match had only 2 chain-ended log lines in 96s. Not a code bug.
+
+**Test signal for the future**: if you suspect garbage isn't reaching the local player in flag-on play, check `logger.info("G emit: ...")` (engine `Match.lua:515/547/592`) immediately after the match. Presence of G emit + corresponding `send:G` in the trace confirms outbound; absence of any chain/combo clears confirms there was simply nothing to send.
+
 ## Remaining open questions (to resolve during Phase A)
 
 - **Event taxonomy completeness.** Does the draft cover every visible visual? Audit during Phase A — likely additions for portrait fade, danger flash, score popup, chain pop animation.

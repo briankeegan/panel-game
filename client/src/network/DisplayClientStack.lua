@@ -333,45 +333,23 @@ end
 ---
 ---No engine work. The snapshot is the state; we paint from it directly.
 ---@param viewStack table the matching ClientStack (for layout)
--- Compute an extrapolated displacement for smoother visuals at 20Hz
--- snapshot rate. Linear extrapolation from prev → latest, projected
--- forward by however much wall-clock time has elapsed since the latest
--- snapshot arrived. Clamped to one snapshot interval ahead so we don't
--- run away if the network stalls. Skips the mod-16 wraparound (when
--- displacement jumps from 15→0 on a new row).
----@param self DisplayClientStack
----@return number? displacement nil if not enough history yet
-local function extrapolatedDisplacement(self)
-  local latest = self.snapshot
-  local prev   = self.prevSnapshot
-  if not latest or not prev then return nil end
-  local interval = self.latestRecvTime - self.prevRecvTime
-  if interval <= 0 then return latest.d end
-  local elapsed = love.timer.getTime() - self.latestRecvTime
-  local alpha   = math.min(1.5, math.max(0, elapsed / interval))
-  local dPrev = prev.d   or 0
-  local dCur  = latest.d or 0
-  -- Skip extrapolation across the mod-16 wrap (new row spawned).
-  if math.abs(dCur - dPrev) > 8 then return dCur end
-  return dCur + alpha * (dCur - dPrev)
-end
+-- Extrapolation was removed: it overshot the latest snapshot then
+-- snapped back on the next arrival, producing visible bounce ("janky,
+-- lowers and raises as it goes"). Render the authoritative latest
+-- snapshot directly. At 20Hz the motion is choppy but stable — better
+-- than smooth-but-bouncing. Proper delayed-interpolation is future
+-- work if smoothness is needed.
 
 function DisplayClientStack:render(viewStack)
   if not viewStack or not self.snapshot then return end
   if not viewStack.setDrawArea or not viewStack.resetDrawArea then return end
 
-  -- Temporarily replace displacement with the extrapolated value so the
-  -- grid paint + cursor reads the smoothed scroll position. Restore
-  -- after rendering so subsequent applyBatch sees the authoritative
-  -- shipped value.
-  local origD = self.snapshot.d
-  local interp = extrapolatedDisplacement(self)
-  if interp then self.snapshot.d = interp end
-
-  -- No background fill — let the scene background (sky / clouds / etc.)
-  -- show through where the old viewer used to draw. The character portrait
-  -- behind the stack is intentionally not drawn here (would need its own
-  -- snapshot data); the empty rows above the panels reveal the scene.
+  -- Match the old viewer's appearance: character portrait behind the
+  -- stack, frame border around it, wall at the bottom of the panel area.
+  -- These read fields off the viewStack itself (character, theme, frame
+  -- assets) and from viewStack.engine for things like displacement, which
+  -- mirrorHudScalars already keeps in sync with the snapshot. Calling
+  -- them directly reuses the existing draw paths instead of rebuilding.
   local scale = viewStack.gfxScale or 3
   local ox = (viewStack.frameOriginX or 0) * scale
   local oy = (viewStack.frameOriginY or 0) * scale
@@ -381,8 +359,18 @@ function DisplayClientStack:render(viewStack)
   viewStack:setDrawArea(0, 0)
   love.graphics.push("all")
 
+  -- Character portrait + stack frame (matches old viewer's layered look).
+  if viewStack.drawCharacter then pcall(viewStack.drawCharacter, viewStack) end
+
   -- Paint the grid + cursor inside the panel-coord transform.
   paintGridFromSnapshot(self, viewStack, self.snapshot)
+
+  -- Frame border + wall at the bottom row.
+  if viewStack.drawFrame then pcall(viewStack.drawFrame, viewStack) end
+  if viewStack.drawWall and self.snapshot.h then
+    pcall(viewStack.drawWall, viewStack, self.snapshot.d or 0, self.snapshot.h)
+  end
+
   paintCursorFromSnapshot(self, viewStack, self.snapshot)
 
   love.graphics.pop()
@@ -397,10 +385,6 @@ function DisplayClientStack:render(viewStack)
     love.graphics.print("DEAD", ox + 8, oy + 8)
     love.graphics.pop()
   end
-
-  -- Restore the authoritative displacement so future applyBatch / lerp
-  -- math reads from the wire value, not the extrapolated render value.
-  self.snapshot.d = origD
 end
 
 return DisplayClientStack

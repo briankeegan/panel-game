@@ -88,6 +88,19 @@ local settingDefinitions = {
     debugBuildOnly = false
   },
   {
+    -- Per-room display-history replication gate (see DISPLAY_HISTORY_PLAN.md).
+    -- When false, the parallel display-event pipeline is dormant — no signal
+    -- capture, no `Y` wire traffic, no DisplayClientStack render. Real per-
+    -- room UI in the waiting room is future work; for Phase C validation the
+    -- DebugSettings flag is the working toggle. BattleRoom reads this when
+    -- it's constructed.
+    key = "displayHistoryEnabled",
+    type = "boolean",
+    default = false,
+    label = "Display History (Parallel Viewer)",
+    debugBuildOnly = false
+  },
+  {
     key = "showDesignHelper",
     type = "boolean",
     default = false,
@@ -318,6 +331,14 @@ end
 ---@return number
 function DebugSettings.getVSFramesBehind()
   return DebugSettings.get("vsFramesBehind") --[[@as number]]
+end
+
+-- Returns whether the parallel display-history pipeline is enabled.
+-- See DISPLAY_HISTORY_PLAN.md. BattleRoom reads this on construction; when
+-- false the entire pipeline is dormant.
+---@return boolean
+function DebugSettings.displayHistoryEnabled()
+  return DebugSettings.get("displayHistoryEnabled") --[[@as boolean]]
 end
 
 -- Sets whether to show stack debug information

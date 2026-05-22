@@ -1441,6 +1441,24 @@ function Server:processMessages()
       q:shallowClear()
     end
 
+    -- Display-history replication relay (parallel system; see
+    -- DISPLAY_HISTORY_PLAN.md). Best-effort fan-out to other room members.
+    -- No game-state recording, no replay log entry, no retry. A dropped
+    -- batch just means receivers' display-stacks lag for a few frames.
+    if connection.incomingDisplayEventQueue.last ~= -1 then
+      local q = connection.incomingDisplayEventQueue
+      local player = self.connectionToPlayer[connection]
+      if player then
+        local room = self.playerToRoom[player]
+        if room and room.broadcastDisplayEvent then
+          for i = q.first, q.last do
+            room:broadcastDisplayEvent(player, q[i])
+          end
+        end
+      end
+      q:shallowClear()
+    end
+
     if connection.incomingMessageQueue.last ~= -1 then
       local q = connection.incomingMessageQueue
       local player = self.connectionToPlayer[connection]

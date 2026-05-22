@@ -73,6 +73,18 @@ local handlers = {
     self.receivedMessageQueue:push({[prefix] = body})
   end,
 
+  [NP.serverMessageTypes.displayEvent.prefix] = function(self, data)
+    -- Display-history replication (parallel system, see DISPLAY_HISTORY_PLAN.md).
+    -- Decode the batch and push to the queue. NetClient's processDisplayEvents
+    -- routes it to the match's DisplayClientStacks. When the receiving room
+    -- has displayHistoryEnabled=false, no Y traffic should arrive in the first
+    -- place; the decode is defensive in case a peer is gated differently.
+    local prefix = NP.serverMessageTypes.displayEvent.prefix
+    local body = decodeJson(data, self.name, prefix)
+    if not body then return end
+    self.receivedMessageQueue:push({[prefix] = body})
+  end,
+
   [NP.serverMessageTypes.jsonMessage.prefix] = function(self, data)
     local prefix = NP.serverMessageTypes.jsonMessage.prefix
     local msg = decodeJson(data, self.name, prefix)

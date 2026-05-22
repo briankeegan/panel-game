@@ -14,6 +14,8 @@ local Easings = require("client.src.Easings")
 local system = require("client.src.system")
 local GeneratorSource = require("common.engine.GeneratorSource")
 local DebugSettings = require("client.src.debug.DebugSettings")
+local DisplayEventCapture = require("client.src.network.DisplayEventCapture")
+local DisplayClientStack = require("client.src.network.DisplayClientStack")
 
 -- After createFromReplay, force match.doCountdown from the live wire-shipped
 -- gameMode rather than trusting replay.rules — closes a drift window where a
@@ -98,6 +100,25 @@ function(self, mode, gameScene)
   -- Fired when self.players is mutated mid-session (open FFA drop-in/drop-out).
   -- Scenes that render per-player UI subscribe and re-build their roster widgets.
   self:createSignal("rosterChanged")
+  -- Fired after BattleRoom:startMatch has fully constructed self.match and
+  -- started its engine. Additive hook for parallel systems (display-history
+  -- capture, future spectator pipes) that need to attach observers to the
+  -- live match without modifying ClientMatch or PlayerStack. Emitter args:
+  -- (match, battleRoom).
+  self:createSignal("matchCreated")
+
+  -- Per-room gate for the display-history replication system
+  -- (DISPLAY_HISTORY_PLAN.md). When false (default), the entire pipeline is
+  -- dormant: no engine-signal capture, no `Y` traffic on the wire, no
+  -- receive-side decode, no DisplayClientStacks built. Production play pays
+  -- zero overhead. Flip to true to enable the parallel viewer for this room.
+  --
+  -- Phase C uses the DebugSettings flag as the working toggle; the real
+  -- waiting-room UI is future work. Reading once at room creation snapshots
+  -- the value so flipping the debug setting mid-room doesn't toggle the
+  -- pipeline mid-match.
+  local ok, dbg = pcall(function() return DebugSettings.displayHistoryEnabled() end)
+  self.displayHistoryEnabled = (ok and dbg) or false
 end)
 
 -- Server payloads can be sparse by playerNumber (e.g. slots 1 and 3 occupied).
@@ -632,6 +653,45 @@ function BattleRoom:startMatch(replay)
   self.match = match
   self.state = BattleRoom.states.MatchInProgress
 
+  -- Phase A+B wire-up of the display-history replication system (see
+  -- DISPLAY_HISTORY_PLAN.md). Per-room gated: when displayHistoryEnabled
+  -- is false (the default), this block is a no-op — nothing captures,
+  -- nothing decodes, no `Y` traffic exists. When true:
+  --   * Each local player's engine gets a DisplayEventCapture observer
+  --     that batches frame-stamped events out via NetClient.
+  --   * Each remote player gets a DisplayClientStack that consumes the
+  --     `Y` batches arriving for that player (routed by playerID).
+  -- The capture/decode pipeline never modifies engine state and never
+  -- touches the existing input-replication path. Old view-stack rendering
+  -- remains the authoritative visualization until Phase C wires the
+  -- new renderer.
+  self._displayCaptures = nil
+  self._displayStacks   = nil
+  if self.displayHistoryEnabled then
+    self._displayCaptures = {}
+    self._displayStacks   = {}
+    for _, player in ipairs(match.players) do
+      if player.isLocal and player.stack and player.stack.engine then
+        local capture = DisplayEventCapture.new(player.stack.engine, player.publicId or player.playerNumber or 0)
+        capture:start()
+        self._displayCaptures[#self._displayCaptures + 1] = capture
+      else
+        -- Remote player → instantiate a DisplayClientStack keyed by the
+        -- same playerID the sender stamps into its batches.
+        local pid = player.publicId or player.playerNumber or 0
+        self._displayStacks[pid] = DisplayClientStack.new(pid, player)
+      end
+    end
+    match:connectSignal("matchEnded", self, self._stopDisplayCaptures)
+  end
+
+  -- Additive hook: announce the freshly-started match. External observers
+  -- (display capture above, future parallel pipes) can subscribe to
+  -- `matchCreated` on BattleRoom and attach to the match without any
+  -- modifications to ClientMatch or PlayerStack. Fires after the match is
+  -- fully initialized but before the scene transition.
+  self:emitSignal("matchCreated", match, self)
+
   -- Use instant transition if requested, otherwise fade
   local transition = nil
   if not (self.sceneParameters and self.sceneParameters.useInstantTransition) then
@@ -643,6 +703,57 @@ function BattleRoom:startMatch(replay)
   GAME.navigationStack:push(scene, transition)
 
   return match
+end
+
+---Stop and detach all DisplayEventCaptures and clear DisplayClientStacks.
+---Fired by the match's matchEnded signal so the display-history pipeline
+---tears down the moment the match concludes — even before the scene
+---unmounts. Idempotent.
+function BattleRoom:_stopDisplayCaptures()
+  if self._displayCaptures then
+    for _, capture in ipairs(self._displayCaptures) do
+      pcall(capture.stop, capture)
+    end
+    self._displayCaptures = nil
+  end
+  self._displayStacks = nil
+end
+
+---Route an inbound display-event batch to the appropriate
+---DisplayClientStack. Called from NetClient's processDisplayEvents
+---drain. No-op when the room flag is off (no stacks exist) or when
+---the sender doesn't map to any of our known remote players.
+---@param batch table { from = playerID, events = [...] }
+function BattleRoom:applyDisplayEventBatch(batch)
+  if not self._displayStacks then return end
+  if type(batch) ~= "table" then return end
+  local from = batch.from
+  if from == nil then return end
+  local stack = self._displayStacks[from]
+  if not stack then return end
+  stack:applyBatch(batch)
+end
+
+---Phase C parallel render. Called from GameBase:draw after the existing
+---match render. For each remote player, locate their existing ClientStack
+---in the match (for layout) and ask the matching DisplayClientStack to
+---draw itself over the view-stack region. No-op when displayHistoryEnabled
+---is false.
+---@param match ClientMatch
+function BattleRoom:renderDisplayStacks(match)
+  if not self._displayStacks then return end
+  if not match or not match.stacks then return end
+  for _, stack in ipairs(match.stacks) do
+    local pid = stack.player
+      and (stack.player.publicId or stack.player.playerNumber)
+      or nil
+    if pid ~= nil then
+      local displayStack = self._displayStacks[pid]
+      if displayStack then
+        pcall(displayStack.render, displayStack, stack)
+      end
+    end
+  end
 end
 
 function BattleRoom:createScene(match)

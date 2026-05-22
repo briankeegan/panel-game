@@ -1034,6 +1034,27 @@ local function processRewindEvents(self)
   end
 end
 
+---Display-history replication inbound (Phase B). Drains incoming `Y`
+---batches and hands them to BattleRoom (NOT ClientMatch — prime directive
+---forbids touching ClientMatch). BattleRoom owns the per-room
+---DisplayClientStacks dict and routes each batch by `from` playerID.
+---When the receiving room has displayHistoryEnabled=false, no `Y`
+---traffic exists in the first place, so this drain is a no-op for the
+---default production case.
+---@param self NetClient
+local function processDisplayEvents(self)
+  local prefix = NetworkProtocol.serverMessageTypes.displayEvent.prefix
+  local messages = _drainBoth(self, prefix)
+  if not self.room then return end
+  if not self.room.applyDisplayEventBatch then return end
+  for _, msg in ipairs(messages) do
+    local body = msg[prefix]
+    if body then
+      pcall(self.room.applyDisplayEventBatch, self.room, body)
+    end
+  end
+end
+
 ---@param self NetClient
 local function processChallengeUpdate(self, challengeUpdateMessage)
   if challengeUpdateMessage.challengeUpdate then
@@ -1418,6 +1439,18 @@ function NetClient:sendInput(input)
   _sendGameplay(self, NetworkProtocol.clientMessageTypes.playerInput.prefix, input)
 end
 
+---Display-history replication: ship a batch of frame-stamped display events
+---from the local engine to other room members. Parallel system — these
+---events feed the optional DisplayClientStack renderer; the existing
+---input-replication path is untouched. Best-effort (no queue+retry): a
+---missed batch just means the receiver's display-stack falls behind for a
+---few frames until the next batch arrives. Old view-stacks always have
+---fallback input data, so display dropouts are display-only.
+---@param batch table { from = playerID, events = {...} }
+function NetClient:sendDisplayEvents(batch)
+  _sendGameplay(self, NetworkProtocol.clientMessageTypes.displayEvent.prefix, json.encode(batch))
+end
+
 ---Loose-sync: send a GarbageEvent from the local sim.
 ---@param body table parsed event payload
 ---
@@ -1773,6 +1806,7 @@ function NetClient:update(dt)
     processGarbageEvents(self)
     processDeathEvents(self)
     processRewindEvents(self)
+    processDisplayEvents(self)
 
     -- Spectate-channel silence watchdog. Opponent I events arrive on
     -- spectate every few hundred ms in any active match. >5s of silence

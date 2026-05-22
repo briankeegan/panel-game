@@ -35,6 +35,7 @@ local MAX_LEFTOVERS_BYTES = 4 * 1024 * 1024
 ---@field incomingGarbageQueue Queue loose-sync GarbageEvent bodies awaiting room relay
 ---@field incomingDeathQueue Queue loose-sync DeathEvent bodies awaiting room relay
 ---@field incomingRewindQueue Queue pause-mode RewindEvent bodies awaiting room relay
+---@field incomingDisplayEventQueue Queue display-history replication batches awaiting room relay
 ---@field sendRetryCount integer
 ---@field sendRetryLimit integer
 ---@field inputProcessor InputProcessor?
@@ -57,6 +58,7 @@ local Connection = class(
     self.incomingGarbageQueue = Queue()
     self.incomingDeathQueue = Queue()
     self.incomingRewindQueue = Queue()
+    self.incomingDisplayEventQueue = Queue()
     self.sendRetryCount = 0
     self.sendRetryLimit = DEFAULT_SEND_RETRY_LIMIT
     self.rttSamples = nil
@@ -298,6 +300,10 @@ function Connection:processMessage(messageType, data)
     self.incomingDeathQueue:push(data)
   elseif messageType == "R" then
     self.incomingRewindQueue:push(data)
+  elseif messageType == "Y" then
+    -- Display-history replication batch (parallel system). Best-effort relay
+    -- — no queue+retry, no game-state recording. See DISPLAY_HISTORY_PLAN.md.
+    self.incomingDisplayEventQueue:push(data)
   elseif messageType == "H" then
     H(self, data)
   elseif messageType == "E" then

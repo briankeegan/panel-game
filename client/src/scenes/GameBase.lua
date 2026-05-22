@@ -874,6 +874,14 @@ function GameBase:draw()
     prof.push("Match:render")
     self.match:render()
     prof.pop("Match:render")
+    -- Display-history replication parallel render (Phase C, see
+    -- DISPLAY_HISTORY_PLAN.md). When the BattleRoom flag is off, this is
+    -- a no-op. When on, BattleRoom blacks out each remote view-stack's
+    -- region and re-draws via DisplayClientStack — the binary toggle
+    -- specified in the design (never side-by-side with the old viewer).
+    if GAME.battleRoom and GAME.battleRoom.renderDisplayStacks then
+      GAME.battleRoom:renderDisplayStacks(self.match)
+    end
     prof.push("GameBase:drawHUD")
     self:drawHUD()
     self:drawEndGameText()

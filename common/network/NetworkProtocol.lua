@@ -25,6 +25,7 @@ NetworkProtocol.clientMessageTypes = {
   rewindEvent = {prefix="R"},      -- Pause-mode rewind commit (JSON body)
   acknowledgedPing = {prefix="E"}, -- Ping ack (empty body)
   versionCheck = {prefix="H"},     -- Initial handshake; body is NETWORK_VERSION
+  displayEvent = {prefix="Y"},     -- Display-history events (parallel-system; ignored by clients without DisplayClientStack support)
 }
 NetworkProtocol.clientPrefixToMessageType = {}
 for _, value in pairs(NetworkProtocol.clientMessageTypes) do
@@ -40,6 +41,7 @@ NetworkProtocol.serverMessageTypes = {
   versionCorrect = {prefix="H"},                     -- Sent if client's NETWORK_VERSION matches
   versionWrong = {prefix="N"},                       -- Sent if client's NETWORK_VERSION mismatches
   ping = {prefix="E", verbose=true},                 -- Ping (empty body); client replies with E
+  displayEvent = {prefix="Y", verbose=true},         -- Relayed display-history events
 }
 NetworkProtocol.serverPrefixToMessageType = {}
 for _, value in pairs(NetworkProtocol.serverMessageTypes) do

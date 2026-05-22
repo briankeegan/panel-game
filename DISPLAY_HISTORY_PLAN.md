@@ -26,27 +26,29 @@ If a phase ever requires touching existing code, **stop and re-design.** Everyth
 
 ## Locked Design Decisions
 
-### Send side — always on, no gating
-- Every client emits display events while playing.
-- No per-room flag, no per-player flag, no coordination.
-- Bandwidth and CPU cost paid from day 1; gives us real measurements from production play.
+### Gate — per-room, send-side too
+- **One flag per room.** When the room flag is FALSE, **nothing fires**: no signal capture, no batching, no `Y` traffic on the wire, no receiver decode work, no DisplayClientStacks built. The display-history pipeline is fully dormant.
+- When the room flag is TRUE: every client in the room captures + sends display events; receivers decode them; the render gate (also per-room) picks which renderer draws remote stacks.
+- **Default: FALSE.** Production users pay zero cost unless the flag is flipped for a specific room.
+- **Local player's own stack is never subject to any of this.** Always engine-driven.
 
-### Server — always relays
-- New wire prefix gets a new relay path. Same shape as I/G/D relay.
+### Send side — gated by room flag
+- When room flag is TRUE, every client emits display events for its local stack(s).
+- When room flag is FALSE, capture never starts; no `Y` messages exist.
+
+### Server — always carries the relay capacity
+- New wire prefix `Y` has a relay path always available on the server side.
+- Server is content-agnostic: if a client sends `Y`, the server forwards to the room. If no client sends, nothing happens.
 - Existing relay paths untouched.
 
-### Receive side — always decodes
-- Every client builds DisplayClientStacks for every remote player.
-- Decode runs in production for everyone; decode bugs surface immediately.
-- No conditional logic on the decode path — it's a fixed pipeline.
+### Receive side — gated by incoming traffic
+- When the room flag is FALSE, no `Y` messages arrive, so no decode happens; DisplayClientStacks are never built.
+- When the room flag is TRUE, every client builds DisplayClientStacks for every remote player.
+- Decode runs only when there's something to decode — no conditional check per tick.
 
-### Gate — render-only, per-player, set in waiting room
-- The gate is purely on the *render* step: which renderer draws each remote stack.
-- **Per-player toggle**: each remote player slot in the character-select / waiting-room scene has a toggle for "use new viewer."
-- **Local-only setting**: lives in client config; doesn't go over the wire; doesn't persist beyond the session if we don't want it to.
-- **Decided pre-match**: when `Match` starts, the per-player toggle state is read once and bound to each remote stack. Doesn't need to be flippable mid-game.
-- **Binary choice per stack**: old view-stack ClientStack OR new DisplayClientStack. No side-by-side. No overlay. One renderer per remote stack.
-- **Local player's own stack is never subject to the toggle.** It's always engine-driven (it's the source of truth for your gameplay).
+### Render gate — also per-room
+- Same room flag decides: TRUE → render via the new DisplayClientStack; FALSE → render via the existing view-stack path (today's behavior).
+- One renderer per remote stack — no side-by-side, no overlay.
 
 ### Transport — piggyback on the existing gameplay socket
 - No new socket setup.

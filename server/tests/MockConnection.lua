@@ -16,6 +16,9 @@ local MockConnection = class(function(self, channel)
   self.incomingGarbageQueue = Queue()
   self.incomingDeathQueue = Queue()
   self.incomingRewindQueue = Queue()
+  -- Display-history replication queue (parallel system; always present so
+  -- Server:processMessages can drain it. Empty unless a test sends `Y`.)
+  self.incomingDisplayEventQueue = Queue()
 end)
 
 function MockConnection:update(t) end

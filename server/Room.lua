@@ -1346,6 +1346,37 @@ function Room:broadcastRewindEvent(sender, body)
   end
 end
 
+---Relay a display-history replication batch. Parallel-system traffic
+---(see DISPLAY_HISTORY_PLAN.md): forward as-is to every other room
+---member on the spectate channel. No JSON inspection, no game-state
+---recording, no replay log, no retry. A dropped batch just means
+---receivers' DisplayClientStacks lag for a few frames; the existing
+---input-replication path remains the authoritative view.
+---@param sender ServerPlayer
+---@param body string raw JSON body from the client
+function Room:broadcastDisplayEvent(sender, body)
+  if not self.game then return end
+  if not body or #body == 0 then return end
+
+  local message = NetworkProtocol.markedMessageForTypeAndBody(
+    NetworkProtocol.serverMessageTypes.displayEvent.prefix, body)
+
+  -- pairs (not ipairs): self.players is keyed by player_number and may be sparse.
+  for _, player in pairs(self.players) do
+    if player ~= sender then
+      player:sendSpectate(message)
+    end
+  end
+  for _, spec in pairs(self.spectators) do
+    if spec then
+      spec:sendSpectate(message)
+    end
+  end
+  for _, entry in ipairs(self.pendingJoiners) do
+    if entry.player then entry.player:sendSpectate(message) end
+  end
+end
+
 ---Returns the set of living team indices: teams with at least one player who
 ---is neither eliminated nor disconnected. For FFA (no teams) each slot is
 ---treated as its own team.

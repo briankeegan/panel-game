@@ -690,9 +690,14 @@ function BattleRoom:startMatch(replay)
         self._displayCaptures[#self._displayCaptures + 1] = capture
       else
         -- Remote player → instantiate a DisplayClientStack keyed by the
-        -- same playerID the sender stamps into its batches.
+        -- same playerID the sender stamps into its batches. We pass the
+        -- remote PlayerStack reference so applyBatch can mirror HUD
+        -- scalars onto the engine fields (score/speed/level/etc.) — the
+        -- existing drawScore / drawSpeed / drawMultibar methods read
+        -- straight from engine.X, so writing the snapshot's values onto
+        -- those fields makes the HUD work without changing any draw code.
         local pid = player.publicId or player.playerNumber or 0
-        self._displayStacks[pid] = DisplayClientStack.new(pid, player)
+        self._displayStacks[pid] = DisplayClientStack.new(pid, player, player.stack)
         -- Hide the existing PlayerStack:render for this remote — its
         -- visualization is now the DisplayClientStack's responsibility.
         -- Setting stack.canvas = nil makes PlayerStack:render early-return
@@ -757,10 +762,16 @@ end
 ---in the match (for layout) and ask the matching DisplayClientStack to
 ---draw itself over the view-stack region. No-op when displayHistoryEnabled
 ---is false.
+---
+---Telegraph: ClientMatch:render skips Telegraph:render for stacks with
+---stack.canvas == nil (which is how we suppress the old viewer). So we
+---also drive Telegraph from here, using the snapshot-mirrored
+---outgoingGarbage queue on the remote engine.
 ---@param match ClientMatch
 function BattleRoom:renderDisplayStacks(match)
   if not self._displayStacks then return end
   if not match or not match.stacks then return end
+  local Telegraph = require("client.src.graphics.Telegraph")
   for _, stack in ipairs(match.stacks) do
     local pid = stack.player
       and (stack.player.publicId or stack.player.playerNumber)
@@ -769,6 +780,29 @@ function BattleRoom:renderDisplayStacks(match)
       local displayStack = self._displayStacks[pid]
       if displayStack then
         pcall(displayStack.render, displayStack, stack)
+        -- Pop FX + score-card queues were filled by the snapshot's one-
+        -- shot events; drawPopEffects / drawCards are normally invoked
+        -- from PlayerStack:render which we suppress. Drive them here so
+        -- the animations actually play. Both expect the panel-coord
+        -- transform from setDrawArea.
+        if stack.drawPopEffects and stack.drawCards then
+          stack:setDrawArea(0, 0)
+          pcall(stack.drawPopEffects, stack)
+          pcall(stack.drawCards, stack)
+          stack:resetDrawArea()
+        end
+        -- Render telegraphs from this remote stack to each target. The
+        -- snapshot mirrored its outgoingGarbage onto the engine so the
+        -- existing Telegraph render code works unchanged.
+        if stack.engine and not stack:game_ended() then
+          if stack.garbageTargets and #stack.garbageTargets > 0 then
+            for _, target in ipairs(stack.garbageTargets) do
+              pcall(Telegraph.render, Telegraph, stack, target)
+            end
+          elseif stack.garbageTarget then
+            pcall(Telegraph.render, Telegraph, stack, stack.garbageTarget)
+          end
+        end
       end
     end
   end

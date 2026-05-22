@@ -52,6 +52,9 @@ end
 ---@field pendingPromotion boolean? spectator joined while queued for promotion to player at next match
 ---@field voided boolean? set when a match was aborted because a player left; blocks ready until everyone leaves
 ---@field voidReason string? human-readable reason surfaced to UI when self.voided
+---@field displayHistoryEnabled boolean per-room gate for the display-history replication pipeline (DISPLAY_HISTORY_PLAN.md); default false
+---@field _displayCaptures DisplayEventCapture[]? per-local-stack signal observers; nil unless displayHistoryEnabled
+---@field _displayStacks table<integer, DisplayClientStack>? per-remote-player display stacks keyed by playerID; nil unless displayHistoryEnabled
 ---@overload fun(mode: GameMode, gameScene: table?): BattleRoom
 BattleRoom = class(
 function(self, mode, gameScene)

@@ -24,7 +24,24 @@
 
 local logger = require("common.lib.logger")
 
+---@class DisplayClientStackVisualState
+---@field cursorRow integer
+---@field cursorCol integer
+---@field swapPulse integer increments on each swap event; renderer uses for flash effects
+---@field landings { r: integer, c: integer, f: integer? }[] recent panel landings ring
+---@field pops { r: integer, c: integer, color: integer?, f: integer? }[] recent panel pops ring
+---@field matches { combo: integer?, chain: boolean?, metal: integer?, garbage: integer?, f: integer? }[] recent match events
+---@field rows integer count of new-row events received
+---@field lastRowColors integer[]? colors of the most recent new row
+---@field dead boolean true after a D (gameOver) event has been applied
+
 ---@class DisplayClientStack
+---@field playerID integer wire identifier of the remote player this stack mirrors
+---@field player Player? optional reference to the matching Player (for name / layout)
+---@field lastFrame integer most recent frame stamp applied (engine clock of the sender)
+---@field eventsApplied integer running total of events successfully applied (diagnostic)
+---@field pendingEvents table[] reserved for playback-buffer use in future iterations
+---@field visualState DisplayClientStackVisualState
 local DisplayClientStack = {}
 DisplayClientStack.__index = DisplayClientStack
 

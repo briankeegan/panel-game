@@ -24,6 +24,11 @@ local logger = require("common.lib.logger")
 local Signal = require("common.lib.signal")
 
 ---@class DisplayEventCapture
+---@field engine Stack the local engine being observed
+---@field playerID integer wire identifier stamped onto outgoing batches
+---@field events table[] buffered events awaiting the next flush
+---@field lastFlushTime number love.timer.getTime() at last successful flush
+---@field started boolean idempotency flag for start()/stop()
 local DisplayEventCapture = {}
 DisplayEventCapture.__index = DisplayEventCapture
 

@@ -1274,47 +1274,64 @@ function Server:addConnection(connection)
 end
 
 -- Process any data on all active connections
-function Server:updateConnections()
-  -- Make a list of all the sockets to listen to (both listener sockets plus
-  -- every active connection's socket).
-  local socketsToRead = {self.socket}
-  if self.lobbyListenSocket then
-    socketsToRead[#socketsToRead+1] = self.lobbyListenSocket
-  end
-  if self.spectateListenSocket then
-    socketsToRead[#socketsToRead+1] = self.spectateListenSocket
-  end
-  -- Make a list of all the sockets we want to send messages to
-  -- the server socket cannot "send" in the traditional sense, only accept incoming connections (which is in the read domain) so it is not added here
-  local socketsToSend = {}
-  for _, v in pairs(self.connections) do
-    if v.outgoingMessageQueue:len() > 0 then
-      -- socket.select(_, socketsToSend) only checks if at least one socket in the table is generally ready to send even if there is no data to be sent
-      -- predictably that is immediately true for most client sockets most of the time
-      -- so only check for sockets we actually have something to send for because sockets ready for sending will make the select return instantly
-      --  causing us to loop very busily even though there is possibly nothing to do
-      socketsToSend[#socketsToSend+1] = v.socket
+
+function Server:update()
+  local clock = self.clockInstance
+  local t0 = clock:monotonicMs()
+  local function logStep(name, t_start)
+    local t_end = clock:monotonicMs()
+    local dt = t_end - t_start
+    if dt > 200 then
+      logger.warn(string.format("Server.update step '%s' took %dms", name, dt))
     end
-    -- whereas for read, we can check for all of them because they will only make select return if there is actually something to read
-    socketsToRead[#socketsToRead + 1] = v.socket
+    return t_end
   end
 
-  -- Wait for up to 1 second to see if there is any socket to read / write on
-  -- the waiting time is only until at least one socket has data to read or a socket we want to send data on is ready so it's not actually stalling unless there is no data anyway
-  socketsToRead, socketsToSend = socket.select(socketsToRead, socketsToSend, 1)
+  local t = t0
+  if not self._shuttingDown then
+    self:acceptNewConnections()
+    t = logStep("acceptNewConnections", t)
+  end
 
-  for _, connection in pairs(self.connections) do
-    local canRead = not not socketsToRead[connection.socket]
-    local canSend = not not socketsToSend[connection.socket]
-    local success = connection:update(self.lastProcessTime, canRead, canSend)
-    if not success then
-      local player = self.connectionToPlayer[connection]
-      local reason = "disconnect"
-      if player then
-        reason = player.name .. "'s connection failed"
-      end
-      self:closeConnection(connection, reason)
-    end
+  self:updateConnections()
+  t = logStep("updateConnections", t)
+
+  self:processMessages()
+  t = logStep("processMessages", t)
+
+  self:tickRoomMatchEnd()
+  t = logStep("tickRoomMatchEnd", t)
+
+  self:tickSilentDeathWatchdogs()
+  t = logStep("tickSilentDeathWatchdogs", t)
+
+  -- Only check once a second to avoid over checking
+  local currentTime = time()
+  if currentTime ~= self.lastProcessTime then
+    self:flushLogs(currentTime)
+    t = logStep("flushLogs", t)
+
+    self:sweepIdleRooms(currentTime)
+    t = logStep("sweepIdleRooms", t)
+
+    self:sweepChallengedPlayers(currentTime)
+    t = logStep("sweepChallengedPlayers", t)
+
+    pcall(function() self.crashReports:sweep() end)
+    t = logStep("crashReports:sweep", t)
+
+    pcall(function() self:sweepStuckMatches(currentTime) end)
+    t = logStep("sweepStuckMatches", t)
+
+    self.lastProcessTime = currentTime
+  end
+
+  self:broadCastLobbyIfChanged()
+  t = logStep("broadCastLobbyIfChanged", t)
+
+  local total = t - t0
+  if total > 500 then
+      logger.warn(string.format("Server.update total tick took %dms", total))
   end
 end
 

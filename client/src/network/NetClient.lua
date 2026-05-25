@@ -663,6 +663,21 @@ local function processLeaveRoomMessage(self, message)
     self:setState(states.ONLINE)
     GAME.navigationStack:popToName("Lobby", transition)
   end
+
+  -- Patch: Always reset and send fresh settings after leaving a room
+  if GAME and GAME.localPlayer then
+    -- Reset any local ready/loaded state to default (unready, not loaded)
+    if GAME.localPlayer.setWantsReady then
+      GAME.localPlayer:setWantsReady(false)
+    end
+    if GAME.localPlayer.setHasLoaded then
+      GAME.localPlayer:setHasLoaded(false)
+    end
+    -- Immediately send a fresh settingsUpdate to the server
+    if self.sendPlayerSettings then
+      self:sendPlayerSettings(GAME.localPlayer)
+    end
+  end
 end
 
 local function processTauntMessage(self, message)

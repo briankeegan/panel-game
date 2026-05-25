@@ -1434,16 +1434,26 @@ function Room:maybeFinalizeFromLivingTeams()
     return false
   end
 
-  -- If grace window is not running, start it
+
+  -- If grace window is not running, start it at the latest elimination frame
   if not self._pendingFinalizeGrace then
     self._pendingFinalizeGrace = true
-    self._pendingFinalizeFrame = self.game.clock or 0
-    -- Use the game's current frame as the start
-    if self.game and self.game.engine and self.game.engine.clock then
-      self._pendingFinalizeFrame = self.game.engine.clock
-    elseif self.game and self.game.clock then
-      self._pendingFinalizeFrame = self.game.clock
+    -- Find the latest elimination frame among all eliminated players
+    local latestElim = 0
+    if self.game and self.game.eliminatedPlayers then
+      for _, frame in pairs(self.game.eliminatedPlayers) do
+        if frame and frame > latestElim then latestElim = frame end
+      end
     end
+    -- Fallback to current clock if no eliminations found
+    if latestElim == 0 then
+      if self.game and self.game.engine and self.game.engine.clock then
+        latestElim = self.game.engine.clock
+      elseif self.game and self.game.clock then
+        latestElim = self.game.clock
+      end
+    end
+    self._pendingFinalizeFrame = latestElim
     return false -- Don't finalize yet
   end
 

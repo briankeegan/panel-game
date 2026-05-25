@@ -1,10 +1,13 @@
 -- DisplaySnapshotFFI.lua
 -- Platform guard and FFI struct definition for display-history binary packing
 
+
+-- Config override: set to true to force-disable FFI path for testing
+local FORCE_DISABLE_FFI = love and love.filesystem and love.filesystem.getInfo(".disable_display_ffi") ~= nil
 local has_ffi, ffi = pcall(require, "ffi")
 local M = {}
 
-M.FFI_SUPPORTED = has_ffi
+M.FFI_SUPPORTED = has_ffi and not FORCE_DISABLE_FFI
 
 if has_ffi then
   ffi.cdef[[
@@ -28,6 +31,7 @@ if has_ffi then
       uint16_t sw;
       uint16_t dc;
       uint8_t  p[72]; // Flat board: 1 byte per panel (Color + State combined)
+      char     extra[512]; // JSON-encoded extra fields
     } __attribute__((packed)) DisplaySnapshot;
   ]]
   M.DisplaySnapshot = ffi.typeof("DisplaySnapshot")

@@ -1077,7 +1077,9 @@ function Server:update()
     if not (clock and clock.monotonicMs) then return end
     local tNow = clock:monotonicMs()
     local dt = tNow - t
-    if dt > 200 then
+    -- updateConnections includes a 1s socket.select timeout when idle, so its baseline is ~1000ms
+    local threshold = (name == "updateConnections") and 1200 or 200
+    if dt > threshold then
       logger.warn(string.format("Server.update step '%s' took %dms", name, dt))
     end
     t = tNow
@@ -1117,7 +1119,7 @@ function Server:update()
 
   if clock and clock.monotonicMs then
     local total = clock:monotonicMs() - t0
-    if total > 500 then
+    if total > 1500 then
       logger.warn(string.format("Server.update total tick took %dms", total))
     end
   end

@@ -75,12 +75,14 @@ local handlers = {
 
   [NP.serverMessageTypes.displayEvent.prefix] = function(self, data)
     -- Display-history replication (parallel system, see DISPLAY_HISTORY_PLAN.md).
-    -- Try FFI binary decode first, fallback to JSON.
+    -- Binary path is identified by version byte (0x01); JSON path starts
+    -- with '{' (0x7B). Fall through to JSON for non-FFI senders.
     local prefix = NP.serverMessageTypes.displayEvent.prefix
     local ffiGuard = require("client.src.network.DisplaySnapshotFFI")
     local util = require("client.src.network.DisplaySnapshotUtil")
     local body
-    if ffiGuard.FFI_SUPPORTED and data and #data >= 80 then
+    if ffiGuard.FFI_SUPPORTED and data and #data > 0
+        and string.byte(data, 1) == ffiGuard.WIRE_VERSION then
       local from, snapshot = util.unpack_snapshot(data)
       if from and snapshot then
         body = { from = from, snapshot = snapshot }

@@ -1,40 +1,13 @@
 -- DisplaySnapshotFFI.lua
--- Platform guard and FFI struct definition for display-history binary packing
+-- Platform guard for the binary display-snapshot path. The actual
+-- wire format lives in DisplaySnapshotUtil; this module only decides
+-- whether the FFI path is usable on the current platform.
 
-
--- Config override: set to true to force-disable FFI path for testing
 local FORCE_DISABLE_FFI = love and love.filesystem and love.filesystem.getInfo(".disable_display_ffi") ~= nil
-local has_ffi, ffi = pcall(require, "ffi")
+local has_ffi, _ = pcall(require, "ffi")
+
 local M = {}
-
 M.FFI_SUPPORTED = has_ffi and not FORCE_DISABLE_FFI
-
-if has_ffi then
-  ffi.cdef[[
-    typedef struct {
-      uint8_t  from;
-      uint32_t f;
-      float    d;
-      uint8_t  cr;
-      uint8_t  cc;
-      uint8_t  flags; // Bit 0: ic (countdown), Bit 1: rl (rise lock)
-      uint8_t  sh, psh, pkh;
-      uint8_t  dt, ct;
-      uint8_t  go;
-      uint8_t  im;
-      uint16_t cn;
-      uint32_t sc;
-      uint8_t  sp;
-      uint16_t pc, mp;
-      uint8_t  hp;
-      uint8_t  st, ps;
-      uint16_t sw;
-      uint16_t dc;
-      uint8_t  p[72]; // Flat board: 1 byte per panel (Color + State combined)
-      char     extra[512]; // JSON-encoded extra fields
-    } __attribute__((packed)) DisplaySnapshot;
-  ]]
-  M.DisplaySnapshot = ffi.typeof("DisplaySnapshot")
-end
+M.WIRE_VERSION = 1   -- first byte of every binary snapshot
 
 return M

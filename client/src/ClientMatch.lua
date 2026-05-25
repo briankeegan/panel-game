@@ -1677,7 +1677,17 @@ function ClientMatch:drawCommunityMessage()
   end
 end
 
+-- framesBehind is meaningless for snapshot-driven remotes — their engine
+-- doesn't tick under displayHistoryEnabled so stack.clock stays at 0
+-- while match.clock advances. Treat such stacks as not-behind for the
+-- rollback / desync UI overlays.
+local function _framesBehindMeaningful(stack)
+  if stack.is_local then return true end
+  return not (GAME.battleRoom and GAME.battleRoom.displayHistoryEnabled)
+end
+
 local function isRollbackActive(stack)
+  if not _framesBehindMeaningful(stack) then return false end
   return stack.engine.framesBehind > GARBAGE_DELAY_LAND_TIME
 end
 
@@ -1686,7 +1696,10 @@ function ClientMatch:render()
     local drawY = #self.stacks > 2 and 90 or 23
     for i = 1, #self.stacks do
       local stack = self.stacks[i]
-      GraphicsUtil.print("P" .. stack.layoutSlot .." Average Latency: " .. stack.engine.framesBehind, 1, drawY)
+      local label = _framesBehindMeaningful(stack)
+        and tostring(stack.engine.framesBehind)
+        or "(snapshot)"
+      GraphicsUtil.print("P" .. stack.layoutSlot .." Average Latency: " .. label, 1, drawY)
       drawY = drawY + 11
     end
 
@@ -1700,7 +1713,10 @@ function ClientMatch:render()
         GraphicsUtil.draw(themes[config.theme].images.IMG_bug, x, y, 0, iconSize / icon_width, iconSize / icon_height)
       end
     else
-      if tableUtils.trueForAny(self.stacks, function(stack) return stack.engine.framesBehind > MAX_LAG * 0.75 end) then
+      if tableUtils.trueForAny(self.stacks, function(stack)
+        if not _framesBehindMeaningful(stack) then return false end
+        return stack.engine.framesBehind > MAX_LAG * 0.75
+      end) then
         -- let the spectator know the game is about to die
         local iconSize = 60
         local icon_width, icon_height = themes[config.theme].images.IMG_bug:getDimensions()

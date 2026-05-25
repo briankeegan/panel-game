@@ -510,8 +510,12 @@ local function paintCursorFromSnapshot(self, viewStack, snapshot)
     if math.abs(cc - prevCc) <= 6 then cc = prevCc + (cc - prevCc) * alpha end
   end
 
-  local xPosition = (cc - 1) * panelWidth
-  local yPosition = (11 - cr) * panelWidth + (snapshot.d or 0)
+  -- Round to integer pixels before drawing. Fractional positions from the
+  -- cursor interp cause bilinear filtering to blur bracket pixels across
+  -- screen pixels — the cursor looks faint / "transparent" compared to
+  -- the sharply-drawn local cursor at integer engine.cur_row positions.
+  local xPosition = math.floor((cc - 1) * panelWidth + 0.5)
+  local yPosition = math.floor((11 - cr) * panelWidth + (snapshot.d or 0) + 0.5)
 
   if (snapshot.go or 0) > 0 then
     love.graphics.setColor(1, 1, 1, 0.3)

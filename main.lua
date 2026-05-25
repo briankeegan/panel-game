@@ -390,6 +390,25 @@ function love.errorhandler(msg)
     love.graphics.clear(love.graphics.getBackgroundColor())
     local positionX = 40
     local positionY = positionX
+
+    -- Wrong-LOVE-version hint above the crash message. Hard-coded English and
+    -- pcall-guarded — the crash screen must never crash, and loc()/system may
+    -- be in an undefined state if they're what blew up.
+    pcall(function()
+      if not system.isRecommendedLoveVersion() then
+        local warning = string.format(
+          "You are running LOVE %s. Panel Attack is tested against LOVE 11.5. Install it from https://love2d.org/",
+          system.loveVersionString())
+        local font = love.graphics.getFont()
+        local wrapWidth = love.graphics.getWidth() - positionX
+        local _, lines = font:getWrap(warning, wrapWidth)
+        love.graphics.setColor(1, 0.85, 0.2, 1)
+        love.graphics.printf(warning, positionX, positionY, wrapWidth)
+        love.graphics.setColor(1, 1, 1, 1)
+        positionY = positionY + (#lines + 1) * font:getHeight()
+      end
+    end)
+
     love.graphics.printf(messageToDraw, positionX, positionY, love.graphics.getWidth() - positionX)
 
     love.graphics.setColor(0.25, 0.45, 0.85, 1)

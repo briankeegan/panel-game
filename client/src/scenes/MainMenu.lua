@@ -189,9 +189,8 @@ function MainMenu:drawSelf()
   local fontHeight = GraphicsUtil.getGlobalFont():getHeight()
   local infoYPosition = 705 - fontHeight / 2
 
-  local loveString = system.loveVersionString()
-  if loveString == "11.3.0" then
-    GraphicsUtil.printf(loc("love_version_warning"), -5, infoYPosition, consts.CANVAS_WIDTH, "right")
+  if not system.isRecommendedLoveVersion() then
+    GraphicsUtil.printf(loc("love_version_warning", system.loveVersionString()), -5, infoYPosition, consts.CANVAS_WIDTH, "right")
     infoYPosition = infoYPosition - fontHeight
   end
 

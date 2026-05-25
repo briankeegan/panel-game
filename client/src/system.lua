@@ -93,6 +93,11 @@ function system.meetsLoveVersionRequirement(reqMajor, reqMinor)
   end
 end
 
+---@return boolean true when running the LÖVE version Panel Attack is built and tested against (11.5.x)
+function system.isRecommendedLoveVersion()
+  return major == 11 and minor == 5
+end
+
 ---@return string
 function system.getOsInfo()
   return "OS: " .. (love.system.getOS() or "Unknown")

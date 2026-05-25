@@ -931,9 +931,13 @@ function ClientStack:drawPlayerName()
     local markerY = chipY - markerHeight - 2
     GraphicsUtil.drawRectangle("fill", chipX, markerY, chipWidth, markerHeight, 0, 0, 0, 0.7)
     GraphicsUtil.printf(marker, chipX, markerY + 2, chipWidth, "center", {1, 0.4, 0.4, 1}, nil, 2)
-  elseif self.engine and (self.engine.framesBehind or 0) > ClientStack.UNRESPONSIVE_FRAMES then
+  elseif self.engine and (self.engine.framesBehind or 0) > ClientStack.UNRESPONSIVE_FRAMES
+      and not (GAME.battleRoom and GAME.battleRoom.displayHistoryEnabled and not self.is_local) then
     -- Stack is alive but its inputs have stopped flowing — show survivors
     -- something before the server-side silent watchdog fires (~10s+).
+    -- Skip for snapshot-driven remote stacks: their engine doesn't tick
+    -- under displayHistoryEnabled, so framesBehind grows unboundedly even
+    -- when the player is perfectly healthy.
     local secondsBehind = math.floor((self.engine.framesBehind or 0) / 60)
     local marker = string.format("…%ds", secondsBehind)
     local markerHeight = 20

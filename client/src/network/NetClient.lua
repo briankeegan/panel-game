@@ -990,6 +990,13 @@ local function processInputMessages(self)
   local inputPrefix = NetworkProtocol.serverMessageTypes.input.prefix
   local messages = _drainBoth(self, inputPrefix)
   if not (self.room and self.room.match) then return end
+  -- Snapshot pipeline owns remote visuals; remote engines don't tick
+  -- under displayHistoryEnabled (Match:shouldRun skips them). Draining I
+  -- messages into confirmedInput buffers nobody reads is pure waste.
+  -- Skip the whole drain so the network thread doesn't even decode them.
+  -- Garbage and death delivery are independent of this path — G/D events
+  -- go via their own queues + applyGarbageEvent / applyDeathEvent.
+  if self.room.displayHistoryEnabled then return end
   -- All I are visual: server never echoes your own inputs. body.playerNumber
   -- on the wire is the engine-side stackIndex (server compacted at match
   -- start), NOT a lobby seatId — pass straight through.

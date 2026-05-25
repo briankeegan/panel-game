@@ -1941,15 +1941,25 @@ function ClientMatch:_applyGarbageEventNow(body)
   for _, recipientIndex in ipairs(body.recipients) do
     local stack = self.stacks[recipientIndex]
     if stack and stack.engine then
-      logger.info(string.format(
-        "G apply: sender=%s senderFrame=%s -> stack[%d] (is_local=%s) garbageCount=%d",
-        tostring(body.sender), tostring(body.senderFrame), recipientIndex,
-        tostring(stack.is_local), garbageCount))
-      if engine then
-        engine._gAppliedEvents = (engine._gAppliedEvents or 0) + 1
-        engine._gAppliedPieces = (engine._gAppliedPieces or 0) + garbageCount
+      -- Frozen remote (snapshot pipeline owns visuals, engine doesn't
+      -- tick): pushing G onto incomingGarbage queues that nothing drains
+      -- piles up memory and never lands. Local stacks still get the G —
+      -- those are the only landings that matter for game outcome.
+      local frozen = engine and engine.displayHistoryActive and not stack.is_local
+      if frozen then
+        engine._gSkippedFrozenEvents = (engine._gSkippedFrozenEvents or 0) + 1
+        engine._gSkippedFrozenPieces = (engine._gSkippedFrozenPieces or 0) + garbageCount
+      else
+        logger.info(string.format(
+          "G apply: sender=%s senderFrame=%s -> stack[%d] (is_local=%s) garbageCount=%d",
+          tostring(body.sender), tostring(body.senderFrame), recipientIndex,
+          tostring(stack.is_local), garbageCount))
+        if engine then
+          engine._gAppliedEvents = (engine._gAppliedEvents or 0) + 1
+          engine._gAppliedPieces = (engine._gAppliedPieces or 0) + garbageCount
+        end
+        stack.engine:applyNetworkGarbage(body.garbage)
       end
-      stack.engine:applyNetworkGarbage(body.garbage)
     else
       -- Recipient not landable: slot was emptied (mid-match leave) or the
       -- engine hasn't booted yet (mod still loading on a spectator/rejoiner).

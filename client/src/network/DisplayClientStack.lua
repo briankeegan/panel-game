@@ -419,45 +419,15 @@ end
 ---
 ---No engine work. The snapshot is the state; we paint from it directly.
 ---@param viewStack table the matching ClientStack (for layout)
--- Delayed interpolation: render ~one snapshot-interval behind real time,
--- lerping between the two most-recent known snapshots. This is the safe
--- form of interpolation — both endpoints are authoritative, no
--- overshoot, no snap-back. The trade-off is ~50ms of visual lag on
--- remote boards, which is invisible to the local player's gameplay
--- (their own engine is never interpolated).
---
--- Lerps displacement only (the main "feels janky" axis). Cursor uses
--- the latest snapshot's position directly — cursor jumps are
--- semantically significant and shouldn't be smoothed.
-local function interpolatedDisplacement(self)
-  local latest = self.snapshot
-  local prev   = self.prevSnapshot
-  if not latest then return nil end
-  if not prev then return latest.d end
-  local interval = self.latestRecvTime - self.prevRecvTime
-  if interval <= 0 then return latest.d end
-  -- "render time" sits one full interval behind the latest arrival.
-  -- alpha 0 = render prev fully; alpha 1 = render latest fully.
-  local elapsed = love.timer.getTime() - self.latestRecvTime
-  local alpha   = math.max(0, math.min(1, elapsed / interval))
-  local dPrev = prev.d   or 0
-  local dCur  = latest.d or 0
-  -- Skip the lerp across the mod-16 wrap (new row spawned) so we don't
-  -- count down 15→14→...→0 instead of skipping to 0.
-  if math.abs(dCur - dPrev) > 8 then return dCur end
-  return dPrev + alpha * (dCur - dPrev)
-end
-
+-- Render at the latest authoritative state. No interpolation, no
+-- artificial lag. Snapshots arrive frequently enough (20Hz baseline,
+-- 60Hz during raises via the fast-event bypass) that direct rendering
+-- keeps up. The earlier delayed-interp introduced a half-interval lag
+-- that never caught up because every fresh snapshot reset the elapsed
+-- clock — visible to the user as the remote "lagging behind" forever.
 function DisplayClientStack:render(viewStack)
   if not viewStack or not self.snapshot then return end
   if not viewStack.setDrawArea or not viewStack.resetDrawArea then return end
-
-  -- Apply interpolated displacement for smooth scroll at 20Hz snapshot
-  -- rate. Restore the authoritative value after rendering so subsequent
-  -- applyBatch + mirrorHudScalars see the wire value, not the interp.
-  local origD = self.snapshot.d
-  local interp = interpolatedDisplacement(self)
-  if interp then self.snapshot.d = interp end
 
   -- Match the old viewer's appearance: character portrait behind the
   -- stack, frame border around it, wall at the bottom of the panel area.
@@ -498,10 +468,6 @@ function DisplayClientStack:render(viewStack)
 
   love.graphics.pop()
   viewStack:resetDrawArea()
-
-  -- Restore the wire displacement so future applyBatch sees the
-  -- authoritative shipped value, not our render-time interpolation.
-  self.snapshot.d = origD
 end
 
 return DisplayClientStack

@@ -46,13 +46,36 @@ function ServerQueue.to_short_string(self)
 end
 
 
+-- Prefixes whose messages fire every frame / every tick. Logging anything
+-- for these floods the debug log and slows every message arrival to a
+-- table_to_string call. Suppress at the queue boundary.
+local NP_PREFIXES = NetworkProtocol.serverMessageTypes
+local _quietPrefixes = {
+  [NP_PREFIXES.input.prefix]        = true, -- "I"
+  [NP_PREFIXES.displayEvent.prefix] = true, -- "Y" (snapshot stream, ~20Hz)
+}
+
+-- JSON message types we receive at high frequency. lobbyStateV2 fires on
+-- every player settings change; the dump is a multi-line table that
+-- buries everything else in the log.
+local _quietTypes = {
+  lobbyStateV2 = true,
+}
+
 -- push a server message in queue
 function ServerQueue.push(self, msg)
-  -- Suppress per-frame input spam from the debug log. Unified input messages
-  -- all share the single "I" prefix; no per-slot keys to check anymore.
-  local isInputOnly = msg[NetworkProtocol.serverMessageTypes.input.prefix]
-  if not isInputOnly then
-    logger.debug("message received:\n" .. table_to_string(msg))
+  -- Pick a label for the debug log. JSON messages carry `type`; raw-prefix
+  -- messages (Y/G/D/R/I) arrive as { [prefix] = body }, so use the first
+  -- key. Quiet-list silences high-frequency channels entirely.
+  local label = msg.type
+  if not label then
+    for k in pairs(msg) do
+      if _quietPrefixes[k] then label = nil; break end
+      label = k
+    end
+  end
+  if label and not _quietTypes[label] then
+    logger.debug("message received: " .. tostring(label))
   end
   local last = self.last + 1
   self.last = last

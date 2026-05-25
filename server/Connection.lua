@@ -106,7 +106,17 @@ function Connection:sendJson(messageInfo)
   end
 
   local json = json.encode(messageInfo.messageText)
-  logger.debug("Connection " .. self.index .. " Sending JSON: " .. json)
+  -- High-frequency broadcasts (lobbyStateV2 fires on every settings churn)
+  -- bury everything else in the log. Log only the type for those, full JSON
+  -- for the rest.
+  local msgType = messageInfo.messageText and messageInfo.messageText.type
+  if msgType == "lobbyStateV2" then
+    -- silently dropped — too noisy at debug level
+  elseif msgType then
+    logger.debug("Connection " .. self.index .. " Sending " .. tostring(msgType))
+  else
+    logger.debug("Connection " .. self.index .. " Sending JSON: " .. json)
+  end
   local message = NetworkProtocol.markedMessageForTypeAndBody(messageInfo.messageType.prefix, json)
 
   self.outgoingMessageQueue:push(message)

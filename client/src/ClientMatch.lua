@@ -725,6 +725,21 @@ function ClientMatch:handleMatchEnd()
   pcall(function()
     TraceWriter.localEvent("matchEnded", { clock = self.engine and self.engine.clock or nil })
   end)
+  -- Per-match garbage accounting summary. sent counts events emitted FROM
+  -- this machine; applied/dropped count events processed BY this machine
+  -- (which includes ones we sent and bounced back, plus ones other clients
+  -- sent that targeted any stack visible on our screen). Cross-machine
+  -- reconciliation = sum across all clients' logs; sent_total should equal
+  -- applied_total + dropped_total. Within one machine, applied+dropped is
+  -- what we processed; sent is what we shipped.
+  local eng = self.engine
+  if eng then
+    logger.info(string.format(
+      "G match summary: sent=%d/%dp  applied=%d/%dp  dropped=%d/%dp",
+      eng._gSentEvents or 0, eng._gSentPieces or 0,
+      eng._gAppliedEvents or 0, eng._gAppliedPieces or 0,
+      eng._gDroppedEvents or 0, eng._gDroppedPieces or 0))
+  end
   -- execute callbacks
   self:emitSignal("matchEnded", self)
 end
@@ -1907,6 +1922,7 @@ function ClientMatch:_applyGarbageEventNow(body)
   end
 
   local garbageCount = (type(body.garbage) == "table") and #body.garbage or 0
+  local engine = self.engine
   for _, recipientIndex in ipairs(body.recipients) do
     local stack = self.stacks[recipientIndex]
     if stack and stack.engine then
@@ -1914,6 +1930,10 @@ function ClientMatch:_applyGarbageEventNow(body)
         "G apply: sender=%s senderFrame=%s -> stack[%d] (is_local=%s) garbageCount=%d",
         tostring(body.sender), tostring(body.senderFrame), recipientIndex,
         tostring(stack.is_local), garbageCount))
+      if engine then
+        engine._gAppliedEvents = (engine._gAppliedEvents or 0) + 1
+        engine._gAppliedPieces = (engine._gAppliedPieces or 0) + garbageCount
+      end
       -- self.stacks[i] is a ClientStack wrapper; the actual engine stack
       -- (and the receiveGarbage method) lives on stack.engine.
       -- applyNetworkGarbage snapshots + receives and records a frame-stamped
@@ -1930,6 +1950,10 @@ function ClientMatch:_applyGarbageEventNow(body)
         "G apply DROPPED: sender=%s senderFrame=%s -> stack[%d] reason=%s garbageCount=%d",
         tostring(body.sender), tostring(body.senderFrame), recipientIndex,
         reason, garbageCount))
+      if engine then
+        engine._gDroppedEvents = (engine._gDroppedEvents or 0) + 1
+        engine._gDroppedPieces = (engine._gDroppedPieces or 0) + garbageCount
+      end
     end
   end
 

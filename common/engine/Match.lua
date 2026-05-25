@@ -512,10 +512,13 @@ function Match:deliverOutgoingGarbage(source, target, garbageDelivery)
       -- forward in that case).
       local senderIndex = tableUtils.indexOf(self.stacks, source)
       local recipientIndex = tableUtils.indexOf(self.stacks, target)
+      local pieceCount = garbageDelivery and #garbageDelivery or 0
       logger.info(string.format(
         "G emit: stack[%d] -> stack[%d] frame=%d count=%d",
         senderIndex or -1, recipientIndex or -1, source.stopWatch or -1,
-        garbageDelivery and #garbageDelivery or 0))
+        pieceCount))
+      self._gSentEvents  = (self._gSentEvents  or 0) + 1
+      self._gSentPieces  = (self._gSentPieces  or 0) + pieceCount
       GAME.netClient:sendGarbageEvent({
         senderFrame = source.stopWatch,
         recipients = { recipientIndex },
@@ -544,10 +547,13 @@ function Match:deliverOutgoingGarbage(source, target, garbageDelivery)
       target:receiveGarbage(garbageDelivery)
       local senderIndex = tableUtils.indexOf(self.stacks, source)
       local recipientIndex = tableUtils.indexOf(self.stacks, target)
+      local pieceCount = garbageDelivery and #garbageDelivery or 0
       logger.info(string.format(
         "G emit (self): stack[%d] -> stack[%d] frame=%d count=%d",
         senderIndex or -1, recipientIndex or -1, source.stopWatch or -1,
-        garbageDelivery and #garbageDelivery or 0))
+        pieceCount))
+      self._gSentEvents  = (self._gSentEvents  or 0) + 1
+      self._gSentPieces  = (self._gSentPieces  or 0) + pieceCount
       GAME.netClient:sendGarbageEvent({
         senderFrame = source.stopWatch,
         recipients = { recipientIndex },
@@ -589,11 +595,16 @@ function Match:deliverOutgoingGarbageToMultiple(source, targets, garbageDelivery
 
     if #recipientIndices > 0 then
       local senderIndex = tableUtils.indexOf(self.stacks, source)
+      local pieceCount = garbageDelivery and #garbageDelivery or 0
       logger.info(string.format(
         "G emit (all): stack[%d] -> [%s] frame=%d count=%d",
         senderIndex or -1, table.concat(recipientIndices, ","),
-        source.stopWatch or -1,
-        garbageDelivery and #garbageDelivery or 0))
+        source.stopWatch or -1, pieceCount))
+      -- Broadcast counts as ONE event (one wire send), but the pieces fan
+      -- out: bookkeeping counts pieces × recipients so the "applied across
+      -- all recipients" total matches.
+      self._gSentEvents = (self._gSentEvents or 0) + 1
+      self._gSentPieces = (self._gSentPieces or 0) + pieceCount * #recipientIndices
       GAME.netClient:sendGarbageEvent({
         senderFrame = source.stopWatch,
         recipients = recipientIndices,
@@ -1286,6 +1297,17 @@ function Match:setupTeamGarbageTargets()
       end
     end
   end
+
+  -- One-line match-start summary so post-mortem log grep can answer "what
+  -- garbage routing was in effect" without hunting GameMode + Team data.
+  local teamShape = {}
+  for _, team in ipairs(self.teams) do
+    teamShape[#teamShape + 1] = "{" .. table.concat(team.playerIndices, ",") .. "}"
+  end
+  logger.info(string.format(
+    "Match garbage routing: mode=%s stacks=%d teams=%d shape=%s",
+    tostring(self.garbageMode), #self.stacks, #self.teams,
+    table.concat(teamShape, " vs ")))
 end
 
 --- Returns the winning team (if any)

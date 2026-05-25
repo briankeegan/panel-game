@@ -94,6 +94,11 @@ local function snapshotCell(panel)
   if panel.combo_size  ~= nil                     then cell.cs = panel.combo_size end
   if panel.combo_index ~= nil                     then cell.ci = panel.combo_index end
   if panel.isSwappingFromLeft                     then cell.sl = true end
+  -- fell_from_garbage: timer value (or true) that the renderer uses to
+  -- animate the garbage-pop bounce on hovering/falling panels. Without
+  -- this, panels emerging from a popped garbage block fall as if they
+  -- were plain panels — no bounce.
+  if panel.fell_from_garbage                      then cell.fg = panel.fell_from_garbage end
   return cell
 end
 

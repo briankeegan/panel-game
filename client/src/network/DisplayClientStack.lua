@@ -219,6 +219,7 @@ local function expandCell(cell, row, col, frameTimes)
     combo_size         = cell.cs,
     combo_index        = cell.ci,
     isSwappingFromLeft = cell.sl or false,
+    fell_from_garbage  = cell.fg,
     -- frameTimes is per-match (level data); the receiver attaches the
     -- viewStack's engine's frameTimes when available so matched-state
     -- timing math in getDrawProps works.

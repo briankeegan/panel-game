@@ -3,6 +3,7 @@ local consts = require("common.engine.consts")
 local Signal = require("common.lib.signal")
 local GraphicsUtil = require("client.src.graphics.graphics_util")
 local ModController = require("client.src.mods.ModController")
+local logger = require("common.lib.logger")
 
 -- gfxScale at which theme label sizes are calibrated; also the default scale for a full-size stack
 local NORMAL_GFX_SCALE = 3
@@ -763,6 +764,29 @@ function ClientStack:resetDrawArea()
   love.graphics.pop()
   love.graphics.setScissor()
 end
+
+-- Scoped draw-area: pushes the scissor + transform, runs `fn` inside a
+-- pcall, then unconditionally pops. Use this in place of the bare
+-- setDrawArea / resetDrawArea pair anywhere `fn` could throw — the outer
+-- love.graphics matrix stack stays balanced regardless of inner errors.
+-- Without this, a single thrown draw call would leak a push per frame
+-- and eventually overflow love's matrix stack ("Maximum stack depth
+-- reached"). All callers in renderDisplayStacks / DisplayClientStack go
+-- through this so the per-stack error boundary is structural, not
+-- per-callsite-discipline.
+---@param xOffset integer?
+---@param yOffset integer?
+---@param fn fun()
+---@return boolean ok
+---@return string? err
+function ClientStack:withDrawArea(xOffset, yOffset, fn)
+  self:setDrawArea(xOffset, yOffset)
+  local ok, err = pcall(fn)
+  self:resetDrawArea()
+  if not ok then logger.warn("withDrawArea: " .. tostring(err)) end
+  return ok, err
+end
+
 
 function ClientStack:drawCharacter()
   -- Update portrait fade if needed

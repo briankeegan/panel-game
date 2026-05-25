@@ -513,16 +513,16 @@ local function paintCursorFromSnapshot(self, viewStack, snapshot)
   local xPosition = (cc - 1) * panelWidth
   local yPosition = (11 - cr) * panelWidth + (snapshot.d or 0)
 
-  -- Explicitly set color before drawing. The snapshot render path is
-  -- entered from BattleRoom:renderDisplayStacks AFTER the local
-  -- match:render path has already drawn pop FX, telegraph, etc. — those
-  -- can leave alpha < 1 in the global color state, and inheriting that
-  -- here makes the cursor render translucent. Force the color so the
-  -- cursor is opaque while alive and dim while dead.
+  -- DIAGNOSTIC: tint the cursor RED to verify this code is the one drawing.
+  -- If you see a red cursor in-game, my paintCursorFromSnapshot IS running
+  -- and the transparency is from the sprite's built-in alpha (brackets
+  -- with hollow interior — same as the OLD viewer renders). If the cursor
+  -- stays the same dark/transparent look, this code is NOT being called
+  -- and the actual cursor is drawn elsewhere.
   if (snapshot.go or 0) > 0 then
-    love.graphics.setColor(1, 1, 1, 0.3)
+    love.graphics.setColor(1, 0.4, 0.4, 0.3)
   else
-    love.graphics.setColor(1, 1, 1, 1)
+    love.graphics.setColor(1, 0.2, 0.2, 1)
   end
 
   love.graphics.draw(cursor.image,

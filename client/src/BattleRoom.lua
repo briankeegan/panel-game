@@ -792,43 +792,72 @@ end
 ---stack.canvas == nil (which is how we suppress the old viewer). So we
 ---also drive Telegraph from here, using the snapshot-mirrored
 ---outgoingGarbage queue on the remote engine.
+
+----------------------------------------------------------------------
+-- Per-concern render paths. Each one knows exactly one job; the
+-- orchestrator just calls them in order. No `if hasX then drawX`
+-- inside the loop body — every gate lives at the top of its own
+-- function, not inline with peers.
+----------------------------------------------------------------------
+
+-- Snapshot-driven board paint: panels, frame, wall, cursor, character.
+-- DisplayClientStack:render owns its own push/pop balance.
+local function _renderDisplayBoard(displayStack, viewStack)
+  pcall(displayStack.render, displayStack, viewStack)
+end
+
+-- Pop FX + score-card queues filled by snapshot one-shot events. These
+-- normally live on PlayerStack:render which the display pipeline
+-- suppresses, so we drive them from here under the panel-coord
+-- transform. withDrawArea guarantees push/pop balance even if a
+-- queued effect throws.
+local function _renderLiveFx(viewStack)
+  if not viewStack.drawPopEffects then return end
+  if not viewStack.drawCards then return end
+  viewStack:withDrawArea(0, 0, function()
+    pcall(viewStack.drawPopEffects, viewStack)
+    pcall(viewStack.drawCards, viewStack)
+  end)
+end
+
+-- Outgoing garbage telegraphs from this stack to each of its targets.
+-- The snapshot path mirrors outgoingGarbage onto the remote engine so
+-- the existing Telegraph render code works unchanged.
+local function _renderTelegraphs(viewStack, Telegraph)
+  if not viewStack.engine then return end
+  if viewStack:game_ended() then return end
+  if viewStack.garbageTargets and #viewStack.garbageTargets > 0 then
+    for _, target in ipairs(viewStack.garbageTargets) do
+      pcall(Telegraph.render, Telegraph, viewStack, target)
+    end
+    return
+  end
+  if viewStack.garbageTarget then
+    pcall(Telegraph.render, Telegraph, viewStack, viewStack.garbageTarget)
+  end
+end
+
+-- Lookup table: stack → its DisplayClientStack. nil → no display
+-- pipeline for this stack on this client; caller skips it entirely.
+local function _displayStackForStack(self, stack)
+  local player = stack.player
+  if not player then return nil end
+  local pid = player.publicId or player.playerNumber
+  if pid == nil then return nil end
+  return self._displayStacks[pid]
+end
+
 ---@param match ClientMatch
 function BattleRoom:renderDisplayStacks(match)
   if not self._displayStacks then return end
   if not match or not match.stacks then return end
   local Telegraph = require("client.src.graphics.Telegraph")
   for _, stack in ipairs(match.stacks) do
-    local pid = stack.player
-      and (stack.player.publicId or stack.player.playerNumber)
-      or nil
-    if pid ~= nil then
-      local displayStack = self._displayStacks[pid]
-      if displayStack then
-        pcall(displayStack.render, displayStack, stack)
-        -- Pop FX + score-card queues were filled by the snapshot's one-
-        -- shot events; drawPopEffects / drawCards are normally invoked
-        -- from PlayerStack:render which we suppress. Drive them here so
-        -- the animations actually play. Both expect the panel-coord
-        -- transform from setDrawArea.
-        if stack.drawPopEffects and stack.drawCards then
-          stack:setDrawArea(0, 0)
-          pcall(stack.drawPopEffects, stack)
-          pcall(stack.drawCards, stack)
-          stack:resetDrawArea()
-        end
-        -- Render telegraphs from this remote stack to each target. The
-        -- snapshot mirrored its outgoingGarbage onto the engine so the
-        -- existing Telegraph render code works unchanged.
-        if stack.engine and not stack:game_ended() then
-          if stack.garbageTargets and #stack.garbageTargets > 0 then
-            for _, target in ipairs(stack.garbageTargets) do
-              pcall(Telegraph.render, Telegraph, stack, target)
-            end
-          elseif stack.garbageTarget then
-            pcall(Telegraph.render, Telegraph, stack, stack.garbageTarget)
-          end
-        end
-      end
+    local displayStack = _displayStackForStack(self, stack)
+    if displayStack then
+      _renderDisplayBoard(displayStack, stack)
+      _renderLiveFx(stack)
+      _renderTelegraphs(stack, Telegraph)
     end
   end
 end

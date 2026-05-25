@@ -215,11 +215,33 @@ function DisplayClientStack:applyBatch(batch)
   -- forget — events are discarded after replay so they don't double-play
   -- on the next snapshot.
   if snapshot.e and self.viewStack and self.viewStack.enqueue_popfx then
+    local SoundController = require("client.src.music.SoundController")
+    local theme = themes and themes[config and config.theme]
     for _, ev in ipairs(snapshot.e) do
       if ev.k == "pop" then
         pcall(self.viewStack.enqueue_popfx, self.viewStack, ev.col, ev.row, ev.sz or 1)
+        if theme and theme.sounds and theme.sounds.pops then
+          local popLevel = math.min(math.max(ev.pl or 1, 1), 4)
+          local popIndex = math.min(math.max(ev.gi or ev.pi or 1, 1), 10)
+          local sfx = theme.sounds.pops[popLevel] and theme.sounds.pops[popLevel][popIndex]
+          if sfx then pcall(SoundController.playSfx, SoundController, sfx) end
+        end
       elseif ev.k == "card" and self.viewStack.enqueue_card then
         pcall(self.viewStack.enqueue_card, self.viewStack, ev.chain == true, ev.col, ev.row, ev.n or 1)
+        local character = self.viewStack.character
+        if character then
+          if ev.chain == true and character.playChainSfx then
+            pcall(character.playChainSfx, character, ev.n or 1)
+          elseif ev.chain ~= true and character.playComboSfx then
+            pcall(character.playComboSfx, character, ev.n or 1)
+          end
+        end
+      elseif ev.k == "gland" then
+        if theme and theme.sounds and theme.sounds.garbage_thud then
+          local idx = math.min(math.max(ev.h or 1, 1), 3)
+          local sfx = theme.sounds.garbage_thud[idx]
+          if sfx then pcall(SoundController.playSfx, SoundController, sfx) end
+        end
       end
     end
     snapshot.e = nil
@@ -395,8 +417,24 @@ local function paintCursorFromSnapshot(self, viewStack, snapshot)
   local panelWidth = 16
   local scale_x = desiredCursorWidth / cursor.image:getWidth()
   local scale_y = 24 / cursor.image:getHeight()
-  local xPosition = ((snapshot.cc or 1) - 1) * panelWidth
-  local yPosition = (11 - (snapshot.cr or 1)) * panelWidth + (snapshot.d or 0)
+
+  -- Cursor-only interpolation: lerp from prev (cr, cc) to latest (cr, cc)
+  -- over ~30ms wall-clock. Short interval so we glide instead of teleport
+  -- between snapshots, without re-introducing the displacement lag-bug.
+  local cr = snapshot.cr or 1
+  local cc = snapshot.cc or 1
+  local prev = self.prevSnapshot
+  if prev and self.latestRecvTime > 0 then
+    local elapsed = love.timer.getTime() - self.latestRecvTime
+    local alpha = math.min(1, math.max(0, elapsed / 0.03))
+    local prevCr = prev.cr or cr
+    local prevCc = prev.cc or cc
+    if math.abs(cr - prevCr) <= 6 then cr = prevCr + (cr - prevCr) * alpha end
+    if math.abs(cc - prevCc) <= 6 then cc = prevCc + (cc - prevCc) * alpha end
+  end
+
+  local xPosition = (cc - 1) * panelWidth
+  local yPosition = (11 - cr) * panelWidth + (snapshot.d or 0)
 
   -- Dim if the sender is dead.
   if (snapshot.go or 0) > 0 then

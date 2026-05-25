@@ -325,14 +325,15 @@ function DisplayEventCapture:onMatched(engine, attackGfxOrigin, isChainLink, com
   end
 end
 
--- One-shot trigger: a panel popped. Queue a pop-FX event keyed to the
--- pop size we last saw on matched.
 function DisplayEventCapture:onPanelPop(panel)
   if not panel then return end
   self._pendingEvents[#self._pendingEvents + 1] = {
     k = "pop",
     col = panel.column, row = panel.row,
     sz = self._popSizeThisFrame,
+    pl = math.min(math.max(self.engine.chain_counter or 1, 1), 4),
+    pi = panel.combo_index or 1,
+    gi = panel.isGarbage and (panel.pop_index or 0) or nil,
   }
 end
 
@@ -347,6 +348,20 @@ function DisplayEventCapture:onPanelLanded(panel)
   local target = engineClock + 13
   if (self._landingActiveUntilClock or 0) < target then
     self._landingActiveUntilClock = target
+  end
+  -- Garbage land "thud": ship a one-shot event so the receiver can play
+  -- the same garbage_thud SFX the sender's PlayerStack would. Dedup by
+  -- garbageId so multi-cell blocks only emit once per land.
+  if panel and panel.isGarbage and panel.shake_time and panel.garbageId
+      and (panel.row or 0) <= (self.engine.height or 12) then
+    self._landedGarbageIds = self._landedGarbageIds or {}
+    if not self._landedGarbageIds[panel.garbageId] then
+      self._landedGarbageIds[panel.garbageId] = true
+      self._pendingEvents[#self._pendingEvents + 1] = {
+        k = "gland",
+        h = panel.height or 1,
+      }
+    end
   end
 end
 

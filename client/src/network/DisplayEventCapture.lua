@@ -136,17 +136,19 @@ local function buildSnapshot(engine)
   -- top — that's how the dead-player's top rows were going missing on
   -- the receiver. The per-row `if enginePanelRow` guard handles legit
   -- nil rows gracefully.
+  -- Pad EVERY cell index with at least `false` so the table stays dense
+  -- 1..(height+2)*width. dkjson encodes sparse Lua tables as JSON OBJECTS
+  -- with STRING keys, which breaks the receiver's numeric `grid[idx]`
+  -- lookup — panels show up at the wrong rows or vanish entirely. The
+  -- false sentinel decodes as boolean false; expandCell treats it as
+  -- empty (`not cell` short-circuits → nil panel → skipped).
   local panels = {}
   local enginePanels = engine.panels
-  if enginePanels then
-    for row = 0, height + 1 do
-      local enginePanelRow = enginePanels[row]
-      if enginePanelRow then
-        for col = 1, width do
-          local idx = row * width + col
-          panels[idx] = snapshotCell(enginePanelRow[col])
-        end
-      end
+  for row = 0, height + 1 do
+    local enginePanelRow = enginePanels and enginePanels[row]
+    for col = 1, width do
+      local idx = row * width + col
+      panels[idx] = (enginePanelRow and snapshotCell(enginePanelRow[col])) or false
     end
   end
 
@@ -391,8 +393,16 @@ function DisplayEventCapture:_send(now)
   -- there are no one-shot triggers to ship. Saves the encode work on
   -- the sender's main thread + wire bandwidth during pauses / dead /
   -- between matches.
+  --
+  -- BUT: bypass the skip once the player has died. After death the
+  -- engine stops ticking (Stack:shouldRun returns false on
+  -- game_ended), so clock/cur_row/cur_col freeze — signature stays
+  -- identical even though applyVisualDeath has flipped panel states
+  -- to "dead". Without this bypass, the death-state transitions never
+  -- reach the wire.
   local sig = stateSignature(self.engine)
-  if sig == self._lastSentSig and #self._pendingEvents == 0 then
+  local isPostDeath = (self.engine.game_over_clock or 0) > 0
+  if not isPostDeath and sig == self._lastSentSig and #self._pendingEvents == 0 then
     return
   end
   self._lastSentSig = sig

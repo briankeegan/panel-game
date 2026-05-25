@@ -13,6 +13,7 @@ local InputCompression = require("common.data.InputCompression")
 local ReplayV3 = require("common.data.ReplayV3")
 local MatchRules = require("common.data.MatchRules")
 local TeamUtils = require("common.data.TeamUtils")
+local GarbageDelivery = require("common.engine.GarbageDelivery")
 
 ---@class Match
 ---@field stacks (Stack | SimulatedStack)[] The stacks to run as part of the match.
@@ -52,6 +53,7 @@ local TeamUtils = require("common.data.TeamUtils")
 ---@field _gDroppedPieces integer? per-match accounting: count of pieces dropped
 ---@field _gSkippedFrozenEvents integer? per-match accounting: G messages skipped because the recipient stack is a snapshot-driven frozen remote
 ---@field _gSkippedFrozenPieces integer? per-match accounting: pieces skipped (frozen-remote recipient)
+---@field garbageDelivery GarbageDelivery per-tick garbage shipping + cross-stack distribution module (see common/engine/GarbageDelivery.lua)
 
 ---@class MatchDebugConfig
 ---@field vsFramesBehind integer
@@ -92,6 +94,8 @@ function(self, panelSource, matchRules)
   self.debug = {
     vsFramesBehind = 0
   }
+
+  self.garbageDelivery = GarbageDelivery.new(self)
 end
 )
 
@@ -307,15 +311,7 @@ function Match:run()
 
   local runsSoFar = 0
   while tableUtils.contains(runs, runsSoFar) do
-    -- pushGarbageTo runs for EVERY stack regardless of shouldRun. It's
-    -- the per-recipient loop that fires deliverOutgoingGarbage for
-    -- local-source→remote-target pairs — i.e., shipping G off this
-    -- machine. Gating it behind shouldRun broke single-target
-    -- (2-player) garbage emission once shouldRun stopped ticking
-    -- non-local recipients under the snapshot pipeline.
-    for i, stack in ipairs(self.stacks) do
-      if stack then self:pushGarbageTo(stack) end
-    end
+    self.garbageDelivery:tickPreSim()
     for i, stack in ipairs(self.stacks) do
       if stack and self:shouldRun(stack, runsSoFar) then
         stack:run()
@@ -324,9 +320,7 @@ function Match:run()
     end
 
     self:updateClock()
-
-    -- Distribute multi-target garbage after all stacks have run for this iteration
-    self:distributeGarbageToTargets()
+    self.garbageDelivery:tickPostSim()
 
     -- Since the stacks can affect each other, don't save rollback until after all have run
     for i, stack in ipairs(self.stacks) do
@@ -358,291 +352,6 @@ function Match:run()
   return runs
 end
 
---- Distributes ready garbage from each sender to their targets
---- For "all" mode: sends to ALL targets at once
---- For "shared" mode: sends to the next target in the round-robin queue
----
---- Shared-mode note: round-robin state is tracked per SENDER and the
---- rotation itself only advances over LIVING enemies. Dead players are
---- skipped for both selection and advancement so the next delivery always
---- rotates to the next living opponent for that sender.
--- Aliveness predicate for recipient selection. Uses game_over_clock > 0
--- (death has been recorded) instead of stack:game_ended() (sim clock has
--- caught up past death). For a remote view-stack in loose-sync the clock
--- is permanently pinned below game_over_clock once input stops, so
--- game_ended() stays false forever — without this predicate the sender
--- would keep listing dead remotes as recipients every combo, forcing
--- the server's _redirectIfDead path on every emit. Same trap noted at
--- ClientMatch.lua:419-424.
-local function isStackAlive(s)
-  return s and (s.game_over_clock or -1) <= 0
-end
-
-function Match:distributeGarbageToTargets()
-  for senderIndex, targets in ipairs(self.garbageTargets) do
-    if #targets > 1 then
-      -- Multi-target: handle based on garbage mode
-      local sender = self.stacks[senderIndex]
-      local oldestTransitTime = sender:getOldestFinishedGarbageTransitTime()
-      if oldestTransitTime and sender.stopWatch >= oldestTransitTime then
-        if self.garbageMode == "shared" then
-          local teamState = self.teamGarbageState and self.teamGarbageState[senderIndex]
-
-          if teamState and #teamState.enemyIndices > 0 then
-            local stacks = self.stacks
-            local alive = function(slot) return isStackAlive(stacks[slot]) end
-
-            -- Pre-flight: confirm at least one living enemy BEFORE popping
-            -- the transit bundle. getReadyGarbageAt mutates the queue, so
-            -- a pop followed by no-living-enemies would silently drop the
-            -- whole batch on the floor.
-            local _, firstSlot = TeamUtils.findNextLiving(
-              teamState.enemyIndices, teamState.currentTargetIndex, alive)
-            if firstSlot then
-              local garbageDelivery = sender:getReadyGarbageAt(oldestTransitTime)
-              if garbageDelivery then
-                -- Per-piece rotation: a chain/combo that lands multiple pieces
-                -- at the same transit time would otherwise dump the entire
-                -- batch on a single enemy with one cursor advance, leaving the
-                -- other enemy untouched until the first dies. Rotating per
-                -- piece spreads the batch across living enemies in order.
-                for _, g in ipairs(garbageDelivery) do
-                  local _, pickedSlot, nextLivingIndex = TeamUtils.findNextLiving(
-                    teamState.enemyIndices, teamState.currentTargetIndex, alive)
-                  if not pickedSlot then
-                    -- Defensive: within a single engine tick no sim runs
-                    -- between iterations so liveness can't change mid-loop.
-                    -- Warn loudly if that invariant ever breaks so the
-                    -- dropped pieces don't go silent.
-                    logger.warn(string.format(
-                      "shared-mode garbage dropped mid-batch: sender=%d ran out of living enemies",
-                      senderIndex))
-                    break
-                  end
-                  if nextLivingIndex then
-                    teamState.currentTargetIndex = nextLivingIndex
-                  end
-                  self:deliverOutgoingGarbage(sender, stacks[pickedSlot], { shallowcpy(g) })
-                end
-              end
-            end
-          end
-        else
-          -- "All" mode: collect all living targets BEFORE popping the
-          -- transit bundle (same silent-drop risk as the shared branch
-          -- above), then send one batched event with every recipient.
-          local livingTargets = {}
-          for _, target in ipairs(targets) do
-            if isStackAlive(target) then
-              livingTargets[#livingTargets + 1] = target
-            end
-          end
-
-          if #livingTargets > 0 then
-            local garbageDelivery = sender:getReadyGarbageAt(oldestTransitTime)
-            if garbageDelivery then
-              self:deliverOutgoingGarbageToMultiple(sender, livingTargets, garbageDelivery)
-            end
-          end
-        end
-      end
-    end
-  end
-end
-
----@param stack BaseStack
-function Match:pushGarbageTo(stack)
-  -- Replay network-injected garbage at the same frame it was originally
-  -- received, so a rollback past the receive frame doesn't permanently
-  -- lose the staging push.
-  stack:drainNetworkGarbageForFrame(stack.stopWatch)
-
-  -- check if anyone wants to push garbage into the stack's queue
-  for _, st in ipairs(self.garbageSources[stack]) do
-    -- Skip multi-target senders (handled by distributeGarbageToTargets)
-    local senderIndex = tableUtils.indexOf(self.stacks, st)
-    if senderIndex and #self.garbageTargets[senderIndex] > 1 then
-      -- Multi-target garbage is distributed separately, skip this sender
-    else
-      local oldestTransitTime = st:getOldestFinishedGarbageTransitTime()
-      if oldestTransitTime and ((not st.outgoingGarbage.illegalStuffIsAllowed) or (#stack.incomingGarbage.stagedGarbage < 72)) then
-        -- Replays use the receiver's clock with strict exact-match (lockstep
-        -- ticking preserves the recorded delivery frame). Live loose-sync
-        -- uses oldestTransitTime as the ready clock so a receiver view-stack
-        -- running in catch-up mode and skipping the exact transit frame
-        -- doesn't strand the garbage in the sender's outgoing queue.
-        local readyClock
-        if self.fromReplay then
-          readyClock = stack.stopWatch
-        elseif st.stopWatch >= oldestTransitTime then
-          readyClock = oldestTransitTime
-        end
-        if readyClock then
-          local garbageDelivery = st:getReadyGarbageAt(readyClock)
-          if garbageDelivery then
-            self:deliverOutgoingGarbage(st, stack, garbageDelivery)
-          end
-        end
-      end
-    end
-  end
-end
-
----Deliver garbage from a sender stack to a target stack, honoring the loose-sync
----routing rules:
----  * If the source is local-authoritative and the target is remote (a view of
----    another player), emit a G event so the target's own machine applies the
----    garbage authoritatively. Locally also push the garbage onto the view for
----    visual consistency on the sender's screen.
----  * If the source is remote and the target is local-authoritative, SUPPRESS
----    the local-sim push — the authoritative G event from the source's machine
----    will deliver. Without this, garbage would land twice on the local player.
----  * If the source is local AND the target is local (vsSelf self-attack) while
----    a server connection is active, direct-push for responsiveness AND emit a
----    G so spectators see the drop. The server bounces the G back to us; the
----    echo guard in ClientMatch:_applyGarbageEventNow prevents double-apply.
----  * Offline / replay playback: direct push, no server in the loop.
----@param source BaseStack
----@param target BaseStack
----@param garbageDelivery table garbage payload (array of Garbage records)
-function Match:deliverOutgoingGarbage(source, target, garbageDelivery)
-  -- Replay-driven engines (saved replays, the pause-mode scrub preview) must
-  -- skip the loose-sync routing entirely. Their stacks are is_local=false, so
-  -- the "remote source → suppress local push" branch would erase their garbage
-  -- — exactly the "blocks vanish on rewind" symptom the scrub preview comment
-  -- in ClientMatch:scrubToFrame mentions. They're local re-sim, not network.
-  local looseSyncActive = LOOSE_SYNC_GARBAGE
-      and not self.fromReplay
-      and GAME and GAME.netClient and GAME.netClient:isConnected()
-
-  if looseSyncActive then
-    if source.is_local and not target.is_local then
-      -- Local source → remote target: emit G to the server. Do NOT push the
-      -- garbage onto the local view of the target — the server's relay of the
-      -- G back to us is what triggers the visual on our view of the recipient
-      -- (see ClientMatch:applyGarbageEvent), so we never show a hit the
-      -- server hasn't confirmed. The server can also redirect the recipient
-      -- if the original target died between our emit and the server's
-      -- processing (Room:broadcastGarbageEvent handles round-robin walk-
-      -- forward in that case).
-      local senderIndex = tableUtils.indexOf(self.stacks, source)
-      local recipientIndex = tableUtils.indexOf(self.stacks, target)
-      local pieceCount = garbageDelivery and #garbageDelivery or 0
-      logger.info(string.format(
-        "G emit: stack[%d] -> stack[%d] frame=%d count=%d",
-        senderIndex or -1, recipientIndex or -1, source.stopWatch or -1,
-        pieceCount))
-      self._gSentEvents  = (self._gSentEvents  or 0) + 1
-      self._gSentPieces  = (self._gSentPieces  or 0) + pieceCount
-      GAME.netClient:sendGarbageEvent({
-        senderFrame = source.stopWatch,
-        recipients = { recipientIndex },
-        garbage = garbageDelivery,
-      })
-      return
-    elseif not source.is_local then
-      -- Remote source → anything (local target OR remote target). The
-      -- authoritative G from the source's own machine, relayed by the server
-      -- to every client, drives ALL visuals via applyGarbageEvent:
-      --   * recipient's own machine: G pushes onto the local stack.
-      --   * sender's machine: G pushes onto the view of the recipient.
-      --   * third-party machines (3+ player modes, spectators): G pushes onto
-      --     the view of the recipient there too.
-      -- Without suppressing here, the third-party-observer case would push
-      -- twice on each non-self view-stack: once from the remote view-of-sender
-      -- producing garbage in the local sim, and again when the server relays
-      -- the G — causing 2× visual garbage on view-of-non-self-recipient.
-      return
-    else
-      -- Local source → local target (vsSelf self-attack online). Push locally
-      -- so the player's own screen reacts immediately (no RTT delay on their
-      -- own garbage), AND emit a G so the server can relay to spectators.
-      -- The echo guard in ClientMatch:_applyGarbageEventNow skips the bounced
-      -- G on the sender's machine so it doesn't apply twice.
-      target:receiveGarbage(garbageDelivery)
-      local senderIndex = tableUtils.indexOf(self.stacks, source)
-      local recipientIndex = tableUtils.indexOf(self.stacks, target)
-      local pieceCount = garbageDelivery and #garbageDelivery or 0
-      logger.info(string.format(
-        "G emit (self): stack[%d] -> stack[%d] frame=%d count=%d",
-        senderIndex or -1, recipientIndex or -1, source.stopWatch or -1,
-        pieceCount))
-      self._gSentEvents  = (self._gSentEvents  or 0) + 1
-      self._gSentPieces  = (self._gSentPieces  or 0) + pieceCount
-      GAME.netClient:sendGarbageEvent({
-        senderFrame = source.stopWatch,
-        recipients = { recipientIndex },
-        garbage = garbageDelivery,
-      })
-      return
-    end
-  end
-
-  -- Offline / replay playback: direct push, no server in the loop.
-  target:receiveGarbage(garbageDelivery)
-end
-
----Deliver garbage from a sender stack to multiple target stacks via a single batched event.
----Used by "all" mode to send one event with all recipients instead of N separate events.
----@param source BaseStack
----@param targets BaseStack[] array of target stacks
----@param garbageDelivery table garbage payload (array of Garbage records)
-function Match:deliverOutgoingGarbageToMultiple(source, targets, garbageDelivery)
-  -- Same fromReplay carve-out as deliverOutgoingGarbage: replay/preview engines
-  -- aren't network-connected sims, so loose-sync routing doesn't apply.
-  local looseSyncActive = LOOSE_SYNC_GARBAGE
-      and not self.fromReplay
-      and GAME and GAME.netClient and GAME.netClient:isConnected()
-
-  if looseSyncActive and source.is_local then
-    -- Local source → remote targets: emit a single G event to the server with
-    -- ALL recipients listed. Server's redirect logic walks the recipient list
-    -- once and handles dead-target redirects atomically per delivery.
-    local recipientIndices = {}
-    for _, target in ipairs(targets) do
-      if not target.is_local then
-        local recipientIndex = tableUtils.indexOf(self.stacks, target)
-        if recipientIndex then
-          recipientIndices[#recipientIndices + 1] = recipientIndex
-        end
-      end
-    end
-
-    if #recipientIndices > 0 then
-      local senderIndex = tableUtils.indexOf(self.stacks, source)
-      local pieceCount = garbageDelivery and #garbageDelivery or 0
-      logger.info(string.format(
-        "G emit (all): stack[%d] -> [%s] frame=%d count=%d",
-        senderIndex or -1, table.concat(recipientIndices, ","),
-        source.stopWatch or -1, pieceCount))
-      -- Broadcast counts as ONE event (one wire send), but the pieces fan
-      -- out: bookkeeping counts pieces × recipients so the "applied across
-      -- all recipients" total matches.
-      self._gSentEvents = (self._gSentEvents or 0) + 1
-      self._gSentPieces = (self._gSentPieces or 0) + pieceCount * #recipientIndices
-      GAME.netClient:sendGarbageEvent({
-        senderFrame = source.stopWatch,
-        recipients = recipientIndices,
-        garbage = garbageDelivery,
-      })
-    end
-    return
-  elseif looseSyncActive and not source.is_local then
-    -- Remote source: suppress local-sim push for local targets — the
-    -- authoritative G from the source's machine will deliver. Same rule as
-    -- the single-recipient path in deliverOutgoingGarbage.
-    return
-  end
-
-  -- Local↔local or offline: deliver to each target directly (no server relay needed)
-  for _, target in ipairs(targets) do
-    local garbageCopy = {}
-    for j, g in ipairs(garbageDelivery) do
-      garbageCopy[j] = shallowcpy(g)
-    end
-    target:receiveGarbage(garbageCopy)
-  end
-end
 
 ---@param stack BaseStack
 ---@return boolean

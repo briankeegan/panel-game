@@ -513,15 +513,11 @@ local function paintCursorFromSnapshot(self, viewStack, snapshot)
   local xPosition = (cc - 1) * panelWidth
   local yPosition = (11 - cr) * panelWidth + (snapshot.d or 0)
 
-  -- Always set the color before drawing. Earlier batches (panels, frame,
-  -- character) leave the global color in whatever state they last used —
-  -- pop FX or chain cards in particular set alpha < 1 and don't always
-  -- restore. Without this explicit reset the cursor inherits that alpha
-  -- and renders faded.
+  -- Match PlayerStack:render_cursor exactly: setColor ONLY for dim-on-
+  -- dead, otherwise inherit whatever the prior draws left. The reset
+  -- after the draw guarantees we leave the color stack in a clean state.
   if (snapshot.go or 0) > 0 then
     love.graphics.setColor(1, 1, 1, 0.3)
-  else
-    love.graphics.setColor(1, 1, 1, 1)
   end
 
   love.graphics.draw(cursor.image,

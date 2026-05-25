@@ -166,3 +166,63 @@ for _, base in ipairs(BASE_SCENARIOS) do
 end
 
 logger.info(string.format("GarbageDeliveryPropertyTests: %d scenarios passed", ran))
+
+----------------------------------------------------------------------
+-- Isolation invariant: pauseNonLocalSimulation must not change
+-- garbage-arrival behavior. If it does, the rendering pipeline is
+-- leaking into the game-logic pipeline somewhere — exactly the bug
+-- class ARCHITECTURE.md forbids.
+--
+-- For each scenario, runs the matrix with the flag OFF and with it
+-- ON, and asserts the per-recipient garbage counts are identical.
+----------------------------------------------------------------------
+
+local function arrivalCounts(opts)
+  local match = buildScenario(opts)
+  runToFrame(match, 100)
+  GarbageQueueTestingUtils.sendGarbage(match.stacks[1], 4, 1)
+  runToFrame(match, 400)
+  local counts = {}
+  for _, recipient in ipairs(match.garbageTargets[1] or {}) do
+    counts[recipient.which] = recipient.incomingGarbage
+      and #recipient.incomingGarbage.history or 0
+  end
+  return counts
+end
+
+local function sameCounts(a, b)
+  for k, v in pairs(a) do if b[k] ~= v then return false end end
+  for k, v in pairs(b) do if a[k] ~= v then return false end end
+  return true
+end
+
+local function describeCounts(counts)
+  local parts = {}
+  for slot, n in pairs(counts) do parts[#parts+1] = string.format("slot%d=%d", slot, n) end
+  table.sort(parts)
+  return "{" .. table.concat(parts, ",") .. "}"
+end
+
+local isolationRan = 0
+for _, base in ipairs(BASE_SCENARIOS) do
+  local optsOff = {}
+  for k, v in pairs(base) do optsOff[k] = v end
+  optsOff.pauseNonLocalSimulation = false
+
+  local optsOn = {}
+  for k, v in pairs(base) do optsOn[k] = v end
+  optsOn.pauseNonLocalSimulation = true
+
+  local countsOff = arrivalCounts(optsOff)
+  local countsOn  = arrivalCounts(optsOn)
+  if not sameCounts(countsOff, countsOn) then
+    error(string.format(
+      "Isolation invariant FAILED for %s\n  pauseNonLocalSimulation=false: %s\n  pauseNonLocalSimulation=true:  %s",
+      base.name, describeCounts(countsOff), describeCounts(countsOn)))
+  end
+  isolationRan = isolationRan + 1
+end
+
+logger.info(string.format(
+  "GarbageDeliveryPropertyTests isolation: %d scenarios identical with/without pauseNonLocalSimulation",
+  isolationRan))

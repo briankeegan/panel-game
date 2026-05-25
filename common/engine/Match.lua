@@ -307,11 +307,18 @@ function Match:run()
 
   local runsSoFar = 0
   while tableUtils.contains(runs, runsSoFar) do
+    -- pushGarbageTo runs for EVERY stack regardless of shouldRun. It's
+    -- the per-recipient loop that fires deliverOutgoingGarbage for
+    -- local-source→remote-target pairs — i.e., shipping G off this
+    -- machine. Gating it behind shouldRun broke single-target
+    -- (2-player) garbage emission once shouldRun stopped ticking
+    -- non-local recipients under the snapshot pipeline.
+    for i, stack in ipairs(self.stacks) do
+      if stack then self:pushGarbageTo(stack) end
+    end
     for i, stack in ipairs(self.stacks) do
       if stack and self:shouldRun(stack, runsSoFar) then
-        self:pushGarbageTo(stack)
         stack:run()
-
         runs[i] = runs[i] + 1
       end
     end

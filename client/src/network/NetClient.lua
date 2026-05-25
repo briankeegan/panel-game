@@ -1823,6 +1823,13 @@ function NetClient:update(dt)
     for _, listener in pairs(self.roomListeners) do
       listener:listen()
     end
+    -- Display-history `Y` messages keep flowing past matchEnded — the
+    -- sender's capture stays alive through runGameOver to ship the
+    -- death-animation tail. Drain them in ROOM state too so the
+    -- DisplayClientStack receives the post-match snapshots instead of
+    -- freezing at the last pre-matchEnded frame. applyDisplayEventBatch
+    -- is a no-op when _displayStacks is nil, so this is safe.
+    processDisplayEvents(self)
   elseif self.state == states.INGAME then
     processInputMessages(self)
     processGarbageEvents(self)

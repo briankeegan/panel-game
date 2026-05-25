@@ -164,13 +164,17 @@ function DisplayClientStack:applyBatch(batch)
   -- exist.
   if snapshot.p then
     local cached = self._cachedPanels
-    if cached then
-      for i = 1, #snapshot.p do
-        if snapshot.p[i] == true then snapshot.p[i] = cached[i] end
+    -- Orphan-delta safety: if a new spectator joins mid-match, their
+    -- first snapshot may arrive as a delta (sender doesn't know about
+    -- viewers; keyframes only every KEYFRAME_EVERY sends). Without a
+    -- cache, an unresolved `true` cell hits expandCell as `not true.c`
+    -- which is a crash. Resolve to `false` (empty) when nothing cached;
+    -- the next keyframe corrects.
+    for i = 1, #snapshot.p do
+      if snapshot.p[i] == true then
+        snapshot.p[i] = (cached and cached[i]) or false
       end
     end
-    -- Stash a fresh copy of the resolved grid for the next merge. New
-    -- table so future deltas modifying snapshot.p don't mutate cache.
     local nextCache = {}
     for i = 1, #snapshot.p do nextCache[i] = snapshot.p[i] end
     self._cachedPanels = nextCache
@@ -484,49 +488,85 @@ end
 -- keeps up. The earlier delayed-interp introduced a half-interval lag
 -- that never caught up because every fresh snapshot reset the elapsed
 -- clock — visible to the user as the remote "lagging behind" forever.
+----------------------------------------------------------------------
+-- Layer-by-layer draw paths. One function per visible component; each
+-- one knows exactly what it draws and what it needs. The render method
+-- is a flat call list — no `if hasX then drawX` branches inline.
+-- Adding/removing/reordering a layer is one line.
+----------------------------------------------------------------------
+
+-- Character portrait painted behind the stack frame. No-op if the
+-- viewStack doesn't expose drawCharacter (e.g. SimulatedStack).
+local function drawPortraitLayer(viewStack)
+  if not viewStack.drawCharacter then return end
+  pcall(viewStack.drawCharacter, viewStack)
+end
+
+-- The panel grid: every non-empty cell becomes a sprite or part of a
+-- multi-cell garbage block. Owns its own batch via panelSet:drawBatch.
+-- pcall'd so a malformed cell (e.g. delta sentinel not resolved against
+-- the receiver's cache) crashes only the grid layer for this frame,
+-- not the surrounding portrait/frame/wall/cursor.
+local function drawGridLayer(self, viewStack, snapshot, shakeOffset)
+  local ok, err = pcall(paintGridFromSnapshot, self, viewStack, snapshot, shakeOffset)
+  if not ok then logger.warn("drawGridLayer: " .. tostring(err)) end
+end
+
+-- Frame border around the play area.
+local function drawFrameLayer(viewStack)
+  if not viewStack.drawFrame then return end
+  pcall(viewStack.drawFrame, viewStack)
+end
+
+-- The wall at the bottom of the panel area. Shakes with the stack but
+-- intentionally does NOT take displacement (smooth-scroll offset) — see
+-- PlayerStack:render. Skipped if the snapshot didn't ship board height.
+local function drawWallLayer(viewStack, snapshot, shakeOffset)
+  if not viewStack.drawWall then return end
+  if not snapshot.h then return end
+  pcall(viewStack.drawWall, viewStack, shakeOffset, snapshot.h)
+end
+
+-- The remote player's cursor sprite, placed by snapshot cr/cc. pcall'd
+-- so a missing cursor sprite for the remote panels mod can't take the
+-- frame down.
+local function drawCursorLayer(self, viewStack, snapshot)
+  local ok, err = pcall(paintCursorFromSnapshot, self, viewStack, snapshot)
+  if not ok then logger.warn("drawCursorLayer: " .. tostring(err)) end
+end
+
+-- Compute the shake offset for this frame in panel coordinates. Pulled
+-- out so render() stays a flat sequence.
+local function computeShakeOffset(viewStack)
+  if not viewStack.currentShakeOffset then return 0 end
+  if not viewStack.gfxScale or viewStack.gfxScale == 0 then return 0 end
+  local ok, val = pcall(viewStack.currentShakeOffset, viewStack)
+  if not ok or type(val) ~= "number" then return 0 end
+  return val / viewStack.gfxScale
+end
+
+-- Flat orchestrator: every layer in declared order. Push/pop balance is
+-- owned by withDrawArea + the explicit love.graphics.push/pop wrapper
+-- below, so a throw inside any single layer can't leak the matrix stack.
 function DisplayClientStack:render(viewStack)
   if not viewStack or not self.snapshot then return end
   if not viewStack.setDrawArea or not viewStack.resetDrawArea then return end
 
-  -- Match the old viewer's appearance: character portrait behind the
-  -- stack, frame border around it, wall at the bottom of the panel area.
-  -- These read fields off the viewStack itself (character, theme, frame
-  -- assets) and from viewStack.engine for things like displacement, which
-  -- mirrorHudScalars already keeps in sync with the snapshot.
+  local snapshot = self.snapshot
+  local shakeOffset = computeShakeOffset(viewStack)
 
-  -- shakeOffset comes from the mirrored shake_time on engine. Wall + panels
-  -- both displace by this same amount so the bottom row + grid shift together
-  -- under garbage impact. Displacement (the smooth scroll) is intentionally
-  -- NOT applied to the wall — that's the bug fix for "bottom red piece
-  -- raising/lowering".
-  local shakeOffset = 0
-  if viewStack.currentShakeOffset and viewStack.gfxScale and viewStack.gfxScale ~= 0 then
-    local ok, val = pcall(viewStack.currentShakeOffset, viewStack)
-    if ok and type(val) == "number" then
-      shakeOffset = val / viewStack.gfxScale
-    end
-  end
-
-  viewStack:setDrawArea(0, 0)
-  love.graphics.push("all")
-
-  -- Character portrait + stack frame (matches old viewer's layered look).
-  if viewStack.drawCharacter then pcall(viewStack.drawCharacter, viewStack) end
-
-  -- Paint the grid + cursor inside the panel-coord transform.
-  paintGridFromSnapshot(self, viewStack, self.snapshot, shakeOffset)
-
-  -- Frame border + wall at the bottom row. Wall takes shakeOffset, NOT
-  -- displacement — matches PlayerStack:render:985 (drawWall(shakeOffset, ...)).
-  if viewStack.drawFrame then pcall(viewStack.drawFrame, viewStack) end
-  if viewStack.drawWall and self.snapshot.h then
-    pcall(viewStack.drawWall, viewStack, shakeOffset, self.snapshot.h)
-  end
-
-  paintCursorFromSnapshot(self, viewStack, self.snapshot)
-
-  love.graphics.pop()
-  viewStack:resetDrawArea()
+  viewStack:withDrawArea(0, 0, function()
+    love.graphics.push("all")
+    local ok, err = pcall(function()
+      drawPortraitLayer(viewStack)
+      drawGridLayer(self, viewStack, snapshot, shakeOffset)
+      drawFrameLayer(viewStack)
+      drawWallLayer(viewStack, snapshot, shakeOffset)
+      drawCursorLayer(self, viewStack, snapshot)
+    end)
+    love.graphics.pop()
+    if not ok then logger.warn("DisplayClientStack:render layer error: " .. tostring(err)) end
+  end)
 end
 
 return DisplayClientStack

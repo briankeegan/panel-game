@@ -394,12 +394,17 @@ function DisplayEventCapture:_maybeSend()
   --     mod-16 wrap when a new row spawns)
   local engineClock = self.engine.clock or 0
   local curDisplacement = self.engine.displacement or 0
+  local curR = self.engine.cur_row or 0
+  local curC = self.engine.cur_col or 0
   local displacementChanged = (self._lastSentDisplacement ~= nil)
     and (self._lastSentDisplacement ~= curDisplacement)
+  local cursorChanged = (self._lastSentCurR ~= nil)
+    and (self._lastSentCurR ~= curR or self._lastSentCurC ~= curC)
   local fastEvent = (self.engine.manual_raise == true)
     or ((self._landingActiveUntilClock or 0) > engineClock)
     or ((self._matchActiveUntilClock or 0) > engineClock)
     or displacementChanged
+    or cursorChanged
   if not fastEvent and (now - self.lastFlushTime) < SEND_INTERVAL_S then return end
   -- Option F (adaptive rate): if the local engine is behind wall-clock
   -- by 2+ frames, skip this send. The local player's main loop is
@@ -522,9 +527,11 @@ function DisplayEventCapture:_send(now)
   end
   self._lastSentSig = sig
   self._lastSentPanelsSig = panelsSig
-  -- Remember displacement so the next _maybeSend can detect a change
-  -- (passive or manual raise, mod-16 wrap on new row spawn).
+  -- Remember displacement + cursor position so the next _maybeSend can
+  -- bypass the 20Hz gate on the very next change.
   self._lastSentDisplacement = self.engine.displacement or 0
+  self._lastSentCurR = self.engine.cur_row or 0
+  self._lastSentCurC = self.engine.cur_col or 0
 
   local snapshot = buildSnapshot(self.engine)
 

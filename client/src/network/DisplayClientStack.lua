@@ -65,17 +65,69 @@ local EXPECTED_INTERVAL_S = 0.05
 ---@param playerID integer
 ---@param player Player?
 ---@param viewStack table? matching ClientStack for the remote player (engine field mirror target)
+-- Seed the receiver with the deterministic initial board so the remote
+-- view isn't blank during countdown before the first snapshot lands.
+-- Both clients ran the engine's starting_state() against the shared
+-- panelSource seed, so viewStack.engine.panels has the initial 6-row
+-- layout populated locally — we just snapshot it here.
+local function _initialSnapshotFromEngine(viewStack)
+  if not viewStack or not viewStack.engine then return nil end
+  local engine = viewStack.engine
+  local width  = engine.width  or 6
+  local height = engine.height or 12
+  local panels = {}
+  for row = 0, height + 1 do
+    local r = engine.panels and engine.panels[row]
+    for col = 1, width do
+      local idx = row * width + col
+      local p = r and r[col]
+      if p and p.color and p.color ~= 0 then
+        panels[idx] = {
+          c  = p.color,
+          s  = p.state,
+          t  = (p.timer and p.timer ~= 0) and p.timer or nil,
+          g  = p.isGarbage or nil,
+          m  = p.metal or nil,
+          ch = p.chaining or nil,
+          gi = p.garbageId,
+          xo = p.x_offset,
+          yo = p.y_offset,
+          gw = p.width,
+          gh = p.height,
+        }
+      else
+        panels[idx] = false
+      end
+    end
+  end
+  return {
+    f  = engine.clock or 0,
+    d  = engine.displacement or 0,
+    cr = engine.cur_row or 1,
+    cc = engine.cur_col or 1,
+    w  = width,
+    h  = height,
+    p  = panels,
+    go = 0,
+  }
+end
+
 ---@return DisplayClientStack
 function DisplayClientStack.new(playerID, player, viewStack)
   local self = setmetatable({}, DisplayClientStack)
   self.playerID         = playerID
   self.player           = player
   self.viewStack        = viewStack
-  self.snapshot         = nil
+  self.snapshot         = _initialSnapshotFromEngine(viewStack)
   self.prevSnapshot     = nil
   self.snapshotsApplied = 0
-  self.latestRecvTime   = 0
+  self.latestRecvTime   = self.snapshot and love.timer.getTime() or 0
   self.prevRecvTime     = 0
+  if self.snapshot and self.snapshot.p then
+    local cache = {}
+    for i = 1, #self.snapshot.p do cache[i] = self.snapshot.p[i] end
+    self._cachedPanels = cache
+  end
   return self
 end
 

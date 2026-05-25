@@ -38,8 +38,9 @@ local SEND_INTERVAL_S = 0.05
 
 ---@param engine Stack the local player's engine stack
 ---@param playerID integer wire identifier for the sending player
+---@param hostStack table? the PlayerStack holding danger_col / danger_timer (only those fields live on PlayerStack, not engine). nil for SimulatedStack.
 ---@return DisplayEventCapture
-function DisplayEventCapture.new(engine, playerID)
+function DisplayEventCapture.new(engine, playerID, hostStack)
   assert(engine, "DisplayEventCapture requires an engine")
   assert(playerID, "DisplayEventCapture requires a playerID")
   local self = setmetatable({}, DisplayEventCapture)
@@ -52,7 +53,23 @@ function DisplayEventCapture.new(engine, playerID)
   -- handlers, drained into each snapshot.
   self._pendingEvents     = {}
   self._popSizeThisFrame  = 1
+  -- Park the PlayerStack on the engine so buildSnapshot can pull
+  -- PlayerStack-resident render fields (danger_col, danger_timer) without
+  -- passing extra args through every layer.
+  if hostStack then
+    engine._displayCaptureHost = hostStack
+  end
   return self
+end
+
+---Per-frame heartbeat driven from BattleRoom:update. Independent of
+---engine.finishedRun, which stops firing once the player dies
+---(Stack:shouldRun returns false on game_ended). Without this, the
+---death-state panel transitions set by PlayerStack:applyVisualDeath
+---never reach the wire.
+function DisplayEventCapture:tick()
+  if not self.started then return end
+  self:_maybeSend()
 end
 
 ----------------------------------------------------------------------
@@ -133,6 +150,18 @@ local function buildSnapshot(engine)
     end
   end
 
+  -- danger_col + danger_timer live on the PlayerStack, NOT the engine,
+  -- but the receiver needs them so the renderer can play the column-
+  -- bounce animation on columns that reached the danger zone. Pull them
+  -- via the PlayerStack reference attached at capture-creation time.
+  -- Without these, every panel renders with empty dangerCol → static.
+  local dangerCol, dangerTimer = nil, 0
+  local hostStack = engine._displayCaptureHost
+  if hostStack and hostStack.danger_col then
+    dangerCol   = hostStack.danger_col
+    dangerTimer = hostStack.danger_timer or 0
+  end
+
   return {
     f  = engine.clock                      or 0,
     d  = engine.displacement               or 0,
@@ -143,6 +172,8 @@ local function buildSnapshot(engine)
     sh = engine.shake_time                 or 0,
     psh= engine.prev_shake_time            or 0,
     pkh= engine.peak_shake_time            or 0,
+    dc = dangerCol,
+    dt = dangerTimer,
     ic = engine.in_countdown and true or false,
     ct = engine.countdown_timer            or 0,
     go = engine.game_over_clock            or 0,

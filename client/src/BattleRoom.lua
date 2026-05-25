@@ -703,7 +703,7 @@ function BattleRoom:startMatch(replay)
     self._displayStacks   = {}
     for _, player in ipairs(match.players) do
       if player.isLocal and player.stack and player.stack.engine then
-        local capture = DisplayEventCapture.new(player.stack.engine, player.publicId or player.playerNumber or 0)
+        local capture = DisplayEventCapture.new(player.stack.engine, player.publicId or player.playerNumber or 0, player.stack)
         capture:start()
         self._displayCaptures[#self._displayCaptures + 1] = capture
       else
@@ -944,6 +944,19 @@ end
 function BattleRoom:update(dt)
   -- if there are still unloaded assets, we can load them 1 asset a frame in the background
   ModController:update()
+
+  -- Drive display-history captures every frame, regardless of match state.
+  -- Stack:shouldRun returns false once game_ended, so engine.finishedRun
+  -- stops firing post-death. Without an external heartbeat the snapshot
+  -- stream goes silent at the most visually-interesting moment — the
+  -- post-death panel transitions (state="dead") set by applyVisualDeath
+  -- in PlayerStack:runGameOver never reach the wire. _maybeSend is still
+  -- wall-clock gated internally so this isn't a 60Hz force-send.
+  if self._displayCaptures then
+    for _, capture in ipairs(self._displayCaptures) do
+      pcall(capture.tick, capture)
+    end
+  end
 
   if self.state == BattleRoom.states.Setup then
     -- the setup phase of the room

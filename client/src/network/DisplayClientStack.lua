@@ -189,9 +189,9 @@ function DisplayClientStack:debugSnapshot()
   }
 end
 
--- Empty danger-column table reused per draw call (no per-column danger
--- visualization in the snapshot viewer yet — keep panels visually static
--- rather than animate danger).
+-- Fallback empty table for snapshots that pre-date the danger-col field
+-- (older sender versions). Lookup `dangerCol[col]` returns nil → renderer
+-- falls through to the non-danger branch.
 local NO_DANGER = {}
 
 -- Re-expand a wire-form cell into a Panel-shaped table the existing
@@ -249,6 +249,11 @@ local function paintGridFromSnapshot(self, viewStack, snapshot, shakeOffset)
   local height = snapshot.h or 12
   local displacement = snapshot.d or 0
   local grid = snapshot.p or {}
+  -- Danger animation lives on PlayerStack (danger_col, danger_timer);
+  -- sender ships them as dc/dt so the receiver can play the column-
+  -- bounce on stacks that reached the danger zone.
+  local dangerCol   = snapshot.dc or NO_DANGER
+  local dangerTimer = snapshot.dt or 0
 
   -- frameTimes lives on the engine.levelData.frameConstants; needed by
   -- getDrawProps for the matched-state flash/face/pop timing. We pull
@@ -307,7 +312,7 @@ local function paintGridFromSnapshot(self, viewStack, snapshot, shakeOffset)
           -- sprite. Reuse the panel set's batch for that.
           if panel.state == "matched" and frameTimes then
             panelSet:addToDraw(panel, draw_x, draw_y, viewStack.gfxScale,
-              NO_DANGER, 0, snapshot.st or 0)
+              dangerCol, dangerTimer, snapshot.st or 0)
           end
         else
           panelSet:addToDraw(panel, draw_x, draw_y, viewStack.gfxScale,

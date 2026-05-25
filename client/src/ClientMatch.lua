@@ -591,16 +591,19 @@ function ClientMatch:drainPendingHistoricalEvents()
   end
 
   local function isReady(ev)
-    local senderStack = self.engine and self.engine.stacks[ev.sender]
-    if not senderStack then return true end -- nowhere to defer to; just apply
     local frame = ev.senderFrame or 0
-    if (senderStack.stopWatch or 0) >= frame then return true end
-    if senderStack.game_over_clock and senderStack.game_over_clock > 0 then return true end
+    local localClock = (self.engine and self.engine.clock) or 0
+    if localClock >= frame then return true end
+    -- Sender's view-stack-side death short-circuit: once the sender is
+    -- known dead (D event processed), no more late catch-up is expected;
+    -- apply whatever parked G's they sent before dying.
+    local senderStack = self.engine and self.engine.stacks[ev.sender]
+    if senderStack and (senderStack.game_over_clock or -1) > 0 then return true end
 
-    -- Safety net: a G targeting the local player parked for >2s with the
-    -- view-stack of the sender still pinned behind senderFrame means catch-up
-    -- isn't coming. Force-apply rather than lose damage. Pure-visual parks
-    -- (no local recipient) stay parked so spectator catch-up replays in order.
+    -- Safety net: a G targeting the local player parked for >2s without
+    -- the local clock catching up means catch-up isn't coming. Force-apply
+    -- rather than lose damage. Pure-visual parks (no local recipient)
+    -- stay parked so spectator catch-up replays in order.
     if ev._parkedAtMs and love and love.timer
        and (love.timer.getTime() * 1000 - ev._parkedAtMs) > 2000 then
       if type(ev.recipients) == "table" then
@@ -608,9 +611,8 @@ function ClientMatch:drainPendingHistoricalEvents()
           local s = self.stacks[rIdx]
           if s and s.is_local then
             logger.warn(string.format(
-              "ClientMatch: force-applying parked G targeting local stack — sender=%s senderFrame=%d viewStopWatch=%s parkedMs=%d",
-              tostring(ev.sender), frame,
-              tostring(senderStack.stopWatch),
+              "ClientMatch: force-applying parked G targeting local stack — sender=%s senderFrame=%d localClock=%d parkedMs=%d",
+              tostring(ev.sender), frame, localClock,
               math.floor(love.timer.getTime() * 1000 - ev._parkedAtMs)))
             return true
           end
@@ -1884,29 +1886,28 @@ function ClientMatch:applyGarbageEvent(body)
     return
   end
 
-  -- Defer only when the sender's sim is FAR behind senderFrame (catch-up
-  -- for spectators / rejoiners). For an in-sync client the sender's view-
-  -- stack lags by network latency only — a handful of frames at most — and
-  -- we keep the existing "apply immediately" path so garbage drops feel
-  -- responsive. The 60-frame threshold (~1s at 60fps) easily covers normal
-  -- network jitter while catching the catch-up case where we're seconds or
-  -- minutes behind. See drainPendingHistoricalEvents.
-  local senderStack = body.sender and self.engine and self.engine.stacks[body.sender]
+  -- Defer only when THIS CLIENT'S match clock is far behind senderFrame —
+  -- i.e., we're catching up (spectator joining mid-match, rejoiner). In
+  -- live play the local match clock tracks wall-time, so it's within
+  -- network latency of senderFrame and we apply immediately. The earlier
+  -- version checked senderStack.stopWatch (the sender's VIEW stack on this
+  -- machine), which baked the input-replication assumption directly into
+  -- garbage delivery — broke as soon as the snapshot pipeline removed view-
+  -- stack ticking. Use the local match clock instead so G delivery is
+  -- decoupled from how we render remote players.
   local catchupDeferFrames = 60
-  if senderStack and body.senderFrame
-      and (senderStack.stopWatch or 0) + catchupDeferFrames < body.senderFrame then
+  local localClock = (self.engine and self.engine.clock) or 0
+  if body.senderFrame
+      and localClock + catchupDeferFrames < body.senderFrame then
     body._parkedAtMs = math.floor((love.timer.getTime() or 0) * 1000)
     self.pendingHistoricalGarbage = self.pendingHistoricalGarbage or {}
     self.pendingHistoricalGarbage[#self.pendingHistoricalGarbage + 1] = body
-    -- Trace capture: this G was deferred to pendingHistoricalGarbage.
-    -- Drain marker fires from drainPendingHistoricalEvents below.
     pcall(function()
       TraceWriter.localEvent("applyDeferred", {
         event       = "G",
         sender      = body.sender,
         senderFrame = body.senderFrame,
-        senderStopWatch = senderStack.stopWatch or 0,
-        clock = self.engine and self.engine.clock or nil,
+        localClock  = localClock,
       })
     end)
     return

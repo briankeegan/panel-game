@@ -735,11 +735,10 @@ function ClientMatch:handleMatchEnd()
   local eng = self.engine
   if eng then
     logger.info(string.format(
-      "G match summary: sent=%d/%dp  applied=%d/%dp  dropped=%d/%dp  skipped_frozen=%d/%dp",
+      "G match summary: sent=%d/%dp  applied=%d/%dp  dropped=%d/%dp",
       eng._gSentEvents or 0, eng._gSentPieces or 0,
       eng._gAppliedEvents or 0, eng._gAppliedPieces or 0,
-      eng._gDroppedEvents or 0, eng._gDroppedPieces or 0,
-      eng._gSkippedFrozenEvents or 0, eng._gSkippedFrozenPieces or 0))
+      eng._gDroppedEvents or 0, eng._gDroppedPieces or 0))
   end
   -- execute callbacks
   self:emitSignal("matchEnded", self)
@@ -1925,25 +1924,15 @@ function ClientMatch:_applyGarbageEventNow(body)
   for _, recipientIndex in ipairs(body.recipients) do
     local stack = self.stacks[recipientIndex]
     if stack and stack.engine then
-      -- Frozen remote view-stack: snapshot path owns visualization; queue would never drain.
-      local frozen = engine and engine.displayHistoryActive and not stack.is_local
-      if frozen then
-        logger.info(string.format(
-          "G apply SKIPPED: sender=%s senderFrame=%s -> stack[%d] reason=frozen_remote garbageCount=%d",
-          tostring(body.sender), tostring(body.senderFrame), recipientIndex, garbageCount))
-        engine._gSkippedFrozenEvents = (engine._gSkippedFrozenEvents or 0) + 1
-        engine._gSkippedFrozenPieces = (engine._gSkippedFrozenPieces or 0) + garbageCount
-      else
-        logger.info(string.format(
-          "G apply: sender=%s senderFrame=%s -> stack[%d] (is_local=%s) garbageCount=%d",
-          tostring(body.sender), tostring(body.senderFrame), recipientIndex,
-          tostring(stack.is_local), garbageCount))
-        if engine then
-          engine._gAppliedEvents = (engine._gAppliedEvents or 0) + 1
-          engine._gAppliedPieces = (engine._gAppliedPieces or 0) + garbageCount
-        end
-        stack.engine:applyNetworkGarbage(body.garbage)
+      logger.info(string.format(
+        "G apply: sender=%s senderFrame=%s -> stack[%d] (is_local=%s) garbageCount=%d",
+        tostring(body.sender), tostring(body.senderFrame), recipientIndex,
+        tostring(stack.is_local), garbageCount))
+      if engine then
+        engine._gAppliedEvents = (engine._gAppliedEvents or 0) + 1
+        engine._gAppliedPieces = (engine._gAppliedPieces or 0) + garbageCount
       end
+      stack.engine:applyNetworkGarbage(body.garbage)
     else
       -- Recipient not landable: slot was emptied (mid-match leave) or the
       -- engine hasn't booted yet (mod still loading on a spectator/rejoiner).

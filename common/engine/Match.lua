@@ -43,7 +43,7 @@ local TeamUtils = require("common.data.TeamUtils")
 ---@field debug MatchDebugConfig internal debug configuration that defaults to non-debug values
 ---@field fromReplay boolean? true when the Match was constructed via createFromReplay
 ---@field stackInteraction StackInteractions? mirror of rules.stackInteraction, set during initialization
----@field displayHistoryActive boolean? when true, Match:shouldRun skips non-local stacks — the parallel display-history viewer owns their visuals. See DISPLAY_HISTORY_PLAN.md.
+---@field displayHistoryActive boolean? set by BattleRoom when display-history pipeline is on. Display-only; engine code must not consult it.
 
 ---@class MatchDebugConfig
 ---@field vsFramesBehind integer
@@ -675,13 +675,7 @@ end
 -- also triggers the danger music from time running out if a timeLimit was set
 function Match:updateClock()
   for i, stack in ipairs(self.stacks) do
-    -- Skip non-local stacks when the display-history pipeline is on.
-    -- Those stacks' clocks are mirrored from snapshots (sender's clock,
-    -- not the local engine's progress), so reading them here would
-    -- contaminate the local match's time-limit / danger-music logic.
-    if self.displayHistoryActive and not stack.is_local then
-      -- nothing
-    elseif stack.clock > self.clock then
+    if stack.clock > self.clock then
       self.clock = stack.clock
     end
   end
@@ -1062,16 +1056,6 @@ end
 ---@param runsSoFar integer
 ---@return boolean
 function Match:shouldRun(stack, runsSoFar)
-  -- Display-history viewer (DISPLAY_HISTORY_PLAN.md) takes over for remote
-  -- stacks when the per-room flag is on. The new viewer is then the source
-  -- of truth for what other players' boards look like; running the old
-  -- per-tick simulation for those stacks is pure waste. Skip them here so
-  -- the local stack is the ONLY engine work this client does per tick.
-  -- Local stack always ticks regardless — you still play your own game.
-  if self.displayHistoryActive and not stack.is_local then
-    return false
-  end
-
   -- check the match specific conditions in match
   if not stack:game_ended() then
     if self.timeLimit then

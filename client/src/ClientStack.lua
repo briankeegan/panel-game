@@ -843,7 +843,10 @@ function ClientStack:drawAbsoluteMultibar(stop_time, shake_time, pre_stop_time)
   local barPos = themes[config.theme].multibar_Pos
   local overtimePos = themes[config.theme].multibar_LeftoverTime_Pos
 
-  self:drawLabel(self.assets.multibar.frameAbsolute, framePos, themes[config.theme].healthbar_frame_Scale * (self.gfxScale / 3))
+  -- Shift multibar frame rightward so its right pink edge meets the
+  -- playfield's left pink edge instead of leaving a gap.
+  local adjustedFramePos = {framePos[1] + self.panelOriginXOffset, framePos[2]}
+  self:drawLabel(self.assets.multibar.frameAbsolute, adjustedFramePos, themes[config.theme].healthbar_frame_Scale * (self.gfxScale / 3))
 
   local multiBarFrameCount = self.multiBarFrameCount
   local multiBarMaxHeight = 589 * (self.gfxScale / 3) * themes[config.theme].multibar_Scale

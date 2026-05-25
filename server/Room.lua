@@ -1413,16 +1413,37 @@ end
 ---survivor that's "never."
 ---@return boolean true if the match was finalized this tick
 
--- Wall-clock grace window after the first elimination drops livingTeams
--- to threshold. Catches a near-simultaneous second elimination whose D
--- arrives slightly later in wall-clock so matchWinRuleset can compare
--- game_over_clocks instead of crowning whoever's D landed first.
-local FINALIZE_GRACE_MS = 500
+-- Hard wall-clock cap on the finalize wait. Survivors with frozen input
+-- streams (disconnect, network stall) shouldn't hang the room forever
+-- waiting for a clock catch-up that's never coming.
+local FINALIZE_WALL_CLOCK_CAP_MS = 5000
 
--- Apply the gameMode's matchWinRuleset to pick a winner among eliminated
--- players. Server-side analog of Match:getWinners on the client. Honors
--- GAME_OVER_CLOCK: HIGHEST and falls back to slot order when ruleset
--- doesn't disambiguate.
+local function _highestDeathFrame(game)
+  local high = 0
+  for _, frame in pairs(game.eliminatedPlayers) do
+    if frame and frame > high then high = frame end
+  end
+  return high
+end
+
+-- Every still-alive player's input stream has advanced past the highest
+-- frame anyone died at. Until that's true we can't tell whether the
+-- "survivor" actually outlived the deceased in game-clock or was simply
+-- still working through earlier frames.
+local function _aliveCaughtUpPastDeaths(self)
+  local high = _highestDeathFrame(self.game)
+  if high == 0 then return true end
+  for slot, player in pairs(self.players) do
+    if player
+        and not self.game.eliminatedPlayers[slot]
+        and not self.game.disconnectedPlayers[slot] then
+      local frame = #(self.game.inputs[slot] or {})
+      if frame <= high then return false end
+    end
+  end
+  return true
+end
+
 ---@param self Room
 ---@param candidates integer[] player_numbers eligible to win
 ---@return integer? winnerSlot
@@ -1476,9 +1497,10 @@ function Room:maybeFinalizeFromLivingTeams()
   local nowMs = math.floor(self.clock() * 1000)
   if not self._pendingFinalizeStartMs then
     self._pendingFinalizeStartMs = nowMs
-    return false
   end
-  if nowMs - self._pendingFinalizeStartMs < FINALIZE_GRACE_MS then
+  local elapsed = nowMs - self._pendingFinalizeStartMs
+
+  if elapsed < FINALIZE_WALL_CLOCK_CAP_MS and not _aliveCaughtUpPastDeaths(self) then
     return false
   end
 

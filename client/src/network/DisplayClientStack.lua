@@ -62,6 +62,13 @@ DisplayClientStack.__index = DisplayClientStack
 -- arrives (avoids div-by-zero on the first frame after .new).
 local EXPECTED_INTERVAL_S = 0.05
 
+-- HUD tween convergence window. Set equal to the snapshot interval so
+-- we reach the latest value exactly when the next snapshot is due —
+-- continuous motion across snapshot boundaries with no lag-forever
+-- trap (the reverted displacement-interp's failure mode was
+-- convergence_time >= snapshot_interval).
+local HUD_TWEEN_S = 0.05
+
 ---@param playerID integer
 ---@param player Player?
 ---@param viewStack table? matching ClientStack for the remote player (engine field mirror target)
@@ -167,6 +174,41 @@ local function mirrorHudScalars(self, snapshot)
     engine.outgoingGarbage.stagedGarbage = snapshot.og
   end
   if snapshot.f  ~= nil then engine.clock             = snapshot.f end
+end
+
+-- Per-render-frame HUD tween. Engine fields driving drawScore /
+-- drawMultibar / Telegraph arc are mirrored once on snapshot apply,
+-- so without this they step at 20Hz. Lerp from prev → current snapshot
+-- across one snapshot interval so the HUD scrolls instead of ticking.
+-- Discrete fields (level, chain_counter, speed, etc.) are NOT tweened
+-- and stay snap-mirrored by mirrorHudScalars.
+local function tweenHudScalars(self)
+  local viewStack = self.viewStack
+  if not viewStack or not viewStack.engine then return end
+  local snapshot = self.snapshot
+  if not snapshot then return end
+  local prev = self.prevSnapshot
+  if not prev or self.prevRecvTime <= 0 then return end
+
+  local elapsed = love.timer.getTime() - self.latestRecvTime
+  local alpha = math.min(1, math.max(0, elapsed / HUD_TWEEN_S))
+
+  local engine = viewStack.engine
+  local function lerp(p, c)
+    if p == nil or alpha >= 1 then return c end
+    return p + (c - p) * alpha
+  end
+
+  -- Integer-valued fields get floored so drawNumber / multibar height
+  -- math don't display fractional pixels.
+  if snapshot.sc ~= nil then engine.score          = math.floor(lerp(prev.sc, snapshot.sc) + 0.5) end
+  if snapshot.pc ~= nil then engine.panels_cleared = math.floor(lerp(prev.pc, snapshot.pc) + 0.5) end
+  if snapshot.sh ~= nil then engine.shake_time     = math.floor(lerp(prev.sh, snapshot.sh) + 0.5) end
+  if snapshot.f  ~= nil then engine.clock          = math.floor(lerp(prev.f,  snapshot.f)  + 0.5) end
+  -- Float-friendly fields (multibar heights compute smoothly).
+  if snapshot.hp ~= nil then engine.health         = lerp(prev.hp, snapshot.hp) end
+  if snapshot.st ~= nil then engine.stop_time      = lerp(prev.st, snapshot.st) end
+  if snapshot.ps ~= nil then engine.pre_stop_time  = lerp(prev.ps, snapshot.ps) end
 end
 
 ---Apply an inbound batch. The batch is the JSON-decoded `Y` payload —
@@ -386,7 +428,8 @@ end
 ---@param viewStack table the matching ClientStack (for panels_dir + gfxScale + character)
 ---@param snapshot DisplayClientStackSnapshot
 ---@param shakeOffset number panel-coord vertical shake from mirrored shake_time
-local function paintGridFromSnapshot(self, viewStack, snapshot, shakeOffset)
+---@param displacement number tweened smooth-scroll offset (caller picked the value)
+local function paintGridFromSnapshot(self, viewStack, snapshot, shakeOffset, displacement)
   local panelsDir = viewStack.panels_dir
   if not panelsDir then return end
   local panelSet = panels and panels[panelsDir]
@@ -396,7 +439,6 @@ local function paintGridFromSnapshot(self, viewStack, snapshot, shakeOffset)
 
   local width  = snapshot.w or 6
   local height = snapshot.h or 12
-  local displacement = snapshot.d or 0
   local grid = snapshot.p or {}
   -- Danger animation lives on PlayerStack (danger_col, danger_timer);
   -- sender ships them as dc/dt so the receiver can play the column-
@@ -477,8 +519,9 @@ end
 -- Cursor sprite is fetched the same way PlayerStack:render_cursor does:
 -- alternating frame indexed by snapshot.f / 16 % 2. Position in panel
 -- coords matches the engine's (cur_col-1)*16, (11-cur_row)*16 +
--- displacement formula.
-local function paintCursorFromSnapshot(self, viewStack, snapshot)
+-- displacement formula. Takes the tweened displacement from the caller
+-- so the cursor tracks the panel grid even between snapshots.
+local function paintCursorFromSnapshot(self, viewStack, snapshot, displacement)
   local theme = viewStack.theme or (themes and themes[config and config.theme])
   if not theme or not theme.images or not theme.images.cursor then return end
   local frameIndex = (math.floor((snapshot.f or 0) / 16) % 2) + 1
@@ -495,50 +538,26 @@ local function paintCursorFromSnapshot(self, viewStack, snapshot)
   local scale_x = desiredCursorWidth / cursor.image:getWidth()
   local scale_y = 24 / cursor.image:getHeight()
 
-  -- Cursor-only interpolation: lerp from prev (cr, cc) to latest (cr, cc)
-  -- over ~30ms wall-clock. Short interval so we glide instead of teleport
-  -- between snapshots, without re-introducing the displacement lag-bug.
+  -- MATCH P1 EXACTLY. No interp, no snap, no filter override, no
+  -- explicit setColor — every previous "fix" tried adding one of these
+  -- and none helped. Reduce P2's render to the same call shape as
+  -- PlayerStack:render_cursor so any remaining visual difference must
+  -- live in the input data (snapshot.cr/cc/d vs engine.cur_row/col/
+  -- displacement) or in viewStack.gfxScale, not in this function.
   local cr = snapshot.cr or 1
   local cc = snapshot.cc or 1
-  local prev = self.prevSnapshot
-  if prev and self.latestRecvTime > 0 then
-    local elapsed = love.timer.getTime() - self.latestRecvTime
-    local alpha = math.min(1, math.max(0, elapsed / 0.03))
-    local prevCr = prev.cr or cr
-    local prevCc = prev.cc or cc
-    if math.abs(cr - prevCr) <= 6 then cr = prevCr + (cr - prevCr) * alpha end
-    if math.abs(cc - prevCc) <= 6 then cc = prevCc + (cc - prevCc) * alpha end
-  end
-
-  -- Round to integer pixels before drawing. Fractional positions from the
-  -- cursor interp cause bilinear filtering to blur bracket pixels across
-  -- screen pixels — the cursor looks faint / "transparent" compared to
-  -- the sharply-drawn local cursor at integer engine.cur_row positions.
-  local xPosition = math.floor((cc - 1) * panelWidth + 0.5)
-  local yPosition = math.floor((11 - cr) * panelWidth + (snapshot.d or 0) + 0.5)
+  local xPosition = (cc - 1) * panelWidth
+  local yPosition = (11 - cr) * panelWidth + (displacement or snapshot.d or 0)
 
   if (snapshot.go or 0) > 0 then
     love.graphics.setColor(1, 1, 1, 0.3)
-  else
-    love.graphics.setColor(1, 1, 1, 1)
   end
-
-  -- Cursor sprite (@2x source) loaded with linear filter under the
-  -- "linear when shrinking" heuristic. Local player draws at integer
-  -- gfxScale where final scale is 1:1 and filter doesn't matter; remote
-  -- stacks in multi-player layouts have fractional gfxScale, so the net
-  -- ~0.57x downscale with linear blends the sparse bracket pixels into
-  -- transparency. Force nearest for this draw so the brackets stay
-  -- visible regardless of layout scale, then restore.
-  local prevMin, prevMag = cursor.image:getFilter()
-  cursor.image:setFilter("nearest", "nearest")
   love.graphics.draw(cursor.image,
     xPosition * viewStack.gfxScale,
     yPosition * viewStack.gfxScale,
     0,
     scale_x * viewStack.gfxScale,
     scale_y * viewStack.gfxScale)
-  cursor.image:setFilter(prevMin, prevMag)
   love.graphics.setColor(1, 1, 1, 1)
 end
 
@@ -574,8 +593,8 @@ end
 -- pcall'd so a malformed cell (e.g. delta sentinel not resolved against
 -- the receiver's cache) crashes only the grid layer for this frame,
 -- not the surrounding portrait/frame/wall/cursor.
-local function drawGridLayer(self, viewStack, snapshot, shakeOffset)
-  local ok, err = pcall(paintGridFromSnapshot, self, viewStack, snapshot, shakeOffset)
+local function drawGridLayer(self, viewStack, snapshot, shakeOffset, displacement)
+  local ok, err = pcall(paintGridFromSnapshot, self, viewStack, snapshot, shakeOffset, displacement)
   if not ok then logger.warn("drawGridLayer: " .. tostring(err)) end
 end
 
@@ -597,9 +616,25 @@ end
 -- The remote player's cursor sprite, placed by snapshot cr/cc. pcall'd
 -- so a missing cursor sprite for the remote panels mod can't take the
 -- frame down.
-local function drawCursorLayer(self, viewStack, snapshot)
-  local ok, err = pcall(paintCursorFromSnapshot, self, viewStack, snapshot)
+local function drawCursorLayer(self, viewStack, snapshot, displacement)
+  local ok, err = pcall(paintCursorFromSnapshot, self, viewStack, snapshot, displacement)
   if not ok then logger.warn("drawCursorLayer: " .. tostring(err)) end
+end
+
+-- Snapshot-driven smooth-scroll. Same lerp-with-wrap-skip pattern as
+-- Stack:applyRenderInterp (Stack.lua:758-771). Displacement is mod 16
+-- (decreases 16→0 as the stack rises, then wraps when a row shifts up);
+-- lerping across that wrap visually scrolls the wrong direction, so we
+-- snap to snapshot.d in that one-snapshot window.
+-- Convergence window = snapshot interval, same rationale as HUD_TWEEN_S.
+local function tweenedDisplacement(self, snapshot)
+  if snapshot.d == nil then return 0 end
+  local prev = self.prevSnapshot
+  if not prev or prev.d == nil or self.prevRecvTime <= 0 then return snapshot.d end
+  local elapsed = love.timer.getTime() - self.latestRecvTime
+  local alpha = math.min(1, math.max(0, elapsed / HUD_TWEEN_S))
+  if math.abs(snapshot.d - prev.d) >= 8 then return snapshot.d end  -- wrap; skip
+  return prev.d + (snapshot.d - prev.d) * alpha
 end
 
 -- Compute the shake offset for this frame in panel coordinates. Pulled
@@ -619,17 +654,25 @@ function DisplayClientStack:render(viewStack)
   if not viewStack or not self.snapshot then return end
   if not viewStack.setDrawArea or not viewStack.resetDrawArea then return end
 
+  -- Update HUD-driving engine fields with interpolated values before any
+  -- draw. GameBase:draw orders us before drawHUD, so the tweened values
+  -- are what drawScore / drawMultibar / Telegraph read this frame.
+  tweenHudScalars(self)
+
   local snapshot = self.snapshot
   local shakeOffset = computeShakeOffset(viewStack)
+  -- Same tween for the smooth-scroll offset — grid and cursor must use
+  -- the same value or the cursor drifts off its panel between snapshots.
+  local displacement = tweenedDisplacement(self, snapshot)
 
   viewStack:withDrawArea(0, 0, function()
     love.graphics.push("all")
     local ok, err = pcall(function()
       drawPortraitLayer(viewStack)
-      drawGridLayer(self, viewStack, snapshot, shakeOffset)
+      drawGridLayer(self, viewStack, snapshot, shakeOffset, displacement)
       drawFrameLayer(viewStack)
       drawWallLayer(viewStack, snapshot, shakeOffset)
-      drawCursorLayer(self, viewStack, snapshot)
+      drawCursorLayer(self, viewStack, snapshot, displacement)
     end)
     love.graphics.pop()
     if not ok then logger.warn("DisplayClientStack:render layer error: " .. tostring(err)) end

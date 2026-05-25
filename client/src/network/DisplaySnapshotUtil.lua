@@ -324,12 +324,14 @@ local function unpackOgEntry(r)
     colEarned   = rU8(r),
   }
   if band(flags, OG_FLAG_HAS_LINKS) ~= 0 then
-    local n = rU16(r)
+    local n = rU16(r) or 0
     local links = {}
     for _ = 1, n do
       local frame = rU32(r)
       local row = rU8(r)
       local col = rU8(r)
+      -- Truncated stream: stop reading rather than indexing with nil.
+      if not frame then break end
       links[frame] = { rowEarned = row, colEarned = col }
     end
     entry.links = links

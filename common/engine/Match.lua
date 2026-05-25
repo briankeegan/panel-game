@@ -675,7 +675,13 @@ end
 -- also triggers the danger music from time running out if a timeLimit was set
 function Match:updateClock()
   for i, stack in ipairs(self.stacks) do
-    if stack.clock > self.clock then
+    -- Skip non-local stacks when the display-history pipeline is on.
+    -- Those stacks' clocks are mirrored from snapshots (sender's clock,
+    -- not the local engine's progress), so reading them here would
+    -- contaminate the local match's time-limit / danger-music logic.
+    if self.displayHistoryActive and not stack.is_local then
+      -- nothing
+    elseif stack.clock > self.clock then
       self.clock = stack.clock
     end
   end

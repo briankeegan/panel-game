@@ -678,7 +678,11 @@ function BattleRoom:startMatch(replay)
   -- keep _displayStacks alive AFTER matchEnded so the dead board stays
   -- visible — see _stopDisplayCaptures — but at NEW-MATCH start we
   -- want a clean slate.)
-  self._displayCaptures = nil
+  -- Gracefully stop the prior match's captures (disconnect signals,
+  -- ship their final terminal snapshot) BEFORE nil'ing — otherwise
+  -- their finishedRun subscribers can linger on an engine that's
+  -- about to be deinit'd.
+  self:_stopDisplayCaptures()
   self._displayStacks   = nil
   -- Drop any in-flight Y messages from the prior match's tail. Without
   -- this, a stale OLD-match death snapshot can arrive after the NEW
@@ -719,7 +723,11 @@ function BattleRoom:startMatch(replay)
         if player.stack then player.stack.canvas = nil end
       end
     end
-    match:connectSignal("matchEnded", self, self._stopDisplayCaptures)
+    -- NOTE: deliberately do NOT stop captures on matchEnded. The engine
+    -- continues to tick post-matchEnded via ClientMatch:runGameOver,
+    -- producing the cracked-face / dimmed-panel death animation frames.
+    -- We want ALL of those shipped to the receiver. Captures stop only
+    -- at new-match start (above) and BattleRoom:shutdown.
   end
 
   -- Additive hook: announce the freshly-started match. External observers
@@ -742,15 +750,10 @@ function BattleRoom:startMatch(replay)
   return match
 end
 
----Stop the DisplayEventCaptures. Fired by the match's matchEnded signal
----so the sender stops shipping new snapshots the moment the match ends.
----
----IMPORTANT: we deliberately keep `_displayStacks` alive after match end
----so the receiver's renderer keeps painting the LAST snapshot received.
----Without this, the new viewer would disappear at the moment of death /
----game-over, which is exactly when the player wants to LOOK at the final
----board state. The captured snapshots are torn down later when the
----next match starts (see startMatch reset) or when the scene unmounts.
+---Stop the DisplayEventCaptures. Called at new-match start (before rebuild)
+---and at BattleRoom:shutdown. NOT fired on matchEnded — the engine keeps
+---ticking through runGameOver and we want the death-animation tail
+---shipped to receivers in real time.
 function BattleRoom:_stopDisplayCaptures()
   if self._displayCaptures then
     for _, capture in ipairs(self._displayCaptures) do
@@ -758,7 +761,6 @@ function BattleRoom:_stopDisplayCaptures()
     end
     self._displayCaptures = nil
   end
-  -- _displayStacks intentionally left alive — see comment above.
 end
 
 ---Route an inbound display-event batch to the appropriate
@@ -962,6 +964,11 @@ end
 -- option, etc.). Crashes, match-end aborts, scene transitions all use this
 -- path and must NOT boot the player from the room.
 function BattleRoom:shutdown()
+  -- Stop the display-history captures BEFORE deiniting the match — the
+  -- captures hold signal subscriptions on engine.finishedRun and we want
+  -- to ship one final terminal snapshot before the engine goes away.
+  self:_stopDisplayCaptures()
+  self._displayStacks = nil
   for _, player in ipairs(self.players) do
     player:disconnectSubscriber(self)
     player:reset()

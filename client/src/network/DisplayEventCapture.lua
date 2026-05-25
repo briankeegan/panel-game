@@ -108,13 +108,16 @@ local function buildSnapshot(engine)
   -- Grid is a flat list indexed by (row-1)*width + (col-1), 1-based.
   -- Why flat: nested tables JSON-encode with more punctuation; flat keeps
   -- the wire compact. Receiver re-indexes by the same formula.
+  --
+  -- Iterate by explicit bound (height+1), NOT by #enginePanels. Lua's #
+  -- operator on a table with any nil row can short-circuit before the
+  -- top — that's how the dead-player's top rows were going missing on
+  -- the receiver. The per-row `if enginePanelRow` guard handles legit
+  -- nil rows gracefully.
   local panels = {}
   local enginePanels = engine.panels
   if enginePanels then
-    -- Walk rows 0..height+1 (engine uses row 0 for the buffer below the
-    -- play area and row height+1 for the upcoming row above) so all
-    -- visible cells are captured. Empty cells stay nil.
-    for row = 0, math.min(height + 1, #enginePanels) do
+    for row = 0, height + 1 do
       local enginePanelRow = enginePanels[row]
       if enginePanelRow then
         for col = 1, width do
@@ -277,23 +280,34 @@ function DisplayEventCapture:onPanelPop(panel)
 end
 
 -- A panel just landed. Record an active-until clock so _maybeSend bypasses
--- the 20Hz gate while the bounce animation plays out (~8 ticks). Without
--- this, the receiver sees the bounce as a 1-2 frame snap rather than the
--- full squish.
+-- the 20Hz gate for the FULL landing duration. Panel.lua sets panel.timer
+-- to 12 on land; the bounce animation is exactly 12 ticks of timer
+-- countdown. Bump by 13 to cover that span plus a safety frame. Multiple
+-- lands in quick succession extend the bump (max), not reset, so a stack
+-- of landings stays smooth.
 function DisplayEventCapture:onPanelLanded(panel)
   local engineClock = self.engine and self.engine.clock or 0
-  self._landingActiveUntilClock = engineClock + 8
+  local target = engineClock + 13
+  if (self._landingActiveUntilClock or 0) < target then
+    self._landingActiveUntilClock = target
+  end
 end
 
 function DisplayEventCapture:_maybeSend()
   local now = love.timer.getTime()
-  -- Fast-events bypass: ship every tick during manual raise or shortly
-  -- after a panel landed. Both produce sub-50ms visual changes the 20Hz
-  -- baseline undersamples. The bypass auto-clears when the engine clock
-  -- passes _landingActiveUntilClock, or when manual_raise drops false.
+  -- Fast-events bypass: ship every tick when something visually fast is
+  -- happening that 20Hz undersamples. Three triggers:
+  --   * manual raise in progress (player holding raise button)
+  --   * within the panel-landing bounce window (~12 ticks)
+  --   * displacement just changed (any raise — passive or manual — or the
+  --     mod-16 wrap when a new row spawns)
   local engineClock = self.engine.clock or 0
+  local curDisplacement = self.engine.displacement or 0
+  local displacementChanged = (self._lastSentDisplacement ~= nil)
+    and (self._lastSentDisplacement ~= curDisplacement)
   local fastEvent = (self.engine.manual_raise == true)
     or ((self._landingActiveUntilClock or 0) > engineClock)
+    or displacementChanged
   if not fastEvent and (now - self.lastFlushTime) < SEND_INTERVAL_S then return end
   -- Option F (adaptive rate): if the local engine is behind wall-clock
   -- by 2+ frames, skip this send. The local player's main loop is
@@ -346,6 +360,9 @@ function DisplayEventCapture:_send(now)
     return
   end
   self._lastSentSig = sig
+  -- Remember displacement so the next _maybeSend can detect a change
+  -- (passive or manual raise, mod-16 wrap on new row spawn).
+  self._lastSentDisplacement = self.engine.displacement or 0
 
   local snapshot = buildSnapshot(self.engine)
   -- Attach any one-shot triggers collected since last send, then clear.

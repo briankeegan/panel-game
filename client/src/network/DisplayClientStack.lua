@@ -81,8 +81,17 @@ end
 -- drawScore / drawSpeed / drawLevel / drawMultibar / drawAnalyticData
 -- methods read from. The engine isn't simulating for this stack (Match:
 -- shouldRun returns false when displayHistoryActive is on), so writing
--- these fields is safe — nothing else is going to overwrite them. This
--- avoids having to rewrite the HUD rendering for the snapshot viewer.
+-- these fields is safe — nothing else is going to overwrite them.
+--
+-- engine.clock IS mirrored (Telegraph attack animation reads it). The
+-- corresponding contamination of Match:updateClock is handled by an
+-- explicit guard in Match.lua that skips non-local stacks when
+-- displayHistoryActive is true.
+--
+-- engine.game_over_clock is NOT mirrored — the existing D-event path
+-- already owns it. If we mirrored snapshot.go, a stale snapshot with
+-- go=0 could "resurrect" a dead stack for hasEnded purposes, blocking
+-- the match-end logic.
 local function mirrorHudScalars(self, snapshot)
   local viewStack = self.viewStack
   if not viewStack or not viewStack.engine then return end
@@ -100,14 +109,9 @@ local function mirrorHudScalars(self, snapshot)
   if snapshot.sh ~= nil then engine.shake_time        = snapshot.sh end
   if snapshot.psh~= nil then engine.prev_shake_time   = snapshot.psh end
   if snapshot.pkh~= nil then engine.peak_shake_time   = snapshot.pkh end
-  if snapshot.go ~= nil then engine.game_over_clock   = snapshot.go end
-  -- Telegraph: mirror the outgoing-garbage staged list onto the engine
-  -- so the existing Telegraph:render reads from the snapshot data.
   if snapshot.og ~= nil and engine.outgoingGarbage then
     engine.outgoingGarbage.stagedGarbage = snapshot.og
   end
-  -- engine.clock is set last so HUD readouts that depend on it (chain
-  -- card animations, danger flash) see consistent values.
   if snapshot.f  ~= nil then engine.clock             = snapshot.f end
 end
 

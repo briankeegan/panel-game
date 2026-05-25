@@ -513,11 +513,16 @@ local function paintCursorFromSnapshot(self, viewStack, snapshot)
   local xPosition = (cc - 1) * panelWidth
   local yPosition = (11 - cr) * panelWidth + (snapshot.d or 0)
 
-  -- Match PlayerStack:render_cursor exactly: setColor ONLY for dim-on-
-  -- dead, otherwise inherit whatever the prior draws left. The reset
-  -- after the draw guarantees we leave the color stack in a clean state.
+  -- Explicitly set color before drawing. The snapshot render path is
+  -- entered from BattleRoom:renderDisplayStacks AFTER the local
+  -- match:render path has already drawn pop FX, telegraph, etc. — those
+  -- can leave alpha < 1 in the global color state, and inheriting that
+  -- here makes the cursor render translucent. Force the color so the
+  -- cursor is opaque while alive and dim while dead.
   if (snapshot.go or 0) > 0 then
     love.graphics.setColor(1, 1, 1, 0.3)
+  else
+    love.graphics.setColor(1, 1, 1, 1)
   end
 
   love.graphics.draw(cursor.image,

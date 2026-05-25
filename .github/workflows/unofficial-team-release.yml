@@ -27,7 +27,7 @@ jobs:
         run: ./build.sh just-love
 
       - name: Move .love to workspace
-        run: mv ../dev-build/panel-attack.love ./unofficial-panel-attack-patch-fighting-the-sunday-scaries.love
+        run: mv ../dev-build/panel-attack.love ./unofficial-panel-attack-patch-monday-funday.love
 
       - name: Create GitHub release
         run: |
@@ -36,7 +36,7 @@ jobs:
           # (PANEL_SKIP_VERSION_BUMP) don't fail on "tag already exists".
           gh release delete "$TAG" --yes --cleanup-tag 2>/dev/null || true
           gh release create "$TAG" \
-            unofficial-panel-attack-patch-fighting-the-sunday-scaries.love \
+            unofficial-panel-attack-patch-monday-funday.love \
             --target bramp/multi-player \
             --prerelease \
             --title "Unofficial Panel Attack Team vs — $TAG"

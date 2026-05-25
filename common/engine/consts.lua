@@ -39,7 +39,7 @@ consts.VERSION_MIN_VIEW = consts.ENGINE_VERSIONS.LEVELDATA -- The lowest version
 -- and the locally-launched client print the same thing on startup; if
 -- they don't match, it tells you somebody is on a stale build.
 -- Format: "<ENGINE_VERSION>.<patch>" so it sorts naturally.
-consts.BUILD_VERSION = "049.0007-fighting-the-sunday-scaries"
+consts.BUILD_VERSION = "049.0008-monday-funday"
 
 consts.COUNTDOWN_CURSOR_SPEED = 4 --one move every this many frames
 consts.COUNTDOWN_START = 8

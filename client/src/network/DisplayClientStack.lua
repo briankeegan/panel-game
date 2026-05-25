@@ -158,6 +158,56 @@ function DisplayClientStack:applyBatch(batch)
   -- Push HUD scalars onto the matching engine so existing HUD render
   -- methods (drawScore etc.) display the correct values.
   mirrorHudScalars(self, snapshot)
+
+  -- Telemetry, throttled to ~1Hz. Mirrors the [SPECTATE-SEND] log on
+  -- the sender so we can compare side-by-side what was shipped vs.
+  -- what we got. Grep logs/client.log for `[SPECTATE-RECV]`. One-shot
+  -- on first death-state snapshot per stack so we know the wire path
+  -- delivered the death info.
+  local nowSec = self.latestRecvTime
+  if (nowSec - (self._lastTelemetryAt or 0)) >= 1.0 then
+    self._lastTelemetryAt = nowSec
+    -- Count panels in the wire-form grid by state. Each cell is either
+    -- false (empty pad), a table with .s/.c, or absent.
+    local total, stateCount = 0, {}
+    local p = snapshot.p
+    if p then
+      for _, cell in pairs(p) do
+        if type(cell) == "table" and cell.c and cell.c ~= 0 then
+          total = total + 1
+          local s = cell.s or "?"
+          stateCount[s] = (stateCount[s] or 0) + 1
+        end
+      end
+    end
+    local keys, parts = {}, {}
+    for k in pairs(stateCount) do keys[#keys+1] = k end
+    table.sort(keys)
+    for _, k in ipairs(keys) do parts[#parts+1] = k .. "=" .. stateCount[k] end
+    local dc = snapshot.dc
+    local dcStr = "{}"
+    if type(dc) == "table" then
+      local cols = {}
+      for i = 1, #dc do if dc[i] then cols[#cols+1] = tostring(i) end end
+      dcStr = "{" .. table.concat(cols, ",") .. "}"
+    end
+    require("common.lib.logger").info(string.format(
+      "[SPECTATE-RECV] pid=%s clock=%s go=%s d=%s panels=%d states=[%s] dangerCols=%s dt=%s",
+      tostring(self.playerID),
+      tostring(snapshot.f or 0),
+      tostring(snapshot.go or 0),
+      tostring(snapshot.d or 0),
+      total, table.concat(parts, ","), dcStr,
+      tostring(snapshot.dt or 0)))
+  end
+  if (snapshot.go or 0) > 0 and not self._loggedFirstDeath then
+    self._loggedFirstDeath = true
+    require("common.lib.logger").info(string.format(
+      "[SPECTATE-RECV] FIRST-DEATH-SNAPSHOT pid=%s go=%s clock=%s",
+      tostring(self.playerID),
+      tostring(snapshot.go or 0),
+      tostring(snapshot.f or 0)))
+  end
   -- One-shot triggers: pop FX + score cards. Replay each by calling the
   -- existing PlayerStack helpers on the remote stack so its pop_q + cards
   -- queues fill exactly as if the panel had popped locally. The existing

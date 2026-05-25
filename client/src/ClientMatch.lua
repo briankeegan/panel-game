@@ -735,10 +735,11 @@ function ClientMatch:handleMatchEnd()
   local eng = self.engine
   if eng then
     logger.info(string.format(
-      "G match summary: sent=%d/%dp  applied=%d/%dp  dropped=%d/%dp",
+      "G match summary: sent=%d/%dp  applied=%d/%dp  dropped=%d/%dp  skipped_frozen=%d/%dp",
       eng._gSentEvents or 0, eng._gSentPieces or 0,
       eng._gAppliedEvents or 0, eng._gAppliedPieces or 0,
-      eng._gDroppedEvents or 0, eng._gDroppedPieces or 0))
+      eng._gDroppedEvents or 0, eng._gDroppedPieces or 0,
+      eng._gSkippedFrozenEvents or 0, eng._gSkippedFrozenPieces or 0))
   end
   -- execute callbacks
   self:emitSignal("matchEnded", self)
@@ -1088,11 +1089,9 @@ function ClientMatch:scrubToFrame(targetFrame)
 
   if needsRebuild then
     preview = Match.createFromReplay(self.replay)
-    -- Keep fromReplay=true (set by createFromReplay): it makes garbage
-    -- delivery use strict stopWatch timing instead of the live oldest-
-    -- transit-time path. Without this, vs-self preview can deliver/skip
-    -- garbage on a different frame than the original timeline did, and
-    -- garbage blocks appear to vanish on rewind.
+    -- Preview is always offline sim; in-progress source replay has completed=false
+    -- so createFromReplay leaves fromReplay=false. Force it on for strict timing.
+    preview.fromReplay = true
     -- Force per-frame rollback saves so _transplantPreviewState can extract a
     -- snapshot at targetFrame. Match:shouldSaveRollback otherwise returns
     -- false in single-player modes (no garbage senders), buffer stays empty.
@@ -1926,20 +1925,25 @@ function ClientMatch:_applyGarbageEventNow(body)
   for _, recipientIndex in ipairs(body.recipients) do
     local stack = self.stacks[recipientIndex]
     if stack and stack.engine then
-      logger.info(string.format(
-        "G apply: sender=%s senderFrame=%s -> stack[%d] (is_local=%s) garbageCount=%d",
-        tostring(body.sender), tostring(body.senderFrame), recipientIndex,
-        tostring(stack.is_local), garbageCount))
-      if engine then
-        engine._gAppliedEvents = (engine._gAppliedEvents or 0) + 1
-        engine._gAppliedPieces = (engine._gAppliedPieces or 0) + garbageCount
+      -- Frozen remote view-stack: snapshot path owns visualization; queue would never drain.
+      local frozen = engine and engine.displayHistoryActive and not stack.is_local
+      if frozen then
+        logger.info(string.format(
+          "G apply SKIPPED: sender=%s senderFrame=%s -> stack[%d] reason=frozen_remote garbageCount=%d",
+          tostring(body.sender), tostring(body.senderFrame), recipientIndex, garbageCount))
+        engine._gSkippedFrozenEvents = (engine._gSkippedFrozenEvents or 0) + 1
+        engine._gSkippedFrozenPieces = (engine._gSkippedFrozenPieces or 0) + garbageCount
+      else
+        logger.info(string.format(
+          "G apply: sender=%s senderFrame=%s -> stack[%d] (is_local=%s) garbageCount=%d",
+          tostring(body.sender), tostring(body.senderFrame), recipientIndex,
+          tostring(stack.is_local), garbageCount))
+        if engine then
+          engine._gAppliedEvents = (engine._gAppliedEvents or 0) + 1
+          engine._gAppliedPieces = (engine._gAppliedPieces or 0) + garbageCount
+        end
+        stack.engine:applyNetworkGarbage(body.garbage)
       end
-      -- self.stacks[i] is a ClientStack wrapper; the actual engine stack
-      -- (and the receiveGarbage method) lives on stack.engine.
-      -- applyNetworkGarbage snapshots + receives and records a frame-stamped
-      -- entry so a later Stack rollback past this frame can replay it; without
-      -- that, the queue restore wipes the staged push and view-stacks diverge.
-      stack.engine:applyNetworkGarbage(body.garbage)
     else
       -- Recipient not landable: slot was emptied (mid-match leave) or the
       -- engine hasn't booted yet (mod still loading on a spectator/rejoiner).

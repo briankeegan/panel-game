@@ -784,12 +784,9 @@ function Match.createFromReplay(replay)
   end
 
   local match = Match(panelSource, replay.rules)
-  -- Replays should run all stacks to their recorded death frames before
-  -- declaring the match over (the test suite + replay-watching scenes rely
-  -- on this). Live online play wants the loose-sync bypass in hasEnded so
-  -- the survivor doesn't get stuck waiting for the dead opponent's view-
-  -- stack to "catch up" — but that only applies to live matches.
-  match.fromReplay = true
+  -- Online live matches reuse this constructor (server matchStart is replay-shaped).
+  -- True only for actually-completed replays; unconditional true silently kills G-ship.
+  match.fromReplay = (replay.metadata and replay.metadata.completed) and true or false
 
   for i, replayStack in ipairs(replay.stacks) do
     local stack

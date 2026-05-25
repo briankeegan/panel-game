@@ -295,10 +295,16 @@ end
 -- One-shot trigger: a panel match just resolved. Queue a score-card
 -- event so the receiver's PlayerStack:enqueue_card replays it.
 function DisplayEventCapture:onMatched(engine, attackGfxOrigin, isChainLink, comboSize, metalCount, garbagePanelCount)
-  -- Track pop size for the upcoming panelPop events this frame (mirrors
-  -- PlayerStack.popSizeThisFrame which is set on matched and read by
-  -- onPanelPop).
   self._popSizeThisFrame = comboSize or 1
+  -- Match → flash → face → popping → hover → fall → land covers ~80
+  -- ticks. Bump send rate for the full window so the receiver gets
+  -- enough frames to render smooth pop + drop sequences instead of the
+  -- 20Hz snap-cuts.
+  local engineClock = self.engine and self.engine.clock or 0
+  local target = engineClock + 90
+  if (self._matchActiveUntilClock or 0) < target then
+    self._matchActiveUntilClock = target
+  end
   if not attackGfxOrigin then return end
   -- Card kind matches the existing enqueue_card pairs in PlayerStack:
   -- non-chain combo card + (optionally) chain card.
@@ -358,6 +364,7 @@ function DisplayEventCapture:_maybeSend()
     and (self._lastSentDisplacement ~= curDisplacement)
   local fastEvent = (self.engine.manual_raise == true)
     or ((self._landingActiveUntilClock or 0) > engineClock)
+    or ((self._matchActiveUntilClock or 0) > engineClock)
     or displacementChanged
   if not fastEvent and (now - self.lastFlushTime) < SEND_INTERVAL_S then return end
   -- Option F (adaptive rate): if the local engine is behind wall-clock

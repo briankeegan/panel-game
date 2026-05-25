@@ -1474,15 +1474,31 @@ end
 function NetClient:sendDisplayEvents(batch)
   local ffiGuard = require("client.src.network.DisplaySnapshotFFI")
   local util = require("client.src.network.DisplaySnapshotUtil")
+  local payload
   if ffiGuard.FFI_SUPPORTED and batch and batch.from and batch.snapshot then
-    local bin = util.pack_snapshot(batch.from, batch.snapshot)
-    if bin then
-      _sendGameplay(self, NetworkProtocol.clientMessageTypes.displayEvent.prefix, bin)
-      return
-    end
+    payload = util.pack_snapshot(batch.from, batch.snapshot)
   end
-  -- fallback: JSON for unsupported platforms or error
-  _sendGameplay(self, NetworkProtocol.clientMessageTypes.displayEvent.prefix, json.encode(batch))
+  if not payload then
+    payload = json.encode(batch)
+  end
+  _sendGameplay(self, NetworkProtocol.clientMessageTypes.displayEvent.prefix, payload)
+
+  -- Bandwidth telemetry: per-second log of total bytes shipped via the
+  -- display-event channel. Grep logs/client.log for `[SPECTATE-BW]`.
+  self._spectateBwBytes = (self._spectateBwBytes or 0) + #payload
+  self._spectateBwSends = (self._spectateBwSends or 0) + 1
+  local nowMs = math.floor(love.timer.getTime() * 1000)
+  self._spectateBwLogAtMs = self._spectateBwLogAtMs or nowMs
+  if nowMs - self._spectateBwLogAtMs >= 1000 then
+    local elapsedS = (nowMs - self._spectateBwLogAtMs) / 1000
+    logger.info(string.format("[SPECTATE-BW] %.1f KB/s, %d sends/s, avg %d B/send",
+      (self._spectateBwBytes / 1024) / elapsedS,
+      math.floor(self._spectateBwSends / elapsedS + 0.5),
+      math.floor(self._spectateBwBytes / self._spectateBwSends)))
+    self._spectateBwBytes = 0
+    self._spectateBwSends = 0
+    self._spectateBwLogAtMs = nowMs
+  end
 end
 
 ---Drain and discard any pending `Y` (display-event) messages from both

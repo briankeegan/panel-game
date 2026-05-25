@@ -119,6 +119,31 @@ function DisplayClientStack:applyBatch(batch)
   if type(batch) ~= "table" then return end
   local snapshot = batch.snapshot
   if type(snapshot) ~= "table" then return end
+  -- Match-boundary detection. A stale tail snapshot from the previous
+  -- match can arrive after our DisplayClientStack has been rebuilt for
+  -- the new match (flushDisplayEvents drains at startMatch, but the
+  -- sender's stop()-final may still be in flight). When we detect the
+  -- boundary, treat the incoming snapshot as the first of the new match:
+  -- drop the stale snapshot we just stored, reset prev. Two signals:
+  --   (a) Big clock regression: prev.f >> incoming.f (new match started
+  --       at clock 0 or low).
+  --   (b) Resurrection: prev had go>0 (dead) but incoming has go==0
+  --       (alive). You can't un-die within a match.
+  local cur = self.snapshot
+  local isBoundary = false
+  if cur then
+    local prevF = cur.f or 0
+    local nextF = snapshot.f or 0
+    if (prevF - nextF) > 60 then isBoundary = true end
+    if (cur.go or 0) > 0 and (snapshot.go or 0) == 0 then isBoundary = true end
+  end
+  if isBoundary then
+    -- Drop the stale stored snapshot. prev gets cleared so interp doesn't
+    -- lerp from a stale displacement into the fresh one.
+    self.snapshot     = nil
+    self.prevSnapshot = nil
+    self.prevRecvTime = 0
+  end
   -- Shift latest → prev for interpolation. Render uses both to lerp
   -- displacement (and cursor, if cheap) between frames.
   self.prevSnapshot   = self.snapshot
@@ -206,7 +231,8 @@ end
 ---@param self DisplayClientStack
 ---@param viewStack table the matching ClientStack (for panels_dir + gfxScale + character)
 ---@param snapshot DisplayClientStackSnapshot
-local function paintGridFromSnapshot(self, viewStack, snapshot)
+---@param shakeOffset number panel-coord vertical shake from mirrored shake_time
+local function paintGridFromSnapshot(self, viewStack, snapshot, shakeOffset)
   local panelsDir = viewStack.panels_dir
   if not panelsDir then return end
   local panelSet = panels and panels[panelsDir]
@@ -253,7 +279,7 @@ local function paintGridFromSnapshot(self, viewStack, snapshot)
       local panel = expandCell(cell, row, col, frameTimes)
       if panel and panel.state ~= "popped" then
         local draw_x = 4 + (col - 1) * 16
-        local draw_y = 4 + (11 - row) * 16 + displacement
+        local draw_y = 4 + (11 - row) * 16 + displacement - shakeOffset
 
         if panel.isGarbage then
           -- Only the bottom-right corner of a garbage block triggers the
@@ -377,13 +403,20 @@ function DisplayClientStack:render(viewStack)
   -- stack, frame border around it, wall at the bottom of the panel area.
   -- These read fields off the viewStack itself (character, theme, frame
   -- assets) and from viewStack.engine for things like displacement, which
-  -- mirrorHudScalars already keeps in sync with the snapshot. Calling
-  -- them directly reuses the existing draw paths instead of rebuilding.
-  local scale = viewStack.gfxScale or 3
-  local ox = (viewStack.frameOriginX or 0) * scale
-  local oy = (viewStack.frameOriginY or 0) * scale
-  local w  = (viewStack.baseWidth   or 0) * scale
-  local h  = (viewStack.baseHeight  or 0) * scale
+  -- mirrorHudScalars already keeps in sync with the snapshot.
+
+  -- shakeOffset comes from the mirrored shake_time on engine. Wall + panels
+  -- both displace by this same amount so the bottom row + grid shift together
+  -- under garbage impact. Displacement (the smooth scroll) is intentionally
+  -- NOT applied to the wall — that's the bug fix for "bottom red piece
+  -- raising/lowering".
+  local shakeOffset = 0
+  if viewStack.currentShakeOffset and viewStack.gfxScale and viewStack.gfxScale ~= 0 then
+    local ok, val = pcall(viewStack.currentShakeOffset, viewStack)
+    if ok and type(val) == "number" then
+      shakeOffset = val / viewStack.gfxScale
+    end
+  end
 
   viewStack:setDrawArea(0, 0)
   love.graphics.push("all")
@@ -392,28 +425,19 @@ function DisplayClientStack:render(viewStack)
   if viewStack.drawCharacter then pcall(viewStack.drawCharacter, viewStack) end
 
   -- Paint the grid + cursor inside the panel-coord transform.
-  paintGridFromSnapshot(self, viewStack, self.snapshot)
+  paintGridFromSnapshot(self, viewStack, self.snapshot, shakeOffset)
 
-  -- Frame border + wall at the bottom row.
+  -- Frame border + wall at the bottom row. Wall takes shakeOffset, NOT
+  -- displacement — matches PlayerStack:render:985 (drawWall(shakeOffset, ...)).
   if viewStack.drawFrame then pcall(viewStack.drawFrame, viewStack) end
   if viewStack.drawWall and self.snapshot.h then
-    pcall(viewStack.drawWall, viewStack, self.snapshot.d or 0, self.snapshot.h)
+    pcall(viewStack.drawWall, viewStack, shakeOffset, self.snapshot.h)
   end
 
   paintCursorFromSnapshot(self, viewStack, self.snapshot)
 
   love.graphics.pop()
   viewStack:resetDrawArea()
-
-  -- Dead overlay drawn outside setDrawArea so it sits on top of the grid.
-  if (self.snapshot.go or 0) > 0 and w > 0 and h > 0 then
-    love.graphics.push("all")
-    love.graphics.setColor(0, 0, 0, 0.5)
-    love.graphics.rectangle("fill", ox, oy, w, h)
-    love.graphics.setColor(1, 0.3, 0.3, 0.9)
-    love.graphics.print("DEAD", ox + 8, oy + 8)
-    love.graphics.pop()
-  end
 
   -- Restore the wire displacement so future applyBatch sees the
   -- authoritative shipped value, not our render-time interpolation.

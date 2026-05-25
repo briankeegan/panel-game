@@ -202,10 +202,26 @@ function DisplayEventCapture:start()
   -- ferried over the wire so the new viewer plays the same animations.
   self.engine:connectSignal("matched",     self, self.onMatched)
   self.engine:connectSignal("panelPop",    self, self.onPanelPop)
+  -- Track recent landings so _maybeSend can bump rate while the bounce
+  -- animation plays out (~8 ticks). Without this the 20Hz default
+  -- undersamples the bounce and the receiver sees panels snap to rest
+  -- with no visible bounce.
+  self.engine:connectSignal("panelLanded", self, self.onPanelLanded)
+  -- Initial snapshot so receivers paint the board on frame 0 rather than
+  -- waiting one full SEND_INTERVAL_S window. Without this the remote board
+  -- is blank for ~50ms after every match start.
+  self:_send()
 end
 
----Stop the capture and send one final snapshot so the receiver sees the
----terminal state (e.g. a game-over board). Idempotent.
+---Stop the capture and ship one final snapshot so the receiver sees the
+---terminal state (cracked face, dimmed panels). Idempotent.
+---
+---The final send used to race the next match's startMatch on the receiver
+---— a stale terminal snapshot could arrive after the receiver rebuilt its
+---DisplayClientStacks and briefly paint the dead board over the fresh
+---match. The receiver now drains pending Y messages at startMatch
+---(NetClient:flushDisplayEvents) and detects match-boundary transitions in
+---applyBatch (big clock regression or dead→alive flip → drop stale prev).
 function DisplayEventCapture:stop()
   if not self.started then return end
   self.started = false
@@ -260,9 +276,25 @@ function DisplayEventCapture:onPanelPop(panel)
   }
 end
 
+-- A panel just landed. Record an active-until clock so _maybeSend bypasses
+-- the 20Hz gate while the bounce animation plays out (~8 ticks). Without
+-- this, the receiver sees the bounce as a 1-2 frame snap rather than the
+-- full squish.
+function DisplayEventCapture:onPanelLanded(panel)
+  local engineClock = self.engine and self.engine.clock or 0
+  self._landingActiveUntilClock = engineClock + 8
+end
+
 function DisplayEventCapture:_maybeSend()
   local now = love.timer.getTime()
-  if (now - self.lastFlushTime) < SEND_INTERVAL_S then return end
+  -- Fast-events bypass: ship every tick during manual raise or shortly
+  -- after a panel landed. Both produce sub-50ms visual changes the 20Hz
+  -- baseline undersamples. The bypass auto-clears when the engine clock
+  -- passes _landingActiveUntilClock, or when manual_raise drops false.
+  local engineClock = self.engine.clock or 0
+  local fastEvent = (self.engine.manual_raise == true)
+    or ((self._landingActiveUntilClock or 0) > engineClock)
+  if not fastEvent and (now - self.lastFlushTime) < SEND_INTERVAL_S then return end
   -- Option F (adaptive rate): if the local engine is behind wall-clock
   -- by 2+ frames, skip this send. The local player's main loop is
   -- already racing to catch up; piling JSON-encode work on top makes it

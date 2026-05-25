@@ -1460,6 +1460,15 @@ function NetClient:sendDisplayEvents(batch)
   _sendGameplay(self, NetworkProtocol.clientMessageTypes.displayEvent.prefix, json.encode(batch))
 end
 
+---Drain and discard any pending `Y` (display-event) messages from both
+---inbound queues. Called by BattleRoom:startMatch right before rebuilding
+---_displayStacks so trailing stale snapshots from the previous match
+---don't briefly paint over the new match's fresh stacks.
+function NetClient:flushDisplayEvents()
+  local prefix = NetworkProtocol.serverMessageTypes.displayEvent.prefix
+  _drainBoth(self, prefix)
+end
+
 ---Loose-sync: send a GarbageEvent from the local sim.
 ---@param body table parsed event payload
 ---

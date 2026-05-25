@@ -680,6 +680,14 @@ function BattleRoom:startMatch(replay)
   -- want a clean slate.)
   self._displayCaptures = nil
   self._displayStacks   = nil
+  -- Drop any in-flight Y messages from the prior match's tail. Without
+  -- this, a stale OLD-match death snapshot can arrive after the NEW
+  -- stacks are created and briefly paint the dead board on top of the
+  -- fresh match. The drain is a no-op when displayHistoryEnabled is off
+  -- (no Y traffic exists in the first place).
+  if GAME.netClient and GAME.netClient.flushDisplayEvents then
+    pcall(GAME.netClient.flushDisplayEvents, GAME.netClient)
+  end
   if self.displayHistoryEnabled then
     -- Tell the engine to skip simulating non-local stacks. The new viewer
     -- now owns the visual representation of remote players entirely; their

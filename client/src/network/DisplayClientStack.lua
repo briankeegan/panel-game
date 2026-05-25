@@ -366,7 +366,7 @@ local function paintGridFromSnapshot(self, viewStack, snapshot, shakeOffset)
           end
         else
           panelSet:addToDraw(panel, draw_x, draw_y, viewStack.gfxScale,
-            NO_DANGER, 0, snapshot.st or 0)
+            dangerCol, dangerTimer, snapshot.st or 0)
         end
       end
     end

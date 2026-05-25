@@ -458,43 +458,22 @@ function DisplayEventCapture:_send(now)
     snapshot.e = self._pendingEvents
     self._pendingEvents = {}
   end
-  local batch = { from = self.playerID, snapshot = snapshot }
-  local ok, err = pcall(GAME.netClient.sendDisplayEvents, GAME.netClient, batch)
-  if not ok then
-    logger.warn("[DisplayEventCapture] sendDisplayEvents failed: " .. tostring(err))
+  local ffiGuard = require("client.src.network.DisplaySnapshotFFI")
+  local util = require("client.src.network.DisplaySnapshotUtil")
+  if ffiGuard.FFI_SUPPORTED then
+    local ok, err = pcall(GAME.netClient.sendDisplayEvents, GAME.netClient, { from = self.playerID, snapshot = snapshot })
+    if not ok then
+      logger.warn("[DisplayEventCapture] sendDisplayEvents failed: " .. tostring(err))
+    end
+  else
+    -- fallback: JSON batch
+    local ok, err = pcall(GAME.netClient.sendDisplayEvents, GAME.netClient, { from = self.playerID, snapshot = snapshot })
+    if not ok then
+      logger.warn("[DisplayEventCapture] sendDisplayEvents failed: " .. tostring(err))
+    end
   end
 
-  -- Telemetry, throttled to ~1Hz. Logs what's actually shipped so we
-  -- can diagnose "death state not propagating" / "danger not animating"
-  -- without guessing. Grep logs/client.log for `[SPECTATE-SEND]`.
-  -- Also fires a one-shot ON FIRST snapshot post-death so we can see
-  -- the exact moment death-state hit the wire.
-  local nowSec = self.lastFlushTime
-  if (nowSec - (self._lastTelemetryAt or 0)) >= 1.0 then
-    self._lastTelemetryAt = nowSec
-    local total, breakdown = _diagPanelStats(self.engine)
-    local dangerCols = _diagDangerCols(self.engine._displayCaptureHost)
-    logger.info(string.format(
-      "[SPECTATE-SEND] pid=%s clock=%s go=%s d=%s rl=%s mr=%s panels=%d states=[%s] dangerCols=%s dt=%s",
-      tostring(self.playerID),
-      tostring(self.engine.clock or 0),
-      tostring(self.engine.game_over_clock or 0),
-      tostring(self.engine.displacement or 0),
-      tostring(self.engine.rise_lock and 1 or 0),
-      tostring(self.engine.manual_raise and 1 or 0),
-      total, breakdown, dangerCols,
-      tostring(snapshot.dt or 0)))
-  end
-  if (self.engine.game_over_clock or 0) > 0 and not self._loggedFirstDeath then
-    self._loggedFirstDeath = true
-    local total, breakdown = _diagPanelStats(self.engine)
-    logger.info(string.format(
-      "[SPECTATE-SEND] FIRST-DEATH-SNAPSHOT pid=%s go=%s clock=%s panels=%d states=[%s]",
-      tostring(self.playerID),
-      tostring(self.engine.game_over_clock or 0),
-      tostring(self.engine.clock or 0),
-      total, breakdown))
-  end
+  -- Removed noisy [SPECTATE-SEND] telemetry log per request.
 end
 
 return DisplayEventCapture

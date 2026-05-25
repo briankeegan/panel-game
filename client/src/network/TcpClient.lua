@@ -75,12 +75,20 @@ local handlers = {
 
   [NP.serverMessageTypes.displayEvent.prefix] = function(self, data)
     -- Display-history replication (parallel system, see DISPLAY_HISTORY_PLAN.md).
-    -- Decode the batch and push to the queue. NetClient's processDisplayEvents
-    -- routes it to the match's DisplayClientStacks. When the receiving room
-    -- has displayHistoryEnabled=false, no Y traffic should arrive in the first
-    -- place; the decode is defensive in case a peer is gated differently.
+    -- Try FFI binary decode first, fallback to JSON.
     local prefix = NP.serverMessageTypes.displayEvent.prefix
-    local body = decodeJson(data, self.name, prefix)
+    local ffiGuard = require("client.src.network.DisplaySnapshotFFI")
+    local util = require("client.src.network.DisplaySnapshotUtil")
+    local body
+    if ffiGuard.FFI_SUPPORTED and data and #data >= 80 then
+      local from, snapshot = util.unpack_snapshot(data)
+      if from and snapshot then
+        body = { from = from, snapshot = snapshot }
+      end
+    end
+    if not body then
+      body = decodeJson(data, self.name, prefix)
+    end
     if not body then return end
     self.receivedMessageQueue:push({[prefix] = body})
   end,

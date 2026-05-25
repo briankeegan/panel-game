@@ -1457,6 +1457,16 @@ end
 ---fallback input data, so display dropouts are display-only.
 ---@param batch table { from = playerID, events = {...} }
 function NetClient:sendDisplayEvents(batch)
+  local ffiGuard = require("client.src.network.DisplaySnapshotFFI")
+  local util = require("client.src.network.DisplaySnapshotUtil")
+  if ffiGuard.FFI_SUPPORTED and batch and batch.from and batch.snapshot then
+    local bin = util.pack_snapshot(batch.from, batch.snapshot)
+    if bin then
+      _sendGameplay(self, NetworkProtocol.clientMessageTypes.displayEvent.prefix, bin)
+      return
+    end
+  end
+  -- fallback: JSON for unsupported platforms or error
   _sendGameplay(self, NetworkProtocol.clientMessageTypes.displayEvent.prefix, json.encode(batch))
 end
 
@@ -1632,7 +1642,10 @@ function NetClient:requestRoom(gameMode, latencyTolerance, openRoom, displayHist
       return
     end
 
-    _sendLobby(self, ClientMessages.sendRoomRequest(gameMode, latencyTolerance, openRoom, displayHistoryEnabled))
+    -- Platform guard: only allow displayHistoryEnabled if FFI is supported
+    local ffiGuard = require("client.src.network.DisplaySnapshotFFI")
+    local dhEnabled = displayHistoryEnabled and ffiGuard.FFI_SUPPORTED
+    _sendLobby(self, ClientMessages.sendRoomRequest(gameMode, latencyTolerance, openRoom, dhEnabled))
   end
 end
 

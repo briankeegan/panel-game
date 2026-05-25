@@ -152,11 +152,12 @@ function BattleRoom.createFromServerMessage(message)
   local gameMode = GameModes.createFromServerData(message.gameMode)
   local battleRoom = BattleRoom(gameMode)
   battleRoom.roomNumber = message.roomNumber
-  -- Per-room "Spectator View" flag set by the room's host and echoed by
-  -- the server in addToRoom. Every client in the room reads it from the
-  -- same authoritative source so all clients agree.
-  if message.displayHistoryEnabled == true then
+  -- Platform guard: only enable displayHistory if FFI is supported
+  local ffiGuard = require("client.src.network.DisplaySnapshotFFI")
+  if message.displayHistoryEnabled == true and ffiGuard.FFI_SUPPORTED then
     battleRoom.displayHistoryEnabled = true
+  else
+    battleRoom.displayHistoryEnabled = false
   end
 
   if message.spectate_request_granted then
@@ -775,7 +776,10 @@ function BattleRoom:applyDisplayEventBatch(batch)
   if from == nil then return end
   local stack = self._displayStacks[from]
   if not stack then return end
-  stack:applyBatch(batch)
+  -- If batch is already a decoded FFI snapshot, pass as-is
+  if batch.snapshot and type(batch.snapshot) == "table" then
+    stack:applyBatch(batch)
+  end
 end
 
 ---Phase C parallel render. Called from GameBase:draw after the existing

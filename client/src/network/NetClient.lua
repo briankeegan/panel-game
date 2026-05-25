@@ -990,15 +990,6 @@ local function processInputMessages(self)
   local inputPrefix = NetworkProtocol.serverMessageTypes.input.prefix
   local messages = _drainBoth(self, inputPrefix)
   if not (self.room and self.room.match) then return end
-  -- Display-history viewer (DISPLAY_HISTORY_PLAN.md): when the per-room
-  -- flag is on, the new viewer owns remote-player visuals and the old
-  -- engine sim for non-local stacks is skipped. Feeding inputs to those
-  -- engines would just pile up in confirmedInput buffers nobody drains.
-  -- Drop them on the floor — the local stack never receives I messages
-  -- (server doesn't echo your own).
-  if self.room.displayHistoryEnabled then
-    return
-  end
   -- All I are visual: server never echoes your own inputs. body.playerNumber
   -- on the wire is the engine-side stackIndex (server compacted at match
   -- start), NOT a lobby seatId — pass straight through.

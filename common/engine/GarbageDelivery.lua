@@ -86,7 +86,11 @@ function GarbageDelivery:_pushToRecipient(stack)
     -- Multi-target senders are handled by _distributeMultiTarget; skip here.
     if senderIndex and #match.garbageTargets[senderIndex] > 1 then
       -- skip
-    else
+    -- Skip remote senders before the pop: see _distributeMultiTarget for
+    -- the full rationale (same latent-drop risk). Offline / replay
+    -- engines DO want this pickup path even for is_local=false senders
+    -- because there's no wire to relay through.
+    elseif st.is_local or match.fromReplay then
       local oldestTransitTime = st:getOldestFinishedGarbageTransitTime()
       if oldestTransitTime and ((not st.outgoingGarbage.illegalStuffIsAllowed)
                                 or (#stack.incomingGarbage.stagedGarbage < 72)) then
@@ -116,12 +120,21 @@ function GarbageDelivery:_distributeMultiTarget()
   for senderIndex, targets in ipairs(match.garbageTargets) do
     if #targets > 1 then
       local sender = match.stacks[senderIndex]
-      local oldestTransitTime = sender:getOldestFinishedGarbageTransitTime()
-      if oldestTransitTime and sender.stopWatch >= oldestTransitTime then
-        if match.garbageMode == "shared" then
-          self:_distributeShared(senderIndex, sender, oldestTransitTime)
-        else
-          self:_distributeAll(senderIndex, sender, targets, oldestTransitTime)
+      -- Skip remote senders early: their outgoing-garbage queue is either
+      -- empty (snapshot pipeline doesn't tick them) or echo from input
+      -- replication that we'd silently drop via _deliverMulti's
+      -- "not source.is_local → return". Popping before the source-side
+      -- check would mutate (and lose) any garbage the queue contained.
+      -- The authoritative G from the source's own machine drives all
+      -- visuals via applyGarbageEvent on every client.
+      if sender.is_local then
+        local oldestTransitTime = sender:getOldestFinishedGarbageTransitTime()
+        if oldestTransitTime and sender.stopWatch >= oldestTransitTime then
+          if match.garbageMode == "shared" then
+            self:_distributeShared(senderIndex, sender, oldestTransitTime)
+          else
+            self:_distributeAll(senderIndex, sender, targets, oldestTransitTime)
+          end
         end
       end
     end

@@ -44,6 +44,12 @@ local TeamUtils = require("common.data.TeamUtils")
 ---@field fromReplay boolean? true when the Match was constructed via createFromReplay
 ---@field stackInteraction StackInteractions? mirror of rules.stackInteraction, set during initialization
 ---@field displayHistoryActive boolean? set by BattleRoom when display-history pipeline is on. Display-only; engine code must not consult it.
+---@field _gSentEvents integer? per-match garbage-event accounting: count of G messages we sent
+---@field _gSentPieces integer? per-match garbage-event accounting: count of pieces we sent (sum of piece counts in our G events)
+---@field _gAppliedEvents integer? per-match accounting: count of G messages we applied locally
+---@field _gAppliedPieces integer? per-match accounting: count of pieces we applied locally
+---@field _gDroppedEvents integer? per-match accounting: count of G messages dropped (no recipient stack)
+---@field _gDroppedPieces integer? per-match accounting: count of pieces dropped
 
 ---@class MatchDebugConfig
 ---@field vsFramesBehind integer

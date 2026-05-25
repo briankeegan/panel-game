@@ -42,6 +42,8 @@ local logger = require("common.lib.logger")
 ---@field og table outgoing garbage queue (staged)
 ---@field e table? one-shot trigger events (pop FX + score cards)
 ---@field p table flat panels array, indexed (row-1)*width + col; empty slots = nil
+---@field dc boolean[]? per-column danger flags (sparse), nil when no columns are in danger
+---@field dt integer? danger timer (frames since dc went non-empty)
 
 ---@class DisplayClientStack
 ---@field playerID integer wire identifier of the remote player

@@ -176,6 +176,7 @@ local DIRECTION_ROW = {up = 1, down = -1, left = 0, right = 0}
 ---@field garbageMode integer? garbage targeting mode for multi-opponent stacks
 ---@field incomingGarbage GarbageQueue
 ---@field outgoingGarbage GarbageQueue
+---@field _displayCaptureHost table? PlayerStack reference parked on the engine by DisplayEventCapture so buildSnapshot can read PlayerStack-resident render fields (danger_col, danger_timer) without threading them through every layer
 
 
 -- Represents the full panel stack for one player

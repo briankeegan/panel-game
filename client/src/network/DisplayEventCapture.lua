@@ -36,6 +36,16 @@ DisplayEventCapture.__index = DisplayEventCapture
 -- on wall-clock elapsed so the rate is independent of tick rate.
 local SEND_INTERVAL_S = 0.05
 
+-- Adaptive idle rate (item 6 of smoother-visuals goal): when nothing
+-- visually interesting has changed for IDLE_AFTER_S, drop to
+-- IDLE_INTERVAL_S until the next fastEvent. The fast-event bypass
+-- already snaps us back to 20Hz the moment something happens, so this
+-- only kicks in during true visual idle (e.g. stack sitting still
+-- post-countdown or mid-stop). Average bandwidth drops; visible motion
+-- stays at full rate.
+local IDLE_AFTER_S    = 1.0
+local IDLE_INTERVAL_S = 0.15
+
 ---@param engine Stack the local player's engine stack
 ---@param playerID integer wire identifier for the sending player
 ---@param hostStack table? the PlayerStack holding danger_col / danger_timer (only those fields live on PlayerStack, not engine). nil for SimulatedStack.
@@ -407,7 +417,19 @@ function DisplayEventCapture:_maybeSend()
     or ((self._matchActiveUntilClock or 0) > engineClock)
     or displacementChanged
     or cursorChanged
-  if not fastEvent and (now - self.lastFlushTime) < SEND_INTERVAL_S then return end
+  -- Track wall-clock of the most recent fast event so the idle detector
+  -- below knows when to slow down. Anything that's a fastEvent counts as
+  -- "active" — same definition both sides should agree on.
+  if fastEvent then self._lastFastEventAt = now end
+  -- Adaptive interval: stretch to IDLE_INTERVAL_S once we've been quiet
+  -- past IDLE_AFTER_S since the last fastEvent. Any fastEvent on the
+  -- next tick still bypasses gating entirely, so wake-up latency is one
+  -- engine tick.
+  local interval = SEND_INTERVAL_S
+  if (now - (self._lastFastEventAt or 0)) > IDLE_AFTER_S then
+    interval = IDLE_INTERVAL_S
+  end
+  if not fastEvent and (now - self.lastFlushTime) < interval then return end
   -- Option F (adaptive rate): if the local engine is behind wall-clock
   -- by 2+ frames, skip this send. The local player's main loop is
   -- already racing to catch up; piling JSON-encode work on top makes it

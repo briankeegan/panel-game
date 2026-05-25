@@ -1960,6 +1960,27 @@ function ClientMatch:_applyGarbageEventNow(body)
     end
   end
 
+  -- Item 4 of smoother-visuals goal: observer-side immediate feedback.
+  -- One bump per G event regardless of recipient count (all-mode fans
+  -- out, but it's still one attack). Bumps the SENDER's view-stack
+  -- shake so anyone watching the attacker — recipient + third-party
+  -- observers — sees "attacker hit something" the instant G arrives,
+  -- decaying as Y delivers the authoritative shake. Skip if sender is
+  -- us (our own engine shook live from the sim already).
+  if body.sender and GAME and GAME.battleRoom and GAME.battleRoom._displayStacks then
+    local senderStack = self.stacks[body.sender]
+    if senderStack and not senderStack.is_local and senderStack.player then
+      local pid = senderStack.player.publicId or senderStack.player.playerNumber
+      local ds = pid and GAME.battleRoom._displayStacks[pid]
+      if ds then
+        -- Scale roughly with attack size; cap so a huge combo doesn't
+        -- spike the screen beyond what the real shake will be.
+        local bump = math.min(30, garbageCount * 4)
+        ds:bumpShake(bump)
+      end
+    end
+  end
+
   -- Self-heal the round-robin cursor: G is the canonical "who got hit"
   -- per delivery (the server even redirects when the original recipient is
   -- dead). distributeGarbageToTargets advances each client's cursor based

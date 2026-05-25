@@ -130,6 +130,13 @@ function DisplayClientStack.new(playerID, player, viewStack)
   self.snapshotsApplied = 0
   self.latestRecvTime   = self.snapshot and love.timer.getTime() or 0
   self.prevRecvTime     = 0
+  -- Transient shake-bump from G arrivals (item 4 in the smoother-visuals
+  -- goal). Fires *before* the next Y snapshot can mirror the sender's
+  -- real shake_time, so observers see the attacker's hit immediately
+  -- instead of 0-50ms late. Decays over one snapshot interval so the
+  -- authoritative shake_time from Y takes over smoothly.
+  self._shakeBump   = 0
+  self._shakeBumpAt = 0
   if self.snapshot and self.snapshot.p then
     local cache = {}
     for i = 1, #self.snapshot.p do cache[i] = self.snapshot.p[i] end
@@ -157,23 +164,20 @@ local function mirrorHudScalars(self, snapshot)
   local viewStack = self.viewStack
   if not viewStack or not viewStack.engine then return end
   local engine = viewStack.engine
-  if snapshot.sc ~= nil then engine.score             = snapshot.sc end
+  -- Discrete / step-change fields: snap-mirrored at apply. Tweenable
+  -- fields (sc/pc/sh/hp/st/ps/f) are intentionally OWNED by
+  -- tweenHudScalars below; writing them here too would visually step
+  -- the value back to prev on the first render after apply.
   if snapshot.sp ~= nil then engine.speed             = snapshot.sp end
   if snapshot.lv ~= nil then engine.level             = snapshot.lv end
-  if snapshot.pc ~= nil then engine.panels_cleared    = snapshot.pc end
   if snapshot.mp ~= nil then engine.metalPanelsQueued = snapshot.mp end
-  if snapshot.hp ~= nil then engine.health            = snapshot.hp end
-  if snapshot.st ~= nil then engine.stop_time         = snapshot.st end
-  if snapshot.ps ~= nil then engine.pre_stop_time     = snapshot.ps end
   if snapshot.cn ~= nil then engine.chain_counter     = snapshot.cn end
   if snapshot.sw ~= nil then engine.swapCount         = snapshot.sw end
-  if snapshot.sh ~= nil then engine.shake_time        = snapshot.sh end
   if snapshot.psh~= nil then engine.prev_shake_time   = snapshot.psh end
   if snapshot.pkh~= nil then engine.peak_shake_time   = snapshot.pkh end
   if snapshot.og ~= nil and engine.outgoingGarbage then
     engine.outgoingGarbage.stagedGarbage = snapshot.og
   end
-  if snapshot.f  ~= nil then engine.clock             = snapshot.f end
 end
 
 -- Per-render-frame HUD tween. Engine fields driving drawScore /
@@ -187,28 +191,49 @@ local function tweenHudScalars(self)
   if not viewStack or not viewStack.engine then return end
   local snapshot = self.snapshot
   if not snapshot then return end
-  local prev = self.prevSnapshot
-  if not prev or self.prevRecvTime <= 0 then return end
-
-  local elapsed = love.timer.getTime() - self.latestRecvTime
-  local alpha = math.min(1, math.max(0, elapsed / HUD_TWEEN_S))
 
   local engine = viewStack.engine
+  local prev = self.prevSnapshot
+  local hasPrev = prev and self.prevRecvTime > 0
+  local alpha
+  if hasPrev then
+    local elapsed = love.timer.getTime() - self.latestRecvTime
+    alpha = math.min(1, math.max(0, elapsed / HUD_TWEEN_S))
+  else
+    alpha = 1  -- no prev → snap to snapshot value (acts as the mirror)
+  end
+
   local function lerp(p, c)
-    if p == nil or alpha >= 1 then return c end
+    if not hasPrev or p == nil or alpha >= 1 then return c end
     return p + (c - p) * alpha
   end
 
+  -- prev may be nil on the first snapshot — guard each access so Lua
+  -- doesn't error when reading prev.X before the lerp helper bails out.
+  local p = prev or {}
   -- Integer-valued fields get floored so drawNumber / multibar height
   -- math don't display fractional pixels.
-  if snapshot.sc ~= nil then engine.score          = math.floor(lerp(prev.sc, snapshot.sc) + 0.5) end
-  if snapshot.pc ~= nil then engine.panels_cleared = math.floor(lerp(prev.pc, snapshot.pc) + 0.5) end
-  if snapshot.sh ~= nil then engine.shake_time     = math.floor(lerp(prev.sh, snapshot.sh) + 0.5) end
-  if snapshot.f  ~= nil then engine.clock          = math.floor(lerp(prev.f,  snapshot.f)  + 0.5) end
+  if snapshot.sc ~= nil then engine.score          = math.floor(lerp(p.sc, snapshot.sc) + 0.5) end
+  if snapshot.pc ~= nil then engine.panels_cleared = math.floor(lerp(p.pc, snapshot.pc) + 0.5) end
+  if snapshot.sh ~= nil then
+    local v = lerp(p.sh, snapshot.sh)
+    -- Stack a decaying G-arrival bump on top of the Y-mirrored shake so
+    -- attack feedback shows immediately and then blends into the
+    -- authoritative shake_time as Y catches up.
+    local bump = self._shakeBump or 0
+    if bump > 0 then
+      local age = love.timer.getTime() - (self._shakeBumpAt or 0)
+      local d = math.min(1, math.max(0, age / HUD_TWEEN_S))
+      v = v + bump * (1 - d)
+      if d >= 1 then self._shakeBump = 0 end
+    end
+    engine.shake_time = math.floor(v + 0.5)
+  end
+  if snapshot.f  ~= nil then engine.clock          = math.floor(lerp(p.f,  snapshot.f)  + 0.5) end
   -- Float-friendly fields (multibar heights compute smoothly).
-  if snapshot.hp ~= nil then engine.health         = lerp(prev.hp, snapshot.hp) end
-  if snapshot.st ~= nil then engine.stop_time      = lerp(prev.st, snapshot.st) end
-  if snapshot.ps ~= nil then engine.pre_stop_time  = lerp(prev.ps, snapshot.ps) end
+  if snapshot.hp ~= nil then engine.health         = lerp(p.hp, snapshot.hp) end
+  if snapshot.st ~= nil then engine.stop_time      = lerp(p.st, snapshot.st) end
+  if snapshot.ps ~= nil then engine.pre_stop_time  = lerp(p.ps, snapshot.ps) end
 end
 
 ---Apply an inbound batch. The batch is the JSON-decoded `Y` payload —
@@ -364,6 +389,20 @@ function DisplayClientStack:applyBatch(batch)
       end
     end
     snapshot.e = nil
+  end
+end
+
+---Bump shake_time on the next tween pass. Called from ClientMatch's
+---G receive handler when a remote stack we have a view of just emitted
+---garbage. Y snapshot will mirror authoritative shake within 50ms;
+---this just bridges the gap so observers see hits in real time.
+---Takes max() so successive bumps don't reduce a larger in-flight one.
+---@param amount number frames of shake to add
+function DisplayClientStack:bumpShake(amount)
+  if not amount or amount <= 0 then return end
+  if amount > (self._shakeBump or 0) then
+    self._shakeBump   = amount
+    self._shakeBumpAt = love.timer.getTime()
   end
 end
 

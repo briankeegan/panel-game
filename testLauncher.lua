@@ -82,6 +82,9 @@ local allTests = {
   "common.tests.data.TeamGameModeTests",
   "common.tests.engine.TeamMatchTests",
   "common.tests.engine.TeamGarbageTests",
+  -- Structural-decoupling property test: G arrival across player counts ×
+  -- team layouts × garbage modes × snapshot-pipeline state.
+  "common.tests.engine.GarbageDeliveryPropertyTests",
   -- Loose-sync TDD tests
   "common.tests.engine.LooseSyncTests",
   "common.tests.engine.LooseSyncContractTests",

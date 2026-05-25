@@ -53,10 +53,12 @@ function RoomCreateFfaMenu:rebuildMenu()
     end, tooltipFn),
     RoomCreateRows.createGarbageRow(prefs, tooltipFn),
     RoomCreateRows.createLatencyRow(prefs, tooltipFn),
-    RoomCreateRows.createSpectateViewRow(prefs, tooltipFn),
-    RoomCreateRows.createCreateButton(function() self:submit() end, tooltipFn),
-    RoomCreateRows.createCancelButton(tooltipFn),
   }
+  if DEBUG_ENABLED then
+    items[#items + 1] = RoomCreateRows.createSpectateViewRow(prefs, tooltipFn)
+  end
+  items[#items + 1] = RoomCreateRows.createCreateButton(function() self:submit() end, tooltipFn)
+  items[#items + 1] = RoomCreateRows.createCancelButton(tooltipFn)
   local createIndex = #items - 1
 
   -- Center each row within the menu's locked column so rows of different

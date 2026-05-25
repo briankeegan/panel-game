@@ -131,14 +131,14 @@ config = {
       composition  = "3 vs 3",  -- label from Lobby.TEAM_DIVISIONS[playerCount]
       garbage      = "shared",  -- "all" (broadcast) | "shared" (round robin)
       latency      = "normal",  -- "strict" | "normal" | "relaxed"
-      spectateView = "old",     -- "old" (input-replication) | "new" (display-history). Per-client choice for how OTHER players' boards are rendered to you.
+      spectateView = "new",     -- "old" (input-replication) | "new" (display-history). Per-client choice for how OTHER players' boards are rendered to you.
     },
     lobbyFfaPrefs                 = {
       type         = "open",
       playerCount  = 7,         -- 3 | 4 | 5 | 7
       garbage      = "all",
       latency      = "normal",
-      spectateView = "old",     -- per-client; see lobbyTeamPrefs.spectateView
+      spectateView = "new",     -- per-client; see lobbyTeamPrefs.spectateView
     },
 
     -- True if we immediately want to maximize the screen on startup

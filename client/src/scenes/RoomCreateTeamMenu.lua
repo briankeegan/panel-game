@@ -72,10 +72,12 @@ function RoomCreateTeamMenu:rebuildMenu()
     RoomCreateRows.createCompositionRow(prefs, prefs.playerCount, tooltipFn),
     RoomCreateRows.createGarbageRow(prefs, tooltipFn),
     RoomCreateRows.createLatencyRow(prefs, tooltipFn),
-    RoomCreateRows.createSpectateViewRow(prefs, tooltipFn),
-    RoomCreateRows.createCreateButton(function() self:submit() end, tooltipFn),
-    RoomCreateRows.createCancelButton(tooltipFn),
   }
+  if DEBUG_ENABLED then
+    items[#items + 1] = RoomCreateRows.createSpectateViewRow(prefs, tooltipFn)
+  end
+  items[#items + 1] = RoomCreateRows.createCreateButton(function() self:submit() end, tooltipFn)
+  items[#items + 1] = RoomCreateRows.createCancelButton(tooltipFn)
   -- Index of the Create button — pre-focus this when the menu opens so the
   -- user can press Enter to confirm defaults immediately. Keep in sync with
   -- the items list above; the Create button is always second from last.

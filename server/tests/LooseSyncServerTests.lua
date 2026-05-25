@@ -61,6 +61,43 @@ local function get2pMatchInProgress()
   return room, p1, p2
 end
 
+-- 3-player FFA room (SEVEN_PLAYER_FFA preset, 3 of 7 slots filled). Three
+-- separate teams (teamCount=7, playersPerTeam=1) so each player's recipient
+-- list is the other two slots.
+local function get3pFfaMatchInProgress()
+  local p1 = makePlayer("ls-ffa-1", "LSAFa", 2001)
+  local p2 = makePlayer("ls-ffa-2", "LSBFa", 2002)
+  local p3 = makePlayer("ls-ffa-3", "LSCFa", 2003)
+
+  -- Override minPlayers so the 3-player room can start; the SEVEN_PLAYER_FFA
+  -- preset defaults to playerCount=7 which would gate the readiness handshake.
+  local gameMode = GameModes.getPreset(GameModes.IDs.SEVEN_PLAYER_FFA)
+  gameMode.minPlayers = 2
+  gameMode.openRoom = true
+  local room = Room(1, { p1, p2, p3 }, gameMode)
+  for _, p in ipairs({ p1, p2, p3 }) do
+    p:updateSettings({ wants_ready = true, loaded = true, ready = true })
+  end
+
+  assert(room.game, "test setup: 3p FFA room should have an active game after all players ready")
+  for _, p in ipairs({ p1, p2, p3 }) do
+    p.connection.outgoingMessageQueue:clear()
+    p.connection.outgoingInputQueue:clear()
+  end
+  return room, p1, p2, p3
+end
+
+-- Pop one message (string) from a queue and return its prefix + JSON-decoded body.
+-- v009 framing: [4-byte BE length][prefix][body].
+local function popPrefixedJson(queue)
+  local msg = queue:pop()
+  if type(msg) ~= "string" or #msg < 5 then return nil, nil end
+  local prefix = msg:sub(5, 5)
+  local body = msg:sub(6)
+  local ok, decoded = pcall(json.decode, body)
+  return prefix, ok and decoded or nil
+end
+
 -- Count messages in a queue by prefix.
 -- v009 framing: [4-byte BE length][prefix][body] → prefix byte is at position 5.
 local function countByPrefix(queue, prefix)
@@ -163,6 +200,53 @@ local function test_broadcastGarbageEvent_relay()
   assert(p2GCount == 1, "P2 should receive 1 G, got " .. p2GCount)
   local p1GCount = countByPrefix(p1.connection.outgoingInputQueue, "G")
   assert(p1GCount == 1, "P1 should also receive their own G (server-confirmed visual), got " .. p1GCount)
+
+  room:close()
+end
+
+----------------------------------------------------------------------
+-- 3-player FFA G relay: every non-sender recipient gets one G with the
+-- full recipients list intact. Hardens against regressions in the
+-- multi-recipient (FFA/team "all" mode) path; the 2-player single-
+-- recipient test above doesn't exercise this branch.
+local function test_broadcastGarbageEvent_relay_multiRecipient_ffa()
+  logger.info("test_broadcastGarbageEvent_relay_multiRecipient_ffa")
+  local room, p1, p2, p3 = get3pFfaMatchInProgress()
+
+  local body = json.encode({
+    senderFrame = 500,
+    recipients = { 2, 3 },
+    garbage = { { width = 6, height = 1 } },
+  })
+  room:broadcastGarbageEvent(p1, body)
+
+  assert(#room.game.garbageEvents == 1, "1 G should be recorded")
+  local recorded = room.game.garbageEvents[1]
+  assert(recorded.sender == 1, "sender slot preserved")
+  assert(type(recorded.recipients) == "table"
+      and #recorded.recipients == 2
+      and recorded.recipients[1] == 2
+      and recorded.recipients[2] == 3,
+    "recipients [2,3] preserved on the server-recorded event")
+
+  -- Every player (sender + both recipients) gets exactly one G.
+  for _, p in ipairs({ p1, p2, p3 }) do
+    local n = countByPrefix(p.connection.outgoingInputQueue, "G")
+    assert(n == 1, "player " .. p.name .. " expected 1 G, got " .. n)
+  end
+
+  -- Each relayed body must carry the full recipients list so each client
+  -- can route applyNetworkGarbage to every targeted stack.
+  for _, p in ipairs({ p1, p2, p3 }) do
+    local prefix, decoded = popPrefixedJson(p.connection.outgoingInputQueue)
+    assert(prefix == "G", p.name .. " expected G prefix")
+    assert(decoded and decoded.recipients
+        and #decoded.recipients == 2
+        and decoded.recipients[1] == 2
+        and decoded.recipients[2] == 3,
+      p.name .. " relayed body must carry [2,3] recipients intact")
+    assert(decoded.sender == 1, p.name .. " relayed body must keep sender=1")
+  end
 
   room:close()
 end
@@ -655,6 +739,7 @@ end
 
 test_broadcastInput_relays_immediately()
 test_broadcastGarbageEvent_relay()
+test_broadcastGarbageEvent_relay_multiRecipient_ffa()
 test_broadcastDeathEvent_eliminate_and_relay()
 test_singleDeath_finalizes_to_winner()
 test_sameTick_doubleDeath_tie()

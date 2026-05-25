@@ -337,13 +337,6 @@ function Match:run()
     runsSoFar = runsSoFar + 1
   end
 
-  -- for i = 1, #self.players do
-  --   local stack = self.players[i].stack
-  --   if stack and stack.is_local not stack:game_ended() then
-  --     assert(#stack.confirmedInput == stack.clock, "Local games should always simulate all inputs")
-  --   end
-  -- end
-
   local endTime = love.timer.getTime()
   local timeDifference = endTime - startTime
   self.timeSpentRunning = self.timeSpentRunning + timeDifference

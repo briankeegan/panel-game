@@ -86,6 +86,31 @@ local function withMockSocketGetTime(secondsStarting, advanceFn)
   end
 end
 
+-- Room:maybeFinalizeFromLivingTeams holds the match open until either every
+-- still-alive player's input stream has advanced past the highest death
+-- frame, or 5s wall-clock has passed since the first time finalization was
+-- viable (FINALIZE_WALL_CLOCK_CAP_MS). End-of-match unit tests need to
+-- satisfy one of those conditions; advancing the input stream is the
+-- realistic path (mirrors what a live engine would do).
+local function advanceAliveInputsPastDeaths(room)
+  local game = room.game
+  if not game then return end
+  local high = 0
+  for _, frame in pairs(game.eliminatedPlayers or {}) do
+    if frame and frame > high then high = frame end
+  end
+  if high == 0 then return end
+  for slot, player in pairs(room.players) do
+    if player
+        and not (game.eliminatedPlayers or {})[slot]
+        and not (game.disconnectedPlayers or {})[slot] then
+      local list = game.inputs[slot] or {}
+      for i = #list + 1, high + 1 do list[i] = "A" end
+      game.inputs[slot] = list
+    end
+  end
+end
+
 ----------------------------------------------------------------------
 -- Test 12: Server broadcastInput relays to other players immediately
 ----------------------------------------------------------------------
@@ -190,20 +215,28 @@ local function test_singleDeath_finalizes_to_winner()
   local room, p1, p2 = get2pMatchInProgress()
 
   room:broadcastDeathEvent(p1, json.encode({ senderFrame = 500, reason = "topOut" }))
+  advanceAliveInputsPastDeaths(room)
+  -- prepare_character_select nils room.game inside _finalizeMatch; keep a
+  -- ref so the post-finalize assertions can still inspect the result.
+  local game = room.game
   local finalized = room:maybeFinalizeFromLivingTeams()
   assert(finalized, "match should finalize once a survivor is alone")
-  assert(room.game.complete, "game.complete should be true after finalize")
-  assert(room.game.winnerIndex == 2,
-    "winnerIndex should be P2's stackIndex (2), got " .. tostring(room.game.winnerIndex))
+  assert(game.complete, "game.complete should be true after finalize")
+  assert(game.winnerIndex == 2,
+    "winnerIndex should be P2's stackIndex (2), got " .. tostring(game.winnerIndex))
 
   room:close()
 end
 
 ----------------------------------------------------------------------
--- Test 16: Same-tick double death → finalize as tie
+-- Test 16: Both players dead → game-over-clock tiebreaker crowns last to die
 ----------------------------------------------------------------------
--- Expected: P1 and P2 both die before maybeFinalizeFromLivingTeams runs;
--- livingTeams = 0, the match finalizes with no winner (tie).
+-- When the last living team is wiped, _pickWinnerByRuleset runs the
+-- matchWinRuleset against the dead pool. TwoPlayerVersus declares
+-- GAME_OVER_CLOCK = HIGHEST, so the player who survived the longest
+-- (P2 here, dying at frame 510 vs P1 at 500) wins. This replaces the
+-- earlier "both dead = tie" behavior — the server is authoritative and
+-- always picks a winner when the ruleset has a tiebreaker.
 
 local function test_sameTick_doubleDeath_tie()
   logger.info("test_sameTick_doubleDeath_tie")
@@ -211,11 +244,12 @@ local function test_sameTick_doubleDeath_tie()
 
   room:broadcastDeathEvent(p1, json.encode({ senderFrame = 500, reason = "topOut" }))
   room:broadcastDeathEvent(p2, json.encode({ senderFrame = 510, reason = "topOut" }))
+  local game = room.game
   local finalized = room:maybeFinalizeFromLivingTeams()
   assert(finalized, "match should finalize when both teams are dead")
-  assert(room.game.complete, "game.complete should be true after finalize")
-  assert(room.game.winnerIndex == nil,
-    "winnerIndex should be nil (tie), got " .. tostring(room.game.winnerIndex))
+  assert(game.complete, "game.complete should be true after finalize")
+  assert(game.winnerIndex == 2,
+    "winnerIndex should be P2 (died last at frame 510), got " .. tostring(game.winnerIndex))
 
   room:close()
 end
@@ -247,11 +281,13 @@ local function test_2v2_team_wipe_finalizes()
 
   room:broadcastDeathEvent(p1, json.encode({ senderFrame = 500, reason = "topOut" }))
   room:broadcastDeathEvent(p2, json.encode({ senderFrame = 510, reason = "topOut" }))
+  advanceAliveInputsPastDeaths(room)
+  local game = room.game
   local finalized = room:maybeFinalizeFromLivingTeams()
   assert(finalized, "match should finalize once team 1 is wiped")
-  assert(room.game.complete, "game.complete should be true after finalize")
-  assert(room.game.winnerTeamIndex == 2,
-    "winnerTeamIndex should be 2 (team 2), got " .. tostring(room.game.winnerTeamIndex))
+  assert(game.complete, "game.complete should be true after finalize")
+  assert(game.winnerTeamIndex == 2,
+    "winnerTeamIndex should be 2 (team 2), got " .. tostring(game.winnerTeamIndex))
 
   room:close()
 end
@@ -294,11 +330,13 @@ local function test_sequentialDeaths_each_tick_evaluates()
   -- team 2 wins. The bug this guards against: a sticky flag from arbitration
   -- swallowing the second death evaluation.
   room:broadcastDeathEvent(p2, json.encode({ senderFrame = 1500, reason = "topOut" }))
+  advanceAliveInputsPastDeaths(room)
+  local game = room.game
   local finalizedAfterSecond = room:maybeFinalizeFromLivingTeams()
   assert(finalizedAfterSecond, "match should finalize after both team-1 deaths")
-  assert(room.game.complete, "game.complete should be true after team 1 wiped")
-  assert(room.game.winnerTeamIndex == 2,
-    "winnerTeamIndex should be 2 (team 2), got " .. tostring(room.game.winnerTeamIndex))
+  assert(game.complete, "game.complete should be true after team 1 wiped")
+  assert(game.winnerTeamIndex == 2,
+    "winnerTeamIndex should be 2 (team 2), got " .. tostring(game.winnerTeamIndex))
 
   room:close()
 end
@@ -470,6 +508,11 @@ local function test_silentDeathWatchdog_synthesizes_death_when_slot_silent()
   -- p1 went silent at T=1000ms; p2 is still active at T=11500ms.
   room.lastInputMs[p1.player_number] = 1000
   room.lastInputMs[p2.player_number] = 11500
+  -- Fast-lane gate: synth-death only fires when someone is queuing
+  -- garbage at the silent slot (i.e. their silence is blocking the
+  -- match). Without this, p1's silence would have to hit the 30s
+  -- absolute orphan threshold instead.
+  room.lastGarbageToMs[p1.player_number] = 5000
 
   -- Clear queues so we count only watchdog traffic.
   p2.connection.outgoingInputQueue:clear()
@@ -541,6 +584,11 @@ local function test_silentDeathWatchdog_emits_incidentDetected()
 
   room.lastInputMs[p1.player_number] = 1000
   room.lastInputMs[p2.player_number] = 11500  -- p2 active, only p1 silent
+  -- Fast-lane gate (see _slotShouldSyntheticDie): a silent slot only
+  -- triggers synth-death when garbage has been queued at it since it
+  -- last spoke. Without this the test would have to wait the 30s
+  -- orphan window instead.
+  room.lastGarbageToMs[p1.player_number] = 5000
 
   room:tickSilentDeathWatchdog(12000)
 

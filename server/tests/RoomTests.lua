@@ -63,7 +63,10 @@ local function basicTest()
     room:broadcastInput("A", p2)
   end
 
-  room:handleGameOverOutcome({outcome = 1}, p2)
+  -- TwoPlayerVersus is on the team pipeline (teamCount=2, playersPerTeam=1),
+  -- so outcome semantics are "did MY team win" (1) or lose (2), not the
+  -- winner's player number. p2 (team 2) lost, p1 (team 1) won.
+  room:handleGameOverOutcome({outcome = 2}, p2)
 
   -- winner usually sends a few more inputs until they get the messages from the other play that the match is over
   room:broadcastInput("A", p1)

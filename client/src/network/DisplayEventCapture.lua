@@ -419,6 +419,29 @@ local function stateSignature(engine)
        + (engine.cur_col or 0)
 end
 
+-- Rolling hash of panel state across the grid. Picks up applyVisualDeath
+-- state flips and any other panel-state transition that happens when
+-- engine.clock has frozen (post-death). Cost: one pass over ~84 cells.
+local function panelsSignature(engine)
+  if not engine.panels then return 0 end
+  local h = 0
+  local height = engine.height or 12
+  local width  = engine.width  or 6
+  for row = 0, height + 1 do
+    local r = engine.panels[row]
+    if r then
+      for col = 1, width do
+        local p = r[col]
+        if p then
+          local stateLen = p.state and #p.state or 0
+          h = (h * 31 + (p.color or 0) * 17 + stateLen * 7 + (p.timer or 0)) % 16777216
+        end
+      end
+    end
+  end
+  return h
+end
+
 -- Diagnostic snapshot for the throttled telemetry line. Counts panels
 -- by state so logs reveal whether dead/landing/matched are actually
 -- shipping. Iterates the same grid buildSnapshot does — kept tiny.
@@ -464,24 +487,22 @@ function DisplayEventCapture:_send(now)
   self.lastFlushTime = now or love.timer.getTime()
   if not (GAME and GAME.netClient) then return end
 
-  -- Option A (skip-when-unchanged): bail before the expensive JSON
-  -- encode if no engine tick has happened since the last send AND
-  -- there are no one-shot triggers to ship. Saves the encode work on
-  -- the sender's main thread + wire bandwidth during pauses / dead /
-  -- between matches.
-  --
-  -- BUT: bypass the skip once the player has died. After death the
-  -- engine stops ticking (Stack:shouldRun returns false on
-  -- game_ended), so clock/cur_row/cur_col freeze — signature stays
-  -- identical even though applyVisualDeath has flipped panel states
-  -- to "dead". Without this bypass, the death-state transitions never
-  -- reach the wire.
-  local sig = stateSignature(self.engine)
-  local isPostDeath = (self.engine.game_over_clock or 0) > 0
-  if not isPostDeath and sig == self._lastSentSig and #self._pendingEvents == 0 then
+  -- Skip-when-unchanged: bail before the expensive serialize if NOTHING
+  -- shippable has changed since the last send. Catches:
+  --   * Engine clock advancing (normal play) — sig differs
+  --   * Panel state flipping while clock frozen (post-death
+  --     applyVisualDeath) — panelsSig differs
+  --   * One-shot events pending — _pendingEvents non-empty
+  -- All three quiet → no info to ship → skip.
+  local sig       = stateSignature(self.engine)
+  local panelsSig = panelsSignature(self.engine)
+  if sig == self._lastSentSig
+      and panelsSig == self._lastSentPanelsSig
+      and #self._pendingEvents == 0 then
     return
   end
   self._lastSentSig = sig
+  self._lastSentPanelsSig = panelsSig
   -- Remember displacement so the next _maybeSend can detect a change
   -- (passive or manual raise, mod-16 wrap on new row spawn).
   self._lastSentDisplacement = self.engine.displacement or 0

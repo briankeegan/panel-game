@@ -134,7 +134,12 @@ local function parsePlayerSettingsFields(settings)
   out.ranked = settings.ranked
   out.loaded = settings.loaded
   out.wants_ready = settings.wants_ready
-  out.endless_no_raise = settings.endless_no_raise == true
+  -- Nil-preserving: don't synthesize the field when the wire omits it
+  -- (parseLoginRequest splats this dict at the top level and the
+  -- doesNotRenameTopLevelKeys contract would catch a phantom key).
+  if settings.endless_no_raise ~= nil then
+    out.endless_no_raise = settings.endless_no_raise == true
+  end
   if settings.levelData and LevelData.validate(settings.levelData) then
     out.levelData = settings.levelData
     setmetatable(out.levelData, LevelData)

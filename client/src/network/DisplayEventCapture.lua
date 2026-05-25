@@ -53,11 +53,13 @@ function DisplayEventCapture.new(engine, playerID, hostStack)
   -- handlers, drained into each snapshot.
   self._pendingEvents     = {}
   self._popSizeThisFrame  = 1
-  -- Park the PlayerStack on the engine so buildSnapshot can pull
-  -- PlayerStack-resident render fields (danger_col, danger_timer) without
-  -- passing extra args through every layer.
+  -- Park the PlayerStack on the engine as _renderHost so buildSnapshot
+  -- can pull PlayerStack-resident render fields (danger_col,
+  -- danger_timer) without passing extra args through every layer.
+  -- Engine never reads _renderHost; it's purely render-side data
+  -- riding on the engine reference for convenience.
   if hostStack then
-    engine._displayCaptureHost = hostStack
+    engine._renderHost = hostStack
   end
   return self
 end
@@ -190,7 +192,7 @@ local function buildSnapshot(engine)
   -- via the PlayerStack reference attached at capture-creation time.
   -- Without these, every panel renders with empty dangerCol → static.
   local dangerCol, dangerTimer = nil, 0
-  local hostStack = engine._displayCaptureHost
+  local hostStack = engine._renderHost
   if hostStack and hostStack.danger_col then
     dangerCol   = hostStack.danger_col
     dangerTimer = hostStack.danger_timer or 0

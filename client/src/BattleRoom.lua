@@ -698,7 +698,7 @@ function BattleRoom:startMatch(replay)
     -- now owns the visual representation of remote players entirely; their
     -- engine sim, rollback, input apply are all dead-weight when this flag
     -- is on. Local stack still ticks normally.
-    if match.engine then match.engine.displayHistoryActive = true end
+    if match.engine then match.engine.pauseNonLocalSimulation = true end
 
     self._displayCaptures = {}
     self._displayStacks   = {}

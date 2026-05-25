@@ -44,7 +44,7 @@ local GarbageDelivery = require("common.engine.GarbageDelivery")
 ---@field debug MatchDebugConfig internal debug configuration that defaults to non-debug values
 ---@field fromReplay boolean? true when the Match was constructed via createFromReplay
 ---@field stackInteraction StackInteractions? mirror of rules.stackInteraction, set during initialization
----@field displayHistoryActive boolean? per-match flag set by BattleRoom when the snapshot pipeline is on. Gates Match:shouldRun (skip non-local stack ticks) and Match:updateClock (skip cross-stack clock reads); the snapshot path then owns remote-visual rendering exclusively.
+---@field pauseNonLocalSimulation boolean? when true, Match:shouldRun returns false for non-local stacks (engine doesn't tick them) and Match:updateClock skips them. Set by the rendering layer when it owns remote-visual rendering through some non-input-replication path. Engine doesn't know or care which.
 ---@field _gSentEvents integer? per-match garbage-event accounting: count of G messages we sent
 ---@field _gSentPieces integer? per-match garbage-event accounting: count of pieces we sent (sum of piece counts in our G events)
 ---@field _gAppliedEvents integer? per-match accounting: count of G messages we applied locally
@@ -399,12 +399,12 @@ end
 -- also triggers the danger music from time running out if a timeLimit was set
 function Match:updateClock()
   for i, stack in ipairs(self.stacks) do
-    -- Skip non-local stacks under displayHistoryActive: those stacks
-    -- don't tick (Match:shouldRun returns false), so their clock value
-    -- is either stale or snapshot-mirrored — neither represents real
-    -- match progress and would contaminate the local match's
-    -- time-limit / danger-music clock.
-    if self.displayHistoryActive and not stack.is_local then
+    -- Skip non-local stacks when their simulation is paused: their
+    -- clock is either stale (no input replication) or mirrored from
+    -- some external source — neither represents real match progress
+    -- and would contaminate the local match's time-limit / danger-
+    -- music clock.
+    if self.pauseNonLocalSimulation and not stack.is_local then
       -- skip
     elseif stack.clock > self.clock then
       self.clock = stack.clock
@@ -787,12 +787,11 @@ end
 ---@param runsSoFar integer
 ---@return boolean
 function Match:shouldRun(stack, runsSoFar)
-  -- Snapshot pipeline (DISPLAY_HISTORY_PLAN.md): when displayHistoryActive
-  -- is on, remote stacks' visuals come from Y snapshots, NOT input
-  -- replication. Skip their engine ticks entirely — saves CPU per remote
-  -- player (the entire reason the snapshot path exists). Local stack
-  -- always ticks; the player is still playing their own game.
-  if self.displayHistoryActive and not stack.is_local then
+  -- Skip non-local stacks when their simulation is paused. The reason
+  -- for the pause is the caller's concern (rendering layer drives
+  -- visuals through some external path); the engine just respects the
+  -- flag. Local stack always ticks regardless.
+  if self.pauseNonLocalSimulation and not stack.is_local then
     return false
   end
   -- check the match specific conditions in match

@@ -133,14 +133,14 @@ end
 
 -- Mirror HUD scalars from the snapshot onto the engine fields the existing
 -- drawScore / drawSpeed / drawLevel / drawMultibar / drawAnalyticData
--- methods read from. The engine isn't simulating for this stack (Match:
--- shouldRun returns false when displayHistoryActive is on), so writing
--- these fields is safe — nothing else is going to overwrite them.
+-- methods read from. The engine isn't simulating for this stack (the
+-- match's pauseNonLocalSimulation flag tells Match:shouldRun to skip
+-- non-local stacks), so writing these fields is safe — nothing else
+-- is going to overwrite them.
 --
 -- engine.clock IS mirrored (Telegraph attack animation reads it). The
--- corresponding contamination of Match:updateClock is handled by an
--- explicit guard in Match.lua that skips non-local stacks when
--- displayHistoryActive is true.
+-- corresponding contamination of Match:updateClock is handled by the
+-- same pause-flag check in Match.lua that skips non-local stacks.
 --
 -- engine.game_over_clock is NOT mirrored — the existing D-event path
 -- already owns it. If we mirrored snapshot.go, a stale snapshot with
@@ -523,12 +523,22 @@ local function paintCursorFromSnapshot(self, viewStack, snapshot)
     love.graphics.setColor(1, 1, 1, 1)
   end
 
+  -- Cursor sprite (@2x source) loaded with linear filter under the
+  -- "linear when shrinking" heuristic. Local player draws at integer
+  -- gfxScale where final scale is 1:1 and filter doesn't matter; remote
+  -- stacks in multi-player layouts have fractional gfxScale, so the net
+  -- ~0.57x downscale with linear blends the sparse bracket pixels into
+  -- transparency. Force nearest for this draw so the brackets stay
+  -- visible regardless of layout scale, then restore.
+  local prevMin, prevMag = cursor.image:getFilter()
+  cursor.image:setFilter("nearest", "nearest")
   love.graphics.draw(cursor.image,
     xPosition * viewStack.gfxScale,
     yPosition * viewStack.gfxScale,
     0,
     scale_x * viewStack.gfxScale,
     scale_y * viewStack.gfxScale)
+  cursor.image:setFilter(prevMin, prevMag)
   love.graphics.setColor(1, 1, 1, 1)
 end
 

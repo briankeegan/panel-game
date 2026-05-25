@@ -7,8 +7,8 @@
 --   * local→remote G emission, local↔local self-attack, remote-source suppress
 --
 -- Does NOT know about:
---   * the snapshot pipeline (DisplayClientStack, displayHistoryActive)
---   * view-stack rendering, telegraph, or anything visual
+--   * any rendering pipeline (visual code may swap viewers freely)
+--   * view-stack tick state, telegraph rendering, or anything visual
 --   * which subset of stacks is "currently ticking" — runs on the routing
 --     topology, not on per-stack tick scheduling
 --

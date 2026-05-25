@@ -1924,11 +1924,11 @@ function ClientMatch:_applyGarbageEventNow(body)
   for _, recipientIndex in ipairs(body.recipients) do
     local stack = self.stacks[recipientIndex]
     if stack and stack.engine then
-      -- Frozen remote (snapshot pipeline owns visuals, engine doesn't
-      -- tick): pushing G onto incomingGarbage queues that nothing drains
-      -- piles up memory and never lands. Local stacks still get the G —
-      -- those are the only landings that matter for game outcome.
-      local frozen = engine and engine.displayHistoryActive and not stack.is_local
+      -- Frozen remote (engine sim paused for non-local stacks): pushing
+      -- G onto incomingGarbage queues that nothing drains piles up
+      -- memory and never lands. Local stacks still get the G — those
+      -- are the only landings that matter for game outcome.
+      local frozen = engine and engine.pauseNonLocalSimulation and not stack.is_local
       if frozen then
         engine._gSkippedFrozenEvents = (engine._gSkippedFrozenEvents or 0) + 1
         engine._gSkippedFrozenPieces = (engine._gSkippedFrozenPieces or 0) + garbageCount

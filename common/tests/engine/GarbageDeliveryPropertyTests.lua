@@ -6,7 +6,7 @@
 --   * player count (1v1, 3p, 4p, 7p)
 --   * team layout (FFA vs team)
 --   * garbage mode ("all" vs "shared")
---   * snapshot pipeline state (displayHistoryActive on/off)
+--   * snapshot pipeline state (pauseNonLocalSimulation on/off)
 --
 -- Runs the full matrix per CI invocation. Any future change that
 -- breaks G delivery in any combination fails CI before the commit
@@ -31,7 +31,7 @@ local GarbageQueueTestingUtils = require("common.tests.engine.GarbageQueueTestin
 -- Scenario builder
 ----------------------------------------------------------------------
 
----@param opts table { playerCount, teamCount?, playersPerTeam?, garbageMode?, displayHistoryActive? }
+---@param opts table { playerCount, teamCount?, playersPerTeam?, garbageMode?, pauseNonLocalSimulation? }
 ---@return Match
 local function buildScenario(opts)
   local matchRules = {
@@ -66,8 +66,8 @@ local function buildScenario(opts)
     match:setupTeamGarbageTargets()
   end
 
-  if opts.displayHistoryActive then
-    match.displayHistoryActive = true
+  if opts.pauseNonLocalSimulation then
+    match.pauseNonLocalSimulation = true
   end
 
   match:start()
@@ -86,7 +86,7 @@ local function describe(opts)
     opts.playerCount,
     tostring(opts.teamCount),
     tostring(opts.garbageMode),
-    tostring(opts.displayHistoryActive))
+    tostring(opts.pauseNonLocalSimulation))
 end
 
 ----------------------------------------------------------------------
@@ -152,10 +152,10 @@ local BASE_SCENARIOS = {
 
 local ran = 0
 for _, base in ipairs(BASE_SCENARIOS) do
-  for _, displayHistoryActive in ipairs({ false, true }) do
+  for _, pauseNonLocalSimulation in ipairs({ false, true }) do
     local opts = {}
     for k, v in pairs(base) do opts[k] = v end
-    opts.displayHistoryActive = displayHistoryActive
+    opts.pauseNonLocalSimulation = pauseNonLocalSimulation
     local ok, err = pcall(assertGarbageArrives, opts)
     if not ok then
       error(string.format("GarbageDeliveryPropertyTests FAILED for %s (%s)\n  reason: %s",

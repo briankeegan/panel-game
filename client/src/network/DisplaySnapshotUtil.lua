@@ -204,6 +204,11 @@ local function packPanel(w, cell)
     wU8(w, 0)
     return
   end
+  if cell == true then
+    -- Delta sentinel: receiver should keep its cached value for this index.
+    wU8(w, 2)
+    return
+  end
   wU8(w, 1)
   wU8(w, cell.c or 0)
   local state = cell.s
@@ -252,6 +257,7 @@ end
 local function unpackPanel(r)
   local present = rU8(r); if not present then return nil end
   if present == 0 then return false end
+  if present == 2 then return true end -- delta: receiver keeps cached value
   local c = rU8(r)
   local sCode = rU8(r)
   local mask = rU16(r)

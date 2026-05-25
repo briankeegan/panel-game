@@ -142,11 +142,10 @@ function DisplayClientStack:applyBatch(batch)
     if (cur.go or 0) > 0 and (snapshot.go or 0) == 0 then isBoundary = true end
   end
   if isBoundary then
-    -- Drop the stale stored snapshot. prev gets cleared so interp doesn't
-    -- lerp from a stale displacement into the fresh one.
     self.snapshot     = nil
     self.prevSnapshot = nil
     self.prevRecvTime = 0
+    self._cachedPanels = nil
   end
   -- Shift latest → prev for interpolation. Render uses both to lerp
   -- displacement (and cursor, if cheap) between frames.
@@ -155,6 +154,26 @@ function DisplayClientStack:applyBatch(batch)
   self.snapshot       = snapshot
   self.latestRecvTime = love.timer.getTime()
   self.snapshotsApplied = self.snapshotsApplied + 1
+
+  -- Delta merge: snapshot.p arrives with `true` for cells unchanged since
+  -- the last shipped state. Resolve to a full grid using the cached
+  -- previous grid, then replace snapshot.p with the resolved grid so the
+  -- rest of the render path (paintGridFromSnapshot) is unaware deltas
+  -- exist.
+  if snapshot.p then
+    local cached = self._cachedPanels
+    if cached then
+      for i = 1, #snapshot.p do
+        if snapshot.p[i] == true then snapshot.p[i] = cached[i] end
+      end
+    end
+    -- Stash a fresh copy of the resolved grid for the next merge. New
+    -- table so future deltas modifying snapshot.p don't mutate cache.
+    local nextCache = {}
+    for i = 1, #snapshot.p do nextCache[i] = snapshot.p[i] end
+    self._cachedPanels = nextCache
+  end
+
   -- Push HUD scalars onto the matching engine so existing HUD render
   -- methods (drawScore etc.) display the correct values.
   mirrorHudScalars(self, snapshot)

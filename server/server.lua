@@ -1070,38 +1070,57 @@ function Server:insertBan(ip, reason, completionTime)
 end
 
 function Server:update()
+  local clock = self.clockInstance
+  local t0 = clock and clock.monotonicMs and clock:monotonicMs() or 0
+  local t = t0
+  local function logStep(name)
+    if not (clock and clock.monotonicMs) then return end
+    local tNow = clock:monotonicMs()
+    local dt = tNow - t
+    if dt > 200 then
+      logger.warn(string.format("Server.update step '%s' took %dms", name, dt))
+    end
+    t = tNow
+  end
 
   if not self._shuttingDown then
     self:acceptNewConnections()
+    logStep("acceptNewConnections")
   end
 
   self:updateConnections()
+  logStep("updateConnections")
   self:processMessages()
+  logStep("processMessages")
   self:tickRoomMatchEnd()
-  -- Belt-and-suspenders watchdog for stuck matches: if a slot stops sending
-  -- inputs for >10s without sending a D, synthesize an inferred death so the
-  -- living-teams check can resolve. The client-side onGameOver immediate-
-  -- notify fix is the actual cure; this exists for legacy clients, future
-  -- regressions, and any other path that silences a slot without telling us.
+  logStep("tickRoomMatchEnd")
   self:tickSilentDeathWatchdogs()
+  logStep("tickSilentDeathWatchdogs")
 
-  -- Only check once a second to avoid over checking
-  -- (we are relying on time() returning a number rounded to the second)
   local currentTime = time()
   if currentTime ~= self.lastProcessTime then
     self:flushLogs(currentTime)
+    logStep("flushLogs")
     self:sweepIdleRooms(currentTime)
+    logStep("sweepIdleRooms")
     self:sweepChallengedPlayers(currentTime)
-    -- CrashReports:sweep is pcall-internal AND we wrap again here so
-    -- nothing can disturb the per-second sweep cadence the room/idle
-    -- handling depends on.
+    logStep("sweepChallengedPlayers")
     pcall(function() self.crashReports:sweep() end)
+    logStep("crashReports:sweep")
     pcall(function() self:sweepStuckMatches(currentTime) end)
+    logStep("sweepStuckMatches")
     self.lastProcessTime = currentTime
   end
 
-  -- If the lobby changed tell everyone
   self:broadCastLobbyIfChanged()
+  logStep("broadCastLobbyIfChanged")
+
+  if clock and clock.monotonicMs then
+    local total = clock:monotonicMs() - t0
+    if total > 500 then
+      logger.warn(string.format("Server.update total tick took %dms", total))
+    end
+  end
 end
 
 ---Per-room silent-death watchdog dispatch. Wrapped in pcall — a watchdog
@@ -1274,64 +1293,36 @@ function Server:addConnection(connection)
 end
 
 -- Process any data on all active connections
-
-function Server:update()
-  local clock = self.clockInstance
-  local t0 = clock:monotonicMs()
-  local function logStep(name, t_start)
-    local t_end = clock:monotonicMs()
-    local dt = t_end - t_start
-    if dt > 200 then
-      logger.warn(string.format("Server.update step '%s' took %dms", name, dt))
+function Server:updateConnections()
+  local socketsToRead = {self.socket}
+  if self.lobbyListenSocket then
+    socketsToRead[#socketsToRead+1] = self.lobbyListenSocket
+  end
+  if self.spectateListenSocket then
+    socketsToRead[#socketsToRead+1] = self.spectateListenSocket
+  end
+  local socketsToSend = {}
+  for _, v in pairs(self.connections) do
+    if v.outgoingMessageQueue:len() > 0 then
+      socketsToSend[#socketsToSend+1] = v.socket
     end
-    return t_end
+    socketsToRead[#socketsToRead + 1] = v.socket
   end
 
-  local t = t0
-  if not self._shuttingDown then
-    self:acceptNewConnections()
-    t = logStep("acceptNewConnections", t)
-  end
+  socketsToRead, socketsToSend = socket.select(socketsToRead, socketsToSend, 1)
 
-  self:updateConnections()
-  t = logStep("updateConnections", t)
-
-  self:processMessages()
-  t = logStep("processMessages", t)
-
-  self:tickRoomMatchEnd()
-  t = logStep("tickRoomMatchEnd", t)
-
-  self:tickSilentDeathWatchdogs()
-  t = logStep("tickSilentDeathWatchdogs", t)
-
-  -- Only check once a second to avoid over checking
-  local currentTime = time()
-  if currentTime ~= self.lastProcessTime then
-    self:flushLogs(currentTime)
-    t = logStep("flushLogs", t)
-
-    self:sweepIdleRooms(currentTime)
-    t = logStep("sweepIdleRooms", t)
-
-    self:sweepChallengedPlayers(currentTime)
-    t = logStep("sweepChallengedPlayers", t)
-
-    pcall(function() self.crashReports:sweep() end)
-    t = logStep("crashReports:sweep", t)
-
-    pcall(function() self:sweepStuckMatches(currentTime) end)
-    t = logStep("sweepStuckMatches", t)
-
-    self.lastProcessTime = currentTime
-  end
-
-  self:broadCastLobbyIfChanged()
-  t = logStep("broadCastLobbyIfChanged", t)
-
-  local total = t - t0
-  if total > 500 then
-      logger.warn(string.format("Server.update total tick took %dms", total))
+  for _, connection in pairs(self.connections) do
+    local canRead = not not socketsToRead[connection.socket]
+    local canSend = not not socketsToSend[connection.socket]
+    local success = connection:update(self.lastProcessTime, canRead, canSend)
+    if not success then
+      local player = self.connectionToPlayer[connection]
+      local reason = "disconnect"
+      if player then
+        reason = player.name .. "'s connection failed"
+      end
+      self:closeConnection(connection, reason)
+    end
   end
 end
 

@@ -1413,8 +1413,51 @@ end
 ---survivor that's "never."
 ---@return boolean true if the match was finalized this tick
 
--- Grace window config (in frames)
-local FINALIZE_GRACE_FRAMES = 60
+-- Wall-clock grace window after the first elimination drops livingTeams
+-- to threshold. Catches a near-simultaneous second elimination whose D
+-- arrives slightly later in wall-clock so matchWinRuleset can compare
+-- game_over_clocks instead of crowning whoever's D landed first.
+local FINALIZE_GRACE_MS = 500
+
+-- Apply the gameMode's matchWinRuleset to pick a winner among eliminated
+-- players. Server-side analog of Match:getWinners on the client. Honors
+-- GAME_OVER_CLOCK: HIGHEST and falls back to slot order when ruleset
+-- doesn't disambiguate.
+---@param self Room
+---@param candidates integer[] player_numbers eligible to win
+---@return integer? winnerSlot
+local function _pickWinnerByRuleset(self, candidates)
+  if #candidates == 0 then return nil end
+  if #candidates == 1 then return candidates[1] end
+
+  local ruleset = self.gameMode and self.gameMode.matchRules
+                  and self.gameMode.matchRules.matchWinRuleset
+  if not ruleset then return candidates[1] end
+
+  local pool = {}
+  for _, s in ipairs(candidates) do pool[#pool+1] = s end
+
+  for _, ruleEntry in ipairs(ruleset) do
+    local rule, order = next(ruleEntry)
+    if rule == "GAME_OVER_CLOCK" then
+      local best, kept = -1, {}
+      for _, s in ipairs(pool) do
+        local f = self.game.eliminatedPlayers[s] or 0
+        if order == "HIGHEST" then
+          if f > best then best = f; kept = {s}
+          elseif f == best then kept[#kept+1] = s end
+        else
+          if best == -1 or f < best then best = f; kept = {s}
+          elseif f == best then kept[#kept+1] = s end
+        end
+      end
+      pool = kept
+      if #pool == 1 then return pool[1] end
+    end
+  end
+
+  return pool[1]
+end
 
 function Room:maybeFinalizeFromLivingTeams()
   if not self.game or self.game.complete then return false end
@@ -1426,80 +1469,64 @@ function Room:maybeFinalizeFromLivingTeams()
 
   local livingTeams, representatives = self:_livingTeams()
   if #livingTeams > threshold then
-    -- If grace window is running, but enough teams revived, cancel grace
-    if self._pendingFinalizeGrace then
-      self._pendingFinalizeGrace = nil
-      self._pendingFinalizeFrame = nil
-    end
+    self._pendingFinalizeStartMs = nil
     return false
   end
 
-
-  -- If grace window is not running, start it at the latest elimination frame
-  if not self._pendingFinalizeGrace then
-    self._pendingFinalizeGrace = true
-    -- Find the latest elimination frame among all eliminated players
-    local latestElim = 0
-    if self.game and self.game.eliminatedPlayers then
-      for _, frame in pairs(self.game.eliminatedPlayers) do
-        if frame and frame > latestElim then latestElim = frame end
-      end
-    end
-    -- Fallback to current clock if no eliminations found
-    if latestElim == 0 then
-      if self.game and self.game.engine and self.game.engine.clock then
-        latestElim = self.game.engine.clock
-      elseif self.game and self.game.clock then
-        latestElim = self.game.clock
-      end
-    end
-    self._pendingFinalizeFrame = latestElim
-    return false -- Don't finalize yet
+  local nowMs = math.floor(self.clock() * 1000)
+  if not self._pendingFinalizeStartMs then
+    self._pendingFinalizeStartMs = nowMs
+    return false
+  end
+  if nowMs - self._pendingFinalizeStartMs < FINALIZE_GRACE_MS then
+    return false
   end
 
-  -- Check if grace window expired
-  local nowFrame = 0
-  if self.game and self.game.engine and self.game.engine.clock then
-    nowFrame = self.game.engine.clock
-  elseif self.game and self.game.clock then
-    nowFrame = self.game.clock
-  end
-  if nowFrame - (self._pendingFinalizeFrame or 0) < FINALIZE_GRACE_FRAMES then
-    return false -- Still waiting
+  self._pendingFinalizeStartMs = nil
+
+  local function toStackIndex(seatId)
+    return self:_slotIdFor(self.players[seatId]) or seatId
   end
 
-  -- Grace window expired: finalize using matchWinRuleset
-  self._pendingFinalizeGrace = nil
-  self._pendingFinalizeFrame = nil
-
-  -- Use the same logic as client: getWinners
-  local match = self.game.match or self.game
-  local winners = nil
-  if match and match.getWinners then
-    winners = match:getWinners()
-  end
-
-  if winners and #winners >= 1 then
-    -- Pick the first winner (or all, if tie)
-    local winnerStack = winners[1].stackIndex or winners[1].player_number or 1
+  if #livingTeams == 1 and threshold >= 1 then
+    local winnerSeatId = representatives[1]
+    local winnerStack = toStackIndex(winnerSeatId)
     self.game.winnerIndex = winnerStack
-    self.game.winnerId = self.players[winnerStack] and self.players[winnerStack].publicPlayerID or nil
-    if self.teams and winners[1].teamIndex then
-      self.game.winnerTeamIndex = winners[1].teamIndex
+    self.game.winnerId = self.players[winnerSeatId].publicPlayerID
+    if self.teams then
+      self.game.winnerTeamIndex = livingTeams[1]
     end
     self.game.aborted = false
     self.game.complete = true
     self.game:finalizeReplay(winnerStack)
     self:_finalizeMatch()
     return true
-  else
-    -- No winner: treat as tie
+  end
+
+  local eliminatedSlots = {}
+  for slot in pairs(self.game.eliminatedPlayers) do
+    eliminatedSlots[#eliminatedSlots+1] = slot
+  end
+  local winnerSlot = _pickWinnerByRuleset(self, eliminatedSlots)
+  if winnerSlot and self.players[winnerSlot] then
+    local winnerStack = toStackIndex(winnerSlot)
+    self.game.winnerIndex = winnerStack
+    self.game.winnerId = self.players[winnerSlot].publicPlayerID
+    if self.teams then
+      self.game.winnerTeamIndex = TeamUtils.getPlayerTeamIndex(self.teams, winnerStack)
+    end
     self.game.aborted = false
     self.game.complete = true
-    self.game:finalizeReplay(0)
+    self.game:finalizeReplay(winnerStack)
     self:_finalizeMatch()
     return true
   end
+
+  self.game.aborted = false
+  self.game.complete = true
+  self.game:finalizeReplay(0)
+  self:_finalizeMatch()
+  return true
 end
 
 -- broadcasts the message to everyone in the room

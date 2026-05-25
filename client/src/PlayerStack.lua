@@ -1040,6 +1040,8 @@ function PlayerStack:render_cursor(shake, matchEnded)
 
   if self:game_ended() or matchEnded then
     GraphicsUtil.setColor(1, 1, 1, 0.3)
+  else
+    GraphicsUtil.setColor(1, 1, 1, 1)
   end
 
   if self.inputMethod == "touch" then

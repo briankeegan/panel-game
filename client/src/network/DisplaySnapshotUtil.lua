@@ -47,7 +47,8 @@ function M.pack_snapshot(from, snapshot)
   for i = 1, math.min(72, #(snapshot.p or {})) do
     local cell = snapshot.p[i]
     if type(cell) == "table" then
-      s.p[i-1] = encode_panel(cell.c or 0, 0) -- TODO: encode state if needed
+      -- Encode both color and state (default to 0 if missing)
+      s.p[i-1] = encode_panel(cell.c or 0, cell.s or 0)
     else
       s.p[i-1] = 0
     end

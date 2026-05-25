@@ -82,15 +82,28 @@ end
 -- JSON-encoded (json.encode skips nil entries).
 ---@param panel Panel?
 ---@return table? cell nil when panel is nil; otherwise a compact wire-cell
+-- Map panel.state string to numeric code for FFI packing
+local PANEL_STATE_CODES = {
+  normal = 0,
+  swapping = 1,
+  popping = 2,
+  matched = 3,
+  landing = 4,
+  hovering = 5,
+  falling = 6,
+  dimmed = 7,
+  dead = 8,
+  popped = 9,
+}
+
 local function snapshotCell(panel)
   if not panel then return nil end
+  local stateCode = PANEL_STATE_CODES[panel.state] or 0
   local cell = {
     -- color: 0/nil = empty slot, 1-8 = panel color
     c = panel.color,
-    -- state: short string (already short in engine; "normal", "swapping",
-    -- "popping", "matched", "landing", "hovering", "falling", "dimmed",
-    -- "dead", "popped"). Receiver picks sprite by this.
-    s = panel.state,
+    -- state: numeric code for FFI packing
+    s = stateCode,
   }
   -- Timers / flags only if non-default so JSON stays small.
   if panel.timer       and panel.timer ~= 0       then cell.t  = panel.timer end

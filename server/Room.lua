@@ -201,6 +201,9 @@ function Room:resetForNewMatch()
   self.lastInputMs = {}
   self.lastGarbageToMs = {}
   self._lastWatchdogTickMs = nil
+  -- Reset grace window state for match finalization
+  self._pendingFinalizeGrace = nil
+  self._pendingFinalizeFrame = nil
   local nowMs = math.floor(self.clock() * 1000)
   for _, player in pairs(self.players) do
     local stackIdx = self:_slotIdFor(player)
@@ -1409,48 +1412,84 @@ end
 ---INGAME state until the natural game-end logic trips — for an unopposed
 ---survivor that's "never."
 ---@return boolean true if the match was finalized this tick
+
+-- Grace window config (in frames)
+local FINALIZE_GRACE_FRAMES = 60
+
 function Room:maybeFinalizeFromLivingTeams()
   if not self.game or self.game.complete then return false end
   if self.voided then return false end
 
-  -- Respect the gameMode's match-end threshold. For VS/team modes the rule
-  -- is "last team standing wins" (STACKS_ACTIVE=1 or TEAMS_ACTIVE=1), so 1
-  -- living team means match over. For solo endless the rule is
-  -- STACKS_ACTIVE=0 — the only way to end is for the lone player to die.
-  -- Without this gate, a 1-player endless room finalizes on the first tick
-  -- because livingTeams=1 from match start.
   local mec = (self.gameMode and self.gameMode.matchRules
                and self.gameMode.matchRules.matchEndConditions) or {}
   local threshold = mec.TEAMS_ACTIVE or mec.STACKS_ACTIVE or 1
 
   local livingTeams, representatives = self:_livingTeams()
-  if #livingTeams > threshold then return false end
-
-  local function toStackIndex(seatId)
-    return self:_slotIdFor(self.players[seatId]) or seatId
+  if #livingTeams > threshold then
+    -- If grace window is running, but enough teams revived, cancel grace
+    if self._pendingFinalizeGrace then
+      self._pendingFinalizeGrace = nil
+      self._pendingFinalizeFrame = nil
+    end
+    return false
   end
 
-  if #livingTeams == 1 and threshold >= 1 then
-    local winnerSeatId = representatives[1]
-    local winnerStack = toStackIndex(winnerSeatId)
+  -- If grace window is not running, start it
+  if not self._pendingFinalizeGrace then
+    self._pendingFinalizeGrace = true
+    self._pendingFinalizeFrame = self.game.clock or 0
+    -- Use the game's current frame as the start
+    if self.game and self.game.engine and self.game.engine.clock then
+      self._pendingFinalizeFrame = self.game.engine.clock
+    elseif self.game and self.game.clock then
+      self._pendingFinalizeFrame = self.game.clock
+    end
+    return false -- Don't finalize yet
+  end
+
+  -- Check if grace window expired
+  local nowFrame = 0
+  if self.game and self.game.engine and self.game.engine.clock then
+    nowFrame = self.game.engine.clock
+  elseif self.game and self.game.clock then
+    nowFrame = self.game.clock
+  end
+  if nowFrame - (self._pendingFinalizeFrame or 0) < FINALIZE_GRACE_FRAMES then
+    return false -- Still waiting
+  end
+
+  -- Grace window expired: finalize using matchWinRuleset
+  self._pendingFinalizeGrace = nil
+  self._pendingFinalizeFrame = nil
+
+  -- Use the same logic as client: getWinners
+  local match = self.game.match or self.game
+  local winners = nil
+  if match and match.getWinners then
+    winners = match:getWinners()
+  end
+
+  if winners and #winners >= 1 then
+    -- Pick the first winner (or all, if tie)
+    local winnerStack = winners[1].stackIndex or winners[1].player_number or 1
     self.game.winnerIndex = winnerStack
-    self.game.winnerId = self.players[winnerSeatId].publicPlayerID
-    if self.teams then
-      self.game.winnerTeamIndex = livingTeams[1]
+    self.game.winnerId = self.players[winnerStack] and self.players[winnerStack].publicPlayerID or nil
+    if self.teams and winners[1].teamIndex then
+      self.game.winnerTeamIndex = winners[1].teamIndex
     end
     self.game.aborted = false
     self.game.complete = true
     self.game:finalizeReplay(winnerStack)
     self:_finalizeMatch()
     return true
+  else
+    -- No winner: treat as tie
+    self.game.aborted = false
+    self.game.complete = true
+    self.game:finalizeReplay(0)
+    self:_finalizeMatch()
+    return true
   end
-
-  -- livingTeams == 0: everyone eliminated/disconnected; finalize as tie.
-  self.game.aborted = false
-  self.game.complete = true
-  self.game:finalizeReplay(0)
-  self:_finalizeMatch()
-  return true
 end
 
 -- broadcasts the message to everyone in the room

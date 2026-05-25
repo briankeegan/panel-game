@@ -56,10 +56,12 @@ local function fullLogin(client, ip, port, userId)
 
   if not value.versionCompatible then
     result.message = loc("nt_ver_err")
-    -- Tell the user which patch the server is on + a direct download link.
-    -- Server's BUILD_VERSION is either "<engine>.<patch>" or
-    -- "<engine>.<patch>-<patch-name>". Tag is "build-<BUILD_VERSION>"
-    -- (set by .github/workflows/unofficial-team-release.yml).
+    -- Always include the local build so the user can read it off even
+    -- when the server didn't send its version back (older server, or
+    -- the rejection body got eaten). The server-side build + direct
+    -- download URL get appended too when serverBuildVersion is present.
+    result.message = result.message
+      .. "\n\nYour build:   " .. consts.BUILD_VERSION
     if type(value.serverBuildVersion) == "string" and value.serverBuildVersion ~= "" then
       local serverBuild = value.serverBuildVersion
       local patchName = serverBuild:match("%-(.+)$")
@@ -72,9 +74,11 @@ local function fullLogin(client, ip, port, userId)
       local downloadUrl = "https://github.com/briankeegan/panel-game/releases/download/build-"
         .. serverBuild .. "/" .. loveFile
       result.message = result.message
-        .. "\n\nServer build: " .. serverBuild
-        .. "\nYour build:   " .. consts.BUILD_VERSION
+        .. "\nServer build: " .. serverBuild
         .. "\n\nDownload: " .. downloadUrl
+    else
+      result.message = result.message
+        .. "\nServer build: (server didn't report — likely an older build)"
     end
     return result
   end

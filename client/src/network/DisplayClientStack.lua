@@ -513,16 +513,10 @@ local function paintCursorFromSnapshot(self, viewStack, snapshot)
   local xPosition = (cc - 1) * panelWidth
   local yPosition = (11 - cr) * panelWidth + (snapshot.d or 0)
 
-  -- DIAGNOSTIC: tint the cursor RED to verify this code is the one drawing.
-  -- If you see a red cursor in-game, my paintCursorFromSnapshot IS running
-  -- and the transparency is from the sprite's built-in alpha (brackets
-  -- with hollow interior — same as the OLD viewer renders). If the cursor
-  -- stays the same dark/transparent look, this code is NOT being called
-  -- and the actual cursor is drawn elsewhere.
   if (snapshot.go or 0) > 0 then
-    love.graphics.setColor(1, 0.4, 0.4, 0.3)
+    love.graphics.setColor(1, 1, 1, 0.3)
   else
-    love.graphics.setColor(1, 0.2, 0.2, 1)
+    love.graphics.setColor(1, 1, 1, 1)
   end
 
   love.graphics.draw(cursor.image,

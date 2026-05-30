@@ -39,6 +39,7 @@ local REPLAY_VERSION = 4
 ---@field panelId string?
 ---@field characterId string?
 ---@field wins integer?
+---@field seatId integer? canonical team seat assignment; single-player/legacy replays default to stackIndex on load
 
 ---@class StackMetadata : BaseStackMetadata
 ---@field publicId integer?
@@ -46,12 +47,10 @@ local REPLAY_VERSION = 4
 ---@field level integer?
 ---@field difficulty integer?
 ---@field analytics AnalyticsData?
----@field seatId integer? canonical team seat assignment for team-mode replays
 
 ---@class SimulatedStackMetadata : BaseStackMetadata
 ---@field challengeModeDifficulty integer?
 ---@field stageIndex integer?
----@field seatId integer? canonical team seat assignment (single-player modes default to stackIndex)
 
 ---@class ReplayMetadata
 ---@field timestamp integer The time the replay got created as a system dependent timestamp; this denotes the start time

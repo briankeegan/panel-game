@@ -112,10 +112,10 @@ ClientStack.PANEL_LAYOUT = {
   STACK_Y = 108,  -- Player 1's frameOriginY * NORMAL_GFX_SCALE  (baseWidth + panelOriginXOffset)
 }
 
--- Vertical gap between rows of mini stacks; sized so each mini's panel
--- (which extends above and below its stack frame for HUD) doesn't overlap
--- the row above. Used by every multi-row mini layout below.
-ClientStack.MINI_LABEL_AREA = 100
+-- Vertical gap between rows of mini stacks; only needs to clear the lower
+-- row's name banner (~30px at mini scale), so it's kept tight to give the
+-- boards more height. Used by every multi-row mini layout below.
+ClientStack.MINI_LABEL_AREA = 50
 
 -- (panelOriginX, panelOriginY, panelScale) — translate+scale that puts a
 -- Player-1-coord HUD draw at the right screen location for THIS stack.

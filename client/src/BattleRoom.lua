@@ -720,8 +720,13 @@ function BattleRoom:startMatch(replay)
         -- Hide the existing PlayerStack:render for this remote — its
         -- visualization is now the DisplayClientStack's responsibility.
         -- Setting stack.canvas = nil makes PlayerStack:render early-return
-        -- (existing skip path, no new code in PlayerStack).
-        if player.stack then player.stack.canvas = nil end
+        -- (existing skip path, no new code in PlayerStack). Flag the stack as
+        -- still on-screen via the display pipeline so spectator-focus logic
+        -- (which used canvas as its "is this board drawn" proxy) keeps working.
+        if player.stack then
+          player.stack.canvas = nil
+          player.stack.displayRendered = true
+        end
       end
     end
     -- NOTE: deliberately do NOT stop captures on matchEnded. The engine

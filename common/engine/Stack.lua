@@ -821,8 +821,9 @@ function Stack:shouldRun(runsSoFar, remoteCapTight)
     local target = Smoothing.targetRate(buffer_len, self.max_runs_per_frame)
 
     local pendingDeath = (self.game_over_clock or 0) > 0
-    if pendingDeath then
-      -- Race to game_over_clock. Skip smoothing.
+    -- play_to_end: spectator/joiner catch-up races at max rate (smoothing would let a still-live game's input outpace it and hang "Catching up")
+    if pendingDeath or self.play_to_end then
+      -- Race to the end. Skip smoothing.
       self._smoothedRate = self.max_runs_per_frame
       self._smoothedRateVelocity = 0
       self._smoothedRateAccum = 0
@@ -852,7 +853,7 @@ function Stack:shouldRun(runsSoFar, remoteCapTight)
     -- this cycle's remote run to at most 1 so we don't steal CPU from local.
     -- SmoothDamp accumulator carries the unspent rate forward, so remotes
     -- still converge over many cycles — just one tick at a time.
-    if remoteCapTight and planned > 1 then planned = 1 end
+    if remoteCapTight and planned > 1 and not (self.play_to_end or pendingDeath) then planned = 1 end
     self._smoothedPlannedRuns = planned
   end
 

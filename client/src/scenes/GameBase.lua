@@ -831,11 +831,12 @@ function GameBase:update(dt)
       end
     end
 
-    -- Spectator focus cycling: available to pure spectators immediately, and
-    -- to dead local players only after a short grace period (so the cycle
-    -- hint / focused-stack snap doesn't pop in at the exact instant of death).
-    local spectatorControlsReady = isPureSpectator
-      or (isDeadLocal and (self.deathGraceTimer or 0) >= DEAD_LOCAL_GRACE_SECONDS)
+    -- Spectator focus switching: only meaningful at 3+ stacks. Available to
+    -- pure spectators immediately, and to dead local players only after a short
+    -- grace period (so the hint / focused-stack snap doesn't pop in at the
+    -- exact instant of death).
+    local spectatorControlsReady = #self.match.stacks >= 3 and (isPureSpectator
+      or (isDeadLocal and (self.deathGraceTimer or 0) >= DEAD_LOCAL_GRACE_SECONDS))
     if spectatorControlsReady then
       if isDeadLocal and not self.match.spectatorFocus then
         -- First grace-period expiry after death: snap focus to your own stack
@@ -850,11 +851,7 @@ function GameBase:update(dt)
           end
         end
       end
-      if input:isPressedWithRepeat("MenuLeft") then
-        self.match:cycleSpectatorFocus(-1)
-      elseif input:isPressedWithRepeat("MenuRight") then
-        self.match:cycleSpectatorFocus(1)
-      end
+      self:pollSpectatorFocusInput()
     end
 
     local ok, err = xpcall(function() self:runGame(dt) end, debug.traceback)
@@ -986,19 +983,37 @@ function GameBase:drawHUD()
   end
 end
 
+-- Spectator focus switching: click a stack to view it, or Left/Right to cycle.
+-- Both are device-independent — the menu keys aggregate every input config and
+-- the mouse needs no claimed device, so it works regardless of what the player
+-- picked at character select.
+function GameBase:pollSpectatorFocusInput()
+  if input.mouse.isDown[1] then
+    local mx, my = GAME:transform_coordinates(love.mouse.getPosition())
+    self.match:setSpectatorFocus(self.match:stackSlotAtCanvasPoint(mx, my))
+  end
+
+  if input:isPressedWithRepeat("MenuLeft") then
+    self.match:cycleSpectatorFocus(-1)
+  elseif input:isPressedWithRepeat("MenuRight") then
+    self.match:cycleSpectatorFocus(1)
+  end
+end
+
 function GameBase:drawSpectatorHint()
   -- Pure spectators and dead-but-still-watching local players both get the
   -- "<  >  Switch Player" hint and the focused-player highlight. Live local
   -- players don't (they're playing, not spectating). Dead locals are gated by
   -- a brief grace period so the UI doesn't flood in at the moment of death
   -- (deathGraceTimer accumulates in GameBase:update while isDeadLocal).
+  if #self.match.stacks < 3 then return end
   if self.match:hasLocalPlayer() then
     if not self.match:isLocalPlayerEliminated() then return end
     if (self.deathGraceTimer or 0) < DEAD_LOCAL_GRACE_SECONDS then return end
   end
   local consts = require("common.engine.consts")
   local font = GraphicsUtil.getGlobalFont()
-  local hint = "<  >  Switch Player"
+  local hint = "<  >  or click   Switch Player"
   local hintW = font:getWidth(hint)
   local hintX = (consts.CANVAS_WIDTH - hintW) / 2
   local hintY = consts.CANVAS_HEIGHT - font:getHeight() - 6
@@ -1009,7 +1024,7 @@ function GameBase:drawSpectatorHint()
     for _, stack in ipairs(self.match.stacks) do
       if TeamUtils.slotOf(stack.player, stack.player_number) == self.match.spectatorFocus and stack.player then
         focusName = stack.player.name
-        if stack.canvas then
+        if self.match:stackIsOnScreen(stack) then
           local x = stack.frameOriginX * stack.gfxScale
           local y = stack.frameOriginY * stack.gfxScale
           local w = stack:canvasWidth()

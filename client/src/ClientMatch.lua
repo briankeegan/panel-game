@@ -166,6 +166,13 @@ function ClientMatch.createFromReplay(replay, players, gameMode)
         "ClientMatch.createFromReplay: skipping metadata stackIndex %d (no stackData in replay with %d stacks)",
         stackMetadata.stackIndex, #replay.stacks))
     else
+      -- Backfill seat identity for replays saved before seatId was persisted
+      -- (or by an older client). assignSeatIdentity no-ops on nil, which would
+      -- leave player.playerNumber unset and make the team-color lookup throw;
+      -- default to stackIndex so the shared view always has a seat to read.
+      if not stackMetadata.seatId then
+        stackMetadata.seatId = stackMetadata.stackIndex
+      end
       local prior = stackMetadata.publicId and priorByPublicId[stackMetadata.publicId]
       if prior then
         -- Same person, possibly new seat. Wipe per-match state first so stale
@@ -689,6 +696,27 @@ function ClientMatch:handleMatchEnd()
       winnerSet[ws] = true
     end
   end
+  -- Safety net for the winner. The backfill below stamps every stack whose
+  -- death was never recorded (game_over_clock <= 0) so a loser whose D event
+  -- was lost in the match-end race still gets an OUT marker. That set also
+  -- includes the true winner, who must be excluded. If the server-derived
+  -- winnerSet matched none of those survivors (winnerIndex/teamIndex mapping
+  -- disagreed with our stack roster), fall back to the engine's getWinners so
+  -- we never stamp the actual winner with a bogus OUT time.
+  local matchedSurvivor = false
+  for _, stack in ipairs(self.stacks) do
+    local engine = stack.engine
+    if engine and (engine.game_over_clock or 0) <= 0 and winnerSet[engine] then
+      matchedSurvivor = true
+      break
+    end
+  end
+  if not matchedSurvivor then
+    for _, ws in ipairs(self.engine and self.engine:getWinners() or {}) do
+      winnerSet[ws] = true
+    end
+  end
+
   local endFrame = self.engine and self.engine.clock or 0
   if endFrame > 0 then
     for _, stack in ipairs(self.stacks) do
@@ -973,7 +1001,7 @@ function ClientMatch:cycleSpectatorFocus(direction)
   -- Track focus by seat (slotOf), matching moveStacks' rotation pivot.
   local live = {}
   for _, stack in ipairs(self.stacks) do
-    if stack.canvas then
+    if self:stackIsOnScreen(stack) then
       live[#live + 1] = TeamUtils.slotOf(stack.player, stack.player_number)
     end
   end
@@ -992,6 +1020,37 @@ function ClientMatch:cycleSpectatorFocus(direction)
   -- Restamp positions so the newly focused stack lands in layoutSlot 1
   -- (big-left); other stacks shift into the small containers around it.
   self:moveStacks()
+end
+
+-- A stack is focusable/clickable when it's currently drawn on screen — either
+-- via its own canvas (normal render path) or via the display-history pipeline,
+-- which nils stack.canvas and draws remotes through DisplayClientStack instead.
+-- Keying focus off canvas alone silently excluded every remote board (so a
+-- spectator, whose stacks are all remote, could cycle through nothing).
+function ClientMatch:stackIsOnScreen(stack)
+  return stack.canvas ~= nil or stack.displayRendered == true
+end
+
+-- Focus a specific seat directly (mouse-click path). No-op if already focused.
+function ClientMatch:setSpectatorFocus(slot)
+  if not slot or self.spectatorFocus == slot then return end
+  self.spectatorFocus = slot
+  self:moveStacks()
+end
+
+-- Seat (slotOf) of the stack whose on-screen rect contains the given
+-- canvas-space point, or nil. Rect math mirrors GameBase:drawSpectatorHint.
+function ClientMatch:stackSlotAtCanvasPoint(x, y)
+  for _, stack in ipairs(self.stacks) do
+    if self:stackIsOnScreen(stack) then
+      local sx = stack.frameOriginX * stack.gfxScale
+      local sy = stack.frameOriginY * stack.gfxScale
+      if x >= sx and x <= sx + stack:canvasWidth() and y >= sy and y <= sy + stack:canvasHeight() then
+        return TeamUtils.slotOf(stack.player, stack.player_number)
+      end
+    end
+  end
+  return nil
 end
 
 function ClientMatch:setStage(stageId)
@@ -1278,6 +1337,11 @@ function ClientMatch:finalizeReplay()
     replay:setRanked(self.ranked)
     if self.gameMode then
       replay.metadata.gameModeName = self.gameMode.name
+      -- Persist team shape so playback reconstructs seats/colors. No local
+      -- compaction exists (that's a server room concept), so the preset shape
+      -- is the played shape for client-saved matches.
+      replay.metadata.playersPerTeam = self.gameMode.playersPerTeam
+      replay.metadata.teamCount = self.gameMode.teamCount
     end
 
     for i, stack in ipairs(self.stacks) do
@@ -1293,6 +1357,8 @@ function ClientMatch:finalizeReplay()
       local player = stack.player
       if player then
         metadata.wins = player.wins
+        -- Seat identity drives team color in the shared (spectator) view.
+        metadata.seatId = player.seatId
         if player.human then
           ---@cast metadata StackMetadata
           ---@cast player Player
@@ -1357,11 +1423,26 @@ function ClientMatch:initializeTelegraphRelationships()
     end
   end
 
-  for recipientStack, garbageSources in pairs(self.engine.garbageSources) do
-    local recipientIndex = tableUtils.indexOf(self.engine.stacks, recipientStack)
-    for _, engineStack in ipairs(garbageSources) do
-      local index = tableUtils.indexOf(self.engine.stacks, engineStack)
-      self.stacks[recipientIndex]:setGarbageSource(self.stacks[index])
+  -- setGarbageSource is singular (last call wins). Iterating pairs() over
+  -- engine.garbageSources and looping every source overwrites until only the
+  -- "last" survives, and pairs/ipairs order isn't stable across Lua VMs — so
+  -- spectator clients pick a different source than the player and the break
+  -- window renders different character art (garbageCharacter = garbageSource
+  -- .character). Pick deterministically: lowest stack-index source wins on
+  -- every client.
+  for recipientIndex, recipientStack in ipairs(self.engine.stacks) do
+    local sources = self.engine.garbageSources[recipientStack]
+    if sources and #sources > 0 and self.stacks[recipientIndex] then
+      local bestSourceIndex
+      for _, engineStack in ipairs(sources) do
+        local idx = tableUtils.indexOf(self.engine.stacks, engineStack)
+        if idx and (not bestSourceIndex or idx < bestSourceIndex) then
+          bestSourceIndex = idx
+        end
+      end
+      if bestSourceIndex and self.stacks[bestSourceIndex] then
+        self.stacks[recipientIndex]:setGarbageSource(self.stacks[bestSourceIndex])
+      end
     end
   end
 

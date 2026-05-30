@@ -12,6 +12,13 @@ local Queue = require("common.lib.Queue")
 local RTT_SAMPLE_WINDOW = 8
 
 local DEFAULT_SEND_RETRY_LIMIT = 5
+-- Drop a socket that has gone fully silent. A healthy client acks every ping
+-- unconditionally (TcpClient replies even on a malformed body), so no inbound
+-- for this long means the peer is actually gone — not merely quiet. Generous
+-- vs worst-case RTT plus a run of missed pings. This is NOT the app-level
+-- idle-disconnect we deliberately avoid: it keys off pings a live client always
+-- answers, so a player sitting silent in a match never trips it.
+local ACK_DEADLINE = 30
 -- Cap on un-parsed inbound leftovers. With length-prefixed v009 framing a
 -- peer could announce a huge frame length and never deliver the body; this
 -- bounds that. Real frames are well under this — the largest JSON we send
@@ -275,10 +282,17 @@ function Connection:update(t, canRead, canSend)
 
   if t ~= self.lastCommunicationTime then
     local timeSinceLastComm = t - self.lastCommunicationTime
-    -- No idle-disconnect: a player with a room slot must not get booted just
-    -- because their socket went quiet. Room-destruction rules handle cleanup.
-    -- Pings still fire to elicit acks; an actually-dead socket gets detected
-    -- via socket:receive returning "closed" (DISCONNECT-PATH-1).
+    -- A live client acks every ping; total silence past the deadline means the
+    -- peer is gone (half-open socket, no FIN/RST), which socket:receive won't
+    -- report. Drop it here so the player doesn't ghost in the lobby.
+    if timeSinceLastComm > ACK_DEADLINE then
+      logger.info("[DISCONNECT-PATH-4] Closing connection " .. self.index
+        .. ". No inbound for " .. timeSinceLastComm .. "s; peer unresponsive to pings.")
+      return false
+    end
+    -- No app-level idle-disconnect: a player with a room slot must not get
+    -- booted just because they stopped sending lobby chatter. Pings fire to
+    -- elicit acks; that traffic keeps the deadline above satisfied.
     if t > self.lastPingTime and timeSinceLastComm > 1 then
       -- Body carries serverTimeMs so clients can refine their server-time
       -- offset even when no lobby chatter is flowing. The client echoes it

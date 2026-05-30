@@ -294,6 +294,50 @@ local function testDisconnect()
 end
 
 
+local MockConnection = require("server.tests.MockConnection")
+
+-- Wire a side-channel lobby connection onto an already-logged-in player the
+-- way the server's attach path would, without driving the full login attach.
+local function attachLobbyChannel(server, player)
+  local lobbyConn = MockConnection("lobby")
+  player.lobbyConnection = lobbyConn
+  server.connectionToPlayer[lobbyConn] = player
+  server.connections[lobbyConn.index] = lobbyConn
+  return lobbyConn
+end
+
+-- Change 2: a lobby side-channel drop must NOT tear down a player who is still
+-- live on gameplay (the common case — they're just browsing the lobby).
+local function testLobbyDropKeepsPlayerWithLiveGameplay()
+  local server = ServerTesting.getTestServer()
+  local alice = ServerTesting.login(server, ServerTesting.players[2])
+  assert(alice.gameplayConnection, "alice should be on gameplay after login")
+  assert(server.publicIdToPlayer[alice.publicPlayerID] == alice)
+
+  local lobbyConn = attachLobbyChannel(server, alice)
+  server:closeConnection(lobbyConn, "lobby socket dropped")
+
+  assert(server.publicIdToPlayer[alice.publicPlayerID] == alice,
+    "player with a live gameplay socket must stay registered on a lobby drop")
+  assert(alice.lobbyConnection == nil, "the dropped lobby slot should be nil'd")
+end
+
+-- Change 2: a lobby drop that is the LAST living connection for a roomless
+-- player must tear them down — otherwise they ghost in the lobby list.
+local function testLobbyDropTearsDownRoomlessGhost()
+  local server = ServerTesting.getTestServer()
+  local bob = ServerTesting.login(server, ServerTesting.players[1])
+  local lobbyConn = attachLobbyChannel(server, bob)
+  -- Precondition for the ghost: gameplay already gone, not in any room.
+  bob.gameplayConnection = nil
+  assert(server.playerToRoom[bob] == nil and server.spectatorToRoom[bob] == nil)
+
+  server:closeConnection(lobbyConn, "lobby socket dropped")
+
+  assert(server.publicIdToPlayer[bob.publicPlayerID] == nil,
+    "roomless player whose last (lobby) socket drops must be fully torn down")
+end
+
 local function testLobbyDataComposition()
   local server = ServerTesting.getTestServer()
   local leaderboard = Leaderboard(GameModes.getPreset(GameModes.IDs.TWO_PLAYER_VS), MockPersistence)
@@ -844,6 +888,8 @@ testRoomSetup()
 testRoomSetup2()
 testGameplay()
 testDisconnect()
+testLobbyDropKeepsPlayerWithLiveGameplay()
+testLobbyDropTearsDownRoomlessGhost()
 testLobbyDataComposition()
 testSinglePlayer()
 testCannotSpectateWhileInRoom()

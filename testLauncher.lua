@@ -68,7 +68,6 @@ local allTests = {
   "common.tests.PuzzleHintHelperTests",
   "common.tests.engine.StackTouchReplayTests",
   "common.tests.engine.StackRollbackReplayTests",
-  "common.tests.engine.ScrubRewindDiagnostic",
   -- disabled for testLauncher because it needs the client love callbacks
   --"common.tests.lib.InputTests",
   "common.tests.lib.JsonEncodingTests",
@@ -102,6 +101,7 @@ local allTests = {
   "server.tests.RealSocketPartialSendTest",
   "client.tests.FileUtilsTests",
   "client.tests.ModControllerTests",
+  "client.tests.TouchInputControllerTests",
   "client.tests.QueueTests",
   "client.tests.PuzzleSetTests",
   "client.tests.PuzzleSetIteratorTests",

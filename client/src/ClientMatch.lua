@@ -970,10 +970,11 @@ end
 -- The focused stack moves into the big-left render position via moveStacks;
 -- containers stay where they are, only the players inside them swap.
 function ClientMatch:cycleSpectatorFocus(direction)
+  -- Track focus by seat (slotOf), matching moveStacks' rotation pivot.
   local live = {}
   for _, stack in ipairs(self.stacks) do
     if stack.canvas then
-      live[#live + 1] = stack.player_number
+      live[#live + 1] = TeamUtils.slotOf(stack.player, stack.player_number)
     end
   end
   table.sort(live)

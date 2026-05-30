@@ -2235,8 +2235,14 @@ function Server:closeConnection(connection, reason)
   -- can attempt to reconnect that side channel independently.
   if channel == "lobby" and player.lobbyConnection == connection then
     player.lobbyConnection = nil
-    logger.info("Side-channel lobby drop for " .. player.name .. "; player still active on gameplay.")
-    return
+    -- Only keep the Player record if they're genuinely active elsewhere.
+    -- A lobby-only player whose lobby socket drops has no other presence, so
+    -- falling through to full teardown stops them ghosting in the lobby list.
+    if player.gameplayConnection or self.playerToRoom[player]
+       or self.spectatorToRoom[player] then
+      logger.info("Side-channel lobby drop for " .. player.name .. "; player still active on gameplay.")
+      return
+    end
   end
   if channel == "spectate" and player.spectateConnection == connection then
     player.spectateConnection = nil

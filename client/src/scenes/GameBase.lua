@@ -844,7 +844,7 @@ function GameBase:update(dt)
         -- big-left container via ClientMatch:cycleSpectatorFocus.
         for _, stack in ipairs(self.match.stacks) do
           if stack.is_local then
-            self.match.spectatorFocus = stack.player_number
+            self.match.spectatorFocus = TeamUtils.slotOf(stack.player, stack.player_number)
             self.match:moveStacks()
             break
           end
@@ -1007,7 +1007,7 @@ function GameBase:drawSpectatorHint()
   local focusName
   if self.match.spectatorFocus then
     for _, stack in ipairs(self.match.stacks) do
-      if stack.player_number == self.match.spectatorFocus and stack.player then
+      if TeamUtils.slotOf(stack.player, stack.player_number) == self.match.spectatorFocus and stack.player then
         focusName = stack.player.name
         if stack.canvas then
           local x = stack.frameOriginX * stack.gfxScale

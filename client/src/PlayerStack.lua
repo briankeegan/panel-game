@@ -11,6 +11,7 @@ local tableUtils = require("common.lib.tableUtils")
 local GameModes = require("common.data.GameModes")
 local TouchInputController = require("client.src.TouchInputController")
 local TouchInputDetector = require("client.src.TouchInputDetector")
+local PanelCellRender = require("client.src.graphics.PanelCellRender")
 local logger = require("common.lib.logger")
 require("client.src.analytics")
 local KeyDataEncoding = require("common.data.KeyDataEncoding")
@@ -287,6 +288,11 @@ function PlayerStack:onRollback(engine)
   -- the notify is authoritative once sent.
   if engine.game_over_clock <= 0 then
     self._pendingVisualDeath = nil
+  end
+
+  -- Touch selection is client-side per-cell state the rollback can't restore.
+  if self.touchInputController then
+    self.touchInputController:onRollback()
   end
 end
 
@@ -1279,12 +1285,6 @@ function PlayerStack:drawMoveCount()
   self:drawNumber(moveNumber, themes[config.theme].move_Pos, themes[config.theme].move_Scale, true)
 end
 
-local function shouldFlashForFrame(frame)
-  local flashFrames = 1
-  flashFrames = 2 -- add config
-  return frame % (flashFrames * 2) < flashFrames
-end
-
 ---@param garbageCharacter Character
 ---@param metalPanelSet Panels
 function PlayerStack:drawPanels(garbageCharacter, metalPanelSet, shakeOffset)
@@ -1294,6 +1294,7 @@ function PlayerStack:drawPanels(garbageCharacter, metalPanelSet, shakeOffset)
 
   local metall_w, metall_h = metalPanelSet.images.metals.left:getDimensions()
   local metalr_w, metalr_h = metalPanelSet.images.metals.right:getDimensions()
+  local FLASH = self.engine.levelData.frameConstants.FLASH
 
   -- Draw all the panels
   for row = 0, self.engine.height do
@@ -1302,69 +1303,10 @@ function PlayerStack:drawPanels(garbageCharacter, metalPanelSet, shakeOffset)
       local draw_x = 4 + (col - 1) * 16
       local draw_y = 4 + (11 - (row)) * 16 + self.engine.displacement - shakeOffset
       if panel.color ~= 0 and panel.state ~= "popped" then
-        if panel.isGarbage and panel.state ~= "dead" then
-          -- a dead board flips garbage to "dead" along with everything else;
-          -- let it fall through to the dead/grey panel draw, not a live block
-
-          -- this is the bottom right corner panel, meaning the first that will reappear when popping
-          if panel.x_offset == (panel.width - 1) and panel.y_offset == 0 then
-            -- we only need to draw the block if it is not matched 
-            -- or if the bottom right panel already started popping
-            if panel.state ~= "matched" or panel.timer <= panel.pop_time then
-              if panel.metal then
-                metalPanelSet:drawMetalGarbage(draw_x, draw_y, panel.width, self.gfxScale)
-              else
-                -- any chain where the face is situated above row 12 is going to look the same so there is no need to render it accurately
-                -- filler sprites at the bottom of the garbage alternate in a sequence of 4 so we can use a block with the same pattern
-                local drawHeight = math.min(panel.height, 28 + panel.height % 4)
-                -- need the top left offset for this one
-                local garbageX = draw_x - (panel.width - 1) * 16
-                local garbageY = draw_y - (drawHeight - 1) * 16
-
----@diagnostic disable-next-line: param-type-mismatch
-                garbageCharacter:drawGarbage(garbageX, garbageY, panel.width, drawHeight, self.gfxScale)
-              end
-            end
-          end
-
-          if panel.state == "matched" then
-            local flash_time = panel.initial_time - panel.timer
-            if flash_time >= self.engine.levelData.frameConstants.FLASH then
-              if panel.timer > panel.pop_time then
-                if panel.metal then
-                  drawGfxScaled(self, metalPanelSet.images.metals.left, draw_x, draw_y, 0, 8 / metall_w, 16 / metall_h)
-                  drawGfxScaled(self, metalPanelSet.images.metals.right, draw_x + 8, draw_y, 0, 8 / metalr_w, 16 / metalr_h)
-                else
-                  local popped_w, popped_h = garbageCharacter.images.pop:getDimensions()
-                  drawGfxScaled(self, garbageCharacter.images.pop, draw_x, draw_y, 0, 16 / popped_w, 16 / popped_h)
-                end
-              elseif panel.y_offset == -1 then
-                panelSet:addToDraw(panel, draw_x, draw_y, self.gfxScale, self.danger_col, self.danger_timer, self.engine.stop_time)
-              end
-            else
-              if shouldFlashForFrame(flash_time) == false then
-                if panel.metal then
-                  drawGfxScaled(self, metalPanelSet.images.metals.left, draw_x, draw_y, 0, 8 / metall_w, 16 / metall_h)
-                  drawGfxScaled(self, metalPanelSet.images.metals.right, draw_x + 8, draw_y, 0, 8 / metalr_w, 16 / metalr_h)
-                else
-                  local popped_w, popped_h = garbageCharacter.images.pop:getDimensions()
-                  drawGfxScaled(self, garbageCharacter.images.pop, draw_x, draw_y, 0, 16 / popped_w, 16 / popped_h)
-                end
-              else
-                local flashImage
-                if panel.metal then
-                  flashImage = metalPanelSet.images.metals.flash
-                else
-                  flashImage = garbageCharacter.images.flash
-                end
-                local flashed_w, flashed_h = flashImage:getDimensions()
-                drawGfxScaled(self, flashImage, draw_x, draw_y, 0, 16 / flashed_w, 16 / flashed_h)
-              end
-            end
-          end
-        else
-          panelSet:addToDraw(panel, draw_x, draw_y, self.gfxScale, self.danger_col, self.danger_timer, self.engine.stop_time)
-        end
+        PanelCellRender.drawPanelCell(panel, draw_x, draw_y, self.gfxScale,
+          garbageCharacter, metalPanelSet, panelSet,
+          self.danger_col, self.danger_timer, self.engine.stop_time, FLASH,
+          metall_w, metall_h, metalr_w, metalr_h)
       end
     end
   end

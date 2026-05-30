@@ -13,14 +13,7 @@
 --- like.
 
 local logger = require("common.lib.logger")
-local GraphicsUtil = require("client.src.graphics.graphics_util")
-
--- Mirrors PlayerStack's local helper: flashes alternate every `flashFrames`
--- frames during the matched flash window.
-local function shouldFlashForFrame(frame)
-  local flashFrames = 2
-  return frame % (flashFrames * 2) < flashFrames
-end
+local PanelCellRender = require("client.src.graphics.PanelCellRender")
 
 ---@class DisplayClientStackSnapshot
 ---@field f integer engine clock at snapshot time
@@ -511,12 +504,17 @@ local function paintGridFromSnapshot(self, viewStack, snapshot, shakeOffset, dis
   -- getDrawProps for the matched-state flash/face/pop timing. We pull
   -- it from the still-resident remote engine — it doesn't tick but its
   -- level data is set up at match start and is stable.
-  local frameTimes
-  if viewStack.engine
+  -- frameTimes carries the FLASH/FACE timing constants needed by both the
+  -- matched-garbage branch and panelSet:addToDraw's matched-state animation
+  -- math. If the resident engine's level data isn't populated yet (race vs
+  -- match start), bail rather than render a partial frame — the next
+  -- snapshot will arrive once setup completes.
+  if not (viewStack.engine
       and viewStack.engine.levelData
-      and viewStack.engine.levelData.frameConstants then
-    frameTimes = viewStack.engine.levelData.frameConstants
+      and viewStack.engine.levelData.frameConstants) then
+    return
   end
+  local frameTimes = viewStack.engine.levelData.frameConstants
 
   -- Garbage character + metal panel set come from the sender's stack;
   -- ClientStack already loaded them at match start. Match the lookup
@@ -543,84 +541,10 @@ local function paintGridFromSnapshot(self, viewStack, snapshot, shakeOffset, dis
         local draw_x = 4 + (col - 1) * 16
         local draw_y = 4 + (11 - row) * 16 + displacement - shakeOffset
 
-        if panel.isGarbage and panel.state ~= "dead" then
-          -- A dead board (post-applyVisualDeath) flips garbage to "dead"
-          -- like every other panel; render it as a dead/grey panel via the
-          -- else branch instead of the live garbage block.
-          -- Only the bottom-right corner of a garbage block triggers the
-          -- block draw (mirrors PlayerStack:drawPanels).
-          if panel.x_offset == (panel.width or 1) - 1 and panel.y_offset == 0 then
-            if panel.state ~= "matched"
-                or (panel.timer and panel.pop_time and panel.timer <= panel.pop_time) then
-              if panel.metal and metalPanelSet and metalPanelSet.drawMetalGarbage then
-                metalPanelSet:drawMetalGarbage(draw_x, draw_y, panel.width, viewStack.gfxScale)
-              elseif garbageCharacter and garbageCharacter.drawGarbage then
-                local drawHeight = math.min(panel.height or 1,
-                  28 + (panel.height or 1) % 4)
-                local garbageX = draw_x - ((panel.width or 1) - 1) * 16
-                local garbageY = draw_y - (drawHeight - 1) * 16
-                garbageCharacter:drawGarbage(garbageX, garbageY, panel.width, drawHeight, viewStack.gfxScale)
-              end
-            end
-          end
-          -- Matched garbage: mirror PlayerStack:drawPanels (1328-1361).
-          -- Flash phase shows flash/pop sprites alternating; face phase
-          -- shows the pop sprite per cell; pop phase only addToDraws the
-          -- bottom row so the revealed colors emerge as the slab shrinks.
-          -- Calling addToDraw unconditionally here paints color=9 cells as
-          -- greyPanel during flash/face → stones appear too early.
-          if panel.state == "matched" and frameTimes
-              and panel.initial_time and panel.timer then
-            local flash_time = panel.initial_time - panel.timer
-            local scale = viewStack.gfxScale
-            if flash_time >= frameTimes.FLASH then
-              if panel.pop_time and panel.timer > panel.pop_time then
-                if panel.metal and metalPanelSet and metall_w then
-                  GraphicsUtil.draw(metalPanelSet.images.metals.left,
-                    draw_x * scale, draw_y * scale, 0, (8 / metall_w) * scale, (16 / metall_h) * scale)
-                  GraphicsUtil.draw(metalPanelSet.images.metals.right,
-                    (draw_x + 8) * scale, draw_y * scale, 0, (8 / metalr_w) * scale, (16 / metalr_h) * scale)
-                elseif garbageCharacter and garbageCharacter.images and garbageCharacter.images.pop then
-                  local popped_w, popped_h = garbageCharacter.images.pop:getDimensions()
-                  GraphicsUtil.draw(garbageCharacter.images.pop,
-                    draw_x * scale, draw_y * scale, 0, (16 / popped_w) * scale, (16 / popped_h) * scale)
-                end
-              elseif panel.y_offset == -1 then
-                panelSet:addToDraw(panel, draw_x, draw_y, scale,
-                  dangerCol, dangerTimer, snapshot.st or 0)
-              end
-            else
-              if not shouldFlashForFrame(flash_time) then
-                if panel.metal and metalPanelSet and metall_w then
-                  GraphicsUtil.draw(metalPanelSet.images.metals.left,
-                    draw_x * scale, draw_y * scale, 0, (8 / metall_w) * scale, (16 / metall_h) * scale)
-                  GraphicsUtil.draw(metalPanelSet.images.metals.right,
-                    (draw_x + 8) * scale, draw_y * scale, 0, (8 / metalr_w) * scale, (16 / metalr_h) * scale)
-                elseif garbageCharacter and garbageCharacter.images and garbageCharacter.images.pop then
-                  local popped_w, popped_h = garbageCharacter.images.pop:getDimensions()
-                  GraphicsUtil.draw(garbageCharacter.images.pop,
-                    draw_x * scale, draw_y * scale, 0, (16 / popped_w) * scale, (16 / popped_h) * scale)
-                end
-              else
-                local flashImage
-                if panel.metal and metalPanelSet and metalPanelSet.images
-                    and metalPanelSet.images.metals then
-                  flashImage = metalPanelSet.images.metals.flash
-                elseif garbageCharacter and garbageCharacter.images then
-                  flashImage = garbageCharacter.images.flash
-                end
-                if flashImage then
-                  local flashed_w, flashed_h = flashImage:getDimensions()
-                  GraphicsUtil.draw(flashImage,
-                    draw_x * scale, draw_y * scale, 0, (16 / flashed_w) * scale, (16 / flashed_h) * scale)
-                end
-              end
-            end
-          end
-        else
-          panelSet:addToDraw(panel, draw_x, draw_y, viewStack.gfxScale,
-            dangerCol, dangerTimer, snapshot.st or 0)
-        end
+        PanelCellRender.drawPanelCell(panel, draw_x, draw_y, viewStack.gfxScale,
+          garbageCharacter, metalPanelSet, panelSet,
+          dangerCol, dangerTimer, snapshot.st or 0, frameTimes.FLASH,
+          metall_w, metall_h, metalr_w, metalr_h)
       end
     end
   end

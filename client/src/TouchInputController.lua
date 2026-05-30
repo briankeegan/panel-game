@@ -49,6 +49,14 @@ function TouchInputController:clearSelection()
   self.touchSwapCooldownTimer = 0
 end
 
+-- Drop all per-cell touch state. The engine rollback can't restore it, so a
+-- scrub-rewind would otherwise leave a lingering cursor pointing at a stale
+-- (since-risen) cell and block swaps there.
+function TouchInputController:onRollback()
+  self:clearSelection()
+  self.touchTargetColumn = 0
+end
+
 -- Given the current touch state, returns the new row and column of the cursor
 function TouchInputController:handleTouch(touchedCell, previousTouchedCell)
   if self.touchSwapCooldownTimer > 0 then

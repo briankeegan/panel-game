@@ -1302,7 +1302,9 @@ function PlayerStack:drawPanels(garbageCharacter, metalPanelSet, shakeOffset)
       local draw_x = 4 + (col - 1) * 16
       local draw_y = 4 + (11 - (row)) * 16 + self.engine.displacement - shakeOffset
       if panel.color ~= 0 and panel.state ~= "popped" then
-        if panel.isGarbage then
+        if panel.isGarbage and panel.state ~= "dead" then
+          -- a dead board flips garbage to "dead" along with everything else;
+          -- let it fall through to the dead/grey panel draw, not a live block
 
           -- this is the bottom right corner panel, meaning the first that will reappear when popping
           if panel.x_offset == (panel.width - 1) and panel.y_offset == 0 then

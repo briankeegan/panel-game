@@ -114,7 +114,7 @@ function ClientMatch.createFromGameMode(players, gameMode, panelSource, ranked, 
   clientMatch.stackInteraction = gameMode.stackInteraction
   clientMatch.matchRules = gameMode.matchRules
 
-  if gameMode.gameScene == "EndlessGame" and players[1] and players[1].settings.endlessNoRaise then
+  if (gameMode.gameScene == "EndlessGame" or gameMode.gameScene == "VsSelfGame") and players[1] and players[1].settings.endlessNoRaise then
     clientMatch.noRaiseMode = true
     local rules = {}
     for k, v in pairs(clientMatch.matchRules) do rules[k] = v end
@@ -1503,10 +1503,14 @@ end
 
 function ClientMatch:drawTimer()
   -- Draw the timer for time attack
+  -- Use the furthest-advanced stack: a dead stack's stopWatch freezes at its
+  -- death frame, so reading only stacks[1] stalls the clock once the local
+  -- player dies while opponents play on. Live stacks keep counting up.
   local frames = 0
-  local stack = self.stacks[1]
-  if stack ~= nil and stack.engine.stopWatch ~= nil and tonumber(stack.engine.stopWatch) ~= nil then
-    frames = stack.engine.stopWatch
+  for _, stack in ipairs(self.stacks) do
+    if stack ~= nil and stack.engine.stopWatch ~= nil and tonumber(stack.engine.stopWatch) ~= nil then
+      frames = math.max(frames, stack.engine.stopWatch)
+    end
   end
 
   if self.engine.timeLimit then

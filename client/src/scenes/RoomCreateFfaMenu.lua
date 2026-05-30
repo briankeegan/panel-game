@@ -52,9 +52,9 @@ function RoomCreateFfaMenu:rebuildMenu()
       -- no-op for symmetry with Team's rebuild-on-count pattern.
     end, tooltipFn),
     RoomCreateRows.createGarbageRow(prefs, tooltipFn),
-    RoomCreateRows.createLatencyRow(prefs, tooltipFn),
   }
   if DEBUG_ENABLED then
+    items[#items + 1] = RoomCreateRows.createLatencyRow(prefs, tooltipFn)
     items[#items + 1] = RoomCreateRows.createSpectateViewRow(prefs, tooltipFn)
   end
   items[#items + 1] = RoomCreateRows.createCreateButton(function() self:submit() end, tooltipFn)

@@ -36,11 +36,22 @@ function CharacterSelectVsSelf:loadUserInterface()
   self.ui.panelSelection:addElement(panelCarousel, player)
   self.ui.grid:createElementAt(1, 2, 2, 1, "panelSelection", self.ui.panelSelection)
 
-  local stageCarousel = self:createStageCarousel(player, self.ui.grid.unitSize * 3 - self.ui.grid.unitMargin * 2)
+  local stageCarousel = self:createStageCarousel(player, self.ui.grid.unitSize * 2 - self.ui.grid.unitMargin * 2)
   self.ui.stageSelection = ui.MultiPlayerSelectionWrapper({vFill = true, alignment = "left", hAlign = "center", vAlign = "center"})
   self.ui.stageSelection:setTitle("stage")
   self.ui.stageSelection:addElement(stageCarousel, player)
-  self.ui.grid:createElementAt(3, 2, 3, 1, "stageSelection", self.ui.stageSelection)
+  self.ui.grid:createElementAt(3, 2, 2, 1, "stageSelection", self.ui.stageSelection)
+
+  self.ui.noRaiseSelection = ui.MultiPlayerSelectionWrapper({vFill = true, alignment = "left", hAlign = "center", vAlign = "center"})
+  self.ui.noRaiseSelection:setTitle("endless_no_raise")
+  local noRaiseContainer, noRaiseSelector = self:createNoRaiseSelection(player, self.ui.grid.unitSize)
+  self.ui.noRaiseSelection:addElement(noRaiseContainer, player)
+  self.ui.grid:createElementAt(5, 2, 1, 1, "noRaiseSelection", self.ui.noRaiseSelection)
+
+  noRaiseSelector.onValueChange = function(boolSelector, value)
+    GAME.theme:playValidationSfx()
+    player:setEndlessNoRaise(value)
+  end
 
   self.ui.levelSelection = ui.MultiPlayerSelectionWrapper({hFill = true, alignment = "top", hAlign = "center", vAlign = "top"})
   self.ui.levelSelection:setTitle("level")

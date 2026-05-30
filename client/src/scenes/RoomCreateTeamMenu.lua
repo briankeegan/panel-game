@@ -71,9 +71,9 @@ function RoomCreateTeamMenu:rebuildMenu()
     end, tooltipFn),
     RoomCreateRows.createCompositionRow(prefs, prefs.playerCount, tooltipFn),
     RoomCreateRows.createGarbageRow(prefs, tooltipFn),
-    RoomCreateRows.createLatencyRow(prefs, tooltipFn),
   }
   if DEBUG_ENABLED then
+    items[#items + 1] = RoomCreateRows.createLatencyRow(prefs, tooltipFn)
     items[#items + 1] = RoomCreateRows.createSpectateViewRow(prefs, tooltipFn)
   end
   items[#items + 1] = RoomCreateRows.createCreateButton(function() self:submit() end, tooltipFn)

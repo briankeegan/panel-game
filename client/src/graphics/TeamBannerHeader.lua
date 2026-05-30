@@ -122,7 +122,7 @@ function TeamBannerHeader.drawGarbageModeBelowBanner(gameMode, canvasWidth, cont
   if not gameMode then return end
 
   local gLabel = garbageModeLabel(gameMode)
-  local latLabel = gameMode.latencyTolerance
+  local latLabel = gameMode.latencyTolerance and gameMode.latencyTolerance ~= "normal"
     and (gameMode.latencyTolerance:sub(1,1):upper() .. gameMode.latencyTolerance:sub(2) .. " latency")
     or nil
 

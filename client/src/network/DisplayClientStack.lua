@@ -13,6 +13,14 @@
 --- like.
 
 local logger = require("common.lib.logger")
+local GraphicsUtil = require("client.src.graphics.graphics_util")
+
+-- Mirrors PlayerStack's local helper: flashes alternate every `flashFrames`
+-- frames during the matched flash window.
+local function shouldFlashForFrame(frame)
+  local flashFrames = 2
+  return frame % (flashFrames * 2) < flashFrames
+end
 
 ---@class DisplayClientStackSnapshot
 ---@field f integer engine clock at snapshot time
@@ -68,6 +76,13 @@ local EXPECTED_INTERVAL_S = 0.05
 -- trap (the reverted displacement-interp's failure mode was
 -- convergence_time >= snapshot_interval).
 local HUD_TWEEN_S = 0.05
+
+-- Pop-SFX backlog cap. A batch carries ~3 frames of pops (more for a big
+-- garbage clear); we replay the sounds one-per-render-frame to mirror the
+-- local stack's cadence instead of firing the whole batch into one instant
+-- (the "broken as hell" overlap). Cap the queue so a huge clear can't lag
+-- the audio behind the visuals — drop oldest, keep the freshest pops.
+local MAX_POP_SFX_BACKLOG = 6
 
 ---@param playerID integer
 ---@param player Player?
@@ -137,6 +152,12 @@ function DisplayClientStack.new(playerID, player, viewStack)
   -- authoritative shake_time from Y takes over smoothly.
   self._shakeBump   = 0
   self._shakeBumpAt = 0
+  -- Queue of pending pop sounds, drained one-per-frame in render() so a
+  -- batch's worth of pops doesn't overlap into one instant. _lastPop*
+  -- track the playing pop so the next one can stop it (mirrors PlayerStack).
+  self._popSfxQueue  = {}
+  self._lastPopLevel = nil
+  self._lastPopIndex = nil
   if self.snapshot and self.snapshot.p then
     local cache = {}
     for i = 1, #self.snapshot.p do cache[i] = self.snapshot.p[i] end
@@ -267,6 +288,7 @@ function DisplayClientStack:applyBatch(batch)
     self.prevSnapshot = nil
     self.prevRecvTime = 0
     self._cachedPanels = nil
+    self._popSfxQueue = {}  -- drop stale pops from the previous match
   end
   -- Shift latest → prev for interpolation. Render uses both to lerp
   -- displacement (and cursor, if cheap) between frames.
@@ -363,13 +385,13 @@ function DisplayClientStack:applyBatch(batch)
     local theme = themes and themes[config and config.theme]
     for _, ev in ipairs(snapshot.e) do
       if ev.k == "pop" then
+        -- Visual pop FX go straight into the viewStack's pop_q, which has
+        -- its own animation timing — leave it inline. Only the SOUND must
+        -- be spaced out (see drainPopSfx): queue it, capped, drop oldest.
         pcall(self.viewStack.enqueue_popfx, self.viewStack, ev.col, ev.row, ev.sz or 1)
-        if theme and theme.sounds and theme.sounds.pops then
-          local popLevel = math.min(math.max(ev.pl or 1, 1), 4)
-          local popIndex = math.min(math.max(ev.gi or ev.pi or 1, 1), 10)
-          local sfx = theme.sounds.pops[popLevel] and theme.sounds.pops[popLevel][popIndex]
-          if sfx then pcall(SoundController.playSfx, SoundController, sfx) end
-        end
+        local q = self._popSfxQueue
+        q[#q + 1] = { pl = ev.pl, pi = ev.gi or ev.pi }
+        if #q > MAX_POP_SFX_BACKLOG then table.remove(q, 1) end
       elseif ev.k == "card" and self.viewStack.enqueue_card then
         pcall(self.viewStack.enqueue_card, self.viewStack, ev.chain == true, ev.col, ev.row, ev.n or 1)
         local character = self.viewStack.character
@@ -521,7 +543,10 @@ local function paintGridFromSnapshot(self, viewStack, snapshot, shakeOffset, dis
         local draw_x = 4 + (col - 1) * 16
         local draw_y = 4 + (11 - row) * 16 + displacement - shakeOffset
 
-        if panel.isGarbage then
+        if panel.isGarbage and panel.state ~= "dead" then
+          -- A dead board (post-applyVisualDeath) flips garbage to "dead"
+          -- like every other panel; render it as a dead/grey panel via the
+          -- else branch instead of the live garbage block.
           -- Only the bottom-right corner of a garbage block triggers the
           -- block draw (mirrors PlayerStack:drawPanels).
           if panel.x_offset == (panel.width or 1) - 1 and panel.y_offset == 0 then
@@ -538,11 +563,59 @@ local function paintGridFromSnapshot(self, viewStack, snapshot, shakeOffset, dis
               end
             end
           end
-          -- Matched garbage panels also draw the per-cell "pop reveal"
-          -- sprite. Reuse the panel set's batch for that.
-          if panel.state == "matched" and frameTimes then
-            panelSet:addToDraw(panel, draw_x, draw_y, viewStack.gfxScale,
-              dangerCol, dangerTimer, snapshot.st or 0)
+          -- Matched garbage: mirror PlayerStack:drawPanels (1328-1361).
+          -- Flash phase shows flash/pop sprites alternating; face phase
+          -- shows the pop sprite per cell; pop phase only addToDraws the
+          -- bottom row so the revealed colors emerge as the slab shrinks.
+          -- Calling addToDraw unconditionally here paints color=9 cells as
+          -- greyPanel during flash/face → stones appear too early.
+          if panel.state == "matched" and frameTimes
+              and panel.initial_time and panel.timer then
+            local flash_time = panel.initial_time - panel.timer
+            local scale = viewStack.gfxScale
+            if flash_time >= frameTimes.FLASH then
+              if panel.pop_time and panel.timer > panel.pop_time then
+                if panel.metal and metalPanelSet and metall_w then
+                  GraphicsUtil.draw(metalPanelSet.images.metals.left,
+                    draw_x * scale, draw_y * scale, 0, (8 / metall_w) * scale, (16 / metall_h) * scale)
+                  GraphicsUtil.draw(metalPanelSet.images.metals.right,
+                    (draw_x + 8) * scale, draw_y * scale, 0, (8 / metalr_w) * scale, (16 / metalr_h) * scale)
+                elseif garbageCharacter and garbageCharacter.images and garbageCharacter.images.pop then
+                  local popped_w, popped_h = garbageCharacter.images.pop:getDimensions()
+                  GraphicsUtil.draw(garbageCharacter.images.pop,
+                    draw_x * scale, draw_y * scale, 0, (16 / popped_w) * scale, (16 / popped_h) * scale)
+                end
+              elseif panel.y_offset == -1 then
+                panelSet:addToDraw(panel, draw_x, draw_y, scale,
+                  dangerCol, dangerTimer, snapshot.st or 0)
+              end
+            else
+              if not shouldFlashForFrame(flash_time) then
+                if panel.metal and metalPanelSet and metall_w then
+                  GraphicsUtil.draw(metalPanelSet.images.metals.left,
+                    draw_x * scale, draw_y * scale, 0, (8 / metall_w) * scale, (16 / metall_h) * scale)
+                  GraphicsUtil.draw(metalPanelSet.images.metals.right,
+                    (draw_x + 8) * scale, draw_y * scale, 0, (8 / metalr_w) * scale, (16 / metalr_h) * scale)
+                elseif garbageCharacter and garbageCharacter.images and garbageCharacter.images.pop then
+                  local popped_w, popped_h = garbageCharacter.images.pop:getDimensions()
+                  GraphicsUtil.draw(garbageCharacter.images.pop,
+                    draw_x * scale, draw_y * scale, 0, (16 / popped_w) * scale, (16 / popped_h) * scale)
+                end
+              else
+                local flashImage
+                if panel.metal and metalPanelSet and metalPanelSet.images
+                    and metalPanelSet.images.metals then
+                  flashImage = metalPanelSet.images.metals.flash
+                elseif garbageCharacter and garbageCharacter.images then
+                  flashImage = garbageCharacter.images.flash
+                end
+                if flashImage then
+                  local flashed_w, flashed_h = flashImage:getDimensions()
+                  GraphicsUtil.draw(flashImage,
+                    draw_x * scale, draw_y * scale, 0, (16 / flashed_w) * scale, (16 / flashed_h) * scale)
+                end
+              end
+            end
           end
         else
           panelSet:addToDraw(panel, draw_x, draw_y, viewStack.gfxScale,
@@ -686,10 +759,41 @@ local function computeShakeOffset(viewStack)
   return val / viewStack.gfxScale
 end
 
+-- Play at most one queued pop sound per render frame, stopping the
+-- previously-played pop first. This reproduces PlayerStack:playSfx's
+-- one-pop-per-frame staccato for remote boards; replaying a whole batch
+-- inline (as applyBatch used to) overlapped a batch's worth of pops into a
+-- single instant, which is what sounded broken to spectators.
+local function drainPopSfx(self)
+  local q = self._popSfxQueue
+  if not q or #q == 0 then return end
+  local theme = themes and themes[config and config.theme]
+  if not (theme and theme.sounds and theme.sounds.pops) then
+    self._popSfxQueue = {}  -- no theme pops: drop so the queue can't grow
+    return
+  end
+  local SoundController = require("client.src.music.SoundController")
+  local ev = table.remove(q, 1)
+  -- Stop the previous pop so voices don't pile up (mirrors PlayerStack).
+  local lastL, lastI = self._lastPopLevel, self._lastPopIndex
+  if lastL and theme.sounds.pops[lastL] and theme.sounds.pops[lastL][lastI] then
+    pcall(SoundController.stopSfx, SoundController, theme.sounds.pops[lastL][lastI])
+  end
+  local popLevel = math.min(math.max(ev.pl or 1, 1), 4)
+  local popIndex = math.min(math.max(ev.pi or 1, 1), 10)
+  local sfx = theme.sounds.pops[popLevel] and theme.sounds.pops[popLevel][popIndex]
+  if sfx then pcall(SoundController.playSfx, SoundController, sfx) end
+  self._lastPopLevel, self._lastPopIndex = popLevel, popIndex
+end
+
 -- Flat orchestrator: every layer in declared order. Push/pop balance is
 -- owned by withDrawArea + the explicit love.graphics.push/pop wrapper
 -- below, so a throw inside any single layer can't leak the matrix stack.
 function DisplayClientStack:render(viewStack)
+  -- Drain queued pop sounds every frame regardless of draw-guard bailouts
+  -- below, so the audio cadence stays at render rate.
+  drainPopSfx(self)
+
   if not viewStack or not self.snapshot then return end
   if not viewStack.setDrawArea or not viewStack.resetDrawArea then return end
 

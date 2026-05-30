@@ -550,9 +550,18 @@ function GameBase:_buildPlacementLines()
   if not self.match or not self.match.players or #self.match.players < 3 then
     return nil
   end
+  -- match.players is frozen at match start; the live room roster drops players
+  -- who left mid-match. Filter departed players out of the ranking when online.
+  local present
+  if GAME.netClient and GAME.netClient:isConnected() and GAME.battleRoom then
+    present = {}
+    for _, p in ipairs(GAME.battleRoom.players) do
+      if p.publicId then present[p.publicId] = true end
+    end
+  end
   local rows = {}
   for _, p in ipairs(self.match.players) do
-    if p.lastPlacement and p.name then
+    if p.lastPlacement and p.name and (present == nil or not p.publicId or present[p.publicId]) then
       rows[#rows + 1] = { placement = p.lastPlacement, name = p.name }
     end
   end

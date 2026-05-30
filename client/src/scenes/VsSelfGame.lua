@@ -17,6 +17,9 @@ end
 
 ---@param match ClientMatch
 function VsSelfGame:onMatchEnded(match)
+  if match.noRaiseMode then
+    return
+  end
   local P1 = match.players[1].stack
   if P1.level then
     GAME.scores:saveVsSelfScoreForLevel(P1.analytic.data.sent_garbage_lines, P1.level)

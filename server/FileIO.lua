@@ -265,7 +265,15 @@ function FileIO.saveReplay(game)
   end
 
   local path = "ftp" .. sep .. game.replay:generatePath(sep)
-  local filename = game.replay:generateFileName() .. ".json"
+  -- game_<n> sequence within the roster folder; count existing replays there.
+  -- lfs.dir throws on a not-yet-created folder, so guard and default to 0.
+  local gameIndex = 0
+  pcall(function()
+    for f in lfs.dir(path) do
+      if f:sub(-5) == ".json" then gameIndex = gameIndex + 1 end
+    end
+  end)
+  local filename = game.replay:generateFileName(gameIndex) .. ".json"
 
   logger.debug("saving replay as " .. path .. sep .. filename)
   FileIO.write_replay_file(game.replay, path, filename)

@@ -53,6 +53,18 @@ function TeamUtils.teamLetter(teamIndex)
   return string.char(string.byte("A") + (teamIndex - 1))
 end
 
+-- Human-readable name per team, index-aligned with TEAM_COLORS. Used for
+-- replay winner labels (e.g. "winner_Pink") and anywhere a team needs a word.
+TeamUtils.TEAM_COLOR_NAMES = {
+  "Pink", "Purple", "Green", "Yellow", "Orange", "Blue", "Cyan", "Red",
+}
+
+---@param teamIndex integer 1-based team index
+---@return string
+function TeamUtils.teamColorName(teamIndex)
+  return TeamUtils.TEAM_COLOR_NAMES[teamIndex] or ("Team" .. tostring(teamIndex))
+end
+
 -- Slot (player_number) for a player, falling back to the dense-array index when
 -- the player is mid-construction or otherwise missing the slot field.
 function TeamUtils.slotOf(player, fallbackIndex)

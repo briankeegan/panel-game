@@ -2098,6 +2098,17 @@ function Lobby:onLobbyStateUpdate(lobbyDataV2)
   self.lobbyMenu:addChild(self.showLeaderboardButton)
   self.lobbyMenu:addChild(self.backButton)
 
+  -- The action buttons are persistent objects re-added across rebuilds. The
+  -- rebuild nils selectedIndex without deselecting, and select() only clears
+  -- the (now nil) selectedIndex — so a button selected before the rebuild stays
+  -- `selected` and accumulates a run of stuck highlights. Clear all here so the
+  -- single select() below lights exactly one.
+  for _, child in ipairs(self.lobbyMenu.children) do
+    if child.setSelected then
+      child:setSelected(false)
+    end
+  end
+
   local previousButton
   local found = false
 

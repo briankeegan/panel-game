@@ -37,7 +37,6 @@ end
 ---@field multi_stopQuad love.Quad
 ---@field multi_shakeQuad love.Quad
 ---@field danger_music boolean
----@field garbageSource ClientStack The stack the garbage assets are used from
 ---@field garbageTarget GarbageTarget? Convenience alias for garbageTargets[1] (legacy 1v1 paths)
 ---@field garbageTargets GarbageTarget[]? All targets this stack visually attacks (Telegraph render loops over these)
 ---@field assets IngameAssetPack
@@ -116,6 +115,13 @@ ClientStack.PANEL_LAYOUT = {
 -- row's name banner (~30px at mini scale), so it's kept tight to give the
 -- boards more height. Used by every multi-row mini layout below.
 ClientStack.MINI_LABEL_AREA = 50
+
+-- Top/bottom margins for the mini grid. The top margin sits below Player 1's
+-- frame Y (108) to lift the column higher while still clearing the match
+-- header bar and the top row's name banner; the bottom margin is kept minimal.
+-- Trimming both reclaims vertical space into board size (minis are height-bound).
+ClientStack.MINI_TOP_MARGIN = 80
+ClientStack.MINI_BOTTOM_MARGIN = 6
 
 -- (panelOriginX, panelOriginY, panelScale) — translate+scale that puts a
 -- Player-1-coord HUD draw at the right screen location for THIS stack.
@@ -345,9 +351,10 @@ function ClientStack:setupForLayoutSlot(layoutSlot)
     error("Invalid layoutSlot: " .. tostring(layoutSlot) .. ". Expected 1-7.")
   end
 
-  -- Use modulo to map to one of 2 asset packs
-  local assetIndex = ((layoutSlot - 1) % 2) + 1
-  self:assignAssets(GAME.theme:getIngameAssetPack(assetIndex))
+  -- Always use asset pack 1 (the blue frame). The alternating red pack (2)
+  -- scales badly into the mini slots and reads as "messed up", so every stack
+  -- uses the blue frame.
+  self:assignAssets(GAME.theme:getIngameAssetPack(1))
 end
 
 -- Sets which way the stack faces. "left" = HUD/analytics on the stack's left
@@ -456,30 +463,45 @@ function ClientStack:moveForLayoutSlot3Player(layoutSlot)
     self.gfxScale = NORMAL_GFX_SCALE
     self:moveForLayoutSlot(1)
   else
-    -- Players 2 & 3 on the right with responsive scaling
+    -- Players 2 & 3 side-by-side on the right, sized to fill the right half.
+    -- Stacking them vertically was height-bound and left the whole right half
+    -- mostly empty; one row of two lets each board grow ~65% larger.
     self:setupForLayoutSlot(layoutSlot)
     self:setFacing("left")
 
     local canvasWidth = GAME.globalCanvas:getWidth()
-    local topMargin = self.baseWidth + self.panelOriginXOffset
-    local bottomMargin = 12
-    -- Gap between rows must reserve room for the lower stack's name / WINS / LEVEL labels.
-    local gap = ClientStack.MINI_LABEL_AREA
+    local canvasHeight = GAME.globalCanvas:getHeight()
+    -- Sits low on the canvas so the minis' stats clear the broadcast/timer text
+    -- in the center and the full board + multibar still fit without clipping.
+    local topMargin = 220
+    local bottomMargin = 30
     local rightMargin = 24
+    -- The stats column is drawn to the LEFT of each board and scales WITH it,
+    -- so it needs ~this many px of gap per unit of gfxScale (calibrated from the
+    -- 2x2 grid: gapX 100 at ~1.48 scale). Fold it into the width budget so two
+    -- boards + their stats fit the right zone without overlapping, then derive
+    -- the real gap from the resulting scale.
+    local analyticsGapPerScale = 72
 
-    -- Responsive scaling for 2 stacks on the right
-    self.gfxScale = self:calculateResponsiveScaleForRightColumn(2, topMargin, bottomMargin, gap, rightMargin)
+    -- Preserve the classic center gutter around Player 1, then fit two boards
+    -- across the right zone. Bound by width (two side-by-side + stats gap) and
+    -- by height (full board must sit on-canvas).
+    local minRightColumnLeftX = (canvasWidth / 2) + 100
+    local availableWidth = (canvasWidth - rightMargin) - minRightColumnLeftX
+    local availableHeight = canvasHeight - topMargin - bottomMargin
+    local widthBoundScale = availableWidth / (self.baseWidth * 2 + analyticsGapPerScale)
+    local heightBoundScale = availableHeight / self.baseHeight
+    self.gfxScale = math.max(0.85, math.min(NORMAL_GFX_SCALE, widthBoundScale, heightBoundScale))
+
     local stackWidth = self:canvasWidth()
-    local stackHeight = self:canvasHeight()
-    local rightX = canvasWidth - stackWidth - rightMargin  -- Right side with margin
-    
+    local gapX = analyticsGapPerScale * self.gfxScale
+    local pairWidth = (stackWidth * 2) + gapX
+    local startX = (canvasWidth - rightMargin) - pairWidth  -- right-aligned pair
+
     if layoutSlot == 2 then
-      -- Top-right
-      self:moveToPosition(rightX, topMargin)
+      self:moveToPosition(startX, topMargin)
     elseif layoutSlot == 3 then
-      -- Bottom-right
-      local bottomY = topMargin + stackHeight + gap
-      self:moveToPosition(rightX, bottomY)
+      self:moveToPosition(startX + stackWidth + gapX, topMargin)
     end
   end
 end
@@ -501,13 +523,14 @@ function ClientStack:moveForLayoutSlot4PlayerHorizontal(layoutSlot)
 
     local canvasWidth = GAME.globalCanvas:getWidth()
     local canvasHeight = GAME.globalCanvas:getHeight()
-    local topMargin = self.baseWidth + self.panelOriginXOffset
-    local bottomMargin = 12
+    -- Tightened to push the 2x2 minis to their height-limited maximum size.
+    local topMargin = 76
+    local bottomMargin = 4
     -- gapX must fit each mini's analytics column (which sits to the LEFT of its
     -- frame as part of the shared panel component) between adjacent stacks.
     local gapX = 100
     -- Vertical gap reserves the label area above the bottom row's mini stacks.
-    local gapY = ClientStack.MINI_LABEL_AREA
+    local gapY = 34
     local rightMargin = 24
 
     -- Keep the center gap around player 1 and fit a 2-column by 2-row right-side zone.
@@ -553,13 +576,14 @@ function ClientStack:moveForLayoutSlot5Player(layoutSlot)
 
     local canvasWidth = GAME.globalCanvas:getWidth()
     local canvasHeight = GAME.globalCanvas:getHeight()
-    local topMargin = self.baseWidth + self.panelOriginXOffset
-    local bottomMargin = 12
+    -- Tightened to push the 2x2 minis to their height-limited maximum size.
+    local topMargin = 76
+    local bottomMargin = 4
     -- gapX must fit each mini's analytics column (which sits to the LEFT of its
     -- frame as part of the shared panel component) between adjacent stacks.
     local gapX = 100
     -- Vertical gap reserves the label area above the bottom row's mini stacks.
-    local gapY = ClientStack.MINI_LABEL_AREA
+    local gapY = 34
     local rightMargin = 24
 
     local minRightColumnLeftX = (canvasWidth / 2) + 100
@@ -632,8 +656,8 @@ function ClientStack:_positionInRightGrid3x2(layoutSlot)
 
   local canvasWidth = GAME.globalCanvas:getWidth()
   local canvasHeight = GAME.globalCanvas:getHeight()
-  local topMargin = self.baseWidth + self.panelOriginXOffset
-  local bottomMargin = 12
+  local topMargin = ClientStack.MINI_TOP_MARGIN
+  local bottomMargin = ClientStack.MINI_BOTTOM_MARGIN
   -- gapX must fit each mini's analytics column (which sits to the LEFT of its
   -- frame as part of the shared panel component) between adjacent stacks.
   local gapX = 100
@@ -689,8 +713,8 @@ function ClientStack:moveForLayoutSlot4Player(layoutSlot)
 
   local canvasWidth = GAME.globalCanvas:getWidth()
   local canvasHeight = GAME.globalCanvas:getHeight()
-  local topMargin = self.baseWidth + self.panelOriginXOffset
-  local bottomMargin = 12
+  local topMargin = ClientStack.MINI_TOP_MARGIN
+  local bottomMargin = ClientStack.MINI_BOTTOM_MARGIN
   local sideMargin = 24
   local gapX = 20
   -- Vertical gap reserves the label area above the bottom row's mini stacks.
@@ -997,10 +1021,9 @@ function ClientStack:isCatchingUp()
   return self.engine.play_to_end
 end
 
----@param garbageSource ClientStack
-function ClientStack:setGarbageSource(garbageSource)
-  self.garbageSource = garbageSource
-end
+-- setGarbageSource removed: each garbage cell carries panel.senderId on the
+-- wire and the renderer looks up the source character per-cell via
+-- match.stacks[senderId] (see PanelCellRender + paintGridFromSnapshot).
 
 function ClientStack:setMaxRunsPerFrame(maxRunsPerFrame)
   self.engine:setMaxRunsPerFrame(maxRunsPerFrame)

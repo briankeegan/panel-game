@@ -141,6 +141,12 @@ local function snapshotCell(panel)
   -- this, panels emerging from a popped garbage block fall as if they
   -- were plain panels — no bounce.
   if panel.fell_from_garbage                      then cell.fg = panel.fell_from_garbage end
+  -- senderId: stack index of the player who sent this garbage. The renderer
+  -- needs it to pick the correct character art (face/flash/composition)
+  -- per-block. Without it the spec falls back to local match-setup state
+  -- which can diverge from the sender's choice → different sprite art only
+  -- during the matched/break window.
+  if panel.senderId                               then cell.sid = panel.senderId end
   return cell
 end
 
@@ -155,7 +161,7 @@ local function cellsEqual(a, b)
      and a.gi == b.gi and a.xo == b.xo and a.yo == b.yo
      and a.gw == b.gw and a.gh == b.gh and a.pt == b.pt
      and a.it == b.it and a.cs == b.cs and a.ci == b.ci
-     and a.sl == b.sl and a.fg == b.fg
+     and a.sl == b.sl and a.fg == b.fg and a.sid == b.sid
 end
 
 -- Keyframe interval. Every Nth send goes out as a full grid (no deltas)

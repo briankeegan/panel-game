@@ -17,7 +17,16 @@ local logger = {
 
 if love then
   local sourceDir = love.filesystem.getSourceBaseDirectory()
-  local logPath = sourceDir .. "/logs/client.log"
+  -- Per-identity log file. run_client.sh sets a distinct LOVE_IDENTITY per
+  -- local player; a single shared client.log meant every client truncated and
+  -- interleaved into it, leaving the multi-client sessions unreadable. This
+  -- io.open(...,"w") + per-line flush (below) is the reliable channel — the
+  -- save-dir debug.log can silently no-op depending on the love version's
+  -- newFile open semantics. Default identity keeps the documented client.log.
+  local identity = (love.filesystem.getIdentity and love.filesystem.getIdentity()) or "Panel Attack"
+  local suffix = identity:gsub("Panel Attack", ""):gsub("^%s+", ""):gsub("%s+", "-")
+  local logName = (suffix == "") and "client.log" or ("client-" .. suffix .. ".log")
+  local logPath = sourceDir .. "/logs/" .. logName
   logger.logFile = io.open(logPath, "w")
 
   -- Per-identity live debug.log under love.filesystem (Application Support/

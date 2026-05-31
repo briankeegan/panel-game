@@ -291,10 +291,78 @@ function fileUtils.saveTextureToFile(texture, filePath, format)
   love.filesystem.write(filePath .. "." .. format, data)
 end
 
+-- List a save-dir-relative folder straight from the OS, bypassing
+-- love.filesystem. This love pre-release's getDirectoryItems is unreliable
+-- per-window — a long-lived client won't show replays written after it launched
+-- or by another client — so the replay browser reads the real disk instead.
+-- Falls back to the (possibly stale) love listing if io.popen isn't available.
+function fileUtils.freshDirectoryItems(relPath)
+  local saveDir = love.filesystem.getSaveDirectory()
+  local ok, p = pcall(io.popen, 'ls -1A "' .. saveDir .. '/' .. relPath .. '" 2>/dev/null')
+  if ok and p then
+    local results = {}
+    for line in p:lines() do
+      local startOfFile = string.sub(line, 0, string.len(PREFIX_OF_IGNORED_DIRECTORIES))
+      if line ~= "" and startOfFile ~= PREFIX_OF_IGNORED_DIRECTORIES and line ~= ".DS_Store" then
+        results[#results + 1] = line
+      end
+    end
+    p:close()
+    return results
+  end
+  return fileUtils.getFilteredDirectoryItems(relPath)
+end
+
+-- Read + decode a save-dir-relative JSON file straight from the OS (same reason
+-- as freshDirectoryItems). Falls back to the love.filesystem reader.
+function fileUtils.readJsonFileFresh(relPath)
+  local saveDir = love.filesystem.getSaveDirectory()
+  local f = io.open(saveDir .. "/" .. relPath, "r")
+  if not f then
+    return fileUtils.readJsonFile(relPath)
+  end
+  local content = f:read("*a")
+  f:close()
+  if not content then
+    return nil
+  end
+  local value, _, errorMsg = json.decode(content)
+  if errorMsg then
+    logger.error("Error reading " .. relPath .. ":\n" .. errorMsg)
+    return nil
+  end
+  return value
+end
+
+-- Replay root. Normally just "replays". But when several clients run on one
+-- machine they all share a single love save dir (this love build ignores the
+-- per-client identity), so namespace by the launching player's name to keep
+-- each client's replays separate — a window then only ever reads files it
+-- wrote itself, so its own games show up immediately. No PLAYER_NAME (a normal
+-- single-client launch) -> unchanged "replays/..." layout.
+function fileUtils.replayBasePath()
+  local who = os.getenv("PLAYER_NAME")
+  if who and who ~= "" then
+    return "replays/" .. who
+  end
+  return "replays"
+end
+
 ---@param replay ReplayV3
 function fileUtils.saveReplay(replay)
   local path = replay:generatePath("/")
-  local filename = replay:generateFileName()
+  -- Swap the "replays" root for the (possibly player-scoped) one.
+  local base = fileUtils.replayBasePath()
+  if base ~= "replays" then
+    path = base .. path:sub(#"replays" + 1)
+  end
+  -- game_<n> is the sequence within this roster's folder. Count existing
+  -- replays already there (getDirectoryItems returns {} for a new folder).
+  local gameIndex = 0
+  for _, f in ipairs(love.filesystem.getDirectoryItems(path)) do
+    if f:sub(-5) == ".json" then gameIndex = gameIndex + 1 end
+  end
+  local filename = replay:generateFileName(gameIndex)
   GAME.lastReplayPath = path
   fileUtils.writeJson(path, filename .. ".json", replay, replay.keyOrder)
 end

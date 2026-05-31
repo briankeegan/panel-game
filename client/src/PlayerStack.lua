@@ -148,17 +148,24 @@ end
 -- Called from runGameOver() once in-flight animations have drained.
 function PlayerStack:applyVisualDeath()
   self._pendingVisualDeath = nil
+  -- Flip EVERY panel to the dead state. This must run regardless of self.canvas:
+  -- remotely-simulated opponents and the stacks a broadcaster captures for
+  -- spectators have canvas=nil, and the dead state is exactly what the renderer
+  -- and the spectate snapshot read. Gating it on canvas hid the death animation
+  -- on every board except the dying player's own client.
+  local panels = self.engine.panels
+  for row = 1, #panels do
+    for col = 1, self.engine.width do
+      panels[row][col].state = "dead"
+    end
+  end
+
+  -- The pop-effect particles are purely cosmetic — only enqueue for stacks
+  -- that actually draw a canvas.
   if self.canvas then
-    local popsize = "small"
-    local panels = self.engine.panels
-    for row = 1, #panels do
-      for col = 1, self.engine.width do
-        local panel = panels[row][col]
-        panel.state = "dead"
-        if row == #panels then
-          self:enqueue_popfx(col, row, popsize)
-        end
-      end
+    local topRow = #panels
+    for col = 1, self.engine.width do
+      self:enqueue_popfx(col, topRow, "small")
     end
   end
 end
@@ -973,15 +980,41 @@ function PlayerStack:render(matchEnded, xOffset, yOffset, alpha)
 
   self:setDrawArea(xOffset, yOffset)
   self:drawCharacter()
-  local garbageCharacter
-  local metalPanelSet
-
-  if not self.garbageSource then
-    garbageCharacter = self.character
-    metalPanelSet = panels[self.panels_dir]
-  else
-    garbageCharacter = self.garbageSource.character
-    metalPanelSet = panels[self.garbageSource.panels_dir]
+  -- Each garbage cell carries panel.senderId (set in Stack:dropGarbage from
+  -- the receiveGarbage senderId arg). The renderer looks up the sender's
+  -- ClientStack from the active match and uses ITS character/panels mod for
+  -- the block's face/flash/composition art. Falls back to self when senderId
+  -- isn't present (single-player, replay before threading, etc.).
+  local match = GAME and GAME.battleRoom and GAME.battleRoom.match
+  local fallbackCharacter = self.character
+  local fallbackPanelSet  = panels[self.panels_dir]
+  local function senderStack(panel)
+    if not (panel.senderId and match and match.stacks) then return nil end
+    return match.stacks[panel.senderId]
+  end
+  local garbageCharacter = function(panel)
+    local s = senderStack(panel)
+    return (s and s.character) or fallbackCharacter
+  end
+  -- drawPanels uses one metalPanelSet for the whole stack. Pick from the
+  -- first garbage cell with a senderId; fall back to own. Metal panels are
+  -- visually less divergent than character art across mods, so this is fine.
+  local metalPanelSet = fallbackPanelSet
+  for row = 1, self.engine.height + 1 do
+    local r = self.engine.panels[row]
+    if r then
+      for col = 1, self.engine.width do
+        local p = r[col]
+        if p and p.isGarbage and p.senderId then
+          local s = match and match.stacks and match.stacks[p.senderId]
+          if s and s.panels_dir and panels[s.panels_dir] then
+            metalPanelSet = panels[s.panels_dir]
+          end
+          break
+        end
+      end
+      if metalPanelSet ~= fallbackPanelSet then break end
+    end
   end
 
   local shakeOffset = self:currentShakeOffset() / self.gfxScale

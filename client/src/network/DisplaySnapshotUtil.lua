@@ -182,21 +182,22 @@ end
 -- Panel optional-field bitmask
 ----------------------------------------------------------------------
 local PANEL_OPT = {
-  t  = 0x0001,  -- timer        uint16
-  g  = 0x0002,  -- isGarbage    (bool flag, no payload)
-  m  = 0x0004,  -- metal        (bool flag)
-  ch = 0x0008,  -- chaining     (bool flag)
-  gi = 0x0010,  -- garbageId    uint32
-  xo = 0x0020,  -- x_offset     int8
-  yo = 0x0040,  -- y_offset     int8
-  gw = 0x0080,  -- width        uint8
-  gh = 0x0100,  -- height       uint8
-  pt = 0x0200,  -- pop_time     uint16
-  it = 0x0400,  -- initial_time uint16
-  cs = 0x0800,  -- combo_size   uint8
-  ci = 0x1000,  -- combo_index  uint8
-  sl = 0x2000,  -- isSwappingFromLeft (bool flag)
-  fg = 0x4000,  -- fell_from_garbage  uint8 (1..12)
+  t   = 0x0001,  -- timer        uint16
+  g   = 0x0002,  -- isGarbage    (bool flag, no payload)
+  m   = 0x0004,  -- metal        (bool flag)
+  ch  = 0x0008,  -- chaining     (bool flag)
+  gi  = 0x0010,  -- garbageId    uint32
+  xo  = 0x0020,  -- x_offset     int8
+  yo  = 0x0040,  -- y_offset     int8
+  gw  = 0x0080,  -- width        uint8
+  gh  = 0x0100,  -- height       uint8
+  pt  = 0x0200,  -- pop_time     uint16
+  it  = 0x0400,  -- initial_time uint16
+  cs  = 0x0800,  -- combo_size   uint8
+  ci  = 0x1000,  -- combo_index  uint8
+  sl  = 0x2000,  -- isSwappingFromLeft (bool flag)
+  fg  = 0x4000,  -- fell_from_garbage  uint8 (1..12)
+  sid = 0x8000,  -- senderId     uint8 (stack index of garbage's sender; renderer picks character art from this)
 }
 
 local function packPanel(w, cell)
@@ -231,6 +232,7 @@ local function packPanel(w, cell)
   if cell.ci ~= nil          then mask = bor(mask, PANEL_OPT.ci) end
   if cell.sl                 then mask = bor(mask, PANEL_OPT.sl) end
   if cell.fg                 then mask = bor(mask, PANEL_OPT.fg) end
+  if cell.sid                then mask = bor(mask, PANEL_OPT.sid) end
 
   wU16(w, mask)
 
@@ -252,6 +254,7 @@ local function packPanel(w, cell)
     if fg == true then fg = 12 end
     wU8(w, fg)
   end
+  if band(mask, PANEL_OPT.sid) ~= 0 then wU8(w, cell.sid) end
 end
 
 local function unpackPanel(r)
@@ -280,6 +283,7 @@ local function unpackPanel(r)
   if band(mask, PANEL_OPT.ci) ~= 0 then cell.ci = rU8(r) end
   if band(mask, PANEL_OPT.sl) ~= 0 then cell.sl = true end
   if band(mask, PANEL_OPT.fg) ~= 0 then cell.fg = rU8(r) end
+  if band(mask, PANEL_OPT.sid) ~= 0 then cell.sid = rU8(r) end
   return cell
 end
 

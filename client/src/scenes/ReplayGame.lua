@@ -4,8 +4,6 @@ local consts = require("common.engine.consts")
 local util = require("common.lib.util")
 local class = require("common.lib.class")
 local GraphicsUtil = require("client.src.graphics.graphics_util")
-local prof = require("common.lib.zoneProfiler")
-local DebugSettings = require("client.src.debug.DebugSettings")
 
 local ReplayGame = class(
   function (self, sceneParams)
@@ -124,31 +122,10 @@ function ReplayGame:customDraw()
   GraphicsUtil.printf(playbackText, textPos[0], textPos[1], consts.CANVAS_WIDTH, "center", nil, 1, 10)
 end
 
-function ReplayGame:drawHUD()
-  for i, stack in ipairs(self.match.stacks) do
-    if config.show_ingame_infos then
-      stack:drawScore()
-      stack:drawSpeed()
-      prof.push("Stack:drawMultibar")
-      stack:drawMultibar()
-      prof.pop("Stack:drawMultibar")
-    end
-
-    -- Draw VS HUD
-    if stack.player then
-      stack:drawPlayerName()
-      stack:drawWinCount()
-      stack:drawRating()
-    end
-
-    stack:drawLevel()
-    if stack.analytic and not DebugSettings.showStackDebugInfo() then
-      prof.push("Stack:drawAnalyticData")
-      stack:drawAnalyticData()
-      prof.pop("Stack:drawAnalyticData")
-    end
-  end
-end
+-- No drawHUD override: ReplayGame inherits GameBase:drawHUD so the HUD
+-- (multibar, names, team colors, level) renders IDENTICALLY to the live game.
+-- The old override drew without withPanelTransform, so the multibar landed at
+-- the wrong scale/position (the stray red bar).
 
 ---@param match ClientMatch
 function ReplayGame:genericOnMatchEnded(match)

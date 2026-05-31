@@ -1493,7 +1493,7 @@ function Stack:tryDropGarbage()
   local garbage = self.incomingGarbage:pop()
   logger.debug(string.format("%d Dropping garbage on stack %d - height %d  width %d  %s", self.stopWatch, self.which, garbage.height, garbage.width, garbage.isMetal and "Metal" or ""))
 
-  self:dropGarbage(garbage.width, garbage.height, garbage.isMetal)
+  self:dropGarbage(garbage.width, garbage.height, garbage.isMetal, garbage.senderId)
 
   return true
 end
@@ -1507,7 +1507,7 @@ function Stack:getGarbageSpawnColumn(garbageWidth)
   return spawnColumn
 end
 
-function Stack:dropGarbage(width, height, isMetal)
+function Stack:dropGarbage(width, height, isMetal, senderId)
   -- garbage always drops in row 13
   local originRow = self.height + 1
   -- combo garbage will alternate it's spawn column
@@ -1539,6 +1539,7 @@ function Stack:dropGarbage(width, height, isMetal)
           panel.state = "falling"
           panel.row = row
           panel.column = col
+          panel.senderId = senderId
           if isMetal then
             panel.metal = isMetal
           end

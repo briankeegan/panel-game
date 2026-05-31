@@ -122,7 +122,12 @@ function BaseStack:getReadyGarbageAt(clock)
   return self.outgoingGarbage:popFinishedTransitsAt(clock)
 end
 
-function BaseStack:receiveGarbage(garbageDelivery)
+function BaseStack:receiveGarbage(garbageDelivery, senderId)
+  if senderId then
+    for _, g in ipairs(garbageDelivery) do
+      g.senderId = senderId
+    end
+  end
   self.incomingGarbage:pushTable(garbageDelivery)
 end
 
@@ -131,7 +136,8 @@ end
 ---engine-internal garbage (Match:deliverOutgoingGarbage already replays those
 ---deterministically via the input-driven forward sim).
 ---@param garbageArray Garbage[] wire-form garbage records from the G payload
-function BaseStack:applyNetworkGarbage(garbageArray)
+---@param senderId integer? sender's stack index, attached to each garbage entry so it flows through to panel.senderId at drop time (used by the renderer to pick the correct character art for the breaking block)
+function BaseStack:applyNetworkGarbage(garbageArray, senderId)
   -- Snapshot is immutable; correctChainingFlag will mutate `finalized` on
   -- whichever copy reaches the queue, so keep our log copy separate.
   local snapshot = {}
@@ -150,13 +156,13 @@ function BaseStack:applyNetworkGarbage(garbageArray)
     end
   end
   for i = #log, writeIdx + 1, -1 do log[i] = nil end
-  log[#log + 1] = { frame = self.stopWatch, garbage = snapshot, applied = true }
+  log[#log + 1] = { frame = self.stopWatch, garbage = snapshot, applied = true, senderId = senderId }
 
   local workingCopy = {}
   for i, g in ipairs(garbageArray) do
     workingCopy[i] = shallowcpy(g)
   end
-  self:receiveGarbage(workingCopy)
+  self:receiveGarbage(workingCopy, senderId)
 end
 
 ---Called from Stack/SimulatedStack:rollbackToFrame after the garbage queues
@@ -189,7 +195,7 @@ function BaseStack:drainNetworkGarbageForFrame(frame)
       for j, g in ipairs(entry.garbage) do
         workingCopy[j] = shallowcpy(g)
       end
-      self:receiveGarbage(workingCopy)
+      self:receiveGarbage(workingCopy, entry.senderId)
       entry.applied = true
     end
   end

@@ -938,9 +938,10 @@ local SILENT_DEATH_THRESHOLD_MS = 10000
 -- regardless of the pending-garbage gate.
 local SILENT_DEATH_ABSOLUTE_THRESHOLD_MS = 30000
 
--- Gap > this between watchdog ticks means the server stalled (GC, host
--- pause, NTP step). Reset baselines instead of mass-firing on the clients.
-local WATCHDOG_HICCUP_THRESHOLD_MS = 1000
+-- Real server stall (GC/NTP step): reset baselines instead of mass-firing.
+-- Must clear the ~1000ms idle-loop cadence (1s socket.select) or it self-trips
+-- every idle tick and disables the watchdog; stays under the 10s death lane.
+local WATCHDOG_HICCUP_THRESHOLD_MS = 5000
 
 ---@param nowMs integer
 function Room:_resetWatchdogBaselines(nowMs)

@@ -454,6 +454,10 @@ end
 ---@param result integer?
 function Game:finalizeReplay(result)
   self.replay:setOutcome(result)
+  -- setOutcome only records winnerIndex (the first player of the winning team
+  -- for team games); persist the winning team too so playback / replay naming
+  -- can label it by team color.
+  self.replay.metadata.winnerTeam = self.winnerTeamIndex
 
   for i, stack in ipairs(self.replay.stacks) do
     if stack.stackType == 1 then

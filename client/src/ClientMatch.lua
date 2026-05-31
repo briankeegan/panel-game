@@ -1385,6 +1385,45 @@ function ClientMatch:finalizeReplay()
     end
 
     ReplayV3.finalizeReplay(self.engine, self.replay)
+
+    -- ReplayV3.finalizeReplay derives the winner from the local engine's
+    -- getWinners, which in loose-sync can disagree with the server: a remote
+    -- death that hasn't been applied yet leaves extra stacks at game_over_clock
+    -- 0, so the engine sees multiple survivors and records a false "draw".
+    -- The on-screen result already trusts the server outcome — make the saved
+    -- replay use the SAME source so screen and replay (and every client's
+    -- replay) always agree.
+    if self:hasServerOutcome() then
+      self.replay.metadata.winnerTeam = self:getServerWinnerTeamIndex()
+      local winnerIndex = self:getServerWinnerIndex()
+      if winnerIndex then
+        -- setOutcome stamps winnerIndex + the matching winnerId. For team
+        -- modes the server reports the winning team's representative player.
+        self.replay:setOutcome(winnerIndex)
+      else
+        -- nil winnerIndex with a server outcome = genuine tie / no winner.
+        self.replay:setOutcome(0)
+      end
+    elseif TeamUtils.isSharedTeamMode(self.gameMode) and not self.replay.metadata.winnerTeam then
+      -- Offline team game (no server outcome): the engine collapses a team win
+      -- into a tie, so recover the team-aware winner so the replay records it.
+      local winners = self:getWinners()
+      local first = winners[1]
+      if first and first.playerNumber then
+        local teamIndex = TeamUtils.teamIndexForPlayer(self, first)
+        local sameTeam = teamIndex ~= nil
+        for _, w in ipairs(winners) do
+          if not w.playerNumber or TeamUtils.teamIndexForPlayer(self, w) ~= teamIndex then
+            sameTeam = false
+            break
+          end
+        end
+        if sameTeam then
+          self.replay.metadata.winnerTeam = teamIndex
+          self.replay.metadata.winnerIndex = first.stackIndex
+        end
+      end
+    end
   end
 
   return replay
@@ -1423,28 +1462,11 @@ function ClientMatch:initializeTelegraphRelationships()
     end
   end
 
-  -- setGarbageSource is singular (last call wins). Iterating pairs() over
-  -- engine.garbageSources and looping every source overwrites until only the
-  -- "last" survives, and pairs/ipairs order isn't stable across Lua VMs — so
-  -- spectator clients pick a different source than the player and the break
-  -- window renders different character art (garbageCharacter = garbageSource
-  -- .character). Pick deterministically: lowest stack-index source wins on
-  -- every client.
-  for recipientIndex, recipientStack in ipairs(self.engine.stacks) do
-    local sources = self.engine.garbageSources[recipientStack]
-    if sources and #sources > 0 and self.stacks[recipientIndex] then
-      local bestSourceIndex
-      for _, engineStack in ipairs(sources) do
-        local idx = tableUtils.indexOf(self.engine.stacks, engineStack)
-        if idx and (not bestSourceIndex or idx < bestSourceIndex) then
-          bestSourceIndex = idx
-        end
-      end
-      if bestSourceIndex and self.stacks[bestSourceIndex] then
-        self.stacks[recipientIndex]:setGarbageSource(self.stacks[bestSourceIndex])
-      end
-    end
-  end
+  -- Per-stack garbageSource is gone — each garbage cell now carries its own
+  -- senderId on the wire (see DisplayEventCapture:snapshotCell). The renderer
+  -- looks up the character from match.stacks[panel.senderId] per-cell. Both
+  -- sender and spec arrive at the same answer from the same data instead of
+  -- diverging local match-setup state.
 
   self:refreshSharedModeTelegraphTargets()
 end
@@ -2027,7 +2049,7 @@ function ClientMatch:_applyGarbageEventNow(body)
           engine._gAppliedEvents = (engine._gAppliedEvents or 0) + 1
           engine._gAppliedPieces = (engine._gAppliedPieces or 0) + garbageCount
         end
-        stack.engine:applyNetworkGarbage(body.garbage)
+        stack.engine:applyNetworkGarbage(body.garbage, body.sender)
       end
     else
       -- Recipient not landable: slot was emptied (mid-match leave) or the

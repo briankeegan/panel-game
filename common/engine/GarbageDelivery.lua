@@ -204,6 +204,7 @@ end
 function GarbageDelivery:_deliverOne(source, target, garbageDelivery)
   local match = self.match
   local active = looseSyncActive(match)
+  local senderId = tableUtils.indexOf(match.stacks, source)
 
   if active then
     if source.is_local and not target.is_local then
@@ -216,13 +217,13 @@ function GarbageDelivery:_deliverOne(source, target, garbageDelivery)
       -- Local→local (vsSelf): push locally + emit G so spectators see it.
       -- ClientMatch:_applyGarbageEventNow's echo guard prevents double-apply
       -- on the sender's own machine.
-      target:receiveGarbage(garbageDelivery)
+      target:receiveGarbage(garbageDelivery, senderId)
       self:_emitG(source, { target }, garbageDelivery, "G emit (self)")
       return
     end
   end
   -- Offline / replay: direct push, no wire.
-  target:receiveGarbage(garbageDelivery)
+  target:receiveGarbage(garbageDelivery, senderId)
 end
 
 function GarbageDelivery:_deliverMulti(source, targets, garbageDelivery)
@@ -247,10 +248,11 @@ function GarbageDelivery:_deliverMulti(source, targets, garbageDelivery)
     return
   end
   -- Local↔local or offline: direct push per target.
+  local senderId = tableUtils.indexOf(match.stacks, source)
   for _, target in ipairs(targets) do
     local garbageCopy = {}
     for j, g in ipairs(garbageDelivery) do garbageCopy[j] = shallowcpy(g) end
-    target:receiveGarbage(garbageCopy)
+    target:receiveGarbage(garbageCopy, senderId)
   end
 end
 

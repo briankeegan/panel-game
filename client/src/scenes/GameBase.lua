@@ -25,12 +25,22 @@ local socket = require("common.lib.socket")
 -- focus cycling) become available. Without this, the UI floods in at the
 -- exact moment of death, which players read as "the game broke" rather
 -- than "I died and can now watch teammates".
-local DEAD_LOCAL_GRACE_SECONDS = 3
+--
+-- The window isn't fixed: it scales to how far behind the surviving
+-- teammates' stacks are rendering relative to the local clock (framesBehind
+-- / 60). That lag is the only thing the grace is really covering — once the
+-- other screens have caught up, there's nothing left to settle. On a clean
+-- connection that's a fraction of a second (near-instant); it only stretches
+-- toward the ceiling when the game is genuinely laggy. Clamped to a floor so
+-- the death animation always gets a beat to read, and a ceiling that matches
+-- the old fixed value.
+local DEAD_LOCAL_GRACE_FLOOR_SECONDS = 0.5
+local DEAD_LOCAL_GRACE_CEIL_SECONDS = 3
 
 -- Shorter wall-clock window before the dead local's MenuEsc → waiting-room
 -- exit is honored. Without this, a player who was holding Esc when they died
 -- (or who reflexively jams it on death) bails out before they realize what
--- happened. Same dt-accumulator pattern as DEAD_LOCAL_GRACE_SECONDS, just a
+-- happened. Same dt-accumulator pattern as the spectator grace, just a fixed
 -- tighter window — exiting is a smaller commitment than swapping into
 -- spectator UI.
 local DEAD_LOCAL_EXIT_GRACE_SECONDS = 0.5
@@ -591,11 +601,11 @@ function GameBase:runGameOver()
   local minDisplayMet = displayTime >= self.minDisplayTime
   local maxDisplayMet = self.maxDisplayTime ~= -1 and displayTime >= self.maxDisplayTime
 
-  -- Post-death rewind: escape opens the pause/rewind menu in scenes that
-  -- opt into scrub. Any other key continues to the next scene. Check both
-  -- the raw key (love's love.keypressed) AND the menu-level binding —
-  -- different code paths can populate one without the other.
-  local escapePressed = input.allKeys.isDown["escape"] or input.isDown["MenuEsc"]
+  -- Post-death rewind: escape OR Start opens the pause/rewind menu in scenes
+  -- that opt into scrub (mirrors the alive-state pause trigger). Any other key
+  -- continues to the next scene. Check both the raw key (love's love.keypressed)
+  -- AND the menu-level binding — different code paths can populate one without the other.
+  local escapePressed = input.allKeys.isDown["escape"] or input.isDown["MenuEsc"] or playerPressingStart(self.match)
   local keyPressed = self:readyToProceedToNextScene()
 
   if minDisplayMet and escapePressed and self:_canScrub() then
@@ -802,9 +812,18 @@ function GameBase:update(dt)
     -- between rounds and the pure-spectator path. Accumulated before the
     -- MenuEsc check below so the exit grace can read it.
     if isDeadLocal then
+      if not self.deathGraceTimer then
+        -- Death transition: sample the target window once, scaled to the
+        -- worst clock skew among the surviving teammate stacks. Sampling once
+        -- (not every frame) keeps the threshold from jittering as framesBehind
+        -- fluctuates. framesBehind is meaningless for snapshot-driven remotes,
+        -- so those contribute 0 and the floor applies.
+        self.deathGraceTarget = self:computeDeathGraceTarget()
+      end
       self.deathGraceTimer = (self.deathGraceTimer or 0) + dt
     else
       self.deathGraceTimer = nil
+      self.deathGraceTarget = nil
     end
 
     if isPureSpectator then
@@ -832,11 +851,11 @@ function GameBase:update(dt)
     end
 
     -- Spectator focus switching: only meaningful at 3+ stacks. Available to
-    -- pure spectators immediately, and to dead local players only after a short
-    -- grace period (so the hint / focused-stack snap doesn't pop in at the
-    -- exact instant of death).
+    -- pure spectators immediately, and to dead local players only after the
+    -- clock-scaled grace period (so the hint / focused-stack snap doesn't pop
+    -- in at the exact instant of death).
     local spectatorControlsReady = #self.match.stacks >= 3 and (isPureSpectator
-      or (isDeadLocal and (self.deathGraceTimer or 0) >= DEAD_LOCAL_GRACE_SECONDS))
+      or (isDeadLocal and (self.deathGraceTimer or 0) >= (self.deathGraceTarget or DEAD_LOCAL_GRACE_CEIL_SECONDS)))
     if spectatorControlsReady then
       if isDeadLocal and not self.match.spectatorFocus then
         -- First grace-period expiry after death: snap focus to your own stack
@@ -983,6 +1002,25 @@ function GameBase:drawHUD()
   end
 end
 
+-- Grace window (seconds) for the current death, scaled to the worst clock
+-- skew among the surviving teammate stacks. framesBehind is meaningless for
+-- snapshot-driven remotes (their engine doesn't tick), so in that mode every
+-- remote contributes 0 and the floor applies. Clamped to [floor, ceil].
+function GameBase:computeDeathGraceTarget()
+  local snapshotRemotes = GAME.battleRoom and GAME.battleRoom.displayHistoryEnabled
+  local maxBehind = 0
+  if not snapshotRemotes then
+    for _, stack in ipairs(self.match.stacks) do
+      if not stack.is_local then
+        local behind = stack.engine and stack.engine.framesBehind or 0
+        if behind > maxBehind then maxBehind = behind end
+      end
+    end
+  end
+  local seconds = maxBehind / 60
+  return math.max(DEAD_LOCAL_GRACE_FLOOR_SECONDS, math.min(DEAD_LOCAL_GRACE_CEIL_SECONDS, seconds))
+end
+
 -- Spectator focus switching: click a stack to view it, or Left/Right to cycle.
 -- Both are device-independent — the menu keys aggregate every input config and
 -- the mouse needs no claimed device, so it works regardless of what the player
@@ -1009,7 +1047,7 @@ function GameBase:drawSpectatorHint()
   if #self.match.stacks < 3 then return end
   if self.match:hasLocalPlayer() then
     if not self.match:isLocalPlayerEliminated() then return end
-    if (self.deathGraceTimer or 0) < DEAD_LOCAL_GRACE_SECONDS then return end
+    if (self.deathGraceTimer or 0) < (self.deathGraceTarget or DEAD_LOCAL_GRACE_CEIL_SECONDS) then return end
   end
   local consts = require("common.engine.consts")
   local font = GraphicsUtil.getGlobalFont()

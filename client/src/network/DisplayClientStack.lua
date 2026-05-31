@@ -465,6 +465,11 @@ local function expandCell(cell, row, col, frameTimes)
     combo_index        = cell.ci,
     isSwappingFromLeft = cell.sl or false,
     fell_from_garbage  = cell.fg,
+    -- senderId: stack index of the player who sent this garbage. Renderer
+    -- looks up garbageCharacter = match.stacks[senderId].character per-cell
+    -- so the break window uses the SENDER's sprites, not whatever
+    -- viewStack.garbageSource happens to point at locally.
+    senderId           = cell.sid,
     -- frameTimes is per-match (level data); the receiver attaches the
     -- viewStack's engine's frameTimes when available so matched-state
     -- timing math in getDrawProps works.
@@ -516,14 +521,36 @@ local function paintGridFromSnapshot(self, viewStack, snapshot, shakeOffset, dis
   end
   local frameTimes = viewStack.engine.levelData.frameConstants
 
-  -- Garbage character + metal panel set come from the sender's stack;
-  -- ClientStack already loaded them at match start. Match the lookup
-  -- PlayerStack:drawPanels uses so multi-cell garbage renders with the
-  -- right sprite atlas.
-  local garbageCharacter = viewStack.garbageSource and viewStack.garbageSource.character
-                       or viewStack.character
-  local metalPanelSet    = viewStack.garbageSource and panels[viewStack.garbageSource.panels_dir]
-                       or panelSet
+  -- Per-cell character resolution: each garbage cell ships panel.senderId
+  -- (the sender's stack index). Look up the sender's ClientStack in the
+  -- active match and pull its character for the break-window sprites
+  -- (face/flash/composition). Different garbage blocks from different
+  -- opponents render with different characters — matches what the
+  -- sender's local PlayerStack:render does. Falls back to viewStack's own
+  -- character when senderId is missing (legacy snapshots, single-player).
+  local activeMatch = GAME and GAME.battleRoom and GAME.battleRoom.match
+  local fallbackCharacter = viewStack.character
+  local garbageCharacter = function(panel)
+    if panel.senderId and activeMatch and activeMatch.stacks
+        and activeMatch.stacks[panel.senderId] then
+      return activeMatch.stacks[panel.senderId].character or fallbackCharacter
+    end
+    return fallbackCharacter
+  end
+  -- Metal set: pick from the first garbage cell with a senderId; fall back
+  -- to viewStack's own panel set.
+  local metalPanelSet = panelSet
+  for i = 1, #grid do
+    local cell = grid[i]
+    if type(cell) == "table" and cell.g and cell.sid and activeMatch
+        and activeMatch.stacks and activeMatch.stacks[cell.sid] then
+      local s = activeMatch.stacks[cell.sid]
+      if s.panels_dir and panels[s.panels_dir] then
+        metalPanelSet = panels[s.panels_dir]
+        break
+      end
+    end
+  end
 
   local metall_w, metall_h, metalr_w, metalr_h
   if metalPanelSet and metalPanelSet.images and metalPanelSet.images.metals then

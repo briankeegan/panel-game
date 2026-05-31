@@ -27,7 +27,7 @@ end
 ---@param draw_x number  panel-coord x (pre-scale)
 ---@param draw_y number  panel-coord y (pre-scale, includes displacement + shake)
 ---@param scale number  gfxScale
----@param garbageCharacter Character
+---@param garbageCharacter Character|fun(panel: table):Character  character mod whose face/flash/composition sprites paint the breaking garbage. Pass a function when sources can vary per-cell (multi-opponent FFA snapshot path) — it's called only for garbage cells; pass a Character directly when one source covers the whole stack.
 ---@param metalPanelSet Panels
 ---@param panelSet Panels
 ---@param dangerCol table
@@ -43,6 +43,9 @@ function M.drawPanelCell(panel, draw_x, draw_y, scale,
     dangerCol, dangerTimer, stopTime, FLASH,
     metall_w, metall_h, metalr_w, metalr_h)
   if panel.isGarbage and panel.state ~= "dead" then
+    if type(garbageCharacter) == "function" then
+      garbageCharacter = garbageCharacter(panel)
+    end
     -- a dead board flips garbage to "dead" along with everything else;
     -- let it fall through to the dead/grey panel draw, not a live block
 

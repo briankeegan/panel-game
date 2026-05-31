@@ -8,6 +8,7 @@ local class = require("common.lib.class")
 local GameModes = require("common.data.GameModes")
 local ReplayGame = require("client.src.scenes.ReplayGame")
 local ClientMatch = require("client.src.ClientMatch")
+local logger = require("common.lib.logger")
 
 local ReplayBrowser = class(
   function (self, sceneParams)
@@ -20,7 +21,9 @@ local ReplayBrowser = class(
 ReplayBrowser.name = "ReplayBrowser"
 
 local selection = nil
-local base_path = "replays"
+-- Player-scoped when multiple clients share one save dir (see FileUtils); plain
+-- "replays" otherwise. Must match what fileUtils.saveReplay writes to.
+local base_path = fileUtils.replayBasePath()
 local current_path = "/"
 local path_contents = {}
 local filename = nil
@@ -81,7 +84,10 @@ local function updateBrowsingPath(new_path)
     end
     current_path = new_path
   end
-  path_contents = fileUtils.getFilteredDirectoryItems(base_path .. current_path)
+  path_contents = fileUtils.freshDirectoryItems(base_path .. current_path)
+  logger.info(string.format("ReplayBrowser: saveDir=%s  listing=[%s]  -> %d items: %s",
+    love.filesystem.getSaveDirectory(), base_path .. current_path,
+    #path_contents, table.concat(path_contents, ", ")))
   if not path_contents[cursor_pos] then
     cursor_pos = replay_id_top
   end
@@ -95,25 +101,23 @@ local function selectMenuItem()
   if cursor_pos == 0 then
     setPathToParentDir()
   else
-    selection = base_path .. current_path .. path_contents[cursor_pos]
-    local file_info = love.filesystem.getInfo(selection)
-    if file_info then
-      if file_info.type == "file" then
-        filename = selection
-        local replay = ReplayV3.createFromTable(fileUtils.readJsonFile(selection), true)
-        if replay then
-          selectedReplay = replay
-        else
-          GAME.theme:playCancelSfx()
-        end
-        return not not replay
-      elseif file_info.type == "directory" then
-        updateBrowsingPath(current_path .. path_contents[cursor_pos] .. "/")
+    local item = path_contents[cursor_pos]
+    selection = base_path .. current_path .. item
+    -- Replay files are .json; everything else is a folder. Avoids
+    -- love.filesystem.getInfo, which is as unreliable as getDirectoryItems on
+    -- this love build. Read fresh from the OS too (see fileUtils).
+    if item:sub(-5) == ".json" then
+      filename = selection
+      local data = fileUtils.readJsonFileFresh(selection)
+      local replay = data and ReplayV3.createFromTable(data, true)
+      if replay then
+        selectedReplay = replay
       else
-        --print(loc("rp_browser_error_unknown_filetype", file_info.type, selection))
+        GAME.theme:playCancelSfx()
       end
+      return not not replay
     else
-      --print(loc("rp_browser_error_file_not_found", selection))
+      updateBrowsingPath(current_path .. item .. "/")
     end
   end
 end

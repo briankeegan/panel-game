@@ -575,12 +575,24 @@ local function processJoinQueuedMessage(self, message)
   self:emitSignal("joinQueued", message.roomNumber)
 end
 
+-- Forward declaration; defined below where the death-drain helpers are in scope.
+local _flushPendingDeaths
+
 ---@param self NetClient
 local function processGameResultMessage(self, message)
   -- receiving a gameResult message means that both players have reported their game results to the server
   -- that means from here on it is expected to receive no further input messages from either player
   -- if we went game over first, the opponent will notice later and keep sending inputs until we went game over on their end too
   -- these extra messages will remain unprocessed in the queue and need to be cleared up so they don't get applied the next match
+
+  -- Apply every still-pending death NOW, ignoring the per-frame visual budget,
+  -- BEFORE clearing the queues. Once a player dies the server stops relaying
+  -- their inputs, so on every other client the death EVENT is the only thing
+  -- that transitions that stack to game-over (animation + OUT/death-time marker
+  -- + pops). A burst of end-of-match deaths can defer some past the budget; if
+  -- we cleared without flushing they'd never render. applyDeathEvent is
+  -- idempotent, so re-touching an already-applied death is safe.
+  _flushPendingDeaths(self)
   _clearMatchInputState(self)
 
   if not self.room then
@@ -701,7 +713,15 @@ end
 ---@param self NetClient
 ---@param message { replay: ReplayV3, [string]: any }
 local function processMatchStartMessage(self, message)
+  -- Observability for the silent match-start drop class: a received match_start
+  -- that never becomes a running match leaves the client stuck in CharacterSelect
+  -- as a network no-op until the server's silent-death watchdog evicts it at
+  -- frame 1. None of the bail paths below logged, so the failure was invisible.
+  logger.info(string.format("match_start received: netState=%s room=%s players=%s",
+    tostring(self.state), self.room and "present" or "MISSING",
+    self.room and tostring(#self.room.players) or "?"))
   if not self.room then
+    logger.warn("match_start DROPPED: no self.room — client/server room state desynced; this client will NOT enter the match")
     return
   end
 
@@ -731,6 +751,18 @@ local function processMatchStartMessage(self, message)
           end
         end
       end
+    end
+
+    -- Observability: a local human that matches no stack gets no input binding
+    -- below and will send no input all match — the silent slot-mismatch path.
+    if player.isLocal and player.human and not matchedStackIdx and not isClientDrivenSolo then
+      local seatIds = {}
+      for _, m in ipairs(message.replay.metadata.stacks) do
+        seatIds[#seatIds + 1] = tostring(m.seatId or m.stackIndex)
+      end
+      logger.warn(string.format(
+        "match_start: local player %s (playerNumber=%s) matched NO replay stack (available seats: %s) — input won't bind; this client will send no input",
+        tostring(player.name), tostring(player.playerNumber), table.concat(seatIds, ",")))
     end
 
     for i, stackSettings in ipairs(message.replay.stacks) do
@@ -793,6 +825,8 @@ local function processMatchStartMessage(self, message)
   _clearMatchInputState(self)
   local match = self.room:startMatch(message.replay)
   self:setState(states.INGAME)
+  logger.info(string.format("match_start: entered match (state=INGAME, hasLocalPlayer=%s, stacks=%s)",
+    tostring(match:hasLocalPlayer()), tostring(match.stacks and #match.stacks or "?")))
   if match.supportsPause and match:hasLocalPlayer() then
     match:connectSignal("pauseChanged", self, self.sendPauseToggle)
   end
@@ -1041,6 +1075,24 @@ local function processDeathEvents(self)
     local body = msg[prefix]
     if body then self.room.match:applyDeathEvent(body) end
   end)
+end
+
+-- Body for the forward-declared _flushPendingDeaths: apply ALL pending death
+-- events (parked + fresh) ignoring the per-frame budget. See the callsite in
+-- processGameResultMessage for why this runs at authoritative match end.
+function _flushPendingDeaths(self)
+  if not (self.room and self.room.match) then return end
+  local prefix = NetworkProtocol.serverMessageTypes.deathEvent.prefix
+  -- deferred (parked from earlier frames, FIFO) first, then any fresh ones.
+  for _, msg in ipairs(self._deferredDeathMsgs or {}) do
+    local body = msg[prefix]
+    if body then self.room.match:applyDeathEvent(body) end
+  end
+  for _, msg in ipairs(_drainBoth(self, prefix)) do
+    local body = msg[prefix]
+    if body then self.room.match:applyDeathEvent(body) end
+  end
+  self._deferredDeathMsgs = nil
 end
 
 ---@param self NetClient

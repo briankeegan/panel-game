@@ -3,12 +3,12 @@
     [
         {
             "name":"team",
-            "versioningType": "timestamp",
+            "versioningType": "build",
             "serverEndPoint":
             {
                 "type": "github",
                 "repository": "briankeegan/panel-game",
-                "prefix":"team-"
+                "prefix":"build-"
             }
         }
     ],

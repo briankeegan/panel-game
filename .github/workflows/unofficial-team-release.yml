@@ -27,19 +27,21 @@ jobs:
         run: ./build.sh just-love
 
       - name: Move .love to workspace
-        run: mv ../dev-build/panel-attack.love ./unofficial-panel-attack-ffa-and-team.love
+        # Asset name is managed by deploy.sh (rewritten to match the patch name).
+        run: mv ../dev-build/panel-attack.love ./unofficial-panel-attack-patch-sat-cats.love
 
       - name: Create GitHub release
         run: |
-          # Tag is a timestamp version with the "team-" prefix. The in-game
-          # updater lists this repo's releases, strips the prefix, and reads the
-          # remainder as a yyyy-MM-dd_hh-mm-ss version; the single .love asset is
-          # the download. Each push is a unique tag, so no prior-release cleanup.
-          TAG="team-$(date +'%Y-%m-%d_%H-%M-%S')"
+          # Tag is build-<BUILD_VERSION> — the same release LoginRoutine.lua's
+          # download URL and the in-game auto-updater (build versioning) both
+          # read. The updater grabs the first asset, so its name is cosmetic.
+          # Delete-before-create makes non-bump redeploys (same tag) idempotent.
+          TAG="build-${{ steps.build_version.outputs.version }}"
+          gh release delete "$TAG" --yes --cleanup-tag 2>/dev/null || true
           gh release create "$TAG" \
-            unofficial-panel-attack-ffa-and-team.love \
+            unofficial-panel-attack-patch-sat-cats.love \
             --target bramp/multi-player \
             --prerelease \
-            --title "Unofficial Panel Attack FFA & Team — ${{ steps.build_version.outputs.version }}"
+            --title "Unofficial Panel Attack FFA & Team — $TAG"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

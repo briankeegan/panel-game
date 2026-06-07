@@ -1,5 +1,6 @@
 local semanticVersion = require("updater.semanticVersion")
 local timestampVersion = require("updater.timestampVersion")
+local buildVersion = require("updater.buildVersion")
 
 local versioning = {}
 
@@ -8,6 +9,8 @@ function versioning.getVersionProcessor(type)
     return semanticVersion
   elseif type == "timestamp" then
     return timestampVersion
+  elseif type == "build" then
+    return buildVersion
   end
 end
 

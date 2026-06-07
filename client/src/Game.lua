@@ -194,11 +194,11 @@ function Game:writeReleaseStreamDefinition()
       {
         {
           name = "team",
-          versioningType = "timestamp",
+          versioningType = "build",
           serverEndPoint = {
             type = "github",
-            repository = "briankeegan/panel-game", -- our fork; updater reads team-<timestamp> tags
-            prefix = "team-"
+            repository = "briankeegan/panel-game", -- our fork; updater reads build-<BUILD_VERSION> tags
+            prefix = "build-"
           }
         }
       },

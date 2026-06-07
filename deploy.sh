@@ -5,6 +5,9 @@ SERVER="root@104.156.250.136"
 INSTALL_DIR="/opt/panel-attack"
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
 PATCH_NAME=""
+# both (default): client release + server restart. client: release only.
+# server: server restart only (no client version bump).
+DEPLOY_TARGET="both"
 
 # --patch-name labels this deploy. When set, BUILD_VERSION becomes
 # "<engine>.<NNNN>-<name>" and the GitHub Action ships
@@ -21,8 +24,20 @@ while [[ $# -gt 0 ]]; do
       PATCH_NAME="${1#*=}"
       shift
       ;;
+    --client-only)
+      DEPLOY_TARGET="client"
+      shift
+      ;;
+    --server-only)
+      DEPLOY_TARGET="server"
+      shift
+      ;;
     -h|--help)
-      echo "Usage: zsh deploy.sh [--patch-name <kebab-case-name>]"
+      echo "Usage: zsh deploy.sh [--patch-name <kebab-case-name>] [--client-only | --server-only]"
+      echo ""
+      echo "  --client-only  publish a new client release only; no server restart"
+      echo "  --server-only  restart the server only; no client version bump"
+      echo "  (default)      both: client release + server restart"
       echo ""
       echo "Env vars:"
       echo "  PANEL_ALLOW_DIRTY=1        — allow deploy with uncommitted changes"
@@ -70,7 +85,7 @@ fi
 # we touch the running process. Outputs to gathered_logs/<ts>_<commit>/.
 # Set PANEL_SKIP_GATHER=1 to skip (e.g. emergency hotfix where you're
 # already on the box doing surgery).
-if [[ "${PANEL_SKIP_GATHER:-0}" != "1" ]]; then
+if [[ "${PANEL_SKIP_GATHER:-0}" != "1" && "$DEPLOY_TARGET" != "client" ]]; then
   echo "==> Gathering pre-deploy state..."
   PANEL_SERVER="$SERVER" INSTALL_DIR="$INSTALL_DIR" zsh ./gather_logs.sh
 else
@@ -82,7 +97,7 @@ fi
 # startup. Mismatch between them = somebody is on a stale build.
 # Set PANEL_SKIP_VERSION_BUMP=1 to redeploy without bumping (e.g. server
 # config change with no code delta).
-if [[ "${PANEL_SKIP_VERSION_BUMP:-0}" != "1" ]]; then
+if [[ "${PANEL_SKIP_VERSION_BUMP:-0}" != "1" && "$DEPLOY_TARGET" != "server" ]]; then
   CONSTS_FILE="common/engine/consts.lua"
   WORKFLOW_FILE=".github/workflows/unofficial-team-release.yml"
   CURRENT_VERSION=$(grep -E 'consts\.BUILD_VERSION\s*=' "$CONSTS_FILE" | sed -E 's/.*"([^"]+)".*/\1/')
@@ -125,28 +140,34 @@ if [[ "${PANEL_SKIP_VERSION_BUMP:-0}" != "1" ]]; then
   # so the deploy point lands as a marker in git log.
   git commit --allow-empty -m "deploy: build $NEW_VERSION"
 else
-  echo "==> Skipping version bump (PANEL_SKIP_VERSION_BUMP=1)"
+  echo "==> Skipping version bump (server-only or PANEL_SKIP_VERSION_BUMP=1)"
 fi
 
 echo "==> Pushing branch '$BRANCH' to origin..."
 git push origin "$BRANCH"
 
-echo "==> Deploying to $SERVER..."
-ssh "$SERVER" "git config --global --add safe.directory $INSTALL_DIR; cd $INSTALL_DIR && git pull && systemctl restart panel-attack"
+if [[ "$DEPLOY_TARGET" != "client" ]]; then
+  echo "==> Deploying to $SERVER..."
+  ssh "$SERVER" "git config --global --add safe.directory $INSTALL_DIR; cd $INSTALL_DIR && git pull && systemctl restart panel-attack"
+else
+  echo "==> Client-only: skipping server restart (new client release builds via the GitHub Action)."
+fi
 
 # Loud reminder so you don't keep playing on a stale client. Both sides
 # read consts.BUILD_VERSION from the same file; if the running client
 # was launched before this deploy, it's still on the old version.
-if [[ "${PANEL_SKIP_VERSION_BUMP:-0}" != "1" ]]; then
+if [[ -n "${NEW_VERSION:-}" ]]; then
   echo ""
-  echo "==> Build is now $NEW_VERSION on both sides of the wire."
-  echo "    Restart any running client (zsh run_client.sh) to load the new version."
+  echo "==> Build is now $NEW_VERSION."
+  echo "    Auto-updater clients pick it up on next launch; or relaunch run_client.sh."
   echo ""
   echo "==> Download URL (live once the GitHub Action finishes):"
   echo "    $DOWNLOAD_URL"
   echo ""
 fi
 
-echo "==> Tailing logs (Ctrl+C to exit)..."
-ssh "$SERVER" "journalctl -u panel-attack -f --no-pager"
+if [[ "$DEPLOY_TARGET" != "client" ]]; then
+  echo "==> Tailing logs (Ctrl+C to exit)..."
+  ssh "$SERVER" "journalctl -u panel-attack -f --no-pager"
+fi
 

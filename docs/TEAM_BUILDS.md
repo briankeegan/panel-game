@@ -30,7 +30,7 @@ That launcher is small and you only download it **once**. After that:
 ## How updating works (the short version)
 
 The launcher makes one web request to our GitHub releases, finds the newest
-`team-<timestamp>` release, and downloads its `.love` (the game). Nothing about
+`build-<version>` release, and downloads its `.love` (the game). Nothing about
 your real Panel Attack — different game, different folders, different server
 account.
 
@@ -40,9 +40,16 @@ account.
 
 ### Cut a new game version (the common case)
 
-Just **push to `bramp/multi-player`**. The `unofficial-team-release.yml` workflow
-builds the game and publishes a new `team-<timestamp>` prerelease automatically.
-Every launcher out there picks it up on next launch. **No shell rebuild needed.**
+Run **`zsh deploy.sh`** (optionally `--patch-name <name>`). It bumps
+`BUILD_VERSION`, pushes, and the `unofficial-team-release.yml` workflow publishes
+a new `build-<BUILD_VERSION>` prerelease; the same release backs both the
+auto-updater and `LoginRoutine`'s manual "you're out of date" download. Every
+launcher picks it up on next launch. **No shell rebuild needed.**
+
+- `deploy.sh --client-only` — new client release, no server restart.
+- `deploy.sh --server-only` — restart the server only (no client bump).
+- A **patch bump** is non-disruptive (active players keep playing, update on
+  relaunch); only an **engine bump** (`ENGINE_VERSION`) forces clients off.
 
 ### Rebuild the launchers (rare — only when LÖVE or the shell changes)
 

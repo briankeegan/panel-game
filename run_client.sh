@@ -183,7 +183,7 @@ love_pids=()
 typeset -A launched_pid_by_name
 for player_name in "$@"; do
   identity_arg="$player_name"
-  LOVE_IDENTITY="Panel Attack $identity_arg" PLAYER_NAME="$player_name" PA_SHOW_LOCAL="$PA_SHOW_LOCAL" \
+  LOVE_IDENTITY="Unofficial Panel Attack FFA & Team $identity_arg" PLAYER_NAME="$player_name" PA_SHOW_LOCAL="$PA_SHOW_LOCAL" \
     PA_NETWORK_LAG_MS="${PA_NETWORK_LAG_MS:-}" \
     PA_NETWORK_LAG_MIN_MS="${PA_NETWORK_LAG_MIN_MS:-}" \
     PA_NETWORK_LAG_MAX_MS="${PA_NETWORK_LAG_MAX_MS:-}" \

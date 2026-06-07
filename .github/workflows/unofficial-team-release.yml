@@ -27,18 +27,19 @@ jobs:
         run: ./build.sh just-love
 
       - name: Move .love to workspace
-        run: mv ../dev-build/panel-attack.love ./unofficial-panel-attack-patch-sat-cats.love
+        run: mv ../dev-build/panel-attack.love ./unofficial-panel-attack-ffa-and-team.love
 
       - name: Create GitHub release
         run: |
-          TAG="build-${{ steps.build_version.outputs.version }}"
-          # Wipe any prior release+tag at the same version so re-runs
-          # (PANEL_SKIP_VERSION_BUMP) don't fail on "tag already exists".
-          gh release delete "$TAG" --yes --cleanup-tag 2>/dev/null || true
+          # Tag is a timestamp version with the "team-" prefix. The in-game
+          # updater lists this repo's releases, strips the prefix, and reads the
+          # remainder as a yyyy-MM-dd_hh-mm-ss version; the single .love asset is
+          # the download. Each push is a unique tag, so no prior-release cleanup.
+          TAG="team-$(date +'%Y-%m-%d_%H-%M-%S')"
           gh release create "$TAG" \
-            unofficial-panel-attack-patch-sat-cats.love \
+            unofficial-panel-attack-ffa-and-team.love \
             --target bramp/multi-player \
             --prerelease \
-            --title "Unofficial Panel Attack Team vs — $TAG"
+            --title "Unofficial Panel Attack FFA & Team — ${{ steps.build_version.outputs.version }}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

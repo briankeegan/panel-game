@@ -1,0 +1,16 @@
+{
+    "releaseStreams":
+    [
+        {
+            "name":"team",
+            "versioningType": "timestamp",
+            "serverEndPoint":
+            {
+                "type": "github",
+                "repository": "briankeegan/panel-game",
+                "prefix":"team-"
+            }
+        }
+    ],
+    "default": "team"
+}

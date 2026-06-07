@@ -1,0 +1,157 @@
+name: build-shells
+
+# Builds the auto-updating desktop shells (Windows/macOS/Linux) for
+# "Unofficial Panel Attack FFA & Team" and publishes them to a stable `launcher` release
+# that teammates download once. Manual trigger — shells only change when the
+# LÖVE version or the updater shell changes (rarely).
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Stage 1 — compile lua-https per platform (LÖVE 11.5 has no bundled `https`).
+  # Backends per platform: macOS=NSURL (built-in), Linux=openssl, Windows=schannel.
+  # Output is always the module `https` with empty prefix -> https.so / https.dll.
+  # ---------------------------------------------------------------------------
+  lua-https:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest,  plat: linux, out: https.so }
+          - { os: macos-latest,   plat: macos, out: https.so }
+          - { os: windows-latest, plat: win64, out: https.dll }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Clone lua-https
+        run: git clone --depth 1 https://github.com/love2d/lua-https.git lua-https-src
+
+      # --- Linux: openssl backend, LuaJIT headers only (module isn't linked to lua) ---
+      - name: Linux deps + build
+        if: matrix.plat == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake libluajit-5.1-dev libssl-dev
+          cmake -S lua-https-src -B build -DCMAKE_BUILD_TYPE=Release \
+            -DUSE_CURL_BACKEND=OFF -DUSE_OPENSSL_BACKEND=ON
+          cmake --build build --config Release
+
+      # --- macOS: NSURL backend (Foundation, built-in), LuaJIT headers from brew ---
+      - name: macOS deps + build
+        if: matrix.plat == 'macos'
+        run: |
+          brew install luajit cmake
+          LUAJIT_PREFIX="$(brew --prefix luajit)"
+          # Universal binary so one .so covers Intel + Apple Silicon teammates.
+          # NSURL backend resolves lua_* at load time, so the single-arch luajit
+          # lib here is only for headers/detection, not linked into the module.
+          cmake -S lua-https-src -B build -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
+            -DLUAJIT_INCLUDE_DIR="$LUAJIT_PREFIX/include/luajit-2.1" \
+            -DLUAJIT_LIBRARY="$(echo $LUAJIT_PREFIX/lib/libluajit-5.1.*dylib | head -1)"
+          cmake --build build --config Release
+
+      # --- Windows: schannel/wininet backends, but the module MUST link a LuaJIT
+      # import lib, so build LuaJIT 2.1 first (msvcbuild) and point CMake at it. ---
+      - name: Windows build LuaJIT + lua-https
+        if: matrix.plat == 'win64'
+        shell: cmd
+        run: |
+          git clone --depth 1 https://github.com/LuaJIT/LuaJIT.git luajit
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" x64
+          cd luajit\src && call msvcbuild.bat && cd ..\..
+          cmake -S lua-https-src -B build -DCMAKE_BUILD_TYPE=Release ^
+            -DLUAJIT_INCLUDE_DIR="%CD%\luajit\src" ^
+            -DLUAJIT_LIBRARY="%CD%\luajit\src\lua51.lib"
+          cmake --build build --config Release
+
+      - name: Collect artifact
+        shell: bash
+        run: |
+          mkdir -p out
+          found=$(find build -name '${{ matrix.out }}' -type f | head -1)
+          if [ -z "$found" ]; then echo "https lib not found:"; find build -name 'https*'; exit 1; fi
+          cp "$found" "out/${{ matrix.out }}"
+          echo "built: $found"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: https-${{ matrix.plat }}
+          path: out/${{ matrix.out }}
+
+  # ---------------------------------------------------------------------------
+  # Stage 2 — package the shells with love-build (one runner builds all 3).
+  # ---------------------------------------------------------------------------
+  package:
+    needs: lua-https
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read BUILD_VERSION (for release title)
+        id: bv
+        run: echo "version=$(grep -E 'consts\.BUILD_VERSION\s*=' common/engine/consts.lua | sed -E 's/.*\"([^\"]+)\".*/\1/')" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch compiled https libs
+        uses: actions/download-artifact@v4
+        with:
+          pattern: https-*
+          path: https-libs
+      - name: Place https libs into the shell
+        run: |
+          mkdir -p updater-shell/https/win64 updater-shell/https/macos updater-shell/https/linux
+          cp https-libs/https-win64/https.dll updater-shell/https/win64/https.dll
+          cp https-libs/https-macos/https.so  updater-shell/https/macos/https.so
+          cp https-libs/https-linux/https.so  updater-shell/https/linux/https.so
+
+      - name: Install tools (xvfb for headless love-build, zip)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb zip libfuse2
+
+      - name: Download standalone love-build (bundles its own LÖVE 12 to RUN the tool)
+        run: |
+          # NOTE: the tool's bundled LÖVE is irrelevant to what the shells ship —
+          # build.lua's love='11.5' controls that. We use the standalone because
+          # love-build's source needs LÖVE 12 APIs (mountFullPath) that ubuntu's
+          # apt `love` (11.x) lacks.
+          mkdir -p tool && cd tool
+          curl -fsSL "https://github.com/ellraiser/love-build/releases/download/v0.9/love-build-0.9-linux.zip" -o lb.zip
+          unzip -q lb.zip && chmod +x love-build
+
+      - name: Build embedded base game .love
+        run: |
+          ./build.sh just-love
+          mkdir -p updater-shell/team/0
+          cp ../dev-build/panel-attack.love updater-shell/team/0/game.love
+
+      - name: Package shells (targets come from build.lua's platforms)
+        run: |
+          xvfb-run --auto-servernum tool/love-build "$(pwd)/updater-shell/main.lua" "windows,macos,linux" 2>&1 | tee /tmp/love-build.log
+          grep -E "built .* successfully|build finished|error" /tmp/love-build.log || true
+
+      - name: Collect artifacts from love-build's save dir
+        run: |
+          # standalone love-build (LÖVE 12) save dir on Linux:
+          save="$HOME/.local/share/love-build/output"
+          folder=$(ls "$save" 2>/dev/null | head -1)
+          [ -z "$folder" ] && { echo "no love-build output under $save"; find "$HOME/.local/share" -maxdepth 3 -type d; exit 1; }
+          for plat in windows macos linux; do
+            f=$(find "$save/$folder" -iname "*-$plat.zip" | head -1)
+            [ -n "$f" ] && cp "$f" "unofficial-panel-attack-ffa-and-team-$plat.zip" && echo "collected $plat"
+          done
+          ls -lh unofficial-panel-attack-ffa-and-team-*.zip
+
+      - name: Publish to the stable `launcher` release
+        run: |
+          gh release delete launcher --yes --cleanup-tag 2>/dev/null || true
+          gh release create launcher \
+            unofficial-panel-attack-ffa-and-team-*.zip \
+            --target bramp/multi-player \
+            --title "Panel Attack FFA & Team — Launcher (${{ steps.bv.outputs.version }})" \
+            --notes "Download your platform's launcher once; it auto-updates the game on every launch. macOS is unsigned — right-click → Open the first time."
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

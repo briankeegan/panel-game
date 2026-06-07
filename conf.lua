@@ -9,7 +9,9 @@ require("client.src.developer")
 function love.conf(t)
   -- Set the identity before loading the config file
   -- as we need it set to get to the correct load directory.
-  local identity = os.getenv("LOVE_IDENTITY") or "Panel Attack"
+  -- Distinct identity: this is a separate game and must never share its save
+  -- dir (config, user-id, replays, logs) with a real Panel Attack install.
+  local identity = os.getenv("LOVE_IDENTITY") or "Unofficial Panel Attack FFA & Team"
   love.filesystem.setIdentity(identity)
   readConfigFile(config)
   if os.getenv("PLAYER_NAME") then
@@ -54,7 +56,7 @@ function love.conf(t)
   t.audio.mic = false                 -- Request and use microphone capabilities in Android (boolean)
   t.audio.mixwithsystem = false       -- Keep background music playing when opening LOVE (boolean, iOS and Android only)
 
-  t.window.title = "Panel Attack"          -- The window title (string)
+  t.window.title = "Unofficial Panel Attack FFA & Team"          -- The window title (string)
   t.window.icon = "client/assets/themes/Panel Attack Modern/background/unofficial_brand_square.png"                      -- Filepath to an image to use as the window's icon (string)
   t.window.width = config.windowWidth            -- The window width (number)
   t.window.height = config.windowHeight          -- The window height (number)

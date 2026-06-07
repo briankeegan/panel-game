@@ -31,3 +31,16 @@ trace_archive_test/
 
 # Claude Code local state (settings.local.json, scheduled task locks)
 .claude/
+.aider*
+
+# Updater shell: the embedded offline-base game .love is regenerated at
+# shell-build time (build-shells.sh / build-shells.yml), never committed (~48MB).
+updater-shell/team/*/game.love
+# love-build output for the shells
+dev-build-shells/
+
+# Updater shell: lua-https native libs are produced by build-shells.yml (CI) and
+# fetched at package time. macOS must be universal (lipo arm64+x86_64), so don't
+# commit locally-built single-arch binaries.
+updater-shell/https/**/*.so
+updater-shell/https/**/*.dll

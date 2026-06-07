@@ -23,8 +23,8 @@ if love then
   -- io.open(...,"w") + per-line flush (below) is the reliable channel — the
   -- save-dir debug.log can silently no-op depending on the love version's
   -- newFile open semantics. Default identity keeps the documented client.log.
-  local identity = (love.filesystem.getIdentity and love.filesystem.getIdentity()) or "Panel Attack"
-  local suffix = identity:gsub("Panel Attack", ""):gsub("^%s+", ""):gsub("%s+", "-")
+  local identity = (love.filesystem.getIdentity and love.filesystem.getIdentity()) or "Unofficial Panel Attack FFA & Team"
+  local suffix = identity:gsub("Unofficial Panel Attack FFA & Team", ""):gsub("^%s+", ""):gsub("%s+", "-")
   local logName = (suffix == "") and "client.log" or ("client-" .. suffix .. ".log")
   local logPath = sourceDir .. "/logs/" .. logName
   logger.logFile = io.open(logPath, "w")

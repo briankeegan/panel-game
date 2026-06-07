@@ -33,9 +33,9 @@ if [[ -f main.lua.bak ]]; then
   fi
 fi
 
-# Distinct save directory so a running dev client (LOVE_IDENTITY="Panel Attack")
+# Distinct save directory so a running dev client (LOVE_IDENTITY="Unofficial Panel Attack FFA & Team")
 # doesn't get its config / replays / state stomped by parallel test runs.
-export LOVE_IDENTITY="Panel Attack Tests"
+export LOVE_IDENTITY="Unofficial Panel Attack FFA & Team Tests"
 
 # main.lua early-returns into testLauncher when this is set (see main.lua:1).
 export PA_TEST_MODE=1

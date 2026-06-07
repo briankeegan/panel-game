@@ -222,7 +222,7 @@ function MainMenu:drawSelf()
     end
 
     if showUpdaterUpdateWarning then
-      GraphicsUtil.printf(loc("auto_updater_version_warning") .. " https://poolsuite.net/", -5, infoYPosition, consts.CANVAS_WIDTH, "right")
+      GraphicsUtil.printf(loc("auto_updater_version_warning") .. " https://github.com/briankeegan/panel-game/releases", -5, infoYPosition, consts.CANVAS_WIDTH, "right")
       infoYPosition = infoYPosition - fontHeight
     end
   end

@@ -130,8 +130,9 @@ function Game:load()
   DebugSettings.init()
   PuzzleLibrary.cleanupDefaultPuzzles(consts.PUZZLES_SAVE_DIRECTORY)
 
-  -- Unofficial build: disable updater integration to avoid upstream network calls.
-  self.updater = nil
+  -- Adopt the updater the shell injects (GAME_UPDATER global); nil in plain
+  -- source/dev runs. Points at our own release stream, never upstream.
+  self.updater = GAME_UPDATER
   logger.info("Panel Attack client build " .. consts.BUILD_VERSION
     .. " (engine " .. consts.ENGINE_VERSION .. ")")
 
@@ -192,40 +193,28 @@ function Game:writeReleaseStreamDefinition()
       releaseStreams =
       {
         {
-          name = "stable",
+          name = "team",
           versioningType = "timestamp",
           serverEndPoint = {
-            type = "filesystem",
-            url = "https://poolsuite.net/downloads/updates/stable", -- unused: GAME.updater is nil for source builds on bramp/multi-player
-            prefix = "panel-"
-          }
-        },
-        {
-          name = "beta",
-          versioningType = "timestamp",
-          serverEndPoint = {
-            type = "filesystem",
-            url = "https://poolsuite.net/downloads/updates/beta", -- unused: GAME.updater is nil for source builds on bramp/multi-player
-            prefix = "panel-beta-"
+            type = "github",
+            repository = "briankeegan/panel-game", -- our fork; updater reads team-<timestamp> tags
+            prefix = "team-"
           }
         }
       },
-      default = "stable"
+      default = "team"
     }
 
     -- this will only start to be active on next startup
     love.filesystem.write("releaseStreams.json", json.encode(releaseStreamDefinition))
 
-    -- this is for the assumption that a release stream is being retired
-    -- comment in / out as fit depending on release
-    local retiredReleaseNames = {"canary"}
-
-    if tableUtils.contains(retiredReleaseNames, self.updater.activeReleaseStream.name) then
-      local launchDefinition =
-      {
+    -- This is a standalone game with a single self-hosted stream. It must never
+    -- point at any upstream stream, so if the active stream ever drifts off
+    -- "team" for any reason, snap it straight back.
+    if self.updater.activeReleaseStream.name ~= releaseStreamDefinition.default then
+      love.filesystem.write("updater/launch.json", json.encode({
         activeReleaseStream = releaseStreamDefinition.default
-      }
-      love.filesystem.write("updater/launch.json", json.encode(launchDefinition))
+      }))
     end
   end
 end

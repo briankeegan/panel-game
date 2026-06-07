@@ -27,8 +27,7 @@ jobs:
         run: ./build.sh just-love
 
       - name: Move .love to workspace
-        # Asset name is managed by deploy.sh (rewritten to match the patch name).
-        run: mv ../dev-build/panel-attack.love ./unofficial-panel-attack-patch-sat-cats.love
+        run: mv ../dev-build/panel-attack.love ./unofficial-panel-attack-ffa-and-team.love
 
       - name: Create GitHub release
         run: |
@@ -39,7 +38,7 @@ jobs:
           TAG="build-${{ steps.build_version.outputs.version }}"
           gh release delete "$TAG" --yes --cleanup-tag 2>/dev/null || true
           gh release create "$TAG" \
-            unofficial-panel-attack-patch-sat-cats.love \
+            unofficial-panel-attack-ffa-and-team.love \
             --target bramp/multi-player \
             --prerelease \
             --title "Unofficial Panel Attack FFA & Team — $TAG"

@@ -4,26 +4,16 @@ set -e
 SERVER="root@104.156.250.136"
 INSTALL_DIR="/opt/panel-attack"
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
-PATCH_NAME=""
 # both (default): client release + server restart. client: release only.
 # server: server restart only (no client version bump).
 DEPLOY_TARGET="both"
 
-# --patch-name labels this deploy. When set, BUILD_VERSION becomes
-# "<engine>.<NNNN>-<name>" and the GitHub Action ships
-# unofficial-panel-attack-patch-<name>.love. When omitted, BUILD_VERSION
-# is just "<engine>.<NNNN>" and the action ships the default
-# unofficial-panel-attack-team-vs.love. The patch number always bumps.
+# Each deploy bumps BUILD_VERSION's patch number ("<engine>.<NNNN>") and the
+# GitHub Action ships unofficial-panel-attack-ffa-and-team.love under the
+# build-<BUILD_VERSION> tag. The auto-updater picks the highest; LoginRoutine
+# points the manual prompt at the same fixed filename.
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --patch-name)
-      PATCH_NAME="$2"
-      shift 2
-      ;;
-    --patch-name=*)
-      PATCH_NAME="${1#*=}"
-      shift
-      ;;
     --client-only)
       DEPLOY_TARGET="client"
       shift
@@ -33,7 +23,7 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     -h|--help)
-      echo "Usage: zsh deploy.sh [--patch-name <kebab-case-name>] [--client-only | --server-only]"
+      echo "Usage: zsh deploy.sh [--client-only | --server-only]"
       echo ""
       echo "  --client-only  publish a new client release only; no server restart"
       echo "  --server-only  restart the server only; no client version bump"
@@ -47,20 +37,11 @@ while [[ $# -gt 0 ]]; do
       ;;
     *)
       echo "==> ERROR: unknown argument: $1" >&2
-      echo "    Usage: zsh deploy.sh [--patch-name <kebab-case-name>]" >&2
+      echo "    Usage: zsh deploy.sh [--client-only | --server-only]" >&2
       exit 1
       ;;
   esac
 done
-
-if [[ -n "$PATCH_NAME" ]]; then
-  # Kebab-case only — anything else breaks the .love filename or the
-  # version-string parser on the client side.
-  if ! [[ "$PATCH_NAME" =~ ^[a-z0-9]+(-[a-z0-9]+)*$ ]]; then
-    echo "==> ERROR: --patch-name must be kebab-case (a-z, 0-9, single hyphens). Got: $PATCH_NAME" >&2
-    exit 1
-  fi
-fi
 
 cd "$(dirname "$0")"
 
@@ -114,13 +95,8 @@ if [[ "${PANEL_SKIP_VERSION_BUMP:-0}" != "1" && "$DEPLOY_TARGET" != "server" ]];
   # interpreted as octal by $(( )).
   PATCH_INT=$((10#$PATCH_PART))
   NEW_PATCH=$(printf "%04d" $((PATCH_INT + 1)))
-  if [[ -n "$PATCH_NAME" ]]; then
-    NEW_VERSION="${ENGINE_PART}.${NEW_PATCH}-${PATCH_NAME}"
-    LOVE_FILENAME="unofficial-panel-attack-patch-${PATCH_NAME}.love"
-  else
-    NEW_VERSION="${ENGINE_PART}.${NEW_PATCH}"
-    LOVE_FILENAME="unofficial-panel-attack-team-vs.love"
-  fi
+  NEW_VERSION="${ENGINE_PART}.${NEW_PATCH}"
+  LOVE_FILENAME="unofficial-panel-attack-ffa-and-team.love"
   echo "==> Bumping BUILD_VERSION: $CURRENT_VERSION → $NEW_VERSION"
   echo "==> .love artifact filename: $LOVE_FILENAME"
   # Hardcoded to match LoginRoutine.lua's URL construction. If the repo
@@ -129,9 +105,8 @@ if [[ "${PANEL_SKIP_VERSION_BUMP:-0}" != "1" && "$DEPLOY_TARGET" != "server" ]];
   # macOS sed needs -i '' or -i.bak; use the latter for portability with Linux.
   sed -i.bak -E "s/(consts\.BUILD_VERSION[[:space:]]*=[[:space:]]*)\"[^\"]+\"/\\1\"$NEW_VERSION\"/" "$CONSTS_FILE"
   rm "${CONSTS_FILE}.bak"
-  # Rewrite all unofficial-panel-attack-*.love references in the workflow
-  # so the GitHub Action publishes the artifact under the new name.
-  # Matches the current default (-team-vs) AND any prior -patch-<name>.
+  # Keep the workflow's .love asset name in sync with $LOVE_FILENAME
+  # (idempotent: it's already the fixed ffa-and-team name).
   sed -i.bak -E "s|unofficial-panel-attack[a-z0-9-]*\.love|${LOVE_FILENAME}|g" "$WORKFLOW_FILE"
   rm "${WORKFLOW_FILE}.bak"
   git add "$CONSTS_FILE" "$WORKFLOW_FILE"

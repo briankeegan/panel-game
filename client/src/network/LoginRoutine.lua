@@ -64,13 +64,7 @@ local function fullLogin(client, ip, port, userId)
       .. "\n\nYour build:   " .. consts.BUILD_VERSION
     if type(value.serverBuildVersion) == "string" and value.serverBuildVersion ~= "" then
       local serverBuild = value.serverBuildVersion
-      local patchName = serverBuild:match("%-(.+)$")
-      local loveFile
-      if patchName then
-        loveFile = "unofficial-panel-attack-patch-" .. patchName .. ".love"
-      else
-        loveFile = "unofficial-panel-attack-team-vs.love"
-      end
+      local loveFile = "unofficial-panel-attack-ffa-and-team.love"
       local downloadUrl = "https://github.com/briankeegan/panel-game/releases/download/build-"
         .. serverBuild .. "/" .. loveFile
       result.message = result.message

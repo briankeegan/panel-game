@@ -176,6 +176,7 @@ panels_init()
 CharacterLoader.initCharacters()
 
 local scenarios = {
+  require("server.tests.E2E.ReloginTests"),
   require("server.tests.E2E.ThreePlayerFFATests"),
   require("server.tests.E2E.RegressionTests"),
   require("server.tests.E2E.TraceReplayTests"),

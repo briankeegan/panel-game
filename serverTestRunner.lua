@@ -37,6 +37,7 @@ require("server.tests.TripleSocketBehaviorTests")
 require("server.tests.RoomTests")
 require("server.tests.TeamRoomTests")
 require("server.tests.LooseSyncServerTests")
+require("server.tests.ReconnectNameTests")
 
 logger.info("=== all server tests passed ===")
 os.exit(0)

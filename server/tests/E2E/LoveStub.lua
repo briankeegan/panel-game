@@ -126,7 +126,17 @@ function fs.getInfo(path, infoType)
 end
 function fs.exists(path) return fs.getInfo(path) ~= nil end
 function fs.read(path)
-  local f, err = io.open(path, "rb")
+  -- Files written during a test live under TEST_SAVE_ROOT (see fs.write);
+  -- bundled project assets live relative to cwd. Check the save root first so
+  -- write→read round-trips (e.g. servers/<ip>/user_id.txt) resolve the same way
+  -- production's love.filesystem does, then fall back to cwd for real assets.
+  local f, err
+  if path:sub(1, 1) ~= "/" then
+    f = io.open(TEST_SAVE_ROOT .. "/" .. path, "rb")
+  end
+  if not f then
+    f, err = io.open(path, "rb")
+  end
   if not f then return nil, err end
   local data = f:read("*a")
   f:close()

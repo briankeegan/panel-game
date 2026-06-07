@@ -48,7 +48,9 @@ local Harness = class(function(self, opts)
     self.port = opts.port
   else
     _portCounter = _portCounter + 1
-    self.port = 49600 + (_portCounter % 1000)
+    -- Reserve a 4-port block per harness (gameplay, lobby=+1, spectate=+2, +1
+    -- gap) so a neighbour instance's side-channel ports don't collide.
+    self.port = 49600 + ((_portCounter * 4) % 1000)
   end
   self.clients = {}
   self.server = nil
@@ -87,6 +89,13 @@ function Harness:start()
   -- Override the SERVER_PORT global before Server:start() reads it.
   -- We can't change the binding after the fact.
   SERVER_PORT = self.port
+  -- The production server binds lobby/spectate on fixed LOBBY_PORT/SPECTATE_PORT
+  -- globals, but the CLIENT derives them as gameplay+1/+2 (NetClient:login).
+  -- Mirror the client's offset here so all three channels actually connect
+  -- under test — otherwise side-channel claims fail and every scenario silently
+  -- runs in single-socket fallback.
+  LOBBY_PORT = self.port + 1
+  SPECTATE_PORT = self.port + 2
   -- The server otherwise enforces ENGINE_VERSION match at login. For e2e tests
   -- we don't care which build the harness picks up — version-skew testing is a
   -- separate concern. Letting any version in keeps the test resilient to the

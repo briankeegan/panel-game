@@ -15,6 +15,15 @@ local ServerTesting = require("server.tests.ServerTesting")
 local ClientProtocol = require("common.network.ClientProtocol")
 local MockConnection = require("server.tests.MockConnection")
 local json = require("common.lib.dkjson")
+local GameModes = require("common.data.GameModes")
+
+-- ServerTesting.getTestServer doesn't wire a leaderboard, but Server:changeUsername
+-- indexes self.leaderboard — so rename paths need one. Mirrors the E2E Harness.
+local function testServerWithLeaderboard()
+  local server = ServerTesting.getTestServer()
+  server:initializeLeaderboard(GameModes.getPreset(GameModes.IDs.TWO_PLAYER_VS), "")
+  return server
+end
 
 -- Pull the loginResponse content ({approved=, reason=, newUserId=, ...}) out
 -- of a connection's outgoing queue, scanning newest-first. Returns nil if the
@@ -172,8 +181,88 @@ local function test_new_user_relogin_without_persisted_id()
     .. " reason=" .. tostring(result and result.reason))
 end
 
+-- A rename frees the old name. The maps nameToPlayer/nameToConnectionIndex are
+-- keyed by name and NOT migrated by Server:changeUsername, so this guards that
+-- the leaked old-name entries don't wrongly block a new user from claiming it.
+local function test_changeUsername_frees_old_name_for_new_user()
+  logger.info("test_changeUsername_frees_old_name_for_new_user")
+  local server = testServerWithLeaderboard()
+
+  local cA = MockConnection("gameplay")
+  local rA = doLogin(server, cA, "need a new user id", "alpha")
+  assert(rA.approved, "A should log in as alpha")
+  local idA = rA.newUserId
+  server:closeConnection(cA, "logout")
+
+  -- A comes back and renames alpha -> beta.
+  local cA2 = MockConnection("gameplay")
+  local rA2 = doLogin(server, cA2, idA, "beta")
+  assert(rA2.approved, "rename alpha -> beta should succeed")
+
+  -- A brand-new user must be able to claim the now-free name "alpha".
+  local cB = MockConnection("gameplay")
+  local rB = doLogin(server, cB, "need a new user id", "alpha")
+  assert(rB.approved,
+    "freed name 'alpha' must be claimable after rename; got reason=" .. tostring(rB.reason)
+      .. " (nameToPlayer[alpha]=" .. tostring(server.nameToPlayer["alpha"])
+      .. " nameToConnectionIndex[alpha]=" .. tostring(server.nameToConnectionIndex["alpha"]) .. ")")
+end
+
+-- Fast server-level analogue of the messy long-running server: hundreds of
+-- login / rename / dirty-disconnect cycles against ONE Server, with a stable
+-- "victim" that must ALWAYS be able to re-login with its own id+name. No
+-- sockets, no pumping — runs in milliseconds. A wrongful victim denial = bug.
+local function test_messy_accumulation_does_not_wedge_names()
+  logger.info("test_messy_accumulation_does_not_wedge_names")
+  local server = testServerWithLeaderboard()
+
+  local vc = MockConnection("gameplay")
+  local vres = doLogin(server, vc, "need a new user id", "Victim")
+  assert(vres.approved, "victim first login")
+  local victimId = vres.newUserId
+  server:closeConnection(vc, "logout")
+
+  local pool = {"alpha", "beta", "gamma", "delta"}
+  local userIds = {}
+  local dirty = {}  -- connections deliberately left un-closed (ghosts)
+
+  for round = 1, 300 do
+    local u = "U" .. ((round % 5) + 1)
+    local name = pool[(round % #pool) + 1]
+    local conn = MockConnection("gameplay")
+    local res = doLogin(server, conn, userIds[u] or "need a new user id", name)
+    if res and res.approved then
+      userIds[u] = res.newUserId or userIds[u]
+      local mode = round % 3
+      if mode == 0 then
+        server:closeConnection(conn, "logout")            -- clean
+      elseif mode == 1 then
+        local nm = pool[((round + 2) % #pool) + 1]         -- rename (changeUsername)
+        local c2 = MockConnection("gameplay")
+        doLogin(server, c2, userIds[u], nm)
+        dirty[#dirty + 1] = c2
+        dirty[#dirty + 1] = conn
+      else
+        dirty[#dirty + 1] = conn                           -- dirty ghost
+      end
+    end
+
+    -- Invariant: the victim re-logs in with its own id+name every round.
+    local rvc = MockConnection("gameplay")
+    local rv = doLogin(server, rvc, victimId, "Victim")
+    assert(rv and rv.approved,
+      "MESSY (round " .. round .. "): victim 'Victim' denied with its own user_id — reason="
+        .. tostring(rv and rv.reason)
+        .. ". This is the 'name already taken' bug.")
+    server:closeConnection(rvc, "logout")
+  end
+  logger.info("  survived 300 messy cycles; victim never wrongly denied")
+end
+
 test_returning_user_relogin_after_lobby_logout()
 test_returning_user_relogin_after_full_disconnect()
 test_new_user_relogin_with_minted_id()
 test_new_user_relogin_without_persisted_id()
+test_changeUsername_frees_old_name_for_new_user()
+test_messy_accumulation_does_not_wedge_names()
 logger.info("All ReconnectNameTests passed!")

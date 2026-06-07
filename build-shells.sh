@@ -67,6 +67,28 @@ if [ -n "$folder" ] && [ -d "$save_out/$folder" ]; then
     f=$(find "$save_out/$folder" -iname "*-$plat.zip" | head -1)
     [ -n "$f" ] && cp "$f" "$OUT_DIR/unofficial-panel-attack-ffa-and-team-$plat.zip" && echo "    collected $plat"
   done
+  # love-build's macOS .app is unsigned, which macOS reports as "damaged or
+  # incomplete". Ad-hoc re-sign it (only possible on a Mac) so it launches.
+  macz_abs="$(cd "$OUT_DIR" && pwd)/unofficial-panel-attack-ffa-and-team-macos.zip"
+  if [ "$host" = Darwin ] && command -v codesign >/dev/null && [ -f "$macz_abs" ]; then
+    echo "==> Fixing + ad-hoc signing the macOS app"
+    tmp=$(mktemp -d)
+    unzip -q "$macz_abs" -d "$tmp"
+    chmod -R u+rwx "$tmp"   # love-build's .app dirs are 700 and block find/edit
+    app=$(find "$tmp" -iname "*.app" -maxdepth 2 -print 2>/dev/null | head -1)
+    if [ -n "$app" ]; then
+      # love-build writes the app name into Info.plist unescaped, so a '&' in the
+      # name corrupts the XML ("damaged or incomplete"). Fix BEFORE signing.
+      if ! plutil -lint "$app/Contents/Info.plist" >/dev/null 2>&1; then
+        sed -i '' 's/ & / \&amp; /g' "$app/Contents/Info.plist"; echo "    fixed Info.plist (& -> &amp;)"
+      fi
+      xattr -cr "$app"; codesign --force --deep --sign - "$app" >/dev/null 2>&1 && echo "    signed: $(basename "$app")"
+      ( cd "$tmp" && rm -f "$macz_abs" && zip -q -r -y "$macz_abs" "$(basename "$app")" )
+    else
+      echo "    !! could not locate .app to sign"
+    fi
+    rm -rf "$tmp"
+  fi
   echo "==> Shells in $OUT_DIR:" && ls -lh "$OUT_DIR"/*.zip 2>/dev/null
 else
   echo "!! no love-build output found under $save_out — check /tmp/love-build.log"

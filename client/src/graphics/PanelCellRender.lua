@@ -1,7 +1,11 @@
 -- Per-cell panel render, shared between PlayerStack:drawPanels (live engine
 -- view) and DisplayClientStack.paintGridFromSnapshot (snapshot-driven remote
--- view). Extracted verbatim from PlayerStack:drawPanels so both paths can
--- never drift again.
+-- view). The garbage/normal draw logic matches OG PlayerStack:drawPanels.
+-- Two signature differences from OG, both plumbing (same visual result):
+--   * garbageCharacter may be a per-cell function so multi-opponent FFA can
+--     draw each garbage block with its own sender's character (1v1 == OG).
+--   * FLASH is passed in rather than read from self.engine, so the snapshot
+--     path (no live self) can supply it.
 
 local GraphicsUtil = require("client.src.graphics.graphics_util")
 
@@ -42,12 +46,10 @@ function M.drawPanelCell(panel, draw_x, draw_y, scale,
     garbageCharacter, metalPanelSet, panelSet,
     dangerCol, dangerTimer, stopTime, FLASH,
     metall_w, metall_h, metalr_w, metalr_h)
-  if panel.isGarbage and panel.state ~= "dead" then
+  if panel.isGarbage then
     if type(garbageCharacter) == "function" then
       garbageCharacter = garbageCharacter(panel)
     end
-    -- a dead board flips garbage to "dead" along with everything else;
-    -- let it fall through to the dead/grey panel draw, not a live block
 
     -- this is the bottom right corner panel, meaning the first that will reappear when popping
     if panel.x_offset == (panel.width - 1) and panel.y_offset == 0 then

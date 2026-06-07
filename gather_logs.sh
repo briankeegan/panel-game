@@ -167,3 +167,9 @@ Journal since:  ${JOURNAL_SINCE}
 EOF
 
 echo "==> Done. ${dest}"
+
+# Surface "important things" from the snapshot we just pulled (finalize caps,
+# winner disagreements, desyncs, tracebacks). Extend the registry in
+# check_important.sh as new things-to-watch come up. Never fatal — a checker
+# hiccup must not block the deploy.
+zsh ./check_important.sh "${dest}" || true

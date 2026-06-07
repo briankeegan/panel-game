@@ -24,15 +24,31 @@ function save.write_user_id_file(userID, serverIP)
   FileUtils.write("servers/" .. serverIP, "user_id.txt", tostring(userID))
 end
 
--- reads the "user_id.txt" file of the directory of the connected ip
+-- reads the "user_id.txt" file of the directory of the connected ip.
+-- Reads the real save-dir path via io first: love 12's love.filesystem can't see
+-- files written after the client launched (the quirk FileUtils.readJsonFileFresh
+-- already dodges for replays), so a user_id persisted on first login otherwise
+-- reads back as nil on re-login — the client then re-registers as a new user and
+-- the server rejects the now-taken name. Falls back to love.filesystem for
+-- source-mounted / first-run paths.
 function save.read_user_id_file(serverIP)
+  local relPath = "servers/" .. serverIP .. "/user_id.txt"
   local userID
-  pcall(
-    function()
-      userID = love.filesystem.read("servers/" .. serverIP .. "/user_id.txt")
-      userID = userID:match("^%s*(.-)%s*$")
+  local saveDir = love.filesystem.getSaveDirectory()
+  if saveDir then
+    local f = io.open(saveDir .. "/" .. relPath, "r")
+    if f then
+      userID = f:read("*a")
+      f:close()
     end
-  )
+  end
+  if not userID then
+    pcall(function() userID = love.filesystem.read(relPath) end)
+  end
+  if userID then
+    userID = userID:match("^%s*(.-)%s*$")
+    if userID == "" then userID = nil end
+  end
   return userID
 end
 

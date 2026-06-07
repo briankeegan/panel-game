@@ -516,9 +516,15 @@ function ClientMatch:shouldFinalize()
       and #self.players == 1 and self.players[1].isLocal then
     return self.engine:isLocallyEnded()
   end
-  -- Live online: wait for server. _serverConfirmedEnd is set when
-  -- NetClient processes gameResult (or an abort, which also sets aborted).
-  return false
+  -- Live online: finalize the instant WE locally know the match is decided
+  -- (OG-style snappy end) instead of waiting for the server's gameResult.
+  -- evaluateEndConditions won't fire while aliveCount > 1, so this stays safe
+  -- for 3+ FFA / teams (the 3p stuck bug came from the OLD hasEnded freezing
+  -- the clock early, not from this corrected logic). The server's gameResult
+  -- still arrives and remains the authority for winner/order — it decorates
+  -- the already-shown result (GameBase rebuilds placement when it lands) and
+  -- no longer gates the freeze. _serverConfirmedEnd above is the backstop.
+  return self.engine:isLocallyEnded()
 end
 
 ---Called by NetClient when a gameResult message arrives. The server has
@@ -559,6 +565,36 @@ function ClientMatch:setServerOutcome(outcome)
   self._hasServerOutcome = true
   self._serverWinnerTeamIndex = outcome.winnerTeamIndex
   self._serverWinnerIndex = outcome.winnerIndex
+  self:_checkWinnerMismatch()
+end
+
+---Logs [WINNER-MISMATCH] once if the local winner (captured at handleMatchEnd)
+---disagrees with the server's authoritative winner. Fired from whichever side
+---completes the pair. Online + definitive-server-winner only — offline/replay
+---has no server, and a server-declared tie isn't a "wrong winner" to compare.
+function ClientMatch:_checkWinnerMismatch()
+  if self._winnerMismatchChecked then return end
+  if not self._localWinnerNums or not self._hasServerOutcome then return end
+  if not (GAME.battleRoom and GAME.battleRoom.online) then return end
+  if not (self._serverWinnerIndex or self._serverWinnerTeamIndex) then return end
+  self._winnerMismatchChecked = true
+
+  local localKey, serverKey
+  if self._serverWinnerTeamIndex then
+    local teams = {}
+    for _, num in ipairs(self._localWinnerNums) do
+      teams[tostring(self.engine and TeamUtils.teamIndexForOrNil(self.engine, num))] = true
+    end
+    local teamList = {}
+    for t in pairs(teams) do teamList[#teamList + 1] = t end
+    table.sort(teamList)
+    localKey, serverKey = "team:" .. table.concat(teamList, ","), "team:" .. tostring(self._serverWinnerTeamIndex)
+  else
+    localKey, serverKey = "p:" .. table.concat(self._localWinnerNums, ","), "p:" .. tostring(self._serverWinnerIndex)
+  end
+  if localKey ~= serverKey then
+    logger.warn(string.format("[WINNER-MISMATCH] local=%s server=%s", localKey, serverKey))
+  end
 end
 
 ---True once a gameResult has been received from the server. Callers can
@@ -657,6 +693,26 @@ end
 function ClientMatch:handleMatchEnd()
   if self.ended then return end -- idempotent: shouldFinalize can flip true multiple ways
   self.ended = true
+
+  -- [WINNER-MISMATCH] diagnostic: capture the LOCAL winner now. With local
+  -- finalize we get here BEFORE the server's gameResult arrives, so the
+  -- comparison can't run yet — store it and let _checkWinnerMismatch fire
+  -- whichever side completes the pair (here if the server already answered,
+  -- or from setServerOutcome when it lands). Silence == always agreed; a hit
+  -- means the local getWinners would have crowned the wrong winner.
+  if GAME.battleRoom and GAME.battleRoom.online then
+    local nums = {}
+    for _, ws in ipairs(self.engine and self.engine:getWinners() or {}) do
+      for _, stack in ipairs(self.stacks) do
+        if stack.engine == ws then
+          nums[#nums + 1] = (stack.player and stack.player.playerNumber) or stack.player_number
+        end
+      end
+    end
+    table.sort(nums)
+    self._localWinnerNums = nums
+    self:_checkWinnerMismatch()
+  end
 
   -- Backfill OUT markers for any non-winning stack whose D event never landed.
   -- 3p+ FFA: the last dying player's D event and the server's match-end signal

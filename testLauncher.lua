@@ -100,6 +100,7 @@ local allTests = {
   "server.tests.ServerTests",
   "server.tests.RealSocketPartialSendTest",
   "client.tests.FileUtilsTests",
+  "client.tests.SaveUserIdTests",
   "client.tests.ModControllerTests",
   "client.tests.TouchInputControllerTests",
   "client.tests.QueueTests",

@@ -106,7 +106,10 @@ if [ -n "$folder" ] && [ -d "$save_out/$folder" ]; then
     fi
     rm -rf "$tmp"
   fi
-  echo "==> Shells in $OUT_DIR:" && ls -lh "$OUT_DIR"/*.zip 2>/dev/null
+  # Wipe love-build's raw (Title-Case, unsigned) output so only the fixed,
+  # lowercase zips in $OUT_DIR can ever be picked up / distributed.
+  rm -rf "$save_out"/* 2>/dev/null || true
+  echo "==> Shells in $OUT_DIR (the ONLY ones to distribute):" && ls -1 "$OUT_DIR"/*.zip 2>/dev/null
 else
   echo "!! no love-build output found under $save_out — check /tmp/love-build.log"
   exit 1

@@ -2,10 +2,19 @@ name: build-shells
 
 # Builds the auto-updating desktop shells (Windows/macOS/Linux) for
 # "Unofficial Panel Attack FFA & Team" and publishes them to a stable `launcher` release
-# that teammates download once. Manual trigger — shells only change when the
+# that teammates download once. Triggered on demand — shells only change when the
 # LÖVE version or the updater shell changes (rarely).
+#
+# How to run it (this is a FORK; we never touch the upstream `beta` default branch,
+# so the workflow_dispatch button is unavailable — it requires the default branch).
+# Instead push a `build-shells-*` tag from this branch; the tag's commit runs this
+# file directly. Normal code pushes do NOT trigger it.
+#   git tag build-shells-1 && git push origin build-shells-1   (bump the number each run)
 on:
-  workflow_dispatch:
+  workflow_dispatch:   # kept for if this ever lands on the default branch
+  push:
+    tags:
+      - 'build-shells-*'
 
 permissions:
   contents: write

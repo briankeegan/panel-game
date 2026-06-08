@@ -100,17 +100,15 @@ jobs:
           path: out/${{ matrix.out }}
 
   # ---------------------------------------------------------------------------
-  # Stage 2 — package the shells with love-build (one runner builds all 3).
+  # Stage 2a — package the WINDOWS + LINUX shells on Linux (one runner, no signing
+  # needed for those two). macOS is built separately on a Mac runner (stage 2b)
+  # because only macOS can codesign the .app.
   # ---------------------------------------------------------------------------
-  package:
+  package-unix:
     needs: lua-https
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Read BUILD_VERSION (for release title)
-        id: bv
-        run: echo "version=$(grep -E 'consts\.BUILD_VERSION\s*=' common/engine/consts.lua | sed -E 's/.*\"([^\"]+)\".*/\1/')" >> "$GITHUB_OUTPUT"
 
       - name: Fetch compiled https libs
         uses: actions/download-artifact@v4
@@ -119,9 +117,8 @@ jobs:
           path: https-libs
       - name: Place https libs into the shell
         run: |
-          mkdir -p updater-shell/https/win64 updater-shell/https/macos updater-shell/https/linux
+          mkdir -p updater-shell/https/win64 updater-shell/https/linux
           cp https-libs/https-win64/https.dll updater-shell/https/win64/https.dll
-          cp https-libs/https-macos/https.so  updater-shell/https/macos/https.so
           cp https-libs/https-linux/https.so  updater-shell/https/linux/https.so
 
       - name: Install tools (xvfb for headless love-build, zip)
@@ -129,19 +126,15 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y xvfb zip libfuse2
 
-      - name: Download standalone love-build (bundles its own LÖVE 12 to RUN the tool)
+      # love-build's own bundled LÖVE 12 RUNS the tool; build.lua's love='11.5'
+      # is what the shells SHIP.
+      - name: Download standalone love-build (Linux)
         run: |
-          # NOTE: the tool's bundled LÖVE is irrelevant to what the shells ship —
-          # build.lua's love='11.5' controls that. We use the standalone because
-          # love-build's source needs LÖVE 12 APIs (mountFullPath) that ubuntu's
-          # apt `love` (11.x) lacks.
           mkdir -p tool && cd tool
           curl -fsSL "https://github.com/ellraiser/love-build/releases/download/v0.9/love-build-0.9-linux.zip" -o lb.zip
           # -o: the zip has a .DirIcon collision; overwrite instead of prompting
-          # (CI has no stdin -> EOF -> fail). The zip is an AppDir: the executable
-          # is bin/love-build, launched via AppRun (which sets LD_LIBRARY_PATH etc).
-          # The zip also stores bin/ as mode 000 (no search bit), so we can't reach
-          # bin/love-build until we restore owner perms across the tree.
+          # (CI has no stdin -> EOF -> fail). It's an AppDir: launch via AppRun.
+          # bin/ is stored mode 000, so restore owner perms before use.
           unzip -q -o lb.zip
           chmod -R u+rwX . && chmod +x AppRun
 
@@ -151,30 +144,151 @@ jobs:
           mkdir -p updater-shell/team/0
           cp ../dev-build/panel-attack.love updater-shell/team/0/game.love
 
-      - name: Package shells (targets come from build.lua's platforms)
+      - name: Package windows + linux shells
         run: |
-          xvfb-run --auto-servernum tool/AppRun "$(pwd)/updater-shell/main.lua" "windows,macos,linux" 2>&1 | tee /tmp/love-build.log
+          xvfb-run --auto-servernum tool/AppRun "$(pwd)/updater-shell/main.lua" "windows,linux" 2>&1 | tee /tmp/love-build.log
           grep -E "built .* successfully|build finished|error" /tmp/love-build.log || true
 
-      - name: Collect artifacts from love-build's save dir
+      - name: Collect windows + linux zips
         run: |
-          # standalone love-build (LÖVE 12) save dir on Linux:
           save="$HOME/.local/share/love-build/output"
           folder=$(ls "$save" 2>/dev/null | head -1)
           [ -z "$folder" ] && { echo "no love-build output under $save"; find "$HOME/.local/share" -maxdepth 3 -type d; exit 1; }
-          for plat in windows macos linux; do
+          mkdir -p dist
+          for plat in windows linux; do
             f=$(find "$save/$folder" -iname "*-$plat.zip" | head -1)
-            [ -n "$f" ] && cp "$f" "unofficial-panel-attack-ffa-and-team-$plat.zip" && echo "collected $plat"
+            [ -z "$f" ] && { echo "MISSING $plat zip"; exit 1; }
+            cp "$f" "dist/unofficial-panel-attack-ffa-and-team-$plat.zip" && echo "collected $plat"
           done
-          ls -lh unofficial-panel-attack-ffa-and-team-*.zip
+          ls -lh dist/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shells-unix
+          path: dist/*.zip
+
+  # ---------------------------------------------------------------------------
+  # Stage 2b — package + SIGN the macOS shell on a Mac runner. Mirrors the proven
+  # local recipe in build-shells.sh: fix love-build's unescaped '&' in Info.plist,
+  # drop the stray Contents/MacOS/lbconfig.lua, then ad-hoc codesign so Gatekeeper
+  # doesn't flag the .app as "damaged or incomplete".
+  # ---------------------------------------------------------------------------
+  package-macos:
+    needs: lua-https
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch compiled https lib (universal arm64+x86_64)
+        uses: actions/download-artifact@v4
+        with:
+          name: https-macos
+          path: https-macos
+      - name: Place https lib into the shell
+        run: |
+          mkdir -p updater-shell/https/macos
+          cp https-macos/https.so updater-shell/https/macos/https.so
+
+      # love-build's own bundled LÖVE 12 RUNS the tool; build.lua's love='11.5'
+      # is what the shell SHIPS.
+      - name: Download standalone love-build (macOS)
+        run: |
+          mkdir -p tool && cd tool
+          curl -fsSL "https://github.com/ellraiser/love-build/releases/download/v0.9/love-build-0.9-macos.zip" -o lb.zip
+          unzip -q -o lb.zip
+          xattr -dr com.apple.quarantine love-build.app 2>/dev/null || true
+
+      - name: Build embedded base game .love
+        run: |
+          ./build.sh just-love
+          mkdir -p updater-shell/team/0
+          cp ../dev-build/panel-attack.love updater-shell/team/0/game.love
+
+      - name: Package macOS shell
+        run: |
+          save="$HOME/Library/Application Support/love-build/output"
+          rm -rf "$save"/* 2>/dev/null || true
+          # love-build is a GUI LÖVE app that leaves its window open after "Build
+          # Finished" and never exits, so run it backgrounded and stop it once the
+          # macos zip appears (same watchdog as build-shells.sh).
+          "tool/love-build.app/Contents/MacOS/love" "$(pwd)/updater-shell/main.lua" "macos" >/tmp/lb.log 2>&1 &
+          lb_pid=$!
+          for _ in $(seq 1 150); do
+            ls "$save"/*/*-macos.zip >/dev/null 2>&1 && break
+            kill -0 "$lb_pid" 2>/dev/null || break
+            sleep 2
+          done
+          sleep 2
+          pkill -f love-build 2>/dev/null || true
+          kill "$lb_pid" 2>/dev/null || true
+          wait "$lb_pid" 2>/dev/null || true
+          grep -iE "built .* successfully|build finished|error" /tmp/lb.log | tail -10 || true
+
+      - name: Fix + ad-hoc sign + repackage the .app
+        run: |
+          save="$HOME/Library/Application Support/love-build/output"
+          folder=$(ls -t "$save" 2>/dev/null | head -1)
+          src=$(find "$save/$folder" -iname "*-macos.zip" | head -1)
+          [ -z "$src" ] && { echo "no macos zip produced"; cat /tmp/lb.log; exit 1; }
+          tmp=$(mktemp -d)
+          unzip -q "$src" -d "$tmp"
+          chmod -R u+rwx "$tmp"   # love-build's .app dirs are 700, block find/edit
+          app=$(find "$tmp" -iname "*.app" -maxdepth 2 | head -1)
+          [ -z "$app" ] && { echo "no .app inside the zip"; exit 1; }
+          # love-build writes the app name into Info.plist unescaped -> a '&' in
+          # "FFA & Team" corrupts the XML ("damaged"). Fix BEFORE signing.
+          if ! plutil -lint "$app/Contents/Info.plist" >/dev/null 2>&1; then
+            sed -i '' 's/ & / \&amp; /g' "$app/Contents/Info.plist"
+            echo "fixed Info.plist (& -> &amp;)"
+          fi
+          # Stray lbconfig.lua in Contents/MacOS/ invalidates the --deep signature;
+          # the game reads the Resources/ copy, so remove the MacOS/ one.
+          rm -f "$app/Contents/MacOS/lbconfig.lua"
+          xattr -cr "$app"
+          codesign --force --deep --sign - "$app"
+          codesign --verify --deep --strict "$app" && echo "signature verified"
+          mkdir -p dist
+          dest="$(pwd)/dist/unofficial-panel-attack-ffa-and-team-macos.zip"
+          ( cd "$tmp" && zip -q -r -y "$dest" "$(basename "$app")" )
+          ls -lh dist/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shells-macos
+          path: dist/*.zip
+
+  # ---------------------------------------------------------------------------
+  # Stage 3 — publish all three signed/working shells to the stable `launcher`
+  # release that teammates download once.
+  # ---------------------------------------------------------------------------
+  release:
+    needs: [package-unix, package-macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read BUILD_VERSION (for release title)
+        id: bv
+        run: echo "version=$(grep -E 'consts\.BUILD_VERSION\s*=' common/engine/consts.lua | sed -E 's/.*\"([^\"]+)\".*/\1/')" >> "$GITHUB_OUTPUT"
+
+      - name: Download all shell artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: shells-*
+          path: dist
+          merge-multiple: true
 
       - name: Publish to the stable `launcher` release
         run: |
+          ls -lh dist/
+          test -f dist/unofficial-panel-attack-ffa-and-team-windows.zip
+          test -f dist/unofficial-panel-attack-ffa-and-team-linux.zip
+          test -f dist/unofficial-panel-attack-ffa-and-team-macos.zip
           gh release delete launcher --yes --cleanup-tag 2>/dev/null || true
           gh release create launcher \
-            unofficial-panel-attack-ffa-and-team-*.zip \
+            dist/unofficial-panel-attack-ffa-and-team-*.zip \
             --target bramp/multi-player \
             --title "Panel Attack FFA & Team — Launcher (${{ steps.bv.outputs.version }})" \
-            --notes "Download your platform's launcher once; it auto-updates the game on every launch. macOS is unsigned — right-click → Open the first time."
+            --notes "Download your platform's launcher once; it auto-updates the game on every launch. macOS is ad-hoc signed — if Gatekeeper still complains, right-click → Open the first time."
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

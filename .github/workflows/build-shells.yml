@@ -137,7 +137,7 @@ jobs:
           # apt `love` (11.x) lacks.
           mkdir -p tool && cd tool
           curl -fsSL "https://github.com/ellraiser/love-build/releases/download/v0.9/love-build-0.9-linux.zip" -o lb.zip
-          unzip -q lb.zip && chmod +x love-build
+          unzip -q -o lb.zip && chmod +x love-build  # -o: the zip has a .DirIcon collision; overwrite instead of prompting (CI has no stdin -> EOF -> fail)
 
       - name: Build embedded base game .love
         run: |

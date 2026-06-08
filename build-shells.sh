@@ -93,7 +93,13 @@ if [ -n "$folder" ] && [ -d "$save_out/$folder" ]; then
       if ! plutil -lint "$app/Contents/Info.plist" >/dev/null 2>&1; then
         sed -i '' 's/ & / \&amp; /g' "$app/Contents/Info.plist"; echo "    fixed Info.plist (& -> &amp;)"
       fi
+      # love-build drops a stray lbconfig.lua in Contents/MacOS/ (should hold only
+      # the executable); it makes the --deep signature invalid -> Gatekeeper
+      # "damaged" on a Finder launch. The game reads the Resources/ copy, so remove
+      # the MacOS/ one before signing.
+      rm -f "$app/Contents/MacOS/lbconfig.lua"
       xattr -cr "$app"; codesign --force --deep --sign - "$app" >/dev/null 2>&1 && echo "    signed: $(basename "$app")"
+      codesign --verify --deep --strict "$app" >/dev/null 2>&1 && echo "    signature verified" || echo "    !! signature still invalid"
       ( cd "$tmp" && rm -f "$macz_abs" && zip -q -r -y "$macz_abs" "$(basename "$app")" )
     else
       echo "    !! could not locate .app to sign"

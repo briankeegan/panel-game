@@ -137,7 +137,10 @@ jobs:
           # apt `love` (11.x) lacks.
           mkdir -p tool && cd tool
           curl -fsSL "https://github.com/ellraiser/love-build/releases/download/v0.9/love-build-0.9-linux.zip" -o lb.zip
-          unzip -q -o lb.zip && chmod +x love-build  # -o: the zip has a .DirIcon collision; overwrite instead of prompting (CI has no stdin -> EOF -> fail)
+          # -o: the zip has a .DirIcon collision; overwrite instead of prompting
+          # (CI has no stdin -> EOF -> fail). The zip is an AppDir: the executable
+          # is bin/love-build, launched via AppRun (which sets LD_LIBRARY_PATH etc).
+          unzip -q -o lb.zip && chmod +x AppRun bin/love-build
 
       - name: Build embedded base game .love
         run: |
@@ -147,7 +150,7 @@ jobs:
 
       - name: Package shells (targets come from build.lua's platforms)
         run: |
-          xvfb-run --auto-servernum tool/love-build "$(pwd)/updater-shell/main.lua" "windows,macos,linux" 2>&1 | tee /tmp/love-build.log
+          xvfb-run --auto-servernum tool/AppRun "$(pwd)/updater-shell/main.lua" "windows,macos,linux" 2>&1 | tee /tmp/love-build.log
           grep -E "built .* successfully|build finished|error" /tmp/love-build.log || true
 
       - name: Collect artifacts from love-build's save dir

@@ -140,7 +140,10 @@ jobs:
           # -o: the zip has a .DirIcon collision; overwrite instead of prompting
           # (CI has no stdin -> EOF -> fail). The zip is an AppDir: the executable
           # is bin/love-build, launched via AppRun (which sets LD_LIBRARY_PATH etc).
-          unzip -q -o lb.zip && chmod +x AppRun bin/love-build
+          # The zip also stores bin/ as mode 000 (no search bit), so we can't reach
+          # bin/love-build until we restore owner perms across the tree.
+          unzip -q -o lb.zip
+          chmod -R u+rwX . && chmod +x AppRun
 
       - name: Build embedded base game .love
         run: |

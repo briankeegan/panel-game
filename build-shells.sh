@@ -52,10 +52,21 @@ for f in win64/https.dll macos/https.so linux/https.so; do
 done
 
 # 4) Run love-build (targets come from build.lua's `platforms`)
-# Wipe stale output folders first so collection can't grab an old build.
+# love-build leaves its GUI window open after "Build Finished", so run it in the
+# background and close it once the artifacts (linux zip is built last) appear.
 rm -rf "$save_out"/* 2>/dev/null || true
-echo "==> Running love-build"
-lb_run "$(pwd)/updater-shell/main.lua" "macos,windows,linux" >/tmp/love-build.log 2>&1 || true
+echo "==> Running love-build (window closes automatically when done)"
+lb_run "$(pwd)/updater-shell/main.lua" "macos,windows,linux" >/tmp/love-build.log 2>&1 &
+lb_pid=$!
+for _ in $(seq 1 120); do
+  if ls "$save_out"/*/*-linux.zip >/dev/null 2>&1; then break; fi
+  kill -0 "$lb_pid" 2>/dev/null || break   # exited on its own
+  sleep 2
+done
+sleep 2  # let the last zip finish writing
+pkill -f "love-build" 2>/dev/null || true
+kill "$lb_pid" 2>/dev/null || true
+wait "$lb_pid" 2>/dev/null || true
 grep -E "built .* successfully|build finished|error" /tmp/love-build.log | tail -10 || true
 
 # 5) Collect the artifacts from love-build's save dir

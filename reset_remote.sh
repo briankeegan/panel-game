@@ -11,8 +11,11 @@ BRANCH=$(git rev-parse --abbrev-ref HEAD)
 
 NUKE_CMD=""
 if [[ "$1" == "--nuke" ]]; then
-  echo "==> NUKE mode: wipes all server-side player data."
-  NUKE_CMD="rm -f players.txt leaderboard.csv PADatabase.sqlite3*"
+  echo "==> NUKE mode: backs up, then wipes all server-side player data."
+  TS=$(date +%Y%m%dT%H%M%SZ)
+  # Back up the sqlite DB (+ legacy files) into a timestamped folder BEFORE the
+  # rm, so the full wipe is recoverable. Backups live under db_backups/<ts>/.
+  NUKE_CMD="mkdir -p db_backups/${TS} && cp -a PADatabase.sqlite3* players.txt leaderboard.csv db_backups/${TS}/ 2>/dev/null; echo '    backed up to db_backups/${TS}/'; rm -f players.txt leaderboard.csv PADatabase.sqlite3*"
 fi
 
 echo "==> Pushing branch '$BRANCH' to origin..."

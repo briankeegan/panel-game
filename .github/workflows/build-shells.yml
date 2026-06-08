@@ -64,15 +64,23 @@ jobs:
           cmake --build build --config Release
 
       # --- Windows: schannel/wininet backends, but the module MUST link a LuaJIT
-      # import lib, so build LuaJIT 2.1 first (msvcbuild) and point CMake at it. ---
+      # import lib, so build LuaJIT 2.1 first (msvcbuild) and point CMake at it.
+      # Do NOT hardcode a vcvarsall path: the runner's VS version moves (2022 ->
+      # VS18/2026), which broke the build. msvc-dev-cmd finds whatever VS is present. ---
+      - name: Windows set up MSVC env
+        if: matrix.plat == 'win64'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
       - name: Windows build LuaJIT + lua-https
         if: matrix.plat == 'win64'
         shell: cmd
         run: |
           git clone --depth 1 https://github.com/LuaJIT/LuaJIT.git luajit
-          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" x64
           cd luajit\src && call msvcbuild.bat && cd ..\..
-          cmake -S lua-https-src -B build -DCMAKE_BUILD_TYPE=Release ^
+          if not exist "%CD%\luajit\src\lua51.lib" ( echo ERROR: LuaJIT build produced no lua51.lib & exit /b 1 )
+          cmake -S lua-https-src -B build ^
             -DLUAJIT_INCLUDE_DIR="%CD%\luajit\src" ^
             -DLUAJIT_LIBRARY="%CD%\luajit\src\lua51.lib"
           cmake --build build --config Release

@@ -202,7 +202,9 @@ function MainMenu:drawSelf()
       if DEBUG_ENABLED then
         version = "PA Version: debug"
       else
-        version = "PA Version: " .. GAME.updater.activeReleaseStream.name .. " " .. (GAME.updater.activeVersion and GAME.updater.activeVersion.version or "dev")
+        -- show the human-readable build stamp, not the updater's internal
+        -- comparison number (the `build` processor collapses to e.g. 49000010)
+        version = "PA Version: " .. consts.BUILD_VERSION
       end
     end
     GraphicsUtil.printf(version, -5, infoYPosition, consts.CANVAS_WIDTH, "right")

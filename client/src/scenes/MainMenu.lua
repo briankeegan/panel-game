@@ -194,23 +194,21 @@ function MainMenu:drawSelf()
     infoYPosition = infoYPosition - fontHeight
   end
 
+  -- Always show the build stamp (consts.BUILD_VERSION), whether or not the
+  -- updater global is present. updateAvailable is only ever true when the
+  -- updater is active, so it's safe to read here.
+  local version
+  if updateAvailable then
+    version = "New version available! Restart the game to download!"
+  elseif DEBUG_ENABLED then
+    version = "PA Version: debug"
+  else
+    version = "PA Version: " .. consts.BUILD_VERSION
+  end
+  GraphicsUtil.printf(version, -5, infoYPosition, consts.CANVAS_WIDTH, "right")
+  infoYPosition = infoYPosition - fontHeight
+
   if GAME.updater then
-    local version
-    if updateAvailable then
-      version = "New " .. GAME.updater.activeReleaseStream.name .. " version available! Restart the game to download!"
-    else
-      if DEBUG_ENABLED then
-        version = "PA Version: debug"
-      else
-        -- show the human-readable build stamp, not the updater's internal
-        -- comparison number (the `build` processor collapses to e.g. 49000010)
-        version = "PA Version: " .. consts.BUILD_VERSION
-      end
-    end
-    GraphicsUtil.printf(version, -5, infoYPosition, consts.CANVAS_WIDTH, "right")
-    infoYPosition = infoYPosition - fontHeight
-
-
     local showUpdaterUpdateWarning = false
     if system.meetsLoveVersionRequirement(12, 0) and GAME.updater.version.major < 2 or (GAME.updater.version.major == 2 and GAME.updater.version.minor < 0) then
       showUpdaterUpdateWarning = true

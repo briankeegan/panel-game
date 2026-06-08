@@ -227,29 +227,50 @@ function FileIO.write_replay_file(replay, path, filename)
   end
 end
 
+-- Derive a FRESH csprng seed on every startup. The old behaviour read a static
+-- number out of csprng_seed.txt and used it verbatim, so the MT/ISAAC sequence
+-- (and thus the user_ids cs_random hands out) replayed identically after every
+-- server restart — that's the source of repeated/predictable ids. We now pull
+-- real OS entropy from /dev/urandom (available on the Linux server and macOS),
+-- fall back to time + the previously persisted seed, and write the new value
+-- back so each boot starts from a different point.
 function FileIO.read_csprng_seed_file()
   pcall(
     function()
-      local f = io.open("csprng_seed.txt", "r")
-      if f then
-        io.input(f)
-        csprng_seed = io.read("*all")
-        io.close(f)
-      else
-        csprng_seed = math.random(1,99999)
-        print("csprng_seed.txt could not be read.  Writing a new csprng_seed.txt")
-        local new_file = io.open("csprng_seed.txt", "w")
-        if new_file then
-          io.output(new_file)
-          io.write(csprng_seed)
-          io.close(new_file)
+      local seed
+
+      -- 1) Preferred: 4 bytes of real entropy → a fresh 32-bit seed each boot.
+      local urandom = io.open("/dev/urandom", "rb")
+      if urandom then
+        local bytes = urandom:read(4)
+        io.close(urandom)
+        if bytes and #bytes == 4 then
+          seed = 0
+          for i = 1, 4 do
+            seed = seed * 256 + bytes:byte(i)
+          end
         end
       end
-      if tonumber(csprng_seed) then
-        local tempvar = tonumber(csprng_seed)
-        csprng_seed = tempvar
-      else
-        error("ERROR: csprng_seed.txt content is not numeric.")
+
+      -- 2) Fallback: mix wall-clock + CPU time + the previously persisted seed
+      --    so each boot still differs even without /dev/urandom.
+      if not seed then
+        local prev = 0
+        local f = io.open("csprng_seed.txt", "r")
+        if f then
+          prev = tonumber(f:read("*all")) or 0
+          io.close(f)
+        end
+        seed = (os.time() + math.floor((os.clock() % 1) * 1e6) + prev) % (2 ^ 32 - 1)
+      end
+
+      csprng_seed = math.floor(seed)
+
+      -- 3) Persist the new seed so the next boot starts somewhere different.
+      local out = io.open("csprng_seed.txt", "w")
+      if out then
+        out:write(tostring(csprng_seed))
+        io.close(out)
       end
     end
   )

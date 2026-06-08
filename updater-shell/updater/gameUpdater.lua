@@ -247,9 +247,10 @@ end
 local function launchWithVersion(version)
   local _, _, vendor, _ = love.graphics.getRendererInfo( )
 
-  if love.system.getOS() == "Windows" and (vendor == "ATI Technologies Inc." or vendor == "AMD") then
-    -- there is a silent crash lua panic issue on windows 10 with AMD gpus if the game is relaunched via restart
-    -- at least that's the anecdotal evidence
+  local amdWindows = love.system.getOS() == "Windows" and (vendor == "ATI Technologies Inc." or vendor == "AMD")
+  -- love.event.restart is LÖVE 12+. On 11.5 it's nil, so fall back to the same
+  -- manual in-process restart used for the AMD-windows silent-crash workaround.
+  if amdWindows or not love.event.restart then
     package.loaded.main = nil
     package.loaded.conf = nil
     love.conf = nil

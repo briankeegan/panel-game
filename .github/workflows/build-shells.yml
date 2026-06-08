@@ -196,6 +196,9 @@ jobs:
           mkdir -p tool && cd tool
           curl -fsSL "https://github.com/ellraiser/love-build/releases/download/v0.9/love-build-0.9-macos.zip" -o lb.zip
           unzip -q -o lb.zip
+          # The zip stores Contents/MacOS/ as mode 000 (no search bit), so the
+          # love binary inside is unreachable ("Permission denied"). Restore perms.
+          chmod -R u+rwX love-build.app
           xattr -dr com.apple.quarantine love-build.app 2>/dev/null || true
 
       - name: Build embedded base game .love

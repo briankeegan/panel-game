@@ -30,7 +30,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { os: ubuntu-latest,  plat: linux, out: https.so }
+          # Build the Linux .so on an OLDER runner: a native lib links the runner's
+          # glibc as a MINIMUM version. ubuntu-latest (24.04, glibc 2.39) made
+          # https.so demand GLIBC_2.38, which breaks on teammates' older distros.
+          # ubuntu-22.04 (glibc 2.35) runs on far more systems.
+          - { os: ubuntu-22.04,   plat: linux, out: https.so }
           - { os: macos-latest,   plat: macos, out: https.so }
           - { os: windows-latest, plat: win64, out: https.dll }
     runs-on: ${{ matrix.os }}

@@ -90,13 +90,12 @@ jobs:
           git clone --depth 1 https://github.com/LuaJIT/LuaJIT.git luajit
           cd luajit\src && call msvcbuild.bat && cd ..\..
           if not exist "%CD%\luajit\src\lua51.lib" ( echo ERROR: LuaJIT build produced no lua51.lib & exit /b 1 )
-          rem WinINet backend, NOT schannel: schannel uses lua-https's minimal HTTP
-          rem parser (same as the openssl backend) which does NOT de-chunk
-          rem `Transfer-Encoding: chunked` responses -> large GitHub replies would
-          rem return raw chunk framing and break json.decode (proven on Linux/openssl).
-          rem WinINet is a full OS HTTP client that de-chunks. (Not yet device-tested.)
+          rem Use lua-https' DEFAULT Windows backends (no flags): both WinINet AND
+          rem schannel are compiled, and HTTPS.cpp PREFERS WinINet, a full OS HTTP
+          rem client that de-chunks. (Forcing WinINet-only broke the link: the
+          rem always-compiled PlaintextConnection needs ws2_32/Winsock, which only
+          rem the schannel backend's CMake links -> LNK2019 on closesocket/WSAStartup.)
           cmake -S lua-https-src -B build ^
-            -DUSE_WININET_BACKEND=ON -DUSE_SCHANNEL_BACKEND=OFF ^
             -DLUAJIT_INCLUDE_DIR="%CD%\luajit\src" ^
             -DLUAJIT_LIBRARY="%CD%\luajit\src\lua51.lib"
           cmake --build build --config Release

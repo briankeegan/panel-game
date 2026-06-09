@@ -142,12 +142,6 @@ jobs:
           unzip -q -o lb.zip
           chmod -R u+rwX . && chmod +x AppRun
 
-      - name: Build embedded base game .love
-        run: |
-          ./build.sh just-love
-          mkdir -p updater-shell/team/0
-          cp ../dev-build/panel-attack.love updater-shell/team/0/game.love
-
       - name: Package windows + linux shells
         run: |
           xvfb-run --auto-servernum tool/AppRun "$(pwd)/updater-shell/main.lua" "windows,linux" 2>&1 | tee /tmp/love-build.log
@@ -204,12 +198,6 @@ jobs:
           # love binary inside is unreachable ("Permission denied"). Restore perms.
           chmod -R u+rwX love-build.app
           xattr -dr com.apple.quarantine love-build.app 2>/dev/null || true
-
-      - name: Build embedded base game .love
-        run: |
-          ./build.sh just-love
-          mkdir -p updater-shell/team/0
-          cp ../dev-build/panel-attack.love updater-shell/team/0/game.love
 
       - name: Package macOS shell
         run: |

@@ -47,9 +47,15 @@ jobs:
         if: matrix.plat == 'linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake libluajit-5.1-dev libssl-dev
-          cmake -S lua-https-src -B build -DCMAKE_BUILD_TYPE=Release \
-            -DUSE_CURL_BACKEND=OFF -DUSE_OPENSSL_BACKEND=ON
+          sudo apt-get install -y cmake libluajit-5.1-dev libcurl4-openssl-dev
+          # CURL backend, NOT bare openssl. The openssl backend's minimal HTTP
+          # parser does NOT de-chunk `Transfer-Encoding: chunked` responses, so
+          # large GitHub API replies came back with raw chunk framing
+          # ("8000\r\n[{...") and json.decode read the leading "8000" as a number
+          # and crashed. libcurl de-chunks properly. (Proven in a container against
+          # live GitHub + real LÖVE 11.5.) https.so dlopens libcurl at runtime
+          # (no hard ELF link); libcurl4 ships on essentially all desktop Linux.
+          cmake -S lua-https-src -B build -DCMAKE_BUILD_TYPE=Release -DUSE_CURL_BACKEND=ON
           cmake --build build --config Release
 
       # --- macOS: NSURL backend (Foundation, built-in), LuaJIT headers from brew ---
@@ -84,7 +90,13 @@ jobs:
           git clone --depth 1 https://github.com/LuaJIT/LuaJIT.git luajit
           cd luajit\src && call msvcbuild.bat && cd ..\..
           if not exist "%CD%\luajit\src\lua51.lib" ( echo ERROR: LuaJIT build produced no lua51.lib & exit /b 1 )
+          rem WinINet backend, NOT schannel: schannel uses lua-https's minimal HTTP
+          rem parser (same as the openssl backend) which does NOT de-chunk
+          rem `Transfer-Encoding: chunked` responses -> large GitHub replies would
+          rem return raw chunk framing and break json.decode (proven on Linux/openssl).
+          rem WinINet is a full OS HTTP client that de-chunks. (Not yet device-tested.)
           cmake -S lua-https-src -B build ^
+            -DUSE_WININET_BACKEND=ON -DUSE_SCHANNEL_BACKEND=OFF ^
             -DLUAJIT_INCLUDE_DIR="%CD%\luajit\src" ^
             -DLUAJIT_LIBRARY="%CD%\luajit\src\lua51.lib"
           cmake --build build --config Release

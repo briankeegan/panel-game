@@ -90,12 +90,16 @@ jobs:
           git clone --depth 1 https://github.com/LuaJIT/LuaJIT.git luajit
           cd luajit\src && call msvcbuild.bat && cd ..\..
           if not exist "%CD%\luajit\src\lua51.lib" ( echo ERROR: LuaJIT build produced no lua51.lib & exit /b 1 )
-          rem Use lua-https' DEFAULT Windows backends (no flags): both WinINet AND
-          rem schannel are compiled, and HTTPS.cpp PREFERS WinINet, a full OS HTTP
-          rem client that de-chunks. (Forcing WinINet-only broke the link: the
-          rem always-compiled PlaintextConnection needs ws2_32/Winsock, which only
-          rem the schannel backend's CMake links -> LNK2019 on closesocket/WSAStartup.)
+          rem Force the WinINet backend ONLY. schannel shares lua-https' minimal HTTP
+          rem parser (same as openssl on Linux) which does NOT de-chunk chunked GitHub
+          rem responses -> the most likely cause of the Windows blank screen. WinINet
+          rem is a full OS HTTP client that de-chunks. Disabling schannel drops the
+          rem ws2_32/Winsock link that the always-compiled PlaintextConnection needs,
+          rem so add it back explicitly via the linker flags (else LNK2019 on
+          rem closesocket/WSAStartup/socket/getaddrinfo).
           cmake -S lua-https-src -B build ^
+            -DUSE_WININET_BACKEND=ON -DUSE_SCHANNEL_BACKEND=OFF ^
+            -DCMAKE_SHARED_LINKER_FLAGS="ws2_32.lib" ^
             -DLUAJIT_INCLUDE_DIR="%CD%\luajit\src" ^
             -DLUAJIT_LIBRARY="%CD%\luajit\src\lua51.lib"
           cmake --build build --config Release

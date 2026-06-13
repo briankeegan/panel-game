@@ -116,6 +116,13 @@ local allTests = {
   -- default test run; re-enable manually when running it against a real
   -- server. Has been broken in CI-style runs for years.
   -- "client.tests.TcpClientTests",
+  -- Display-history snapshot wire format (pack/unpack). Self-executing
+  -- via top-level assert()s; the pcall(require) loop flags any failure.
+  "client.tests.DisplaySnapshotUtilTest",
+  "client.tests.DisplaySnapshotUtilFullTest",
+  "client.tests.DisplaySnapshotUtilEdgeTest",
+  "client.tests.DisplaySnapshotUtilNilTest",
+  "client.tests.DisplaySnapshotUtilRealTest",
   "client.tests.ThemeTests",
   "client.tests.StackGraphicsTests",
   "client.tests.InputConfigurationTests",

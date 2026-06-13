@@ -261,6 +261,11 @@ function ClientMatch.createFromReplay(replay, players, gameMode)
       clientStack:enableCatchup(true)
     end
     clientMatch.stacks[i] = clientStack
+    -- Backref so renderers resolve garbage senderId against the match that
+    -- owns the stack, not the global GAME.battleRoom.match (which onMatchEnded
+    -- nils at match end while the dead board is still on screen — that nil made
+    -- garbage blocks fall back from the thrower's theme to the board owner's).
+    clientStack.match = clientMatch
   end
 
   -- Loose-sync catch-up: when a spectator / mid-match joiner receives a
@@ -310,6 +315,7 @@ function ClientMatch:setupFromGameMode()
 
     clientStack = player:createClientStack(engineStack)
     self.stacks[i] = clientStack
+    clientStack.match = self -- see backref note in createFromReplay
   end
 
   if self.stackInteraction == GameModes.StackInteractions.ATTACK_ENGINE then
@@ -324,6 +330,7 @@ function ClientMatch:setupFromGameMode()
         match = self,
       })
       self.engine:addTarget(engineStack, player.stack.engine)
+      attackEngineHost.match = self -- backref (constructor ignores args.match)
       self.stacks[#self.stacks+1] = attackEngineHost
     end
   else
@@ -1336,6 +1343,12 @@ function ClientMatch:_transplantPreviewState(targetFrame)
     end
 
     livStack:rewindToFrame(targetFrame)
+
+    -- No button is held on scrub commit; drop the restored manual-raise latch so the stack doesn't self-raise on resume.
+    if livStack.manual_raise ~= nil then
+      livStack.manual_raise = false
+      livStack.manual_raise_yet = false
+    end
   end
 
   live.clock = targetFrame

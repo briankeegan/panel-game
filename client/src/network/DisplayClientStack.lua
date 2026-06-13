@@ -569,7 +569,11 @@ local function paintGridFromSnapshot(self, viewStack, snapshot, shakeOffset, dis
   -- opponents render with different characters — matches what the
   -- sender's local PlayerStack:render does. Falls back to viewStack's own
   -- character when senderId is missing (legacy snapshots, single-player).
-  local activeMatch = GAME and GAME.battleRoom and GAME.battleRoom.match
+  -- Use the match that OWNS the viewStack, NOT global GAME.battleRoom.match:
+  -- onMatchEnded nils that global at match end while the dead board is still
+  -- rendered, which reverted garbage from the thrower's theme to the board
+  -- owner's. Fall back to the global only if the viewStack has no owning match.
+  local activeMatch = viewStack.match or (GAME and GAME.battleRoom and GAME.battleRoom.match)
   local fallbackCharacter = viewStack.character
   local garbageCharacter = function(panel)
     if panel.senderId and activeMatch and activeMatch.stacks
@@ -597,27 +601,6 @@ local function paintGridFromSnapshot(self, viewStack, snapshot, shakeOffset, dis
   if metalPanelSet and metalPanelSet.images and metalPanelSet.images.metals then
     metall_w, metall_h = metalPanelSet.images.metals.left:getDimensions()
     metalr_w, metalr_h = metalPanelSet.images.metals.right:getDimensions()
-  end
-
-  -- [DIAG blocks-change-theme-on-death] throttled: log how each snapshot garbage
-  -- block's senderId (sid) resolves to a thrower theme on the spectator view, with
-  -- go (game_over_clock) so we can see alive-vs-dead. Remove when fixed.
-  if (snapshot.f or 0) % 30 == 0 then
-    local seenSid = {}
-    for i = 1, #grid do
-      local c = grid[i]
-      if type(c) == "table" and c.g and c.sid and not seenSid[c.sid] then
-        seenSid[c.sid] = true
-        local s = activeMatch and activeMatch.stacks and activeMatch.stacks[c.sid]
-        logger.debug(string.format(
-          "[garbtheme-snap] view=%s f=%s go=%s sid=%s resolved{char=%s panels=%s} own{char=%s panels=%s} fellBack=%s nStacks=%s",
-          tostring(viewStack.player_number), tostring(snapshot.f), tostring(snapshot.go),
-          tostring(c.sid),
-          s and tostring(s.character and s.character.id) or "NIL", s and tostring(s.panels_dir) or "NIL",
-          tostring(viewStack.character and viewStack.character.id), tostring(viewStack.panels_dir),
-          tostring(s == nil), tostring(activeMatch and activeMatch.stacks and #activeMatch.stacks)))
-      end
-    end
   end
 
   -- Loop matches PlayerStack:drawPanels' iteration order (rows from

@@ -214,6 +214,22 @@ local function buildSnapshot(engine)
     dangerTimer = hostStack.danger_timer or 0
   end
 
+  -- Analytics: the receiver's remote engine is paused (pauseNonLocalSimulation)
+  -- so its analytic never ticks. Ship the local stack's counts; the receiver
+  -- mirrors them onto its remote PlayerStack and recomputes APM/GPM from clock.
+  local an = nil
+  if hostStack and hostStack.analytic and hostStack.analytic.data then
+    local d = hostStack.analytic.data
+    an = {
+      dp = d.destroyed_panels   or 0,
+      sg = d.sent_garbage_lines or 0,
+      mv = d.move_count         or 0,
+      sw = d.swap_count         or 0,
+      rc = d.reached_chains     or {},
+      uc = d.used_combos        or {},
+    }
+  end
+
   return {
     f  = engine.clock                      or 0,
     d  = engine.displacement               or 0,
@@ -270,6 +286,7 @@ local function buildSnapshot(engine)
       end
       return out
     end)(),
+    an = an,
     p  = panels,
   }
 end

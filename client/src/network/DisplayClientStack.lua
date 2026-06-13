@@ -194,6 +194,45 @@ local function mirrorHudScalars(self, snapshot)
   end
 end
 
+-- Mirror analytics counts onto the remote PlayerStack's analytic so the
+-- existing drawAnalyticData reads real data. The remote engine is paused
+-- (pauseNonLocalSimulation) so its analytic never ticks and nothing else
+-- writes it — this is the sole writer. APM/GPM display strings are
+-- recomputed here because PlayerStack:onRun never runs for a paused engine.
+local function mirrorAnalytics(self, snapshot)
+  local an = snapshot.an
+  local vs = self.viewStack
+  if not an or not vs or not vs.analytic or not vs.analytic.data then return end
+  local d = vs.analytic.data
+  d.destroyed_panels   = an.dp or 0
+  d.sent_garbage_lines = an.sg or 0
+  d.move_count         = an.mv or 0
+  d.swap_count         = an.sw or 0
+  -- tonumber the keys: on the JSON fallback path dkjson decodes sparse
+  -- integer-keyed tables as STRING keys, but drawAnalyticData indexes them
+  -- numerically. Binary path already yields numeric keys (no-op there).
+  local function numKeys(t)
+    local o = {}
+    if type(t) == "table" then
+      for k, v in pairs(t) do
+        local nk = tonumber(k)
+        if nk then o[nk] = v end
+      end
+    end
+    return o
+  end
+  d.reached_chains = numKeys(an.rc)
+  d.used_combos    = numKeys(an.uc)
+  -- Recompute display strings from the authoritative clock. Guard clock > 0:
+  -- getRoundedGPM divides by clock with no guard of its own (→ "inf" at f==0).
+  local clock = snapshot.f or 0
+  if clock > 0 then
+    local apm = (d.swap_count + d.move_count) / (clock / 60 / 60)
+    vs.analytic.lastAPM = string.format("%0.0f", math.round(apm, 0))
+    vs.analytic.lastGPM = vs.analytic:getRoundedGPM(clock)
+  end
+end
+
 -- Per-render-frame HUD tween. Engine fields driving drawScore /
 -- drawMultibar / Telegraph arc are mirrored once on snapshot apply,
 -- so without this they step at 20Hz. Lerp from prev → current snapshot
@@ -317,6 +356,8 @@ function DisplayClientStack:applyBatch(batch)
   -- Push HUD scalars onto the matching engine so existing HUD render
   -- methods (drawScore etc.) display the correct values.
   mirrorHudScalars(self, snapshot)
+  -- Mirror analytics counts so drawAnalyticData shows opponent stats.
+  mirrorAnalytics(self, snapshot)
 
   -- Telemetry, throttled to ~1Hz. Mirrors the [SPECTATE-SEND] log on
   -- the sender so we can compare side-by-side what was shipped vs.

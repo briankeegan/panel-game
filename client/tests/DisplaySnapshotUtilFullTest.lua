@@ -133,3 +133,64 @@ local function test_fell_from_garbage_true_coerced()
 end
 
 test_fell_from_garbage_true_coerced()
+
+local function test_analytics_roundtrip()
+  if not ffiGuard.FFI_SUPPORTED then print("FFI not supported, skipping test.") return end
+  local orig = {
+    p = {},
+    an = {
+      dp = 120, sg = 34, mv = 200, sw = 88,
+      rc = { [2] = 3, [5] = 1, [13] = 2 },
+      uc = { [4] = 2, [27] = 1, [72] = 4 },
+    },
+  }
+  local from = 6
+  local packed = DisplaySnapshotUtil.pack_snapshot(from, orig)
+  assert(packed, "Packing failed for analytics test")
+  local from2, unpacked = DisplaySnapshotUtil.unpack_snapshot(packed)
+  assert(from2 == from, "From mismatch")
+  assert(unpacked.an, "analytics section missing after round-trip")
+  assert(unpacked.an.dp == 120 and unpacked.an.sg == 34
+      and unpacked.an.mv == 200 and unpacked.an.sw == 88, "analytics scalars corrupted")
+  assert(deepEqual(unpacked.an.rc, orig.an.rc), "reached_chains mismatch")
+  assert(deepEqual(unpacked.an.uc, orig.an.uc), "used_combos mismatch")
+  -- Keys must be integers (the binary path must not introduce string keys).
+  assert(type(next(unpacked.an.rc)) == "number", "reached_chains keys must be numeric")
+  assert(type(next(unpacked.an.uc)) == "number", "used_combos keys must be numeric")
+  print("Analytics round-trip test passed.")
+end
+
+test_analytics_roundtrip()
+
+local function test_analytics_empty_dicts()
+  if not ffiGuard.FFI_SUPPORTED then print("FFI not supported, skipping test.") return end
+  local orig = { p = {}, an = { dp = 1, sg = 0, mv = 0, sw = 0, rc = {}, uc = {} } }
+  local _, unpacked = DisplaySnapshotUtil.unpack_snapshot(DisplaySnapshotUtil.pack_snapshot(0, orig))
+  assert(unpacked.an and unpacked.an.dp == 1, "analytics present with empty dicts")
+  assert(next(unpacked.an.rc) == nil, "reached_chains should be empty")
+  assert(next(unpacked.an.uc) == nil, "used_combos should be empty")
+  print("Analytics empty-dicts test passed.")
+end
+
+test_analytics_empty_dicts()
+
+local function test_analytics_backcompat_truncated()
+  -- A pre-analytics sender ships no tail at all. Simulate by packing a
+  -- snapshot with no `an` (a 1-byte present=0 tail) and lopping that byte
+  -- off, then confirm the new reader yields no analytics and does not error.
+  if not ffiGuard.FFI_SUPPORTED then print("FFI not supported, skipping test.") return end
+  local packed = DisplaySnapshotUtil.pack_snapshot(0, { p = {} })
+  local truncated = string.sub(packed, 1, #packed - 1)
+  local ok, _, snap = pcall(DisplaySnapshotUtil.unpack_snapshot, truncated)
+  assert(ok, "unpack of a tail-less packet must not error")
+  assert(snap and snap.an == nil, "tail-less packet must yield no analytics")
+  -- And a snapshot that DID carry analytics, truncated mid-tail, must not crash.
+  local withAn = DisplaySnapshotUtil.pack_snapshot(0,
+    { p = {}, an = { dp = 9, sg = 9, mv = 9, sw = 9, rc = { [2] = 1, [3] = 1 }, uc = { [4] = 1 } } })
+  local midTail = string.sub(withAn, 1, #withAn - 3)
+  local ok2 = pcall(DisplaySnapshotUtil.unpack_snapshot, midTail)
+  assert(ok2, "unpack of a mid-tail-truncated packet must not error")
+  print("Analytics back-compat truncation test passed.")
+end
+
+test_analytics_backcompat_truncated()

@@ -350,6 +350,40 @@ local function unpackOgEntry(r)
 end
 
 ----------------------------------------------------------------------
+-- analytics sparse dicts (used_combos / reached_chains): integer-keyed
+-- sparse maps (keys = combo size 4..72 / chain length 2..13, values =
+-- occurrence counts). Pack as uint16 pair-count + per pair uint8 key +
+-- uint16 value. Enumerate with pairs() — these are sparse, so #dict is 0.
+----------------------------------------------------------------------
+local function packDict(w, dict)
+  local n, keys, vals = 0, {}, {}
+  if type(dict) == "table" then
+    for k, v in pairs(dict) do
+      k = tonumber(k)
+      if k and v and v ~= 0 then n = n + 1; keys[n] = k; vals[n] = v end
+    end
+  end
+  wU16(w, n)
+  for i = 1, n do
+    wU8(w, keys[i])
+    wU16(w, vals[i])
+  end
+end
+
+local function unpackDict(r)
+  local n = rU16(r) or 0
+  local out = {}
+  for _ = 1, n do
+    local k = rU8(r)
+    local v = rU16(r)
+    -- Truncated stream: stop rather than index with nil (mirrors unpackOgEntry).
+    if not k or not v then break end
+    out[k] = v
+  end
+  return out
+end
+
+----------------------------------------------------------------------
 -- events
 ----------------------------------------------------------------------
 local EVENT_CARD = 1
@@ -458,6 +492,21 @@ function M.pack_snapshot(from, snapshot)
     packEvent(w, e[i])
   end
 
+  -- analytics (tail section; absent on older senders — receiver guards on
+  -- remaining bytes). Present-byte gates the rest so an empty snapshot stays 1 byte.
+  local an = snapshot.an
+  if an then
+    wU8(w, 1)
+    wU32(w, an.dp or 0)
+    wU32(w, an.sg or 0)
+    wU32(w, an.mv or 0)
+    wU16(w, an.sw or 0)
+    packDict(w, an.rc)
+    packDict(w, an.uc)
+  else
+    wU8(w, 0)
+  end
+
   return wFinish(w)
 end
 
@@ -526,6 +575,22 @@ function M.unpack_snapshot(data)
       e[i] = unpackEvent(r)
     end
     snapshot.e = e
+  end
+
+  -- analytics tail (WIRE_VERSION 1, back-compat): older packets have no tail,
+  -- so only read when bytes remain. present==1 gates the payload.
+  if r.pos <= r.len then
+    local present = rU8(r)
+    if present == 1 then
+      local an = {}
+      an.dp = rU32(r) or 0
+      an.sg = rU32(r) or 0
+      an.mv = rU32(r) or 0
+      an.sw = rU16(r) or 0
+      an.rc = unpackDict(r)
+      an.uc = unpackDict(r)
+      snapshot.an = an
+    end
   end
 
   return from, snapshot

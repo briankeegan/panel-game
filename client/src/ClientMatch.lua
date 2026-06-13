@@ -1662,14 +1662,14 @@ function ClientMatch:drawMatchTime(timeString, themePositionOffset, scale)
 end
 
 function ClientMatch:drawTimer()
-  -- Draw the timer for time attack
-  -- Use the furthest-advanced stack: a dead stack's stopWatch freezes at its
-  -- death frame, so reading only stacks[1] stalls the clock once the local
-  -- player dies while opponents play on. Live stacks keep counting up.
+  -- Max over stacks so the clock keeps counting while anyone is alive. Derive
+  -- from clock, not stopWatch: snapshot-driven remote stacks never run Stack:run
+  -- so their stopWatch is frozen, and a dead local stack's freezes too.
   local frames = 0
   for _, stack in ipairs(self.stacks) do
-    if stack ~= nil and stack.engine.stopWatch ~= nil and tonumber(stack.engine.stopWatch) ~= nil then
-      frames = math.max(frames, stack.engine.stopWatch)
+    local engine = stack ~= nil and stack.engine
+    if engine and tonumber(engine.clock) ~= nil then
+      frames = math.max(frames, engine.clock - (engine.countdownOffsetFrames or 0))
     end
   end
 

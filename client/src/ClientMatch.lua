@@ -1259,6 +1259,20 @@ function ClientMatch:endScrub(commitFrame, fromNetwork)
     end
   end
 
+  -- Resume backstop: clear death state the snapshot restore may miss (same as
+  -- applyRewindEvent) and clamp clock so buffer_len can't go negative — both
+  -- gate input for controller and touch alike, freezing the board on resume.
+  local floor = (needsTruncate and commitFrame) or live.clock
+  for _, stack in ipairs(live.stacks) do
+    if stack.game_over_clock and stack.game_over_clock > floor then
+      stack.game_over_clock = -1
+      stack.game_over_stopWatch = 0
+    end
+    if stack.confirmedInput and stack.clock > #stack.confirmedInput then
+      stack.clock = #stack.confirmedInput
+    end
+  end
+
   self._scrubLiveEngine = nil
   self._scrubLiveEngineStacks = nil
   self._scrubPreview = nil

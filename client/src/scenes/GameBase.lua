@@ -350,6 +350,18 @@ function GameBase:load()
 
   self:initializeFrameInfo()
 
+  -- Scrub modes: clear death state a reused stack may carry in from a prior
+  -- round so a rewind never resumes into a gated (unresponsive) stack.
+  if self:_canScrub() then
+    for _, stack in ipairs(self.match.stacks) do
+      local e = stack.engine
+      if e and e.game_over_clock and e.game_over_clock > 0 then
+        e.game_over_clock = -1
+        e.game_over_stopWatch = 0
+      end
+    end
+  end
+
   self:customLoad()
 end
 

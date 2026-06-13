@@ -123,6 +123,9 @@ function MainMenu:createMainMenu()
     ui.MenuItem.createButtonMenuItem("mm_options", nil, nil, function()
       switchToScene(OptionsMenu())
     end),
+    ui.MenuItem.createButtonMenuItem("mm_replay_browser", nil, nil, function()
+      switchToScene(ReplayBrowser())
+    end),
     ui.MenuItem.createButtonMenuItem("mm_fullscreen", {"\n(Alt+Enter)"}, nil, function()
       GAME.theme:playValidationSfx()
       GAME:toggleFullscreen()
@@ -141,7 +144,6 @@ function MainMenu:createMainMenu()
   local menu = ui.Menu.createCenteredMenu(menuItems)
 
   if showDebugServers then
-    menu:addMenuItem(#menu.menuItems + 1, ui.MenuItem.createButtonMenuItem("Replay Browser", nil, false, function() switchToScene(ReplayBrowser()) end))
     menu:addMenuItem(#menu.menuItems + 1, ui.MenuItem.createButtonMenuItem("Beta Server", nil, false, function() switchToScene(Lobby({serverIp = "betaserver.panelattack.com", serverPort = 59569})) end))
   end
   if DebugSettings.showDesignHelper() then

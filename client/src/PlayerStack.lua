@@ -1017,6 +1017,33 @@ function PlayerStack:render(matchEnded, xOffset, yOffset, alpha)
     end
   end
 
+  -- [DIAG blocks-change-theme-on-death] throttled: log how each garbage block's
+  -- senderId resolves to a thrower theme (char/panels), with game_over_clock so we
+  -- can see alive-vs-dead. If the resolution flips on death (e.g. to NIL/fellBack),
+  -- the garbage will visibly switch to the board owner's theme. Remove when fixed.
+  if self.engine.clock % 30 == 0 then
+    local seen = {}
+    for row = 1, self.engine.height + 1 do
+      local r = self.engine.panels[row]
+      if r then
+        for col = 1, self.engine.width do
+          local p = r[col]
+          if p and p.isGarbage and p.senderId and not seen[p.senderId] then
+            seen[p.senderId] = true
+            local s = match and match.stacks and match.stacks[p.senderId]
+            logger.debug(string.format(
+              "[garbtheme-live] view=%s clk=%d goc=%s senderId=%s resolved{char=%s panels=%s} own{char=%s panels=%s} fellBack=%s nStacks=%s",
+              tostring(self.player_number), self.engine.clock, tostring(self.engine.game_over_clock),
+              tostring(p.senderId),
+              s and tostring(s.character and s.character.id) or "NIL", s and tostring(s.panels_dir) or "NIL",
+              tostring(self.character and self.character.id), tostring(self.panels_dir),
+              tostring(s == nil), tostring(match and match.stacks and #match.stacks)))
+          end
+        end
+      end
+    end
+  end
+
   local shakeOffset = self:currentShakeOffset() / self.gfxScale
 
   self:drawPanels(garbageCharacter, metalPanelSet, shakeOffset)

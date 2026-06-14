@@ -53,7 +53,24 @@ local function test_recent_inbound_survives_and_still_pings()
     "a ping should be enqueued for a live-but-quiet connection")
 end
 
+local function test_steady_probe_fires_despite_recent_traffic()
+  logger.info("test_steady_probe_fires_despite_recent_traffic")
+  local conn = Connection(stubSocket(), 4)
+  -- Comm happened THIS tick (t == lastCommunicationTime): the old 1s-idle gate
+  -- would suppress the ping. The steady RTT probe must fire anyway so the
+  -- min-RTT window stays fresh during busy pre-match lobby chatter (otherwise
+  -- Room:start_match reads a stale window when computing per-player startInMs).
+  conn.lastCommunicationTime = 1000
+  conn.lastPingTime = 1000
+  local queueBefore = conn.outgoingMessageQueue:len()
+  local alive = conn:update(1000, false, false)
+  assert(alive == true, "live connection must survive")
+  assert(conn.outgoingMessageQueue:len() == queueBefore + 1,
+    "steady probe must enqueue a ping even when there was traffic this tick")
+end
+
 test_ack_deadline_drops_silent_socket()
 test_ack_deadline_boundary_keeps_socket()
 test_recent_inbound_survives_and_still_pings()
+test_steady_probe_fires_despite_recent_traffic()
 logger.info("All ConnectionTests passed!")

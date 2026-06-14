@@ -7,9 +7,16 @@ local socket = require("common.lib.socket")
 local Queue = require("common.lib.Queue")
 
 -- Per-connection RTT samples kept for adaptive start-budget sizing
--- (Room:start_match widens the +500ms grace using max-RTT-in-room).
--- 8 samples × ~1 ping/sec = ~8s of recent history; min filters jitter.
+-- (Room:start_match widens the +500ms grace using max-RTT-in-room, and uses
+-- min-RTT for each player's one-way start correction).
+-- 8 samples × the steady probe below (~300ms) = ~2.4s of recent history; min
+-- filters jitter, and the fixed cadence keeps the window fresh at match start
+-- regardless of lobby traffic.
 local RTT_SAMPLE_WINDOW = 8
+
+-- Steady RTT-probe cadence. Sub-second and traffic-independent so the min/max
+-- RTT window is fresh when Room:start_match computes per-player start offsets.
+local RTT_PROBE_INTERVAL_MS = 300
 
 local DEFAULT_SEND_RETRY_LIMIT = 5
 -- Drop a socket that has gone fully silent. A healthy client acks every ping
@@ -59,6 +66,10 @@ local Connection = class(
     self.loggedIn = false
     self.lastCommunicationTime = time()
     self.lastPingTime = self.lastCommunicationTime
+    -- 0 → first update() seeds it and fires one probe promptly. Kept out of the
+    -- constructor so construction never depends on socket.gettime (the RTT clock
+    -- is only touched in update(), as before).
+    self.lastPingTimeMs = 0
     self.incomingMessageQueue = Queue()
     self.outgoingMessageQueue = Queue()
     self.incomingInputQueue = Queue()
@@ -296,20 +307,25 @@ function Connection:update(t, canRead, canSend)
       return false
     end
     -- No app-level idle-disconnect: a player with a room slot must not get
-    -- booted just because they stopped sending lobby chatter. Pings fire to
-    -- elicit acks; that traffic keeps the deadline above satisfied.
-    if t > self.lastPingTime and timeSinceLastComm > 1 then
-      -- Body carries serverTimeMs so clients can refine their server-time
-      -- offset even when no lobby chatter is flowing. The client echoes it
-      -- back in its E ack; we diff against now to compute RTT. Using the
-      -- echoed value (rather than a stored send-time) makes multi-in-flight
-      -- pings self-correlate without per-ping bookkeeping.
-      local nowMs = math.floor(socket.gettime() * 1000)
-      local body = '{"serverTimeMs":' .. nowMs .. '}'
-      self:send(NetworkProtocol.markedMessageForTypeAndBody(
-        NetworkProtocol.serverMessageTypes.ping.prefix, body))
-      self.lastPingTime = t
-    end
+    -- booted just because they stopped sending lobby chatter. The steady RTT
+    -- probe below elicits the acks that keep the deadline above satisfied.
+  end
+
+  -- Steady RTT probe: fixed sub-second cadence, independent of other traffic.
+  -- The keepalive ping used to fire only after >1s of silence, so pre-match
+  -- ready/settings chatter suppressed it and Room:start_match read a stale
+  -- min-RTT window when computing each player's startInMs. Probing on a fixed
+  -- interval keeps getMin/MaxRecentRttMs fresh, so start-time alignment is
+  -- computed from current samples. Body carries serverTimeMs; the client echoes
+  -- it back in its E ack and we diff against now — using the echoed value (not a
+  -- stored send-time) lets multiple in-flight pings self-correlate without
+  -- per-ping bookkeeping. Body + ack path unchanged, so no client change needed.
+  local nowMs = math.floor(socket.gettime() * 1000)
+  if nowMs - self.lastPingTimeMs >= RTT_PROBE_INTERVAL_MS then
+    self:send(NetworkProtocol.markedMessageForTypeAndBody(
+      NetworkProtocol.serverMessageTypes.ping.prefix, '{"serverTimeMs":' .. nowMs .. '}'))
+    self.lastPingTimeMs = nowMs
+    self.lastPingTime = t
   end
 
   return true

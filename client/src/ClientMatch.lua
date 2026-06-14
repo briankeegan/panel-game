@@ -1008,26 +1008,6 @@ function ClientMatch:deinit()
 end
 
 function ClientMatch:moveStacks()
-  if self.replay and self.replay.metadata.completed then
-    if tableUtils.trueForAll(self.replay.metadata.stacks, function(s) return s.layoutSlot end) then
-      for _, stackMetadata in ipairs(self.replay.metadata.stacks) do
-        if #self.stacks == 3 then
-          self.stacks[stackMetadata.stackIndex]:moveForLayoutSlot3Player(stackMetadata.layoutSlot)
-        elseif #self.stacks == 4 then
-          self.stacks[stackMetadata.stackIndex]:moveForLayoutSlot4PlayerHorizontal(stackMetadata.layoutSlot)
-        elseif #self.stacks == 5 then
-          self.stacks[stackMetadata.stackIndex]:moveForLayoutSlot5Player(stackMetadata.layoutSlot)
-        elseif #self.stacks == 6 then
-          self.stacks[stackMetadata.stackIndex]:moveForLayoutSlot6Player(stackMetadata.layoutSlot)
-        elseif #self.stacks == 7 then
-          self.stacks[stackMetadata.stackIndex]:moveForLayoutSlot7Player(stackMetadata.layoutSlot)
-        else
-          self.stacks[stackMetadata.stackIndex]:moveForLayoutSlot(stackMetadata.layoutSlot)
-        end
-      end
-      return
-    end
-  end
 
   -- Viewer-relative rotation. The focused stack lands in slot 1 (big-left).
   -- Every other stack gets a slot based on its OFFSET from the focus, not its
@@ -1060,6 +1040,17 @@ function ClientMatch:moveStacks()
   if not focus then
     for _, s in ipairs(stacks) do
       if s.is_local then focus = slotOf(s); break end
+    end
+  end
+  -- A finished replay has no local player to anchor the default focus. Seed it
+  -- from the recorded layout (slot 1 = the board that was up-front at record
+  -- time) so it opens as recorded, then < > rotates exactly like live spectate.
+  if not focus and self.replay and self.replay.metadata.completed and self.replay.metadata.stacks then
+    for _, sm in ipairs(self.replay.metadata.stacks) do
+      if sm.layoutSlot == 1 and self.stacks[sm.stackIndex] then
+        focus = slotOf(self.stacks[sm.stackIndex])
+        break
+      end
     end
   end
 

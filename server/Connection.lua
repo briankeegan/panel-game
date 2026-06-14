@@ -18,6 +18,13 @@ local RTT_SAMPLE_WINDOW = 8
 -- RTT window is fresh when Room:start_match computes per-player start offsets.
 local RTT_PROBE_INTERVAL_MS = 300
 
+-- Millisecond wall-clock for the probe cadence and ack round-trip timing.
+-- Injectable via Connection's 4th constructor arg so tests can drive the
+-- cadence deterministically; production uses socket.gettime.
+local function defaultNowMs()
+  return math.floor(socket.gettime() * 1000)
+end
+
 local DEFAULT_SEND_RETRY_LIMIT = 5
 -- Drop a socket that has gone fully silent. A healthy client acks every ping
 -- unconditionally (TcpClient replies even on a malformed body), so no inbound
@@ -53,12 +60,13 @@ local MAX_LEFTOVERS_BYTES = 4 * 1024 * 1024
 ---@field sendRetryCount integer
 ---@field sendRetryLimit integer
 ---@field inputProcessor InputProcessor?
----@overload fun(socket: any, index: integer) : Connection
+---@overload fun(socket: any, index: integer, nowMsFn: (fun(): integer)?) : Connection
 local Connection = class(
 ---@param self Connection
 ---@param socket TcpSocket
 ---@param index integer
-  function(self, socket, index)
+---@param nowMsFn (fun(): integer)? optional ms-clock override (tests); defaults to socket.gettime
+  function(self, socket, index, nowMsFn)
     self.index = index
     self.socket = socket
     self.channel = "gameplay" -- default; Server:_acceptOnListener overrides for lobby
@@ -67,9 +75,10 @@ local Connection = class(
     self.lastCommunicationTime = time()
     self.lastPingTime = self.lastCommunicationTime
     -- 0 → first update() seeds it and fires one probe promptly. Kept out of the
-    -- constructor so construction never depends on socket.gettime (the RTT clock
-    -- is only touched in update(), as before).
+    -- constructor so construction never depends on the ms clock (only update()
+    -- and the ack handler touch it, via self._nowMs).
     self.lastPingTimeMs = 0
+    self._nowMs = nowMsFn or defaultNowMs
     self.incomingMessageQueue = Queue()
     self.outgoingMessageQueue = Queue()
     self.incomingInputQueue = Queue()
@@ -320,7 +329,7 @@ function Connection:update(t, canRead, canSend)
   -- it back in its E ack and we diff against now — using the echoed value (not a
   -- stored send-time) lets multiple in-flight pings self-correlate without
   -- per-ping bookkeeping. Body + ack path unchanged, so no client change needed.
-  local nowMs = math.floor(socket.gettime() * 1000)
+  local nowMs = self._nowMs()
   if nowMs - self.lastPingTimeMs >= RTT_PROBE_INTERVAL_MS then
     self:send(NetworkProtocol.markedMessageForTypeAndBody(
       NetworkProtocol.serverMessageTypes.ping.prefix, '{"serverTimeMs":' .. nowMs .. '}'))
@@ -357,7 +366,7 @@ function Connection:processMessage(messageType, data)
     if data and #data > 0 then
       local ok, decoded = pcall(json.decode, data)
       if ok and type(decoded) == "table" and type(decoded.echoedServerTimeMs) == "number" then
-        local nowMs = math.floor(socket.gettime() * 1000)
+        local nowMs = self._nowMs()
         local rttMs = nowMs - decoded.echoedServerTimeMs
         -- Sanity-bound: drop nonsense samples (clock skew, replay).
         if rttMs >= 0 and rttMs < 10000 then

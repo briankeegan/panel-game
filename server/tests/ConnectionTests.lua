@@ -53,24 +53,55 @@ local function test_recent_inbound_survives_and_still_pings()
     "a ping should be enqueued for a live-but-quiet connection")
 end
 
-local function test_steady_probe_fires_despite_recent_traffic()
-  logger.info("test_steady_probe_fires_despite_recent_traffic")
-  local conn = Connection(stubSocket(), 4)
-  -- Comm happened THIS tick (t == lastCommunicationTime): the old 1s-idle gate
-  -- would suppress the ping. The steady RTT probe must fire anyway so the
-  -- min-RTT window stays fresh during busy pre-match lobby chatter (otherwise
-  -- Room:start_match reads a stale window when computing per-player startInMs).
+-- Must mirror RTT_PROBE_INTERVAL_MS in server/Connection.lua.
+local RTT_PROBE_INTERVAL_MS = 300
+
+local function test_steady_probe_cadence_is_traffic_independent()
+  logger.info("test_steady_probe_cadence_is_traffic_independent")
+  -- Inject the ms clock so the 300ms cadence is deterministic (no real sleeps).
+  local fakeMs = 1000
+  local conn = Connection(stubSocket(), 4, function() return fakeMs end)
+  -- t == lastCommunicationTime on every tick: the OLD 1s-idle gate would
+  -- suppress the ping. The steady RTT probe must ignore that and fire on its
+  -- own cadence so the min-RTT window stays fresh during busy pre-match chatter
+  -- (otherwise Room:start_match reads a stale window for per-player startInMs).
   conn.lastCommunicationTime = 1000
   conn.lastPingTime = 1000
-  local queueBefore = conn.outgoingMessageQueue:len()
-  local alive = conn:update(1000, false, false)
-  assert(alive == true, "live connection must survive")
-  assert(conn.outgoingMessageQueue:len() == queueBefore + 1,
-    "steady probe must enqueue a ping even when there was traffic this tick")
+  local function pings() return conn.outgoingMessageQueue:len() end
+
+  local base = pings()
+  conn:update(1000, false, false)
+  assert(pings() == base + 1, "probe must fire on the first tick despite same-tick traffic")
+
+  -- Within the interval: suppressed even though we keep calling update().
+  fakeMs = fakeMs + (RTT_PROBE_INTERVAL_MS - 1)
+  conn:update(1000, false, false)
+  assert(pings() == base + 1, "probe within the interval must be suppressed")
+
+  -- Once the interval elapses: fires again.
+  fakeMs = fakeMs + 2
+  conn:update(1000, false, false)
+  assert(pings() == base + 2, "probe must re-fire after the interval elapses")
+end
+
+local function test_rtt_window_min_max_and_trim()
+  logger.info("test_rtt_window_min_max_and_trim")
+  local conn = Connection(stubSocket(), 5)
+  assert(conn:getMinRecentRttMs() == nil and conn:getMaxRecentRttMs() == nil,
+    "empty window has no min/max")
+  for i = 1, 8 do conn:_recordRttSample(i * 10) end -- 10..80; fills the 8-deep window
+  assert(#conn.rttSamples == 8, "window holds the cap of 8 samples")
+  assert(conn:getMinRecentRttMs() == 10, "min across the window")
+  assert(conn:getMaxRecentRttMs() == 80, "max across the window")
+  conn:_recordRttSample(5) -- 9th sample: the oldest (10) ages out
+  assert(#conn.rttSamples == 8, "window stays at 8 after overflow")
+  assert(conn:getMinRecentRttMs() == 5, "newest sample becomes the min")
+  assert(conn:getMaxRecentRttMs() == 80, "max retained (hasn't aged out yet)")
 end
 
 test_ack_deadline_drops_silent_socket()
 test_ack_deadline_boundary_keeps_socket()
 test_recent_inbound_survives_and_still_pings()
-test_steady_probe_fires_despite_recent_traffic()
+test_steady_probe_cadence_is_traffic_independent()
+test_rtt_window_min_max_and_trim()
 logger.info("All ConnectionTests passed!")

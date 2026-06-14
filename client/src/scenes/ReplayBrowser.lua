@@ -5,9 +5,7 @@ local GraphicsUtil = require("client.src.graphics.graphics_util")
 local fileUtils = require("client.src.FileUtils")
 local ReplayV3 = require("common.data.ReplayV3")
 local class = require("common.lib.class")
-local GameModes = require("common.data.GameModes")
-local ReplayGame = require("client.src.scenes.ReplayGame")
-local ClientMatch = require("client.src.ClientMatch")
+local ReplayLauncher = require("client.src.ReplayLauncher")
 local logger = require("common.lib.logger")
 
 local ReplayBrowser = class(
@@ -180,61 +178,6 @@ local function isMultiplayerReplay(replay)
   return humans >= 2
 end
 
-local function startReplay(replay)
-  SoundController:stopMusic()
-
-  -- 2+ player replays play the recorded tape through a real spectating
-  -- BattleRoom (live spectator's render path); BattleRoom.lua is not modified.
-  if replay.displayHistory and #replay.displayHistory > 0 then
-    local BattleRoom = require("client.src.BattleRoom")
-    local DisplayClientStack = require("client.src.network.DisplayClientStack")
-    local ReplaySpectator = require("client.src.scenes.ReplaySpectator")
-    local modeId = GameModes.nameToGameModeId[replay.metadata.gameModeName]
-    local gameMode = modeId and GameModes.getPreset(modeId)
-
-    local battleRoom = BattleRoom(gameMode)
-    battleRoom.spectating = true
-    battleRoom.displayHistoryEnabled = true
-
-    -- hide displayHistory across the call so createFromReplay skips its own
-    -- drain; we feed the room the tape ourselves
-    local tape = replay.displayHistory
-    replay.displayHistory = nil
-    local match = ClientMatch.createFromReplay(replay, nil, gameMode)
-    replay.displayHistory = tape
-
-    for i = 1, #match.players do battleRoom:addPlayer(match.players[i]) end
-    battleRoom.match = match
-    battleRoom.state = BattleRoom.states.MatchInProgress
-    if match.engine then match.engine.pauseNonLocalSimulation = true end
-
-    battleRoom._displayStacks = {}
-    for _, stack in ipairs(match.stacks) do
-      local player = stack.player
-      local pid = player and (player.publicId or player.playerNumber)
-      if pid then
-        battleRoom._displayStacks[pid] = DisplayClientStack.new(pid, player, stack)
-        stack.canvas = nil
-        stack.displayRendered = true
-      end
-    end
-
-    match.renderDuringPause = true
-    match.supportsPause = false
-    match:start()
-    match:moveStacks()
-    GAME.battleRoom = battleRoom
-    GAME.navigationStack:push(ReplaySpectator({match = match, tape = tape}))
-    return
-  end
-
-  local match = ClientMatch.createFromReplay(replay)
-  match.renderDuringPause = true
-  match.supportsPause = true
-  match:start()
-  GAME.navigationStack:push(ReplayGame({match = match}))
-end
-
 function ReplayBrowser:update()
   if state == "browser" then
     if input.isDown["MenuEsc"] then
@@ -246,7 +189,7 @@ function ReplayBrowser:update()
       if selectMenuItem() then
         -- Multiplayer replays launch on a single click; solo show the info screen first.
         if isMultiplayerReplay(selectedReplay) and ReplayV3.replayCanBeViewed(selectedReplay) then
-          startReplay(selectedReplay)
+          ReplayLauncher.launch(selectedReplay)
         else
           state = "info"
         end
@@ -276,7 +219,7 @@ function ReplayBrowser:update()
     if input.isDown["MenuSelect"] then
       if ReplayV3.replayCanBeViewed(selectedReplay) then
         GAME.theme:playValidationSfx()
-        startReplay(selectedReplay)
+        ReplayLauncher.launch(selectedReplay)
       else
         GAME.theme:playCancelSfx()
       end

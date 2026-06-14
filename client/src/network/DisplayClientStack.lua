@@ -810,6 +810,11 @@ function DisplayClientStack:render(viewStack)
   local snapshot = self.snapshot
   if not snapshot then return end -- guaranteed by the guard above; narrows for LuaLS
 
+  -- Hand the current snapshot to the paired view-stack so display-only code that
+  -- runs outside this renderer (ClientStack:drawPlayerName, called by GameBase)
+  -- can read snapshot-shaped state like the death frame/time for the OUT marker.
+  viewStack._displaySnapshot = snapshot
+
   -- Update HUD-driving engine fields with interpolated values before any
   -- draw. GameBase:draw orders us before drawHUD, so the tweened values
   -- are what drawScore / drawMultibar / Telegraph read this frame.

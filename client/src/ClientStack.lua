@@ -978,11 +978,29 @@ function ClientStack:drawPlayerName()
   local fontDelta = 8                                          -- bump default font size
   GraphicsUtil.printf(username, chipX, chipY + 6, chipWidth, "center", nil, nil, fontDelta)
 
-  if self.engine and (self.engine.game_over_clock or 0) > 0 then
-    -- Engine captures game_over_stopWatch at recordDeath in the in-game-timer
-    -- domain (countdown already subtracted). Read it directly — no per-frame
-    -- conversion, no risk of drift between this marker and drawTimer.
-    local seconds = math.floor((self.engine.game_over_stopWatch or 0) / 60)
+  -- Death "OUT m:ss" marker. Live play sets game_over_clock/stopWatch on the
+  -- engine via the death event. Snapshot replays have neither (the death rides
+  -- the snapshot's `go`), so source the death state + time from the snapshot
+  -- when one is attached (set by DisplayClientStack:render).
+  local snap = self._displaySnapshot
+  local snapDead = snap and (snap.go or 0) > 0
+  if snapDead or (self.engine and (self.engine.game_over_clock or 0) > 0) then
+    local seconds
+    if snapDead then
+      -- gsw = death stopWatch when the snapshot carries it; otherwise derive
+      -- from the death frame `go`, which is in the engine-clock domain (includes
+      -- the countdown) — subtracting the offset is exactly what recordDeath does.
+      local sw = snap.gsw
+      if not sw or sw == 0 then
+        local off = (self.engine and self.engine.countdownOffsetFrames) or 0
+        sw = math.max(0, (snap.go or 0) - off)
+      end
+      seconds = math.floor(sw / 60)
+    else
+      -- Engine captures game_over_stopWatch at recordDeath in the in-game-timer
+      -- domain (countdown already subtracted). Read it directly — no drift.
+      seconds = math.floor((self.engine.game_over_stopWatch or 0) / 60)
+    end
     local marker = string.format("OUT %d:%02d", math.floor(seconds / 60), seconds % 60)
     local markerHeight = 20
     local markerY = chipY - markerHeight - 2

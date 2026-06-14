@@ -240,6 +240,11 @@ local function buildSnapshot(engine)
     -- actually is one (>0); the engine's -1 alive sentinel must NOT go on the
     -- wire — it round-trips through uint32 as 4294967295 = "dead".
     go = (engine.game_over_clock or 0) > 0 and engine.game_over_clock or 0,
+    -- Death time (in-game stopWatch, countdown already subtracted). Online this
+    -- rides the separate death event; duplicated here so snapshot replays can
+    -- show the "OUT m:ss" marker. 0 while alive. Remote players' copies go via
+    -- the binary wire (no gsw field) and the renderer derives from `go` instead.
+    gsw = (engine.game_over_clock or 0) > 0 and (engine.game_over_stopWatch or 0) or 0,
     im = engine.inputMethod                or "controller",
     cn = engine.chain_counter              or 0,
     -- HUD scalars: read on the receiver and mirrored onto the engine

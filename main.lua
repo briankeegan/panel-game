@@ -40,6 +40,10 @@ function love.run()
   return CustomRun.run()
 end
 
+-- Dev replay screenshot harness (inert unless PA_AUTO_REPLAY is set). See
+-- client/src/debug/AutoReplay.lua for usage. Wired in love.load / love.update.
+local AutoReplay = require("client.src.debug.AutoReplay")
+
 -- Called at the beginning to load the game
 -- Either called directly or from auto_updater
 -- Intentional override
@@ -77,6 +81,7 @@ function love.load(args, rawArgs)
     prof.enable(DebugSettings.getProfileFrameTimes())
     prof.setDurationFilter(DebugSettings.getProfileThreshold() / 1000)
   end
+  AutoReplay.init()
 end
 
 -- Intentional override
@@ -103,6 +108,8 @@ function love.update(dt)
   touchHandler:update(dt)
 
   GAME:update(dt)
+
+  AutoReplay.update()
 end
 
 local statOrder -- in reverse of the desired display order

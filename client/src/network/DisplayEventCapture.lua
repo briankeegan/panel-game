@@ -236,7 +236,10 @@ local function buildSnapshot(engine)
     dt = dangerTimer,
     ic = engine.in_countdown and true or false,
     ct = engine.countdown_timer            or 0,
-    go = engine.game_over_clock            or 0,
+    -- 0 = alive (the field convention). Store the death frame only when there
+    -- actually is one (>0); the engine's -1 alive sentinel must NOT go on the
+    -- wire — it round-trips through uint32 as 4294967295 = "dead".
+    go = (engine.game_over_clock or 0) > 0 and engine.game_over_clock or 0,
     im = engine.inputMethod                or "controller",
     cn = engine.chain_counter              or 0,
     -- HUD scalars: read on the receiver and mirrored onto the engine

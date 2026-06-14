@@ -1,5 +1,6 @@
 local DisplaySnapshotUtil = require("client.src.network.DisplaySnapshotUtil")
 local ffiGuard = require("client.src.network.DisplaySnapshotFFI")
+local PanelStateCodes = require("client.src.network.PanelStateCodes")
 local assert = assert
 
 local function test_pack_unpack_identity()
@@ -39,10 +40,41 @@ local function test_pack_unpack_identity()
   end
   for i = 1, 72 do
     assert(unpacked.p[i].c == orig.p[i].c, "Panel color mismatch at " .. i)
-    assert(unpacked.p[i].s == orig.p[i].s,
-      "Panel state mismatch at " .. i .. ": " .. tostring(unpacked.p[i].s) .. " vs " .. tostring(orig.p[i].s))
+    -- unpack yields the numeric state code; orig uses engine state names
+    assert(unpacked.p[i].s == PanelStateCodes.toCode(orig.p[i].s),
+      "Panel state mismatch at " .. i .. ": " .. tostring(unpacked.p[i].s)
+        .. " vs " .. tostring(PanelStateCodes.toCode(orig.p[i].s)))
   end
   print("DisplaySnapshotUtil pack/unpack identity test passed.")
 end
 
+-- Regression: the engine's -1 alive sentinel must never reach the wire — it
+-- round-trips through uint32 as 4294967295 and reads back as "dead". Capture
+-- coerces alive to 0; here we prove 0 stays 0 and a real death frame survives.
+local function test_game_over_clock_sentinel()
+  if not ffiGuard.FFI_SUPPORTED then
+    print("FFI not supported, skipping go sentinel test.")
+    return
+  end
+  local function roundtrip_go(go)
+    local snap = {
+      f = 1, d = 0, cr = 1, cc = 1, w = 6, h = 12,
+      ic = false, rl = false, sh = 0, psh = 0, pkh = 0,
+      dt = 0, ct = 0, go = go, im = "controller",
+      cn = 0, sc = 0, sp = 0, pc = 0, mp = 0, hp = 0,
+      st = 0, ps = 0, sw = 0,
+      dc = {false, false, false, false, false, false},
+      p = {},
+    }
+    for i = 1, 72 do snap.p[i] = { c = 0, s = "normal" } end
+    local packed = DisplaySnapshotUtil.pack_snapshot(1, snap)
+    local _, unpacked = DisplaySnapshotUtil.unpack_snapshot(packed)
+    return unpacked.go
+  end
+  assert(roundtrip_go(0) == 0, "alive (go=0) must round-trip to 0, got " .. tostring(roundtrip_go(0)))
+  assert(roundtrip_go(500) == 500, "death frame (go=500) must round-trip to 500, got " .. tostring(roundtrip_go(500)))
+  print("DisplaySnapshotUtil go sentinel test passed.")
+end
+
 test_pack_unpack_identity()
+test_game_over_clock_sentinel()

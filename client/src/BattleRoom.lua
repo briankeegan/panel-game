@@ -751,6 +751,23 @@ function BattleRoom:_stopDisplayCaptures()
   end
 end
 
+-- Copy a display batch so a recorded reference survives applyBatch mutating
+-- the original (it resolves snapshot.p deltas in place and nils snapshot.e).
+-- Copies the snapshot fields + the p array; e stays shared (its contents are
+-- never mutated, only the field is nil'd on the original).
+local function copyDisplayBatch(batch)
+  local snap = batch.snapshot
+  local snapCopy = {}
+  for k, v in pairs(snap) do snapCopy[k] = v end
+  local p = snap.p
+  if p then
+    local pCopy = {}
+    for i = 1, #p do pCopy[i] = p[i] end
+    snapCopy.p = pCopy
+  end
+  return { from = batch.from, snapshot = snapCopy }
+end
+
 ---Route an inbound display-event batch to the appropriate
 ---DisplayClientStack. Called from NetClient's processDisplayEvents
 ---drain. No-op when the room flag is off (no stacks exist) or when
@@ -765,13 +782,13 @@ function BattleRoom:applyDisplayEventBatch(batch)
   if not stack then return end
   -- If batch is already a decoded FFI snapshot, pass as-is
   if batch.snapshot and type(batch.snapshot) == "table" then
-    stack:applyBatch(batch)
-    -- Also record incoming remote snapshots so replay can play them back
-    -- through the same pipeline (identical to what DisplayEventCapture does
-    -- for the local player).
+    -- Record the wire form BEFORE applyBatch consumes it: applyBatch resolves
+    -- the grid in place and nils snapshot.e (pop/card/SFX one-shots), so a
+    -- post-apply capture loses every remote one-shot + the delta form.
     if self._replayDisplayHistory then
-      self._replayDisplayHistory[#self._replayDisplayHistory + 1] = batch
+      self._replayDisplayHistory[#self._replayDisplayHistory + 1] = copyDisplayBatch(batch)
     end
+    stack:applyBatch(batch)
   end
 end
 

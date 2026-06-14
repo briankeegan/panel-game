@@ -294,7 +294,9 @@ function TcpClient:readSocket()
   if data and data:len() > 0 then
     self.data = self.data .. data
     -- Stamp recency for the spectate-channel-silence watchdog in NetClient.
-    self.lastRecvMs = math.floor((love.timer.getTime() or 0) * 1000)
+    -- socket.gettime (already used for the ms stamps above) keeps this
+    -- love-free so the headless bot client can reuse TcpClient.
+    self.lastRecvMs = math.floor(socket.gettime() * 1000)
   end
   if error == "closed" then
     logger.warn(self.name .. ": the connection was closed while trying to stream data")

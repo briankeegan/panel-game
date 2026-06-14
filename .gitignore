@@ -47,3 +47,6 @@ updater-shell/https/**/*.dll
 
 # Replay debug screenshots (AutoReplay harness output)
 pa_*.png
+
+# Bot account credentials (per-server user_id, like servers/*/user_id.txt)
+bot/identities/

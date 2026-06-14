@@ -1,14 +1,24 @@
 local class = require("common.lib.class")
+---@diagnostic disable-next-line: different-requires
+local socket = require("socket")
 
 -- how many seconds it takes for a request to give up waiting for a response
 local REQUEST_TIMEOUT = 5
+
+-- love-free monotonic-ish clock so the headless bot client can reuse Response.
+-- Under LÖVE this is the same love.timer.getTime() as before; headless falls
+-- back to luasocket's wall clock (both callers below use the same source).
+local function now()
+  if love and love.timer then return love.timer.getTime() end
+  return socket.gettime()
+end
 
 -- Responses are drained from the queue of the SAME client that sent the
 -- request (passed in by Request:send). Dual-socket split means a J-message
 -- response lands on lobbyClient and an H-message response lands on whichever
 -- client sent the handshake — both clients need their own response routing.
 local function createResponseCoroutine(client, responseTypes)
-  local startTime = love.timer.getTime()
+  local startTime = now()
   local cr = coroutine.create(
     function ()
       local response
@@ -19,7 +29,7 @@ local function createResponseCoroutine(client, responseTypes)
       assert(client, "Response: client (TcpClient) is required")
       local queue = client.receivedMessageQueue
 
-      while not response and love.timer.getTime() < startTime + REQUEST_TIMEOUT do
+      while not response and now() < startTime + REQUEST_TIMEOUT do
         coroutine.yield()
         response = queue:pop_next_with(unpack(responseTypes))
       end

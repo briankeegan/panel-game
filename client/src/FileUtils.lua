@@ -426,11 +426,10 @@ function fileUtils.getMatchingFiles(files, pattern, validExtensions, separator)
   return matchedFiles
 end
 
--- Returns the correct per-player save directory, working around the love12
--- pre-release bug where getSaveDirectory() returns the project-dir basename
--- ("panel-game") instead of the identity-derived path. Prefer the path
--- constructed from LOVE_IDENTITY + HOME (macOS) so all clients get their
--- own isolated dir regardless of the love.filesystem bug.
+-- Per-client save dir. On our love build love.filesystem.read/write resolve to
+-- the project-dir basename and ignore the identity, so multiple run_client.sh
+-- clients collide; the identity-derived path (LOVE_IDENTITY + HOME, macOS) keeps
+-- them isolated. Falls back to getSaveDirectory() when LOVE_IDENTITY is unset.
 function fileUtils.getSaveDir()
   local identity = os.getenv("LOVE_IDENTITY")
   local home = os.getenv("HOME")
@@ -438,6 +437,52 @@ function fileUtils.getSaveDir()
     return home .. "/Library/Application Support/LOVE/" .. identity
   end
   return love.filesystem.getSaveDirectory and love.filesystem.getSaveDirectory()
+end
+
+-- True only for a named dev client (run_client.sh sets LOVE_IDENTITY). Outside
+-- that, scoped read/write fall back to the untouched love.filesystem path.
+function fileUtils.isScopedSaveDir()
+  return os.getenv("LOVE_IDENTITY") ~= nil and os.getenv("HOME") ~= nil
+end
+
+-- Write a save-dir-relative file, isolated per client when scoped.
+function fileUtils.writeScoped(filename, data)
+  if fileUtils.isScopedSaveDir() then
+    fileUtils.write("", filename, data)
+  else
+    love.filesystem.write(filename, data)
+  end
+end
+
+-- Read+decode a save-dir-relative JSON file, isolated per client when scoped.
+function fileUtils.readScoped(filename)
+  if not fileUtils.isScopedSaveDir() then
+    return fileUtils.readJsonFile(filename)
+  end
+  local f = io.open(fileUtils.getSaveDir() .. "/" .. filename, "r")
+  if not f then return nil end
+  local content = f:read("*a")
+  f:close()
+  if not content then return nil end
+  local value, _, errorMsg = json.decode(content)
+  if errorMsg then
+    logger.error("Error reading " .. filename .. ":\n" .. errorMsg)
+    return nil
+  end
+  return value
+end
+
+-- Existence check matching readScoped's lookup location.
+function fileUtils.existsScoped(filename)
+  if not fileUtils.isScopedSaveDir() then
+    return fileUtils.exists(filename)
+  end
+  local f = io.open(fileUtils.getSaveDir() .. "/" .. filename, "r")
+  if f then
+    f:close()
+    return true
+  end
+  return false
 end
 
 ---@param path string

@@ -163,7 +163,7 @@ config = {
       function()
         local encoded = json.encode(config)
         ---@cast encoded string
-        love.filesystem.write("conf.json", encoded)
+        fileUtils.writeScoped("conf.json", encoded)
       end
     )
   end
@@ -205,7 +205,7 @@ config = {
         -- config current values are defined in globals.lua,
         -- we consider those values are currently in config
 
-        local read_data = fileUtils.readJsonFile("conf.json")
+        local read_data = fileUtils.readScoped("conf.json")
 
         if read_data then
           -- do stuff using read_data.version for retrocompatibility here

@@ -476,9 +476,9 @@ local previousVersionFilename = "keysV2.json"
 function inputManager:hasKeyFile()
   local filename = nil
   local migrateInputs = false
-  if FileUtils.exists(currentVersionFilename) then
+  if FileUtils.existsScoped(currentVersionFilename) then
     filename = currentVersionFilename
-  elseif FileUtils.exists(previousVersionFilename) then
+  elseif FileUtils.existsScoped(previousVersionFilename) then
     filename = previousVersionFilename
     migrateInputs = true
   end
@@ -496,7 +496,7 @@ function inputManager:load()
     return inputManager.inputConfigurations
   end
 
-  local inputConfigs = FileUtils.readJsonFile(filename)
+  local inputConfigs = FileUtils.readScoped(filename)
 
   if migrateInputs then
     -- migrate old input configs

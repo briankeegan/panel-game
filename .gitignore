@@ -44,3 +44,6 @@ dev-build-shells/
 # commit locally-built single-arch binaries.
 updater-shell/https/**/*.so
 updater-shell/https/**/*.dll
+
+# Replay debug screenshots (AutoReplay harness output)
+pa_*.png

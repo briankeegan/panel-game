@@ -10,7 +10,9 @@ local GraphicsUtil = require("client.src.graphics.graphics_util")
 local TeamUtils = require("common.data.TeamUtils")
 
 -- frames/sec = speed * 60; negative = reverse, 0 = pause
-local SPEEDS = {-4, -2, -1, -0.5, 0, 0.5, 1, 2, 4, 8}
+local SPEEDS = {-32, -16, -8, -4, -2, -1, -0.5, 0, 0.5, 1, 2, 4, 8, 16, 32}
+local PAUSE_INDEX = 1
+for i, s in ipairs(SPEEDS) do if s == 0 then PAUSE_INDEX = i; break end end
 
 local ReplaySpectator = class(function(self, sceneParams)
   self.tape = sceneParams.tape or {}
@@ -66,10 +68,20 @@ local function focusedPlayerName(match)
 end
 
 function ReplaySpectator:handleInput()
-  if input.allKeys.isDown["escape"] or input.isDown["MenuEsc"] or input.isDown["MenuBack"] then
-    GAME.theme:playCancelSfx()
-    if self.match then self.match:abort() end
-    GAME.navigationStack:pop()
+  -- Back/escape: first press pauses (speed -> 0); pressing it again while
+  -- already paused exits. Edge-detected so a held key doesn't pause-then-exit.
+  local backDown = input.allKeys.isDown["escape"] or input.isDown["MenuEsc"] or input.isDown["MenuBack"]
+  local backEdge = backDown and not self._backWasDown
+  self._backWasDown = backDown
+  if backEdge then
+    if SPEEDS[self.speedIndex] ~= 0 then
+      self.speedIndex = PAUSE_INDEX
+      GAME.theme:playMoveSfx()
+    else
+      GAME.theme:playCancelSfx()
+      if self.match then self.match:abort() end
+      GAME.navigationStack:pop()
+    end
     return true
   end
 
@@ -81,8 +93,21 @@ function ReplaySpectator:handleInput()
   local left  = input:isPressedWithRepeat("MenuLeft")
   local right = input:isPressedWithRepeat("MenuRight")
   if self.selectedRow == "speed" then
-    if left  then self.speedIndex = math.max(1, self.speedIndex - 1); GAME.theme:playMoveSfx() end
-    if right then self.speedIndex = math.min(#SPEEDS, self.speedIndex + 1); GAME.theme:playMoveSfx() end
+    local speed = SPEEDS[self.speedIndex]
+    local atStart = self.playbackFrame <= 0
+    local atEnd   = self.playbackFrame >= self.lastF
+    if left then
+      -- at the end while playing forward, reversing direction snaps to pause
+      if atEnd and speed > 0 then self.speedIndex = PAUSE_INDEX
+      else self.speedIndex = math.max(1, self.speedIndex - 1) end
+      GAME.theme:playMoveSfx()
+    end
+    if right then
+      -- at the start while rewinding, reversing direction snaps to pause
+      if atStart and speed < 0 then self.speedIndex = PAUSE_INDEX
+      else self.speedIndex = math.min(#SPEEDS, self.speedIndex + 1) end
+      GAME.theme:playMoveSfx()
+    end
   elseif self.match then
     if left  then self.match:cycleSpectatorFocus(-1) end
     if right then self.match:cycleSpectatorFocus(1) end
@@ -130,7 +155,9 @@ function ReplaySpectator:customDraw()
   }
   local y = consts.CANVAS_HEIGHT - 70
   for _, r in ipairs(rows) do
-    GraphicsUtil.printf((r.on and "> " or "  ") .. "<  " .. r.text .. "  >", 0, y, consts.CANVAS_WIDTH, "center", nil, 1, 10)
+    -- selection shown by colour, not a pointer: white when active, grey when not
+    local color = r.on and {1, 1, 1, 1} or {0.5, 0.5, 0.5, 1}
+    GraphicsUtil.printf("<  " .. r.text .. "  >", 0, y, consts.CANVAS_WIDTH, "center", color, 1, 10)
     y = y + 22
   end
 end

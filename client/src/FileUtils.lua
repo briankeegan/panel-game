@@ -426,9 +426,36 @@ function fileUtils.getMatchingFiles(files, pattern, validExtensions, separator)
   return matchedFiles
 end
 
+-- Returns the correct per-player save directory, working around the love12
+-- pre-release bug where getSaveDirectory() returns the project-dir basename
+-- ("panel-game") instead of the identity-derived path. Prefer the path
+-- constructed from LOVE_IDENTITY + HOME (macOS) so all clients get their
+-- own isolated dir regardless of the love.filesystem bug.
+function fileUtils.getSaveDir()
+  local identity = os.getenv("LOVE_IDENTITY")
+  local home = os.getenv("HOME")
+  if identity and home then
+    return home .. "/Library/Application Support/LOVE/" .. identity
+  end
+  return love.filesystem.getSaveDirectory and love.filesystem.getSaveDirectory()
+end
+
 ---@param path string
 ---@param data string
 function fileUtils.write(path, filename, data)
+  local saveDir = fileUtils.getSaveDir()
+  if saveDir and io then
+    local fullDir = saveDir .. "/" .. path
+    os.execute('mkdir -p "' .. fullDir .. '"')
+    local f, err = io.open(fullDir .. "/" .. filename, "w")
+    if f then
+      f:write(data)
+      f:close()
+      return
+    else
+      logger.warn("fileUtils.write: io.open failed (" .. tostring(err) .. ") — falling back to love.filesystem")
+    end
+  end
   love.filesystem.createDirectory(path)
   local success, message = love.filesystem.write(path .. "/" .. filename, data)
   if not success then

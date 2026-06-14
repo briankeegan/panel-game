@@ -492,6 +492,9 @@ rp_browser_current_dir,,Current directory: %1,Dossier actuel : %1,Pasta atual: %
 rp_browser_up,,up,monter,acima,戻る,volver,zurück ins übergeordnete Verzeichnis,su,ขึ้น
 rp_browser_root,,root,racine,raiz,ルート,raíz,Wurzel,sorgente,root
 rp_browser_more,,more,plus,mais,次,más,mehr,altro,more
+rp_browser_stats_games,,%1 games,%1 parties,%1 jogos,%1 試合,%1 partidas,%1 Spiele,%1 partite,%1 เกม
+rp_browser_stats_draws,,Draws,Nuls,Empates,引き分け,Empates,Unentschieden,Pareggi,เสมอ
+rp_browser_stats_other,,Other,Autres,Outros,その他,Otros,Andere,Altri,อื่นๆ
 rp_browser_info_2p_vs,,2P VS,2J VS,2J VS,2P VS,2J VS,2P VS,2P VS,2P VS
 rp_browser_info_1p_vs,,VS Yourself,Contre soi-même,VS Você mesmo,じぶんとのたたかい,VS ti mismo,1P gegen dich selbst,VS Te stesso,แข่งกับตัวเอง
 rp_browser_info_1p,,1P,1J,1J,1P,1J,1P,1P,1P

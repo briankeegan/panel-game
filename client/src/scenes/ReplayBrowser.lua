@@ -41,6 +41,11 @@ local cursor_pos = 0
 
 local replay_id_top = 0
 
+-- Cache for the hovered-folder win/loss panel; keyed by folder path so we only
+-- recompute when the cursor moves to a different folder (see computeFolderStats).
+local statsKey
+local statsData
+
 local function replayMenu()
   if (replay_id_top == 0) then
     if current_path ~= "/" then
@@ -76,6 +81,7 @@ local function moveCursor(dir)
 end
 
 local function updateBrowsingPath(new_path)
+  statsKey = nil -- listing changed; force the stats panel to recompute on next hover
   if new_path then
     cursor_pos = 0
     replay_id_top = 0
@@ -122,13 +128,65 @@ local function selectMenuItem()
   end
 end
 
+-- Drill version/year/month/day, preferring today's folder at each level and
+-- otherwise the most recent (greatest-named) one present, so the browser opens
+-- on today's replays (or the latest day) instead of the bare version-folder
+-- root. Stops early if a level is empty. Folder names are fixed-width
+-- (v049, 2026, 06, 13), so plain string comparison orders them correctly.
+local function latestDatePath()
+  local today = {"v" .. consts.ENGINE_VERSION, os.date("%Y"), os.date("%m"), os.date("%d")}
+  local path = "/"
+  for _, prefer in ipairs(today) do
+    local items = fileUtils.freshDirectoryItems(base_path .. path)
+    if #items == 0 then
+      break
+    end
+    local pick
+    for _, item in ipairs(items) do
+      if item == prefer then
+        pick = prefer
+        break
+      elseif pick == nil or item > pick then
+        pick = item
+      end
+    end
+    path = path .. pick .. "/"
+  end
+  return path
+end
+
 function ReplayBrowser:load()
   if GAME.lastReplayPath then
     current_path = string.sub(GAME.lastReplayPath, (string.len(base_path) + 1)) .. "/"
+  elseif current_path == "/" then
+    -- First open with nothing saved this session: jump to today's replays
+    -- instead of the bare root. A later reopen keeps wherever you browsed to.
+    current_path = latestDatePath()
   end
 
   state = "browser"
   updateBrowsingPath(current_path)
+end
+
+-- 2+ human players = a multiplayer match (VS/FFA/Team). Challenge mode has a
+-- single human stack, so it stays on the info screen like the other solo modes.
+local function isMultiplayerReplay(replay)
+  local humans = 0
+  for _, stack in ipairs(replay.stacks) do
+    if stack.stackType == ReplayV3.stackTypes.Stack then
+      humans = humans + 1
+    end
+  end
+  return humans >= 2
+end
+
+local function startReplay(replay)
+  SoundController:stopMusic()
+  local match = ClientMatch.createFromReplay(replay)
+  match.renderDuringPause = true
+  match.supportsPause = true
+  match:start()
+  GAME.navigationStack:push(ReplayGame({match = match}))
 end
 
 function ReplayBrowser:update()
@@ -140,7 +198,12 @@ function ReplayBrowser:update()
     if input.isDown["MenuSelect"] then
       GAME.theme:playValidationSfx()
       if selectMenuItem() then
-        state = "info"
+        -- Multiplayer replays launch on a single click; solo show the info screen first.
+        if isMultiplayerReplay(selectedReplay) and ReplayV3.replayCanBeViewed(selectedReplay) then
+          startReplay(selectedReplay)
+        else
+          state = "info"
+        end
       end
     end
     if input.isDown["MenuBack"] then
@@ -167,17 +230,65 @@ function ReplayBrowser:update()
     if input.isDown["MenuSelect"] then
       if ReplayV3.replayCanBeViewed(selectedReplay) then
         GAME.theme:playValidationSfx()
-        SoundController:stopMusic()
-        local match = ClientMatch.createFromReplay(selectedReplay)
-        match.renderDuringPause = true
-        match.supportsPause = true
-        match:start()
-        GAME.navigationStack:push(ReplayGame({match = match}))
+        startReplay(selectedReplay)
       else
         GAME.theme:playCancelSfx()
       end
     end
   end
+end
+
+-- Roster folders are the leaf match folders: VS_/FFA_/Team_ + sorted names.
+local function isRosterFolder(name)
+  return name:find("^VS_") or name:find("^FFA_") or name:find("^Team_")
+end
+
+local function rosterOf(folderName)
+  local roster = folderName:gsub("^VS_", ""):gsub("^FFA_", ""):gsub("^Team_", "")
+  local names = {}
+  -- Names are joined with _vs_; the trailing append lets the last name match too.
+  for n in (roster .. "_vs_"):gmatch("(.-)_vs_") do
+    names[#names + 1] = n
+  end
+  return names
+end
+
+-- Both mean "no winner" in a multiplayer filename (game_<n>_winner_<X>_HH-MM-SS).
+local DRAW_LABELS = {draw = true, INCOMPLETE = true}
+
+-- Win tally for a roster folder, derived purely from the replay filenames — no
+-- JSON is read or parsed. VS/FFA name their winner by player, so we seed the
+-- roster from the folder name and show every player (including 0 wins). Team
+-- folders name their winner by team COLOR (Pink/Purple), which the folder name
+-- doesn't carry, so we discover those tokens from the files instead.
+local function computeFolderStats(folderPath, folderName)
+  local isTeam = folderName:find("^Team_") ~= nil
+  local wins, order = {}, {}
+  if not isTeam then
+    for _, name in ipairs(rosterOf(folderName)) do
+      wins[name] = 0
+      order[#order + 1] = name
+    end
+  end
+  local total, draws, other = 0, 0, 0
+  for _, item in ipairs(fileUtils.freshDirectoryItems(folderPath)) do
+    if item:sub(-5) == ".json" then
+      total = total + 1
+      local winner = item:match("winner_(.-)_%d%d%-%d%d%-%d%d")
+      if winner == nil or DRAW_LABELS[winner] then
+        draws = draws + 1
+      elseif wins[winner] ~= nil then
+        wins[winner] = wins[winner] + 1
+      elseif isTeam then
+        wins[winner] = 1
+        order[#order + 1] = winner -- newly seen team color
+      else
+        other = other + 1 -- name we couldn't map to the roster (e.g. _vs_ in a name)
+      end
+    end
+  end
+  if isTeam then table.sort(order) end -- stable color ordering across hovers
+  return {total = total, order = order, wins = wins, draws = draws, other = other}
 end
 
 function ReplayBrowser:draw()
@@ -188,6 +299,39 @@ function ReplayBrowser:draw()
     GraphicsUtil.print(loc("rp_browser_header"), menu_x + 170, menu_y - 40)
     GraphicsUtil.print(loc("rp_browser_current_dir", base_path .. current_path), menu_x, menu_y - 40 + menu_h)
     replayMenu()
+
+    -- Win/loss panel on the right: while hovering a match folder, or while
+    -- browsing inside one (current folder is the roster folder).
+    local statsFolder, statsDir
+    local hovered = cursor_pos > 0 and path_contents[cursor_pos] or nil
+    if hovered and isRosterFolder(hovered) then
+      statsFolder, statsDir = hovered, current_path .. hovered .. "/"
+    else
+      local cur = current_path:match("([^/]+)/$")
+      if cur and isRosterFolder(cur) then
+        statsFolder, statsDir = cur, current_path
+      end
+    end
+
+    if statsFolder then
+      if statsKey ~= statsDir then
+        statsKey = statsDir
+        statsData = computeFolderStats(base_path .. statsDir, statsFolder)
+      end
+      local sx, sy = menu_x + 360, menu_y
+      GraphicsUtil.print(statsFolder, sx, sy)
+      GraphicsUtil.print(loc("rp_browser_stats_games", statsData.total), sx, sy + menu_h * 2)
+      local row = 4
+      for _, name in ipairs(statsData.order) do
+        GraphicsUtil.print(name .. ": " .. (statsData.wins[name] or 0), sx, sy + menu_h * row)
+        row = row + 1
+      end
+      GraphicsUtil.print(loc("rp_browser_stats_draws") .. ": " .. statsData.draws, sx, sy + menu_h * row)
+      row = row + 1
+      if statsData.other > 0 then
+        GraphicsUtil.print(loc("rp_browser_stats_other") .. ": " .. statsData.other, sx, sy + menu_h * row)
+      end
+    end
   elseif state == "info" then
     local next_func = nil
     if ReplayV3.replayCanBeViewed(selectedReplay) == false then

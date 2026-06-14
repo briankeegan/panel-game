@@ -918,6 +918,8 @@ function GameBase:draw()
     -- specified in the design (never side-by-side with the old viewer).
     if GAME.battleRoom and GAME.battleRoom.renderDisplayStacks then
       GAME.battleRoom:renderDisplayStacks(self.match)
+    elseif self.match and self.match.renderDisplayStacks then
+      self.match:renderDisplayStacks(self.match)
     end
     prof.push("GameBase:drawHUD")
     self:drawHUD()

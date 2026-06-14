@@ -34,7 +34,8 @@ end
 function save.read_user_id_file(serverIP)
   local relPath = "servers/" .. serverIP .. "/user_id.txt"
   local userID
-  local saveDir = love.filesystem.getSaveDirectory()
+  local saveDir = FileUtils.getSaveDir()
+  logger.debug("read_user_id_file: saveDir=" .. tostring(saveDir) .. " relPath=" .. relPath)
   if saveDir then
     local f = io.open(saveDir .. "/" .. relPath, "r")
     if f then

@@ -50,7 +50,7 @@ local IDLE_INTERVAL_S = 0.15
 ---@param playerID integer wire identifier for the sending player
 ---@param hostStack table? the PlayerStack holding danger_col / danger_timer (only those fields live on PlayerStack, not engine). nil for SimulatedStack.
 ---@return DisplayEventCapture
-function DisplayEventCapture.new(engine, playerID, hostStack)
+function DisplayEventCapture.new(engine, playerID, hostStack, historyList)
   assert(engine, "DisplayEventCapture requires an engine")
   assert(playerID, "DisplayEventCapture requires a playerID")
   local self = setmetatable({}, DisplayEventCapture)
@@ -63,6 +63,10 @@ function DisplayEventCapture.new(engine, playerID, hostStack)
   -- handlers, drained into each snapshot.
   self._pendingEvents     = {}
   self._popSizeThisFrame  = 1
+  -- Optional list to accumulate every batch for replay recording.
+  -- When set, each batch built in _send is appended here in addition
+  -- to being sent over the network.
+  self._historyList = historyList
   -- Park the PlayerStack on the engine as _renderHost so buildSnapshot
   -- can pull PlayerStack-resident render fields (danger_col,
   -- danger_timer) without passing extra args through every layer.
@@ -612,6 +616,11 @@ function DisplayEventCapture:_send(now)
   if #self._pendingEvents > 0 then
     snapshot.e = self._pendingEvents
     self._pendingEvents = {}
+  end
+  -- Record this batch for replay playback (same delta-encoded form that
+  -- goes over the wire, so the playback path is identical to live receive).
+  if self._historyList then
+    self._historyList[#self._historyList + 1] = { from = self.playerID, snapshot = snapshot }
   end
   local ffiGuard = require("client.src.network.DisplaySnapshotFFI")
   local util = require("client.src.network.DisplaySnapshotUtil")

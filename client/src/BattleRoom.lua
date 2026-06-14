@@ -700,11 +700,12 @@ function BattleRoom:startMatch(replay)
     -- is on. Local stack still ticks normally.
     if match.engine then match.engine.pauseNonLocalSimulation = true end
 
+    self._replayDisplayHistory = {}
     self._displayCaptures = {}
     self._displayStacks   = {}
     for _, player in ipairs(match.players) do
       if player.isLocal and player.stack and player.stack.engine then
-        local capture = DisplayEventCapture.new(player.stack.engine, player.publicId or player.playerNumber or 0, player.stack)
+        local capture = DisplayEventCapture.new(player.stack.engine, player.publicId or player.playerNumber or 0, player.stack, self._replayDisplayHistory)
         capture:start()
         self._displayCaptures[#self._displayCaptures + 1] = capture
       else
@@ -784,6 +785,12 @@ function BattleRoom:applyDisplayEventBatch(batch)
   -- If batch is already a decoded FFI snapshot, pass as-is
   if batch.snapshot and type(batch.snapshot) == "table" then
     stack:applyBatch(batch)
+    -- Also record incoming remote snapshots so replay can play them back
+    -- through the same pipeline (identical to what DisplayEventCapture does
+    -- for the local player).
+    if self._replayDisplayHistory then
+      self._replayDisplayHistory[#self._replayDisplayHistory + 1] = batch
+    end
   end
 end
 

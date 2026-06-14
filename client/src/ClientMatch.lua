@@ -288,6 +288,39 @@ function ClientMatch.createFromReplay(replay, players, gameMode)
     end
   end
 
+  -- For 2+ player replays with saved snapshot history, wire up the same
+  -- spectator display pipeline used during live play. Each sender's batches
+  -- feed through applyBatch (delta resolution, HUD mirror) and render via
+  -- renderDisplayStacks — identical to the live spectator path, no new code.
+  if replay.displayHistory and #replay.displayHistory > 0 then
+    local DisplayClientStack = require("client.src.network.DisplayClientStack")
+    clientMatch._displayHistory      = replay.displayHistory
+    clientMatch._displayHistoryIndex = 1
+    clientMatch._displayStacks       = {}
+    -- Build pid→viewStack index for DisplayClientStack construction.
+    local stackByPid = {}
+    for _, cs in ipairs(clientMatch.stacks) do
+      local p = cs.player
+      if p then
+        local pid = p.publicId or p.playerNumber
+        if pid then stackByPid[pid] = cs end
+      end
+    end
+    -- One DisplayClientStack per unique sender in the history.
+    for _, batch in ipairs(replay.displayHistory) do
+      local pid = batch.from
+      if pid and not clientMatch._displayStacks[pid] then
+        local viewStack = stackByPid[pid]
+        clientMatch._displayStacks[pid] = DisplayClientStack.new(pid, viewStack and viewStack.player, viewStack)
+        -- Suppress the engine-based render for this stack; snapshot owns it.
+        if viewStack then
+          viewStack.canvas = nil
+          viewStack.displayRendered = true
+        end
+      end
+    end
+  end
+
   clientMatch:sharedSetup()
 
   return clientMatch
@@ -441,6 +474,20 @@ function ClientMatch:run(isFreshFrame)
   end
 
   local runs = math.max(unpack(self.engine:run()))
+
+  -- Drain replay snapshot history up to the current engine clock. Feeds
+  -- each batch through the same applyBatch path the live spectator view
+  -- uses — delta resolution, HUD mirror, panel cache all work unchanged.
+  if self._displayHistory then
+    local clock = self.engine.clock
+    while self._displayHistoryIndex <= #self._displayHistory do
+      local batch = self._displayHistory[self._displayHistoryIndex]
+      if batch.snapshot and batch.snapshot.f and batch.snapshot.f > clock then break end
+      local ds = self._displayStacks and self._displayStacks[batch.from]
+      if ds then ds:applyBatch(batch) end
+      self._displayHistoryIndex = self._displayHistoryIndex + 1
+    end
+  end
 
   -- Trace capture: detect per-stack game-over transitions. Emit a marker
   -- the first frame each stack reaches game_over_clock > 0. TraceWriter
@@ -1410,6 +1457,39 @@ function ClientMatch:applyRewindEvent(body)
   end
 end
 
+---Render snapshot-based display stacks for replay playback. Mirrors
+---BattleRoom:renderDisplayStacks so the same GameBase draw hook works for
+---both live play (GAME.battleRoom) and replay (self.match).
+---@param match ClientMatch
+function ClientMatch:renderDisplayStacks(match)
+  if not self._displayStacks then return end
+  if not match or not match.stacks then return end
+  local Telegraph = require("client.src.graphics.Telegraph")
+  for _, stack in ipairs(match.stacks) do
+    local player = stack.player
+    if not player then goto continue end
+    local pid = player.publicId or player.playerNumber
+    local displayStack = pid and self._displayStacks[pid]
+    if displayStack then
+      pcall(displayStack.render, displayStack, stack)
+      if stack.drawPopEffects and stack.drawCards then
+        stack:withDrawArea(0, 0, function()
+          pcall(stack.drawPopEffects, stack)
+          pcall(stack.drawCards, stack)
+        end)
+      end
+      -- Telegraphs (outgoing garbage icons). Snapshot mirrors
+      -- outgoingGarbage onto the engine so existing Telegraph:render works.
+      if not stack:game_ended() and stack.garbageTargets then
+        for _, target in ipairs(stack.garbageTargets) do
+          pcall(Telegraph.render, Telegraph, stack, target)
+        end
+      end
+    end
+    ::continue::
+  end
+end
+
 ---@return ReplayV3?
 function ClientMatch:finalizeReplay()
   local replay
@@ -1465,6 +1545,13 @@ function ClientMatch:finalizeReplay()
         end
       end
       replay.metadata.stacks[i] = metadata
+    end
+
+    -- Save snapshot history for 2+ player matches so the replay viewer
+    -- can feed it through the same spectator display pipeline.
+    if GAME.battleRoom and GAME.battleRoom._replayDisplayHistory
+        and #GAME.battleRoom._replayDisplayHistory > 0 then
+      self.replay.displayHistory = GAME.battleRoom._replayDisplayHistory
     end
 
     ReplayV3.finalizeReplay(self.engine, self.replay)

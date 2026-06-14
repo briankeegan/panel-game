@@ -118,7 +118,7 @@ function(self, engineVersion, rules, panelSource)
 end)
 
 -- so that json.encode always has the same basic structure
-ReplayV3.keyOrder = {keyorder = {"engineVersion", "replayVersion", "panelSource", "rules", "stacks", "garbageFlows", "crossPlayerEvents", "metadata"}}
+ReplayV3.keyOrder = {keyorder = {"engineVersion", "replayVersion", "panelSource", "rules", "stacks", "garbageFlows", "crossPlayerEvents", "displayHistory", "metadata"}}
 
 ---@enum ReplayPanelSourceType
 ReplayV3.panelSourceTypes = { seedV1 = 1, puzzle = 2, seedV2 = 3 }

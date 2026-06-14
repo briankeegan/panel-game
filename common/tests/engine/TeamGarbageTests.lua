@@ -27,10 +27,16 @@ local function createGarbageTestMatch(playerCount, teamCount, playersPerTeam, ga
   local levelData = LevelPresets.getModern(10)
   levelData.maxHealth = math.huge  -- Don't die from garbage
 
+  -- Stacks are is_local=true: multi-target distribution (GarbageDelivery
+  -- :_distributeMultiTarget) only fires for local senders — that's the live
+  -- path that decides recipients and, online, emits the G event the server
+  -- records. With no netClient here looseSyncActive is false, so delivery
+  -- direct-pushes to the chosen targets, letting us assert routing offline.
+  -- Local stacks ignore maxRunsPerFrame and run while input is buffered, so
+  -- runToFrame feeds input one frame at a time instead of dumping it upfront.
   for i = 1, playerCount do
-    local stack = match:createStackWithSettings(levelData, false, "controller")
+    local stack = match:createStackWithSettings(levelData, true, "controller")
     stack:setMaxRunsPerFrame(1)
-    stack:receiveConfirmedInput(string.rep("A", 10000))
     -- Clear panels to make room for garbage
     GarbageQueueTestingUtils.reduceRowsTo(stack, 0)
   end
@@ -45,9 +51,15 @@ local function createGarbageTestMatch(playerCount, teamCount, playersPerTeam, ga
   return match, teams
 end
 
--- Helper to run match to a specific frame
+-- Helper to run match to a specific frame. Local stacks only tick while they
+-- have buffered confirmed input (Stack:shouldRun → buffer_len > 0), so feed
+-- exactly one idle input per stack per frame to advance the match one step at
+-- a time. Dead stacks ignore the extra input (shouldRun is false once ended).
 local function runToFrame(match, targetFrame)
   while match.stacks[1].clock < targetFrame do
+    for _, stack in ipairs(match.stacks) do
+      stack:receiveConfirmedInput("A")
+    end
     match:run()
   end
 end

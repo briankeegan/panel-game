@@ -19,6 +19,7 @@
 --- The shape is small-key for bandwidth; the receiver expands when applying.
 
 local logger = require("common.lib.logger")
+local PanelStateCodes = require("client.src.network.PanelStateCodes")
 
 ---@class DisplayEventCapture
 ---@field engine Stack the local player's engine stack being observed
@@ -98,23 +99,10 @@ end
 -- JSON-encoded (json.encode skips nil entries).
 ---@param panel Panel?
 ---@return table? cell nil when panel is nil; otherwise a compact wire-cell
--- Map panel.state string to numeric code for FFI packing
-local PANEL_STATE_CODES = {
-  normal = 0,
-  swapping = 1,
-  popping = 2,
-  matched = 3,
-  landing = 4,
-  hovering = 5,
-  falling = 6,
-  dimmed = 7,
-  dead = 8,
-  popped = 9,
-}
-
 local function snapshotCell(panel)
   if not panel then return nil end
-  local stateCode = PANEL_STATE_CODES[panel.state] or 0
+  -- state travels as a compact numeric code (see PanelStateCodes).
+  local stateCode = PanelStateCodes.toCode(panel.state)
   local cell = {
     -- color: 0/nil = empty slot, 1-8 = panel color
     c = panel.color,

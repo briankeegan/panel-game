@@ -20,20 +20,11 @@ local has_ffi, ffi = pcall(require, "ffi")
 local bit = require("bit")
 local band, bor, lshift, rshift = bit.band, bit.bor, bit.lshift, bit.rshift
 
-----------------------------------------------------------------------
--- Panel state enum (string <-> uint4) — shared with JSON sender's
--- snapshotCell which already writes integer codes via PANEL_STATE_CODES.
--- We accept both string and int on pack for safety; emit string on unpack
--- so the receiver sees the same shape JSON would produce.
-----------------------------------------------------------------------
-local PANEL_STATE_CODES = {
-  normal = 0, swapping = 1, popping = 2, matched = 3, landing = 4,
-  hovering = 5, falling = 6, dimmed = 7, dead = 8, popped = 9,
-}
-local PANEL_STATE_NAMES = {
-  [0]="normal",[1]="swapping",[2]="popping",[3]="matched",[4]="landing",
-  [5]="hovering",[6]="falling",[7]="dimmed",[8]="dead",[9]="popped",
-}
+-- Panel state enum (string <-> uint4). Single source of truth in
+-- PanelStateCodes. State stays NUMERIC through pack AND unpack — it is
+-- deserialized to a name only at draw time (DisplayClientStack.expandCell),
+-- so the wire and the recorded replay carry the compact, consistent form.
+local PanelStateCodes = require("client.src.network.PanelStateCodes")
 
 ----------------------------------------------------------------------
 -- Float<->bytes via FFI union (only used if FFI is available).
@@ -212,9 +203,7 @@ local function packPanel(w, cell)
   end
   wU8(w, 1)
   wU8(w, cell.c or 0)
-  local state = cell.s
-  if type(state) == "string" then state = PANEL_STATE_CODES[state] or 0 end
-  wU8(w, state or 0)
+  wU8(w, PanelStateCodes.toCode(cell.s))
 
   local mask = 0
   if cell.t  and cell.t ~= 0 then mask = bor(mask, PANEL_OPT.t) end
@@ -266,7 +255,8 @@ local function unpackPanel(r)
   local mask = rU16(r)
   local cell = {
     c = c,
-    s = PANEL_STATE_NAMES[sCode] or "normal",
+    -- Leave state as the numeric code; expandCell deserializes it at draw.
+    s = sCode,
   }
   if band(mask, PANEL_OPT.t)  ~= 0 then cell.t  = rU16(r) end
   if band(mask, PANEL_OPT.g)  ~= 0 then cell.g  = true end

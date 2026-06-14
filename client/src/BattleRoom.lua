@@ -177,6 +177,9 @@ function BattleRoom.createFromServerMessage(message)
       battleRoom.match = match
       battleRoom.match:start()
       battleRoom.state = BattleRoom.states.MatchInProgress
+      -- Same wiring the dead-player path gets via startMatch, or live Y batches
+      -- have nowhere to land and the spectator's boards freeze.
+      battleRoom:_setupDisplayPipeline(match)
     else
       local payloadPlayers = orderedPayloadPlayers(message.players)
       for i = 1, #payloadPlayers do
@@ -661,87 +664,10 @@ function BattleRoom:startMatch(replay)
   self.match = match
   self.state = BattleRoom.states.MatchInProgress
 
-  -- Phase A+B wire-up of the display-history replication system (see
-  -- DISPLAY_HISTORY_PLAN.md). Per-room gated: when displayHistoryEnabled
-  -- is false (the default), this block is a no-op — nothing captures,
-  -- nothing decodes, no `Y` traffic exists. When true:
-  --   * Each local player's engine gets a DisplayEventCapture observer
-  --     that batches frame-stamped events out via NetClient.
-  --   * Each remote player gets a DisplayClientStack that consumes the
-  --     `Y` batches arriving for that player (routed by playerID).
-  -- The capture/decode pipeline never modifies engine state and never
-  -- touches the existing input-replication path. Old view-stack rendering
-  -- remains the authoritative visualization until Phase C wires the
-  -- new renderer.
-  -- Reset both sides of the snapshot pipeline at every match start so a
-  -- previous match's final snapshot doesn't briefly render in the new
-  -- match before the first fresh snapshot arrives. (We deliberately
-  -- keep _displayStacks alive AFTER matchEnded so the dead board stays
-  -- visible — see _stopDisplayCaptures — but at NEW-MATCH start we
-  -- want a clean slate.)
-  -- Gracefully stop the prior match's captures (disconnect signals,
-  -- ship their final terminal snapshot) BEFORE nil'ing — otherwise
-  -- their finishedRun subscribers can linger on an engine that's
-  -- about to be deinit'd.
-  self:_stopDisplayCaptures()
-  self._displayStacks   = nil
-  -- Drop any in-flight Y messages from the prior match's tail. Without
-  -- this, a stale OLD-match death snapshot can arrive after the NEW
-  -- stacks are created and briefly paint the dead board on top of the
-  -- fresh match. The drain is a no-op when displayHistoryEnabled is off
-  -- (no Y traffic exists in the first place).
-  if GAME.netClient and GAME.netClient.flushDisplayEvents then
-    pcall(GAME.netClient.flushDisplayEvents, GAME.netClient)
-  end
-  if self.displayHistoryEnabled then
-    -- Tell the engine to skip simulating non-local stacks. The new viewer
-    -- now owns the visual representation of remote players entirely; their
-    -- engine sim, rollback, input apply are all dead-weight when this flag
-    -- is on. Local stack still ticks normally.
-    if match.engine then match.engine.pauseNonLocalSimulation = true end
+  self:_setupDisplayPipeline(match)
 
-    self._replayDisplayHistory = {}
-    self._displayCaptures = {}
-    self._displayStacks   = {}
-    for _, player in ipairs(match.players) do
-      if player.isLocal and player.stack and player.stack.engine then
-        local capture = DisplayEventCapture.new(player.stack.engine, player.publicId or player.playerNumber or 0, player.stack, self._replayDisplayHistory)
-        capture:start()
-        self._displayCaptures[#self._displayCaptures + 1] = capture
-      else
-        -- Remote player → instantiate a DisplayClientStack keyed by the
-        -- same playerID the sender stamps into its batches. We pass the
-        -- remote PlayerStack reference so applyBatch can mirror HUD
-        -- scalars onto the engine fields (score/speed/level/etc.) — the
-        -- existing drawScore / drawSpeed / drawMultibar methods read
-        -- straight from engine.X, so writing the snapshot's values onto
-        -- those fields makes the HUD work without changing any draw code.
-        local pid = player.publicId or player.playerNumber or 0
-        self._displayStacks[pid] = DisplayClientStack.new(pid, player, player.stack)
-        -- Hide the existing PlayerStack:render for this remote — its
-        -- visualization is now the DisplayClientStack's responsibility.
-        -- Setting stack.canvas = nil makes PlayerStack:render early-return
-        -- (existing skip path, no new code in PlayerStack). Flag the stack as
-        -- still on-screen via the display pipeline so spectator-focus logic
-        -- (which used canvas as its "is this board drawn" proxy) keeps working.
-        if player.stack then
-          player.stack.canvas = nil
-          player.stack.displayRendered = true
-        end
-      end
-    end
-    -- NOTE: deliberately do NOT stop captures on matchEnded. The engine
-    -- continues to tick post-matchEnded via ClientMatch:runGameOver,
-    -- producing the cracked-face / dimmed-panel death animation frames.
-    -- We want ALL of those shipped to the receiver. Captures stop only
-    -- at new-match start (above) and BattleRoom:shutdown.
-  end
-
-  -- Additive hook: announce the freshly-started match. External observers
-  -- (display capture above, future parallel pipes) can subscribe to
-  -- `matchCreated` on BattleRoom and attach to the match without any
-  -- modifications to ClientMatch or PlayerStack. Fires after the match is
-  -- fully initialized but before the scene transition.
+  -- Additive hook: observers can subscribe to `matchCreated` and attach to the
+  -- match without touching ClientMatch or PlayerStack.
   self:emitSignal("matchCreated", match, self)
 
   -- Use instant transition if requested, otherwise fade
@@ -755,6 +681,46 @@ function BattleRoom:startMatch(replay)
   GAME.navigationStack:push(scene, transition)
 
   return match
+end
+
+---Build the snapshot-spectator pipeline for `match`. Single source of truth,
+---called from both startMatch and createFromServerMessage. No-op when
+---displayHistoryEnabled is false.
+---@param match ClientMatch
+function BattleRoom:_setupDisplayPipeline(match)
+  -- Clear the prior match's pipeline before rebuilding so its final snapshot
+  -- doesn't bleed into the new match.
+  self:_stopDisplayCaptures()
+  self._displayStacks   = nil
+  if GAME.netClient and GAME.netClient.flushDisplayEvents then
+    pcall(GAME.netClient.flushDisplayEvents, GAME.netClient)
+  end
+  if self.displayHistoryEnabled then
+    -- Remote stacks are now rendered from snapshots; don't waste sim on them.
+    if match.engine then match.engine.pauseNonLocalSimulation = true end
+
+    self._replayDisplayHistory = {}
+    self._displayCaptures = {}
+    self._displayStacks   = {}
+    for _, player in ipairs(match.players) do
+      if player.isLocal and player.stack and player.stack.engine then
+        local capture = DisplayEventCapture.new(player.stack.engine, player.publicId or player.playerNumber or 0, player.stack, self._replayDisplayHistory)
+        capture:start()
+        self._displayCaptures[#self._displayCaptures + 1] = capture
+      else
+        local pid = player.publicId or player.playerNumber or 0
+        self._displayStacks[pid] = DisplayClientStack.new(pid, player, player.stack)
+        -- canvas=nil makes PlayerStack:render early-return; displayRendered keeps
+        -- spectator-focus logic treating the board as on-screen.
+        if player.stack then
+          player.stack.canvas = nil
+          player.stack.displayRendered = true
+        end
+      end
+    end
+    -- Captures are NOT stopped on matchEnded — the death-animation tail keeps
+    -- ticking via runGameOver and we want it shipped too.
+  end
 end
 
 ---Stop the DisplayEventCaptures. Called at new-match start (before rebuild)

@@ -14,6 +14,7 @@
 
 local logger = require("common.lib.logger")
 local PanelCellRender = require("client.src.graphics.PanelCellRender")
+local PanelStateCodes = require("client.src.network.PanelStateCodes")
 
 ---@class DisplayClientStackSnapshot
 ---@field f integer engine clock at snapshot time
@@ -488,7 +489,9 @@ local function expandCell(cell, row, col, frameTimes)
   if not cell or not cell.c or cell.c == 0 then return nil end
   return {
     color              = cell.c,
-    state              = cell.s or "normal",
+    -- Snapshots carry state as a numeric code (compact wire/replay form);
+    -- deserialize to the engine's name here, the one place it's drawn.
+    state              = PanelStateCodes.toName(cell.s),
     column             = col,
     row                = row,
     timer              = cell.t  or 0,

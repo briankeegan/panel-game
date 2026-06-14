@@ -8,6 +8,7 @@ require("client.src.globals")
 local logger = require("common.lib.logger")
 local ClientMatch = require("client.src.ClientMatch")
 local Match = require("common.engine.Match")
+local GarbageDelivery = require("common.engine.GarbageDelivery")
 local Stack = require("common.engine.Stack")
 local PlayerStack = require("client.src.PlayerStack")
 local ReplayV3 = require("common.data.ReplayV3")
@@ -352,18 +353,14 @@ end
 ----------------------------------------------------------------------
 -- Architecture: shouldFinalize is server-authoritative for live online
 ----------------------------------------------------------------------
--- The isLocallyEnded → display-only refactor: live online matches finalize only
--- when the server confirms (gameResult) or an abort fires. Local isLocallyEnded
--- still drives display, but no longer stops the engine or triggers
--- handleMatchEnd. This decouples the deadlock pattern at the root: every
--- code path that used to assume "engine freezes the same tick as isLocallyEnded"
--- now keeps ticking until the server speaks.
+-- Snappy finalize: live online matches finalize the instant the LOCAL engine
+-- knows the match is decided (isLocallyEnded), not when the server's gameResult
+-- lands. gameResult still arrives and stays authoritative for winner/order, and
+-- _serverConfirmedEnd is a backstop, but neither gates the freeze. (Superseded
+-- the older "wait for the server before finalizing" contract.)
 
-local function test_shouldFinalize_live_online_waits_for_server()
-  logger.info("test_shouldFinalize_live_online_waits_for_server")
-  -- Live-online fixture: engine.isLocallyEnded() returns true (local view says
-  -- match over) but the server has not confirmed yet. shouldFinalize must
-  -- be false — we must keep ticking until the server speaks.
+local function test_shouldFinalize_live_online_snappy_finalize()
+  logger.info("test_shouldFinalize_live_online_snappy_finalize")
   local match = {
     fromReplay = false,
     _serverConfirmedEnd = false,
@@ -377,13 +374,18 @@ local function test_shouldFinalize_live_online_waits_for_server()
   local origBR = GAME.battleRoom
   GAME.battleRoom = { online = true }
   local ok, err = pcall(function()
-    assert(match:shouldFinalize() == false,
-      "live online: must NOT finalize on local isLocallyEnded — wait for server gameResult")
+    assert(match:shouldFinalize() == true,
+      "live online (snappy): finalize as soon as the local match is decided")
 
-    -- Server confirms: NOW it finalizes.
+    -- Local view says still running -> no finalize yet.
+    match.engine.isLocallyEnded = function() return false end
+    assert(match:shouldFinalize() == false,
+      "live online: no finalize while the local match is still running")
+
+    -- Server confirmation is the backstop -> finalize even if local says running.
     match._serverConfirmedEnd = true
     assert(match:shouldFinalize() == true,
-      "live online: shouldFinalize true after serverConfirmedEnd")
+      "live online: serverConfirmedEnd forces finalize")
   end)
   GAME.battleRoom = origBR
   if not ok then error(err) end
@@ -483,7 +485,7 @@ local function test_deliverOutgoingGarbage_local_to_remote()
   local sent, restore = withMockNetClient({ isConnected = true })
   local ok, err = pcall(function()
     local payload = { { width = 6, height = 1 } }
-    Match.deliverOutgoingGarbage(match, match.stacks[1], match.stacks[2], payload)
+    GarbageDelivery.new(match):_deliverOne(match.stacks[1], match.stacks[2], payload)
 
     assert(#sent == 1, "expected exactly 1 G event emitted, got " .. #sent)
     assert(sent[1].recipients[1] == 2, "G recipients[1] should be slot 2, got " .. tostring(sent[1].recipients[1]))
@@ -517,7 +519,7 @@ local function test_deliverOutgoingGarbage_remote_to_local()
 
   local sent, restore = withMockNetClient({ isConnected = true })
   local ok, err = pcall(function()
-    Match.deliverOutgoingGarbage(match, match.stacks[1], match.stacks[2], { { width = 6, height = 1 } })
+    GarbageDelivery.new(match):_deliverOne(match.stacks[1], match.stacks[2], { { width = 6, height = 1 } })
 
     assert(#sent == 0, "no G should be emitted for remote source, got " .. #sent)
     assert(#match.stacks[2].receivedGarbage == 0, "local target should NOT receive from local sim; await G")
@@ -543,7 +545,7 @@ local function test_deliverOutgoingGarbage_offline_direct()
 
   local sent, restore = withMockNetClient({ isConnected = false })
   local ok, err = pcall(function()
-    Match.deliverOutgoingGarbage(match, match.stacks[1], match.stacks[2], { { width = 6, height = 1 } })
+    GarbageDelivery.new(match):_deliverOne(match.stacks[1], match.stacks[2], { { width = 6, height = 1 } })
 
     assert(#sent == 0, "offline mode should not emit G events")
     assert(#match.stacks[2].receivedGarbage == 1, "offline mode should deliver directly to target")
@@ -567,7 +569,7 @@ local function test_roundRobin_counter_advances_by_one()
   -- 4 stacks: solo (1) attacks team (2,3,4). All alive in this test.
   for i = 1, 4 do
     match.stacks[i] = {
-      which = i, is_local = false, stopWatch = 0, game_over_clock = -1, receivedGarbage = {},
+      which = i, is_local = (i == 1), stopWatch = 0, game_over_clock = -1, receivedGarbage = {},
       receiveGarbage = function(self, p) self.receivedGarbage[#self.receivedGarbage + 1] = p end,
       getOldestFinishedGarbageTransitTime = function() return nil end,
       getReadyGarbageAt = function() return nil end,
@@ -597,7 +599,7 @@ local function test_roundRobin_counter_advances_by_one()
   local ok, err = pcall(function()
     -- 6 ticks → 6 deliveries
     for _ = 1, 6 do
-      Match.distributeGarbageToTargets(match)
+      GarbageDelivery.new(match):_distributeMultiTarget()
     end
 
     -- After 6 deliveries with 3 enemies: each should have 2.
@@ -626,7 +628,7 @@ local function test_roundRobin_walks_over_dead()
   local match = setmetatable({ stacks = {}, garbageTargets = {}, garbageMode = "shared", teams = nil }, { __index = Match })
   for i = 1, 4 do
     match.stacks[i] = {
-      which = i, is_local = false, stopWatch = 100, game_over_clock = -1, receivedGarbage = {},
+      which = i, is_local = (i == 1), stopWatch = 100, game_over_clock = -1, receivedGarbage = {},
       receiveGarbage = function(self, p) self.receivedGarbage[#self.receivedGarbage + 1] = p end,
       getOldestFinishedGarbageTransitTime = function() return nil end,
       getReadyGarbageAt = function() return nil end,
@@ -655,7 +657,7 @@ local function test_roundRobin_walks_over_dead()
   local _, restore = withMockNetClient({ isConnected = false })
   local ok, err = pcall(function()
     for _ = 1, 6 do
-      Match.distributeGarbageToTargets(match)
+      GarbageDelivery.new(match):_distributeMultiTarget()
     end
 
     local s2 = #match.stacks[2].receivedGarbage
@@ -878,7 +880,7 @@ test_applyDeathEvent_pinned_view_stack_still_lands()
 test_isLocallyEnded_live_1v1_remote_death_pinned_clock()
 test_isLocallyEnded_replay_requires_clock_catchup()
 test_local_death_notifies_server_even_when_engine_freezes()
-test_shouldFinalize_live_online_waits_for_server()
+test_shouldFinalize_live_online_snappy_finalize()
 test_shouldFinalize_offline_uses_local_isLocallyEnded()
 test_shouldFinalize_replay_uses_local_isLocallyEnded()
 test_shouldFinalize_abort_short_circuits()

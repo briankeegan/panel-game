@@ -53,7 +53,6 @@ local function buildScenario(opts)
     local isLocal = (i == 1)
     local stack = match:createStackWithSettings(levelData, isLocal, "controller")
     stack:setMaxRunsPerFrame(1)
-    stack:receiveConfirmedInput(string.rep("A", 10000))
     GarbageQueueTestingUtils.reduceRowsTo(stack, 0)
   end
 
@@ -74,8 +73,13 @@ local function buildScenario(opts)
   return match
 end
 
+-- Local stacks ignore maxRunsPerFrame and run while input is buffered, so feed
+-- one idle input per stack per frame to advance the match a single step.
 local function runToFrame(match, frame)
   while match.stacks[1].clock < frame do
+    for _, stack in ipairs(match.stacks) do
+      if stack then stack:receiveConfirmedInput("A") end
+    end
     match:run()
   end
 end

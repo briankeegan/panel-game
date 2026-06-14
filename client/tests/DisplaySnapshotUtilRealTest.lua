@@ -1,5 +1,6 @@
 local DisplaySnapshotUtil = require("client.src.network.DisplaySnapshotUtil")
 local ffiGuard = require("client.src.network.DisplaySnapshotFFI")
+local PanelStateCodes = require("client.src.network.PanelStateCodes")
 local assert = assert
 
 -- Realistic snapshot covering scalar variation + canonical state names.
@@ -39,7 +40,7 @@ local function test_real_snapshot()
   end
   for i = 1, #real_snapshot.p do
     assert(unpacked.p[i].c == real_snapshot.p[i].c, "Panel color mismatch at " .. i)
-    assert(unpacked.p[i].s == real_snapshot.p[i].s, "Panel state mismatch at " .. i)
+    assert(PanelStateCodes.toName(unpacked.p[i].s) == real_snapshot.p[i].s, "Panel state mismatch at " .. i)
   end
   print("Real snapshot test passed.")
 end

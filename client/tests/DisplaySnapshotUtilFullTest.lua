@@ -5,6 +5,7 @@
 
 local DisplaySnapshotUtil = require("client.src.network.DisplaySnapshotUtil")
 local ffiGuard = require("client.src.network.DisplaySnapshotFFI")
+local PanelStateCodes = require("client.src.network.PanelStateCodes")
 local assert = assert
 
 local function deepEqual(a, b)
@@ -112,8 +113,9 @@ local function test_panel_all_optionals()
   local _, unpacked = DisplaySnapshotUtil.unpack_snapshot(packed)
   local got = unpacked.p[1]
   for _, k in ipairs({"c","s","t","g","m","ch","sl","gi","xo","yo","gw","gh","pt","it","cs","ci","fg"}) do
-    assert(got[k] == cell[k],
-      "panel field " .. k .. " mismatch: " .. tostring(got[k]) .. " vs " .. tostring(cell[k]))
+    local gotv = (k == "s") and PanelStateCodes.toName(got[k]) or got[k]
+    assert(gotv == cell[k],
+      "panel field " .. k .. " mismatch: " .. tostring(gotv) .. " vs " .. tostring(cell[k]))
   end
   print("Panel optional fields test passed.")
 end

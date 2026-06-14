@@ -10,12 +10,24 @@ local Stage = require("client.src.mods.Stage")
 local function testModBundleSelection()
   local p1 = Player("P1", -1, false)
 
+  -- setCharacter no-ops when the requested id equals the current selection, and
+  -- a fresh player already defaults to RANDOM. Toggle through a concrete
+  -- character each iteration so every RANDOM reselect actually re-rolls.
+  local concreteId
+  for _, id in ipairs(characterIds) do
+    if id ~= consts.RANDOM_CHARACTER_SPECIAL_VALUE then concreteId = id break end
+  end
+  assert(concreteId, "test needs at least one concrete (non-random) character installed")
+
   for i = 1, 1000 do
+    p1:setCharacter(concreteId)
     p1:setCharacter(consts.RANDOM_CHARACTER_SPECIAL_VALUE)
     assert(p1.settings.characterId ~= consts.RANDOM_CHARACTER_SPECIAL_VALUE,
-    "the actual stage coming out of the random bundle should never be the random bundle itself")
+    "the actual character coming out of the random bundle should never be the random bundle itself")
+    assert(characters[p1.settings.characterId],
+    "random selection must resolve to a loaded character")
     assert(not characters[p1.settings.characterId]:isBundle(),
-    "the actual stage coming out of the random bundle should never be another bundle")
+    "the actual character coming out of the random bundle should never be another bundle")
   end
 
   -- all those setCharacter queued up a load so clean up the ModLoader

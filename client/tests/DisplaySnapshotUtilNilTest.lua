@@ -1,5 +1,6 @@
 local DisplaySnapshotUtil = require("client.src.network.DisplaySnapshotUtil")
 local ffiGuard = require("client.src.network.DisplaySnapshotFFI")
+local PanelStateCodes = require("client.src.network.PanelStateCodes")
 local assert = assert
 
 -- Snapshots with most fields nil must encode and decode without crashing,
@@ -24,7 +25,7 @@ local function test_nil_and_missing_fields()
   assert(unpacked.dc == nil, "dc default (all-false mask -> nil)")
   for i = 1, 10 do
     assert(unpacked.p[i].c == 0, "Panel color should default to 0 at " .. i)
-    assert(unpacked.p[i].s == "normal", "Panel state should default to 'normal' at " .. i)
+    assert(PanelStateCodes.toName(unpacked.p[i].s) == "normal", "Panel state should default to 'normal' at " .. i)
   end
   print("Nil and missing fields test passed.")
 end

@@ -1,5 +1,6 @@
 local DisplaySnapshotUtil = require("client.src.network.DisplaySnapshotUtil")
 local ffiGuard = require("client.src.network.DisplaySnapshotFFI")
+local PanelStateCodes = require("client.src.network.PanelStateCodes")
 local assert = assert
 
 local function test_empty_snapshot()
@@ -29,7 +30,7 @@ local function test_all_states()
   assert(packed, "Packing failed for all states test")
   local _, unpacked = DisplaySnapshotUtil.unpack_snapshot(packed)
   for i, s in ipairs(states) do
-    assert(unpacked.p[i].s == s, "Panel state mismatch at " .. i .. ": " .. tostring(unpacked.p[i].s) .. " vs " .. tostring(s))
+    assert(PanelStateCodes.toName(unpacked.p[i].s) == s, "Panel state mismatch at " .. i .. ": " .. tostring(unpacked.p[i].s) .. " vs " .. tostring(s))
     assert(unpacked.p[i].c == i, "Panel color mismatch at " .. i)
   end
   print("All states test passed.")
@@ -50,7 +51,7 @@ local function test_max_panels()
   local _, unpacked = DisplaySnapshotUtil.unpack_snapshot(packed)
   for i = 1, 84 do
     assert(unpacked.p[i].c == orig.p[i].c, "Panel color mismatch at " .. i)
-    assert(unpacked.p[i].s == orig.p[i].s, "Panel state mismatch at " .. i)
+    assert(PanelStateCodes.toName(unpacked.p[i].s) == orig.p[i].s, "Panel state mismatch at " .. i)
   end
   print("Max panels test passed.")
 end
@@ -69,9 +70,9 @@ local function test_false_sentinel_panels()
   assert(packed, "Packing failed for false-sentinel panels test")
   local _, unpacked = DisplaySnapshotUtil.unpack_snapshot(packed)
   assert(unpacked.p[1] == false, "Index 1 should be false")
-  assert(unpacked.p[2].c == 3 and unpacked.p[2].s == "matched", "Index 2 corrupted")
+  assert(unpacked.p[2].c == 3 and PanelStateCodes.toName(unpacked.p[2].s) == "matched", "Index 2 corrupted")
   assert(unpacked.p[3] == false, "Index 3 should be false")
-  assert(unpacked.p[4].c == 5 and unpacked.p[4].s == "swapping", "Index 4 corrupted")
+  assert(unpacked.p[4].c == 5 and PanelStateCodes.toName(unpacked.p[4].s) == "swapping", "Index 4 corrupted")
   assert(unpacked.p[5] == false and unpacked.p[6] == false, "Trailing false cells corrupted")
   print("False-sentinel panels test passed.")
 end

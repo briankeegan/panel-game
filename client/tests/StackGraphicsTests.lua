@@ -436,13 +436,11 @@ local function test3PlayerLayout()
   assert(stack2.layoutSlot == 2)
   assert(stack3.layoutSlot == 3)
   
-  -- Verify that stacks are positioned differently
-  -- Stack 1 should have different frameOriginX than stacks 2 and 3
+  -- Stack 1 (big left) sits apart from the right-zone pair.
   assert(stack1.frameOriginX ~= stack2.frameOriginX)
-  assert(stack2.frameOriginX == stack3.frameOriginX)  -- Stacks 2 and 3 should have same X (right side)
-  
-  -- Verify Y positions: stack 2 should be higher than stack 3
-  assert(stack2.frameOriginY < stack3.frameOriginY)
+  -- Players 2 & 3 are side-by-side on the right: different X, same row (same Y).
+  assert(stack2.frameOriginX ~= stack3.frameOriginX)
+  assert(stack2.frameOriginY == stack3.frameOriginY)
 end
 
 test(test3PlayerLayout)

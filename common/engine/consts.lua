@@ -36,7 +36,7 @@ consts.ENGINE_VERSIONS.WIGGLE_PUNISH = "049"
 -- play: the server (server/Connection.lua) requires a matching engine version
 -- AND a client patch >= its own. ENGINE_VERSION is derived from this so the
 -- two can never drift.
-consts.BUILD_VERSION = "049.0016"
+consts.BUILD_VERSION = "049.0017"
 
 -- Engine/simulation version: the "<engineVersion>" half of BUILD_VERSION.
 -- Stamped into replays; the ENGINE_VERSIONS table above names historical

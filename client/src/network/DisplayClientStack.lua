@@ -449,6 +449,18 @@ function DisplayClientStack:applyBatch(batch)
   end
 end
 
+-- Park on an already-resolved snapshot for replay scrubbing: no delta resolve,
+-- no one-shot events, snaps instead of tweening.
+function DisplayClientStack:showFrame(snapshot)
+  if type(snapshot) ~= "table" then return end
+  self.snapshot       = snapshot
+  self.prevSnapshot   = snapshot
+  self.prevRecvTime   = 0
+  self.latestRecvTime = love.timer.getTime()
+  mirrorHudScalars(self, snapshot)
+  mirrorAnalytics(self, snapshot)
+end
+
 ---Bump shake_time on the next tween pass. Called from ClientMatch's
 ---G receive handler when a remote stack we have a view of just emitted
 ---garbage. Y snapshot will mirror authoritative shake within 50ms;
@@ -815,6 +827,11 @@ function DisplayClientStack:render(viewStack)
       drawFrameLayer(viewStack)
       drawWallLayer(viewStack, snapshot, shakeOffset)
       drawCursorLayer(self, viewStack, snapshot, displacement)
+      -- Countdown on the focused board (P1): reuse the engine's drawCountdown,
+      -- handing it the snapshot's values (no live engine to read here).
+      if viewStack.layoutSlot == 1 then
+        viewStack:drawCountdown(snapshot.f, snapshot.ct, snapshot.ic)
+      end
     end)
     love.graphics.pop()
     if not ok then logger.warn("DisplayClientStack:render layer error: " .. tostring(err)) end

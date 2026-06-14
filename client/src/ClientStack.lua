@@ -855,22 +855,31 @@ function ClientStack:drawWall(displacement, rowCount)
   end
 end
 
-function ClientStack:drawCountdown()
-  if not self.is_local then return end
-  if self.engine.in_countdown and self.engine.countdown_timer and self.engine.countdown_timer > 0 then
+-- clock / countdownTimer / inCountdown are optional. Called with no args this
+-- is the engine/local-player path (reads its own engine, gated to is_local);
+-- the snapshot/spectator path passes the snapshot's values so the same draw
+-- works for a board with no live engine.
+function ClientStack:drawCountdown(clock, countdownTimer, inCountdown)
+  if clock == nil then
+    if not self.is_local then return end
+    clock = self.engine.clock
+    countdownTimer = self.engine.countdown_timer
+    inCountdown = self.engine.in_countdown
+  end
+  if inCountdown and countdownTimer and countdownTimer > 0 then
     local ready_x = 16
     local initial_ready_y = 4
     local ready_y_drop_speed = 6
-    local ready_y = initial_ready_y + (math.min(8, self.engine.clock) - 1) * ready_y_drop_speed
+    local ready_y = initial_ready_y + (math.min(8, clock) - 1) * ready_y_drop_speed
     local countdown_x = 44
     local countdown_y = 68
-    if self.engine.clock <= 8 then
+    if clock <= 8 then
       drawGfxScaled(self, themes[config.theme].images.IMG_ready, ready_x, ready_y)
-    elseif self.engine.clock >= 9 and self.engine.countdown_timer and self.engine.countdown_timer > 0 then
-      if self.engine.countdown_timer >= 100 then
+    elseif clock >= 9 and countdownTimer > 0 then
+      if countdownTimer >= 100 then
         drawGfxScaled(self, themes[config.theme].images.IMG_ready, ready_x, ready_y)
       end
-      local IMG_number_to_draw = themes[config.theme].images.IMG_numbers[math.ceil(self.engine.countdown_timer / 60)]
+      local IMG_number_to_draw = themes[config.theme].images.IMG_numbers[math.ceil(countdownTimer / 60)]
       if IMG_number_to_draw then
         drawGfxScaled(self, IMG_number_to_draw, countdown_x, countdown_y)
       end

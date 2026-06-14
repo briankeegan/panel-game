@@ -1,56 +1,138 @@
--- ReplaySpectator — watches a 2+ player snapshot replay by BEING a spectator.
--- A live spectator's boards animate because the network delivers one snapshot
--- batch per frame and the receiver paints whatever it last got. A replay has
--- the whole tape at once, so this scene supplies the timing the wire used to:
--- it feeds the recorded batches into the (already-open) spectating BattleRoom's
--- existing applyDisplayEventBatch, one frame's worth per real-time frame.
---
--- No engine simulation and ZERO changes to BattleRoom — just the pacing.
+-- Plays a 2+ player snapshot replay as a spectator with a variable-speed
+-- scrubber. The tape is fed forward into the BattleRoom's applyDisplayEventBatch
+-- (which resolves deltas in place, so each fed entry becomes a full board); a
+-- cursor then parks every board on the frame it points at. Replay-only.
 local GameBase = require("client.src.scenes.GameBase")
 local class = require("common.lib.class")
 local input = require("client.src.inputManager")
+local consts = require("common.engine.consts")
+local GraphicsUtil = require("client.src.graphics.graphics_util")
+local TeamUtils = require("common.data.TeamUtils")
+
+-- frames/sec = speed * 60; negative = reverse, 0 = pause
+local SPEEDS = {-4, -2, -1, -0.5, 0, 0.5, 1, 2, 4, 8}
 
 local ReplaySpectator = class(function(self, sceneParams)
-  -- The recorded display-history, sorted by frame (see ReplayBrowser).
   self.tape = sceneParams.tape or {}
-  self.tapeIndex = 1
-  self._startTime = nil
+  -- sort by frame so the high-water gate is monotonic (same-sender frames are
+  -- unique, so per-sender order is preserved regardless of sort stability)
+  table.sort(self.tape, function(a, b)
+    return (a.snapshot.f or 0) < (b.snapshot.f or 0)
+  end)
+
+  self.byStack = {}
+  self.lastF = 0
+  for _, batch in ipairs(self.tape) do
+    local list = self.byStack[batch.from]
+    if not list then list = {}; self.byStack[batch.from] = list end
+    list[#list + 1] = batch
+    self.lastF = math.max(self.lastF, batch.snapshot.f or 0)
+  end
+
+  self.playbackFrame = 0
+  self.highWaterF    = -1
+  self.feedIndex     = 1
+
+  self.speedIndex = 7
+  for i, s in ipairs(SPEEDS) do if s == 1 then self.speedIndex = i end end
+  self.selectedRow = "speed"
+
   self:load(sceneParams)
 end, GameBase)
 
 ReplaySpectator.name = "ReplaySpectator"
 
--- Feed every snapshot whose recorded frame the wall clock has reached. Snapshots
--- are stamped in 60fps engine frames, so a 60/sec cursor replays at record speed.
-function ReplaySpectator:feedTape()
-  local br = GAME.battleRoom
-  if not br or not br.applyDisplayEventBatch then return end
-  if not self._startTime then self._startTime = love.timer.getTime() end
-  local cursor = (love.timer.getTime() - self._startTime) * 60
-  while self.tapeIndex <= #self.tape do
-    local batch = self.tape[self.tapeIndex]
-    local f = (batch and batch.snapshot and batch.snapshot.f) or 0
-    if f > cursor then break end
-    br:applyDisplayEventBatch(batch)
-    self.tapeIndex = self.tapeIndex + 1
+-- largest index whose frame <= F (binary search; everything <= F is fed/resolved)
+local function displayIndexFor(list, F)
+  local lo, hi, best = 1, #list, nil
+  while lo <= hi do
+    local mid = math.floor((lo + hi) / 2)
+    if (list[mid].snapshot.f or 0) <= F then best = mid; lo = mid + 1 else hi = mid - 1 end
   end
+  return best
 end
 
-function ReplaySpectator:update(dt)
-  self:feedTape()
+local function focusedPlayerName(match)
+  local slot = match.spectatorFocus
+  if slot then
+    for _, stack in ipairs(match.stacks) do
+      if stack.player and TeamUtils.slotOf(stack.player, stack.player_number) == slot then
+        return stack.player.name or "Player"
+      end
+    end
+  end
+  local s = match.stacks and match.stacks[1]
+  return (s and s.player and s.player.name) or "Player"
+end
 
-  -- Leave the replay.
+function ReplaySpectator:handleInput()
   if input.allKeys.isDown["escape"] or input.isDown["MenuEsc"] or input.isDown["MenuBack"] then
     GAME.theme:playCancelSfx()
     if self.match then self.match:abort() end
     GAME.navigationStack:pop()
-    return
+    return true
   end
 
-  -- Everything else (spectator player-switch via < >, HUD, uiRoot) comes from
-  -- GameBase unchanged. The engine is paused (pauseNonLocalSimulation) so its
-  -- per-frame run is a no-op; the tape above is what drives the boards.
-  GameBase.update(self, dt)
+  if input:isPressedWithRepeat("MenuUp") or input:isPressedWithRepeat("MenuDown") then
+    self.selectedRow = (self.selectedRow == "speed") and "player" or "speed"
+    GAME.theme:playMoveSfx()
+  end
+
+  local left  = input:isPressedWithRepeat("MenuLeft")
+  local right = input:isPressedWithRepeat("MenuRight")
+  if self.selectedRow == "speed" then
+    if left  then self.speedIndex = math.max(1, self.speedIndex - 1); GAME.theme:playMoveSfx() end
+    if right then self.speedIndex = math.min(#SPEEDS, self.speedIndex + 1); GAME.theme:playMoveSfx() end
+  elseif self.match then
+    if left  then self.match:cycleSpectatorFocus(-1) end
+    if right then self.match:cycleSpectatorFocus(1) end
+  end
+  return false
+end
+
+function ReplaySpectator:update(dt)
+  if self:handleInput() then return end
+  if not self.match then return end
+
+  local speed = SPEEDS[self.speedIndex]
+  self.playbackFrame = math.min(self.lastF, math.max(0, self.playbackFrame + speed * dt * 60))
+  local F = math.floor(self.playbackFrame)
+
+  local br = GAME.battleRoom
+  -- feed only genuinely new frames forward, so pops/sounds fire once
+  if br and br.applyDisplayEventBatch and F > self.highWaterF then
+    while self.feedIndex <= #self.tape and (self.tape[self.feedIndex].snapshot.f or 0) <= F do
+      br:applyDisplayEventBatch(self.tape[self.feedIndex])
+      self.feedIndex = self.feedIndex + 1
+    end
+    self.highWaterF = F
+  end
+
+  -- leading edge keeps the feed's interpolation; only rewind snaps to a frame
+  if br and br._displayStacks and F < self.highWaterF then
+    for from, list in pairs(self.byStack) do
+      local ds = br._displayStacks[from]
+      if ds then
+        local k = displayIndexFor(list, F)
+        if k then ds:showFrame(list[k].snapshot) end
+      end
+    end
+  end
+
+  self.uiRoot:update(dt)
+end
+
+function ReplaySpectator:customDraw()
+  local speed = SPEEDS[self.speedIndex]
+  local rows = {
+    { text = "Speed  " .. ((speed == 0) and "Pause" or (tostring(speed) .. "x")), on = self.selectedRow == "speed" },
+    { text = focusedPlayerName(self.match), on = self.selectedRow == "player" },
+  }
+  local y = consts.CANVAS_HEIGHT - 70
+  for _, r in ipairs(rows) do
+    GraphicsUtil.printf((r.on and "> " or "  ") .. "<  " .. r.text .. "  >", 0, y, consts.CANVAS_WIDTH, "center", nil, 1, 10)
+    y = y + 22
+  end
 end
 
 return ReplaySpectator

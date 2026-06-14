@@ -183,11 +183,8 @@ end
 local function startReplay(replay)
   SoundController:stopMusic()
 
-  -- 2+ player snapshot replays open a real spectating BattleRoom and play the
-  -- recorded snapshot tape THROUGH it — same render path live spectating uses.
-  -- All wiring is done from out here by calling BattleRoom's existing methods;
-  -- BattleRoom.lua itself is not modified. (1-player input replays keep
-  -- ReplayGame.)
+  -- 2+ player replays play the recorded tape through a real spectating
+  -- BattleRoom (live spectator's render path); BattleRoom.lua is not modified.
   if replay.displayHistory and #replay.displayHistory > 0 then
     local BattleRoom = require("client.src.BattleRoom")
     local DisplayClientStack = require("client.src.network.DisplayClientStack")
@@ -199,9 +196,8 @@ local function startReplay(replay)
     battleRoom.spectating = true
     battleRoom.displayHistoryEnabled = true
 
-    -- Build the match WITHOUT the offline display drain: we feed the room the
-    -- tape ourselves, so createFromReplay should just build the engine + view
-    -- stacks. Hide displayHistory for the duration of the call, then restore.
+    -- hide displayHistory across the call so createFromReplay skips its own
+    -- drain; we feed the room the tape ourselves
     local tape = replay.displayHistory
     replay.displayHistory = nil
     local match = ClientMatch.createFromReplay(replay, nil, gameMode)
@@ -212,9 +208,6 @@ local function startReplay(replay)
     battleRoom.state = BattleRoom.states.MatchInProgress
     if match.engine then match.engine.pauseNonLocalSimulation = true end
 
-    -- The display stacks live on the BattleRoom (its renderDisplayStacks +
-    -- applyDisplayEventBatch use battleRoom._displayStacks). Build one per
-    -- player from the match's view stacks and suppress their engine render.
     battleRoom._displayStacks = {}
     for _, stack in ipairs(match.stacks) do
       local player = stack.player

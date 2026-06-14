@@ -211,16 +211,15 @@ function BattleRoom.createFromServerMessage(message)
     for i = 1, #match.players do
       battleRoom:addPlayer(match.players[i])
     end
-    -- All stacks need catchup to fast-forward to the server's frame. The
-    -- spectator path only enables it on remote stacks (because hasLocalPlayer
-    -- is false for spectators) — here the local stack needs it too or it'll
-    -- crawl at 1x and the silent-death watchdog will synth a death.
-    for _, stack in ipairs(match.stacks) do
-      if stack.enableCatchup then stack:enableCatchup(true) end
-    end
+    -- Reconnector resumes playing: own stack must re-sim to the live frame
+    -- (all stacks, vs spectator's remote-only catchup).
+    battleRoom:_setupInputPath(match)
     battleRoom.match = match
     battleRoom.match:start()
     battleRoom.state = BattleRoom.states.MatchInProgress
+    -- Opponents render from snapshots in displayHistoryEnabled rooms; without
+    -- this their boards freeze (the spectator bug, for a reconnector).
+    battleRoom:_setupDisplayPipeline(match)
 
     local payloadPlayers = orderedPayloadPlayers(message.players)
     for i = 1, #battleRoom.players do
@@ -720,6 +719,16 @@ function BattleRoom:_setupDisplayPipeline(match)
     end
     -- Captures are NOT stopped on matchEnded — the death-animation tail keeps
     -- ticking via runGameOver and we want it shipped too.
+  end
+end
+
+---Force input-path catchup so any behind stack fast-forwards to the live
+---frame, else it crawls at 1x and the watchdog synths a death. (Spectator
+---catchup is remote-only, handled inside ClientMatch.createFromReplay.)
+---@param match ClientMatch
+function BattleRoom:_setupInputPath(match)
+  for _, stack in ipairs(match.stacks) do
+    if stack.enableCatchup then stack:enableCatchup(true) end
   end
 end
 

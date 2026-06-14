@@ -154,20 +154,25 @@ function Connection:close()
 end
 
 -- Handle NetworkProtocol.clientMessageTypes.versionCheck
--- Body is "<NETWORK_VERSION>/<BUILD_VERSION>". Both halves must match the
--- server exactly — strict patch-level enforcement so freshly-deployed
--- servers kick off clients on older builds. Rejection body carries the
--- server's expected BUILD_VERSION so the client can tell the user which
--- patch + .love file they need.
+-- Body is the client's BUILD_VERSION ("<engine>.<patch>", e.g. "001.0013").
+-- The client may play iff its engine version equals ours AND its patch is
+-- >= ours: a newer client patch is fine (server is just behind on a deploy),
+-- an older patch or a different engine version is not. Rejection body carries
+-- the server's BUILD_VERSION so the client can tell the user which build +
+-- .love file to grab.
+local function buildParts(build)
+  local v, p = tostring(build):match("^(%d+)%.(%d+)$")
+  return v, tonumber(p)
+end
+
 local function H(connection, version)
-  local clientNet, clientBuild = version:match("^([^/]+)/(.+)$")
-  local netOk = clientNet == NetworkProtocol.NETWORK_VERSION
-  local buildOk = clientBuild == consts.BUILD_VERSION
-  if not netOk or not buildOk then
+  local clientV, clientP = buildParts(version)
+  local serverV, serverP = buildParts(consts.BUILD_VERSION)
+  local compatible = clientV ~= nil and clientV == serverV and clientP >= serverP
+  if not compatible then
     logger.info(string.format(
-      "Connection %d: rejecting handshake (client sent %q, server is %s/%s)",
-      connection.index, tostring(version),
-      NetworkProtocol.NETWORK_VERSION, consts.BUILD_VERSION))
+      "Connection %d: rejecting handshake (client build %q, server build %s)",
+      connection.index, tostring(version), consts.BUILD_VERSION))
     connection:send(NetworkProtocol.markedMessageForTypeAndBody(
       NetworkProtocol.serverMessageTypes.versionWrong.prefix, consts.BUILD_VERSION))
   else

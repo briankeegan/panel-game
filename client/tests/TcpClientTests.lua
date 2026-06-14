@@ -28,7 +28,7 @@ local function testSendData()
   assert(tcpClient:isConnected())
   local message = NetworkProtocol.markedMessageForTypeAndBody(
     NetworkProtocol.clientMessageTypes.versionCheck.prefix,
-    NetworkProtocol.NETWORK_VERSION)
+    consts.BUILD_VERSION)
   assert(tcpClient:send(message))
   tcpClient:sendRequest(ClientMessages.logout())
   assert(tcpClient:isConnected())

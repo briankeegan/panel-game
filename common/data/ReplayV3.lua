@@ -334,9 +334,9 @@ function ReplayV3.replayCanBeViewed(replay)
     -- replay is from a newer game version, we can't watch
     -- or maybe we can but there is no way to verify we can
     return false
-  elseif replay.engineVersion < consts.VERSION_MIN_VIEW then
-    -- there were breaking changes since the version the replay was recorded on
-    -- definitely can not watch
+  elseif replay.engineVersion < consts.ENGINE_VERSION then
+    -- replay is from an older engine version; only current-version replays
+    -- are watchable, so deny
     return false
   else
     if replay.engineVersion == consts.ENGINE_VERSIONS.LEVELDATA then

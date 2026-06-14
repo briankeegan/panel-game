@@ -26,12 +26,12 @@ function Request:send()
   if self.messageType.prefix == "J" then
     message = Request.toJsonMessage(self.messageText)
   elseif self.messageType.prefix == "H" then
-    -- Handshake body: "<NETWORK_VERSION>/<BUILD_VERSION>" so the server can
-    -- reject stale clients on the same wire protocol. Older clients that
-    -- send just NETWORK_VERSION fail the server's strict-match check.
+    -- Handshake body is consts.BUILD_VERSION ("<engine>.<patch>", e.g.
+    -- "001.0013"). Server accepts iff engine versions match exactly and our
+    -- patch >= the server's patch.
     message = NetworkProtocol.markedMessageForTypeAndBody(
       NetworkProtocol.clientMessageTypes.versionCheck.prefix,
-      NetworkProtocol.NETWORK_VERSION .. "/" .. consts.BUILD_VERSION)
+      consts.BUILD_VERSION)
   else
     error("Trying to send a message with message type " .. table_to_string(self.messageType) .. " that has no interaction defined")
   end

@@ -2,7 +2,9 @@ NAME_LENGTH_LIMIT = 16
 COMPRESS_REPLAYS_ENABLED = true
 COMPRESS_SPECTATOR_REPLAYS_ENABLED = true -- Send current replay inputs over the internet in a compressed format to spectators who join.
 ANY_ENGINE_VERSION_ENABLED = false -- The server will accept any engine version. Mainly to be used for debugging.
-ENGINE_VERSION = "049"
+-- Derived from consts.BUILD_VERSION so the server's login gate can't drift
+-- from the client's reported engine version (both read the same source).
+ENGINE_VERSION = require("common.engine.consts").ENGINE_VERSION
 SERVER_PORT = 49569 -- gameplay channel: YOUR critical traffic only — outgoing I, incoming G (targeting you), D (your own), K (KO). Kept lean so your game stays fast.
 LOBBY_PORT = 49570 -- lobby channel: J (all JSON — lobby/room/chat/replays/spectator list/settings) + own H/E.
 SPECTATE_PORT = 49571 -- spectate channel: opponents' I (for rendering their boards), opponents' G (for telegraph visuals), opponents' D. Bulky in 7p FFA; isolated so it can't HoL-block gameplay.

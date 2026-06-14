@@ -29,13 +29,14 @@ local socket = require("common.lib.socket")
 local json = require("common.lib.dkjson")
 local class = require("common.lib.class")
 local NetworkProtocol = require("common.network.NetworkProtocol")
+local consts = require("common.engine.consts")
 local logger = require("common.lib.logger")
 
 ---@class TestClient
 ---@field name string                  display name for log lines + login
 ---@field socket TcpSocket?            luasocket client; nil after close
 ---@field buffer string                raw byte buffer of unparsed receive data
----@field versionConfirmed boolean     server accepted our NETWORK_VERSION
+---@field versionConfirmed boolean     server accepted our BUILD_VERSION
 ---@field loggedIn boolean             server sent login_successful
 ---@field publicId integer?            assigned on login
 ---@field userId string                "need a new user id" until server assigns one
@@ -163,10 +164,11 @@ end
 -- ----------------------------------------------------------------------------
 
 function TestClient:sendVersionCheck()
-  -- Wire frame v009: [4-byte BE length][prefix "H"][3-char NETWORK_VERSION].
+  -- Handshake body is consts.BUILD_VERSION ("<engine>.<patch>"); the server
+  -- accepts iff engine versions match and our patch >= the server's.
   self:_sendRaw(NetworkProtocol.markedMessageForTypeAndBody(
     NetworkProtocol.clientMessageTypes.versionCheck.prefix,
-    NetworkProtocol.NETWORK_VERSION))
+    consts.BUILD_VERSION))
 end
 
 function TestClient:sendLogin(opts)
@@ -175,7 +177,7 @@ function TestClient:sendLogin(opts)
     login_request = true,
     user_id = opts.userId or self.userId,
     name = self.name,
-    engine_version = NetworkProtocol.NETWORK_VERSION,
+    engine_version = consts.ENGINE_VERSION,
     level = opts.level or 5,
     inputMethod = opts.inputMethod or "controller",
     character = opts.character or "__default",
@@ -320,7 +322,7 @@ function TestClient:_dispatch(prefix, body)
     -- "H" body is empty/1-byte; ignore content.
     self.versionConfirmed = true
   elseif prefix == s.versionWrong.prefix then
-    error(self.name .. ": server rejected NETWORK_VERSION " .. NetworkProtocol.NETWORK_VERSION)
+    error(self.name .. ": server rejected build " .. consts.BUILD_VERSION)
   elseif prefix == s.jsonMessage.prefix then
     local msg, _, decodeErr = json.decode(body)
     if not msg then

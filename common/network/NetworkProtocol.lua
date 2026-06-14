@@ -3,17 +3,18 @@ local json = require("common.lib.dkjson")
 
 local NetworkProtocol = {}
 
--- Version 001 was super legacy
--- Version 002 we supported unicode JSON
--- Version 003 we updated login requirements and started sending the network version
--- Version 004 server communicates replays in a new standardised format
--- Version 008 unified input message: single "I" prefix with JSON body {playerNumber, input},
---             replacing the per-slot prefixes (I,U,V,W,X,Y,Z,Q). No 8-player wire cap.
--- Version 009 length-prefixed framing: every frame is [4-byte BE length][1-byte prefix][body].
---             Length includes the prefix byte (so length == 1 + #body, minimum 1).
---             Replaces the prior "←J← UTF-8 sentinel for variable types, fixed-size table for
---             H/E" mix with a single uniform wire shape. Cannot interop with <=008 clients.
-NetworkProtocol.NETWORK_VERSION = "009"
+-- Wire-framing history (informational only — there is no separate network/
+-- protocol version gate anymore; the engine version in consts.BUILD_VERSION,
+-- i.e. the "001" of "001.0013", is the single compatibility gate. See the
+-- handshake check in server/Connection.lua).
+--   001  super legacy
+--   002  unicode JSON
+--   003  login changes; client started sending a network version
+--   004  standardised replay format
+--   008  unified input message: single "I" prefix with JSON body {playerNumber, input}
+--   009  length-prefixed framing: [4-byte BE length][1-byte prefix][body];
+--        length includes the prefix byte (length == 1 + #body, min 1).
+--        Current wire shape; cannot interop with <=008 clients.
 
 -- All the types sent by clients and servers. Length-prefixed framing means
 -- we don't need a `size` table — the wire tells us how big each frame is.
@@ -24,7 +25,7 @@ NetworkProtocol.clientMessageTypes = {
   deathEvent = {prefix="D"},       -- Loose-sync DeathEvent (JSON body)
   rewindEvent = {prefix="R"},      -- Pause-mode rewind commit (JSON body)
   acknowledgedPing = {prefix="E"}, -- Ping ack (empty body)
-  versionCheck = {prefix="H"},     -- Initial handshake; body is NETWORK_VERSION
+  versionCheck = {prefix="H"},     -- Initial handshake; body is BUILD_VERSION
   displayEvent = {prefix="Y"},     -- Display-history events (parallel-system; ignored by clients without DisplayClientStack support)
 }
 NetworkProtocol.clientPrefixToMessageType = {}
@@ -38,8 +39,8 @@ NetworkProtocol.serverMessageTypes = {
   garbageEvent = {prefix="G", verbose=true},         -- Relayed GarbageEvent
   deathEvent = {prefix="D"},                         -- Relayed DeathEvent
   rewindEvent = {prefix="R"},                        -- Relayed RewindEvent
-  versionCorrect = {prefix="H"},                     -- Sent if client's NETWORK_VERSION matches
-  versionWrong = {prefix="N"},                       -- Sent if client's NETWORK_VERSION mismatches
+  versionCorrect = {prefix="H"},                     -- Sent if client's build is compatible
+  versionWrong = {prefix="N"},                       -- Sent if client's build is incompatible
   ping = {prefix="E", verbose=true},                 -- Ping (empty body); client replies with E
   displayEvent = {prefix="Y", verbose=true},         -- Relayed display-history events
 }

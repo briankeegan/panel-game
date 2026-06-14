@@ -31,15 +31,17 @@ consts.ENGINE_VERSIONS.TOUCH_COMPATIBLE = "047"
 consts.ENGINE_VERSIONS.LEVELDATA = "048"
 consts.ENGINE_VERSIONS.WIGGLE_PUNISH = "049"
 
-consts.ENGINE_VERSION = consts.ENGINE_VERSIONS.WIGGLE_PUNISH -- The current engine version
-consts.VERSION_MIN_VIEW = consts.ENGINE_VERSIONS.LEVELDATA -- The lowest version number that can be watched
+-- Build version: "<engineVersion>.<patch>" (e.g. "001.0013"). Single source
+-- of truth for versioning — deploy.sh bumps the patch here. It also gates
+-- play: the server (server/Connection.lua) requires a matching engine version
+-- AND a client patch >= its own. ENGINE_VERSION is derived from this so the
+-- two can never drift.
+consts.BUILD_VERSION = "001.0013"
 
--- Build/patch version: informational only (NOT a protocol gate — changes
--- here don't kick clients off). Bumped by deploy.sh so the running server
--- and the locally-launched client print the same thing on startup; if
--- they don't match, it tells you somebody is on a stale build.
--- Format: "<ENGINE_VERSION>.<patch>" so it sorts naturally.
-consts.BUILD_VERSION = "049.0013"
+-- Engine/simulation version: the "<engineVersion>" half of BUILD_VERSION.
+-- Stamped into replays; the ENGINE_VERSIONS table above names historical
+-- engine values used by the replay-compat branches in Stack.lua / ReplayV3.lua.
+consts.ENGINE_VERSION = consts.BUILD_VERSION:match("^(%d+)%.") -- The current engine version
 
 consts.COUNTDOWN_CURSOR_SPEED = 4 --one move every this many frames
 consts.COUNTDOWN_START = 8

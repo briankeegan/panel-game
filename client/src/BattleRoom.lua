@@ -309,6 +309,12 @@ function BattleRoom.createLocalFromGameMode(gameMode, gameScene, settingChangesU
 
   local battleRoom = BattleRoom(gameMode, gameScene)
 
+  -- Record the snapshot/data replay for local play too (online sets this from
+  -- the server message). Solo games then save BOTH the input replay and the
+  -- display-history version. FFI-guarded like the online path; the local stack
+  -- keeps its normal engine render, this only adds the capture.
+  battleRoom.displayHistoryEnabled = require("client.src.network.DisplaySnapshotFFI").FFI_SUPPORTED == true
+
   if settingChangesUpdateConfig and gameMode.playerCount == 1 then
     -- always use the game client's local player
     battleRoom:addPlayer(GAME.localPlayer)

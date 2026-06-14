@@ -548,7 +548,6 @@ end
 
 function DisplayEventCapture:_send(now)
   self.lastFlushTime = now or love.timer.getTime()
-  if not (GAME and GAME.netClient) then return end
 
   -- Skip-when-unchanged: bail before the expensive serialize if NOTHING
   -- shippable has changed since the last send. Catches:
@@ -610,15 +609,10 @@ function DisplayEventCapture:_send(now)
   if self._historyList then
     self._historyList[#self._historyList + 1] = { from = self.playerID, snapshot = snapshot }
   end
-  local ffiGuard = require("client.src.network.DisplaySnapshotFFI")
-  local util = require("client.src.network.DisplaySnapshotUtil")
-  if ffiGuard.FFI_SUPPORTED then
-    local ok, err = pcall(GAME.netClient.sendDisplayEvents, GAME.netClient, { from = self.playerID, snapshot = snapshot })
-    if not ok then
-      logger.warn("[DisplayEventCapture] sendDisplayEvents failed: " .. tostring(err))
-    end
-  else
-    -- fallback: JSON batch
+  -- The recording above happens regardless (offline solo still saves the data
+  -- replay). Only the live wire send needs a client; sendDisplayEvents picks
+  -- FFI vs JSON internally.
+  if GAME and GAME.netClient then
     local ok, err = pcall(GAME.netClient.sendDisplayEvents, GAME.netClient, { from = self.playerID, snapshot = snapshot })
     if not ok then
       logger.warn("[DisplayEventCapture] sendDisplayEvents failed: " .. tostring(err))

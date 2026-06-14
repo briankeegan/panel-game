@@ -807,17 +807,21 @@ function DisplayClientStack:render(viewStack)
 
   if not viewStack or not self.snapshot then return end
   if not viewStack.setDrawArea or not viewStack.resetDrawArea then return end
+  local snapshot = self.snapshot
+  if not snapshot then return end -- guaranteed by the guard above; narrows for LuaLS
 
   -- Update HUD-driving engine fields with interpolated values before any
   -- draw. GameBase:draw orders us before drawHUD, so the tweened values
   -- are what drawScore / drawMultibar / Telegraph read this frame.
   tweenHudScalars(self)
 
-  local snapshot = self.snapshot
   local shakeOffset = computeShakeOffset(viewStack)
   -- Same tween for the smooth-scroll offset — grid and cursor must use
   -- the same value or the cursor drifts off its panel between snapshots.
   local displacement = tweenedDisplacement(self, snapshot)
+  -- Countdown values, read here (snapshot is narrowed) rather than inside the
+  -- pcall closure (where it re-widens to nilable). Only drawn while in countdown.
+  local cdInCountdown, cdClock, cdTimer = snapshot.ic, snapshot.f or 0, snapshot.ct or 0
 
   viewStack:withDrawArea(0, 0, function()
     love.graphics.push("all")
@@ -827,10 +831,9 @@ function DisplayClientStack:render(viewStack)
       drawFrameLayer(viewStack)
       drawWallLayer(viewStack, snapshot, shakeOffset)
       drawCursorLayer(self, viewStack, snapshot, displacement)
-      -- Countdown on the focused board (P1): reuse the engine's drawCountdown,
-      -- handing it the snapshot's values (no live engine to read here).
-      if viewStack.layoutSlot == 1 then
-        viewStack:drawCountdown(snapshot.f, snapshot.ct, snapshot.ic)
+      -- Countdown on the focused board (P1): reuse the engine's drawCountdown.
+      if viewStack.layoutSlot == 1 and cdInCountdown then
+        viewStack:drawCountdown(cdClock, cdTimer, cdInCountdown)
       end
     end)
     love.graphics.pop()

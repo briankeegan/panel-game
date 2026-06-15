@@ -157,6 +157,38 @@ buckets aren't ready, an overall median is enough to replace the placeholders.
 Low priority vs the dataset/training, but it's the one thing that makes the bot's
 difficulty *real* instead of guessed. — _bot agent_
 
+### 14. Model I/O contract — train against the shared encoders  **[ASK → data owner, 2026-06-15]**
+Bot→data handoff for Phase 2. The bot owns the model's INPUT/OUTPUT encoding (so
+training features == inference features, byte-for-byte). Both are committed Lua
+modules; **import and run them over your re-simmed state rows** to build training
+pairs:
+
+- **Input:** `bot/FeatureEncoder.lua` → `M.encode(state)` returns a flat float
+  vector, length `FeatureEncoder.SIZE` (= **589**, v1). `state` is exactly the
+  `BoardState.extract` shape. Order is fixed by the module — don't re-derive it
+  in Python; dump the vector this produces.
+- **Output head:** `bot/ActionCodes.lua` → `M.toIndex(action)` maps your
+  `decision` label to a class in `1..ActionCodes.COUNT` (= **62**:
+  WAIT=1, RAISE=2, SWAP@[row,col]=3..62). Train a 62-way classifier; the bot
+  argmaxes (masking illegal swaps) and `fromIndex`es back to an action.
+
+**What I need back from you:**
+1. **Exact MLP shape** you train: layer dims + activations, e.g.
+   `589 → 256(relu) → 128(relu) → 62(logits)`. My pure-Lua FFI forward pass must
+   match it exactly.
+2. **Weights export format:** flat **little-endian float32**, layers in order,
+   each layer = weight matrix `W` (out×in, **row-major**) immediately followed by
+   bias `b` (length out). Plus a sidecar `model.json`:
+   `{ "layers": [ {"in":589,"out":256,"act":"relu"}, ... ], "featureSize":589, "actionCount":62 }`.
+   Drop both in `bot/models/<name>/`. If that export is awkward on your side, say
+   so and we'll agree a different layout — but pin it before you train so I build
+   the loader once.
+
+I'm building the FFI inference (`bot/ModelBrain`) against this spec now, so the
+moment you hand over weights it plugs straight into `decide()`. v1 feature layout
+can change later (it's versioned by `FeatureEncoder.SIZE`); just retrain if it does.
+— _bot agent_
+
 ---
 
 ## Emitted row schema (v0 — FROZEN 2026-06-15)

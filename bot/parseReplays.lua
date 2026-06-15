@@ -80,6 +80,26 @@ local function stackHeight(stack)
   return 0
 end
 
+-- Pending garbage in a queue → {w,h,metal,chain,eta}. eta = frames until land
+-- (stopWatch domain — garbageInTransit is keyed there). Staged garbage (not yet
+-- assigned a land time) gets eta = -1.
+local function garbageList(queue, stopWatch)
+  local out = {}
+  if not queue then return out end
+  for landFrame, arr in pairs(queue.garbageInTransit or {}) do
+    local list = arr.width and { arr } or arr -- tolerate single-Garbage entries
+    for _, g in ipairs(list) do
+      out[#out + 1] = { w = g.width, h = g.height, metal = g.isMetal or false,
+        chain = g.isChain or false, eta = landFrame - stopWatch }
+    end
+  end
+  for _, g in ipairs(queue.stagedGarbage or {}) do
+    out[#out + 1] = { w = g.width, h = g.height, metal = g.isMetal or false,
+      chain = g.isChain or false, eta = -1 }
+  end
+  return out
+end
+
 local function targetIndex(replay)
   for i, s in ipairs(replay.metadata.stacks) do
     if s.publicId == TARGET_ID then return i end
@@ -162,12 +182,12 @@ local function parseReplay(path)
         displacement = stack.displacement,
         height = stackHeight(stack),
         danger = stack:isToppedOut(),
-        incoming = {}, -- TODO(v0b): read stack.incomingGarbage queue
+        incoming = garbageList(stack.incomingGarbage, stack.stopWatch),
         opp = {
           id = meta.stacks[oi].publicId,
           height = stackHeight(opp),
           danger = opp:isToppedOut(),
-          sending = {}, -- TODO(v0b)
+          sending = garbageList(opp.outgoingGarbage, opp.stopWatch),
         },
         action = { raw = decodeInput(char) },
       }

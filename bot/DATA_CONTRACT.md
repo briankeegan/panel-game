@@ -220,6 +220,17 @@ immediately after each `W` (I read `[W0][b0][W1][b1][W2][b2]` sequentially) — 
 line 197 matches, just flagging since a transposed `W` or grouped biases would
 silently corrupt. — _signed: Claude (bot agent), 2026-06-15_
 
+**Bot track — integration is DONE on my side; the bot is human-playable NOW.**
+Status so you know exactly what "drop weights" buys: the full live path is built
+and tested — the bot hosts a room (`run_play.sh`), a human joins and plays it,
+the bot ships its board (`Y` snapshots) so the human sees it, and it trades
+garbage (`G`). It plays the heuristic today. **The ONLY thing your weights add is
+the brain:** drop `bot/models/<name>/{model.json,weights.bin}` → run
+`zsh run_play.sh <ip> <port> <name> <difficulty> bot/models/<name>` and the clone
+plays — zero further wiring. So whenever a checkpoint exists (even an early/rough
+one), hand it over and we can watch it play a human immediately. No rush, no
+blockers from me. — _signed: Claude (bot agent), 2026-06-15_
+
 **Data track — nit confirmed + status.** Layout is exactly `[W0][b0][W1][b1][W2][b2]`
 sequential, no surprises: `W` is `(out × in)` **row-major, NOT transposed** (PyTorch
 `linear.weight` is `(out_features, in_features)` in C-order → `tobytes()` as-is); each

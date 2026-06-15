@@ -20,6 +20,9 @@
 --      run <MACRO>         expand a named macro (TO_MENU / VS_SELF / REPLAYS ...)
 --      quit                stop the instance
 --    Results land in PA_OUT_FILE as `reached <scene>`, `shot=<abs path>`, etc.
+--    Sync: wait for the `ready=<scene>` line in PA_OUT_FILE before sending
+--    commands (boot settled + polling live). Cleanup with `find -delete`, not a
+--    zsh `rm *.png` glob (aborts the line on no-match). Quit via the `quit` cmd.
 --
 -- B) SCRIPTED (PA_AUTO_REPLAY / PA_AUTO_ONLINE_ROOM) — one-and-forget journeys.
 --    From boot it walks the scenes: Main Menu -> Replay Browser -> open the target
@@ -333,6 +336,15 @@ end
 -- advance the current blocking op (hold/menusel/waitscene/idle) or run the next.
 local function tickInteractive()
   if st.clicks then feedClicks() end
+  -- Deterministic readiness handshake: once boot settles on a real scene, write
+  -- `ready=<scene>` ONCE. Callers wait for this line in PA_OUT_FILE before
+  -- sending commands — no need to spam `scene`, and it dodges the init cmd-file
+  -- truncate (commands sent pre-ready would be wiped) + print() log buffering.
+  if not st.ready then
+    local sn = sceneName()
+    if sn and sn ~= "BootScene" then st.ready = true; writeOut("ready=" .. sn) end
+    return
+  end
   if st.frame % st.pollEvery == 0 then pollCmdFile() end
   if st.hold then
     st.hold.frames = st.hold.frames - 1

@@ -17,6 +17,38 @@ function M.isPlayColor(c)
   return c and c >= 1 and c <= 6
 end
 
+-- Pending garbage aimed at this stack -> DATA_CONTRACT §6 incoming[] of
+-- { w, h, metal, chain, eta(frames-until-land) }.
+-- eta per §6 (shared with the data track's re-sim — must match exactly):
+--   in transit: deliveryTime - clock (exact; deliveryTime is the queue key).
+--   staged:     frameEarned + STAGING_DURATION + GARBAGE_DELAY_LAND_TIME - clock,
+--               where STAGING_DURATION = GARBAGE_TRANSIT_TIME + GARBAGE_TELEGRAPH_TIME + 1.
+function M.extractIncoming(stack)
+  local out = {}
+  local iq = stack.incomingGarbage
+  if not iq then return out end
+  local clock = stack.clock or 0
+  local stagingDuration = GARBAGE_TRANSIT_TIME + GARBAGE_TELEGRAPH_TIME + 1
+
+  for _, g in ipairs(iq.stagedGarbage or {}) do
+    out[#out + 1] = {
+      w = g.width, h = g.height,
+      metal = g.isMetal or false, chain = g.isChain or false,
+      eta = (g.frameEarned + stagingDuration + GARBAGE_DELAY_LAND_TIME) - clock,
+    }
+  end
+  for deliveryTime, pieces in pairs(iq.garbageInTransit or {}) do
+    for _, g in ipairs(pieces) do
+      out[#out + 1] = {
+        w = g.width, h = g.height,
+        metal = g.isMetal or false, chain = g.isChain or false,
+        eta = deliveryTime - clock,
+      }
+    end
+  end
+  return out
+end
+
 ---@return table state { board, width, rows, cursor, displacement, height, danger, columnHeights, incoming }
 function M.extract(stack)
   local width = stack.width
@@ -58,7 +90,7 @@ function M.extract(stack)
     columnHeights = columnHeights,    -- highest occupied row per column
     maxColHeight = maxColHeight,
     danger = maxColHeight >= (stack.height - 1),
-    incoming = {},                    -- TODO(Phase 1 garbage pass): read stack.incomingGarbage
+    incoming = M.extractIncoming(stack),
   }
 end
 

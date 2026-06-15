@@ -84,5 +84,20 @@ while socket.gettime() < deadline do
 end
 
 sink:close()
-print(string.format("emitted %d rows -> %s/%s.jsonl.gz", emitted, outDir, id))
+
+-- offense stats line (4th fit_targets component), schema = parseReplays EMIT_STATS:
+-- {frames, garbage:[{isChain,width,height,frameEarned}], ...} appended to stats.jsonl.
+local stk = host.myStack
+if stk and stk.outgoingGarbage then
+  local garbage = {}
+  for _, g in ipairs(stk.outgoingGarbage.history or {}) do
+    garbage[#garbage + 1] = { isChain = g.isChain or false, width = g.width, height = g.height, frameEarned = g.frameEarned }
+  end
+  local stats = { gameId = id, outcome = host.outcome, frames = stk.clock,
+    panels_cleared = stk.panels_cleared, score = stk.score, garbage = garbage }
+  local sf = io.open(outDir .. "/stats.jsonl", "a")
+  if sf then sf:write(json.encode(stats) .. "\n"); sf:close() end
+end
+
+print(string.format("emitted %d rows + stats -> %s/%s.jsonl.gz", emitted, outDir, id))
 host:disconnect(); join:disconnect()

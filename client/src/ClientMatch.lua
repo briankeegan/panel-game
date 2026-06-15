@@ -1545,6 +1545,14 @@ function ClientMatch:finalizeReplay()
       self.replay.displayHistory = GAME.battleRoom._replayDisplayHistory
     end
 
+    -- Garbage-arrival log (additive) for the "play from here" fork. Lives in
+    -- crossPlayerEvents.garbage; ignored by normal (completed) playback.
+    if GAME.battleRoom and GAME.battleRoom._replayGarbageEvents
+        and #GAME.battleRoom._replayGarbageEvents > 0 then
+      self.replay.crossPlayerEvents = self.replay.crossPlayerEvents or { garbage = {}, deaths = {} }
+      self.replay.crossPlayerEvents.garbage = GAME.battleRoom._replayGarbageEvents
+    end
+
     ReplayV3.finalizeReplay(self.engine, self.replay)
 
     -- ReplayV3.finalizeReplay derives the winner from the local engine's
@@ -2134,6 +2142,23 @@ function ClientMatch:applyGarbageEvent(body)
   if not body or type(body.recipients) ~= "table" or type(body.garbage) ~= "table" then
     logger.warn("applyGarbageEvent: malformed body, dropping")
     return
+  end
+
+  -- Record the server-confirmed arrival for the "play from here" fork. Purely
+  -- additive: stamped into replay.crossPlayerEvents.garbage at finalize and only
+  -- read by the takeover, never by normal playback. No-op unless recording.
+  local gLog = GAME and GAME.battleRoom and GAME.battleRoom._replayGarbageEvents
+  if gLog then
+    local recipients = {}
+    for i = 1, #body.recipients do recipients[i] = body.recipients[i] end
+    local garbage = {}
+    for i = 1, #body.garbage do garbage[i] = body.garbage[i] end
+    gLog[#gLog + 1] = {
+      sender = body.sender,
+      senderFrame = body.senderFrame,
+      recipients = recipients,
+      garbage = garbage,
+    }
   end
 
   -- Defer fires ONLY for spectators catching up via replay backlog.

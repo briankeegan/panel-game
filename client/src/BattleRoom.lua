@@ -705,6 +705,11 @@ function BattleRoom:_setupDisplayPipeline(match)
     if match.engine then match.engine.pauseNonLocalSimulation = true end
 
     self._replayDisplayHistory = {}
+    -- Garbage-arrival log (additive): server-confirmed G events recorded for
+    -- the "play from here" fork. Never consumed by normal playback (the saved
+    -- replay is `completed`, which gates crossPlayerEvents out of the spectator
+    -- drain) — only the takeover reads it. See ClientMatch:applyGarbageEvent.
+    self._replayGarbageEvents = {}
     self._displayCaptures = {}
     self._displayStacks   = {}
     for _, player in ipairs(match.players) do

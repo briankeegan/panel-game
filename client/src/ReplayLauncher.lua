@@ -56,7 +56,7 @@ function ReplayLauncher.launch(replay)
     match:start()
     match:moveStacks()
     GAME.battleRoom = battleRoom
-    GAME.navigationStack:push(ReplaySpectator({ match = match, tape = tape }))
+    GAME.navigationStack:push(ReplaySpectator({ match = match, tape = tape, replay = replay }))
     return match
   end
 

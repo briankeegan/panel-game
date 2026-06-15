@@ -19,6 +19,7 @@ end
 ---Supports general properties for positioning and drawing
 ---@class ClientStack : Signal
 ---@field is_local boolean if the Stack gets its inputs live from the local client or not
+---@field _displaySnapshot table? latest display snapshot, set by DisplayClientStack:render so drawPlayerName can read snapshot-shaped state (e.g. the OUT death-time) in snapshot replays
 ---@field character Character the character to use for drawing and sounds
 ---@field theme table the theme to determine offsets via theme for multibar and other properties
 ---@field panels_dir string id of the panel set to use for metal garbage assets and panels

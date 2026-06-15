@@ -15,6 +15,8 @@ local PAUSE_INDEX = 1
 for i, s in ipairs(SPEEDS) do if s == 0 then PAUSE_INDEX = i; break end end
 
 local ReplaySpectator = class(function(self, sceneParams)
+  self.replay = sceneParams.replay -- for the "play from here" fork (seed + garbage log)
+  self.spectatorBattleRoom = GAME.battleRoom -- restore on return from a fork (it swaps GAME.battleRoom)
   self.tape = sceneParams.tape or {}
   -- sort by frame so the high-water gate is monotonic (same-sender frames are
   -- unique, so per-sender order is preserved regardless of sort stability)
@@ -85,9 +87,27 @@ function ReplaySpectator:handleInput()
     return true
   end
 
-  if input:isPressedWithRepeat("MenuUp") or input:isPressedWithRepeat("MenuDown") then
-    self.selectedRow = (self.selectedRow == "speed") and "player" or "speed"
+  -- Available control rows. "play" (take over the focused board) only exists
+  -- while paused — that's the gate for the "play from here" fork.
+  local rows = { "speed", "player" }
+  if SPEEDS[self.speedIndex] == 0 then rows[#rows + 1] = "play" end
+  -- keep selection valid if the play row just vanished (un-paused)
+  local curIdx = 1
+  for i, name in ipairs(rows) do if name == self.selectedRow then curIdx = i end end
+  if not rows[curIdx] or rows[curIdx] ~= self.selectedRow then self.selectedRow = rows[1]; curIdx = 1 end
+
+  if input:isPressedWithRepeat("MenuUp") then
+    self.selectedRow = rows[(curIdx - 2) % #rows + 1]
     GAME.theme:playMoveSfx()
+  elseif input:isPressedWithRepeat("MenuDown") then
+    self.selectedRow = rows[curIdx % #rows + 1]
+    GAME.theme:playMoveSfx()
+  end
+
+  -- Confirm on the play row → take over.
+  if self.selectedRow == "play" and (input.isDown["MenuSelect"] or input.isDown["Swap1"]) then
+    self:_forkNow()
+    return true
   end
 
   local left  = input:isPressedWithRepeat("MenuLeft")
@@ -116,6 +136,11 @@ function ReplaySpectator:handleInput()
 end
 
 function ReplaySpectator:update(dt)
+  -- A fork swaps GAME.battleRoom to its live room; on return here, restore ours
+  -- so the spectator's boards render again.
+  if self.spectatorBattleRoom and GAME.battleRoom ~= self.spectatorBattleRoom then
+    GAME.battleRoom = self.spectatorBattleRoom
+  end
   if self:handleInput() then return end
   if not self.match then return end
 
@@ -147,13 +172,36 @@ function ReplaySpectator:update(dt)
   self.uiRoot:update(dt)
 end
 
+-- Take over the focused board as a live solo game. Pause-only entry point.
+function ReplaySpectator:_forkNow()
+  local ReplayFork = require("client.src.ReplayFork")
+  GAME.theme:playValidationSfx()
+  local ok, err = xpcall(ReplayFork.startFromSpectator, debug.traceback, self.replay)
+  if not ok then
+    require("common.lib.logger").error("ReplaySpectator: play-from-here fork failed: " .. tostring(err))
+    GAME.theme:playCancelSfx()
+  end
+end
+
+-- Test/dev hook: jump straight to the paused "Play as" control (used by the
+-- AutoReplay harness to screenshot the entry button).
+function ReplaySpectator:_showPlayMenu()
+  self.speedIndex = PAUSE_INDEX
+  self.selectedRow = "play"
+end
+
 function ReplaySpectator:customDraw()
   local speed = SPEEDS[self.speedIndex]
   local rows = {
     { text = "Speed  " .. ((speed == 0) and "Pause" or (tostring(speed) .. "x")), on = self.selectedRow == "speed" },
     { text = focusedPlayerName(self.match), on = self.selectedRow == "player" },
   }
-  local y = consts.CANVAS_HEIGHT - 70
+  if speed == 0 then
+    rows[#rows + 1] = { text = "Play as " .. focusedPlayerName(self.match), on = self.selectedRow == "play" }
+  end
+  -- Bottom-anchored above the GameBase spectator hint zone so the extra "Play
+  -- as" row (when paused) doesn't overlap the "Switch Player" hint.
+  local y = consts.CANVAS_HEIGHT - 64 - #rows * 22
   for _, r in ipairs(rows) do
     -- selection shown by colour, not a pointer: white when active, grey when not
     local color = r.on and {1, 1, 1, 1} or {0.5, 0.5, 0.5, 1}

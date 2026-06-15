@@ -59,6 +59,7 @@ function AutoReplay.init()
     nextIdx  = 1,
     shotName = os.getenv("PA_AUTO_SHOT") or "pa_autoshot.png",
     quit     = os.getenv("PA_AUTO_QUIT") ~= "0",
+    fork     = os.getenv("PA_AUTO_FORK") ~= nil, -- at the first target, "play from here" then shoot the live fork
     frame    = 0,
     started  = nil, -- frame the replay actually began (after mods loaded)
   }
@@ -85,6 +86,7 @@ local function start()
   local md = replay.metadata or {}
   print(string.format("PA_AUTO_REPLAY: loaded mode=%s players=%d teamCount=%s",
     tostring(md.gameModeName), #(replay.stacks or {}), tostring(md.teamCount)))
+  state.replay = replay
   state.match = ReplayLauncher.launch(replay)
 
   -- Fast-forward the headless capture: the spectator scene advances its
@@ -151,6 +153,44 @@ function AutoReplay.update()
       end
       state.started = state.frame
       print("PA_AUTO_REPLAY: playback started")
+    end
+    return
+  end
+
+  -- Fork mode: reach the target frame, open the paused "Play as" menu and shoot
+  -- it (<shot>_menu.png), then trigger the real control and shoot the live fork
+  -- (<shot>_game.png). Playhead stops once we leave the spectator, so post-menu
+  -- timing switches to love-frame counting.
+  if state.fork then
+    local menuName = state.shotName:gsub("(%.%w+)$", "_menu%1")
+    local gameName = state.shotName:gsub("(%.%w+)$", "_game%1")
+    if not state.menuAt then
+      local p = playbackFrame()
+      if p > (state.lastP or -1) then state.lastP = p; state.stall = 0
+      else state.stall = (state.stall or 0) + 1 end
+      if p >= state.targets[1] or state.stall > 180 then
+        local scene = activeScene()
+        if scene and scene._showPlayMenu then scene:_showPlayMenu() end
+        state.menuAt = state.frame
+        print(string.format("PA_AUTO_REPLAY: opened Play menu at replay frame %d", math.floor(p)))
+      end
+      return
+    end
+    local since = state.frame - state.menuAt
+    if since == 8 then
+      love.graphics.captureScreenshot(menuName)
+      reportShot(menuName, state.targets[1], state.targets[1])
+    elseif since == 16 then
+      local scene = activeScene()
+      local ok, err = pcall(function() return scene and scene._forkNow and scene:_forkNow() end)
+      print("PA_AUTO_REPLAY: FORK via control -> " .. tostring(ok) .. (ok and "" or (" ERR=" .. tostring(err))))
+      state.forkFrame = state.frame
+    elseif state.forkFrame and state.frame - state.forkFrame == 220 then
+      love.graphics.captureScreenshot(gameName)
+      reportShot(gameName, state.targets[1], state.targets[1])
+    elseif state.forkFrame and state.frame - state.forkFrame >= 224 and state.quit then
+      print("PA_AUTO_REPLAY: done (fork)")
+      love.event.quit()
     end
     return
   end

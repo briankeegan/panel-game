@@ -26,9 +26,12 @@ local namedBrain = (modelDir == "search" or modelDir == "expert") and modelDir o
 local brain = namedBrain or (modelDir and "model" or "heuristic")
 if namedBrain then modelDir = nil end
 
+-- PA_SEARCH_PROFILE=bot/profiles/<player>.json conditions the search eval per
+-- player (Phase B); ignored unless brain == "search".
 local bot = BotClient({
   ip = ip, port = port, name = name, difficulty = difficulty,
   brain = brain, modelDir = modelDir,
+  searchProfile = (brain == "search") and os.getenv("PA_SEARCH_PROFILE") or nil,
 })
 
 if not bot:login() then print("login failed"); os.exit(1) end

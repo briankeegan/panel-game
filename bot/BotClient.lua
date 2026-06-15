@@ -68,8 +68,9 @@ local BotClient = class(function(self, opts)
   self.ip = opts.ip or "127.0.0.1"
   self.port = opts.port or 49569
   self.name = opts.name or "BotBella"
-  self.brainKind = opts.brain or "heuristic"   -- "heuristic" | "random" | "model"
+  self.brainKind = opts.brain or "heuristic"   -- "heuristic"|"random"|"model"|"expert"|"search"
   self.modelDir = opts.modelDir                 -- required when brain == "model"
+  self.searchProfile = opts.searchProfile       -- optional per-player eval weights (brain == "search")
   self.difficulty = opts.difficulty or "medium" -- "easy" | "medium" | "hard" (cursor-speed/reaction cap)
   self.gameplay = TcpClient({ name = "bot-gameplay", defaultPort = self.port })
   -- Persisted server identity so re-runs reuse the same account instead of
@@ -343,7 +344,10 @@ function BotClient:startMatch()
     if self.brainKind == "model" then
       self.brain = require("bot.ModelBrain").load(assert(self.modelDir, "bot: brain='model' requires modelDir"))
     elseif self.brainKind == "search" then
-      self.brain = require("bot.SearchBrain").new()
+      -- opts.searchProfile (a JSON weight profile path) conditions the eval per
+      -- player (Phase B); without it, hand-set defaults (Phase A).
+      self.brain = self.searchProfile and require("bot.SearchBrain").load(self.searchProfile)
+        or require("bot.SearchBrain").new()
     elseif self.brainKind == "expert" then
       self.brain = require("bot.ExpertBrain").new()
     else

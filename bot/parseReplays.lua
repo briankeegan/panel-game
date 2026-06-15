@@ -301,6 +301,12 @@ function love.update()
       dropped = dropped + 1
       dropReasons[err or "?"] = (dropReasons[err or "?"] or 0) + 1
     end
+    -- Feature mode allocates a 589-float table + board tables per frame; collect
+    -- per game so the Lua heap can't balloon over a long batch.
+    collectgarbage("collect")
+    if processed % 50 == 0 then
+      logger.info(string.format("  ... %d processed (kept=%d dropped=%d)", processed, kept, dropped))
+    end
   end
   logger.info(string.format("PARSE DONE: processed=%d kept=%d dropped=%d rows=%d",
     processed, kept, dropped, totalRows))

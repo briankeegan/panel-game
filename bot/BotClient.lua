@@ -405,6 +405,7 @@ function BotClient:tickMatch()
       local st = self.boardState.extract(stack)
       local decision = self.brain:decide(st)
       char = self.controller:nextInput(st, decision)
+      self.lastState, self.lastDecision = st, decision -- exposed for the game emitter
       -- decide->execute instrumentation (split "brain WAITs/picks bad" from
       -- "controller never executes"): count decisions, SWAP intents, swap inputs.
       self._decTotal = (self._decTotal or 0) + 1

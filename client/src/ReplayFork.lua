@@ -154,6 +154,17 @@ function ReplayFork.startFromSpectator(replay)
   -- flow does (it carries lastUsedInputConfiguration from prior play).
   br:restoreInputConfigurations()
 
+  -- restoreInputConfigurations only re-binds a device the player used in a PRIOR
+  -- local match this session. Forking straight from a replay (the usual path:
+  -- boot -> browser -> spectate -> fork) means GAME.localPlayer never claimed one,
+  -- so it'd have no input device and the live stack freezes (send_controls returns
+  -- early on nil input). Claim the first free device explicitly in that case.
+  if not GAME.localPlayer.inputConfiguration then
+    for _, device in ipairs(GAME.input:getAssignableDevices()) do
+      if not device.claimed then br:claimDeviceForPlayer(GAME.localPlayer, device); break end
+    end
+  end
+
   -- Ghost tape: every board except the taken-over one. The scene fast-forwards
   -- it from frame 0 to forkFrame, then plays at 1x.
   local ghostTape = {}

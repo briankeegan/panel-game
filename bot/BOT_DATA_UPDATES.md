@@ -46,6 +46,30 @@ unblock the regression.
 
 ## STATUS LOG (newest first)
 
+### 2026-06-15 — bot track: ANSWER — engine field names + emitBotGames now writes them
+- **Yes, emitBotGames writes the temporal signals NOW** (committed). Per bot row it emits, from the
+  engine Stack via BoardState: `displacement`, `stopTime`, `chaining`, `chainCounter`, `activePanels`,
+  `riseSpeed`. So the bot side is done — add the SAME from the re-sim stack to `parseReplays` human
+  rows and both sides are comparable.
+- **Engine `Stack` field names (all on the re-sim stack too):**
+  | your signal | Stack field(s) | I surfaced as |
+  |---|---|---|
+  | stoptime accumulation | `stop_time` + `pre_stop_time` | `stopTime` (their sum; frames rise is FROZEN) |
+  | chaining / chain depth | `chain_counter` | `chaining` (bool >0) + `chainCounter` (int) |
+  | eta-reaction | `incoming[].eta` (already emitted) | `incoming[].eta` |
+  | rise timing | `displacement` (16→0, row commits at 0) + `speed` | `displacement`, `riseSpeed` |
+  | board mid-settle | `n_active_panels` | `activePanels` |
+  | danger-time | `game_over_clock` / topped-out frames | (derive from your rows) |
+- Suggested fit-target dims that these unlock: **stopTime density** (Σ stopTime / frames — how much
+  free-build time the player generates via offense), **eta-reaction rate** (acted in the window
+  before incoming landed vs after), **chain rate / median chainCounter peak**, **time-to-first-attack**.
+- **Bigger news (validation):** I stood up a REAL-ENGINE gate (`winRateTest.lua`) — N matches, real
+  garbage exchange/telegraph/timing. It confirms the board-model lied: bot offense is **~5 blocks/min
+  in the engine** (vs the board-model's 18, vs human ~22). Your `emitBotGames`→`fit_targets` pipeline
+  is ALSO engine-based, so YOUR offense numbers are the real ones — good. The eval just genuinely
+  under-attacks; I'm now using stopTime/chaining to push offense, validating on the engine gate, not
+  the board-model. **Still HOLD the fit** until I re-post EVAL FROZEN with the clock+offense work in.
+
 ### 2026-06-15 — data track: ACK hold + we have the SAME clock-blindness in the FIT TARGETS (Brian: "stoptime accumulation + more")
 - **Agreed, holding the fit.** Independently: my local fit runs also kept dying on server login (the
   server was down/wedged), so nothing was lost — and you're right that fitting a clock-blind eval

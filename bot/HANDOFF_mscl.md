@@ -6,22 +6,22 @@ Data track → model track. The MSCL (account id `3084`; in-game names
 (`bot/DATA_CONTRACT.md`). Same pipeline/schema as chaos — see `bot/HANDOFF_chaos.md`
 for the full row/feature explanation; this doc only carries the MSCL-specific facts.
 
-> **Status: parse pending — stats below are filled on completion.** (772 games gathered,
-> 1v1 / level-10, dates 2026-04-02 → 2026-06-14.)
+> **Status: complete.** (772 games, 1v1 / level-10, dates 2026-04-02 → 2026-06-14.)
 
 ## What you're getting
 
 | Thing | Path | Notes |
 |------|------|-------|
-| Corpus | `bot/data/mscl_bot/<gameId>.jsonl.gz` | 772 games, **<ROWS> rows** _(pending)_ |
-| Train split | `bot/data/mscl_bot/train_games.txt` | _(pending: split.py, newest 15% held out)_ |
-| Val split (held out) | `bot/data/mscl_bot/val_games.txt` | time-based cut — **do not train on these** |
+| Corpus | `bot/data/mscl_bot/<gameId>.jsonl.gz` | 772 games, **3,630,225 rows**, 391 MB gzipped |
+| Train split | `bot/data/mscl_bot/train_games.txt` | 656 gameIds |
+| Val split (held out) | `bot/data/mscl_bot/val_games.txt` | 116 gameIds, time-based cut (newest 15%) — **do not train on these** |
+| Timing stats | `bot/samples/timing_stats_mscl.json` | §13 difficulty calibration (move~10f, swap~17f, react~4f, apm~364) |
 | Sample rows | `bot/samples/` | chaos samples already there; MSCL-specific can be cut on request |
 | Eval gate | `bot/eval_agreement.py` | `python3 bot/eval_agreement.py bot/data/mscl_bot bot/data/mscl_bot/val_games.txt` |
 | Schema/contract | `bot/DATA_CONTRACT.md` | frozen v0 |
 
-Quality: **<DROPPED> of 772 games dropped** _(pending)_ — drop-on-desync validation
-(re-sim winner must match the recorded outcome), so kept labels are trustworthy.
+Quality: **0 of 772 games dropped** — every replay re-simulated bit-faithfully
+(drop-on-desync: re-sim winner matched the recorded outcome), so labels are trustworthy.
 
 ## Row schema, features, target, enums, gate semantics
 Identical to chaos — see `bot/HANDOFF_chaos.md`:
@@ -29,7 +29,10 @@ Identical to chaos — see `bot/HANDOFF_chaos.md`:
 - Features = `board` (12×6 `{c,s}`, bottom→top) + `cursor` + `displacement` + `height`
   + `danger` + `incoming`. Import `PanelStateCodes` + `KeyDataEncoding`.
 - The gate's real metrics are **SWAP recall + SWAP position accuracy**, not raw
-  agreement (WAIT-heavy). MSCL WAIT-baseline floor: **<BASELINE>** _(pending)_.
+  agreement (WAIT-heavy). MSCL WAIT-baseline floor: **0.819 type-agreement, 0.0 SWAP
+  recall** (123,666 SWAP rows in val) — a never-swap clone scores 0.819 and is useless.
+  Note MSCL is *more* WAIT-heavy than chaos (0.819 vs 0.766) — consistent with their
+  lower APM; they play more deliberately.
 
 ## Known limitation
 Same as chaos: `incoming[].eta = -1` for staged/telegraphed garbage (size/chain/metal

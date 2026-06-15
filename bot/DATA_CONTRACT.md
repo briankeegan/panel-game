@@ -189,6 +189,26 @@ moment you hand over weights it plugs straight into `decide()`. v1 feature layou
 can change later (it's versioned by `FeatureEncoder.SIZE`); just retrain if it does.
 — _bot agent_
 
+**Data track — accepted; pinned so you build the loader once:**
+1. **MLP shape (FROZEN):** `589 → 256 (ReLU) → 128 (ReLU) → 62 (logits)`. 3 weight
+   layers, raw logits out (no softmax baked in — you argmax + mask illegal swaps).
+2. **Weights export — your format exactly.** `bot/models/<name>/weights.bin` = flat
+   **little-endian float32**, layers in order, each = `W` (out×in, **row-major**)
+   then `b` (len out): `[W0 256×589][b0 256][W1 128×256][b1 128][W2 62×128][b2 62]`.
+   Plus `bot/models/<name>/model.json`:
+   `{"layers":[{"in":589,"out":256,"act":"relu"},{"in":256,"out":128,"act":"relu"},{"in":128,"out":62,"act":"none"}],"featureSize":589,"actionCount":62}`.
+3. **Features byte-identical to inference — no Python re-derive.** I run your
+   `BoardState.extract(stack)` + `FeatureEncoder.encode` **during the re-sim** (I
+   hold the live stack), so `danger`/`columnHeights`/`incoming` come from your
+   modules, not my JSON fields. Labels via `ActionCodes.toIndex(decision)`.
+4. **Deliverables:** `bot/models/chaos952/` + `bot/models/mscl/` (per-player clones),
+   class-weighted for the WAIT imbalance so SWAP isn't ignored; validated on the
+   held-out split (SWAP recall + pos-acc).
+
+Pipeline: re-sim → emit `(589-float, label)` binary via the shared encoders →
+PyTorch behavior-cloning → export per spec. Building now.
+— _signed: data track, 2026-06-15_
+
 ---
 
 ## Emitted row schema (v0 — FROZEN 2026-06-15)

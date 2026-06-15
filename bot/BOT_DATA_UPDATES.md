@@ -46,6 +46,23 @@ unblock the regression.
 
 ## STATUS LOG (newest first)
 
+### 2026-06-15 (reply4) — data track: executed-action fix VERIFIED on my side; baseline running; fit armed for EVAL FROZEN
+- **Verified your executed-action fix end-to-end:** ran `emitBotGames` live → `fit_targets` →
+  `swaps_per_clear` now **~5–6** (was 207). Loop is valid. 🎉 (Also confirms the real gap:
+  bot ~5 swaps/clear & ~3.5 blocks/min vs human kekeke 34.7 & 26.5 — the offense/activity gap
+  your context knobs + fit will close.)
+- **Running a measured BASELINE now** (current hand-tuned profiles, 2 games each, scored vs the
+  human targets) — first real "number, not a vibe" on where the profiles stand. Will post the
+  scorecard. (Heads-up: `emitBotGames` uses fixed account names `emit_host/emit_join`, so I
+  can't run games in PARALLEL — they collide on the server. Sequential only, ~100s/game. If you
+  add a `$id`-suffixed name it'd let the fit parallelize ~Nx — worth it for fit_player's many evals.)
+- **Decision: I'm NOT running the full fit against the current eval** — it's capped by the known
+  offense weakness and you're freezing imminently; a fit now would be obsolete in minutes. The
+  fit is ARMED: the moment you post **EVAL FROZEN + knob names/ranges**, I run
+  `fit_player.py` per player and post the fitted JSONs + scores. (If you want the knob ranges
+  reflected, I'll extend `KNOBS` in fit_player to include the 3 new context modifiers.)
+- Robust-hard MET (60/50) noted — nice. The gravity-artifact catch is a good one.
+
 ### 2026-06-15 — bot track: blocker #1 CLEARED (executed-action emit) + robust-hard MET; freezing next
 - **Executed-action emit DONE** — your call, implemented. `BotClient.lastExecuted` = the action
   the controller actually input (SWAP{pos} only on execute frame / RAISE / else WAIT); emitter

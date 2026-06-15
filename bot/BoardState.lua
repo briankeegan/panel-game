@@ -49,6 +49,60 @@ function M.extractIncoming(stack)
   return out
 end
 
+-- Per-garbage-cell reveal colors (the colors a block's bottom row becomes when
+-- broken). The engine pops width-char rows from panelSource.garbagePanelBuffer in
+-- pop order and assigns each converting cell the char at its own column. We can
+-- predict this exactly for the common case — the bottom row of a single garbage
+-- block — by assigning buffer rows to blocks bottom-to-top. Multi-block-same-frame
+-- ordering isn't reproducible from a snapshot, so reveals beyond the first row per
+-- block are left unknown (BoardSim then reveals empty, not a fabricated color).
+-- Returns reveal[r][c] = color int, only for bottom-row garbage cells we resolved.
+local function captureReveals(stack, rows, width)
+  local src = stack.panelSource
+  local buf = src and src.garbagePanelBuffer
+  if not buf or buf == "" then return nil end
+  local panels = stack.panels
+
+  -- group garbage cells by garbageId, track each block's bottom row
+  local blocks = {} -- id -> { minRow, cells = {{r,c},...} }
+  local order = {}
+  for r = 1, rows do
+    local prow = panels[r]
+    for c = 1, width do
+      local p = prow and prow[c]
+      if p and p.isGarbage and p.garbageId then
+        local b = blocks[p.garbageId]
+        if not b then b = { minRow = r, cells = {} }; blocks[p.garbageId] = b; order[#order + 1] = p.garbageId end
+        if r < b.minRow then b.minRow = r end
+        b.cells[#b.cells + 1] = { r, c }
+      end
+    end
+  end
+  -- assign bottom-to-top so the lowest block (likeliest to break first) gets the
+  -- front of the buffer
+  table.sort(order, function(a, b) return blocks[a].minRow < blocks[b].minRow end)
+
+  local reveal, pos = {}, 1
+  for _, id in ipairs(order) do
+    local b = blocks[id]
+    if pos + width - 1 > #buf then break end -- ran out of known buffer
+    local rowStr = buf:sub(pos, pos + width - 1)
+    pos = pos + width
+    for _, cell in ipairs(b.cells) do
+      local r, c = cell[1], cell[2]
+      if r == b.minRow then
+        local ch = rowStr:sub(c, c)
+        local col = tonumber(ch)
+        if col and col >= 1 and col <= 6 then
+          reveal[r] = reveal[r] or {}
+          reveal[r][c] = col
+        end
+      end
+    end
+  end
+  return reveal
+end
+
 ---@return table state { board, width, rows, cursor, displacement, height, danger, columnHeights, incoming }
 function M.extract(stack)
   local width = stack.width
@@ -59,14 +113,17 @@ function M.extract(stack)
   local columnHeights = {}
   for c = 1, width do columnHeights[c] = 0 end
 
+  local reveal = captureReveals(stack, rows, width)
+
   for r = 1, rows do
     local prow = panels[r]
     local outRow = {}
+    local revRow = reveal and reveal[r]
     for c = 1, width do
       local p = prow and prow[c]
       if p then
         local color = p.color or 0
-        outRow[c] = { c = color, s = PanelStateCodes.toCode(p.state) }
+        outRow[c] = { c = color, s = PanelStateCodes.toCode(p.state), reveal = revRow and revRow[c] }
         if color ~= 0 then columnHeights[c] = r end -- highest occupied row in this column
       else
         outRow[c] = { c = 0, s = 0 }

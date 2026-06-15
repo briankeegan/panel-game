@@ -1,0 +1,3 @@
+{ "_style": "combo-pressure (chaos) — busy, frequent combos, digs hard, attacks while buried",
+  "comboUnit": 40, "chainUnit": 50, "counterPressure": 0.55, "w_breakGarbage": 1.8,
+  "w_survival": 1.6, "actMargin": 0.7, "futureDiscount": 0.6, "heightBand": [6, 8] }

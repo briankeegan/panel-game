@@ -1,0 +1,3 @@
+{ "_style": "chain-builder (mscl) — patient, builds deep chains when safe, big swings",
+  "chainUnit": 80, "chainDepthWhenSafe": 1.6, "futureDiscount": 0.85, "comboUnit": 25,
+  "counterPressure": 0.4, "w_survival": 1.6, "actMargin": 1.1, "heightBand": [6, 8] }

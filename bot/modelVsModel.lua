@@ -25,6 +25,7 @@ local brain = arg[3] or "model"
 local hostOpts = { ip = ip, port = port, name = "chaos952_bot", brain = brain, difficulty = "medium" }
 local joinOpts = { ip = ip, port = port, name = "mscl_bot", brain = brain, difficulty = "medium" }
 if brain == "model" then hostOpts.modelDir, joinOpts.modelDir = "bot/models/chaos952", "bot/models/mscl" end
+if brain == "search" then hostOpts.searchProfile, joinOpts.searchProfile = "bot/profiles/chaos952.json", "bot/profiles/mscl.json" end
 local host = BotClient(hostOpts)
 local join = BotClient(joinOpts)
 
@@ -98,11 +99,14 @@ end
 
 local function surv(b)
   local s = b.myStack
-  local outG = s and s.outgoingGarbage and s.outgoingGarbage.history and #s.outgoingGarbage.history or 0
-  return string.format("died@%s clock=%s maxCol=%s | cleared=%s score=%s outGarbage=%s",
+  local hist = s and s.outgoingGarbage and s.outgoingGarbage.history or {}
+  local outG, chains = #hist, 0
+  for _, g in ipairs(hist) do if g.isChain then chains = chains + 1 end end
+  local chainPct = outG > 0 and math.floor(100 * chains / outG + 0.5) or 0
+  return string.format("died@%s clock=%s maxCol=%s | cleared=%s score=%s outGarbage=%s chain%%=%s",
     tostring(s and s.game_over_clock), tostring(s and s.clock),
     tostring(s and require("bot.BoardState").extract(s).maxColHeight),
-    tostring(s and s.panels_cleared), tostring(s and s.score), tostring(outG))
+    tostring(s and s.panels_cleared), tostring(s and s.score), tostring(outG), tostring(chainPct))
 end
 local function acts(b)
   return string.format("decisions=%s swapIntents=%s swapInputs=%s",

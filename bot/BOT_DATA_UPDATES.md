@@ -46,6 +46,35 @@ unblock the regression.
 
 ## STATUS LOG (newest first)
 
+### 2026-06-15 — data track: RETHINK eta-reaction (it's broken) + BC-cleanup = yes delete
+**eta-reaction signal is broken — reworking it.** Re-emit via your `BoardState.extract` gives real
+eta now (the -1 bug is gone, stopTime/chain/rise all present ✓). BUT eta is per-block
+`deliveryTime − clock`, and garbage delivers one-at-a-time → a backed-up queue has the NEXT block
+counting down (small +) and everything behind it **overdue (negative)**. So:
+- thresholding `eta ∈ (0,90)` catches almost nothing, and
+- a buried player (kekeke) is under *constant* incoming → no calm-vs-imminent contrast to measure.
+"Anticipation" only has meaning when pressure is INTERMITTENT.
+
+**My rework (no new emit field needed):** drop the eta-threshold dim; measure anticipation
+**event-aligned** — detect garbage-LANDING events from the board (garbage cells appear), compare
+action rate in the ~30 frames BEFORE a landing vs baseline. Robust to queue state; degrades
+gracefully to ≈baseline under constant pressure (which is the honest answer — that player doesn't
+get to anticipate). Keep the already-robust clock dims: **stopTime density, displacement-at-action,
+danger dwell.** Re-emit still stands (it's for stopTime/displacement, not eta).
+
+**⚠️ Gotcha for YOUR clock work:** if the human `eta` goes negative for queued garbage, your LIVE
+`eta` does too. Your new `impending` term must handle **negative/queued eta** (use min-positive eta
+= "frames until the NEXT block lands", and treat all-negative = "being hit continuously"), or it'll
+misjudge under exactly the heavy-pressure states we care about. Confirm how `impending` reads eta.
+
+**BC cleanup — YES, delete the whole BC stack.** I no longer run `train.py` / `parityCheck` /
+`modelVsModel` — the fit pipeline is `emitBotGames`→`fit_targets`→`compare_profiles`→`fit_player`,
+none of which touch BC. Safe to remove `ModelBrain.lua`, `parityCheck.lua`, `modelVsModel.lua`,
+`Reward.lua`, `train.py`, `tests/EncoderTest.lua`, `tests/ModelBrainTest.lua`, the `brain="model"`
+option, and the BC sections of `DATA_CONTRACT.md`. **Keep `FeatureEncoder`+`ActionCodes`** (parseReplays
+imports them at top level). I'll separately decide whether to strip the now-dead `EMIT_FEATURES` mode
+from parseReplays — low priority, won't block your delete.
+
 ### 2026-06-15 — bot track: CLEANUP — deleted dead scaffolding; need your call on the BC stack
 Pruning the bot dir (Brian: "delete what's not needed, no in-between"). Already deleted (zero
 live refs, superseded by SearchBrain/playBot): `spikeLogin.lua`, `spikeMatch.lua`, `vsHumanTest.lua`,

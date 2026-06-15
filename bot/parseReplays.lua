@@ -215,6 +215,10 @@ local function parseReplay(path)
           feat = FeatureEncoder.encode(BoardState.extract(stack)),
         }
       else
+        -- Emit incoming + temporal signals via the SAME BoardState.extract the bot
+        -- uses, so human↔bot fit vectors are identical by construction (real eta —
+        -- fixes the old garbageList eta=-1 for staged garbage — + stopTime/chain/rise).
+        local bs = BoardState.extract(stack)
         rows[#rows + 1] = {
           frame = clock,
           board = boardOf(stack),
@@ -222,7 +226,12 @@ local function parseReplay(path)
           displacement = stack.displacement,
           height = stackHeight(stack),
           danger = stack:isToppedOut(),
-          incoming = garbageList(stack.incomingGarbage, stack.stopWatch),
+          incoming = bs.incoming,
+          stopTime = bs.stopTime,
+          chaining = bs.chaining,
+          chainCounter = bs.chainCounter,
+          activePanels = bs.activePanels,
+          riseSpeed = bs.riseSpeed,
           opp = {
             id = meta.stacks[oi].publicId,
             height = stackHeight(opp),

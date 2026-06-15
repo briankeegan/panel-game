@@ -1,0 +1,99 @@
+{
+  "source": "bot/data/chaos_bot",
+  "_schema": "fit_targets/v1",
+  "board": {
+    "buckets": {
+      "low|noIn|noGb": {
+        "occupancy": 0.0916,
+        "swap": 9.65,
+        "raise": 14.73,
+        "clearStart_per1k": 1.46,
+        "dig_per1k": 1.56
+      },
+      "mid|noIn|noGb": {
+        "occupancy": 0.1017,
+        "swap": 21.97,
+        "raise": 9.44,
+        "clearStart_per1k": 7.05,
+        "dig_per1k": 16.31
+      },
+      "mid|in|noGb": {
+        "occupancy": 0.0288,
+        "swap": 22.61,
+        "raise": 0.79,
+        "clearStart_per1k": 5.84,
+        "dig_per1k": 31.75
+      },
+      "high|in|gb": {
+        "occupancy": 0.3393,
+        "swap": 20.83,
+        "raise": 0.04,
+        "clearStart_per1k": 4.98,
+        "dig_per1k": 28.05
+      },
+      "mid|in|gb": {
+        "occupancy": 0.2072,
+        "swap": 21.65,
+        "raise": 0.35,
+        "clearStart_per1k": 5.71,
+        "dig_per1k": 20.65
+      },
+      "mid|noIn|gb": {
+        "occupancy": 0.1392,
+        "swap": 24.73,
+        "raise": 3.65,
+        "clearStart_per1k": 6.24,
+        "dig_per1k": 38.23
+      },
+      "high|noIn|gb": {
+        "occupancy": 0.0526,
+        "swap": 23.96,
+        "raise": 0.28,
+        "clearStart_per1k": 6.16,
+        "dig_per1k": 34.91
+      },
+      "low|in|gb": {
+        "occupancy": 0.0128,
+        "swap": 20.72,
+        "raise": 3.62,
+        "clearStart_per1k": 6.1,
+        "dig_per1k": 16.25
+      },
+      "low|noIn|gb": {
+        "occupancy": 0.011,
+        "swap": 18.37,
+        "raise": 19.19,
+        "clearStart_per1k": 6.65,
+        "dig_per1k": 17.59
+      }
+    },
+    "swaps_per_clear": 39.19,
+    "height_med": 11,
+    "height_p90": 12,
+    "garbage_on_board_pct": 76.2,
+    "timing": {
+      "act_imminent_pct": null,
+      "act_calm_pct": 27.93,
+      "anticipation": null,
+      "danger_pct": 39.41,
+      "displacement_mean": 10.853
+    },
+    "n_games": 60
+  },
+  "offense": {
+    "chainPct": 28.1,
+    "comboPct": 71.9,
+    "blocksPerMin": 23.5,
+    "chainDepth_med": 1,
+    "chainDepth_peak": 6,
+    "chainDepth_hist": {
+      "1": 328,
+      "2": 156,
+      "3": 84,
+      "4": 40,
+      "5": 10,
+      "6": 1
+    },
+    "n_pieces": 2202
+  }
+}

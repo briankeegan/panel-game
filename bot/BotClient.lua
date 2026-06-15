@@ -16,6 +16,9 @@ local ClientProtocol = require("common.network.ClientProtocol")
 local NetworkProtocol = require("common.network.NetworkProtocol")
 local KeyDataEncoding = require("common.data.KeyDataEncoding")
 local consts = require("common.engine.consts")
+local ServerMessages = require("client.src.network.ServerMessages") -- toServerMenuState (the canonical ready builder)
+local LevelPresets = require("common.data.LevelPresets")
+local GameModes = require("common.data.GameModes")
 
 local IDENTITY_DIR = "bot/identities"
 
@@ -76,6 +79,25 @@ local BotClient = class(function(self, opts)
   self.lobby = nil
   self.inRoom = false
   self.matchStart = nil -- {replay, startInMs, startAtMs} once matchStart arrives
+  -- Player-settings stub matching a fresh client's localPlayer.settings exactly,
+  -- so ServerMessages.toServerMenuState builds a byte-identical menu_state (incl.
+  -- levelData, which the opponent's character-select reads). Character/stage are
+  -- random, like a default client.
+  local level = opts.level or 5
+  self.playerStub = {
+    hasLoaded = false,
+    settings = {
+      level = level, difficulty = level, speed = 1,
+      levelData = LevelPresets.getModern(level),
+      style = GameModes.Styles.MODERN,
+      selectedCharacterId = consts.RANDOM_CHARACTER_SPECIAL_VALUE, characterId = nil,
+      selectedStageId = consts.RANDOM_STAGE_SPECIAL_VALUE, stageId = nil,
+      panelId = nil,
+      wantsReady = false, wantsRanked = false,
+      inputMethod = "controller",
+      endlessNoRaise = false,
+    },
+  }
 end)
 
 function BotClient:identityPath()
@@ -287,18 +309,14 @@ end
 -- assets, so it just asserts loaded=true. Server gate: wants_ready ∧ loaded ∧ ready.
 function BotClient:sendReady()
   logger.info("bot[" .. self.name .. "]: readying up")
-  self.gameplay:sendRequest(ClientProtocol.sendPlayerSettings({
-    loaded = true,
-    ready = true,
-    wants_ready = true,
-    level = 5,
-    inputMethod = "controller",
-    cursor = "__Ready",
-    -- Random character/stage so the opponent's client loads a bundled mod for us
-    -- (avoids the missing-mod ready-icon flicker).
-    character_is_random = consts.RANDOM_CHARACTER_SPECIAL_VALUE,
-    stage_is_random = consts.RANDOM_STAGE_SPECIAL_VALUE,
-  }))
+  -- Build the EXACT menu_state a real client sends (mirrors
+  -- NetClient:sendPlayerSettings -> ServerMessages.toServerMenuState), so the
+  -- opponent's character-select sees a complete, normal player — no missing
+  -- fields, no hand-rolled shape.
+  self.playerStub.hasLoaded = true
+  self.playerStub.settings.wantsReady = true
+  local menuState = ServerMessages.toServerMenuState(self.playerStub)
+  self.gameplay:sendRequest(ClientProtocol.sendPlayerSettings(menuState))
 end
 
 -- Build the live engine match from the matchStart replay (same engine the

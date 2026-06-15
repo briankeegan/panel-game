@@ -63,9 +63,34 @@ function ReplayForkGame:update(dt)
     while self._forkGarbageIndex <= #gl and (gl[self._forkGarbageIndex].senderFrame or 0) <= self._forkCursor do
       local ev = gl[self._forkGarbageIndex]
       if engine and engine.applyNetworkGarbage and type(ev.garbage) == "table" then
-        pcall(engine.applyNetworkGarbage, engine, ev.garbage, ev.sender)
+        -- Recorded frameEarned is in the ORIGINAL replay clock; the queue
+        -- releases garbage when clock >= frameEarned + STAGING_DURATION, so on
+        -- the forked stack's FRESH clock the original frame is thousands of
+        -- frames in the future and never drops. Rebase each piece to "now" so
+        -- it telegraphs + lands like freshly-arrived garbage.
+        local rebased = {}
+        for i, g in ipairs(ev.garbage) do
+          local c = {}
+          for k, v in pairs(g) do c[k] = v end
+          c.frameEarned = engine.clock
+          rebased[i] = c
+        end
+        pcall(engine.applyNetworkGarbage, engine, rebased, ev.sender)
       end
       self._forkGarbageIndex = self._forkGarbageIndex + 1
+    end
+  end
+
+  -- Headless harness only: no input device exists, so send_controls produces
+  -- no input and the live stack would starve at clock 0. Feed idle input when
+  -- starved so the takeover actually simulates (rises, drops garbage) for
+  -- screenshot verification. Real play has a bound device and never hits this.
+  if os.getenv("PA_AUTO_FORK") then
+    local st = self:_localStack()
+    local e = st and st.engine
+    if e and e.confirmedInput and e.receiveConfirmedInput and e.idleInput
+        and #e.confirmedInput < (e.clock or 0) + 2 then
+      e:receiveConfirmedInput(e:idleInput())
     end
   end
 

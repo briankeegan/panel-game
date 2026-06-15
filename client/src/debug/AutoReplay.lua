@@ -60,6 +60,7 @@ function AutoReplay.init()
     shotName = os.getenv("PA_AUTO_SHOT") or "pa_autoshot.png",
     quit     = os.getenv("PA_AUTO_QUIT") ~= "0",
     fork     = os.getenv("PA_AUTO_FORK") ~= nil, -- at the first target, "play from here" then shoot the live fork
+    forkDelay = tonumber(os.getenv("PA_AUTO_FORK_DELAY")) or 220, -- love-frames after fork before the live screenshot (raise to watch garbage stack)
     frame    = 0,
     started  = nil, -- frame the replay actually began (after mods loaded)
   }
@@ -185,10 +186,10 @@ function AutoReplay.update()
       local ok, err = pcall(function() return scene and scene._forkNow and scene:_forkNow() end)
       print("PA_AUTO_REPLAY: FORK via control -> " .. tostring(ok) .. (ok and "" or (" ERR=" .. tostring(err))))
       state.forkFrame = state.frame
-    elseif state.forkFrame and state.frame - state.forkFrame == 220 then
+    elseif state.forkFrame and state.frame - state.forkFrame == state.forkDelay then
       love.graphics.captureScreenshot(gameName)
       reportShot(gameName, state.targets[1], state.targets[1])
-    elseif state.forkFrame and state.frame - state.forkFrame >= 224 and state.quit then
+    elseif state.forkFrame and state.frame - state.forkFrame >= state.forkDelay + 4 and state.quit then
       print("PA_AUTO_REPLAY: done (fork)")
       love.event.quit()
     end

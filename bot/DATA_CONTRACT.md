@@ -147,6 +147,18 @@ greedy clearer can't build the combos/chains that attack). So the **model is the
 offense** — your clones are what make the bot actually punch back, not just a
 nice-to-have. Even an early/rough checkpoint is worth dropping in to see it attack.
 
+**[Bot track — v1 feature scope: `opp` is OUT, keep `FeatureEncoder.SIZE`=589.]**
+The user rightly notes humans play to the OPPONENT's board. But the reactive part
+of that — the opponent's *attacks* — is already in the state as `incoming` garbage
+(eta/size), so a v1 model trained on the current 589 features **can already defend
+and react**. The only thing the contract's `opp` block adds is the opponent's
+height/danger for *kill-timing*, which would (a) change `FeatureEncoder.SIZE` →
+force a retrain and (b) need the live bot to parse opponent snapshots. Not worth
+disrupting your in-flight training. **Decision: train v1 on the 589 features as-is;
+`opp` is a v2 enhancement** once we see whether the clones lack kill-timing. So
+**don't add `opp` to the features** — `FeatureEncoder.encode` stays the source of
+truth. Shout if you'd already wired `opp` in and prefer to ship it now. — _bot agent_
+
 ### 12. Shared constants  **[DECIDED]**
 Index/color/state/input conventions are pinned **here** + the two shared enums
 (`PanelStateCodes`, `KeyDataEncoding`). No second copy. If we need a derived helper

@@ -38,10 +38,10 @@ def board_targets(corpus, sample):
     # eta-reaction = the behavioral signature of clock-awareness: do they act in the
     # window BEFORE incoming lands vs only after. All computable from existing rows
     # (incoming[].eta, displacement, danger). stopTime needs a re-emit (added to parseReplays).
-    danger_frames = 0
+    danger_frames = wait_frames = 0
     imm_frames = imm_acts = 0     # frames with incoming about to land (min eta < ETA_SOON)
     calm_frames = calm_acts = 0   # frames with NO incoming
-    disp_sum = 0.0
+    disp_sum = stoptime_sum = 0.0
     ETA_SOON = 90  # ~1.5s
     for fp in files:
         try:
@@ -79,7 +79,10 @@ def board_targets(corpus, sample):
             act = 1 if dec in ("SWAP", "RAISE") else 0
             if r.get("danger"):
                 danger_frames += 1
+            if dec == "WAIT":
+                wait_frames += 1
             disp_sum += r.get("displacement") or 0
+            stoptime_sum += r.get("stopTime") or 0   # populated after re-emit
             incoming = r.get("incoming") or []
             etas = [g["eta"] for g in incoming if g.get("eta") and g["eta"] > 0]
             if not incoming:
@@ -115,7 +118,10 @@ def board_targets(corpus, sample):
                              if imm_frames and calm_frames else None),
             "danger_pct": round(100 * danger_frames / total, 2) if total else None,
             "displacement_mean": round(disp_sum / total, 3) if total else None,
-            # stopTime density fills in once parseReplays re-emits stopTime (added).
+            "wait_pct": round(100 * wait_frames / total, 2) if total else None,
+            # stopTime density = free-build frames generated per frame (offense density).
+            # 0 until the corpus is re-emitted via BoardState.extract (carries stopTime).
+            "stoptime_density": round(stoptime_sum / total, 4) if total else None,
         },
         "n_games": len(files),
     }

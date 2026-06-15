@@ -27,7 +27,7 @@ KNOBS = [
     ("chainUnit", 30, 90, True), ("comboUnit", 8, 40, True),
     ("futureDiscount", 0.4, 0.95, False), ("actMargin", 0.5, 1.6, False),
     ("raiseWhenSafe", 0.0, 1.0, False), ("digWhenSafe", 0.0, 2.0, False),
-    ("chainDepthWhenSafe", 0.0, 2.0, False),
+    ("chainDepthWhenSafe", 0.0, 2.0, False), ("counterPressure", 0.0, 1.0, False),
 ]
 
 # Parallelism: emitBotGames runs ~real-time (~110s/game), so concurrency is the only
@@ -104,37 +104,51 @@ def _one_game(games_dir, name, ip, port, prof_path):
 
 def eval_profile(profile, target_path, games, server, name):
     """Run the bot `games` times (CONCURRENTLY) with `profile`, build its fit vector, score it.
-    Game ids are globally unique so concurrent evals don't collide on server accounts."""
+    Game ids are globally unique so concurrent evals don't collide on server accounts.
+    Any failure (dead server, exception) → inf, never crashes the descent."""
     ip, port = server.split(":")
     tmp = tempfile.mkdtemp(prefix="fit_")
-    prof_path = os.path.join(tmp, "cand.json")
-    json.dump(profile, open(prof_path, "w"))
-    games_dir = os.path.join(tmp, "games"); os.makedirs(games_dir)
-    with ThreadPoolExecutor(max_workers=games) as ex:
-        list(ex.map(lambda _: _one_game(games_dir, name, ip, port, prof_path), range(games)))
-    import glob as _glob
-    if not _glob.glob(os.path.join(games_dir, "*.jsonl.gz")):
-        # all emits failed → never let an empty dir score as a perfect 0.0 clone
-        shutil.rmtree(tmp, ignore_errors=True)
-        print("  [warn] eval produced 0 games → distance=inf", file=sys.stderr)
+    try:
+        prof_path = os.path.join(tmp, "cand.json")
+        json.dump(profile, open(prof_path, "w"))
+        games_dir = os.path.join(tmp, "games"); os.makedirs(games_dir)
+        with ThreadPoolExecutor(max_workers=games) as ex:
+            list(ex.map(lambda _: _one_game(games_dir, name, ip, port, prof_path), range(games)))
+        import glob as _glob
+        if not _glob.glob(os.path.join(games_dir, "*.jsonl.gz")):
+            # all emits failed → never let an empty dir score as a perfect 0.0 clone
+            print("  [warn] eval produced 0 games → distance=inf", file=sys.stderr)
+            return float("inf")
+        vec_path = os.path.join(tmp, "vec.json")
+        stats = os.path.join(games_dir, "stats.jsonl")
+        cmd = ["python3", os.path.join(HERE, "fit_targets.py"), games_dir]
+        if os.path.exists(stats):
+            cmd.append(stats)
+        with open(vec_path, "w") as f:
+            f.write(run(cmd).stdout)
+        return score(target_path, vec_path)
+    except Exception as e:
+        print(f"  [warn] eval errored → inf: {str(e)[:120]}", file=sys.stderr)
         return float("inf")
-    vec_path = os.path.join(tmp, "vec.json")
-    stats = os.path.join(games_dir, "stats.jsonl")
-    cmd = ["python3", os.path.join(HERE, "fit_targets.py"), games_dir]
-    if os.path.exists(stats):
-        cmd.append(stats)
-    with open(vec_path, "w") as f:
-        f.write(run(cmd).stdout)
-    d = score(target_path, vec_path)
-    shutil.rmtree(tmp, ignore_errors=True)
-    return d
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
 
 
-def coordinate_descent(profile, target_path, games, server, name, iters):
+def _checkpoint(best, best_d, out, target, games):
+    """Write the best-so-far profile after every iteration, so an interruption
+    (incl. an externally-killed server) never loses progress."""
+    snap = copy.deepcopy(best)
+    snap["_fit"] = {"target": target, "distance": round(best_d, 4), "games": games, "checkpoint": True}
+    json.dump(snap, open(out, "w"), indent=2)
+
+
+def coordinate_descent(profile, target_path, games, server, name, iters, out):
     knobs = load_knobs()
     best = copy.deepcopy(profile)
     best_d = eval_profile(best, target_path, games, server, name)
     print(f"  start distance {best_d:.4f}  ({len(knobs)} knobs)", flush=True)
+    if best_d != float("inf"):
+        _checkpoint(best, best_d, out, target_path, games)
     step = 0.5
     for it in range(iters):
         # Build all perturbation candidates from the SAME best, evaluate CONCURRENTLY
@@ -157,6 +171,7 @@ def coordinate_descent(profile, target_path, games, server, name, iters):
         if dists[bi] < best_d - 1e-4:
             best, best_d = cands[bi][1], dists[bi]
             print(f"  it{it} best {cands[bi][0]}  d={best_d:.4f}", flush=True)
+            _checkpoint(best, best_d, out, target_path, games)  # save progress each iter
         else:
             step *= 0.5
             print(f"  it{it} no improve; step->{step:.3f}", flush=True)
@@ -171,13 +186,18 @@ def main():
         d = score(target, arg("--bot-vector"))
         print(f"dry score: {d:.4f}")
         return
-    base = json.load(open(arg("--base")))
     out = arg("--out", "fit_out.json")
+    # warm-start from an existing checkpoint (resume after an interruption)
+    if os.path.exists(out):
+        base = json.load(open(out)); base.pop("_fit", None)
+        print(f"  resuming from checkpoint {out}", flush=True)
+    else:
+        base = json.load(open(arg("--base")))
     games = int(arg("--games", "30"))
     iters = int(arg("--iters", "40"))
     server = arg("--server", "127.0.0.1:49569")
     name = arg("--profile-name", "fit")
-    best, best_d = coordinate_descent(base, target, games, server, name, iters)
+    best, best_d = coordinate_descent(base, target, games, server, name, iters, out)
     if best_d == float("inf"):
         print("\nFIT FAILED: every eval produced 0 games (server/emit error). No profile written.")
         sys.exit(1)

@@ -40,6 +40,10 @@ local function ensureNetClient()
     sendDisplayEvents = function(_, batch) if currentBot then currentBot:_shipDisplaySnapshot(batch) end end,
     sendGarbageEvent  = function(_, body) if currentBot then currentBot:_shipGarbageEvent(body) end end,
     flushDisplayEvents = function() end,
+    -- GarbageDelivery.looseSyncActive gates on this: the bot IS a connected
+    -- client (its own gameplay socket), so loose-sync garbage ships over the
+    -- wire just like a real client — not direct-pushed to the opponent stack.
+    isConnected = function() return true end,
   }
 end
 
@@ -330,6 +334,11 @@ function BotClient:startMatch()
     error("bot[" .. self.name .. "]: no stack at slot " .. tostring(self.localPlayerNumber))
   end
   self.myStack.is_local = true
+  -- Generate each stack's starting board (starting_state), set countdown, and
+  -- save the clock-0 rollback base — exactly as a real client does. Without this
+  -- the bot simulates an EMPTY board from frame 0 (no panels -> brain always
+  -- WAITs -> cursor never moves -> the human sees a blank board).
+  self.match:start()
   if self.brainKind == "heuristic" or self.brainKind == "model" then
     if self.brainKind == "model" then
       self.brain = require("bot.ModelBrain").load(assert(self.modelDir, "bot: brain='model' requires modelDir"))
@@ -368,7 +377,13 @@ function BotClient:tickMatch()
     local char
     if self.brain then
       local st = self.boardState.extract(stack)
-      char = self.controller:nextInput(st, self.brain:decide(st))
+      local decision = self.brain:decide(st)
+      char = self.controller:nextInput(st, decision)
+      -- decide->execute instrumentation (split "brain WAITs/picks bad" from
+      -- "controller never executes"): count decisions, SWAP intents, swap inputs.
+      self._decTotal = (self._decTotal or 0) + 1
+      if decision and decision.type == "SWAP" then self._decSwap = (self._decSwap or 0) + 1 end
+      if char == KeyDataEncoding.swap then self._swapInputs = (self._swapInputs or 0) + 1 end
     else
       char = randomInputChar()
     end

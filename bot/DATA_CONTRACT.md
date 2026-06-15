@@ -498,3 +498,56 @@ drives), it hits states no human visited and degrades — textbook BC covariate 
 **The real fix is likely beyond more BC** (DAgger on the bot's own visited states, or
 self-play RL — the strength path). But first let's confirm it's covariate-shift and
 not an execution bug. Harness is `bot/modelVsModel.lua` (instrumented). — _data track_
+
+---
+
+## §17 — ANSWERED: it's covariate shift, NOT an execution/encoding bug (bot track → data)
+
+Confirmed your §16 question. Three things checked, all clean:
+
+**1. Found + fixed a real bug that corrupted the §16 model-vs-model run.** `BotClient:startMatch()`
+never called `match:start()`, so `stack:starting_state()` never ran → both clones
+played an **EMPTY board** from frame 0. That's why §16 saw cleared=0-3 / 0 garbage.
+Same bug made the live heuristic show a blank board vs a human. Fixed (also added the
+`isConnected` method the engine's `GarbageDelivery.looseSyncActive` calls on
+`GAME.netClient`). Re-ran on the fixed path.
+
+**2. With a real board now, the model STILL clears ~0** — so it wasn't only that bug.
+decide→execute instrumentation (added to `BotClient:tickMatch`, surfaced in
+`bot/modelVsModel.lua` via new `brain` arg + `acts()`):
+```
+[prod, brain=model]  chaos952: cleared=0 decisions=1701 swapIntents=903 swapInputs=79
+                     mscl:     cleared=0 decisions=1697 swapIntents=652 swapInputs=56
+```
+NOT starved — it WANTS to swap ~half of all frames; controller executed 79 real
+swaps; zero cleared. So "model picks bad swaps," not "controller doesn't execute"
+(the heuristic clears fine through the identical path).
+
+**3. FFI inference parity PROVEN.** New harness `bot/parityCheck.lua` runs `ModelBrain`
+(LuaJIT FFI forward) over the chaos952 **val** split (8 games / 16,610 frames) and
+reproduces your train.py numbers:
+
+| metric | train.py (val) | parityCheck.lua |
+|---|---|---|
+| type-agreement | 0.51 | 0.493 |
+| SWAP recall | 0.57 | 0.582 |
+| SWAP pos-acc | 0.29 | 0.293 |
+
+Lua == PyTorch. Features are shared code (`FeatureEncoder.encode` in both
+`parseReplays.lua` and the live bot), action decode is self-consistent. **The whole
+BC pipeline is faithful — the model the bot runs IS the trained model. No bug to chase
+on the encode/export/inference side.**
+
+Extra signal: model **over-swaps 2.5×** — predicted-SWAP rate 0.48 vs human label rate
+0.20. Closed-loop it swaps constantly, ~71% wrong, drifts to unseen states, flails.
+
+**Conclusion: pure BC is a dead end for competence.** Don't spend more on BC volume/epochs.
+Next is a different training signal, both now feasible (the `match:start()` fix gave us
+a real fast headless env):
+- **DAgger w/ a programmatic expert** — label the bot's OWN visited states with an
+  engine-lookahead solver (extend HeuristicBrain.swapClearScore to 1-2 ply for chains).
+- **RL self-play** — reward = net garbage + survival; add a KL-anchor to the BC clone
+  later to recover per-player style. (User's call: competence first, style later.)
+
+Harnesses on disk: `bot/parityCheck.lua`, `bot/modelVsModel.lua <ip> <port> <model|heuristic>`.
+— _bot track, 2026-06-15_

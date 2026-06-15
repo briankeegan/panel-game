@@ -19,8 +19,14 @@ local port = tonumber(arg[2]) or 49569
 -- Heuristic (throttled to human-plausible cursor speed) vs random: the greedy
 -- clearer should still keep its board low and outlast the raise-spamming random
 -- bot, even with the APM cap.
-local host = BotClient({ ip = ip, port = port, name = "chaos952", brain = "model", modelDir = "bot/models/chaos952", difficulty = "medium" })
-local join = BotClient({ ip = ip, port = port, name = "mscl", brain = "model", modelDir = "bot/models/mscl", difficulty = "medium" })
+-- arg[3] brain: "model" (default) | "heuristic" — heuristic runs the SAME
+-- decide->execute path with a known-good brain to isolate model vs controller.
+local brain = arg[3] or "model"
+local hostOpts = { ip = ip, port = port, name = "chaos952_bot", brain = brain, difficulty = "medium" }
+local joinOpts = { ip = ip, port = port, name = "mscl_bot", brain = brain, difficulty = "medium" }
+if brain == "model" then hostOpts.modelDir, joinOpts.modelDir = "bot/models/chaos952", "bot/models/mscl" end
+local host = BotClient(hostOpts)
+local join = BotClient(joinOpts)
 
 local function fail(msg)
   print("=== MATCH SPIKE FAILED: " .. tostring(msg) .. " ===")
@@ -98,8 +104,13 @@ local function surv(b)
     tostring(s and require("bot.BoardState").extract(s).maxColHeight),
     tostring(s and s.panels_cleared), tostring(s and s.score), tostring(outG))
 end
-print(string.format("chaos952: %s", surv(host)))
-print(string.format("mscl:    %s", surv(join)))
+local function acts(b)
+  return string.format("decisions=%s swapIntents=%s swapInputs=%s",
+    tostring(b._decTotal), tostring(b._decSwap), tostring(b._swapInputs))
+end
+print(string.format("[brain=%s]", brain))
+print(string.format("chaos952: %s | %s", surv(host), acts(host)))
+print(string.format("mscl:    %s | %s", surv(join), acts(join)))
 print(string.format("outcomes: host=%s, join=%s", tostring(host.outcome), tostring(join.outcome)))
 print(string.format("display snapshots shipped: host=%s, join=%s",
   tostring(host._displaySendCount), tostring(join._displaySendCount)))

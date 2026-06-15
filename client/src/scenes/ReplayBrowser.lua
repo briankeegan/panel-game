@@ -391,4 +391,12 @@ function ReplayBrowser:draw()
   end
 end
 
+-- Read-only nav state for the dev e2e driver (AppDriver) so it can move the
+-- cursor to a target via real key presses. Returns cursor index, the current
+-- folder's items, and the current path. The list/cursor are file-locals, so
+-- this accessor lives in-file. No effect on normal use.
+function ReplayBrowser.navState()
+  return cursor_pos, path_contents or {}, current_path, state
+end
+
 return ReplayBrowser

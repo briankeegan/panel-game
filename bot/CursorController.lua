@@ -19,23 +19,17 @@ local KeyDataEncoding = require("common.data.KeyDataEncoding")
 local function char(bits) return KeyDataEncoding.base64encode[bits + 1] end
 local IDLE = char(0)
 
--- Calibrated from REAL human timing (data track §13, players 935 & 3084,
--- ~1500 games, 60fps): cursorMoveInterval p25/median/p75 = 8/10-11/17 frames,
--- reactionFrames (idle-run-before-burst proxy) = 2-3/4/7. Tiers map onto that
--- spread. (Both sampled players are strong, APM ~380, so even "easy" here is a
--- good player's slower pace — true beginner stats await ELO buckets, RAISE-C.)
-local PRESETS = {
-  easy   = { cursorMoveInterval = 17, reactionFrames = 7 },
-  medium = { cursorMoveInterval = 11, reactionFrames = 4 },
-  hard   = { cursorMoveInterval = 8,  reactionFrames = 3 },
-}
+-- Speed tiers live in bot.Difficulty (single source of truth; APM/reaction are
+-- §13 human-calibrated). This controller reads cursorMoveInterval + reactionFrames;
+-- the move-quality knobs (chainAware/epsilon) are consumed by SearchBrain.
+local Difficulty = require("bot.Difficulty")
 
 local CursorController = {}
 CursorController.__index = CursorController
 
----@param difficulty string|table "easy"|"medium"|"hard" or a {cursorMoveInterval, reactionFrames} table
+---@param difficulty string|table "easy"|"medium"|"hard" or a knob table
 function CursorController.new(difficulty)
-  local cfg = type(difficulty) == "table" and difficulty or PRESETS[difficulty] or PRESETS.medium
+  local cfg = Difficulty.get(difficulty)
   return setmetatable({
     cfg = cfg,
     moveCooldown = 0,

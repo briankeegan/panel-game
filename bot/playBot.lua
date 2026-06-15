@@ -1,8 +1,8 @@
--- Playtest launcher: one bot that creates an OPEN 2p VS room and plays whoever
--- joins it — so a human can play the bot live. Heuristic brain by default; pass
--- a model dir to run a trained clone. Rematches forever (Ctrl+C to quit).
+-- Playtest launcher: one bot that idles in the lobby and AUTO-ACCEPTS any
+-- challenge — so a human just challenges it in the lobby to play. Heuristic brain
+-- by default; pass "search"/"expert" or a model dir. Rematches forever (Ctrl+C).
 --
--- Usage: zsh run_play.sh [ip] [port] [name] [difficulty] [modelDir]
+-- Usage: zsh run_play.sh [ip] [port] [name] [difficulty] [brain]
 --   defaults: 104.156.250.136 49569 PanelBot medium  (heuristic)
 io.stdout:setvbuf("no")
 require("bot.headlessBoot")
@@ -12,7 +12,6 @@ logger.setLogLevel(logger.levels.WARN) -- quiet; we print our own status
 
 local socket = require("socket")
 local BotClient = require("bot.BotClient")
-local GameModes = require("common.data.GameModes")
 
 local ip = arg[1] or "104.156.250.136"
 local port = tonumber(arg[2]) or 49569
@@ -36,20 +35,15 @@ local bot = BotClient({
 
 if not bot:login() then print("login failed"); os.exit(1) end
 
--- shed any stale room from a prior run
+-- shed any stale room from a prior run so we sit idle in the lobby (challengeable)
 bot:leaveRoom()
 local t = socket.gettime()
 while socket.gettime() < t + 0.6 do bot:pump(); socket.sleep(0.01) end
 bot:leaveRoom()
 
-bot:createRoom(GameModes.getPreset(GameModes.IDs.TWO_PLAYER_VS), true)
-local t2 = socket.gettime()
-while socket.gettime() < t2 + 8 and not bot.roomNumber do bot:pump(); socket.sleep(0.01) end
-if not bot.roomNumber then print("could not create room"); os.exit(1) end
-
 print(string.format(
-  "\n=== Bot '%s' (%s, %s) is waiting in room %d on %s ===\n    Open your client, join that room (it's an open game), ready up, and play.\n    Ctrl+C to stop.\n",
-  name, brain, difficulty, bot.roomNumber, ip))
+  "\n=== Bot '%s' (%s, L%d, %s) is idle in the lobby on %s ===\n    Open your client, CHALLENGE '%s' in the lobby, and play — it auto-accepts.\n    Ctrl+C to stop.\n",
+  name, brain, bot.level, difficulty, ip, name))
 
 local function playerCount()
   local n = 0

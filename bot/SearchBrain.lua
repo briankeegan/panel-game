@@ -30,19 +30,28 @@ local DEFAULTS = {
 }
 
 function SearchBrain.new(opts)
+  opts = opts or {}
   local cfg = {}
   for k, v in pairs(DEFAULTS) do cfg[k] = v end
-  if opts then for k, v in pairs(opts) do cfg[k] = v end end
-  return setmetatable({ cfg = cfg }, SearchBrain)
+  -- difficulty tier sets MOVE-QUALITY: chainAware scales how much it builds chains,
+  -- epsilon is the per-decision fumble rate. Default = hard (full strength, ε 0)
+  -- so validation/bot-vs-bot stays deterministic.
+  local tier = require("bot.Difficulty").get(opts.difficulty or "hard")
+  local chainAware = tier.chainAware or 1
+  local epsilon = tier.epsilon or 0
+  for k, v in pairs(opts) do if k ~= "difficulty" then cfg[k] = v end end -- profile weights override
+  cfg.w_chain = cfg.w_chain * chainAware -- weak tiers barely build chains (just clear)
+  return setmetatable({ cfg = cfg, epsilon = epsilon }, SearchBrain)
 end
 
 -- Phase B hook: load a per-player eval-weight profile (JSON, DATA_CONTRACT §19
 -- shape) and build a SearchBrain conditioned on it. The data track produces these
 -- from each player's corpus so chaos and mscl play their own balance.
-function SearchBrain.load(path)
+function SearchBrain.load(path, difficulty)
   local f = assert(io.open(path, "r"), "SearchBrain: cannot open profile " .. path)
   local raw = f:read("*a"); f:close()
   local profile = assert(require("common.lib.dkjson").decode(raw), "SearchBrain: bad profile json")
+  profile.difficulty = profile.difficulty or difficulty -- tier sets move quality unless the profile pins it
   return SearchBrain.new(profile)
 end
 
@@ -124,8 +133,9 @@ function SearchBrain:decide(state)
   local baseGrid = BoardSim.colorGrid(board, rows)
   local holdValue = self:evalBoard(baseGrid, rows, top, boardHeight)
 
+  local cands = BoardSim.candidates(state, top)
   local best, bestScore
-  for _, sw in ipairs(BoardSim.candidates(state, top)) do
+  for _, sw in ipairs(cands) do
     local r, c = sw[1], sw[2]
     local g, chain, total, firstClear, garbageCleared = BoardSim.simSwap(baseGrid, rows, r, c)
     local score = self:evalBoard(g, rows, math.min(rows, BoardSim.maxHeight(g, rows) + 1), boardHeight)
@@ -141,6 +151,13 @@ function SearchBrain:decide(state)
     end
     score = score - (math.abs(cr - r) + math.abs(cc - c)) * 0.02 -- travel
     if not best or score > bestScore then best, bestScore = sw, score end
+  end
+
+  -- difficulty fumble: a weak player picks a worse swap sometimes. With prob
+  -- epsilon, replace the best with a random legal candidate (rolled once per board
+  -- state, so the mistake persists like a real misplay rather than jittering).
+  if best and self.epsilon > 0 and #cands > 1 and math.random() < self.epsilon then
+    best = cands[math.random(#cands)]
   end
 
   local decision

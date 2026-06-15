@@ -88,7 +88,8 @@ local BotClient = class(function(self, opts)
   -- so ServerMessages.toServerMenuState builds a byte-identical menu_state (incl.
   -- levelData, which the opponent's character-select reads). Character/stage are
   -- random, like a default client.
-  local level = opts.level or 5
+  self.level = opts.level or 10 -- corpus + play target is L10
+  local level = self.level
   self.playerStub = {
     hasLoaded = false,
     settings = {
@@ -168,7 +169,7 @@ function BotClient:login()
   status, value = self:await(
     self.gameplay:sendRequest(ClientProtocol.requestLogin(
       self.userId, self.name,
-      5,            -- level
+      self.level,   -- level
       "controller", -- inputMethod
       nil,          -- panels_dir (cosmetic; resolved client-side)
       -- Random character/stage, exactly like a fresh client's default. Sending
@@ -261,6 +262,13 @@ function BotClient:dispatch(msg)
   elseif msg.gameResult then
     self.matchEnded = true
     logger.info("bot[" .. self.name .. "]: gameResult received")
+  elseif msg.challengeUpdate then
+    -- someone challenged us in the lobby: always accept (reciprocate), which
+    -- makes the server create the room and we fall into the normal match flow.
+    local ch = msg.challengeUpdate
+    if ch.challengeActive and ch.receiverId == self.publicId and not self.inRoom then
+      self:acceptChallenge(ch.senderId, ch.gameModeId)
+    end
   elseif msg.leave_room then
     self.inRoom = false
     logger.info("bot[" .. self.name .. "]: left room (" .. tostring(msg.reason) .. ")")
@@ -277,6 +285,15 @@ function BotClient:pump()
     self:dispatch(msg)
     msg = q:pop()
   end
+end
+
+-- Accept an incoming lobby challenge by reciprocating (mutual active challenge ->
+-- server opens the room). gameModeId echoes whatever they challenged us to.
+function BotClient:acceptChallenge(senderId, gameModeId)
+  logger.info(string.format("bot[%s]: accepting challenge from %s (mode %s)",
+    self.name, tostring(senderId), tostring(gameModeId)))
+  self.gameplay:sendRequest(ClientProtocol.updateChallengeStatus(
+    self.publicId, senderId, gameModeId, true))
 end
 
 function BotClient:createRoom(gameMode, openRoom)
@@ -344,10 +361,11 @@ function BotClient:startMatch()
     if self.brainKind == "model" then
       self.brain = require("bot.ModelBrain").load(assert(self.modelDir, "bot: brain='model' requires modelDir"))
     elseif self.brainKind == "search" then
-      -- opts.searchProfile (a JSON weight profile path) conditions the eval per
-      -- player (Phase B); without it, hand-set defaults (Phase A).
-      self.brain = self.searchProfile and require("bot.SearchBrain").load(self.searchProfile)
-        or require("bot.SearchBrain").new()
+      -- searchProfile (JSON weight path) conditions the eval per player (Phase B);
+      -- self.difficulty sets move quality (chain awareness + fumble rate).
+      local SB = require("bot.SearchBrain")
+      self.brain = self.searchProfile and SB.load(self.searchProfile, self.difficulty)
+        or SB.new({ difficulty = self.difficulty })
     elseif self.brainKind == "expert" then
       self.brain = require("bot.ExpertBrain").new()
     else

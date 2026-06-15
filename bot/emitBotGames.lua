@@ -68,6 +68,14 @@ local function emitRow(b)
     -- executed action (matches the human corpus's executed-action labeling), not
     -- the brain's per-frame intent — so swap-derived metrics are comparable.
     action = { decision = b.lastExecuted or { type = "WAIT" } },
+    -- TEMPORAL signals (data track: add the matching ones to parseReplays human rows
+    -- so the fit/scorecard can reward clock behavior). Same engine fields both sides.
+    displacement = st.displacement,
+    stopTime = st.stopTime,         -- stack.stop_time + pre_stop_time (rise frozen)
+    chaining = st.chaining,         -- stack.chain_counter > 0
+    chainCounter = st.chainCounter, -- stack.chain_counter
+    activePanels = st.activePanels, -- stack.n_active_panels
+    riseSpeed = st.riseSpeed,       -- stack.speed
   }
   sink:write(json.encode(row) .. "\n"); emitted = emitted + 1
 end

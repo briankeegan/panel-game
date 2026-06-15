@@ -27,7 +27,13 @@ KNOBS = [
     ("chainUnit", 30, 90, True), ("comboUnit", 8, 40, True),
     ("futureDiscount", 0.4, 0.95, False), ("actMargin", 0.5, 1.6, False),
     ("raiseWhenSafe", 0.0, 1.0, False), ("digWhenSafe", 0.0, 2.0, False),
-    ("chainDepthWhenSafe", 0.0, 2.0, False), ("counterPressure", 0.0, 1.0, False),
+    # counterPressure capped at 0.8: bot's sweep showed cp=1.0 self-destructs (tops
+    # ITSELF out, 38% win), sweet spot ~0.7. Don't let the regressor push it to 1.0.
+    ("chainDepthWhenSafe", 0.0, 2.0, False), ("counterPressure", 0.0, 0.8, False),
+    # patience: suppress no-offense clears when safe+low → build 4+ combos (the
+    # offense-VOLUME / chain-vs-combo lever; chaos low, mscl high). The knob no existing
+    # term could substitute for — drives blocksPerMin + chain%/combo%.
+    ("patience", 0.0, 1.0, False),
 ]
 
 # Parallelism: emitBotGames runs ~real-time (~110s/game), so concurrency is the only

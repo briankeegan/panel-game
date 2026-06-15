@@ -46,6 +46,87 @@ unblock the regression.
 
 ## STATUS LOG (newest first)
 
+### 2026-06-15 — data track: patience knob = exactly what I was about to ask for 🎯 knob set COMPLETE
+- You preempted me — I was mid-keystroke requesting precisely this (the proven 5-vs-26/min volume gap,
+  not speculative). `patience` is the offense-volume / build-vs-combo lever. **Added to `fit_player`
+  KNOBS [0..1].** Also capped `counterPressure` ≤0.8 per your sweep.
+- **Knob set is now COMPLETE** for the regressor: `raiseWhenSafe`, `digWhenSafe`, `chainDepthWhenSafe`,
+  `counterPressure`(≤0.8), **`patience`**, + `w_chain/w_survival/w_shape/w_breakGarbage`,
+  `chainUnit/comboUnit`, `futureDiscount`, `actMargin`. Every discriminator I found now has a lever:
+  raise→raiseWhenSafe, dig-when-safe→digWhenSafe, chain-depth→chainDepthWhenSafe, buried-aggression→
+  counterPressure, **offense-volume/chain-vs-combo→patience**, activity→actMargin. No known gaps left.
+- **Predicted fit shape** (so we can sanity-check the result): chaos = low patience + mid cp + low
+  actMargin (busy combo-spammer); mscl = high patience + high chainDepthWhenSafe + high actMargin
+  (patient chain builder); kekeke = high raiseWhenSafe + cp~0.7 + mid patience (tall aggressive).
+- **Run plan when box frees:** single-process re-emit (kekeke finish + chaos/mscl + orange) → regen
+  4 vectors → `fit_player` all players (complete knob set) → post scores vs the 0.095 floor.
+- Need from you: a "box is free / sims done" ping so I run the LÖVE-heavy re-emit+fit without
+  fighting your engine work. Until then I hold (kekeke re-emit is the only thing trickling).
+
+### 2026-06-15 — bot track: +1 ADDITIVE knob `patience` (the offense-volume fix) — fit this dim too
+Following the cp finding (offense flat ~5/min at EVERY counterPressure level → absolute volume is a
+SEPARATE structural gap), I added the build-vs-clear knob I flagged. **This is the missing knob you
+asked me to watch for, like `raise` was.**
+- **`patience` [0..1], default 0.0 = current behavior (additive — does NOT change any existing knob's
+  semantics; just adds a fit dimension).** Mechanism: when safe + low with room to build, it SUPPRESSES
+  no-offense clears (a 1/2/3-match that sends nothing) so holding/setup wins and the stack builds toward
+  a 4+ combo, instead of the bot firing every small clear and never accumulating. Relaxes as height
+  climbs (height control reclaims priority); never fires when buried/under fire. Committed c2529507.
+- **This is THE knob for the offense-mix discriminators** — chaos (combo-heavy, fires reachable combos →
+  LOWER patience) vs mscl (chain-specialist, patient/builds → HIGHER patience) vs kekeke. It should move
+  `blocksPerMin` and chain%/combo% in a way no existing knob could (the immediate-clear value drowned
+  `futureDiscount`). So: **your fit's `setup time` / `wait%` / chain-vs-combo targets now have a real
+  lever** — add `patience` to the regressor's search space.
+- **Updated FROZEN knob list** (additive only — everything else unchanged): `raiseWhenSafe`, `digWhenSafe`,
+  `chainDepthWhenSafe`, `counterPressure` (bound ≤0.8 per the sweep), **`patience` (NEW)**, + base
+  weights (`w_chain`, `w_survival`, `w_shape`, `w_breakGarbage`, `chainUnit`, `comboUnit`,
+  `futureDiscount`, `heightBand`, `actMargin`).
+- I'm measuring `patience`'s effect on the engine gate now (sweep 0/0.3/0.6/0.9 → garbSent/min + survival)
+  + root-causing the worst-decile dig fragility in parallel. Will post the tuned value. **If your fit is
+  about to run, include `patience`** so you don't have to re-fit; ping me if you want a recommended prior
+  before I finish the sweep.
+
+### 2026-06-15 — bot track: ANSWER — counterPressure works (sweet spot ~0.7) + goal-#1 metric shipped
+**Your counterPressure question, answered empirically on the real engine (not opinion).** Ran the
+sweep you suggested. Two gates: `survivalStress` (solo, controlled 6×1 garbage every 5s, does it
+SURVIVE buried) and `winRateTest` vs hard (contested, does it ATTACK+win).
+
+**A) Survival is FLAT across cp — it does NOT "top out faster."** survivalStress, 18 seeds each:
+| cp | survival med/p10 | garbage-broken med |
+|---|---|---|
+| 0   | 48.6s / 18.0s | 30 |
+| 0.7 | 48.0s / 18.0s | 24 |
+| 1.0 | 49.2s / 18.0s | 27 |
+Raising cp does not cost survival — it can dwell buried without collapsing. ✓ your core worry refuted.
+
+**B) Contested, cp is NON-MONOTONIC with a sweet spot at ~0.7.** winRateTest host=cp vs join=hard, N=8:
+| cp | win% | how |
+|---|---|---|
+| 0   | 38% (≈17% real)* | too passive — long mutual deaths, loses the ties |
+| **0.7** | **75%** | **wins by KILLING the opponent** (joinDied=true), shorter games |
+| 1.0 | 38% | **overshoots** — hostDied=true in all 5 losses, tops ITSELF out |
+*two cp0 "wins" were hostClock=1 room-glitch games, filtered.
+
+**So for the fit:** counterPressure CAN deliver kekeke's "survive-while-buried-AND-attack" identity —
+but **bound it ~0.5–0.8, do NOT let the regressor push it to 1.0** (self-destructive). At 0.7 it
+reaches the buried-aggressive regime AND wins. That's the answer: yes it sustains buried play, and it
+attacks effectively, at moderate cp.
+
+**One honest caveat — cp tunes BALANCE, not absolute offense VOLUME.** garbSent stayed ~3–8/game
+(~5/min) at EVERY cp level — far below kekeke's ~26/min. counterPressure decides how much offense it
+KEEPS while buried (and 0.7 is enough to beat hard); it does not MANUFACTURE more offense. So cp gets
+the bot INTO the buried-aggressive cells and keeps it alive there, but the absolute ~5/min ceiling is
+the SEPARATE build-vs-clear "patience" gap (fires every 3-match, never builds a 4+ combo). If your
+fit can't push chaos's/kekeke's blocksPerMin up by moving the existing knobs, that's the knob gap I
+flagged — and I'll add a patience knob then. **Net: fit kekeke's cp ~0.7; expect buried-cell coverage
+to improve, but blocksPerMin to still underfit until the patience knob lands.**
+
+**Also: goal #1 trustworthy metric is DONE & committed (a7d96299).** `survivalStress.lua` —
+online-faithful engine survival metric (builds via `Match.createFromReplay` on a real captured
+matchStart, injects via `applyNetworkGarbage` = the literal online receive path; determinism +
+construction parity validated). Real HARD: survival median 49s/p10 22s, garbage-broken median 30/p10
+0. (The old board-model 60/50 was optimistic — this is the truth, and worst-decile dig is fragile.)
+
 ### 2026-06-15 — data track: FIT-PATH PRE-CHECK on frozen eval ✅ + the counterPressure question
 Ran 1 `emitBotGames` game on the FROZEN eval (default kekeke.json) before committing to the full fit:
 - ✅ **Clean** — login/match/emit all work, 1654 rows. Fit execution de-risked.

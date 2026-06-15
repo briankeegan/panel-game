@@ -165,6 +165,12 @@ local function parseReplay(path)
   local tbl = json.decode(content)
   if not tbl then return nil, "json-decode" end
   local replay = ReplayV3.createFromTable(tbl, true)
+  -- resume support: skip the (expensive) re-sim if this game's output already
+  -- exists. Default rows mode only — stats/features batches are written elsewhere.
+  if not EMIT_STATS and not EMIT_FEATURES and replay.metadata and replay.metadata.gameId then
+    local out = io.open(OUTDIR .. "/" .. tostring(replay.metadata.gameId) .. ".jsonl.gz", "rb")
+    if out then out:close(); return nil, "skip-existing" end
+  end
   local ti = targetIndex(replay)
   if not ti then return nil, "target-not-in-replay" end
   local oi = (ti == 1) and 2 or 1
@@ -183,7 +189,12 @@ local function parseReplay(path)
 
   local rows = {}
   local maxChain = 0
+  local guard = 0
   while not match:isLocallyEnded() do
+    -- a desynced re-sim can fail to ever reach a terminal state; cap it so one
+    -- bad replay drops instead of wedging the whole batch (~27min @60fps ceiling).
+    guard = guard + 1
+    if guard > 100000 then return nil, "resim-runaway" end
     local clock = stack.clock
     -- chain_counter resets to 0 between chains; track the running max ourselves.
     if stack.chain_counter and stack.chain_counter > maxChain then

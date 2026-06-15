@@ -118,6 +118,10 @@ function ReplayFork.startFromSpectator(replay)
     logger.warn("ReplayFork: unknown gameMode " .. tostring(meta.gameModeName))
     return false
   end
+  if not GAME.localPlayer then
+    logger.warn("ReplayFork: GAME.localPlayer not initialized; cannot take over")
+    return false
+  end
 
   -- Build the hybrid room: focused = local (live + input), rest = remote ghosts.
   local ReplayForkGame = require("client.src.scenes.ReplayForkGame")
@@ -127,25 +131,28 @@ function ReplayFork.startFromSpectator(replay)
     br.panelSource = GeneratorSource(replay.panelSource.seed, replay.panelSource.shockEnabled)
   end
 
+  -- The taken-over board uses GAME.localPlayer — the existing, input-configured
+  -- local player the normal game flow uses — so its already-claimed input feeds
+  -- through (a fresh player has no device and freezes). Stamp the focused
+  -- identity/level onto it for this match (cosmetic + raise rate).
   local focusedOrigIndex -- the taken-over board's index in the ORIGINAL match (for garbage routing)
   for _, sm in ipairs(meta.stacks) do
     if sm.publicId == focusedPid then
       focusedOrigIndex = sm.stackIndex
-      -- The taken-over board: a real local player (input binds via the live
-      -- path) wearing the focused identity. settingChanges stays off config.
-      local p = Player.createLocalPlayerFromConfig()
+      local p = GAME.localPlayer
       p:setCharacter(sm.characterId)
       if sm.panelId then p:setPanels(sm.panelId) end
       if sm.level then p:setLevel(sm.level) end
-      if sm.name then p.name = sm.name end
       if sm.seatId then TeamUtils.assignSeatIdentity(p, sm.seatId) end
       br:addPlayer(p)
     else
       br:addPlayer(Player.createFromReplayMetadata(sm))
     end
   end
-  -- Bind local input devices to the local player.
-  pcall(function() br:restoreInputConfigurations() end)
+
+  -- Restore GAME.localPlayer's input device the same way the normal local-game
+  -- flow does (it carries lastUsedInputConfiguration from prior play).
+  br:restoreInputConfigurations()
 
   -- Ghost tape: every board except the taken-over one. The scene fast-forwards
   -- it from frame 0 to forkFrame, then plays at 1x.

@@ -81,19 +81,6 @@ function ReplayForkGame:update(dt)
     end
   end
 
-  -- Headless harness only: no input device exists, so send_controls produces
-  -- no input and the live stack would starve at clock 0. Feed idle input when
-  -- starved so the takeover actually simulates (rises, drops garbage) for
-  -- screenshot verification. Real play has a bound device and never hits this.
-  if os.getenv("PA_AUTO_FORK") then
-    local st = self:_localStack()
-    local e = st and st.engine
-    if e and e.confirmedInput and e.receiveConfirmedInput and e.idleInput
-        and #e.confirmedInput < (e.clock or 0) + 2 then
-      e:receiveConfirmedInput(e:idleInput())
-    end
-  end
-
   GameBase.update(self, dt)
 end
 

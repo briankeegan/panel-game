@@ -14,10 +14,18 @@
 -- Usage (via run_client.sh so LOVE_IDENTITY / love-on-PATH are set):
 --   PA_AUTO_REPLAY="replays/<...>.json"   # path RELATIVE to the save dir (required)
 --   PA_AUTO_FRAME=1800                    # target replay frame to shoot (default 1800)
---   PA_AUTO_SHOT=pa_autoshot.png          # screenshot filename (default pa_autoshot.png)
+--   PA_AUTO_SHOT=pa_autoshot.png          # screenshot filename (default pa_autoshot.png);
+--                                         # set "none"/"off" to skip screenshots entirely
+--                                         # (run still loads/forks/plays/quits)
 --   PA_AUTO_QUIT=1                        # quit after the shot; set 0 to keep watching
 --   PA_AUTO_SPEED_INDEX=13                # ReplaySpectator SPEEDS index for fast-fwd
 --                                         # (default = 1x + 3 ≈ 8x; 13≈8x,14≈16x,15≈32x)
+--   PA_AUTO_FORK_DELAY=900                # love-frames after fork before the live shot
+--   PA_AUTO_INPUT="l l s r s g"           # (fork only) scripted gameplay clicks fed
+--                                         # into the taken-over board: l/r/u/d move,
+--                                         # s swap, g raise, . idle; repeat tok*N;
+--                                         # or "wander" for an auto move+swap loop
+--   PA_AUTO_INPUT_HOLD=6                  # frames each click token is held (default 6)
 --   PA_KILL_EXISTING=false zsh run_client.sh Lala
 --
 -- Wiring (main.lua): AutoReplay.init() in love.load; AutoReplay.update() at the
@@ -32,10 +40,45 @@
 local fileUtils = require("client.src.FileUtils")
 local ReplayV3 = require("common.data.ReplayV3")
 local ReplayLauncher = require("client.src.ReplayLauncher")
+local KeyDataEncoding = require("common.data.KeyDataEncoding")
 
 local AutoReplay = {}
 
 local state -- nil unless enabled
+
+-- PA_AUTO_INPUT scripting: turn a readable click sequence into engine input
+-- bytes (the exact bytes a real keypress produces). Tokens are space/comma
+-- separated: l/r/u/d (move), s (swap), g (raise/go), . (idle); repeat with *N.
+-- The keyword "wander" auto-generates a generic move+swap loop.
+local INPUT_TOKENS = {
+  l = KeyDataEncoding.left, left = KeyDataEncoding.left,
+  r = KeyDataEncoding.right, right = KeyDataEncoding.right,
+  u = KeyDataEncoding.up, up = KeyDataEncoding.up,
+  d = KeyDataEncoding.down, down = KeyDataEncoding.down,
+  s = KeyDataEncoding.swap, swap = KeyDataEncoding.swap,
+  g = KeyDataEncoding.raise, raise = KeyDataEncoding.raise,
+  ["."] = KeyDataEncoding.idle, idle = KeyDataEncoding.idle, wait = KeyDataEncoding.idle,
+}
+
+local function buildInputScript(str, hold)
+  hold = hold or 6
+  if not str or str == "" then return nil end
+  local out = {}
+  local function emit(ch, frames) for _ = 1, frames do out[#out + 1] = ch end end
+  if str == "wander" then
+    local pattern = { "left", "left", "swap", "right", "right", "swap", "up", "swap", "down", "swap", "idle", "idle" }
+    for _ = 1, 400 do for _, t in ipairs(pattern) do emit(INPUT_TOKENS[t], hold) end end
+  else
+    for tok in str:gmatch("[^%s,]+") do
+      local name, n = tok:match("^(%a+)%*?(%d*)$")
+      if not name then name = tok end
+      local ch = name and INPUT_TOKENS[name:lower()]
+      if ch then emit(ch, hold * (tonumber(n) or 1)) end
+    end
+  end
+  if #out == 0 then return nil end
+  return out
+end
 
 function AutoReplay.isEnabled()
   return os.getenv("PA_AUTO_REPLAY") ~= nil
@@ -53,19 +96,28 @@ function AutoReplay.init()
   end
   table.sort(targets)
   if #targets == 0 then targets = { 1800 } end
+  -- Screenshots are optional: on by default, off when PA_AUTO_SHOT is "none"/"off"
+  -- (the run still loads/forks/plays/quits — useful for input-only validation).
+  local shotEnv = os.getenv("PA_AUTO_SHOT")
+  local shoot = shotEnv ~= "none" and shotEnv ~= "off"
   state = {
     path     = os.getenv("PA_AUTO_REPLAY"),
     targets  = targets,
     nextIdx  = 1,
-    shotName = os.getenv("PA_AUTO_SHOT") or "pa_autoshot.png",
+    shoot    = shoot,
+    shotName = (shotEnv and shotEnv ~= "none" and shotEnv ~= "off" and shotEnv) or "pa_autoshot.png",
     quit     = os.getenv("PA_AUTO_QUIT") ~= "0",
     fork     = os.getenv("PA_AUTO_FORK") ~= nil, -- at the first target, "play from here" then shoot the live fork
     forkDelay = tonumber(os.getenv("PA_AUTO_FORK_DELAY")) or 220, -- love-frames after fork before the live screenshot (raise to watch garbage stack)
+    inputScript = buildInputScript(os.getenv("PA_AUTO_INPUT"), tonumber(os.getenv("PA_AUTO_INPUT_HOLD"))), -- scripted gameplay clicks for the fork
+    inputIdx = 1,
     frame    = 0,
     started  = nil, -- frame the replay actually began (after mods loaded)
   }
   print("PA_AUTO_REPLAY: armed | path=" .. state.path ..
-    " frames=" .. table.concat(targets, ",") .. " shot=" .. state.shotName)
+    " frames=" .. table.concat(targets, ",") ..
+    " shot=" .. (state.shoot and state.shotName or "OFF") ..
+    (state.inputScript and (" input=" .. #state.inputScript .. "f") or ""))
 end
 
 -- Mods load asynchronously during BootScene; createFromReplay needs the global
@@ -179,19 +231,58 @@ function AutoReplay.update()
     end
     local since = state.frame - state.menuAt
     if since == 8 then
-      love.graphics.captureScreenshot(menuName)
-      reportShot(menuName, state.targets[1], state.targets[1])
+      if state.shoot then
+        love.graphics.captureScreenshot(menuName)
+        reportShot(menuName, state.targets[1], state.targets[1])
+      end
     elseif since == 16 then
+      -- Headless boots straight into the replay, skipping the menu flow that runs
+      -- Game:initializeLocalPlayer + claims an input device. Recreate the local
+      -- player so the fork uses the real GAME.localPlayer path.
+      if not GAME.localPlayer and GAME.initializeLocalPlayer then GAME:initializeLocalPlayer() end
+      if GAME.localPlayer then
+        if state.inputScript then
+          -- Scripted gameplay: drive the engine's input stream directly with
+          -- click bytes. Use controller method (engine decodes KeyDataEncoding)
+          -- and leave it device-less so send_controls doesn't double-feed.
+          pcall(function() GAME.localPlayer:unrestrictInputs() end)
+          GAME.localPlayer:setInputMethod("controller")
+        elseif not GAME.localPlayer.inputConfiguration then
+          -- No script: claim a device so the real send_controls idle path runs
+          -- (proves the live input chain ticks the stack).
+          local devs = GAME.input:getAssignableDevices()
+          local dv
+          for _, d in ipairs(devs) do if d.deviceType ~= "touch" then dv = d; break end end
+          dv = dv or devs[1]
+          if dv then pcall(function() GAME.localPlayer:restrictInputs(dv) end) end
+        end
+      end
       local scene = activeScene()
       local ok, err = pcall(function() return scene and scene._forkNow and scene:_forkNow() end)
-      print("PA_AUTO_REPLAY: FORK via control -> " .. tostring(ok) .. (ok and "" or (" ERR=" .. tostring(err))))
+      print("PA_AUTO_REPLAY: FORK via control -> " .. tostring(ok) .. (ok and "" or (" ERR=" .. tostring(err)))
+        .. (state.inputScript and (" | scripted input (" .. #state.inputScript .. " frames)") or ""))
       state.forkFrame = state.frame
-    elseif state.forkFrame and state.frame - state.forkFrame == state.forkDelay then
-      love.graphics.captureScreenshot(gameName)
-      reportShot(gameName, state.targets[1], state.targets[1])
-    elseif state.forkFrame and state.frame - state.forkFrame >= state.forkDelay + 4 and state.quit then
-      print("PA_AUTO_REPLAY: done (fork)")
-      love.event.quit()
+    elseif state.forkFrame then
+      -- Feed scripted clicks into the live taken-over stack each tick.
+      if state.inputScript then
+        local scene = activeScene()
+        local st = scene and scene._localStack and scene:_localStack()
+        local e = st and st.engine
+        if e and e.confirmedInput and e.receiveConfirmedInput then
+          while #e.confirmedInput < (e.clock or 0) + 2 do
+            e:receiveConfirmedInput(state.inputScript[state.inputIdx])
+            state.inputIdx = (state.inputIdx % #state.inputScript) + 1
+          end
+        end
+      end
+      local fdt = state.frame - state.forkFrame
+      if fdt == state.forkDelay and state.shoot then
+        love.graphics.captureScreenshot(gameName)
+        reportShot(gameName, state.targets[1], state.targets[1])
+      elseif fdt >= state.forkDelay + 4 and state.quit then
+        print("PA_AUTO_REPLAY: done (fork)")
+        love.event.quit()
+      end
     end
     return
   end
@@ -207,9 +298,11 @@ function AutoReplay.update()
     if p >= target or atEnd then
       -- One capture per love frame: captureScreenshot grabs THIS frame's buffer
       -- at end of draw, so taking only one per update keeps each shot distinct.
-      local fname = shotFile(target)
-      love.graphics.captureScreenshot(fname)
-      reportShot(fname, p, target)
+      if state.shoot then
+        local fname = shotFile(target)
+        love.graphics.captureScreenshot(fname)
+        reportShot(fname, p, target)
+      end
       state.nextIdx = state.nextIdx + 1
       state.lastShotFrame = state.frame
       if atEnd and state.nextIdx <= #state.targets then

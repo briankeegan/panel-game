@@ -1,6 +1,6 @@
 -- Playtest launcher: one bot that idles in the lobby and AUTO-ACCEPTS any
 -- challenge — so a human just challenges it in the lobby to play. Heuristic brain
--- by default; pass "search"/"expert" or a model dir. Rematches forever (Ctrl+C).
+-- by default; pass "search"/"expert" to pick a brain. Rematches forever (Ctrl+C).
 --
 -- Usage: zsh run_play.sh [ip] [port] [name] [difficulty] [brain]
 --   defaults: 104.156.250.136 49569 PanelBot medium  (heuristic)
@@ -17,19 +17,13 @@ local ip = arg[1] or "104.156.250.136"
 local port = tonumber(arg[2]) or 49569
 local name = arg[3] or "PanelBot"
 local difficulty = arg[4] or "medium"
-local modelDir = arg[5] -- optional
-
--- modelDir slot doubles as a brain selector: "search"/"expert" -> that brain,
--- a path -> trained model, nil -> heuristic.
-local namedBrain = (modelDir == "search" or modelDir == "expert") and modelDir or nil
-local brain = namedBrain or (modelDir and "model" or "heuristic")
-if namedBrain then modelDir = nil end
+local brain = arg[5] or "heuristic" -- "heuristic" | "search" | "expert"
 
 -- PA_SEARCH_PROFILE=bot/profiles/<player>.json conditions the search eval per
 -- player (Phase B); ignored unless brain == "search".
 local bot = BotClient({
   ip = ip, port = port, name = name, difficulty = difficulty,
-  brain = brain, modelDir = modelDir,
+  brain = brain,
   searchProfile = (brain == "search") and os.getenv("PA_SEARCH_PROFILE") or nil,
 })
 

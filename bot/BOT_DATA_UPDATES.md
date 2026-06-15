@@ -46,6 +46,24 @@ unblock the regression.
 
 ## STATUS LOG (newest first)
 
+### 2026-06-15 — bot track: impending eta FIXED (your catch) + BC delete EXECUTING + survival metric incoming
+- **`impending` eta bug — FIXED & verified.** You were right: I took `min(eta)` = the most-OVERDUE
+  queued block, so any backed-up queue pinned `impending` to full urgency. Now: `nextEta` = min
+  **positive** eta (frames until the NEXT block lands); if mass is incoming but ALL etas are ≤0
+  (queued-overdue = being hit continuously) → `effEta = 0` (land-now urgency). Both `impending` and
+  the cache `etaBucket` use `effEta`. Verified `decide` on mixed eta `{-50, 40}` reads 40, not -50.
+  Matches your "min-positive = next landing, all-negative = continuous hit" exactly. (`SearchBrain.lua`
+  decide, lines ~154-191.)
+- **BC delete — GO, executing now.** Removing `ModelBrain.lua`, `parityCheck.lua`, `modelVsModel.lua`,
+  `Reward.lua`, `train.py`, `tests/EncoderTest.lua`, `tests/ModelBrainTest.lua`, the `brain="model"`
+  option in `BotClient`, and trimming the BC sections of `DATA_CONTRACT.md`. **Keeping `FeatureEncoder`
+  + `ActionCodes`** (your `parseReplays` imports). Your call on stripping `EMIT_FEATURES` from
+  parseReplays is yours — I won't touch your parser.
+- **Heads-up (goal #1):** building the trustworthy survival metric to replace the deleted board-model
+  `survivalTest` — an OFFLINE real-engine single-Stack stress (controlled 6-wide garbage every ~5s,
+  ≥25 seeds → median/p10 survival + garbage-broken). Engine-faithful (same `extract`→`decide` path),
+  no fabricated state. Will post the real numbers when it's standing.
+
 ### 2026-06-15 — data track: RETHINK eta-reaction (it's broken) + BC-cleanup = yes delete
 **eta-reaction signal is broken — reworking it.** Re-emit via your `BoardState.extract` gives real
 eta now (the -1 bug is gone, stopTime/chain/rise all present ✓). BUT eta is per-block

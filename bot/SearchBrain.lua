@@ -151,16 +151,23 @@ function SearchBrain:decide(state)
   local cfg = self.cfg
   local board, rows = state.board, state.rows
 
-  local incoming, minEta = 0, math.huge
+  -- incoming mass + frames until the NEXT block LANDS. eta is per-block
+  -- (deliveryTime - clock); garbage delivers one-at-a-time, so a backed-up queue
+  -- shows the next block as a small POSITIVE and everything queued behind it as
+  -- NEGATIVE (overdue-in-line, not landed). So min-positive eta = true
+  -- time-to-next-landing; all-nonpositive with mass present = being hit
+  -- continuously -> treat as landing NOW (effEta 0). (data track caught this.)
+  local incoming, nextEta = 0, math.huge
   for _, g in ipairs(state.incoming or {}) do
     incoming = incoming + (g.w or 0) * (g.h or 0)
-    local e = g.eta or math.huge; if e < minEta then minEta = e end
+    local e = g.eta; if e and e > 0 and e < nextEta then nextEta = e end
   end
+  local effEta = (nextEta < math.huge) and nextEta or (incoming > 0 and 0 or math.huge)
   local riseSoon = (state.displacement or 16) <= 3 -- displacement 16->0; row commits at 0
 
   -- cache keyed on the things the decision depends on (board + incoming + the clock
   -- buckets); skips the search while the cursor merely travels to its locked target.
-  local etaBucket = (minEta < math.huge) and math.floor(minEta / 30) or 99
+  local etaBucket = (effEta < math.huge) and math.floor(effEta / 30) or 99
   local sig = boardSig(board, rows, state.width or 6) * 31 + incoming + etaBucket * 1009 + (riseSoon and 7919 or 0)
   if sig == self._sig and self._decision then return self._decision end
 
@@ -188,7 +195,7 @@ function SearchBrain:decide(state)
   -- impending = incoming garbage about to LAND -> lower the board NOW so it lands with
   -- room, instead of reacting once it has buried us (grows with area, as eta shrinks).
   local dangerBonus = math.max(0, buried + (riseSoon and 1 or 0)) * 7
-  local impending = (incoming > 0 and minEta < 240) and incoming * (240 - math.max(0, minEta)) / 240 or 0
+  local impending = (incoming > 0 and effEta < 240) and incoming * (240 - effEta) / 240 or 0
   -- STOP WINDOW: after a clear the rise FREEZES (stop_time/pre_stop_time) — free
   -- frames to build/extend offense without the stack climbing. Humans pack their
   -- combos into these windows. Value offense more here; it's "safe" regardless of

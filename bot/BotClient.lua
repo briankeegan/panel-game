@@ -68,8 +68,7 @@ local BotClient = class(function(self, opts)
   self.ip = opts.ip or "127.0.0.1"
   self.port = opts.port or 49569
   self.name = opts.name or "BotBella"
-  self.brainKind = opts.brain or "heuristic"   -- "heuristic"|"random"|"model"|"expert"|"search"
-  self.modelDir = opts.modelDir                 -- required when brain == "model"
+  self.brainKind = opts.brain or "heuristic"   -- "heuristic"|"random"|"expert"|"search"
   self.searchProfile = opts.searchProfile       -- optional per-player eval weights (brain == "search")
   self.difficulty = opts.difficulty or "medium" -- "easy" | "medium" | "hard" (cursor-speed/reaction cap)
   self.gameplay = TcpClient({ name = "bot-gameplay", defaultPort = self.port })
@@ -358,9 +357,7 @@ function BotClient:startMatch()
   -- WAITs -> cursor never moves -> the human sees a blank board).
   self.match:start()
   if self.brainKind ~= "random" then
-    if self.brainKind == "model" then
-      self.brain = require("bot.ModelBrain").load(assert(self.modelDir, "bot: brain='model' requires modelDir"))
-    elseif self.brainKind == "search" then
+    if self.brainKind == "search" then
       -- searchProfile (JSON weight path) conditions the eval per player (Phase B);
       -- self.difficulty sets move quality (chain awareness + fumble rate).
       local SB = require("bot.SearchBrain")

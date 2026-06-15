@@ -16,12 +16,26 @@
 --                          (only works on ui.Menu, not the Lobby ScrollMenu;
 --                          prefer tap up/down + `where` for hand navigation)
 --      waitscene <name> [t] block until that scene is active (t = timeout frames)
+--      waittext [t] <str>  block until <str> is visible on screen (black-box;
+--                          scans the rendered UI text, translated as drawn).
+--                          Optional leading number = timeout frames (def 1800).
+--      texts               dump every visible string in the current scene
 --      wait <frames>       idle
 --      shoot [name]        screenshot to <name>.png in the shared save dir
 --      f2                  screenshot via the real F2 shortcut
 --      scene               report the current scene name to the out file
+--      where               report the focused menu item (see above)
 --      run <MACRO>         expand a named macro (TO_MENU / VS_SELF / REPLAYS ...)
---      quit                stop the instance
+--      leave               leaveRoom but stay connected (back out of a match)
+--      quit                gracefully leave room -> disconnect -> exit (so the
+--                          server frees the room; not an abrupt process kill)
+--
+--    Design notes (what we deliberately did NOT build): waits observe WHAT IT
+--    SEES (waittext over the rendered UI), not internal game state — no
+--    `waitfor netClient.state==INGAME`-style state predicates, and no raw Lua
+--    field-path matching (fragile/footgun). Target a specific player by their
+--    on-screen NAME (`waittext Gromit`). `menusel` (label auto-jump) is kept but
+--    deprecated for hand-nav: prefer tap up/down + `where`/`texts` to validate.
 --    Results land in PA_OUT_FILE as `reached <scene>`, `shot=<abs path>`, etc.
 --    Sync: wait for the `ready=<scene>` line in PA_OUT_FILE before sending
 --    commands (boot settled + polling live). Cleanup with `find -delete`, not a
@@ -348,6 +362,37 @@ local function whereAmI()
   writeOut(string.format("where: %d/%d %q in %s", idx, #items, label or "?", tostring(sceneName())))
 end
 
+-- "What it sees": collect the visible, displayed strings in the active scene's
+-- UI tree, translated exactly as drawn. Pure black-box — no game-state peeking.
+-- Backs `texts` (dump everything matchable) and `waittext` (poll until a string
+-- shows). Skips isVisible==false subtrees so it reflects the actual screen.
+local function collectTexts(node, acc, depth)
+  if not node or depth > 12 or node.isVisible == false then return end
+  local t = node.text
+  if type(t) == "string" and t ~= "" then
+    local shown = node.translate and loc(t) or t
+    if type(shown) == "string" and shown ~= "" then acc[#acc + 1] = shown end
+  end
+  if node.children then
+    for _, ch in ipairs(node.children) do collectTexts(ch, acc, depth + 1) end
+  end
+end
+
+local function sceneTexts()
+  local s = scene()
+  local acc = {}
+  if s and s.uiRoot then collectTexts(s.uiRoot, acc, 0) end
+  return acc
+end
+
+-- First on-screen string containing needle (case-insensitive), or nil.
+local function screenHasText(needle)
+  needle = needle:lower()
+  for _, t in ipairs(sceneTexts()) do
+    if t:lower():find(needle, 1, true) then return t end
+  end
+end
+
 local function execCommand(c)
   local op, args, rest = c.op, c.args, c.rest
   if op == "tap" or op == "key" then tap(args[1]); st.busy = st.tapGap
@@ -356,11 +401,30 @@ local function execCommand(c)
   elseif op == "shoot" then doShoot(rest)
   elseif op == "menusel" then st.menusel = { label = rest, timeout = 600 }
   elseif op == "waitscene" then st.waitScene = { name = args[1], timeout = tonumber(args[2]) or 1800 }
+  elseif op == "waittext" then
+    -- waittext [<timeoutframes>] <string>  — leading number = timeout; quotes optional
+    local needle, timeout = rest, 1800
+    local n, after = rest:match("^(%d+)%s+(.+)$")
+    if n then timeout = tonumber(n); needle = after end
+    needle = needle:gsub('^"(.*)"$', "%1"):gsub("^'(.*)'$", "%1")
+    st.waitText = { needle = needle, timeout = timeout }
+  elseif op == "texts" then
+    writeOut("texts[" .. tostring(sceneName()) .. "]: " .. table.concat(sceneTexts(), " | "))
   elseif op == "wait" then st.busy = tonumber(args[1]) or 30
   elseif op == "scene" then writeOut("scene=" .. tostring(sceneName()))
   elseif op == "where" then whereAmI()
+  elseif op == "leave" then
+    -- back out of the room/match but stay connected in the lobby
+    if GAME.netClient then pcall(function() GAME.netClient:leaveRoom() end); writeOut("leave: sent leaveRoom")
+    else writeOut("leave: no netClient") end
   elseif op == "run" then local m = MACROS[args[1]]; if m then enqueueFront(m) else writeOut("unknown macro: " .. tostring(args[1])) end
-  elseif op == "quit" then writeOut("quit"); love.event.quit()
+  elseif op == "quit" then
+    -- Graceful: if online in a room/match, leave first so the SERVER frees the
+    -- room (an abrupt love.quit() leaves the host "in the game" until socket
+    -- timeout). Then disconnect + exit a few frames later (let the leave flush).
+    if GAME.netClient and GAME.netClient.leaveRoom then pcall(function() GAME.netClient:leaveRoom() end) end
+    st.quitting = { frames = 18 }
+    writeOut("quit: leaving room + shutting down")
   else writeOut("unknown cmd: " .. tostring(op)) end
 end
 
@@ -380,6 +444,16 @@ end
 -- advance the current blocking op (hold/menusel/waitscene/idle) or run the next.
 local function tickInteractive()
   if st.clicks then feedClicks() end
+  -- Graceful shutdown in progress: wait for the leaveRoom to flush, then
+  -- disconnect cleanly and exit.
+  if st.quitting then
+    st.quitting.frames = st.quitting.frames - 1
+    if st.quitting.frames <= 0 then
+      if GAME.netClient and GAME.netClient.disconnect then pcall(function() GAME.netClient:disconnect(true) end) end
+      love.event.quit()
+    end
+    return
+  end
   -- Deterministic readiness handshake: once boot settles on a real scene, write
   -- `ready=<scene>` ONCE. Callers wait for this line in PA_OUT_FILE before
   -- sending commands — no need to spam `scene`, and it dodges the init cmd-file
@@ -400,6 +474,13 @@ local function tickInteractive()
     st.waitScene.timeout = st.waitScene.timeout - 1
     if sceneName() == st.waitScene.name then writeOut("reached " .. st.waitScene.name); st.waitScene = nil
     elseif st.waitScene.timeout <= 0 then writeOut("waitscene TIMEOUT " .. st.waitScene.name .. " (now " .. tostring(sceneName()) .. ")"); st.waitScene = nil
+    else return end
+  end
+  if st.waitText then
+    st.waitText.timeout = st.waitText.timeout - 1
+    local hit = screenHasText(st.waitText.needle)
+    if hit then writeOut('sawtext "' .. st.waitText.needle .. '" -> "' .. hit .. '"'); st.waitText = nil
+    elseif st.waitText.timeout <= 0 then writeOut('waittext TIMEOUT "' .. st.waitText.needle .. '" (scene=' .. tostring(sceneName()) .. ')'); st.waitText = nil
     else return end
   end
   if st.busy and st.busy > 0 then st.busy = st.busy - 1; return end

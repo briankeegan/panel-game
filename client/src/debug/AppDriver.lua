@@ -58,10 +58,37 @@ local function buildClicks(str, hold)
   return (#out > 0) and out or nil
 end
 
-function AppDriver.isEnabled() return os.getenv("PA_AUTO_REPLAY") ~= nil end
+function AppDriver.isEnabled()
+  return os.getenv("PA_AUTO_REPLAY") ~= nil or os.getenv("PA_AUTO_ONLINE_ROOM") ~= nil
+end
 
 function AppDriver.init()
   if not AppDriver.isEnabled() then return end
+
+  -- ONLINE mode: drive the real client to JOIN A ROOM and play (e.g. the bot's
+  -- room) instead of opening a replay. PA_AUTO_ONLINE_ROOM=<n> is the switch;
+  -- PA_AUTO_ONLINE_SERVER="ip:port" (default 127.0.0.1:49569). Screenshots via
+  -- PA_AUTO_TRACE (flipbook) + an in-match shot.
+  local onlineRoom = tonumber(os.getenv("PA_AUTO_ONLINE_ROOM"))
+  if onlineRoom then
+    local srv = os.getenv("PA_AUTO_ONLINE_SERVER") or "127.0.0.1:49569"
+    local ip, port = srv:match("^(.-):(%d+)$")
+    local shotEnv = os.getenv("PA_AUTO_SHOT")
+    st = {
+      online = true, onlineRoom = onlineRoom, ip = ip or "127.0.0.1", port = tonumber(port) or 49569,
+      clicks = buildClicks(os.getenv("PA_AUTO_INPUT") or "wander", tonumber(os.getenv("PA_AUTO_INPUT_HOLD"))),
+      clickIdx = 1,
+      shoot = shotEnv ~= nil and shotEnv ~= "none" and shotEnv ~= "off",
+      shotName = (shotEnv and shotEnv ~= "none" and shotEnv ~= "off" and shotEnv) or "pa_vs_bot.png",
+      quit = os.getenv("PA_AUTO_QUIT") ~= "0",
+      phase = "wait_menu",
+      trace = os.getenv("PA_AUTO_TRACE") ~= nil, traceEvery = tonumber(os.getenv("PA_AUTO_TRACE")) or 15, traceSeq = 0,
+      playFrames = tonumber(os.getenv("PA_AUTO_PLAY_FRAMES")) or 1200,
+      frame = 0, cooldown = 0, tapGap = 8, releaseKey = nil, safety = 0,
+    }
+    print(string.format("PA_AUTO_ONLINE: armed | server=%s:%d room=%d", st.ip, st.port, onlineRoom))
+    return
+  end
   -- Browser descend sequence: the path from the replay root onward, i.e. from
   -- the version folder (v049) to the file — e.g. {v049,2026,06,14,FFA_...,game.json}.
   -- The browser auto-opens on the LATEST date, so we navigate to root first then
@@ -118,6 +145,16 @@ local function indexOf(list, name)
   return nil
 end
 
+-- Menu items don't store their loc-key as .id (UIElement auto-assigns ids), but
+-- the button's Label keeps the raw key as .text ("mm_replay_browser") until it's
+-- translated at draw time. Match on that, then step the cursor with up/down taps.
+local function menuItemIndexByLabel(menu, key)
+  for i, item in ipairs(menu.menuItems or {}) do
+    local lbl = item.textButton and item.textButton.label
+    if lbl and lbl.text == key then return i end
+  end
+end
+
 -- Screenshot through the real input path: tap F2 (the game's screenshot
 -- shortcut, handled by Shortcuts:handleShortcuts each frame). Saves to
 -- screenshots/screenshot_<version>-<timestamp>.png in love's WRITE dir.
@@ -135,6 +172,12 @@ local function feedClicks()
   local s = scene()
   local stk = s and s._localStack and s:_localStack()
   local e = stk and stk.engine
+  -- Online match: find the local stack on the live match.
+  if not e and GAME.battleRoom and GAME.battleRoom.match then
+    for _, stack in ipairs(GAME.battleRoom.match.stacks or {}) do
+      if stack.is_local then e = stack.engine or stack; break end
+    end
+  end
   if e and e.confirmedInput and e.receiveConfirmedInput then
     while #e.confirmedInput < (e.clock or 0) + 2 do
       e:receiveConfirmedInput(st.clicks[st.clickIdx]); st.clickIdx = (st.clickIdx % #st.clicks) + 1
@@ -146,17 +189,74 @@ local PHASES = {}
 
 function PHASES.wait_menu()
   local n = sceneName()
-  if n == "TitleScreen" then tap("return") -- any key advances TitleScreen -> MainMenu
-  elseif n == "MainMenu" then return "nav_menu" end
+  -- First-run setup scenes (fresh identity): accept the default with Return.
+  if n == "LanguageSelectSetup" or (n and n:find("Setup")) then tap("return")
+  elseif n == "TitleScreen" then tap("return") -- any key advances TitleScreen -> MainMenu
+  elseif n == "MainMenu" then return st.online and "online_lobby" or "nav_menu" end
 end
 
--- Menu items don't store their loc-key as .id (UIElement auto-assigns ids), but
--- the button's Label keeps the raw key as .text ("mm_replay_browser") until it's
--- translated at draw time. Match on that, then step the cursor with up/down taps.
-local function menuItemIndexByLabel(menu, key)
-  for i, item in ipairs(menu.menuItems or {}) do
-    local lbl = item.textButton and item.textButton.label
-    if lbl and lbl.text == key then return i end
+-- ===== ONLINE phases: connect -> join the bot's room -> ready -> play =====
+-- Drive to the lobby the same way a human does: tap down/up to the server menu
+-- item on the Main Menu and press Return. Local test server -> "Localhost Server"
+-- (run_client.sh exports PA_SHOW_LOCAL=true so that item is present); otherwise
+-- the prod online item ("mm_2_vs_online"). Nothing is scene-pushed.
+function PHASES.online_lobby()
+  if sceneName() == "Lobby" then return "online_login" end
+  if sceneName() ~= "MainMenu" then return end
+  local menu = scene().menu
+  if not (menu and menu.menuItems) then return end
+  local isLocal = st.ip == "127.0.0.1" or st.ip == "localhost" or st.ip == "Localhost"
+  local label = isLocal and "Localhost Server" or "mm_2_vs_online"
+  local target = menuItemIndexByLabel(menu, label)
+  if not target then print("PA_AUTO_ONLINE: server item '" .. label .. "' missing"); love.event.quit(1); return end
+  if stepCursorTo(menu.selectedIndex, target, "down", "up") then tap("return") end
+end
+
+local function netState() return GAME.netClient and GAME.netClient.state end
+local function STATES() return require("client.src.network.NetClient").STATES end
+
+function PHASES.online_login()
+  if netState() == STATES().ONLINE then return "online_join" end
+end
+
+function PHASES.online_join()
+  GAME.netClient:requestJoinRoom(st.onlineRoom)
+  print("PA_AUTO_ONLINE: requested join room " .. st.onlineRoom)
+  return "online_ready"
+end
+
+function PHASES.online_ready()
+  -- in the room / character-select yet?
+  if not (netState() == STATES().ROOM or GAME.battleRoom) then return end
+  if not st.readied and GAME.localPlayer then
+    local lp = GAME.localPlayer
+    lp.settings.wantsReady = true
+    lp.hasLoaded = true
+    lp.settings.ready = true
+    lp.settings.loaded = true
+    GAME.netClient:sendPlayerSettings(lp)
+    st.readied = true
+    print("PA_AUTO_ONLINE: readied up")
+  end
+  return "online_match"
+end
+
+function PHASES.online_match()
+  if netState() == STATES().INGAME then
+    st.forkFrame = st.frame
+    print("PA_AUTO_ONLINE: ===== MATCH STARTED vs the bot =====")
+    return "online_playing"
+  end
+end
+
+function PHASES.online_playing()
+  -- feedClicks runs every frame in update(); screenshot a few times, then quit.
+  local since = st.frame - st.forkFrame
+  if since == 120 or since == 400 or since == 800 then shoot() end
+  if since >= st.playFrames or netState() ~= STATES().INGAME then
+    st.doneAt = st.frame
+    print("PA_AUTO_ONLINE: done playing (" .. since .. " frames, state=" .. tostring(netState()) .. ")")
+    return "done"
   end
 end
 
@@ -259,7 +359,7 @@ function AppDriver.update()
   if not st then return end
   st.frame = st.frame + 1
   if st.releaseKey then inputManager:keyReleased(st.releaseKey); st.releaseKey = nil end
-  if st.phase == "playing" then feedClicks() end -- every frame, independent of tap cooldown
+  if st.phase == "playing" or st.phase == "online_playing" then feedClicks() end -- every frame, independent of tap cooldown
   -- Flipbook trace: numbered captures so we can watch the click-through in order.
   -- Skip the boot loading screen; capture from the title/menu on.
   local sn = sceneName()

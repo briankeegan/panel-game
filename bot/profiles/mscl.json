@@ -1,0 +1,13 @@
+{
+  "player": "mscl", "id": 3084, "version": "v1",
+  "apm": 364, "swapIntervalFrames": 17,
+  "heightBand": [8, 11],
+  "weights": { "w_chain": 0.33, "w_survival": 0.35, "w_breakGarbage": 0.22, "w_shape": 0.10 },
+  "tempo": { "swapPct": 15, "waitPct": 80, "raisePct": 5 },
+  "offense": { "chainPct": 35, "comboPct": 65, "maxChainMedian": 5, "maxChainPeak": 26,
+               "garbagePerGame": 22, "biggestBlockArea": 150, "sendStyle": "steady (~2.4s), not bursty" },
+  "style": "CHAIN SPECIALIST. Slower (apm 364), patient (swaps 15% / waits 80%), highest chain reliance (35%) and DEEP chains (peak 26, 6x25=150-area block). Deep chains land in WINS (losses cap ~chain-10). Digs garbage REACTIVELY (breaks more when losing/buried) -> lower w_breakGarbage, higher w_chain.",
+  "derivedFrom": "analyze_strategy.py (height band [8,11]) + timing_stats (apm) + re-sim offense fingerprint (100 games). w_chain set HIGHER than chaos (mscl is the chain builder).",
+  "opponentReactive": false,
+  "notes": "opp-state not a decision driver (verified). Faint offensive lean toward a high opponent but weak. opp stays out of v1."
+}

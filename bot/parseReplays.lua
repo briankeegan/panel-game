@@ -35,8 +35,10 @@ local FILE = os.getenv("PA_PARSE_FILE")
 local OUTDIR = os.getenv("PA_PARSE_OUTDIR") or "."
 local LIMIT = tonumber(os.getenv("PA_PARSE_LIMIT") or "0")
 -- PA_PARSE_EMIT=features → write gzipped (589-float feature, label) binary per game
--- for training; default writes the JSON rows.
+-- for training; PA_PARSE_EMIT=stats → one compact JSON line per game (offense
+-- fingerprint); default writes the JSON rows.
 local EMIT_FEATURES = os.getenv("PA_PARSE_EMIT") == "features"
+local EMIT_STATS = os.getenv("PA_PARSE_EMIT") == "stats"
 
 function love.load()
   -- Same engine bootstrap the test harness uses (createFromReplay needs GAME).
@@ -180,8 +182,17 @@ local function parseReplay(path)
   }
 
   local rows = {}
+  local maxChain = 0
   while not match:isLocallyEnded() do
     local clock = stack.clock
+    -- chain_counter resets to 0 between chains; track the running max ourselves.
+    if stack.chain_counter and stack.chain_counter > maxChain then
+      maxChain = stack.chain_counter
+    end
+    if EMIT_STATS then
+      match:run()
+      goto continue
+    end
     local char = stack.confirmedInput[clock + 1]
     if char then
       if EMIT_FEATURES then
@@ -212,11 +223,28 @@ local function parseReplay(path)
       end
     end
     match:run()
+    ::continue::
   end
 
   -- drop-on-desync: re-sim winner index must match the recorded winnerIndex
   if meta.winnerIndex ~= nil and resimWinnerIndex(match) ~= meta.winnerIndex then
     return nil, "resim-desync"
+  end
+
+  if EMIT_STATS then
+    local garbage = {}
+    for _, g in ipairs(stack.outgoingGarbage.history or {}) do
+      garbage[#garbage + 1] = {
+        isChain = g.isChain or false, width = g.width, height = g.height,
+        frameEarned = g.frameEarned,
+      }
+    end
+    local stats = {
+      gameId = tags.gameId, outcome = tags.outcome, frames = stack.clock,
+      panels_cleared = stack.panels_cleared, score = stack.score,
+      maxChain = maxChain, garbage = garbage,
+    }
+    return { stats = stats, gameId = tags.gameId }, nil
   end
 
   labelDecisions(rows)
@@ -266,6 +294,17 @@ local function writeFeatures(gameId, rows)
   return n
 end
 
+-- Stats mode: append one compact JSON line per game to a single JSONL file.
+local statsFh
+local function writeStats(gameId, payload)
+  if not statsFh then
+    statsFh = assert(io.open(OUTDIR .. "/stats.jsonl", "w"))
+  end
+  statsFh:write(json.encode(payload.stats) .. "\n")
+  statsFh:flush()
+  return 1
+end
+
 local function listFiles()
   if FILE then return { FILE } end
   local out = {}
@@ -295,7 +334,8 @@ function love.update()
       logger.error("crash on " .. path .. ": " .. tostring(rowsOrErr))
     elseif rowsOrErr then
       local gameId = rowsOrErr.gameId or (rowsOrErr[1] and rowsOrErr[1].gameId) or "unknown"
-      local n = (EMIT_FEATURES and writeFeatures or writeRows)(gameId, rowsOrErr)
+      local writer = EMIT_STATS and writeStats or (EMIT_FEATURES and writeFeatures or writeRows)
+      local n = writer(gameId, rowsOrErr)
       kept = kept + 1; totalRows = totalRows + n
     else
       dropped = dropped + 1

@@ -35,6 +35,8 @@ def analyze_game(rows):
     dec = collections.Counter()
     last_clear_frame = None
     chained_events = 0
+    # garbage-on-board (landed garbage = color 8 metal / 9 garbage) + breakage
+    gb_frames, gb_broken, prev_gb = 0, 0, None
     for r in rows:
         board = r["board"]
         cells = [c for row in board for c in row]
@@ -44,6 +46,12 @@ def analyze_game(rows):
                 h = ri + 1; break
         heights.append(h)
         fills.append(sum(1 for c in cells if c["c"] != 0))
+        gb = sum(1 for c in cells if c["c"] in (8, 9))   # garbage panels on own board
+        if gb > 0:
+            gb_frames += 1
+        if prev_gb is not None and gb < prev_gb:
+            gb_broken += (prev_gb - gb)                  # garbage cells cleared this frame
+        prev_gb = gb
         # clear event detection: count matched panels; a burst = one clear
         m = sum(1 for c in cells if c["s"] in (MATCHED, POPPING))
         if m > 0:
@@ -63,7 +71,11 @@ def analyze_game(rows):
     n = len(rows)
     return {
         "frames": n,
-        "height_med": med(heights), "height_p90": pctl(heights, 0.9), "height_max": max(heights) if heights else 0,
+        "height_p25": pctl(heights, 0.25), "height_med": med(heights),
+        "height_p75": pctl(heights, 0.75), "height_p90": pctl(heights, 0.9),
+        "height_max": max(heights) if heights else 0,
+        "garbage_on_board_pct": round(100 * gb_frames / n, 1) if n else 0,
+        "garbage_broken_per_1000f": round(1000 * gb_broken / n, 1) if n else 0,
         "fill_med_pct": round(100 * med(fills) / 72, 1) if fills else 0,
         "clears": len(clear_events),
         "clears_per_1000f": round(1000 * len(clear_events) / n, 1) if n else 0,
@@ -98,8 +110,9 @@ def main():
         vals = [g[key] for g in games if g[key] is not None]
         return med(vals)
 
-    keys = ["frames", "height_med", "height_p90", "height_max", "fill_med_pct",
-            "clears_per_1000f", "combo_med", "combo_max", "big_combos", "chained",
+    keys = ["frames", "height_p25", "height_med", "height_p75", "height_p90", "height_max",
+            "fill_med_pct", "garbage_on_board_pct", "garbage_broken_per_1000f",
+            "clears_per_1000f", "combo_med", "combo_max", "big_combos",
             "incoming_frame_pct", "swap_pct", "wait_pct", "raise_pct"]
     print(f"corpus={corpus}  games analyzed={sum(len(v) for v in by_outcome.values())} "
           f"(won={len(by_outcome['won'])}, lost={len(by_outcome['lost'])})\n")

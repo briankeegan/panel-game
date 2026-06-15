@@ -7,12 +7,34 @@
   "chainUnit": 75,
   "comboUnit": 13,
   "futureDiscount": 0.85,
-  "heightBand": [8, 11],
+  "heightBand": [
+    8,
+    11
+  ],
   "actMargin": 1.3,
   "_meta": {
     "style": "CHAIN SPECIALIST: highest chain reliance (35%) and DEEP chains (med 5 / peak 26, 150-area block); deep chains land in WINS; patient (apm 364, swap 15% / wait 80%); digs garbage REACTIVELY.",
     "knobRationale": "w_chain/chainUnit/futureDiscount UP (deep chain builder, values set-ups) + actMargin UP (patient, holds for the big chain); comboUnit/w_breakGarbage down (less combo, reactive dig).",
-    "offenseTarget": { "chainPct": 35, "comboPct": 65, "maxChainMedian": 5, "garbagePerGame": 22 },
-    "opponentReactive": false
+    "offenseTarget": {
+      "chainPct": 35,
+      "comboPct": 65,
+      "maxChainMedian": 5,
+      "garbagePerGame": 22
+    },
+    "opponentReactive": false,
+    "offenseDetail": {
+      "blocksPerMin": 22.4,
+      "blocksPerGame": 22,
+      "topSizes": [
+        "3x1",
+        "4x1",
+        "6x1",
+        "5x1",
+        "6x2"
+      ],
+      "smallComboPct": 51,
+      "chainPct": 35,
+      "pattern": "small combos + notably more taller/chain blocks (6x2+) than chaos"
+    }
   }
 }

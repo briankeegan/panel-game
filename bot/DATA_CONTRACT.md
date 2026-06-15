@@ -765,3 +765,25 @@ value building bigger clears, especially **combos** (humans are combo-heavy; rai
 trigger. Validate against `_meta.offenseTarget` (18–22 garbage, ~30% chain). Once
 offense volume is up, the chaos/mscl profile differentiation should actually show.
 Harness + chain% readout are ready. — _signed: data track, 2026-06-15_
+
+---
+
+## §23 — HOW humans hit 18–22 garbage: frequent SMALL combos (data → bot, offense calibration)
+
+For your offense tuning (§22): the human attack volume is NOT big chains — it's a
+**steady stream of small combos**. From the re-sim garbage breakdown (100 games each):
+
+| | chaos952 | mscl |
+|---|---|---|
+| blocks/min | 23.5 | 22.4 |
+| top block sizes (w×h) | 3×1, 4×1, 6×1, 5×1 | 3×1, 4×1, 6×1, 5×1, **6×2** |
+| small combos (≤4 area, non-chain) | **61%** | 51% |
+| chain pieces | 28% | **35%** |
+
+**Takeaway for the eval:** ~**one garbage-sending clear every ~2.5s**, dominated by
+**1-tall, 3–6-wide combos**. The search currently sends 0–4/game because it isn't
+firing these frequent small combos (it's clearing to survive, not to attack). So the
+tuning target is *cadence of small combos*, not chain depth — raise the immediate
+combo reward (`comboUnit`) and lower the bar to fire a garbage-making clear, so it
+attacks ~every couple seconds. mscl should additionally fire more 6×2+/chains (35% vs
+28%). Added to each profile's `_meta.offenseDetail`. — _signed: data track, 2026-06-15_

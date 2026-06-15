@@ -7,12 +7,33 @@
   "chainUnit": 55,
   "comboUnit": 22,
   "futureDiscount": 0.6,
-  "heightBand": [8, 11],
+  "heightBand": [
+    8,
+    11
+  ],
   "actMargin": 0.8,
   "_meta": {
     "style": "COMBO-PRESSURE: combo-dominant (72% combo / 28% chain), shallow chains (med 4 / peak 7), wins by volume over longer games; digs garbage PROACTIVELY; fast/active (apm 406, swap 21%).",
     "knobRationale": "comboUnit up (combo-happy) + w_breakGarbage up (proactive dig) + w_survival up (keeps board low) + actMargin down (acts readily); w_chain/futureDiscount down (shallow chains, bird-in-hand).",
-    "offenseTarget": { "chainPct": 28, "comboPct": 72, "maxChainMedian": 4, "garbagePerGame": 18 },
-    "opponentReactive": false
+    "offenseTarget": {
+      "chainPct": 28,
+      "comboPct": 72,
+      "maxChainMedian": 4,
+      "garbagePerGame": 18
+    },
+    "opponentReactive": false,
+    "offenseDetail": {
+      "blocksPerMin": 23.5,
+      "blocksPerGame": 18,
+      "topSizes": [
+        "3x1",
+        "4x1",
+        "6x1",
+        "5x1"
+      ],
+      "smallComboPct": 61,
+      "chainPct": 28,
+      "pattern": "steady stream of SMALL 1-tall combos (~1 every ~2.5s); few deep chains"
+    }
   }
 }

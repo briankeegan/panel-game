@@ -44,6 +44,9 @@ local DEFAULTS = {
                             -- BUILDS toward a 4+ combo instead of firing every small clear. 0.3 is the
                             -- engine-validated hard ceiling (offense +15%, win 10->30% vs hard, zero
                             -- survival cost); 0 = old fire-freely behavior. (winRateTest sweep.)
+  construct = 0.0,          -- [0..N] when safe+low, reward MASSING same-color material toward a 4+
+                            -- combo (gradient beyond chainPotential's 1-swap horizon). Offense-volume
+                            -- mechanism; the fit tunes it per player. 0 = off (additive default).
 }
 
 function SearchBrain.new(opts)
@@ -123,6 +126,25 @@ local function buildProxy(grid, rows, top)
     end
   end
   return p
+end
+
+-- CONSTRUCTION signal (offense-volume lever): the most same-color material massed in
+-- the low build region. chainPotential only sees a combo ONE swap away; this gives a
+-- gradient from several swaps out, so the bot ACCUMULATES a color toward a 4+ combo
+-- instead of firing every small clear (the 4→22/min gap). Capped so it doesn't hoard
+-- one color forever. Gated to the safe-build context in decide().
+local function comboLoad(grid, top)
+  local cnt = { 0, 0, 0, 0, 0, 0 }
+  local hi = math.min(top, 6)
+  for r = 1, hi do
+    for c = 1, WIDTH do
+      local v = grid[r][c]
+      if v >= 1 and v <= 6 then cnt[v] = cnt[v] + 1 end
+    end
+  end
+  local best = 0
+  for i = 1, 6 do if cnt[i] > best then best = cnt[i] end end
+  return math.min(best, 8)
 end
 
 -- positional value of a settled board (no immediate attack): build proxy + survival
@@ -219,6 +241,7 @@ function SearchBrain:decide(state)
   -- chain-building when fully safe.
   local digSafeScale = (buried < 0) and cfg.digWhenSafe or 1
   local safeBuild = (buried < 0 and incoming == 0 and not hasGb) -- low, no threat = free to build
+  local baseComboLoad = (safeBuild and cfg.construct > 0) and comboLoad(baseGrid, top) or 0 -- construction ref
   local chainSafeScale = safeBuild and cfg.chainDepthWhenSafe or 1
 
   -- DIG PLAN: when garbage is present, find the first move of a short (≤3-move,
@@ -276,6 +299,13 @@ function SearchBrain:decide(state)
     if cfg.patience > 0 and safeBuild and total > 0 and firstClear < 4 and chain < 2 then
       local room = cfg.heightBand[1] - gH
       if room > 0 then score = score - cfg.patience * cfg.comboUnit * 0.5 * math.min(room, 3) end
+    end
+    -- CONSTRUCTION: reward swaps that MASS same-color material toward a 4+ combo (delta
+    -- vs the base board, so neutral swaps match holding). Gated to safe-build; this is
+    -- the offense-volume gradient chainPotential's 1-swap horizon can't give. (experimental
+    -- weight, tuning on offenseGate.)
+    if safeBuild and cfg.construct > 0 then
+      score = score + (comboLoad(g, math.min(rows, gH + 1)) - baseComboLoad) * cfg.construct
     end
     if garbageCleared > 0 then                                                        -- dig dominates when buried
       score = score + garbageCleared * (6 + incoming + dangerBonus) * cfg.w_breakGarbage * digSafeScale

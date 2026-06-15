@@ -13,6 +13,17 @@ local GameModes = require("common.data.GameModes")
 local TeamUtils = require("common.data.TeamUtils")
 local consts = require("common.engine.consts")
 
+-- Reproduction-grade logging: single greppable `REPRO <event> k=v ...` lines on
+-- lobby/match lifecycle so a scenario can be rebuilt from the server log — room
+-- shape, stable publicIds, player selections, and the match SEED (the one thing
+-- replays-don't-cover that you can't otherwise recover). Additive; never alters
+-- behavior. Callers pass an already-formatted, nil-safe field string.
+local function reproLog(event, fields)
+  logger.info("REPRO " .. event .. " " .. fields)
+end
+
+local function publicIdOf(p) return p and (p.publicPlayerID or p.publicId) end
+
 ---@alias roomNumber integer
 
 -- Object that represents a current session of play between two connections
@@ -179,6 +190,10 @@ function(self, roomNumber, players, gameMode, leaderboard, clock)
     self.ranked = false
     self.rankedReasons = {"Room has no leaderboard"}
   end
+
+  reproLog("room_create", string.format("room=%s mode=%s modeId=%s maxPlayers=%s open=%s host=%s",
+    tostring(self.roomNumber), tostring(self.gameMode and self.gameMode.name), tostring(self.gameModeId),
+    tostring(self.maxPlayers), tostring(self.openRoom), tostring(publicIdOf(self.players[1]))))
 
   return self
 end
@@ -409,6 +424,8 @@ function Room:addPlayer(player, slotNumber)
   self:emitSignal("playerJoined", player)
 
   logger.info("Player " .. player.name .. " joined room " .. self.roomNumber .. " as player " .. playerIndex)
+  reproLog("join", string.format("room=%s id=%s name=%s slot=%s",
+    tostring(self.roomNumber), tostring(publicIdOf(player)), tostring(player.name), tostring(playerIndex)))
   return true
 end
 
@@ -439,6 +456,14 @@ function Room:onPlayerSettingsUpdate(player)
         i, tostring(p.name), tostring(p.wantsReady), tostring(p.loaded), tostring(p.ready), tostring(ServerPlayer.isReady(p)))
     end
     logger.info("Room " .. self.roomNumber .. " readiness after " .. tostring(player.name) .. " update: " .. table.concat(readyParts, " "))
+
+    local reproParts = {}
+    for i, p in self:eachPlayer() do
+      reproParts[#reproParts + 1] = string.format("slot%d=%s:%s[ready=%s char=%s panel=%s lvl=%s]",
+        i, tostring(publicIdOf(p)), tostring(p.name), tostring(ServerPlayer.isReady(p)),
+        tostring(p.character), tostring(p.panels_dir), tostring(p.level))
+    end
+    reproLog("ready", "room=" .. tostring(self.roomNumber) .. " " .. table.concat(reproParts, " "))
 
     -- Match start: every player currently in the room must be ready, and the
     -- roster must meet the mode's minimum. Open-FFA and invite games share the
@@ -598,6 +623,15 @@ function Room:start_match()
 
   self.game = ServerGame.createFromRoomState(self, densePlayers)
   self:resetForNewMatch()
+
+  local rosterParts = {}
+  for i, p in self:eachPlayer() do
+    rosterParts[#rosterParts + 1] = string.format("%s:%s:%s:%s:%s",
+      tostring(publicIdOf(p)), tostring(p.name), tostring(p.character), tostring(p.panels_dir), tostring(p.level))
+  end
+  reproLog("match_start", string.format("room=%s match=%s seed=%s mode=%s roster=[%s]",
+    tostring(self.roomNumber), tostring(self.matchCount), tostring(self.game and self.game.seed),
+    tostring(self.gameMode and self.gameMode.name), table.concat(rosterParts, ",")))
 
   local replay = self.game:getPartialReplay(false)
   -- games generated via createFromRoomState always have a replay
@@ -1623,6 +1657,9 @@ function Room:_finalizeMatch()
 
   self:updateWinCounts(self.game)
   logger.info(self.roomNumber .. " " .. self.name .. " match " .. self.matchCount .. " ended with winner " .. (self.game.winnerIndex or ""))
+  reproLog("match_end", string.format("room=%s match=%s winnerId=%s winnerIdx=%s",
+    tostring(self.roomNumber), tostring(self.matchCount),
+    tostring(self.game and self.game.winnerId), tostring(self.game and self.game.winnerIndex)))
   self:emitSignal("matchEnd", self.game)
 
   if self.game.ranked and self.game.winnerId then
@@ -1945,6 +1982,8 @@ function Room:_removeFromPlayersAndAnnounce(leaver)
     self.players[leaverSlot] = nil
     self.win_counts[leaverSlot] = nil
   end
+  reproLog("leave", string.format("room=%s id=%s name=%s slot=%s",
+    tostring(self.roomNumber), tostring(publicIdOf(leaver)), tostring(leaver and leaver.name), tostring(leaverSlot)))
   -- Teams are no longer valid (player count changed). team_win_counts stays so
   -- the per-team scoreboard keeps showing matches that already happened.
   self.teams = nil

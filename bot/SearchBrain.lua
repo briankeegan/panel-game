@@ -241,7 +241,12 @@ function SearchBrain:decide(state)
   -- chain-building when fully safe.
   local digSafeScale = (buried < 0) and cfg.digWhenSafe or 1
   local safeBuild = (buried < 0 and incoming == 0 and not hasGb) -- low, no threat = free to build
-  local baseComboLoad = (safeBuild and cfg.construct > 0) and comboLoad(baseGrid, top) or 0 -- construction ref
+  -- OFFENSE-SAFE: no immediate threat and not over the top band — the normal BUILDING
+  -- state INCLUDING at the band. The offense knobs (patience/construct) gate on THIS;
+  -- they were gated on safeBuild (buried<0 = BELOW the band), which the bot is rarely in
+  -- once it builds up, so they almost never fired (measured: inert vs default).
+  local offenseSafe = (incoming == 0 and not hasGb and maxH < cfg.heightBand[2])
+  local baseComboLoad = (offenseSafe and cfg.construct > 0) and comboLoad(baseGrid, top) or 0 -- construction ref
   local chainSafeScale = safeBuild and cfg.chainDepthWhenSafe or 1
 
   -- DIG PLAN: when garbage is present, find the first move of a short (≤3-move,
@@ -296,15 +301,15 @@ function SearchBrain:decide(state)
     -- material when we're safe with room to build. Suppress it (scaled by remaining room)
     -- so holding/setup wins and the stack builds toward a 4+ combo. Relaxes as height
     -- climbs (height control reclaims priority); never fires when buried/under fire.
-    if cfg.patience > 0 and safeBuild and total > 0 and firstClear < 4 and chain < 2 then
-      local room = cfg.heightBand[1] - gH
+    if cfg.patience > 0 and offenseSafe and total > 0 and firstClear < 4 and chain < 2 then
+      local room = cfg.heightBand[2] - gH -- build toward the TOP band before firing small clears
       if room > 0 then score = score - cfg.patience * cfg.comboUnit * 0.5 * math.min(room, 3) end
     end
     -- CONSTRUCTION: reward swaps that MASS same-color material toward a 4+ combo (delta
     -- vs the base board, so neutral swaps match holding). Gated to safe-build; this is
     -- the offense-volume gradient chainPotential's 1-swap horizon can't give. (experimental
     -- weight, tuning on offenseGate.)
-    if safeBuild and cfg.construct > 0 then
+    if offenseSafe and cfg.construct > 0 then
       score = score + (comboLoad(g, math.min(rows, gH + 1)) - baseComboLoad) * cfg.construct
     end
     if garbageCleared > 0 then                                                        -- dig dominates when buried

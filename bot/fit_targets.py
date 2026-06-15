@@ -34,6 +34,15 @@ def board_targets(corpus, sample):
     swaps = clears = 0
     heights = []
     gb_frames = total = 0
+    # CLOCK/TIMING signals (Brian: "stoptime accumulation + more"; bot: eta/displacement).
+    # eta-reaction = the behavioral signature of clock-awareness: do they act in the
+    # window BEFORE incoming lands vs only after. All computable from existing rows
+    # (incoming[].eta, displacement, danger). stopTime needs a re-emit (added to parseReplays).
+    danger_frames = 0
+    imm_frames = imm_acts = 0     # frames with incoming about to land (min eta < ETA_SOON)
+    calm_frames = calm_acts = 0   # frames with NO incoming
+    disp_sum = 0.0
+    ETA_SOON = 90  # ~1.5s
     for fp in files:
         try:
             rows = [json.loads(l) for l in gzip.open(fp, "rt")]
@@ -66,6 +75,17 @@ def board_targets(corpus, sample):
             elif m == 0:
                 in_clear = False
             prevGb = gb
+            # --- clock/timing signals ---
+            act = 1 if dec in ("SWAP", "RAISE") else 0
+            if r.get("danger"):
+                danger_frames += 1
+            disp_sum += r.get("displacement") or 0
+            incoming = r.get("incoming") or []
+            etas = [g["eta"] for g in incoming if g.get("eta") and g["eta"] > 0]
+            if not incoming:
+                calm_frames += 1; calm_acts += act
+            elif etas and min(etas) < ETA_SOON:
+                imm_frames += 1; imm_acts += act
     # per-bucket rates, occupancy-weighted (skip <1% cells — §26)
     buckets = {}
     tot = sum(cell[k]["frames"] for k in cell) or 1
@@ -86,6 +106,17 @@ def board_targets(corpus, sample):
         "height_med": med(heights),
         "height_p90": sorted(heights)[int(0.9 * (len(heights) - 1))] if heights else None,
         "garbage_on_board_pct": round(100 * gb_frames / total, 1) if total else None,
+        "timing": {
+            # eta-reaction: act-rate when incoming is imminent vs when calm. The gap
+            # (imminent - calm) is the anticipation signature — clock-aware play.
+            "act_imminent_pct": round(100 * imm_acts / imm_frames, 2) if imm_frames else None,
+            "act_calm_pct": round(100 * calm_acts / calm_frames, 2) if calm_frames else None,
+            "anticipation": (round(100 * imm_acts / imm_frames - 100 * calm_acts / calm_frames, 2)
+                             if imm_frames and calm_frames else None),
+            "danger_pct": round(100 * danger_frames / total, 2) if total else None,
+            "displacement_mean": round(disp_sum / total, 3) if total else None,
+            # stopTime density fills in once parseReplays re-emits stopTime (added).
+        },
         "n_games": len(files),
     }
 

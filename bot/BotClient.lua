@@ -44,7 +44,8 @@ local BotClient = class(function(self, opts)
   self.ip = opts.ip or "127.0.0.1"
   self.port = opts.port or 49569
   self.name = opts.name or "BotBella"
-  self.brainKind = opts.brain or "heuristic"   -- "heuristic" | "random"
+  self.brainKind = opts.brain or "heuristic"   -- "heuristic" | "random" | "model"
+  self.modelDir = opts.modelDir                 -- required when brain == "model"
   self.difficulty = opts.difficulty or "medium" -- "easy" | "medium" | "hard" (cursor-speed/reaction cap)
   self.gameplay = TcpClient({ name = "bot-gameplay", defaultPort = self.port })
   -- Persisted server identity so re-runs reuse the same account instead of
@@ -252,8 +253,12 @@ function BotClient:startMatch()
     error("bot[" .. self.name .. "]: no stack at slot " .. tostring(self.localPlayerNumber))
   end
   self.myStack.is_local = true
-  if self.brainKind == "heuristic" then
-    self.brain = require("bot.HeuristicBrain").new()
+  if self.brainKind == "heuristic" or self.brainKind == "model" then
+    if self.brainKind == "model" then
+      self.brain = require("bot.ModelBrain").load(assert(self.modelDir, "bot: brain='model' requires modelDir"))
+    else
+      self.brain = require("bot.HeuristicBrain").new()
+    end
     self.controller = require("bot.CursorController").new(self.difficulty)
     self.boardState = require("bot.BoardState")
   end

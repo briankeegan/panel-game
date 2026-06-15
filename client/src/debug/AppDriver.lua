@@ -1,8 +1,30 @@
 -- Dev e2e harness: drives the REAL app with synthesized key presses — nothing
--- is shortcut-loaded. From boot it walks the actual scenes through the real
--- input system: Main Menu -> Replay Browser -> open the target replay ->
--- spectator -> (optional) pause -> "Play as" -> take over -> play, screenshotting
--- along the way. Inert unless PA_AUTO_REPLAY is set.
+-- is shortcut-loaded. Two ways to use it:
+--
+-- A) INTERACTIVE (PA_CMD_FILE) — a long-running headless instance you control
+--    live. Append commands to the shared file; the game consumes them each poll,
+--    runs them through the real input system, and appends results to PA_OUT_FILE.
+--    You can keep sending follow-ups (taps, screenshots, back out) while it runs,
+--    or seed the file up front for one-and-forget.
+--      PA_CMD_FILE=/tmp/pa_cmd.txt PA_OUT_FILE=/tmp/pa_out.txt zsh run_client.sh Lala
+--    Command grammar (one per line; '#' = comment):
+--      tap <key>           one key tap (return/escape/up/down/left/right/f2/a-z)
+--      hold <key> <frames> press, hold N frames, release (claim a device etc.)
+--      menusel <label>     move the current menu's cursor to a loc-key/label item
+--                          and press Return (e.g. `menusel mm_1_vs`, `menusel og stuff`)
+--      waitscene <name> [t] block until that scene is active (t = timeout frames)
+--      wait <frames>       idle
+--      shoot [name]        screenshot to <name>.png in the shared save dir
+--      f2                  screenshot via the real F2 shortcut
+--      scene               report the current scene name to the out file
+--      run <MACRO>         expand a named macro (TO_MENU / VS_SELF / REPLAYS ...)
+--      quit                stop the instance
+--    Results land in PA_OUT_FILE as `reached <scene>`, `shot=<abs path>`, etc.
+--
+-- B) SCRIPTED (PA_AUTO_REPLAY / PA_AUTO_ONLINE_ROOM) — one-and-forget journeys.
+--    From boot it walks the scenes: Main Menu -> Replay Browser -> open the target
+--    replay -> spectator -> (optional) pause -> "Play as" -> take over -> play,
+--    screenshotting along the way.
 --
 -- Env (PA_AUTO_REPLAY is the on switch; everything else is optional):
 --   PA_AUTO_REPLAY="replays/v049/2026/06/14/<folder>/<file>.json"  target replay.
@@ -60,10 +82,36 @@ end
 
 function AppDriver.isEnabled()
   return os.getenv("PA_AUTO_REPLAY") ~= nil or os.getenv("PA_AUTO_ONLINE_ROOM") ~= nil
+    or os.getenv("PA_CMD_FILE") ~= nil
 end
 
 function AppDriver.init()
   if not AppDriver.isEnabled() then return end
+
+  -- INTERACTIVE mode: a long-running headless instance driven live through a
+  -- shared command file. Append commands to PA_CMD_FILE; each poll the game reads
+  -- and TRUNCATES it (consuming them), runs them through the real input system,
+  -- and appends results (scene=, shot=<abs path>) to PA_OUT_FILE. Stays running
+  -- so you can keep sending follow-ups; `quit` (or PA_AUTO_QUIT default) stops it.
+  -- See the command grammar + macros below. This branch returns early.
+  local cmdFile = os.getenv("PA_CMD_FILE")
+  if cmdFile then
+    st = {
+      interactive = true,
+      cmdFile = cmdFile,
+      outFile = os.getenv("PA_OUT_FILE"),
+      q = {}, busy = 0, hold = nil, waitScene = nil, menusel = nil, shotSeq = 0,
+      tapGap = tonumber(os.getenv("PA_TAP_GAP")) or 8,
+      pollEvery = tonumber(os.getenv("PA_POLL_EVERY")) or 6,
+      clicks = buildClicks(os.getenv("PA_AUTO_INPUT"), tonumber(os.getenv("PA_AUTO_INPUT_HOLD"))), clickIdx = 1,
+      trace = os.getenv("PA_AUTO_TRACE") ~= nil, traceEvery = tonumber(os.getenv("PA_AUTO_TRACE")) or 15, traceSeq = 0,
+      frame = 0, cooldown = 0, releaseKey = nil,
+    }
+    local w = io.open(cmdFile, "w"); if w then w:close() end -- start from an empty queue
+    if st.outFile then local o = io.open(st.outFile, "w"); if o then o:close() end end
+    print("PA_CMD: interactive armed | cmd=" .. cmdFile .. " out=" .. tostring(st.outFile))
+    return
+  end
 
   -- ONLINE mode: drive the real client to JOIN A ROOM and play (e.g. the bot's
   -- room) instead of opening a replay. PA_AUTO_ONLINE_ROOM=<n> is the switch;
@@ -183,6 +231,124 @@ local function feedClicks()
       e:receiveConfirmedInput(st.clicks[st.clickIdx]); st.clickIdx = (st.clickIdx % #st.clicks) + 1
     end
   end
+end
+
+-- ===================== INTERACTIVE COMMAND CHANNEL =====================
+-- The shared "panel-game" save dir, where captureScreenshot actually writes
+-- (love's write dir ignores per-player identity here — the save-dir collision).
+local function sharedDir()
+  return love.filesystem.getSaveDirectory():gsub("/[^/]+$", "/panel-game")
+end
+
+-- Append a result line to the out file (and echo to the log) so the caller can
+-- watch what happened: reached scenes, screenshot paths, errors.
+local function writeOut(line)
+  print("PA_CMD: " .. line)
+  if st.outFile then
+    local f = io.open(st.outFile, "a"); if f then f:write(line .. "\n"); f:close() end
+  end
+end
+
+-- "tap return", "hold z 20", "menusel og stuff" -> {op=, rest=, args={...}}.
+-- rest keeps spaces (for labels); args is rest split on whitespace (for numbers).
+local function parseLine(line)
+  local op, rest = line:match("^(%S+)%s*(.-)%s*$")
+  local args = {}
+  for w in (rest or ""):gmatch("%S+") do args[#args + 1] = w end
+  return { op = op, rest = rest or "", args = args }
+end
+
+-- Reusable named keystroke/step sequences. `run <NAME>` expands one inline. Add
+-- journeys here once, reuse them everywhere (these are the ENTER_REPLAY-style
+-- constants). Smart steps (menusel/waitscene) make them robust to cursor start.
+local MACROS = {
+  -- boot/title -> Main Menu (title advances on any key; a 2nd Return would
+  -- instead activate the menu's first item, so tap exactly once)
+  TO_MENU  = { "tap return", "waitscene MainMenu 1800" },
+  -- Main Menu -> 1P-VS-Self character select (lives under the "og stuff" submenu)
+  VS_SELF  = { "menusel og stuff", "menusel mm_1_vs", "waitscene CharacterSelectVsSelf 600" },
+  -- Main Menu -> Replay Browser
+  REPLAYS  = { "menusel mm_replay_browser", "waitscene ReplayBrowser 600" },
+}
+
+local function enqueueFront(lines)
+  for i = #lines, 1, -1 do table.insert(st.q, 1, parseLine(lines[i])) end
+end
+
+-- captureScreenshot writes async at end of frame; report the absolute path.
+local function doShoot(name)
+  st.shotSeq = st.shotSeq + 1
+  if not name or name == "" then name = string.format("shot_%03d", st.shotSeq) end
+  if not name:match("%.png$") then name = name .. ".png" end
+  love.graphics.captureScreenshot(name)
+  writeOut("shot=" .. sharedDir() .. "/" .. name)
+end
+
+-- Step the current scene's menu cursor to a labelled item, one tap per tick,
+-- pressing Return on arrival. Spans frames; cleared when done or not found.
+local function stepMenusel()
+  local s = scene()
+  local menu = s and s.menu
+  if not (menu and menu.menuItems) then
+    st.menusel.timeout = st.menusel.timeout - 1
+    if st.menusel.timeout <= 0 then writeOut("menusel: no menu in " .. tostring(sceneName())); st.menusel = nil end
+    return
+  end
+  local target = menuItemIndexByLabel(menu, st.menusel.label)
+  if not target then writeOut("menusel: '" .. st.menusel.label .. "' not in " .. tostring(sceneName())); st.menusel = nil; return end
+  if stepCursorTo(menu.selectedIndex, target, "down", "up") then
+    tap("return"); writeOut("menusel: selected " .. st.menusel.label); st.menusel = nil
+  end
+  st.busy = st.tapGap -- pace cursor steps so each tap registers
+end
+
+local function execCommand(c)
+  local op, args, rest = c.op, c.args, c.rest
+  if op == "tap" or op == "key" then tap(args[1]); st.busy = st.tapGap
+  elseif op == "f2" then tap("f2"); st.busy = st.tapGap; writeOut("f2 -> " .. sharedDir() .. "/screenshots/")
+  elseif op == "hold" then inputManager:keyPressed(args[1]); st.hold = { key = args[1], frames = tonumber(args[2]) or 15 }
+  elseif op == "shoot" then doShoot(rest)
+  elseif op == "menusel" then st.menusel = { label = rest, timeout = 600 }
+  elseif op == "waitscene" then st.waitScene = { name = args[1], timeout = tonumber(args[2]) or 1800 }
+  elseif op == "wait" then st.busy = tonumber(args[1]) or 30
+  elseif op == "scene" then writeOut("scene=" .. tostring(sceneName()))
+  elseif op == "run" then local m = MACROS[args[1]]; if m then enqueueFront(m) else writeOut("unknown macro: " .. tostring(args[1])) end
+  elseif op == "quit" then writeOut("quit"); love.event.quit()
+  else writeOut("unknown cmd: " .. tostring(op)) end
+end
+
+-- Drain the command file into the queue, then truncate it (consume).
+local function pollCmdFile()
+  local f = io.open(st.cmdFile, "r"); if not f then return end
+  local content = f:read("*a"); f:close()
+  if not content or content == "" then return end
+  local w = io.open(st.cmdFile, "w"); if w then w:close() end
+  for line in content:gmatch("[^\n]+") do
+    line = line:gsub("^%s+", ""):gsub("%s+$", "")
+    if line ~= "" and not line:match("^#") then st.q[#st.q + 1] = parseLine(line) end
+  end
+end
+
+-- One interactive tick: feed any gameplay clicks, poll for new commands, then
+-- advance the current blocking op (hold/menusel/waitscene/idle) or run the next.
+local function tickInteractive()
+  if st.clicks then feedClicks() end
+  if st.frame % st.pollEvery == 0 then pollCmdFile() end
+  if st.hold then
+    st.hold.frames = st.hold.frames - 1
+    if st.hold.frames <= 0 then inputManager:keyReleased(st.hold.key); st.hold = nil end
+    return
+  end
+  if st.menusel then stepMenusel(); return end
+  if st.waitScene then
+    st.waitScene.timeout = st.waitScene.timeout - 1
+    if sceneName() == st.waitScene.name then writeOut("reached " .. st.waitScene.name); st.waitScene = nil
+    elseif st.waitScene.timeout <= 0 then writeOut("waitscene TIMEOUT " .. st.waitScene.name .. " (now " .. tostring(sceneName()) .. ")"); st.waitScene = nil
+    else return end
+  end
+  if st.busy and st.busy > 0 then st.busy = st.busy - 1; return end
+  local c = table.remove(st.q, 1)
+  if c then execCommand(c) end
 end
 
 local PHASES = {}
@@ -364,9 +530,12 @@ function AppDriver.update()
   -- Skip the boot loading screen; capture from the title/menu on.
   local sn = sceneName()
   if st.trace and sn and sn ~= "BootScene" and st.frame % st.traceEvery == 0 then
-    love.graphics.captureScreenshot(string.format("e2e_%04d_%s.png", st.traceSeq, st.phase))
+    love.graphics.captureScreenshot(string.format("e2e_%04d_%s.png", st.traceSeq, st.phase or "live"))
     st.traceSeq = st.traceSeq + 1
   end
+
+  if st.interactive then tickInteractive(); return end
+
   if st.cooldown > 0 then st.cooldown = st.cooldown - 1; return end
 
   st.safety = st.safety + 1

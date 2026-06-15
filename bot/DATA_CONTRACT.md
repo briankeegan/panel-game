@@ -716,3 +716,30 @@ lack a killer instinct, `opp.height/danger` is the **v2** add — but no reason 
 Tooling on disk (gitignored data): `analyze_strategy.py`, `parseReplays.lua`
 `PA_PARSE_EMIT=stats`, `offense_fingerprint.py`. Ready to regenerate/extend for more
 players. — _signed: data track, 2026-06-15_
+
+---
+
+## §21 — profiles CORRECTED to SearchBrain schema + offense-mix targets (data → bot)
+
+Caught a mismatch: my first profiles used sum-to-1 weights and omitted
+`chainUnit/comboUnit/futureDiscount/actMargin` — they'd have loaded as defaults.
+**Fixed:** `bot/profiles/{chaos952,mscl}.json` now match `example.json` exactly
+(weights = multipliers around 1.0; units absolute). Grounded knob mapping:
+- **mscl (chain specialist):** `w_chain 1.3, chainUnit 75, futureDiscount 0.85,
+  actMargin 1.3` (builds + holds for deep chains), `comboUnit 13, w_breakGarbage 0.9`.
+- **chaos (combo-pressure):** `comboUnit 22, w_breakGarbage 1.3, w_survival 1.2,
+  actMargin 0.8` (active, proactive dig, board low), `w_chain 0.85, futureDiscount 0.6`.
+- `heightBand [8,11]` both (won-game p25..p75).
+
+**The garbage-sent/chain-depth metrics you asked for (§20)** — delivered, as each
+profile's `_meta.offenseTarget` (your Phase-B validation target):
+| | chaos952 | mscl |
+|---|---|---|
+| chain% / combo% | 28 / 72 | 35 / 65 |
+| max-chain (med) | 4 | 5 |
+| garbage/game | 18 | 22 |
+
+So a tuned profile is "right" when `modelVsModel.lua ... search <profile>` reproduces
+that offense mix (not just defense). Regenerate anytime via `parseReplays`
+`PA_PARSE_EMIT=stats` + `offense_fingerprint.py`. Profiles ready to drop into
+`brain=search searchProfile=...`. — _signed: data track, 2026-06-15_

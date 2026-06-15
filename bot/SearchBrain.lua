@@ -40,6 +40,9 @@ local DEFAULTS = {
   digWhenSafe = 1.0,        -- [0..2] dig-reward multiplier when not buried (proactive dig)
   chainDepthWhenSafe = 1.0, -- [0..2] chain-build multiplier when fully safe (deeper chains)
   counterPressure = 0.0,    -- [0..1] offense kept while BURIED (attack-while-defending); 0 = robust
+  patience = 0.0,           -- [0..1] when safe+low, SUPPRESS no-offense clears (1/2/3-match) so it
+                            -- BUILDS toward a 4+ combo instead of firing every small clear (the
+                            -- offense-volume fix). 0 = current behavior (fire freely).
 }
 
 function SearchBrain.new(opts)
@@ -214,7 +217,8 @@ function SearchBrain:decide(state)
   -- digWhenSafe tunes proactive (not-buried) digging; chainDepthWhenSafe tunes deeper
   -- chain-building when fully safe.
   local digSafeScale = (buried < 0) and cfg.digWhenSafe or 1
-  local chainSafeScale = (buried < 0 and incoming == 0 and not hasGb) and cfg.chainDepthWhenSafe or 1
+  local safeBuild = (buried < 0 and incoming == 0 and not hasGb) -- low, no threat = free to build
+  local chainSafeScale = safeBuild and cfg.chainDepthWhenSafe or 1
 
   -- DIG PLAN: when garbage is present, find the first move of a short (≤3-move,
   -- region-bounded beam) swap sequence that breaks it. We don't override the normal
@@ -261,6 +265,14 @@ function SearchBrain:decide(state)
     if firstClear >= 4 then score = score + (firstClear - 3) * cfg.comboUnit * offenseScale * freeOffense end
     -- extend the active chain: while chaining, any clear we land continues the cascade
     if extending > 0 and total > 0 then score = score + total * cfg.chainUnit * cfg.w_chain * 0.6 end
+    -- PATIENCE (build-vs-clear): a clear that sends NOTHING (no combo, no chain) is spent
+    -- material when we're safe with room to build. Suppress it (scaled by remaining room)
+    -- so holding/setup wins and the stack builds toward a 4+ combo. Relaxes as height
+    -- climbs (height control reclaims priority); never fires when buried/under fire.
+    if cfg.patience > 0 and safeBuild and total > 0 and firstClear < 4 and chain < 2 then
+      local room = cfg.heightBand[1] - gH
+      if room > 0 then score = score - cfg.patience * cfg.comboUnit * 0.5 * math.min(room, 3) end
+    end
     if garbageCleared > 0 then                                                        -- dig dominates when buried
       score = score + garbageCleared * (6 + incoming + dangerBonus) * cfg.w_breakGarbage * digSafeScale
     end

@@ -21,7 +21,24 @@ local IDENTITY_DIR = "bot/identities"
 -- wire prefixes
 local I_PREFIX = NetworkProtocol.clientMessageTypes.playerInput.prefix -- "I"
 local D_PREFIX = NetworkProtocol.clientMessageTypes.deathEvent.prefix  -- "D"
+local Y_PREFIX = NetworkProtocol.clientMessageTypes.displayEvent.prefix -- "Y" (display snapshot)
 local SRV_D_PREFIX = NetworkProtocol.serverMessageTypes.deathEvent.prefix -- "D" (relayed)
+
+-- Display-snapshot shipping so a HUMAN sees the bot's board (opponents render
+-- from snapshots, not from inputs). DisplayEventCapture ships via
+-- GAME.netClient:sendDisplayEvents; we route by batch.from (publicId) to the
+-- owning bot's socket so multiple bots can share one process.
+local displayRegistry = {}
+local function ensureDisplayNetClient()
+  if GAME.netClient then return end
+  GAME.netClient = {
+    sendDisplayEvents = function(_, batch)
+      local bot = batch and batch.from and displayRegistry[batch.from]
+      if bot then bot:_shipDisplaySnapshot(batch) end
+    end,
+    flushDisplayEvents = function() end,
+  }
+end
 
 -- Phase-0 placeholder "brain": random input biased to fill the board so a
 -- bot-vs-bot match tops out within seconds. Replaced by the real decide() +
@@ -138,6 +155,7 @@ function BotClient:login()
   end
 
   self.publicId = value.publicId
+  if self.publicId then displayRegistry[self.publicId] = self end
   if value.new_user_id then
     self.userId = value.new_user_id
     self:writeIdentity(self.userId)
@@ -220,7 +238,21 @@ end
 
 function BotClient:createRoom(gameMode, openRoom)
   logger.info("bot[" .. self.name .. "]: creating room (" .. gameMode.name .. ")")
-  self.gameplay:sendRequest(ClientProtocol.sendRoomRequest(gameMode, "normal", openRoom, false))
+  -- displayHistoryEnabled=true so opponents (humans) render the bot from snapshots.
+  self.gameplay:sendRequest(ClientProtocol.sendRoomRequest(gameMode, "normal", openRoom, true))
+end
+
+-- Pack + send one display snapshot as a Y message on this bot's socket.
+function BotClient:_shipDisplaySnapshot(batch)
+  local ffiGuard = require("client.src.network.DisplaySnapshotFFI")
+  local util = require("client.src.network.DisplaySnapshotUtil")
+  local payload
+  if ffiGuard.FFI_SUPPORTED and batch.from and batch.snapshot then
+    payload = util.pack_snapshot(batch.from, batch.snapshot)
+  end
+  if not payload then payload = json.encode(batch) end
+  self.gameplay:send(NetworkProtocol.markedMessageForTypeAndBody(Y_PREFIX, payload))
+  self._displaySendCount = (self._displaySendCount or 0) + 1
 end
 
 function BotClient:joinRoom(roomNumber, slotNumber)
@@ -262,6 +294,12 @@ function BotClient:startMatch()
     self.controller = require("bot.CursorController").new(self.difficulty)
     self.boardState = require("bot.BoardState")
   end
+  -- Display-snapshot capture so a human opponent sees the bot's board.
+  ensureDisplayNetClient()
+  displayRegistry[self.publicId or 0] = self
+  self.capture = require("client.src.network.DisplayEventCapture").new(self.myStack, self.publicId or self.localPlayerNumber, self.myStack, nil)
+  self.capture:start()
+
   self.scheduledStartMs = socket.gettime() * 1000 + (self.matchStart.startInMs or 500)
   self.matchEnded = false
   self.deathSent = false
@@ -294,6 +332,9 @@ function BotClient:tickMatch()
 
   self.match:run()
 
+  -- Ship a display snapshot (rate-limited internally) so the human sees the board.
+  if self.capture then self.capture:tick() end
+
   if (stack.game_over_clock or -1) > 0 and not self.deathSent then
     self.deathSent = true
     logger.info(string.format("bot[%s]: topped out at frame %d -> sending D", self.name, stack.game_over_clock))
@@ -304,6 +345,7 @@ function BotClient:tickMatch()
   if (self.deathSent or self.oppDied) and not self._resultReported then
     self._resultReported = true
     self.matchEnded = true
+    if self.capture then self.capture:stop(); self.capture = nil end
     self.outcome = self.oppDied and "won" or "lost"
     logger.info(string.format("bot[%s]: match over -> %s", self.name, self.outcome))
     pcall(function() self.gameplay:sendRequest(ClientProtocol.reportLocalGameResult(self.outcome)) end)

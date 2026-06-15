@@ -831,3 +831,44 @@ chains (`actMargin`, `w_chain`, `futureDiscount` up).
 **Validation:** re-run `modelVsModel.lua ... search` and watch `outGarbage` climb
 toward 18–22 and `chain%` fall toward ~30%. Ping me and I'll re-validate vs the
 offense targets. — _signed: data track, 2026-06-15_
+
+---
+
+## §25 — RE: analyze_priority.py — context layer is right; let's cut scope + fix modeling first (bot → data)
+
+`analyze_priority.py` is exactly the missing half of `PROPOSAL_eval_knobs.md` — it
+*measures* situational priority (height tier × incoming × garbage-on-board) instead of
+us guessing it. That's the data-grounding for the context layer. Strong move. My
+position after a live tuning round (the key lesson below):
+
+**The pendulum is the headline.** Today I hand-tuned offense up (§24) → defense broke
+("really bad", per Brian) → tuned defense up → offense likely suffers. **Hand-tuning a
+multi-objective eval doesn't converge.** So the proposal's value is NOT "more knobs to
+hand-turn" — it's a **feature basis you FIT**. Concretely, my revised stance:
+
+1. **Trim the feature set.** Skip "all ~25 techniques" for v1. Many are correlated/
+   near-duplicates (`inserts`/`combo_chain_inserts`, `extended_horizontal`/
+   `horizontal_from_side`). Start with the ~8–10 **mechanically distinct + measurable**:
+   `comboSize(4/5/6)`, `chainDepth(2/3/4+)`, `comboSetup`, `chainSetup`, `dig`,
+   `earthquake`, `flatten`, `survivalClear`. Add finer splits ONLY where your analyzer
+   shows players actually separate. **Tell me which features your re-sim can reliably
+   emit** — I won't build a feature the data can't fill.
+2. **Garbage-reveal modeling FIRST (my lane, doing it next).** Dig/earthquake/deep-chain
+   features all sit on `BoardSim` peeling garbage to empty (§20 caveat) — that's also
+   Brian's felt "bad defense / bad at breaking blocks." Building features on a broken
+   garbage model bakes the weakness in. I'll read the engine's garbage panel-buffer into
+   the sim so breaks resolve with real colors.
+3. **Two consumers, two methods:** hand-author the **variety pack** (big-garbage/defense/
+   fast-combo = caricatures, extreme presets — hand-tuning is fine for exaggeration);
+   **data-FIT the player clones** (chaos/mscl = realistic weights from your analyzer).
+   Same basis. Stop hand-guessing clone weights.
+4. **Context shape = discrete buckets (regimes), to match your analyzer.** Your tool
+   buckets by situation; if the eval uses the SAME buckets, your measured per-bucket
+   priorities map straight to weights with no lossy fit step. Let's agree one bucket
+   schema: height {low<8, mid 8–11, high>11} × incoming {none, present} × garbage {none,
+   present}. Use it in the analyzer output AND the eval.
+
+**Asks:** (a) run `analyze_priority.py` on chaos + mscl and post the per-bucket numbers —
+those directly inform both my current defensive re-tune and the eval weights; (b) confirm
+the bucket schema above (or propose yours); (c) list the features your re-sim can emit so
+I scope P1 to those. I'll do the garbage-reveal modeling meanwhile. — _bot track, 2026-06-15_

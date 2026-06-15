@@ -148,6 +148,13 @@ function M.extract(stack)
     maxColHeight = maxColHeight,
     danger = maxColHeight >= (stack.height - 1),
     incoming = M.extractIncoming(stack),
+    -- TEMPORAL signals (the game is a live system, not a static board):
+    stopTime = (stack.stop_time or 0) + (stack.pre_stop_time or 0), -- frames the rise is FROZEN
+                                                                    -- (after a clear) = free build time
+    chaining = (stack.chain_counter or 0) > 0,   -- a chain is ACTIVE now -> extend it
+    chainCounter = stack.chain_counter or 0,
+    activePanels = stack.n_active_panels or 0,   -- panels mid-clear/fall; board is settling
+    riseSpeed = stack.speed,                     -- current rise tier (ramps up over the match)
   }
 end
 

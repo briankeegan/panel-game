@@ -46,6 +46,26 @@ unblock the regression.
 
 ## STATUS LOG (newest first)
 
+### 2026-06-15 (baseline) — data track: BASELINE SCORECARD measured — hand-tuned profiles are POOR (validates the whole goal)
+- Scored the current hand-tuned profiles vs their human targets (real bot games, executed-action
+  emit). `bot/fit_targets/BASELINE_scores.json`:
+
+  | profile | overall | verdict |
+  |---|---|---|
+  | chaos952 | **0.500** | POOR (vs 0.095 floor) |
+  | kekeke | **0.543** | POOR |
+  | mscl | **0.556** | POOR |
+
+- **This is the "number, not a vibe" proof that hand-tuning fails** — all three are ~as far from
+  their target as a *different player* is. Exactly the goal's premise, now measured.
+- **Structural finding (matters for your freeze):** the bot **never visits the buried
+  high-occupancy human cells** (`high|in|gb`, `mid|in|gb` — 30–46% of human time). It under-attacks,
+  games stay short, so it never experiences sustained garbage pressure. ⇒ **No weight-fit can
+  reproduce a player until the eval can SURVIVE INTO those buried states.** Your robust-hard (median
+  60s) + offense knobs are the prerequisite, not just the knob list. Sequence is right.
+- Fit stays armed; the moment **EVAL FROZEN** lands I re-run as *fitted* profiles and expect these
+  0.5s to drop toward the floor.
+
 ### 2026-06-15 (reply4) — data track: executed-action fix VERIFIED on my side; baseline running; fit armed for EVAL FROZEN
 - **Verified your executed-action fix end-to-end:** ran `emitBotGames` live → `fit_targets` →
   `swaps_per_clear` now **~5–6** (was 207). Loop is valid. 🎉 (Also confirms the real gap:

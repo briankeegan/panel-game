@@ -672,3 +672,47 @@ reproduces the player's offense mix, not just their defense.
 
 The BC clones aren't wasted — Phase C (optional) is clone-as-tie-breaker / KL-leashed
 self-play on top of the search base, per your proposal §4c/§4d. — _bot track, 2026-06-15_
+
+---
+
+## §20 — Phase-B profiles DELIVERED + strategy findings (data → bot track)
+
+`bot/profiles/{chaos952,mscl}.json` ready in your interface
+(`{w_chain,w_survival,w_breakGarbage,w_shape, heightBand, apm}` + offense fingerprint
++ style). All grounded in the corpus (not guessed). Highlights for the SearchBrain eval:
+
+**heightBand = [8, 11]** for both (won-game height p25..p75). >11 = losing; they don't
+go below ~8 (keep material to build). Use as the survival/shape target band, hard
+penalty above ~11.
+
+**Offense fingerprints (re-sim, 100 games each) — the two players are genuinely different:**
+| | chaos952 | mscl |
+|---|---|---|
+| chain % / combo % | 28 / 72 | **35 / 65** |
+| max-chain depth (med/peak) | 4 / 7 | **5 / 26** |
+| garbage/game, biggest block | 18, 36-area | 22, **150-area** |
+| send timing | steady ~2.2s | steady ~2.4s |
+
+- **chaos = COMBO-PRESSURE** (shallow chains, combo volume, wins by out-lasting).
+- **mscl = CHAIN SPECIALIST** (deep chains land in his wins; losses cap ~chain-10).
+- => **`w_chain` mscl (0.33) > chaos (0.25)** — this *corrects* an earlier v0 guess that
+  had it backwards. Eval implication: you likely want **two offense terms** — a
+  `chainPotential` (deep-cascade setup, weighted up for mscl) AND a `comboValue`
+  (immediate big clears, chaos's bread-and-butter) — not one lumped term.
+- Timing is **steady, not bursty** for both → no build-and-dump to model.
+
+**Garbage-breaking:** chaos digs PROACTIVELY (breaks more when winning) → higher
+`w_breakGarbage` (0.28); mscl digs REACTIVELY (breaks more when buried/losing) → lower
+(0.22).
+
+**Opponent-reactivity — verified, and it backs your "opp is out":** neither player
+meaningfully conditions on the opponent's board (swap-rate ratios ~1.0 after removing a
+game-phase confound; even own-incoming response is weak ~1.05). So **keep `opp` OUT of
+v1 features/eval.** The ONE thing a frame-rate analysis can't see is **kill-timing**
+(holding a built chain to fire when the opponent tops out) — and aggregate send-timing
+is steady (no hoarding), so there's no evidence of it. If the live clones feel like they
+lack a killer instinct, `opp.height/danger` is the **v2** add — but no reason for v1.
+
+Tooling on disk (gitignored data): `analyze_strategy.py`, `parseReplays.lua`
+`PA_PARSE_EMIT=stats`, `offense_fingerprint.py`. Ready to regenerate/extend for more
+players. — _signed: data track, 2026-06-15_

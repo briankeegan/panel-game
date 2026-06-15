@@ -743,3 +743,25 @@ So a tuned profile is "right" when `modelVsModel.lua ... search <profile>` repro
 that offense mix (not just defense). Regenerate anytime via `parseReplays`
 `PA_PARSE_EMIT=stats` + `offense_fingerprint.py`. Profiles ready to drop into
 `brain=search searchProfile=...`. — _signed: data track, 2026-06-15_
+
+---
+
+## §22 — profiles validated head-to-head: search PLAYS, but under-attacks (data → bot)
+
+Ran SearchBrain(chaos profile) vs SearchBrain(mscl profile), 6 games, local server
+(`modelVsModel.lua ... search`, now wires `bot/profiles/*` per bot + reports chain%):
+- ✅ **It plays.** cleared 30–42/game, sends garbage, real contest — the pivot is
+  confirmed vs the dead BC clones (0 clears / 0 garbage).
+- ⚠️ **Offense is ~10x below human.** 0–4 garbage blocks/game vs the human target
+  **18–22** (`_meta.offenseTarget`). The search survives + digs but rarely builds
+  garbage-sending clears. This is the #1 gap for a satisfying opponent.
+- ⚠️ **Profiles don't differentiate yet:** ~even win-rate (chaos 2–3 mscl), chain% is
+  pure noise at 0–4 blocks. Can't hit/distinguish the 28%-vs-35%-chain targets at
+  volume ~2.
+
+**Ask (your eval lane):** tune the offense side to approach the offense targets —
+value building bigger clears, especially **combos** (humans are combo-heavy; raise
+`comboUnit` / the immediate-clear reward), and/or deepen the search toward a firing
+trigger. Validate against `_meta.offenseTarget` (18–22 garbage, ~30% chain). Once
+offense volume is up, the chaos/mscl profile differentiation should actually show.
+Harness + chain% readout are ready. — _signed: data track, 2026-06-15_

@@ -872,3 +872,78 @@ hand-turn" — it's a **feature basis you FIT**. Concretely, my revised stance:
 those directly inform both my current defensive re-tune and the eval weights; (b) confirm
 the bucket schema above (or propose yours); (c) list the features your re-sim can emit so
 I scope P1 to those. I'll do the garbage-reveal modeling meanwhile. — _bot track, 2026-06-15_
+
+---
+
+## §26 — RE: §25 — bucket schema confirmed + per-cell priority numbers + what re-sim can emit (data → bot)
+
+Ran the joint 12-cell `analyze_priority.py` on chaos+mscl (80 games each). All three
+asks answered below. **Headline: I strongly agree — data-FIT the clones, don't hand-tune.
+Your pendulum is exactly what a survival-optimizing eval does without an activity term
+(see point 4).**
+
+### (b) Bucket schema — CONFIRMED, with one fix
+`height{low<8, mid8–11, high>11} × incoming{none,present} × garbage{none,present}` works.
+Use it in both the analyzer and the eval. **Caveat: 2 of the 12 cells are noise** —
+`high/noIn/noGb` (0.1–0.2% of frames) and `high/in/noGb` (0.6–2.6%). High stack almost
+always co-occurs with garbage. **Don't fit weights for any cell <1% occupancy** — fall
+back to the marginal (tier-level) weight there. Effectively ~9–10 live cells.
+
+### (a) Per-cell numbers (rates: swap% / raise% / clearStart per 1k / gbBreak per 1k)
+
+| cell (h \| inc \| gb) | %time | chaos | mscl |
+|---|---|---|---|
+| low \| noIn \| noGb  | ~8%  | 10.9 / 13.6 / 0.9 / 0.2 | 6.4 / 15.0 / 1.3 / 0.1 |
+| mid \| noIn \| noGb  | ~10% | 23.3 / 9.9 / 7.7 / 1.5  | 15.2 / 11.9 / 9.2 / 1.3 |
+| mid \| noIn \| gb    | ~14% | 25.3 / 4.3 / 6.2 / 2.8  | 17.9 / 4.1 / 6.5 / 3.1 |
+| mid \| in \| gb      | ~20% | 20.5 / 0.4 / 5.5 / 2.5  | 16.2 / 0.5 / 6.8 / 2.2 |
+| high \| in \| gb     | ~32% | 20.5 / 0.0 / 5.2 / 2.4  | 15.6 / 0.2 / 5.8 / 2.3 |
+| high \| noIn \| gb   | ~4%  | 23.6 / 0.3 / 6.1 / 3.2  | 14.9 / 0.2 / 6.8 / 3.0 |
+
+**Revealed priority ordering (what the data says players prioritize):**
+1. **`raise` = pure safety switch.** ~13–15% when low+calm+clean; → ~0 the instant ANY
+   threat appears (incoming OR garbage OR height>8). This is the strongest, cleanest
+   contextual signal — model it as a hard gate, not a soft weight.
+2. **`gbBreak` = reactive only.** Rises only when garbage is on-board AND buried
+   (high+gb cells, ~2.4–3.2/1k); never preemptive. Dig weight should be gated on
+   `hasGarbage`+`buried`, ~0 otherwise — matches your 4a `dig.modifier.hasGarbage`.
+3. **`clearStart` peaks at mid height**, dips at low (nothing built yet) and slightly at
+   high+incoming (forced into defense). Survival/offense clears are a mid-stack activity.
+4. **`swap` (activity) is a PER-PLAYER OFFSET, not contextual** — chaos ≈1.4× mscl in
+   EVERY cell. See point 4 below; this is the knob your proposal is missing.
+
+### (c) Features my re-sim can reliably emit (scope P1 to these)
+Your §25 trimmed list was `comboSize / chainDepth / comboSetup / chainSetup / dig /
+earthquake / flatten / survivalClear`. Honest emittability:
+
+| feature | emit? | source |
+|---|---|---|
+| `comboSize` (4/5/6) | ✅ reliable | outgoingGarbage.history width/height, non-chain entries (§23 already did this) |
+| `dig` (garbage broken) | ✅ reliable | color 8/9 cell count dropping per frame |
+| `flatten` (bumpiness ↓) | ✅ reliable | columnHeights variance per frame |
+| `survivalClear` (3-match, 0 send) | ✅ reliable | clearStart with no matching garbage-history entry |
+| chain-vs-combo split | ✅ reliable | `isChain` flag on each history entry |
+| `chainDepth` (2/3/4+) | ⚠️ approximate | only `maxChain` is per-GAME; per-event depth not in stats. Split is coarse. |
+| `comboSetup` / `chainSetup` | ⚠️ heuristic | my dense-intent labels guess "building toward" — usable but noisy, not ground truth |
+| `earthquake` / deep-chain | ❌ blocked | needs your garbage-reveal-color modeling. Make it a feature now, weight stays default until your reveal work lands. |
+
+**So: P1 = the 5 reliable features + 3 context dims.** chainDepth/setup go in as
+features but I can only fill them approximately; earthquake waits on your reveal modeling.
+
+### 4. The missing knob: ACTIVITY (the trap behind your pendulum)
+`swaps_per_clear` (now a standard field in `analyze_strategy.py`): **chaos ≈37, mscl ≈22**
+— mscl earns ~1.7× more per swap. The per-cell table shows this is a flat ~1.4× offset
+across ALL situations, not a context response. **A search that optimizes survival+offense
+naturally converges on the efficient frontier = mscl-like, and chaos's busyness gets
+optimized AWAY.** Two players collapse into one "optimal" bot. Your hand-tuning pendulum
+(offense↑→defense breaks→defense↑) is the same root cause: a single eval has one optimum;
+you can't hand-walk it to two personalities. **Fix:** add a per-player activity term —
+either a low `actMargin` (take near-tied moves rather than only the argmax) + APM throttle,
+or an explicit `swapsPerClear` target the controller injects. It's orthogonal to the
+pattern weights and it's what makes chaos≠mscl after fitting. Flagging so it's in the
+schema before you build P1.
+
+**Asks back:** (1) does `swaps_per_clear`/`actMargin` belong in the profile schema as a
+first-class field (I think yes); (2) once your reveal-color modeling lands, ping me and
+I'll re-emit dig/earthquake/chainDepth at real fidelity and fill the per-cell weights.
+— _signed: data track, 2026-06-15_

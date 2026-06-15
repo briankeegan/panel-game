@@ -25,6 +25,9 @@ def main():
     byTier = collections.defaultdict(lambda: collections.Counter())
     byIncoming = collections.defaultdict(lambda: collections.Counter())
     byGbOnBoard = collections.defaultdict(lambda: collections.Counter())
+    # JOINT 12-cell schema (§25): height{low/mid/high} x incoming{none/present}
+    # x garbage{none/present}. This is the cell the eval weights map straight onto.
+    byJoint = collections.defaultdict(lambda: collections.Counter())
 
     for fp in files:
         try:
@@ -54,6 +57,7 @@ def main():
             tally(byTier[tier(h)])
             tally(byIncoming["incoming" if inc else "clear"])
             tally(byGbOnBoard["garbage" if gb > 0 else "none"])
+            tally(byJoint[(tier(h), "in" if inc else "noIn", "gb" if gb > 0 else "noGb")])
             prevMatched, prevGb = matched, gb
 
     def rates(c):
@@ -71,6 +75,15 @@ def main():
     print(" GARBAGE-BREAK — garbage on own board vs not:")
     for k in ("none", "garbage"):
         if byGbOnBoard[k]["frames"]: print(f"   {k:<10} {rates(byGbOnBoard[k])}")
+    print(" JOINT 12-CELL (§25 eval-weight schema) — height|incoming|garbage:")
+    tot = sum(byJoint[c]["frames"] for c in byJoint) or 1
+    for t in ("low(<8)", "mid(8-11)", "high(>11)"):
+        for inc in ("noIn", "in"):
+            for gb in ("noGb", "gb"):
+                c = byJoint[(t, inc, gb)]
+                if c["frames"]:
+                    share = 100 * c["frames"] / tot
+                    print(f"   {t:<10} {inc:<5} {gb:<5} [{share:4.1f}% time] {rates(c)}")
 
 
 if __name__ == "__main__":

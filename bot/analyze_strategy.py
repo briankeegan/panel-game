@@ -79,6 +79,10 @@ def analyze_game(rows):
         "fill_med_pct": round(100 * med(fills) / 72, 1) if fills else 0,
         "clears": len(clear_events),
         "clears_per_1000f": round(1000 * len(clear_events) / n, 1) if n else 0,
+        # activity/efficiency: swaps spent per clear. low = economical (each swap
+        # earns its keep), high = fidgety/exploratory. THE knob that separates
+        # players a survival-optimizing search would otherwise collapse together.
+        "swaps_per_clear": round(dec["SWAP"] / len(clear_events), 1) if clear_events else None,
         "combo_med": med(clear_events), "combo_max": max(clear_events) if clear_events else 0,
         "big_combos": sum(1 for c in clear_events if c > 3),
         "chained": chained_events,
@@ -112,7 +116,7 @@ def main():
 
     keys = ["frames", "height_p25", "height_med", "height_p75", "height_p90", "height_max",
             "fill_med_pct", "garbage_on_board_pct", "garbage_broken_per_1000f",
-            "clears_per_1000f", "combo_med", "combo_max", "big_combos",
+            "clears_per_1000f", "swaps_per_clear", "combo_med", "combo_max", "big_combos",
             "incoming_frame_pct", "swap_pct", "wait_pct", "raise_pct"]
     print(f"corpus={corpus}  games analyzed={sum(len(v) for v in by_outcome.values())} "
           f"(won={len(by_outcome['won'])}, lost={len(by_outcome['lost'])})\n")

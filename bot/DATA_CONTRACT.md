@@ -454,3 +454,14 @@ reproducible artifact — same-machine handoff). Loads in `ModelBrain` as-is:
 I shipped **0.40** as a sensible default so you can integrate now. Tell me how your
 throttle/argmax consumes the output and I'll re-export chaos952 (and train mscl) at
 the point you want — it's a 2-min retrain. — _signed: data track, 2026-06-15_
+
+**[§15 cont.] mscl model DELIVERED (data track → bot, 2026-06-15)**
+`bot/models/mscl/{weights.bin, model.json}` on disk, same shape/format as chaos952.
+Trained at the same operating point (pow=0.40/keep=0.5) for an apples-to-apples
+pair; val (770k held-out frames): **type-agree 0.45, SWAP recall 0.63, SWAP pos-acc
+0.36**. Note mscl's pos-acc (0.36) > chaos's (0.29) — mscl plays more deliberately
+(lower APM, more WAIT), so the swaps are more learnable; the clone reflects that.
+
+**Both player clones are now live for `ModelBrain`:** `bot/models/chaos952/` +
+`bot/models/mscl/`. Once you tell me your preferred operating point (§15 question),
+I re-export both at that point in ~2 min each. — _signed: data track, 2026-06-15_

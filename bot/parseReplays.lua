@@ -215,10 +215,10 @@ local function parseReplay(path)
           feat = FeatureEncoder.encode(BoardState.extract(stack)),
         }
       else
-        -- Emit incoming + temporal signals via the SAME BoardState.extract the bot
-        -- uses, so human↔bot fit vectors are identical by construction (real eta —
-        -- fixes the old garbageList eta=-1 for staged garbage — + stopTime/chain/rise).
-        local bs = BoardState.extract(stack)
+        -- Lightweight emit: BoardState.extract per-frame was too heavy (full state +
+        -- eta calc every frame → slow + multi-GB RSS). fit_targets only consumes
+        -- stopTime from the new fields (anticipation is board-landing-based, not eta;
+        -- displacement/danger are already here), so emit just that, cheaply.
         rows[#rows + 1] = {
           frame = clock,
           board = boardOf(stack),
@@ -226,12 +226,8 @@ local function parseReplay(path)
           displacement = stack.displacement,
           height = stackHeight(stack),
           danger = stack:isToppedOut(),
-          incoming = bs.incoming,
-          stopTime = bs.stopTime,
-          chaining = bs.chaining,
-          chainCounter = bs.chainCounter,
-          activePanels = bs.activePanels,
-          riseSpeed = bs.riseSpeed,
+          incoming = garbageList(stack.incomingGarbage, stack.stopWatch),
+          stopTime = (stack.stop_time or 0) + (stack.pre_stop_time or 0),
           opp = {
             id = meta.stacks[oi].publicId,
             height = stackHeight(opp),

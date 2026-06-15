@@ -256,6 +256,14 @@ function SearchBrain:decide(state)
     -- improve anything either.
     local flat = BoardSim.flattenMove(baseGrid, rows)
     decision = flat and { type = "SWAP", pos = flat } or { type = "WAIT" }
+  elseif buried >= 0 then
+    -- ABOVE the band, no garbage, and no swap CLEARS or beats holding — the dense
+    -- worst-decile state where the bot used to WAIT while rise rows stacked it to the
+    -- ceiling. Never sit: make a SETUP move that best assembles a future clear
+    -- (groups same colors AND flattens), so the next rows give a clear instead of
+    -- piling. Falls back to flatten, then WAIT only if nothing helps at all.
+    local setup = BoardSim.setupMove(baseGrid, rows) or BoardSim.flattenMove(baseGrid, rows)
+    decision = setup and { type = "SWAP", pos = setup } or { type = "WAIT" }
   elseif not state.danger and maxH < cfg.heightBand[1] then
     decision = { type = "RAISE" }
   else

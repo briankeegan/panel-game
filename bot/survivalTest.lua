@@ -70,6 +70,10 @@ local function runOne(seed)
       local r, c = d.pos[1], d.pos[2]
       g[r][c], g[r][c + 1] = g[r][c + 1], g[r][c]
       g.reveal[r][c], g.reveal[r][c + 1] = g.reveal[r][c + 1], g.reveal[r][c]
+      -- a swap that triggers no match never enters resolve's clear loop, so resolve
+      -- alone won't settle a panel swapped over a gap (engine always re-applies
+      -- gravity after a swap). Settle first so the bot never sees a floating panel.
+      BoardSim.applyGravity(g, R)
       local _, _, _, gb = BoardSim.resolve(g, R)
       broke = broke + gb; lastSwap = frame
     elseif d.type == "RAISE" then

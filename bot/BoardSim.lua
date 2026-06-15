@@ -370,6 +370,50 @@ function BoardSim.flattenMove(grid, rows)
   return best
 end
 
+-- SETUP MOVE. Above the build band with no clear available, the bot must keep making
+-- progress toward a clear or the stack rises to the ceiling. Find the swap that best
+-- assembles a future match: maximize same-color adjacency runs (the makings of a
+-- 3-match) while keeping the board flat and low. Returns the best swap {r,c} (strictly
+-- better than holding) or nil. Pure: clones only. Bounded to the occupied region.
+function BoardSim.setupMove(grid, rows)
+  local top = BoardSim.maxHeight(grid, rows)
+  if top == 0 then return nil end
+  -- adjacency potential: same-color H/V pairs are one panel from a triple; reward
+  -- 3-in-a-rows extra (they clear next swap). Minus bumpiness so it also flattens.
+  local function pot(g)
+    local s = 0
+    for r = 1, top do
+      for c = 1, WIDTH do
+        local v = g[r][c]
+        if v >= 1 and v <= 6 then
+          if c < WIDTH and g[r][c + 1] == v then s = s + 2 end
+          if r < top and g[r + 1][c] == v then s = s + 2 end
+        end
+      end
+    end
+    local hts = {}
+    for c = 1, WIDTH do hts[c] = 0; for r = top, 1, -1 do if g[r][c] ~= 0 then hts[c] = r; break end end end
+    local bump = 0
+    for c = 1, WIDTH - 1 do local d = hts[c] - hts[c + 1]; bump = bump + d * d end
+    return s - bump
+  end
+  local base = pot(grid)
+  local best, bestPot = nil, base
+  for r = 1, top do
+    for c = 1, WIDTH - 1 do
+      local a, b = grid[r][c], grid[r][c + 1]
+      if a <= 6 and b <= 6 and a ~= b and (a ~= 0 or b ~= 0) then
+        local ng = BoardSim.cloneGrid(grid, rows)
+        ng[r][c], ng[r][c + 1] = ng[r][c + 1], ng[r][c]
+        BoardSim.applyGravity(ng, rows)
+        local p = pot(ng)
+        if p > bestPot then best, bestPot = { r, c }, p end
+      end
+    end
+  end
+  return best
+end
+
 -- total "depth" of garbage = sum of the rows it occupies (lower = better). Driving
 -- this DOWN pushes garbage into the dense lower board where ordinary clears land
 -- next to it and break it — the practical way garbage gets dug when no single

@@ -220,6 +220,168 @@ function BoardSim.resolve(g, rows)
   return chain, total, firstClear, garbageCleared
 end
 
+-- lowest row that holds any garbage (0 if none). The dig has to happen at/below
+-- here: a match must touch a garbage cell, and only the block's BOTTOM row breaks.
+function BoardSim.lowestGarbageRow(grid, rows)
+  for r = 1, rows do
+    for c = 1, WIDTH do if isGarbage(grid[r][c]) then return r end end
+  end
+  return 0
+end
+
+-- DIG PLANNER. Find a short swap SEQUENCE (1..maxDepth) that breaks garbage, when
+-- no single swap can. Region-bounded to the garbage-contact zone (rows around the
+-- lowest garbage) so the branching stays affordable: a buried board needs a
+-- deliberate multi-move setup to align a 3-match against the garbage, which plain
+-- 1-ply search never finds. Returns the first move {r,c} of the best plan, its
+-- depth, and the garbage it ultimately breaks (0 = no plan found).
+--
+-- Search is a beam DFS over candidate swaps inside a row window straddling the
+-- lowest garbage: wide at the root (most setups branch there), narrowing with depth,
+-- under a hard node budget so decide() stays in frame budget. Prefers SHALLOW plans
+-- and, at equal depth, plans that break MORE garbage. Pure: clones only.
+function BoardSim.digPlan(grid, rows, maxDepth)
+  maxDepth = maxDepth or 3
+  local lg = BoardSim.lowestGarbageRow(grid, rows)
+  if lg == 0 then return nil, 0, 0 end
+  -- Search region: a few rows straddling the lowest garbage — the band where a
+  -- match (or the setup for one) can touch the garbage's bottom row. Bounded tight
+  -- so the beam stays affordable; getting garbage LOWER is handled separately
+  -- (garbage-descent reward / flattenMove in the brain).
+  local lo = math.max(1, lg - 3)
+  local hi = math.min(rows, lg + 1)
+
+  -- legal swaps inside the window, given a grid
+  local function regionSwaps(g)
+    local out = {}
+    for r = lo, hi do
+      for c = 1, WIDTH - 1 do
+        local a, b = g[r][c], g[r][c + 1]
+        if a <= 6 and b <= 6 and a ~= b and (a ~= 0 or b ~= 0) then out[#out + 1] = { r, c } end
+      end
+    end
+    return out
+  end
+
+  -- garbage "depth" = sum of garbage rows (lower is better); lowering it toward the
+  -- dense base is the setup objective when no in-place break exists.
+  local garbageDepth = BoardSim.garbageDepthSum
+  local baseGd = garbageDepth(grid, rows)
+
+  -- progress heuristic for guiding the search toward a break: a 3-match touching
+  -- garbage needs play panels of one color lined up against the garbage. Reward
+  -- runs of same-colored play cells in the rows just below garbage (the makings of
+  -- a triple), so the beam expands the swaps that assemble one. Cheap, local.
+  local function progress(g)
+    local s = 0
+    for r = math.max(1, lg - 2), math.min(rows, lg - 1) do
+      for c = 1, WIDTH do
+        local v = g[r][c]
+        if v >= 1 and v <= 6 then
+          if c < WIDTH and g[r][c + 1] == v then s = s + 2 end          -- horizontal pair
+          if r > 1 and g[r - 1][c] == v then s = s + 1 end              -- vertical pair
+          -- a play cell directly under garbage is one step from a touching match
+          for rr = r + 1, rows do if isGarbage(g[rr][c]) then s = s + 1; break elseif g[rr][c] ~= 0 then break end end
+        end
+      end
+    end
+    return s
+  end
+
+  local bestDepth, bestGb, bestFirst = math.huge, 0, nil
+  -- breadth per level: wide near the root (cheap, where most setups branch) and
+  -- narrow deeper (where the tree explodes). A buried board's break is usually a
+  -- depth-2/3 setup that a too-greedy beam prunes, so we keep the root wide.
+  local function beamAt(depth) return depth == 1 and 12 or (depth == 2 and 6 or 3) end
+  -- beam DFS: at each node, simulate every region swap, keep the ones that broke
+  -- garbage, and recurse into only the top-BEAM by progress heuristic. Deeper but
+  -- narrow, so it can find the 3-4 move setups a buried board needs without exploding.
+  -- A SETUP move only counts if it makes real progress (raises `progress`); pure
+  -- shuffles are pruned so the planner never proposes a thrashing first move.
+  local budget = 1200 -- hard cap on board sims, so decide() stays in frame budget
+  local function dfs(g, depth, firstMove)
+    if depth > maxDepth or budget <= 0 then return end
+    local kids = {}
+    for _, sw in ipairs(regionSwaps(g)) do
+      if budget <= 0 then break end
+      budget = budget - 1
+      local ng = BoardSim.cloneGrid(g, rows)
+      ng[sw[1]][sw[2]], ng[sw[1]][sw[2] + 1] = ng[sw[1]][sw[2] + 1], ng[sw[1]][sw[2]]
+      local _, _, _, gb = BoardSim.resolve(ng, rows)
+      local fm = firstMove or sw
+      if gb > 0 then
+        if depth < bestDepth or (depth == bestDepth and gb > bestGb) then
+          bestDepth, bestGb, bestFirst = depth, gb, fm
+        end
+      else
+        -- rank every child by how close it gets to a touching match; the beam (not a
+        -- hard progress gate) keeps cost bounded, so legit setups that don't strictly
+        -- improve progress at one step are still explored.
+        kids[#kids + 1] = { g = ng, fm = fm, p = progress(ng) + (baseGd - garbageDepth(ng, rows)) * 3 }
+      end
+    end
+    if depth < bestDepth and depth < maxDepth then
+      table.sort(kids, function(a, b) return a.p > b.p end)
+      for i = 1, math.min(beamAt(depth), #kids) do dfs(kids[i].g, depth + 1, kids[i].fm) end
+    end
+  end
+  dfs(grid, 1, nil)
+  if bestFirst then return bestFirst, bestDepth, bestGb end
+  return nil, 0, 0
+end
+
+-- FLATTEN MOVE. When garbage is perched on a spike and no clear/dig exists, the bot
+-- would otherwise WAIT and die. Find the swap that most flattens the board — moving
+-- a panel off a tall column into a lower neighbor — which lowers the column the
+-- garbage rests on so it descends toward a flat, diggable position. Returns the swap
+-- {r,c} that yields the lowest post-swap bumpiness+maxheight, or nil if none helps.
+-- Pure: clones only. Bounded to swaps adjacent to a height mismatch.
+function BoardSim.flattenMove(grid, rows)
+  -- cost rewards: (a) garbage sitting LOWER (sum of garbage rows) — the real goal,
+  -- and (b) tall play columns being dismantled (sum of squared play-heights) — which
+  -- is what frees garbage to fall. Garbage descent dominates so the move that drops
+  -- it is preferred even if it slightly unflattens the play panels.
+  local function cost(g)
+    local gd, ph = 0, 0
+    for c = 1, WIDTH do
+      local top = 0
+      for r = rows, 1, -1 do
+        if isGarbage(g[r][c]) then gd = gd + r end
+        if g[r][c] ~= 0 and top == 0 and not isGarbage(g[r][c]) then top = r end
+      end
+      ph = ph + top * top
+    end
+    return gd * 8 + ph
+  end
+  local base = cost(grid)
+  local best, bestCost = nil, base
+  for r = 1, rows do
+    for c = 1, WIDTH - 1 do
+      local a, b = grid[r][c], grid[r][c + 1]
+      if a <= 6 and b <= 6 and a ~= b and (a ~= 0 or b ~= 0) then
+        local ng = BoardSim.cloneGrid(grid, rows)
+        ng[r][c], ng[r][c + 1] = ng[r][c + 1], ng[r][c]
+        BoardSim.applyGravity(ng, rows)
+        local cst = cost(ng)
+        if cst < bestCost then best, bestCost = { r, c }, cst end
+      end
+    end
+  end
+  return best
+end
+
+-- total "depth" of garbage = sum of the rows it occupies (lower = better). Driving
+-- this DOWN pushes garbage into the dense lower board where ordinary clears land
+-- next to it and break it — the practical way garbage gets dug when no single
+-- touching-match can be assembled up high.
+function BoardSim.garbageDepthSum(grid, rows)
+  local s = 0
+  for r = 1, rows do
+    for c = 1, WIDTH do if isGarbage(grid[r][c]) then s = s + r end end
+  end
+  return s
+end
+
 -- garbage cells currently on a grid (obstruction to penalize / dig out)
 function BoardSim.garbageCount(grid, rows)
   local n = 0
@@ -288,21 +450,25 @@ end
 -- bestCombo (largest first-clear size, i.e. the biggest 4+ COMBO one swap away).
 -- The lookahead term that lets the eval build TOWARD an attack — combos (humans'
 -- main offense, fully modeled) as well as chains. Bounded by `top`.
+-- also returns bestDig = most garbage a single follow-up swap could break, so the
+-- eval can value SETTING UP a dig (a match landing next to garbage), not just one
+-- that's already available.
 function BoardSim.chainPotential(grid, rows, top)
-  local bestChain, bestTotal, bestCombo = 0, 0, 0
+  local bestChain, bestTotal, bestCombo, bestDig = 0, 0, 0, 0
   for r = 1, top do
     for c = 1, WIDTH - 1 do
       local a, b = grid[r][c], grid[r][c + 1]
       if a <= 6 and b <= 6 and a ~= b and (a ~= 0 or b ~= 0) then
-        local _, chain, total, firstClear = BoardSim.simSwap(grid, rows, r, c)
+        local _, chain, total, firstClear, gbCleared = BoardSim.simSwap(grid, rows, r, c)
         if total > 0 and (chain > bestChain or (chain == bestChain and total > bestTotal)) then
           bestChain, bestTotal = chain, total
         end
         if firstClear > bestCombo then bestCombo = firstClear end
+        if gbCleared > bestDig then bestDig = gbCleared end
       end
     end
   end
-  return bestChain, bestTotal, bestCombo
+  return bestChain, bestTotal, bestCombo, bestDig
 end
 
 return BoardSim

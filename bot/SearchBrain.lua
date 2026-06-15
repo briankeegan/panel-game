@@ -30,7 +30,7 @@ local DEFAULTS = {
   chainUnit = 60,       -- value per chain level
   comboUnit = 40,       -- value per combo panel beyond 3 (humans are combo-heavy)
   futureDiscount = 0.6, -- moderate: fire combos as reachable, don't hoard for chains
-  heightBand = { 8, 10 }, -- build at >=8; flatten above 10 (defend earlier than 11)
+  heightBand = { 6, 8 },  -- build low + flatten early so garbage lands with dig room
   actMargin = 1.0,      -- only swap if it beats holding by this
 }
 
@@ -72,7 +72,10 @@ local function topoutRisk(h, H, band)
 end
 
 -- positional shape: target the height band, prefer flat (low bumpiness), don't
--- over-empty (keep material to build with)
+-- over-empty (keep material to build with). Bumpiness is weighted HARD: a single
+-- tall column is the thing that kills the dig — garbage rests on the spike and
+-- floats over empty columns where nothing can reach to break it. A flat low board
+-- lets garbage land flat with play material directly beneath to dig.
 local function shapeScore(grid, rows, band)
   local hts = {}
   for c = 1, WIDTH do
@@ -84,8 +87,11 @@ local function shapeScore(grid, rows, band)
   local s = 0
   if h < band[1] then s = s - (band[1] - h) * 4 end -- too sparse
   local bump = 0
-  for c = 1, WIDTH - 1 do bump = bump + math.abs(hts[c] - hts[c + 1]) end
-  return s - bump * 0.5
+  for c = 1, WIDTH - 1 do
+    local d = math.abs(hts[c] - hts[c + 1])
+    bump = bump + d * d -- squared: small unevenness is fine, spikes are punished
+  end
+  return s - bump * 1.5
 end
 
 -- cheap build proxy: same-color adjacencies (H+V) set up future matches/combos.
@@ -111,7 +117,7 @@ end
 -- + shape + dig. Used for candidates AND for holding.
 function SearchBrain:evalBoard(grid, rows, top, boardHeight)
   local cfg = self.cfg
-  local v = buildProxy(grid, rows, top) * cfg.comboUnit * cfg.futureDiscount * 0.04
+  local v = buildProxy(grid, rows, top) * cfg.comboUnit * cfg.futureDiscount * 0.12
   local h = BoardSim.maxHeight(grid, rows)
   v = v - topoutRisk(h, boardHeight, cfg.heightBand) * cfg.w_survival
   v = v + shapeScore(grid, rows, cfg.heightBand) * cfg.w_shape
@@ -153,35 +159,103 @@ function SearchBrain:decide(state)
   local baseGrid = BoardSim.colorGrid(board, rows)
   local holdValue = self:evalBoard(baseGrid, rows, top, boardHeight)
 
-  local cands = BoardSim.candidates(state, top)
-  local best, bestScore
-  for _, sw in ipairs(cands) do
+  -- Context gate (data §26): SURVIVE when threatened, attack only when safe.
+  -- Once the stack is in/above the build band, suppress offense and make digging
+  -- scale with how buried we are — so when you bury it, breaking garbage beats
+  -- firing a combo (the "doesn't break garbage when about to die" bug).
+  local buried = maxH - cfg.heightBand[1]
+  local offenseScale = (buried >= 0) and 0.35 or 1
+  local dangerBonus = math.max(0, buried) * 7
+
+  local hasGb = BoardSim.hasGarbage(baseGrid, rows)
+  local baseH = maxH
+  local baseGd = hasGb and BoardSim.garbageDepthSum(baseGrid, rows) or 0
+
+  -- DIG PLAN: when garbage is present, find the first move of a short (≤3-move,
+  -- region-bounded beam) swap sequence that breaks it. We don't override the normal
+  -- search with it — we INJECT it as a high-value candidate (digKey/digReward below)
+  -- so it competes with height management on the same scale. The reward scales with
+  -- how buried we are: under pressure the dig setup outranks everything; safe, it
+  -- just nudges. Gated on garbage + not-far-below the band.
+  local digKey, digReward = nil, 0
+  if cfg.w_breakGarbage > 0 and hasGb and buried >= -3 then
+    local digFirst, digDepth, digGb = BoardSim.digPlan(baseGrid, rows, 3)
+    if digFirst and digGb > 0 then
+      digKey = digFirst[1] * 100 + digFirst[2]
+      -- shallower plans + bigger breaks + more danger = stronger pull to step 1
+      digReward = (digGb * (8 + incoming + dangerBonus) / digDepth) * cfg.w_breakGarbage
+    end
+  end
+
+  -- PASS 1: cheap score every candidate (no lookahead) — immediate clear/combo/
+  -- chain/dig + positional eval. Keep the resulting grid for the few we'll deepen.
+  local scored = {}
+  for _, sw in ipairs(BoardSim.candidates(state, top)) do
     local r, c = sw[1], sw[2]
     local g, chain, total, firstClear, garbageCleared = BoardSim.simSwap(baseGrid, rows, r, c)
-    local score = self:evalBoard(g, rows, math.min(rows, BoardSim.maxHeight(g, rows) + 1), boardHeight)
-    -- immediate attack fired by THIS swap (full value — bird in hand). Offense is
-    -- ONLY combos (4+) and chains; a bare 3-match sends nothing, so it earns no
-    -- offense here — its value is just the lower resulting board (via evalBoard).
-    if chain >= 2 then score = score + chain * cfg.chainUnit * cfg.w_chain end
-    if firstClear >= 4 then score = score + (firstClear - 3) * cfg.comboUnit end
-    -- digging: peeling garbage is valuable (survival), more so under incoming pressure
-    if garbageCleared > 0 then
-      score = score + garbageCleared * (6 + incoming) * cfg.w_breakGarbage
+    local gH = BoardSim.maxHeight(g, rows)
+    local score = self:evalBoard(g, rows, math.min(rows, gH + 1), boardHeight)
+    if total > 0 then score = score + total * 2 end                                  -- clearing = height control
+    -- Under garbage, keeping the board LOW is the whole game: that's what lets the
+    -- garbage descend into the play area and land somewhere breakable. So reward any
+    -- clear that drops max height (scaled by danger). Without this the bot freezes
+    -- once garbage lands — ordinary clears no longer beat holding and it waits to die.
+    if hasGb and gH < baseH then score = score + (baseH - gH) * (10 + dangerBonus * 2) end
+    -- ...and reward swaps that push the garbage itself DOWN (toward the dense lower
+    -- board where clears break it). This folds the old flatten fallback into the main
+    -- ranking, so every move is judged on getting garbage lower + breaking it.
+    if hasGb then
+      local gd = BoardSim.garbageDepthSum(g, rows)
+      if gd < baseGd then score = score + (baseGd - gd) * (4 + dangerBonus) end
     end
-    score = score - (math.abs(cr - r) + math.abs(cc - c)) * 0.02 -- travel
-    if not best or score > bestScore then best, bestScore = sw, score end
+    if chain >= 2 then score = score + chain * cfg.chainUnit * cfg.w_chain * offenseScale end
+    if firstClear >= 4 then score = score + (firstClear - 3) * cfg.comboUnit * offenseScale end
+    if garbageCleared > 0 then                                                        -- dig dominates when buried
+      score = score + garbageCleared * (6 + incoming + dangerBonus) * cfg.w_breakGarbage
+    end
+    if digKey and r * 100 + c == digKey then score = score + digReward end            -- dig-plan step 1
+    score = score - (math.abs(cr - r) + math.abs(cc - c)) * 0.02                      -- travel
+    scored[#scored + 1] = { sw = sw, g = g, score = score }
+  end
+
+  -- PASS 2: lookahead only on the top-K — add the value of the best follow-up swap
+  -- (build toward a combo/chain, or toward a DIG: a move that lets the NEXT swap
+  -- break garbage — the term that makes it set up an escape). Bounded to K so it
+  -- stays within the frame budget; K shrinks under garbage where the dig PLANNER
+  -- already carries the heavy lifting.
+  table.sort(scored, function(a, b) return a.score > b.score end)
+  local K = math.min(buried >= 0 and 4 or 6, #scored)
+  local best, bestScore
+  for i = 1, K do
+    local e = scored[i]
+    local gtop = math.min(rows, BoardSim.maxHeight(e.g, rows) + 1)
+    local potChain, _, potCombo, potDig = BoardSim.chainPotential(e.g, rows, gtop)
+    if potChain >= 2 then e.score = e.score + potChain * cfg.chainUnit * cfg.w_chain * cfg.futureDiscount * offenseScale end
+    if potCombo >= 4 then e.score = e.score + (potCombo - 3) * cfg.comboUnit * cfg.futureDiscount * offenseScale end
+    if potDig > 0 then e.score = e.score + potDig * (3 + dangerBonus) * cfg.w_breakGarbage * cfg.futureDiscount end
+    if not best or e.score > bestScore then best, bestScore = e.sw, e.score end
   end
 
   -- difficulty fumble: a weak player picks a worse swap sometimes. With prob
   -- epsilon, replace the best with a random legal candidate (rolled once per board
   -- state, so the mistake persists like a real misplay rather than jittering).
-  if best and self.epsilon > 0 and #cands > 1 and math.random() < self.epsilon then
-    best = cands[math.random(#cands)]
+  if best and self.epsilon > 0 and #scored > 1 and math.random() < self.epsilon then
+    best = scored[math.random(#scored)].sw
   end
 
+  -- act more readily under garbage: holding is rarely right when buried, so drop the
+  -- swap threshold toward 0 once garbage is on the board.
+  local margin = hasGb and 0.1 or cfg.actMargin
   local decision
-  if best and bestScore > holdValue + cfg.actMargin then
+  if best and bestScore > holdValue + margin then
     decision = { type = "SWAP", pos = best }
+  elseif hasGb then
+    -- garbage present but nothing scored above holding (no clear/dig found): don't
+    -- sit and die. Flatten the board — dismantles the spike the garbage is perched
+    -- on so it descends toward a low, diggable spot. Only WAIT if flattening can't
+    -- improve anything either.
+    local flat = BoardSim.flattenMove(baseGrid, rows)
+    decision = flat and { type = "SWAP", pos = flat } or { type = "WAIT" }
   elseif not state.danger and maxH < cfg.heightBand[1] then
     decision = { type = "RAISE" }
   else

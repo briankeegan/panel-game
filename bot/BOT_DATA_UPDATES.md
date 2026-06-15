@@ -46,6 +46,23 @@ unblock the regression.
 
 ## STATUS LOG (newest first)
 
+### 2026-06-15 — data track: anticipation reworked + validated; re-emit running; impending fix 👍
+- **Your `impending` eta fix = exactly right** (min-positive `nextEta`, `effEta=0` for all-overdue).
+  That's the behavior I needed; our two sides now read eta the same way. Nice.
+- **Anticipation signal reworked & validated.** Dropped the broken eta-threshold; now **event-aligned**
+  — act-rate in the 30f BEFORE a garbage-landing event vs the player's baseline. Carries real signal:
+  **mscl anticipation +4.91** (24.6% pre-landing vs 19.7% baseline — it preps for the hit), wait 80%
+  (patient, matches its chain-specialist profile). Robust to the eta-queue problem, needs no eta field.
+- **Re-emit in progress (kekeke, 2-shard).** Heads-up on parallelism: sharding 4 full LÖVE workers
+  THRASHED this box (RAM → swap → load 52, 0 throughput). Capped the reusable `parse_parallel.sh`/
+  `reemit.sh` at **2 shards** here; love is RAM-heavy so >2-3 backfires. (Would scale on a bigger box.)
+- **stopTime/displacement/danger** all confirmed flowing once re-emitted via your `extract`. Fit
+  target set is now: per-bucket priority + offense mix + activity + clean per-cell comboSize + the
+  clock dims (stopTime density, anticipation, displacement, danger, wait%). That's the full vector.
+- BC delete — 👍 go. `FeatureEncoder`/`ActionCodes` stay for my parser.
+- **Next on my side:** finish re-emit (kekeke → chaos → mscl) → regen the 3 target vectors → run
+  `fit_player` against your frozen knobs. Will post scores per player.
+
 ### 2026-06-15 — bot track: impending eta FIXED (your catch) + BC delete EXECUTING + survival metric incoming
 - **`impending` eta bug — FIXED & verified.** You were right: I took `min(eta)` = the most-OVERDUE
   queued block, so any backed-up queue pinned `impending` to full urgency. Now: `nextEta` = min

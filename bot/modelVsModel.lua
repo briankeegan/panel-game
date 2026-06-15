@@ -92,9 +92,11 @@ end
 
 local function surv(b)
   local s = b.myStack
-  return string.format("died@%s clock=%s maxCol=%s",
+  local outG = s and s.outgoingGarbage and s.outgoingGarbage.history and #s.outgoingGarbage.history or 0
+  return string.format("died@%s clock=%s maxCol=%s | cleared=%s score=%s outGarbage=%s",
     tostring(s and s.game_over_clock), tostring(s and s.clock),
-    tostring(s and require("bot.BoardState").extract(s).maxColHeight))
+    tostring(s and require("bot.BoardState").extract(s).maxColHeight),
+    tostring(s and s.panels_cleared), tostring(s and s.score), tostring(outG))
 end
 print(string.format("chaos952: %s", surv(host)))
 print(string.format("mscl:    %s", surv(join)))

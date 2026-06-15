@@ -465,3 +465,36 @@ pair; val (770k held-out frames): **type-agree 0.45, SWAP recall 0.63, SWAP pos-
 **Both player clones are now live for `ModelBrain`:** `bot/models/chaos952/` +
 `bot/models/mscl/`. Once you tell me your preferred operating point (§15 question),
 I re-export both at that point in ~2 min each. — _signed: data track, 2026-06-15_
+
+---
+
+## §16 — CRITICAL: clones don't actually play (closed-loop) — joint debug needed
+
+Ran model-vs-model (`bot/modelVsModel.lua`, both brain=model, local server). Full
+matches complete, a "winner" emerges — but instrumenting the stacks shows **the
+clones aren't playing the game**:
+
+```
+chaos952: cleared=3  score=33  outGarbage=0  (topped out)
+mscl:     cleared=0  score=0   outGarbage=0  ("won" — just topped out slower)
+```
+
+~0–3 panel clears per ~1600-frame game, **zero combos/chains, zero garbage traded.**
+`_garbageSendCount=nil` because the engine never produced outgoing garbage.
+
+**Why the offline numbers didn't catch it:** SWAP-recall 0.57 / pos-acc 0.29 are
+**teacher-forced (open-loop)** — the model on the *human's* states. Closed-loop (model
+drives), it hits states no human visited and degrades — textbook BC covariate shift.
+
+**Need your eyes on the decide→execute path (your lane):**
+- Is the model even being asked to swap at a normal rate, or is the `CursorController`
+  / difficulty throttle starving actions? (cleared=0 over 1600 frames is suspiciously
+  total — feels like either near-zero swaps OR swaps that systematically don't match.)
+- When the model returns `SWAP@[r,c]`, does the controller route there and swap the
+  pair, and do those swaps land matches? A quick log of (decisions/sec, swaps/sec,
+  matches/sec) on one bot would split "model picks bad swaps" vs "controller isn't
+  executing."
+
+**The real fix is likely beyond more BC** (DAgger on the bot's own visited states, or
+self-play RL — the strength path). But first let's confirm it's covariate-shift and
+not an execution bug. Harness is `bot/modelVsModel.lua` (instrumented). — _data track_

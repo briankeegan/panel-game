@@ -37,25 +37,40 @@ bot:createRoom(GameModes.getPreset(GameModes.IDs.TWO_PLAYER_VS), true)
 local t2 = socket.gettime()
 while socket.gettime() < t2 + 8 and not bot.roomNumber do bot:pump(); socket.sleep(0.01) end
 if not bot.roomNumber then print("could not create room"); os.exit(1) end
-bot:sendReady()
 
 print(string.format(
   "\n=== Bot '%s' (%s, %s) is waiting in room %d on %s ===\n    Open your client, join that room (it's an open game), ready up, and play.\n    Ctrl+C to stop.\n",
   name, modelDir and "model" or "heuristic", difficulty, bot.roomNumber, ip))
+
+local function playerCount()
+  local n = 0
+  if bot.players then for _ in pairs(bot.players) do n = n + 1 end end
+  return n
+end
 
 -- 60Hz fixed-timestep so the bot's engine stays in lockstep wall-clock with the
 -- human. tickMatch advances exactly one frame per call (and holds for the
 -- aligned start instant internally).
 local FRAME = 1 / 60
 local nextFrame = nil
+local readied = false
 
 while true do
   bot:pump()
 
+  -- Ready up only once the opponent is actually in the room (the proven flow;
+  -- readying with just ourselves can be cleared when the joiner arrives).
+  if not bot.match and not readied and playerCount() >= 2 then
+    bot:sendReady()
+    readied = true
+    print("opponent joined the room — readying up (you ready up too)")
+  end
+  if playerCount() < 2 then readied = false end -- opponent left; wait again
+
   if bot.matchStart and not bot.match then
     bot:startMatch()
     nextFrame = bot.scheduledStartMs / 1000 -- first frame at the aligned start
-    print("opponent joined — match starting")
+    print("both ready — match starting")
   end
 
   if bot.match and not bot.matchEnded and nextFrame then
@@ -68,11 +83,10 @@ while true do
   end
 
   if bot.matchEnded and bot.match then
-    print("match over — bot " .. tostring(bot.outcome) .. "; readying for a rematch")
+    print("match over — bot " .. tostring(bot.outcome) .. "; waiting for a rematch")
     bot.match, bot.matchStart, bot.matchEnded = nil, nil, false
     bot.oppDied, bot.outcome, bot._resultReported, bot.deathSent = false, nil, false, false
-    bot.capture, nextFrame = nil, nil
-    bot:sendReady()
+    bot.capture, nextFrame, readied = nil, nil, false -- re-ready when both present again
   end
 
   socket.sleep(0.002)

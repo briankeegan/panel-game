@@ -10,6 +10,13 @@ please ack, **[DELIVER]** data owner will provide.
 Shared imports — **both tracks import these, do NOT re-invent**:
 - `client/src/network/PanelStateCodes.lua` — panel state ↔ numeric code.
 - `common/data/KeyDataEncoding.lua` — input char ↔ 6-bit decode.
+- `common/lib/LoveRandom.lua` — **bit-exact pure-Lua LÖVE RandomGenerator**
+  (bot track, 2026-06-15). **REQUIRED for your re-sim to reproduce panels** —
+  without LÖVE's real RNG, every replay's re-sim diverges and your fidelity
+  check rejects all of them. Install before requiring the engine:
+  `love.math.newRandomGenerator = require("common.lib.LoveRandom").newRandomGenerator`
+  Verified vs real LÖVE 11.5 (`bot/rng_probe`): 16,500 comparisons, 0 mismatches.
+  This is the dependency that lets training produce a valid dataset.
 
 ---
 

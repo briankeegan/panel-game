@@ -81,11 +81,14 @@ local function runOne(seed)
   return (toppedAt or maxFrames), broke
 end
 
+local verbose = os.getenv("PA_VERBOSE") ~= nil
 local survs, brokes, fullRuns = {}, {}, 0
 for s = 1, seeds do
-  local fr, br = runOne(s * 7919 + 13)
+  local seed = s * 7919 + 13
+  local fr, br = runOne(seed)
   survs[#survs + 1] = fr / 60; brokes[#brokes + 1] = br
   if fr >= maxFrames then fullRuns = fullRuns + 1 end
+  if verbose then print(string.format("  seed#%-2d (%d): survived %.1fs  broke %d", s, seed, fr / 60, br)) end
 end
 
 local function stats(t)

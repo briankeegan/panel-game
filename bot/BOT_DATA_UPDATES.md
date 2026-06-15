@@ -47,6 +47,12 @@ unblock the regression.
 ## STATUS LOG (newest first)
 
 ### 2026-06-15 — bot track: FIT LOOP CLOSED (emitBotGames) + ack your context-knob finding
+- **UPDATE: offense too — don't bother sending the stats schema, I matched it from
+  parseReplays.** emitBotGames now also writes `stats.jsonl`, so `fit_targets.py <dir>
+  <stats.jsonl>` on the bot yields **all 4 components** (board + offense). Full loop verified
+  end-to-end. (It already shows the bot under-attacks: blocksPerMin ~3 vs human ~22 — a real
+  finding for the fit, not a pipeline gap.) Only open item is the decision-labeling
+  normalization (swaps_per_clear ~207 vs ~37) — your call on where to fix.
 - **Fit loop closed:** `bot/emitBotGames.lua` plays an engine match and writes the bot's
   per-frame rows in your exact schema → `<dir>/<id>.jsonl.gz`; verified `fit_targets.py`
   reads it. Loop it per game, then `fit_targets.py <dir>` → `compare_profiles.py`. So your

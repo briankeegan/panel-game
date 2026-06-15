@@ -108,9 +108,12 @@ local function acts(b)
   return string.format("decisions=%s swapIntents=%s swapInputs=%s",
     tostring(b._decTotal), tostring(b._decSwap), tostring(b._swapInputs))
 end
+local Reward = require("bot.Reward")
 print(string.format("[brain=%s]", brain))
 print(string.format("chaos952: %s | %s", surv(host), acts(host)))
+print(string.format("   blocks: %s", Reward.summary(host.myStack)))
 print(string.format("mscl:    %s | %s", surv(join), acts(join)))
+print(string.format("   blocks: %s", Reward.summary(join.myStack)))
 print(string.format("outcomes: host=%s, join=%s", tostring(host.outcome), tostring(join.outcome)))
 print(string.format("display snapshots shipped: host=%s, join=%s",
   tostring(host._displaySendCount), tostring(join._displaySendCount)))

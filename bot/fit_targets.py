@@ -38,17 +38,19 @@ def board_targets(corpus, sample):
     # eta-reaction = the behavioral signature of clock-awareness: do they act in the
     # window BEFORE incoming lands vs only after. All computable from existing rows
     # (incoming[].eta, displacement, danger). stopTime needs a re-emit (added to parseReplays).
-    danger_frames = wait_frames = 0
-    imm_frames = imm_acts = 0     # frames with incoming about to land (min eta < ETA_SOON)
-    calm_frames = calm_acts = 0   # frames with NO incoming
+    danger_frames = wait_frames = total_acts = 0
     disp_sum = stoptime_sum = 0.0
-    ETA_SOON = 90  # ~1.5s
+    # event-aligned anticipation: action rate in the WINDOW before a garbage LANDING
+    # (gb cells increase) vs baseline. Robust to the eta-queue problem (no eta needed).
+    PRE_WIN = 30
+    landings = pre_land_frames = pre_land_acts = 0
     for fp in files:
         try:
             rows = [json.loads(l) for l in gzip.open(fp, "rt")]
         except Exception:
             continue
         in_clear, prevGb = False, None
+        window = []  # recent per-frame acts (sliding, len <= PRE_WIN), reset per game
         for r in rows:
             board = r["board"]; cells = [c for row in board for c in row]
             h = 0
@@ -69,6 +71,7 @@ def board_targets(corpus, sample):
             if dec == "RAISE": d["raise"] += 1
             if prevGb is not None and gb < prevGb:
                 d["digCells"] += (prevGb - gb)
+            landing = prevGb is not None and gb > prevGb  # garbage just landed this frame
             m = sum(1 for c in cells if c["s"] in (MATCHED, POPPING))
             if m > 0 and not in_clear:
                 d["clearStart"] += 1; clears += 1; in_clear = True
@@ -77,18 +80,19 @@ def board_targets(corpus, sample):
             prevGb = gb
             # --- clock/timing signals ---
             act = 1 if dec in ("SWAP", "RAISE") else 0
+            total_acts += act
             if r.get("danger"):
                 danger_frames += 1
             if dec == "WAIT":
                 wait_frames += 1
             disp_sum += r.get("displacement") or 0
             stoptime_sum += r.get("stopTime") or 0   # populated after re-emit
-            incoming = r.get("incoming") or []
-            etas = [g["eta"] for g in incoming if g.get("eta") and g["eta"] > 0]
-            if not incoming:
-                calm_frames += 1; calm_acts += act
-            elif etas and min(etas) < ETA_SOON:
-                imm_frames += 1; imm_acts += act
+            # event-aligned anticipation: on a landing, score the PRECEDING window's acts
+            if landing and window:
+                pre_land_acts += sum(window); pre_land_frames += len(window); landings += 1
+            window.append(act)
+            if len(window) > PRE_WIN:
+                window.pop(0)
     # per-bucket rates, occupancy-weighted (skip <1% cells — §26)
     buckets = {}
     tot = sum(cell[k]["frames"] for k in cell) or 1
@@ -110,12 +114,14 @@ def board_targets(corpus, sample):
         "height_p90": sorted(heights)[int(0.9 * (len(heights) - 1))] if heights else None,
         "garbage_on_board_pct": round(100 * gb_frames / total, 1) if total else None,
         "timing": {
-            # eta-reaction: act-rate when incoming is imminent vs when calm. The gap
-            # (imminent - calm) is the anticipation signature — clock-aware play.
-            "act_imminent_pct": round(100 * imm_acts / imm_frames, 2) if imm_frames else None,
-            "act_calm_pct": round(100 * calm_acts / calm_frames, 2) if calm_frames else None,
-            "anticipation": (round(100 * imm_acts / imm_frames - 100 * calm_acts / calm_frames, 2)
-                             if imm_frames and calm_frames else None),
+            # event-aligned anticipation: act-rate in the 30f BEFORE a garbage landing vs
+            # the player's baseline act-rate. Positive = they prep before the hit (clock-aware).
+            # ~0 under constant pressure = honestly, that player doesn't get to anticipate.
+            "act_prelanding_pct": round(100 * pre_land_acts / pre_land_frames, 2) if pre_land_frames else None,
+            "act_baseline_pct": round(100 * total_acts / total, 2) if total else None,
+            "anticipation": (round(100 * pre_land_acts / pre_land_frames - 100 * total_acts / total, 2)
+                             if pre_land_frames and total else None),
+            "landings_per_1k": round(1000 * landings / total, 2) if total else None,
             "danger_pct": round(100 * danger_frames / total, 2) if total else None,
             "displacement_mean": round(disp_sum / total, 3) if total else None,
             "wait_pct": round(100 * wait_frames / total, 2) if total else None,

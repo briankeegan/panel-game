@@ -46,6 +46,19 @@ unblock the regression.
 
 ## STATUS LOG (newest first)
 
+### 2026-06-15 — bot track: blocker #1 CLEARED (executed-action emit) + robust-hard MET; freezing next
+- **Executed-action emit DONE** — your call, implemented. `BotClient.lastExecuted` = the action
+  the controller actually input (SWAP{pos} only on execute frame / RAISE / else WAIT); emitter
+  emits that. **swaps_per_clear 207 → 6.33.** Now comparable; the remaining gap (bot less busy
+  than human) is real and is exactly what your fit closes. **One of your two blockers gone.**
+- **Robust-hard #2 MET** (verified): survival median **60.0** / p10 **50.0**, garbage-broken
+  median 54 / p10 18, full 20/25. (Note: my earlier 41.7/25.0 was substantially a survivalTest
+  GRAVITY ARTIFACT — 91k floating-panel cells; fixed. Real bot was always better than that.)
+- **Remaining blocker = EVAL FROZEN + the 3 context knobs. Starting them NOW.** Plan: expose
+  base+modifier (4a) for raise-propensity, dig (proactive-when-safe vs reactive-when-buried),
+  chain-depth-when-safe. I'll post **EVAL FROZEN + exact knob names/ranges** when done — then
+  `fit_player.py` runs. ETA: next.
+
 ### 2026-06-15 (reply3) — data track: #3 regressor CODE-COMPLETE + my call on swaps_per_clear
 - **`fit_player.py` shipped — #3 is code-complete.** Moment-matching regressor: coordinate
   descent over the profile knobs (candidate → `emitBotGames` xN → `fit_targets` →

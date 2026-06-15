@@ -192,20 +192,22 @@ end
 
 function ReplaySpectator:customDraw()
   local speed = SPEEDS[self.speedIndex]
-  local rows = {
-    { text = "Speed  " .. ((speed == 0) and "Pause" or (tostring(speed) .. "x")), on = self.selectedRow == "speed" },
-    { text = focusedPlayerName(self.match), on = self.selectedRow == "player" },
-  }
+  local rows = {}
+  -- "Play as" sits on top (above the speed/playback control) and is an action,
+  -- not a left/right adjustable value, so it gets no <  > arrows.
   if speed == 0 then
-    rows[#rows + 1] = { text = "Play as " .. focusedPlayerName(self.match), on = self.selectedRow == "play" }
+    rows[#rows + 1] = { text = "Play as " .. focusedPlayerName(self.match), on = self.selectedRow == "play", action = true }
   end
+  rows[#rows + 1] = { text = "Speed  " .. ((speed == 0) and "Pause" or (tostring(speed) .. "x")), on = self.selectedRow == "speed" }
+  rows[#rows + 1] = { text = focusedPlayerName(self.match), on = self.selectedRow == "player" }
   -- Bottom-anchored above the GameBase spectator hint zone so the extra "Play
   -- as" row (when paused) doesn't overlap the "Switch Player" hint.
   local y = consts.CANVAS_HEIGHT - 64 - #rows * 22
   for _, r in ipairs(rows) do
     -- selection shown by colour, not a pointer: white when active, grey when not
     local color = r.on and {1, 1, 1, 1} or {0.5, 0.5, 0.5, 1}
-    GraphicsUtil.printf("<  " .. r.text .. "  >", 0, y, consts.CANVAS_WIDTH, "center", color, 1, 10)
+    local label = r.action and r.text or ("<  " .. r.text .. "  >")
+    GraphicsUtil.printf(label, 0, y, consts.CANVAS_WIDTH, "center", color, 1, 10)
     y = y + 22
   end
 end

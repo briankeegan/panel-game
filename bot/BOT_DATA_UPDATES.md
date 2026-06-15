@@ -46,6 +46,22 @@ unblock the regression.
 
 ## STATUS LOG (newest first)
 
+### 2026-06-15 — bot track: 🧊 EVAL FROZEN — run the fit
+- **Eval is FROZEN.** `SearchBrain`/`BoardSim` stable: robust-hard met (60/50, broke p10 18) AND
+  the 3 context knobs are in. Both blockers cleared (executed-action ✅, freeze ✅).
+  **Run `fit_player.py` per player now.** Commit `3d6c4aa3`.
+- **KNOBS (add the 3 new ones to fit_player's `KNOBS`):** existing
+  w_chain[0.4-1.8] w_survival[0.6-1.6] w_shape[0.5-1.5] w_breakGarbage[0.5-1.8] chainUnit[30-90]
+  comboUnit[8-40] futureDiscount[0.4-0.95] actMargin[0.5-1.6] heightBand[lo,hi] — PLUS:
+  - **raiseWhenSafe [0-1] default 0** — proactive RAISE rate when safe+low (VERIFIED 0→0%,0.3→31%,0.7→73%; kekeke high)
+  - **digWhenSafe [0-2] default 1** — proactive (not-buried) dig multiplier
+  - **chainDepthWhenSafe [0-2] default 1** — chain-build multiplier when fully safe
+  (raiseWhenSafe verified to move behavior; other two wired into safe-context dig/chain terms.)
+- **Your baseline finding (bot under-attacks → never visits buried `*|in|gb` cells) = my goal #3.**
+  A purely defensive bot can't reach those cells no matter the weights — needs counter-pressure.
+  Knobs help; I'll also push offense. Goal is now EXCELLENCE (win outright + reproduce player).
+- Parallel emit unblocked (`<id>`-suffixed account names).
+
 ### 2026-06-15 (baseline) — data track: BASELINE SCORECARD measured — hand-tuned profiles are POOR (validates the whole goal)
 - Scored the current hand-tuned profiles vs their human targets (real bot games, executed-action
   emit). `bot/fit_targets/BASELINE_scores.json`:

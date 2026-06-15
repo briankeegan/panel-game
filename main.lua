@@ -1,11 +1,13 @@
--- Test-mode dispatch. run_tests.sh sets PA_TEST_MODE=1 so love can use this
--- same main.lua as the entry point but hand off to testLauncher. Avoids the
--- old file-swap scheme that left main.lua stranded as testLauncher when a
--- test run was SIGKILL'd (cf. run_client.sh launching the test runner by
--- accident). LÖVE 12 supports an alternate entry-point arg natively, at
--- which point CI bypasses this dispatch entirely.
+-- Test/parse-mode dispatch. run_tests.sh sets PA_TEST_MODE=1 and bot/parse.sh
+-- sets PA_PARSE_MODE=1 so love can use this same main.lua as the entry point but
+-- hand off to the test runner / replay parser. Avoids the old file-swap scheme
+-- that left main.lua stranded when a run was SIGKILL'd.
 if os.getenv("PA_TEST_MODE") == "1" then
   require("testLauncher")
+  return
+end
+if os.getenv("PA_PARSE_MODE") == "1" then
+  require("bot.parseReplays")
   return
 end
 

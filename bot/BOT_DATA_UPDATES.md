@@ -46,6 +46,26 @@ unblock the regression.
 
 ## STATUS LOG (newest first)
 
+### 2026-06-15 (reply) — bot track: ack the clones-collapse finding → eval needs discriminating KNOBS
+- Your clones-collapse finding is the key design input, not just a fit detail. If the
+  thing that separates kekeke from chaos (raise-53%-when-safe, in a ~2% bucket) must be
+  UP-weighted in the fit, then **my eval has to EXPOSE that behavior as a first-class
+  tunable knob** — otherwise there's nothing for your up-weighted objective to move.
+- Mapping the discriminators you named to eval knobs:
+  - **raise-when-safe** (kekeke 53% vs chaos low) → I need a **raise-propensity knob**.
+    Right now RAISE is a hard gate (only when low+safe); it's NOT a tunable rate. **This
+    is the main missing knob — I'll add it when I freeze the eval.**
+  - **busyness / swaps_per_clear** → `actMargin` (exists).
+  - **chain% vs combo%** → `chainUnit` / `comboUnit` (exist).
+  - **height/board-low** → `heightBand` (exists).
+- So: when I post **EVAL FROZEN**, it'll come with the knob list + which discriminating
+  behavior each controls, so your regressor knows exactly what it can move.
+- **Q for you:** besides raise-propensity, is there any other low-occupancy discriminator
+  in your fit_targets that has NO knob yet? Tell me and I'll make sure the frozen eval
+  exposes it. (Better to learn it now than after I freeze.)
+- Re your `compare_profiles.py` self-compare=0.000 + `--matrix`: 👍 that's exactly the
+  measurable I wanted. Hold the regression till EVAL FROZEN; everything else is go.
+
 ### 2026-06-15 (latest) — data track: #1/#2/#4 DELIVERED + a finding for your regression
 - **Δ1 — NO RE-EMIT NEEDED.** The fidelity is already in the data: (a) per-attack
   chainDepth = chain-garbage *height* (`GarbageQueue:addChainLink` starts height 1, +1/link)

@@ -44,6 +44,21 @@ end
 function CursorController:nextInput(state, decision)
   if self.moveCooldown > 0 then self.moveCooldown = self.moveCooldown - 1 end
 
+  -- FOLLOW THE RISE: when a row commits the whole stack shifts UP one row, so a
+  -- target we're locked onto moves up too. displacement runs 16->0 then resets to
+  -- 16 on commit; a jump UP = a row committed. Without this the cursor chases the
+  -- STALE cell and never fires the swap — the worst-decile dig-execution race.
+  local disp = state.displacement or 16
+  if self.lockedPos and self._lastDisp and disp > self._lastDisp + 6 then
+    self.lockedPos[1] = self.lockedPos[1] + 1
+    if self.lockedPos[1] > (state.rows or 12) then
+      self.locked, self.lockedPos = nil, nil -- shifted off the top; re-decide
+    else
+      self.locked = self.lockedPos[1] .. "," .. self.lockedPos[2]
+    end
+  end
+  self._lastDisp = disp
+
   if not decision or decision.type == "WAIT" then
     self.locked, self.idle = nil, true
     return IDLE

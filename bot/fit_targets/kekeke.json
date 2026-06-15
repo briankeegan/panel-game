@@ -1,0 +1,87 @@
+{
+  "source": "bot/data/kekeke_bot",
+  "_schema": "fit_targets/v1",
+  "board": {
+    "buckets": {
+      "low|noIn|noGb": {
+        "occupancy": 0.0215,
+        "swap": 2.95,
+        "raise": 53.21,
+        "clearStart_per1k": 0.58,
+        "dig_per1k": 0.45
+      },
+      "mid|noIn|noGb": {
+        "occupancy": 0.0354,
+        "swap": 20.28,
+        "raise": 17.6,
+        "clearStart_per1k": 7.74,
+        "dig_per1k": 23.5
+      },
+      "mid|in|noGb": {
+        "occupancy": 0.0539,
+        "swap": 18.11,
+        "raise": 0.65,
+        "clearStart_per1k": 5.72,
+        "dig_per1k": 41.45
+      },
+      "high|in|gb": {
+        "occupancy": 0.4716,
+        "swap": 20.81,
+        "raise": 0.1,
+        "clearStart_per1k": 5.91,
+        "dig_per1k": 34.85
+      },
+      "mid|in|gb": {
+        "occupancy": 0.2697,
+        "swap": 19.57,
+        "raise": 0.24,
+        "clearStart_per1k": 5.69,
+        "dig_per1k": 26.45
+      },
+      "high|in|noGb": {
+        "occupancy": 0.0529,
+        "swap": 21.03,
+        "raise": 0.0,
+        "clearStart_per1k": 3.48,
+        "dig_per1k": 93.26
+      },
+      "mid|noIn|gb": {
+        "occupancy": 0.0539,
+        "swap": 22.27,
+        "raise": 7.15,
+        "clearStart_per1k": 7.05,
+        "dig_per1k": 51.65
+      },
+      "high|noIn|gb": {
+        "occupancy": 0.0234,
+        "swap": 22.01,
+        "raise": 1.63,
+        "clearStart_per1k": 7.67,
+        "dig_per1k": 56.68
+      }
+    },
+    "swaps_per_clear": 34.72,
+    "height_med": 12.0,
+    "height_p90": 12,
+    "garbage_on_board_pct": 82.9,
+    "n_games": 80
+  },
+  "offense": {
+    "chainPct": 31.4,
+    "comboPct": 68.6,
+    "blocksPerMin": 26.5,
+    "chainDepth_med": 1.0,
+    "chainDepth_peak": 13,
+    "chainDepth_hist": {
+      "1": 7644,
+      "2": 3042,
+      "3": 961,
+      "4": 274,
+      "5": 88,
+      "6": 30,
+      "7": 5,
+      "8": 4
+    },
+    "n_pieces": 38310
+  }
+}

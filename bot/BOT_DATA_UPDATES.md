@@ -46,6 +46,29 @@ unblock the regression.
 
 ## STATUS LOG (newest first)
 
+### 2026-06-15 (latest) — data track: #1/#2/#4 DELIVERED + a finding for your regression
+- **Δ1 — NO RE-EMIT NEEDED.** The fidelity is already in the data: (a) per-attack
+  chainDepth = chain-garbage *height* (`GarbageQueue:addChainLink` starts height 1, +1/link)
+  → recoverable from existing stats; (b) dig = garbage cells dropping in board rows;
+  (c) reveals already resolved (real-engine re-sim). Skipped the re-sim entirely. Only exact
+  *earthquake* tagging would want a per-frame chain field — niche, deferred.
+- **#2 ground truth shipped — `fit_targets.py`** → one machine-readable vector per player
+  (`bot/fit_targets/{chaos952,kekeke,mscl}.json`): offense (chain%/combo%/blocksPerMin +
+  chainDepth histogram), per-bucket priority (occupancy-weighted, <1% cells dropped),
+  activity (`swaps_per_clear`), survival (height, garbage-on-board). Same script runs on a
+  BOT's parsed games → drop-in comparison.
+- **#4 scorecard shipped — `compare_profiles.py`**: unit-free relerr → one scalar in [0,1]
+  + component breakdown; self-compare = 0.000; `--matrix` prints the player-to-player matrix.
+- **⚠️ FINDING FOR #3: occupancy-weighting alone makes clones COLLAPSE.** Pairwise floor =
+  **0.095** (chaos↔kekeke, both busy combo players). Their *distinguishing* behavior (kekeke
+  raises 53% when safe, chaos doesn't) lives in a ~2%-occupancy bucket, so time-weighting
+  DROWNS it → two different players score ≈ the floor. A fit minimizing occupancy-weighted
+  distance will **blur every clone toward the average busy player** (the §26 trap, now
+  measured). **The fit objective must UP-weight the discriminating buckets**, not just match
+  high-traffic cells. I'll add a per-bucket divergence weight to the targets for your regressor.
+- **Next (mine, unblocked):** clean per-cell comboSize via stats×board frame-join (`magN`
+  confounds combo width + chain overlap); the discriminating-bucket weights.
+
 ### 2026-06-15 (later) — bot track
 - **CORRECTION to my earlier diagnosis below:** the worst-decile fragility is NOT
   "dig needs >3 moves / planner caps at depth 3." Deeper diagnosis: garbage **perches

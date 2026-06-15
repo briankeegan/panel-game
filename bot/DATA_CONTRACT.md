@@ -624,3 +624,51 @@ Agreed to `PROPOSAL_search_base.md`. Building Phase A. Confirmations:
 player `{ w_chain, w_survival, w_breakGarbage, w_shape, heightBand:[lo,hi], apm }` is
 my proposed interface; adjust and I'll consume it in SearchBrain. Starting Phase A now
 with hand-set defaults so it PLAYS first. — _bot track, 2026-06-15_
+
+---
+
+## §20 — Phase A COMPLETE → Phase B is yours (bot track → data)
+
+The search-base competence engine is built, validated, and prod-ready. Files:
+`bot/SearchBrain.lua` (brain), `bot/BoardSim.lua` (cascade+garbage sim, shared),
+`bot/puzzleTest.lua` (puzzle validation), `bot/Reward.lua` (outcome reward/blocks).
+
+**Brain progression (engine bot-vs-bot, `modelVsModel.lua`):**
+| brain | cleared | garbage out | blocks |
+|---|---|---|---|
+| heuristic | 0-3 | 0 | none |
+| BC model | 0 | 0 | none |
+| expert (greedy depth-1) | 49 | 4 | chain x3 [6x1] (2-chains only) |
+| **search** | **53-63** | **4-6** | **chain x3-4 incl. 6x2 (3-chains) + combos** |
+
+**Validation vs the game's 235 puzzles** (`bot/puzzleTest.lua`): on pure-color "moves"
+puzzles Search avg chain 1.38 vs greedy 0.85, firing 6-chains the greedy never
+reaches. Garbage modeling (peel garbage adjacent to a clear) added digging + lifted
+live chains to 6x2. Perf: decision cache makes each `decide()` fit the 60Hz budget.
+
+**Known board-model limit:** garbage is peeled to empty (we don't have the engine's
+revealed colors without the panel buffer), so deep garbage CHAINS under-resolve;
+digging/survival is faithful. If you want true garbage-chain modeling, the re-sim
+pass (you own) could surface revealed-color buffers — low priority.
+
+**Phase B is unblocked — your lane. The drop-in hook is live:**
+- Deliver one JSON per player at `bot/profiles/<player>.json`, shape =
+  `bot/profiles/example.json`: `{ w_chain, w_survival, w_shape, w_breakGarbage,
+  chainUnit, comboUnit, futureDiscount, heightBand:[lo,hi], actMargin }`. Omitted
+  keys fall back to defaults.
+- It's consumed with ZERO code change: `brain=search` + `searchProfile=<path>`
+  (BotClient) or `PA_SEARCH_PROFILE=<path>` (playBot). `SearchBrain.load` reads it.
+- From your corpus profiler (`analyze_strategy.py`, extend it): map each player's
+  measured tendencies to weights — e.g. chaos "wins by keeping the stack lower +
+  eats less garbage" (§3) → lower `heightBand`, higher `w_survival`/`w_breakGarbage`;
+  combo-happy → higher `comboUnit`; chain-builder → higher `w_chain`/`futureDiscount`.
+- Success metric (Phase B): chaos.json vs mscl.json play **recognizably differently**
+  (board height, combo/chain mix). Use `modelVsModel.lua <ip> <port> search` with
+  each profile + the block readout to compare.
+
+**What I still need from you for Phase B tuning:** the garbage-sent / chain-depth
+re-sim metrics (the parsed rows lack them, §3 caveat) so we can validate a profile
+reproduces the player's offense mix, not just their defense.
+
+The BC clones aren't wasted — Phase C (optional) is clone-as-tie-breaker / KL-leashed
+self-play on top of the search base, per your proposal §4c/§4d. — _bot track, 2026-06-15_

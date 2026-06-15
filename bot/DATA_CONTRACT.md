@@ -787,3 +787,47 @@ tuning target is *cadence of small combos*, not chain depth — raise the immedi
 combo reward (`comboUnit`) and lower the bar to fire a garbage-making clear, so it
 attacks ~every couple seconds. mscl should additionally fire more 6×2+/chains (35% vs
 28%). Added to each profile's `_meta.offenseDetail`. — _signed: data track, 2026-06-15_
+
+---
+
+## §24 — concrete eval-tuning from the real games (data → bot)
+
+You asked what to tune; here's what the human data says, mechanically grounded.
+
+**Root cause of "under-attacks":** garbage comes from **combos (4+ cleared in one
+match)** and **chains** — a bare 3-match sends NOTHING. Your search cleared 30–42
+panels/game but sent 0–4 garbage → it's making *survival* clears (3-matches), not
+*attacking* clears (4+ combos). It clears to stay alive but never sets up an attack.
+That's the whole gap.
+
+**What humans actually do (re-sim, §23):** ~**22–23 garbage blocks/min** = roughly
+**one combo every ~2.5s**, dominated by **1-tall 3–6-wide combos** (small, frequent),
+with chains a minority (chaos 28% / mscl 35%). Offense is a *steady drip of small
+combos*, NOT hoarded big chains.
+
+**Concrete eval changes (ranked):**
+1. **Make a 4+ combo worth far more than a bare clear, and make the search prefer
+   *building/holding* for a 4-in-a-row over taking the first 3-match.** This is THE
+   fix. Likely your search takes any immediate clear because a 3-match scores ~the
+   same as setting up a 4. Raise `comboUnit` hard (try 15 → 40+) and/or make sub-4
+   clears near-zero offense value. The median human attack is a 4×1 — line up 4 same-
+   color, don't fire at 3.
+2. **Tune for cadence, not size:** target ~1 garbage-clear per ~150 frames. Don't
+   hoard for deep chains (low/moderate `futureDiscount`) — fire combos as they become
+   reachable. Volume of small combos >> rare big chains.
+3. **Favor combos over chains — two reasons:** (a) humans are combo-heavy (51–61%);
+   (b) your OWN board-model under-resolves deep garbage chains (your §20 caveat:
+   garbage peeled to empty), so chains are unreliable to optimize while combos are
+   fully visible/reliable. So raise `comboUnit` relative to `chainUnit`. (mscl gets
+   relatively more chain weight — 35% — than chaos.)
+4. **Height [8,11]:** don't over-clear below 8 (you need material to build a 4-combo);
+   only flatten above 11. Your boards ran to maxCol 12–13 = not flattening AND not
+   building combos. Firing more combos fixes both (attacks AND lowers the stack).
+
+**Per-player (already in profiles):** chaos = fire small combos readily, frequent,
+shallow (`comboUnit` up, `actMargin` down); mscl = more patient, build bigger / more
+chains (`actMargin`, `w_chain`, `futureDiscount` up).
+
+**Validation:** re-run `modelVsModel.lua ... search` and watch `outGarbage` climb
+toward 18–22 and `chain%` fall toward ~30%. Ping me and I'll re-validate vs the
+offense targets. — _signed: data track, 2026-06-15_

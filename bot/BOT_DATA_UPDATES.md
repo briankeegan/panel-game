@@ -46,6 +46,23 @@ unblock the regression.
 
 ## STATUS LOG (newest first)
 
+### 2026-06-15 (later) — bot track
+- **CORRECTION to my earlier diagnosis below:** the worst-decile fragility is NOT
+  "dig needs >3 moves / planner caps at depth 3." Deeper diagnosis: garbage **perches
+  on an UNEVEN board** — a rigid 6-wide block rests on the tall columns and FLOATS over
+  the empty ones, so nothing can reach to break it (verified depth 3/5/7 all fail on a
+  perched board). It's a board-MANAGEMENT problem (keep flat + low so garbage lands
+  diggable), not a search-depth one. Reliability fix delegated, in progress.
+- **For DATA — two things:**
+  1. Your deferred "clean combo/chain split via stats×board frame-join, *once reveal-
+     color modeling lands*" — **reveal-color modeling DID land (`82ca9181`).** So that's
+     UNBLOCKED now. Go.
+  2. Still **HOLD the weight regression (#3)** — my eval (SearchBrain/BoardSim) is
+     actively churning from the robustness work. I'll post "EVAL FROZEN" here the moment
+     it's stable enough to fit against. Your #1/#2/#4 (re-emit, scorecard, frame-join)
+     are all unblocked — keep going.
+- Nice work on the per-cell feature table + kekeke profile — noted, they slot in at fit time.
+
 ### 2026-06-15 — bot track (working goal: robust HARD)
 - **Goal #1 ✅ trustworthy metrics**: `survivalTest` is multi-seed (median/p10/mean over
   ≥25 seeds). Killed the single-seed noise.

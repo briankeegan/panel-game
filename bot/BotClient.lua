@@ -13,8 +13,30 @@ local socket = require("socket")
 local lfs = require("lfs")
 local TcpClient = require("client.src.network.TcpClient")
 local ClientProtocol = require("common.network.ClientProtocol")
+local NetworkProtocol = require("common.network.NetworkProtocol")
+local KeyDataEncoding = require("common.data.KeyDataEncoding")
 
 local IDENTITY_DIR = "bot/identities"
+
+-- wire prefixes
+local I_PREFIX = NetworkProtocol.clientMessageTypes.playerInput.prefix -- "I"
+local D_PREFIX = NetworkProtocol.clientMessageTypes.deathEvent.prefix  -- "D"
+local SRV_D_PREFIX = NetworkProtocol.serverMessageTypes.deathEvent.prefix -- "D" (relayed)
+
+-- Phase-0 placeholder "brain": random input biased to fill the board so a
+-- bot-vs-bot match tops out within seconds. Replaced by the real decide() +
+-- CursorController in Phase 1. Bit layout: Right=1,Left=2,Down=4,Up=8,Swap=16,Raise=32.
+local function randomInputChar()
+  local bits = 0
+  if math.random() < 0.5 then bits = bits + 32 end  -- Raise (fill fast)
+  if math.random() < 0.12 then bits = bits + 16 end -- Swap
+  local r = math.random()
+  if r < 0.08 then bits = bits + 8
+  elseif r < 0.16 then bits = bits + 4
+  elseif r < 0.24 then bits = bits + 2
+  elseif r < 0.32 then bits = bits + 1 end
+  return KeyDataEncoding.base64encode[bits + 1]
+end
 
 ---@class BotClient
 local BotClient = class(function(self, opts)
@@ -167,11 +189,18 @@ function BotClient:dispatch(msg)
     self.matchStart = { replay = msg.replay, startInMs = msg.startInMs, startAtMs = msg.startAtMs }
     logger.info(string.format("bot[%s]: MATCH START (startInMs=%s)",
       self.name, tostring(msg.startInMs)))
+  elseif msg[SRV_D_PREFIX] then
+    -- relayed DeathEvent. For 2p, a death we didn't send = the opponent's.
+    self.oppDied = true
+    logger.info("bot[" .. self.name .. "]: opponent topped out (relayed D)")
+  elseif msg.gameResult then
+    self.matchEnded = true
+    logger.info("bot[" .. self.name .. "]: gameResult received")
   elseif msg.leave_room then
     self.inRoom = false
     logger.info("bot[" .. self.name .. "]: left room (" .. tostring(msg.reason) .. ")")
   end
-  -- menu_state / playerJoinedRoom / gameResult etc. are ignored for now.
+  -- relayed input "I" and other messages fall through (ignored for 3a).
 end
 
 -- Non-blocking: read the socket and drain all pushed messages into state.
@@ -207,6 +236,68 @@ function BotClient:sendReady()
     inputMethod = "controller",
     cursor = "__Ready",
   }))
+end
+
+-- Build the live engine match from the matchStart replay (same engine the
+-- client runs, headless) and mark our own stack local. Call once after
+-- matchStart arrives.
+function BotClient:startMatch()
+  local Match = require("common.engine.Match")
+  self.match = Match.createFromReplay(self.matchStart.replay)
+  self.myStack = self.match.stacks[self.localPlayerNumber]
+  if not self.myStack then
+    error("bot[" .. self.name .. "]: no stack at slot " .. tostring(self.localPlayerNumber))
+  end
+  self.myStack.is_local = true
+  self.scheduledStartMs = socket.gettime() * 1000 + (self.matchStart.startInMs or 500)
+  self.matchEnded = false
+  self.deathSent = false
+  self._resultReported = false
+  logger.info(string.format("bot[%s]: match built; my stack = slot %d; start in %dms",
+    self.name, self.localPlayerNumber, self.matchStart.startInMs or 500))
+end
+
+-- Advance exactly one engine frame: feed+send our input, run, ship D on death,
+-- and finalize on our death or the opponent's. Non-blocking; call per ~60Hz tick.
+function BotClient:tickMatch()
+  if not self.match or self.matchEnded then return end
+  if socket.gettime() * 1000 < self.scheduledStartMs then return end -- hold for the aligned start instant
+
+  local stack = self.myStack
+  if (stack.game_over_clock or 0) == 0 then
+    local char = randomInputChar()
+    stack:receiveConfirmedInput(char)
+    self.gameplay:send(NetworkProtocol.markedMessageForTypeAndBody(I_PREFIX, char))
+  end
+
+  self.match:run()
+
+  if (stack.game_over_clock or 0) > 0 and not self.deathSent then
+    self.deathSent = true
+    logger.info(string.format("bot[%s]: topped out at frame %d -> sending D", self.name, stack.game_over_clock))
+    self.gameplay:send(NetworkProtocol.markedMessageForTypeAndBody(D_PREFIX,
+      json.encode({ senderFrame = stack.game_over_clock, stopWatch = stack.game_over_stopWatch, reason = "topOut" })))
+  end
+
+  if (self.deathSent or self.oppDied) and not self._resultReported then
+    self._resultReported = true
+    self.matchEnded = true
+    self.outcome = self.oppDied and "won" or "lost"
+    logger.info(string.format("bot[%s]: match over -> %s", self.name, self.outcome))
+    pcall(function() self.gameplay:sendRequest(ClientProtocol.reportLocalGameResult(self.outcome)) end)
+  end
+end
+
+-- Leave any room and clear local room/match state. Used on startup to shed a
+-- stale room membership left by a previously-crashed run (the server re-attaches
+-- a returning account to its old room).
+function BotClient:leaveRoom()
+  pcall(function() self.gameplay:sendRequest(ClientProtocol.leaveRoom()) end)
+  self.inRoom = false
+  self.roomNumber = nil
+  self.players = nil
+  self.matchStart = nil
+  self.oppDied = nil
 end
 
 function BotClient:disconnect()

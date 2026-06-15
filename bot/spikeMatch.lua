@@ -38,9 +38,23 @@ local function pumpUntil(cond, timeoutSec, label)
   fail("timed out waiting for " .. tostring(label))
 end
 
+local function pumpFor(seconds)
+  local t0 = socket.gettime()
+  while socket.gettime() < t0 + seconds do
+    host:pump(); join:pump()
+    socket.sleep(0.01)
+  end
+end
+
 -- 1) log both in
 if not host:login() then fail("host login") end
 if not join:login() then fail("join login") end
+
+-- 1b) shed any stale room membership from a previously-crashed run (the server
+-- re-attaches a returning account to its old room), then clear local state.
+host:leaveRoom(); join:leaveRoom()
+pumpFor(0.6)
+host:leaveRoom(); join:leaveRoom()
 
 -- 2) host creates an open 2p VS room
 host:createRoom(GameModes.getPreset(GameModes.IDs.TWO_PLAYER_VS), true)
@@ -60,9 +74,27 @@ join:sendReady()
 
 -- 5) both should receive matchStart
 pumpUntil(function() return host.matchStart and join.matchStart end, 12, "matchStart on both bots")
+print("both reached matchStart; building matches and simulating...")
 
-print("=== MATCH SPIKE OK: both bots reached matchStart in room " .. tostring(host.roomNumber) .. " ===")
--- Leave cleanly so we don't strand a started-but-unsimulated match on prod.
-host:disconnect()
-join:disconnect()
-os.exit(0)
+-- 6) build both matches and run a full random match to completion
+host:startMatch()
+join:startMatch()
+local simDeadline = socket.gettime() + 120
+while socket.gettime() < simDeadline do
+  host:pump(); join:pump()
+  host:tickMatch(); join:tickMatch()
+  if host.matchEnded and join.matchEnded then break end
+  socket.sleep(1 / 60)
+end
+
+print(string.format("outcomes: host=%s, join=%s", tostring(host.outcome), tostring(join.outcome)))
+if host.matchEnded and join.matchEnded then
+  print("=== MATCH SPIKE OK: full random bot-vs-bot match played to completion in room "
+    .. tostring(host.roomNumber) .. " ===")
+  host:disconnect(); join:disconnect()
+  os.exit(0)
+else
+  fail(string.format("simulation didn't finish (host.ended=%s, join.ended=%s, host.myStack frame=%s)",
+    tostring(host.matchEnded), tostring(join.matchEnded),
+    tostring(host.myStack and host.myStack.clock)))
+end

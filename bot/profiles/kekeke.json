@@ -1,0 +1,42 @@
+{
+  "_comment": "kekeke (id 4861) SearchBrain profile. Schema = bot/profiles/example.json. Weights are multipliers (default 1.0); chainUnit/comboUnit/futureDiscount/actMargin are absolute (defaults 60/15/0.7/1.0). Grounded in corpus: analyze_strategy + analyze_priority (joint 12-cell) + re-sim offense fingerprint over all 438 games.",
+  "w_chain": 1.0,
+  "w_survival": 1.0,
+  "w_shape": 1.0,
+  "w_breakGarbage": 1.0,
+  "chainUnit": 65,
+  "comboUnit": 22,
+  "futureDiscount": 0.7,
+  "heightBand": [
+    10,
+    12
+  ],
+  "actMargin": 0.8,
+  "_meta": {
+    "style": "AGGRESSIVE HIGH-BUILDER: highest offense volume of the three (~26 blocks/min) and plays DANGEROUSLY TALL. Raises hard when safe (raise 53% in low/calm/clean vs ~14% for chaos & mscl), runs height median 11-12, and spends 46% of frames high+buried (vs ~32% for the others). Balanced chain/combo (31%/69%, sits between chaos 28% and mscl 35%), deep-chain capable but not a specialist (maxChain med 5 / peak 14). Busy hands (36 swaps/clear, like chaos). Wins fast / loses slow: offense rate is constant (0.44/s) win or lose, so outcome is SURVIVAL-determined, not offense.",
+    "knobRationale": "heightBand RAISED to [10,12] (seeks/tolerates a tall board for combo material) is the signature knob; w_survival kept at 1.0 (NOT lowered) so the high band doesn't make it suicidal. comboUnit UP to 22 (highest-volume combo offense) + actMargin DOWN to 0.8 (busy, acts on near-ties like chaos). chainUnit 65 / w_chain 1.0 = deep-chain capable but combo-leaning. w_breakGarbage 1.0: breaks a LOT in absolute terms (always buried) but the STYLE is reactive, so neutral weight, not proactive like chaos.",
+    "offenseTarget": {
+      "chainPct": 31,
+      "comboPct": 69,
+      "maxChainMedian": 5,
+      "blocksPerMin": 26
+    },
+    "opponentReactive": false,
+    "offenseDetail": {
+      "blocksPerMin": 26,
+      "blocksPerGame": 47,
+      "gameLenSec": 114,
+      "topSizes": [
+        "3x1",
+        "4x1",
+        "5x1",
+        "6x1"
+      ],
+      "comboPct": 69,
+      "chainPct": 31,
+      "maxChainPeak": 14,
+      "pattern": "high-volume small 1-tall combos (~1 every ~2.2s) fired from a tall, buried board; occasional deep chains (peak 14)"
+    },
+    "priorityNotes": "raise = pure safety switch (53% in low/calm/clean, collapses to ~0 the instant any threat appears); dig is reactive (gbBreak rises only when buried, not preemptive); lives at the top of the stack (46% of time high+buried, the highest of the three players). Note: blocksPerGame (47) is measured over all 438 games at full game length and is NOT directly comparable to the older chaos/mscl entries (18/22, smaller sample); blocksPerMin is the comparable cross-player metric."
+  }
+}

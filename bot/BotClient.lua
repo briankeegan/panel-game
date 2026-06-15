@@ -15,6 +15,7 @@ local TcpClient = require("client.src.network.TcpClient")
 local ClientProtocol = require("common.network.ClientProtocol")
 local NetworkProtocol = require("common.network.NetworkProtocol")
 local KeyDataEncoding = require("common.data.KeyDataEncoding")
+local consts = require("common.engine.consts")
 
 local IDENTITY_DIR = "bot/identities"
 
@@ -142,9 +143,12 @@ function BotClient:login()
       self.userId, self.name,
       5,            -- level
       "controller", -- inputMethod
-      nil,          -- panels_dir (cosmetic; server stores as-is)
-      nil, nil,     -- character random / id
-      nil, nil,     -- stage random / id
+      nil,          -- panels_dir (cosmetic; resolved client-side)
+      -- Random character/stage, exactly like a fresh client's default. Sending
+      -- nil is the missing-mod case that flickers the opponent's ready icon
+      -- (ready_state_flash_root_cause); "__Random*" resolves to a bundled mod.
+      consts.RANDOM_CHARACTER_SPECIAL_VALUE, nil, -- selected character (random), resolved
+      consts.RANDOM_STAGE_SPECIAL_VALUE, nil,     -- selected stage (random), resolved
       false,        -- ranked
       false)),       -- save replays publicly
     "login")
@@ -290,6 +294,10 @@ function BotClient:sendReady()
     level = 5,
     inputMethod = "controller",
     cursor = "__Ready",
+    -- Random character/stage so the opponent's client loads a bundled mod for us
+    -- (avoids the missing-mod ready-icon flicker).
+    character_is_random = consts.RANDOM_CHARACTER_SPECIAL_VALUE,
+    stage_is_random = consts.RANDOM_STAGE_SPECIAL_VALUE,
   }))
 end
 

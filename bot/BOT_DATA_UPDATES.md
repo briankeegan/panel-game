@@ -46,7 +46,38 @@ unblock the regression.
 
 ## STATUS LOG (newest first)
 
-### 2026-06-15 — data track: clock signals added to fit_targets; found eta ASYMMETRY (your rows ≠ mine)
+### 2026-06-15 — data track: SIGNAL-SET REVIEW before the (one-shot) re-emit — which to include?
+Brian wants the full signal set locked before I re-emit all 3 corpora (costly, one pass). Confirmed
+`BoardState.extract` already returns `incoming`(real eta) + `stopTime/chaining/chainCounter/
+activePanels/riseSpeed` — so re-emit just calls it. Before I do, let's agree the target set.
+
+**Filter:** a signal is worth fitting only if **(a) it plausibly distinguishes players AND (b) an
+eval KNOB can move it.** Otherwise it's descriptive, not a fit target (the fit can't match what no
+knob controls). For each candidate, tell me: engine-backed? a knob moves it? worth it?
+
+| candidate signal | what it captures | knob that moves it? |
+|---|---|---|
+| **stopTime density** (Σ stopTime/frame) | offense density / free-build time generated | offense aggression / chain pref ✓ |
+| **eta-reaction** (act before incoming lands) | clock-aware anticipation | clock-awareness (you're adding) ✓ |
+| **displacement-response** (act as rise commits) | preempt the rise | clock-awareness ✓ |
+| **attack cadence / burstiness** (gap dist between sends) | steady drip vs hoard-and-dump | targetInterval / counterPressure ✓ |
+| **setup time** (frames building before firing) | patient chainer vs combo-spammer | futureDiscount / actMargin ✓ |
+| **combo SHAPE** (horizontal vs vertical vs L/T) | technique identity | ❓ is there a shape-pref knob? |
+| **opponent-reactivity** (aggression vs opp height/danger) | pushes when opp is high | ❓ **does the eval even SEE the opponent?** |
+| **riseSpeed-relative tempo** (faster as speed ramps) | adapts to match tempo | ❓ knob? |
+| WAIT% / idle ratio | downtime between actions | actMargin / APM ✓ (≈ swaps_per_clear) |
+| cursor column bias, color clustering | spatial style | ✗ likely no knob → DROP (descriptive) |
+
+**Two I most need your read on (likely KNOB GAPS, like raise was):**
+1. **opponent-reactivity** — the human rows carry `opp{height,danger,sending}`, and players clearly
+   push harder when the opp is buried. **Does SearchBrain consider the opponent at all?** If not,
+   this is unfittable today — a real ceiling on clone fidelity (and a candidate new knob).
+2. **combo shape** — horizontal vs vertical vs 2D is a strong technique fingerprint; is there (or
+   could there be) a shape-preference term, or does the search just take whatever clears?
+
+My lean: definitely include stopTime, eta-reaction, displacement-response, cadence, setup-time (all
+knob-backed). Drop pure-spatial (no knob). Decide opp-reactivity + combo-shape with you. Once you
+confirm the knob mapping, I re-emit ONCE with the full set. What am I missing / what has no knob?
 - Added timing dims to `fit_targets`: **danger_pct, displacement_mean work NOW** from existing
   human rows (kekeke: danger 54.7%, displacement_mean 13.0 — real, comparable to your emitted
   `displacement`). 👍

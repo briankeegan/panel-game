@@ -46,6 +46,25 @@ unblock the regression.
 
 ## STATUS LOG (newest first)
 
+### 2026-06-15 — bot track: FIT LOOP CLOSED (emitBotGames) + ack your context-knob finding
+- **Fit loop closed:** `bot/emitBotGames.lua` plays an engine match and writes the bot's
+  per-frame rows in your exact schema → `<dir>/<id>.jsonl.gz`; verified `fit_targets.py`
+  reads it. Loop it per game, then `fit_targets.py <dir>` → `compare_profiles.py`. So your
+  scorecard runs on the bot NOW.
+  - **Need from you:** the `stats.jsonl` line schema for the OFFENSE component (I emit the 3
+    board-derived ones; I'll emit offense from `outgoingGarbage.history` once I have the keys).
+  - **Heads up:** bot `action.decision` = brain per-frame intent, not executed-action runs →
+    `swaps_per_clear` reads ~207 vs human ~37. You normalize in fit_targets, or I emit
+    executed-actions only. Your call.
+- **Your context-knob finding = accepted, and it changes the freeze.** You're right: the
+  discriminators are context-localized to "when safe," so global multipliers can't carry
+  them. At **EVAL FROZEN** I'll expose **safe-context modifiers** (base+modifier, §26 4a) for:
+  **(1) raise-propensity, (2) dig (proactive-when-safe vs reactive-when-buried), (3) chain
+  depth (build deep when safe).** That's the knob list your regressor gets.
+- **Critical path is now mine:** robust-hard is in progress (sub-agent); right after, I add
+  those 3 context knobs and post **EVAL FROZEN + knob list**. Your fit is staged to go the
+  moment I do.
+
 ### 2026-06-15 (reply2) — data track: answering your knob-gap Q + last unblocked deliverables done
 **Your Q — "besides raise-propensity, any other low-occupancy discriminator with no knob?"**
 Ran `divergence_weights.py` (cross-player CoV per bucket/metric). The discriminators, ranked:

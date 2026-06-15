@@ -1,11 +1,14 @@
 -- Throw garbage at the SearchBrain bot and measure whether it DIGS OUT and
--- survives. Pure board-model (same sim the bot reasons with): each frame the bot
--- decides, we apply it (APM-throttled), the stack auto-rises, and garbage blocks
--- drop on top on a schedule. Top-out = a row pushed past the ceiling. Reports
--- survival frames + how much garbage it broke.
+-- survives — over MANY seeds, so the result is a distribution, not one lucky
+-- sample. Pure board-model (the same sim the bot reasons with): each frame the
+-- bot decides, we apply it (APM-throttled), the stack auto-rises, and a 6-wide
+-- garbage block drops on top on a schedule. Top-out = a row pushed past the
+-- ceiling. Reports median / p10 (worst-decile) / mean of survival + garbage-broken.
 --
--- Usage: luajit bot/survivalTest.lua [garbageEvery] [riseEvery] [frames] [difficulty]
---   defaults: garbageEvery=120  riseEvery=28  frames=2000  difficulty=medium
+-- Usage: luajit bot/survivalTest.lua [garbageEvery] [riseEvery] [frames] [difficulty] [seeds]
+--   defaults: garbageEvery=300 riseEvery=250 frames=3600 difficulty=hard seeds=25
+-- A 6-wide block every ~5s + a row every ~4s is "moderate" pressure; riseEvery 250
+-- ≈ the real early-game rise (consts.SPEED_TO_RISE_TIME).
 io.stdout:setvbuf("no")
 require("bot.headlessBoot")
 
@@ -14,15 +17,15 @@ local SearchBrain = require("bot.SearchBrain")
 local Difficulty = require("bot.Difficulty")
 
 local W, R = 6, 12
-local garbageEvery = tonumber(arg[1]) or 120
-local riseEvery = tonumber(arg[2]) or 28
-local maxFrames = tonumber(arg[3]) or 2000
-local difficulty = arg[4] or "medium"
+local garbageEvery = tonumber(arg[1]) or 300
+local riseEvery = tonumber(arg[2]) or 250
+local maxFrames = tonumber(arg[3]) or 3600
+local difficulty = arg[4] or "hard"
+local seeds = tonumber(arg[5]) or 25
 
-math.randomseed(1337) -- reproducible
+local rndState
 local function rnd(n) return math.floor(math.random() * n) + 1 end
 
--- grid helpers (grid[r][c] = color; r=1 floor). reveal map parallel for garbage.
 local function newGrid()
   local g, rev = {}, {}
   for r = 1, R do g[r] = {}; rev[r] = {}; for c = 1, W do g[r][c] = 0 end end
@@ -32,22 +35,19 @@ end
 local function fillBottom(g, nrows)
   for r = 1, nrows do for c = 1, W do g[r][c] = rnd(6) end end
 end
--- BoardState-shaped view for SearchBrain
 local function asState(g)
   local board, ch, mx = {}, {}, 0
   for r = 1, R do board[r] = {} for c = 1, W do board[r][c] = { c = g[r][c], s = 0, reveal = g.reveal[r][c] } end end
   for c = 1, W do ch[c] = 0; for r = R, 1, -1 do if g[r][c] ~= 0 then ch[c] = r; break end end; if ch[c] > mx then mx = ch[c] end end
   return { board = board, width = W, rows = R, cursor = { 1, 1 }, displacement = 0, height = R,
-           columnHeights = ch, maxColHeight = mx, danger = mx >= R - 1, incoming = {} }, mx
+           columnHeights = ch, maxColHeight = mx, danger = mx >= R - 1, incoming = {} }
 end
--- push everything up one row; new random row at the floor. true = topped out.
 local function riseRow(g)
   if BoardSim.maxHeight(g, R) >= R then return true end
   for r = R, 2, -1 do for c = 1, W do g[r][c] = g[r - 1][c]; g.reveal[r][c] = g.reveal[r - 1][c] end end
   for c = 1, W do g[1][c] = rnd(6); g.reveal[1][c] = nil end
   return false
 end
--- drop a 6-wide, h-tall garbage block on top. true = topped out.
 local function dropGarbage(g, h)
   local mx = BoardSim.maxHeight(g, R)
   if mx + h > R then return true end
@@ -55,36 +55,50 @@ local function dropGarbage(g, h)
   return false
 end
 
-local brain = SearchBrain.new({ difficulty = difficulty })
 local cfg = Difficulty.get(difficulty)
-local swapEvery = (cfg.cursorMoveInterval or 11) + 3 -- ~APM + a little travel
+local swapEvery = (cfg.cursorMoveInterval or 11) + 3
 
-local g = newGrid(); fillBottom(g, 5)
-local clears, broke, swaps, lastSwap = 0, 0, 0, -999
-local toppedAt, reason = nil, "survived"
-
-for frame = 1, maxFrames do
-  local state, mx = asState(g)
-  local d = brain:decide(state)
-  if d.type == "SWAP" and frame - lastSwap >= swapEvery then
-    local r, c = d.pos[1], d.pos[2]
-    g[r][c], g[r][c + 1] = g[r][c + 1], g[r][c]
-    g.reveal[r][c], g.reveal[r][c + 1] = g.reveal[r][c + 1], g.reveal[r][c]
-    local _, total, _, gb = BoardSim.resolve(g, R)
-    clears = clears + total; broke = broke + gb; swaps = swaps + 1; lastSwap = frame
-  elseif d.type == "RAISE" then
-    if riseRow(g) then toppedAt, reason = frame, "topout(raise)"; break end
+-- one match against the garbage schedule -> survivalFrames, garbageBroken
+local function runOne(seed)
+  math.randomseed(seed)
+  local brain = SearchBrain.new({ difficulty = difficulty }) -- fresh cache per run
+  local g = newGrid(); fillBottom(g, 5)
+  local broke, lastSwap, toppedAt = 0, -999, nil
+  for frame = 1, maxFrames do
+    local d = brain:decide(asState(g))
+    if d.type == "SWAP" and frame - lastSwap >= swapEvery then
+      local r, c = d.pos[1], d.pos[2]
+      g[r][c], g[r][c + 1] = g[r][c + 1], g[r][c]
+      g.reveal[r][c], g.reveal[r][c + 1] = g.reveal[r][c + 1], g.reveal[r][c]
+      local _, _, _, gb = BoardSim.resolve(g, R)
+      broke = broke + gb; lastSwap = frame
+    elseif d.type == "RAISE" then
+      if riseRow(g) then toppedAt = frame; break end
+    end
+    if frame % riseEvery == 0 and riseRow(g) then toppedAt = frame; break end
+    if frame % garbageEvery == 0 and dropGarbage(g, 1) then toppedAt = frame; break end
   end
-  if frame % riseEvery == 0 then
-    if riseRow(g) then toppedAt, reason = frame, "topout(rise)"; break end
-  end
-  if frame % garbageEvery == 0 then
-    if dropGarbage(g, 1) then toppedAt, reason = frame, "topout(garbage)"; break end
-  end
+  return (toppedAt or maxFrames), broke
 end
 
-local survived = toppedAt or maxFrames
-print(string.format("difficulty=%s  garbageEvery=%d riseEvery=%d", difficulty, garbageEvery, riseEvery))
-print(string.format("RESULT: %s @ frame %d/%d (%.1fs)", reason, survived, maxFrames, survived / 60))
-print(string.format("  swaps=%d  panelsCleared=%d  garbageBroken=%d  finalMaxHeight=%d",
-  swaps, clears, broke, BoardSim.maxHeight(g, R)))
+local survs, brokes, fullRuns = {}, {}, 0
+for s = 1, seeds do
+  local fr, br = runOne(s * 7919 + 13)
+  survs[#survs + 1] = fr / 60; brokes[#brokes + 1] = br
+  if fr >= maxFrames then fullRuns = fullRuns + 1 end
+end
+
+local function stats(t)
+  local c = {}; for i = 1, #t do c[i] = t[i] end; table.sort(c)
+  local function at(p) return c[math.max(1, math.min(#c, math.ceil(p * #c)))] end
+  local sum = 0; for i = 1, #c do sum = sum + c[i] end
+  return at(0.5), at(0.1), sum / #c, c[#c], c[1]
+end
+
+local sMed, sP10, sMean, sMax, sMin = stats(survs)
+local bMed, bP10, bMean = stats(brokes)
+print(string.format("difficulty=%s  garbageEvery=%d (%.1fs/block)  riseEvery=%d  frames=%d  seeds=%d",
+  difficulty, garbageEvery, garbageEvery / 60, riseEvery, maxFrames, seeds))
+print(string.format("SURVIVAL (s):  median %.1f  p10 %.1f  mean %.1f  [min %.1f, max %.1f]  fullRuns %d/%d",
+  sMed, sP10, sMean, sMin, sMax, fullRuns, seeds))
+print(string.format("GARBAGE BROKEN: median %d  p10 %d  mean %.1f", bMed, bP10, bMean))

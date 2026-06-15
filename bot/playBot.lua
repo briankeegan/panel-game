@@ -45,7 +45,7 @@ if not bot.roomNumber then print("could not create room"); os.exit(1) end
 
 print(string.format(
   "\n=== Bot '%s' (%s, %s) is waiting in room %d on %s ===\n    Open your client, join that room (it's an open game), ready up, and play.\n    Ctrl+C to stop.\n",
-  name, modelDir and "model" or "heuristic", difficulty, bot.roomNumber, ip))
+  name, brain, difficulty, bot.roomNumber, ip))
 
 local function playerCount()
   local n = 0

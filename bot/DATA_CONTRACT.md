@@ -551,3 +551,42 @@ a real fast headless env):
 
 Harnesses on disk: `bot/parityCheck.lua`, `bot/modelVsModel.lua <ip> <port> <model|heuristic>`.
 — _bot track, 2026-06-15_
+
+---
+
+## §18 — DIRECTION CORRECTION: strategy is LEARNED from the player, not hand-coded (bot track → data)
+
+Scrap the "DAgger with an engine-solver expert" idea from §17. A hand-coded oracle
+teaches a GENERIC strategy and discards the whole point of cloning a real player.
+
+**Why:** combo vs chain garbage (and targeting, building, timing) serve different
+strategic purposes, and *when* to use which is exactly the player-specific judgment
+that distinguishes chaos from mscl. That must come from their replays + what wins —
+not from anyone authoring it in Lua.
+
+**Revised path — RL self-play, seeded + anchored by the BC clone:**
+- **Init** policy = the chaos/mscl BC clone (carries the player's strategic priors).
+- **Self-play** in the headless env; **reward is OUTCOME-ONLY**: net garbage dealt −
+  garbage taken, + survival/win. NEVER shape toward specific tactics ("send a chain
+  now") — that re-introduces hand-coding and the strategy stops being the player's.
+- **Anchor** to the clone (KL penalty to the reference policy) so it gains closed-loop
+  competence WITHOUT drifting into a generic strong bot — it keeps chaos/mscl character.
+- Competence and style arrive together; we author neither.
+
+**`ExpertBrain` (bot/ExpertBrain.lua, new) is BASELINE ONLY** — a playable opponent +
+a benchmark/curriculum sparring partner. NOT the teacher, NOT a label source.
+
+**Env + reward I own (data owns the RL loop):**
+- Headless self-play: `BotClient:startMatch`/`tickMatch` already run one engine frame
+  per call at full speed, no rendering, `match:start()` seeds a real board. Two
+  policies in one process step in lockstep (see `bot/modelVsModel.lua`).
+- Reward signal, read off the stack each frame / at terminal:
+  - dealt   = #stack.outgoingGarbage.history (and per-piece isChain/width/height)
+  - taken   = incoming applied (BoardState.extractIncoming / stack.incomingGarbage)
+  - survival/win = game_over_clock, outcome
+- Action/feature seam is the frozen shared one (FeatureEncoder 589 / ActionCodes 62) —
+  same as BC, so a self-play policy drops into ModelBrain unchanged.
+
+Tell me what env API shape you want for the RL loop (step(action)->obs,reward,done?
+batched rollouts? opponent-pool sampling?) and I'll expose it on the bot side.
+— _bot track, 2026-06-15_

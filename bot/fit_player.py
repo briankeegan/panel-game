@@ -31,6 +31,35 @@ def arg(name, default=None):
     return sys.argv[sys.argv.index(name) + 1] if name in sys.argv else default
 
 
+def get_knob(prof, path):
+    """Read a knob by dot-path, e.g. 'comboUnit' or 'modifiers.dig.safe'."""
+    cur = prof
+    for k in path.split("."):
+        if not isinstance(cur, dict) or k not in cur:
+            return None
+        cur = cur[k]
+    return cur
+
+
+def set_knob(prof, path, val):
+    cur = prof
+    keys = path.split(".")
+    for k in keys[:-1]:
+        cur = cur.setdefault(k, {})
+    cur[keys[-1]] = val
+
+
+def load_knobs():
+    """Knob spec = built-in flat list, OR --knobs <json> mapping
+    {dot.path: [lo, hi, is_int]} (drops in the bot's EVAL FROZEN ranges directly,
+    including the new context modifiers like modifiers.raise.safe)."""
+    cfg = arg("--knobs")
+    if cfg:
+        spec = json.load(open(cfg))
+        return [(k, v[0], v[1], bool(v[2]) if len(v) > 2 else False) for k, v in spec.items()]
+    return KNOBS
+
+
 def run(cmd):
     return subprocess.run(cmd, capture_output=True, text=True)
 
@@ -68,19 +97,23 @@ def eval_profile(profile, target_path, games, server, name):
 
 
 def coordinate_descent(profile, target_path, games, server, name, iters):
+    knobs = load_knobs()
     best = copy.deepcopy(profile)
     best_d = eval_profile(best, target_path, games, server, name)
-    print(f"  start distance {best_d:.4f}")
+    print(f"  start distance {best_d:.4f}  ({len(knobs)} knobs)")
     step = 0.5
     for it in range(iters):
         improved = False
-        for (k, lo, hi, is_int) in KNOBS:
+        for (k, lo, hi, is_int) in knobs:
             for direction in (+1, -1):
                 cand = copy.deepcopy(best)
                 span = (hi - lo) * step * 0.25
-                v = cand.get(k, (lo + hi) / 2) + direction * span
+                cur = get_knob(cand, k)
+                if cur is None:
+                    cur = (lo + hi) / 2
+                v = cur + direction * span
                 v = max(lo, min(hi, round(v) if is_int else round(v, 3)))
-                cand[k] = v
+                set_knob(cand, k, v)
                 d = eval_profile(cand, target_path, games, server, name)
                 if d < best_d - 1e-4:
                     best, best_d, improved = cand, d, True

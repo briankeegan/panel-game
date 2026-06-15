@@ -71,6 +71,9 @@ config = {
     -- Last choice for ranked and input method
     ranked                        = true,
     inputMethod                   = "controller",
+    -- Last input device the local player claimed (InputConfiguration.id, e.g.
+    -- "config_1" or "touch") so it's auto-restored instead of re-picked each launch
+    inputConfigurationId          = nil,
 
     use_music_from                = "either",
 
@@ -234,6 +237,10 @@ config = {
 
           if type(read_data.inputMethod) == "string" then
             configTable.inputMethod = read_data.inputMethod
+          end
+
+          if type(read_data.inputConfigurationId) == "string" then
+            configTable.inputConfigurationId = read_data.inputConfigurationId
           end
 
           if type(read_data.use_music_from) == "string" and use_music_from_values[read_data.use_music_from] then

@@ -263,6 +263,11 @@ function Game:initializeLocalPlayer()
   self.localPlayer:connectSignal("selectedStageIdChanged", config, function(config, newId) config.stage = newId end)
   self.localPlayer:connectSignal("panelIdChanged", config, function(config, newId) config.panels = newId end)
   self.localPlayer:connectSignal("inputMethodChanged", config, function(config, inputMethod) config.inputMethod = inputMethod end)
+  -- Remember the claimed input device so it's auto-restored next launch. Only save
+  -- on a real config; teardown fires this with nil, and we want to keep the choice.
+  self.localPlayer:connectSignal("inputConfigurationChanged", config, function(config, inputConfig)
+    if inputConfig then config.inputConfigurationId = inputConfig.id end
+  end)
   --self.localPlayer:connectSignal("startingSpeedChanged", config, function(config, speed) config.endless_speed = speed end)
   self.localPlayer:connectSignal("difficultyChanged", config, function(config, difficulty) config.endless_difficulty = difficulty end)
   self.localPlayer:connectSignal("levelChanged", config, function(config, level) config.level = level end)

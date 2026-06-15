@@ -166,23 +166,25 @@ function BoardSim.maxHeight(grid, rows)
   return maxh
 end
 
--- chainPotential: the best cascade a SINGLE swap could trigger on `grid` right
--- now -> bestChain, bestTotal. The high-value lookahead term — "how big a chain
--- is set up." Grid-level (post-sim panels are all settled), bounded by `top`.
+-- What a SINGLE swap could trigger on `grid` right now -> bestChain, bestTotal,
+-- bestCombo (largest first-clear size, i.e. the biggest 4+ COMBO one swap away).
+-- The lookahead term that lets the eval build TOWARD an attack — combos (humans'
+-- main offense, fully modeled) as well as chains. Bounded by `top`.
 function BoardSim.chainPotential(grid, rows, top)
-  local bestChain, bestTotal = 0, 0
+  local bestChain, bestTotal, bestCombo = 0, 0, 0
   for r = 1, top do
     for c = 1, WIDTH - 1 do
       local a, b = grid[r][c], grid[r][c + 1]
       if a <= 6 and b <= 6 and a ~= b and (a ~= 0 or b ~= 0) then
-        local _, chain, total = BoardSim.simSwap(grid, rows, r, c)
+        local _, chain, total, firstClear = BoardSim.simSwap(grid, rows, r, c)
         if total > 0 and (chain > bestChain or (chain == bestChain and total > bestTotal)) then
           bestChain, bestTotal = chain, total
         end
+        if firstClear > bestCombo then bestCombo = firstClear end
       end
     end
   end
-  return bestChain, bestTotal
+  return bestChain, bestTotal, bestCombo
 end
 
 return BoardSim

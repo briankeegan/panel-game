@@ -20,13 +20,18 @@ local WIDTH = BoardSim.WIDTH
 local SearchBrain = {}
 SearchBrain.__index = SearchBrain
 
+-- Offense in this game comes from COMBOS (4+ cleared at once) and chains — a bare
+-- 3-match sends NOTHING. Humans attack via a steady drip of small combos (~1 every
+-- ~2.5s), not hoarded chains (data track §23/§24). So: combos are worth a lot, a
+-- 3-clear has ~no offense value (only its board-lowering counts), and the eval
+-- values being one swap FROM a combo so it builds toward one.
 local DEFAULTS = {
   w_chain = 1.0, w_survival = 1.0, w_shape = 1.0, w_breakGarbage = 1.0,
-  chainUnit = 60,      -- value per chain level
-  comboUnit = 15,      -- value per combo panel beyond 3
-  futureDiscount = 0.7, -- bird-in-hand: set-up chains worth less than fired ones
-  heightBand = { 6, 9 }, -- keep the stack here: below -> build/raise, above -> flatten
-  actMargin = 1.0,     -- only swap if it beats holding by this
+  chainUnit = 60,       -- value per chain level
+  comboUnit = 40,       -- value per combo panel beyond 3 (humans are combo-heavy)
+  futureDiscount = 0.6, -- moderate: fire combos as reachable, don't hoard for chains
+  heightBand = { 8, 11 }, -- keep material to build a 4-combo (>=8); flatten only above 11
+  actMargin = 1.0,      -- only swap if it beats holding by this
 }
 
 function SearchBrain.new(opts)
@@ -81,16 +86,19 @@ local function shapeScore(grid, rows, band)
   return s - bump * 0.5
 end
 
--- positional value of a settled board (no immediate attack): set-up chain
--- potential (discounted) + survival + shape. Used for candidates AND for holding.
+-- positional value of a settled board (no immediate attack): set-up COMBO/chain
+-- potential (discounted) + survival + shape. Used for candidates AND for holding,
+-- so valuing "one swap from a 4+ combo" is what makes the search BUILD an attack
+-- instead of taking a survival 3-match.
 function SearchBrain:evalBoard(grid, rows, top, boardHeight)
   local cfg = self.cfg
-  local potChain, potTotal = BoardSim.chainPotential(grid, rows, top)
+  local potChain, potTotal, potCombo = BoardSim.chainPotential(grid, rows, top)
   local v = 0
   if potChain >= 2 then
     v = v + potChain * cfg.chainUnit * cfg.w_chain * cfg.futureDiscount
-  elseif potTotal > 0 then
-    v = v + potTotal * 0.3 -- at least a clear is available
+  end
+  if potCombo >= 4 then -- one swap from a combo: build toward it (humans' main offense)
+    v = v + (potCombo - 3) * cfg.comboUnit * cfg.futureDiscount
   end
   local h = BoardSim.maxHeight(grid, rows)
   v = v - topoutRisk(h, boardHeight, cfg.heightBand) * cfg.w_survival
@@ -139,12 +147,11 @@ function SearchBrain:decide(state)
     local r, c = sw[1], sw[2]
     local g, chain, total, firstClear, garbageCleared = BoardSim.simSwap(baseGrid, rows, r, c)
     local score = self:evalBoard(g, rows, math.min(rows, BoardSim.maxHeight(g, rows) + 1), boardHeight)
-    -- immediate attack fired by THIS swap (full value — bird in hand)
-    if total > 0 then
-      score = score + total
-      if chain >= 2 then score = score + chain * cfg.chainUnit * cfg.w_chain end
-      if firstClear >= 4 then score = score + (firstClear - 3) * cfg.comboUnit end
-    end
+    -- immediate attack fired by THIS swap (full value — bird in hand). Offense is
+    -- ONLY combos (4+) and chains; a bare 3-match sends nothing, so it earns no
+    -- offense here — its value is just the lower resulting board (via evalBoard).
+    if chain >= 2 then score = score + chain * cfg.chainUnit * cfg.w_chain end
+    if firstClear >= 4 then score = score + (firstClear - 3) * cfg.comboUnit end
     -- digging: peeling garbage is valuable (survival), more so under incoming pressure
     if garbageCleared > 0 then
       score = score + garbageCleared * (3 + incoming * 0.5) * cfg.w_breakGarbage

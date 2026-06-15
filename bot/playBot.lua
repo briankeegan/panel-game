@@ -56,19 +56,22 @@ end
 -- aligned start instant internally).
 local FRAME = 1 / 60
 local nextFrame = nil
-local readied = false
+local lastReadyAt = 0
 
 while true do
   bot:pump()
 
-  -- Ready up only once the opponent is actually in the room (the proven flow;
-  -- readying with just ourselves can be cleared when the joiner arrives).
-  if not bot.match and not readied and playerCount() >= 2 then
-    bot:sendReady()
-    readied = true
-    print("opponent joined the room — readying up (you ready up too)")
+  -- (Re)ready ~every 1.5s while we're in the room with an opponent and no match
+  -- is pending/running. Retrying (not single-shot) survives the post-match room
+  -- reset: the challenge flow keeps both players in the room, so one mistimed
+  -- ready would otherwise strand the rematch (the reported bug).
+  if not bot.match and not bot.matchStart and playerCount() >= 2 then
+    local now = socket.gettime()
+    if now - lastReadyAt > 1.5 then
+      bot:sendReady()
+      lastReadyAt = now
+    end
   end
-  if playerCount() < 2 then readied = false end -- opponent left; wait again
 
   if bot.matchStart and not bot.match then
     bot:startMatch()
@@ -89,7 +92,7 @@ while true do
     print("match over — bot " .. tostring(bot.outcome) .. "; waiting for a rematch")
     bot.match, bot.matchStart, bot.matchEnded = nil, nil, false
     bot.oppDied, bot.outcome, bot._resultReported, bot.deathSent = false, nil, false, false
-    bot.capture, nextFrame, readied = nil, nil, false -- re-ready when both present again
+    bot.capture, nextFrame, lastReadyAt = nil, nil, 0 -- re-ready promptly for the rematch
   end
 
   socket.sleep(0.002)

@@ -39,6 +39,7 @@ local DEFAULTS = {
   raiseWhenSafe = 0.0,      -- [0..1] proactive-raise propensity when safe + low (0 = robust default)
   digWhenSafe = 1.0,        -- [0..2] dig-reward multiplier when not buried (proactive dig)
   chainDepthWhenSafe = 1.0, -- [0..2] chain-build multiplier when fully safe (deeper chains)
+  counterPressure = 0.0,    -- [0..1] offense kept while BURIED (attack-while-defending); 0 = robust
 }
 
 function SearchBrain.new(opts)
@@ -171,7 +172,12 @@ function SearchBrain:decide(state)
   -- scale with how buried we are — so when you bury it, breaking garbage beats
   -- firing a combo (the "doesn't break garbage when about to die" bug).
   local buried = maxH - cfg.heightBand[1]
-  local offenseScale = (buried >= 0) and 0.35 or 1
+  -- counterPressure [0..1] knob: how much offense to keep WHILE buried (attack while
+  -- defending, like a human — needed to reach the contested *|in|gb states and to win
+  -- contested matches). 0 = full suppression (robust-hard default); 1 = full offense
+  -- even when buried. Only relaxes the buried case; safe play is unchanged.
+  local buriedOffense = 0.35 + 0.65 * (cfg.counterPressure or 0)
+  local offenseScale = (buried >= 0) and buriedOffense or 1
   local dangerBonus = math.max(0, buried) * 7
 
   local hasGb = BoardSim.hasGarbage(baseGrid, rows)

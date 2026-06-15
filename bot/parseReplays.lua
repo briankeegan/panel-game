@@ -344,8 +344,14 @@ function love.update()
   local files = listFiles()
   local processed, kept, dropped, totalRows = 0, 0, 0, 0
   local dropReasons = {}
-  for _, path in ipairs(files) do
+  -- Sharding: run N workers (PA_PARSE_NSHARD) with distinct PA_PARSE_SHARD (1..N), each
+  -- to the SAME OUTDIR (gameId filenames don't collide). ~N× faster per corpus. Give each
+  -- worker a distinct LOVE_IDENTITY so concurrent love save-dirs don't race.
+  local SHARD = tonumber(os.getenv("PA_PARSE_SHARD") or "1")
+  local NSHARD = tonumber(os.getenv("PA_PARSE_NSHARD") or "1")
+  for idx, path in ipairs(files) do
     if LIMIT > 0 and processed >= LIMIT then break end
+    if NSHARD > 1 and ((idx - 1) % NSHARD) ~= (SHARD - 1) then goto skipShard end
     processed = processed + 1
     local ok, rowsOrErr, err = pcall(parseReplay, path)
     if not ok then
@@ -367,6 +373,7 @@ function love.update()
     if processed % 50 == 0 then
       logger.info(string.format("  ... %d processed (kept=%d dropped=%d)", processed, kept, dropped))
     end
+    ::skipShard::
   end
   logger.info(string.format("PARSE DONE: processed=%d kept=%d dropped=%d rows=%d",
     processed, kept, dropped, totalRows))

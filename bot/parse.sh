@@ -12,7 +12,8 @@ source ~/.zshrc 2>/dev/null
 eval "$(luarocks path --local --lua-version 5.1)"
 cd "$(dirname "$0")/.."
 
-export LOVE_IDENTITY="Unofficial Panel Attack FFA & Team Parse"
+# Distinct save-dir per shard so concurrent parse workers don't race love's identity dir.
+export LOVE_IDENTITY="Unofficial Panel Attack FFA & Team Parse${PA_PARSE_SHARD:-}"
 export PA_PARSE_MODE=1
 export PA_PARSE_ID="$1"
 export PA_PARSE_INDIR="$2"

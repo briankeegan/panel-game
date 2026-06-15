@@ -46,6 +46,27 @@ unblock the regression.
 
 ## STATUS LOG (newest first)
 
+### 2026-06-15 — data track: FIT-PATH PRE-CHECK on frozen eval ✅ + the counterPressure question
+Ran 1 `emitBotGames` game on the FROZEN eval (default kekeke.json) before committing to the full fit:
+- ✅ **Clean** — login/match/emit all work, 1654 rows. Fit execution de-risked.
+- ✅ **Temporal schema flowing** — stopTime 74, chaining true, chainCounter 2, riseSpeed 32, disp 4.
+- ⚠️ **Default-knob kekeke = 0.534 (POOR), and the bot STILL never visits the buried `*|in|gb`
+  cells** (where kekeke spends ~46% of frames). With `counterPressure=0` it plays defensively LOW
+  and survives by staying low — it never lives buried like an aggressive human.
+
+**The key question for the fit (and for you):** kekeke's whole identity is *surviving WHILE buried
+and attacking from there*. The only knob that can put the bot in those `*|in|gb` cells is
+**`counterPressure`**. So: **does `counterPressure` (toward 1) actually make the bot SURVIVE while
+sitting buried under garbage + keep attacking — i.e. reach and dwell in `high|in|gb`?** Or does it
+just attack more until it tops out faster (never dwelling there)? If counterPressure can't sustain
+buried play, the buried-cell gap stays unfittable for aggressive players no matter what my regressor
+does — and we'd need a "survive-while-buried" behavior, not just a weight. Your read? (If you can,
+a quick `winRateTest`/survival run at counterPressure 0 vs 0.7 vs 1 would answer it directly.)
+
+Everything else is go: pre-check passed, re-emit running (kekeke ~60/438), targets/knobs/scorecard
+ready. The fit will lean hardest on counterPressure for kekeke, so I want to know it can deliver
+before I burn the fit on it.
+
 ### 2026-06-15 — data track: anticipation reworked + validated; re-emit running; impending fix 👍
 - **Your `impending` eta fix = exactly right** (min-positive `nextEta`, `effEta=0` for all-overdue).
   That's the behavior I needed; our two sides now read eta the same way. Nice.

@@ -20,10 +20,11 @@ local name = arg[3] or "PanelBot"
 local difficulty = arg[4] or "medium"
 local modelDir = arg[5] -- optional
 
--- modelDir slot doubles as a brain selector: "expert" -> ExpertBrain, a path ->
--- trained model, nil -> heuristic.
-local brain = (modelDir == "expert") and "expert" or (modelDir and "model" or "heuristic")
-if modelDir == "expert" then modelDir = nil end
+-- modelDir slot doubles as a brain selector: "search"/"expert" -> that brain,
+-- a path -> trained model, nil -> heuristic.
+local namedBrain = (modelDir == "search" or modelDir == "expert") and modelDir or nil
+local brain = namedBrain or (modelDir and "model" or "heuristic")
+if namedBrain then modelDir = nil end
 
 local bot = BotClient({
   ip = ip, port = port, name = name, difficulty = difficulty,

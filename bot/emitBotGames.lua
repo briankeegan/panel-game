@@ -28,9 +28,11 @@ local port = tonumber(arg[4]) or 49569
 local hostProfile = (arg[5] ~= "" and arg[5]) or nil -- a bot/profiles/*.json path, or nil
 local difficulty = arg[6] or "hard"
 
-local host = BotClient({ ip = ip, port = port, name = "emit_host", difficulty = difficulty,
+-- account names suffixed with <id> so concurrent emits (parallel fit evals) don't
+-- collide on the server (data track's request).
+local host = BotClient({ ip = ip, port = port, name = "emit_host_" .. id, difficulty = difficulty,
   brain = "search", searchProfile = hostProfile })
-local join = BotClient({ ip = ip, port = port, name = "emit_join", difficulty = difficulty, brain = "search" })
+local join = BotClient({ ip = ip, port = port, name = "emit_join_" .. id, difficulty = difficulty, brain = "search" })
 
 local function fail(m) print("EMIT FAILED: " .. tostring(m)); os.exit(1) end
 local function pumpUntil(cond, secs, label)

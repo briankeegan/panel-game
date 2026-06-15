@@ -32,6 +32,13 @@ local DEFAULTS = {
   futureDiscount = 0.6, -- moderate: fire combos as reachable, don't hoard for chains
   heightBand = { 6, 8 },  -- build low + flatten early so garbage lands with dig room
   actMargin = 1.0,      -- only swap if it beats holding by this
+  -- CONTEXT KNOBS (data §26: discriminators are "when safe", so these are gated to
+  -- the safe context, not global). Default 1.0 = current behavior. The fit moves
+  -- these per player (raise: kekeke high / chaos low; dig: proactive vs reactive;
+  -- chain depth: deeper when safe). See BOT_DATA_UPDATES "EVAL FROZEN".
+  raiseWhenSafe = 0.0,      -- [0..1] proactive-raise propensity when safe + low (0 = robust default)
+  digWhenSafe = 1.0,        -- [0..2] dig-reward multiplier when not buried (proactive dig)
+  chainDepthWhenSafe = 1.0, -- [0..2] chain-build multiplier when fully safe (deeper chains)
 }
 
 function SearchBrain.new(opts)
@@ -171,6 +178,12 @@ function SearchBrain:decide(state)
   local baseH = maxH
   local baseGd = hasGb and BoardSim.garbageDepthSum(baseGrid, rows) or 0
 
+  -- context-knob scales (data §26): gated to the SAFE context, default 1.0 = neutral.
+  -- digWhenSafe tunes proactive (not-buried) digging; chainDepthWhenSafe tunes deeper
+  -- chain-building when fully safe.
+  local digSafeScale = (buried < 0) and cfg.digWhenSafe or 1
+  local chainSafeScale = (buried < 0 and incoming == 0 and not hasGb) and cfg.chainDepthWhenSafe or 1
+
   -- DIG PLAN: when garbage is present, find the first move of a short (≤3-move,
   -- region-bounded beam) swap sequence that breaks it. We don't override the normal
   -- search with it — we INJECT it as a high-value candidate (digKey/digReward below)
@@ -183,7 +196,7 @@ function SearchBrain:decide(state)
     if digFirst and digGb > 0 then
       digKey = digFirst[1] * 100 + digFirst[2]
       -- shallower plans + bigger breaks + more danger = stronger pull to step 1
-      digReward = (digGb * (8 + incoming + dangerBonus) / digDepth) * cfg.w_breakGarbage
+      digReward = (digGb * (8 + incoming + dangerBonus) / digDepth) * cfg.w_breakGarbage * digSafeScale
     end
   end
 
@@ -208,10 +221,10 @@ function SearchBrain:decide(state)
       local gd = BoardSim.garbageDepthSum(g, rows)
       if gd < baseGd then score = score + (baseGd - gd) * (4 + dangerBonus) end
     end
-    if chain >= 2 then score = score + chain * cfg.chainUnit * cfg.w_chain * offenseScale end
+    if chain >= 2 then score = score + chain * cfg.chainUnit * cfg.w_chain * offenseScale * chainSafeScale end
     if firstClear >= 4 then score = score + (firstClear - 3) * cfg.comboUnit * offenseScale end
     if garbageCleared > 0 then                                                        -- dig dominates when buried
-      score = score + garbageCleared * (6 + incoming + dangerBonus) * cfg.w_breakGarbage
+      score = score + garbageCleared * (6 + incoming + dangerBonus) * cfg.w_breakGarbage * digSafeScale
     end
     if digKey and r * 100 + c == digKey then score = score + digReward end            -- dig-plan step 1
     score = score - (math.abs(cr - r) + math.abs(cc - c)) * 0.02                      -- travel
@@ -230,9 +243,9 @@ function SearchBrain:decide(state)
     local e = scored[i]
     local gtop = math.min(rows, BoardSim.maxHeight(e.g, rows) + 1)
     local potChain, _, potCombo, potDig = BoardSim.chainPotential(e.g, rows, gtop)
-    if potChain >= 2 then e.score = e.score + potChain * cfg.chainUnit * cfg.w_chain * cfg.futureDiscount * offenseScale end
+    if potChain >= 2 then e.score = e.score + potChain * cfg.chainUnit * cfg.w_chain * cfg.futureDiscount * offenseScale * chainSafeScale end
     if potCombo >= 4 then e.score = e.score + (potCombo - 3) * cfg.comboUnit * cfg.futureDiscount * offenseScale end
-    if potDig > 0 then e.score = e.score + potDig * (3 + dangerBonus) * cfg.w_breakGarbage * cfg.futureDiscount end
+    if potDig > 0 then e.score = e.score + potDig * (3 + dangerBonus) * cfg.w_breakGarbage * cfg.futureDiscount * digSafeScale end
     if not best or e.score > bestScore then best, bestScore = e.sw, e.score end
   end
 
@@ -247,7 +260,14 @@ function SearchBrain:decide(state)
   -- swap threshold toward 0 once garbage is on the board.
   local margin = hasGb and 0.1 or cfg.actMargin
   local decision
-  if best and bestScore > holdValue + margin then
+  -- PROACTIVE raise (raise-propensity knob): a raise-happy clone (kekeke) RAISEs to
+  -- build material as a PRIMARY action when safe + low + clean, not just as a last
+  -- resort. Gated by raiseWhenSafe, rolled once per board state (cached) -> a tunable
+  -- raise rate. Default 0 = off (only the last-resort raise below fires) = robust-hard.
+  if cfg.raiseWhenSafe > 0 and not state.danger and not hasGb and incoming == 0
+    and maxH < cfg.heightBand[2] and math.random() < cfg.raiseWhenSafe then
+    decision = { type = "RAISE" }
+  elseif best and bestScore > holdValue + margin then
     decision = { type = "SWAP", pos = best }
   elseif hasGb then
     -- garbage present but nothing scored above holding (no clear/dig found): don't
@@ -265,7 +285,7 @@ function SearchBrain:decide(state)
     local setup = BoardSim.setupMove(baseGrid, rows) or BoardSim.flattenMove(baseGrid, rows)
     decision = setup and { type = "SWAP", pos = setup } or { type = "WAIT" }
   elseif not state.danger and maxH < cfg.heightBand[1] then
-    decision = { type = "RAISE" }
+    decision = { type = "RAISE" } -- last-resort raise: too low, nothing better to do
   else
     decision = { type = "WAIT" }
   end

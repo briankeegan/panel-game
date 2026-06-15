@@ -16,8 +16,10 @@ local GameModes = require("common.data.GameModes")
 local ip = arg[1] or "104.156.250.136"
 local port = tonumber(arg[2]) or 49569
 
-local host = BotClient({ ip = ip, port = port, name = "BotHost" })
-local join = BotClient({ ip = ip, port = port, name = "BotJoin" })
+-- Heuristic vs random: the greedy clearer should keep its board far lower and
+-- outlast the raise-spamming random bot.
+local host = BotClient({ ip = ip, port = port, name = "BotHost", brain = "heuristic" })
+local join = BotClient({ ip = ip, port = port, name = "BotJoin", brain = "random" })
 
 local function fail(msg)
   print("=== MATCH SPIKE FAILED: " .. tostring(msg) .. " ===")
@@ -87,6 +89,14 @@ while socket.gettime() < simDeadline do
   socket.sleep(1 / 60)
 end
 
+local function surv(b)
+  local s = b.myStack
+  return string.format("died@%s clock=%s maxCol=%s",
+    tostring(s and s.game_over_clock), tostring(s and s.clock),
+    tostring(s and require("bot.BoardState").extract(s).maxColHeight))
+end
+print(string.format("host(heuristic): %s", surv(host)))
+print(string.format("join(random):    %s", surv(join)))
 print(string.format("outcomes: host=%s, join=%s", tostring(host.outcome), tostring(join.outcome)))
 if host.matchEnded and join.matchEnded then
   print("=== MATCH SPIKE OK: full random bot-vs-bot match played to completion in room "

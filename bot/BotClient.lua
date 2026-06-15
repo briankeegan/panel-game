@@ -44,6 +44,7 @@ local BotClient = class(function(self, opts)
   self.ip = opts.ip or "127.0.0.1"
   self.port = opts.port or 49569
   self.name = opts.name or "BotBella"
+  self.brainKind = opts.brain or "heuristic" -- "heuristic" | "random"
   self.gameplay = TcpClient({ name = "bot-gameplay", defaultPort = self.port })
   -- Persisted server identity so re-runs reuse the same account instead of
   -- re-registering (and tripping the server's name-already-taken guard).
@@ -192,6 +193,7 @@ function BotClient:dispatch(msg)
   elseif msg[SRV_D_PREFIX] then
     -- relayed DeathEvent. For 2p, a death we didn't send = the opponent's.
     self.oppDied = true
+    self.outcome = self.outcome or "won"
     logger.info("bot[" .. self.name .. "]: opponent topped out (relayed D)")
   elseif msg.gameResult then
     self.matchEnded = true
@@ -249,6 +251,11 @@ function BotClient:startMatch()
     error("bot[" .. self.name .. "]: no stack at slot " .. tostring(self.localPlayerNumber))
   end
   self.myStack.is_local = true
+  if self.brainKind == "heuristic" then
+    self.brain = require("bot.HeuristicBrain").new()
+    self.controller = require("bot.CursorController").new()
+    self.boardState = require("bot.BoardState")
+  end
   self.scheduledStartMs = socket.gettime() * 1000 + (self.matchStart.startInMs or 500)
   self.matchEnded = false
   self.deathSent = false
@@ -264,15 +271,24 @@ function BotClient:tickMatch()
   if socket.gettime() * 1000 < self.scheduledStartMs then return end -- hold for the aligned start instant
 
   local stack = self.myStack
-  if (stack.game_over_clock or 0) == 0 then
-    local char = randomInputChar()
+  -- Feed+send input while the stack is still running. NOTE: alive sentinel is
+  -- game_over_clock == -1 (NOT 0); use game_ended() so we keep ticking up to the
+  -- recorded death frame.
+  if not stack:game_ended() then
+    local char
+    if self.brain then
+      local st = self.boardState.extract(stack)
+      char = self.controller:nextInput(st, self.brain:decide(st))
+    else
+      char = randomInputChar()
+    end
     stack:receiveConfirmedInput(char)
     self.gameplay:send(NetworkProtocol.markedMessageForTypeAndBody(I_PREFIX, char))
   end
 
   self.match:run()
 
-  if (stack.game_over_clock or 0) > 0 and not self.deathSent then
+  if (stack.game_over_clock or -1) > 0 and not self.deathSent then
     self.deathSent = true
     logger.info(string.format("bot[%s]: topped out at frame %d -> sending D", self.name, stack.game_over_clock))
     self.gameplay:send(NetworkProtocol.markedMessageForTypeAndBody(D_PREFIX,

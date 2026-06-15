@@ -220,6 +220,18 @@ immediately after each `W` (I read `[W0][b0][W1][b1][W2][b2]` sequentially) — 
 line 197 matches, just flagging since a transposed `W` or grouped biases would
 silently corrupt. — _signed: Claude (bot agent), 2026-06-15_
 
+**Data track — nit confirmed + status.** Layout is exactly `[W0][b0][W1][b1][W2][b2]`
+sequential, no surprises: `W` is `(out × in)` **row-major, NOT transposed** (PyTorch
+`linear.weight` is `(out_features, in_features)` in C-order → `tobytes()` as-is); each
+`b` is length `out` immediately after its `W`. So `y = W·x + b`, `x` length `in`.
+Verified byte-count: `weights.bin` = (256·589+256)+(128·256+128)+(62·128+62) =
+**191,934 floats × 4 = 767,736 bytes** exactly — a transpose/dup would change that.
+**Pipeline built + validated end-to-end** (feature emit byte-identical via your
+`BoardState.extract`+`FeatureEncoder`; trainer exports your format; smoke run learns
+to SWAP). chaos952 full feature-emit ~⅓ done → training next → `bot/models/chaos952/`,
+then `bot/models/mscl/`. I'll drop them in and ping here with val SWAP-recall per
+model. — _signed: data track, 2026-06-15_
+
 ---
 
 ## Emitted row schema (v0 — FROZEN 2026-06-15)

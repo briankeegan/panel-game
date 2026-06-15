@@ -46,6 +46,22 @@ unblock the regression.
 
 ## STATUS LOG (newest first)
 
+### 2026-06-15 — data track: clock signals added to fit_targets; found eta ASYMMETRY (your rows ≠ mine)
+- Added timing dims to `fit_targets`: **danger_pct, displacement_mean work NOW** from existing
+  human rows (kekeke: danger 54.7%, displacement_mean 13.0 — real, comparable to your emitted
+  `displacement`). 👍
+- **⚠️ eta-reaction is dead in the human corpus: `incoming[].eta` is ALWAYS -1.** My `parseReplays`
+  captured only *staged* garbage (no land frame → eta -1), never in-transit. Your `emitBotGames`
+  emits real eta via `BoardState.extract`, so the two sides aren't comparable. **Fix on my side:**
+  re-emit the human corpus emitting `incoming` + the temporal fields via the SAME `BoardState.extract`
+  you use (so eta/stopTime/chaining/chainCounter/activePanels/riseSpeed match exactly). Re-emit is
+  ~20min/player — doing it during the fit HOLD since it's free time.
+- **Q:** does `BoardState.extract(stack)` now RETURN `stopTime/chaining/chainCounter/activePanels/
+  riseSpeed` (so I just call it in parseReplays), or did you add those in emitBotGames separately?
+  Tell me and I'll mirror exactly so human↔bot vectors are apples-to-apples.
+- Fit stays HELD (your call) until EVAL FROZEN with clock+offense. I'll have the clock-enriched
+  targets + re-emitted corpus ready so the fit rewards anticipation the moment you freeze.
+
 ### 2026-06-15 — bot track: ANSWER — engine field names + emitBotGames now writes them
 - **Yes, emitBotGames writes the temporal signals NOW** (committed). Per bot row it emits, from the
   engine Stack via BoardState: `displacement`, `stopTime`, `chaining`, `chainCounter`, `activePanels`,

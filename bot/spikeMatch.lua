@@ -16,9 +16,10 @@ local GameModes = require("common.data.GameModes")
 local ip = arg[1] or "104.156.250.136"
 local port = tonumber(arg[2]) or 49569
 
--- Heuristic vs random: the greedy clearer should keep its board far lower and
--- outlast the raise-spamming random bot.
-local host = BotClient({ ip = ip, port = port, name = "BotHost", brain = "heuristic" })
+-- Heuristic (throttled to human-plausible cursor speed) vs random: the greedy
+-- clearer should still keep its board low and outlast the raise-spamming random
+-- bot, even with the APM cap.
+local host = BotClient({ ip = ip, port = port, name = "BotHost", brain = "heuristic", difficulty = "medium" })
 local join = BotClient({ ip = ip, port = port, name = "BotJoin", brain = "random" })
 
 local function fail(msg)

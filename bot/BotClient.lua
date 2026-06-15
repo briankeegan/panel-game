@@ -44,7 +44,8 @@ local BotClient = class(function(self, opts)
   self.ip = opts.ip or "127.0.0.1"
   self.port = opts.port or 49569
   self.name = opts.name or "BotBella"
-  self.brainKind = opts.brain or "heuristic" -- "heuristic" | "random"
+  self.brainKind = opts.brain or "heuristic"   -- "heuristic" | "random"
+  self.difficulty = opts.difficulty or "medium" -- "easy" | "medium" | "hard" (cursor-speed/reaction cap)
   self.gameplay = TcpClient({ name = "bot-gameplay", defaultPort = self.port })
   -- Persisted server identity so re-runs reuse the same account instead of
   -- re-registering (and tripping the server's name-already-taken guard).
@@ -253,7 +254,7 @@ function BotClient:startMatch()
   self.myStack.is_local = true
   if self.brainKind == "heuristic" then
     self.brain = require("bot.HeuristicBrain").new()
-    self.controller = require("bot.CursorController").new()
+    self.controller = require("bot.CursorController").new(self.difficulty)
     self.boardState = require("bot.BoardState")
   end
   self.scheduledStartMs = socket.gettime() * 1000 + (self.matchStart.startInMs or 500)

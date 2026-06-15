@@ -26,6 +26,14 @@ local BotClient = class(function(self, opts)
   -- Persisted server identity so re-runs reuse the same account instead of
   -- re-registering (and tripping the server's name-already-taken guard).
   self.userId = self:readIdentity() or "need a new user id"
+  -- lobby/room/match state, populated by pump() from server-pushed messages
+  self.publicId = nil
+  self.roomNumber = nil
+  self.localPlayerNumber = nil
+  self.players = nil
+  self.lobby = nil
+  self.inRoom = false
+  self.matchStart = nil -- {replay, startInMs, startAtMs} once matchStart arrives
 end)
 
 function BotClient:identityPath()
@@ -113,6 +121,97 @@ function BotClient:login()
   logger.info(string.format("bot: logged in as '%s' (publicId=%s)",
     self.name, tostring(self.publicId)))
   return true
+end
+
+-- Resolve our own slot in a room from the players table (server doesn't echo
+-- it back post-sanitize; we match on our publicId).
+local function findLocalNumber(players, publicId)
+  for playerNumber, p in pairs(players) do
+    if p.publicId == publicId then return playerNumber end
+  end
+end
+
+local function countKeys(t)
+  local n = 0
+  for _ in pairs(t) do n = n + 1 end
+  return n
+end
+
+-- Apply one sanitized server-pushed message to our local state.
+function BotClient:dispatch(msg)
+  if msg.lobbyStateV2 then
+    self.lobby = msg.content
+  elseif msg.create_room or msg.addToRoom then
+    self.roomNumber = msg.roomNumber
+    self.players = msg.players
+    self.gameMode = msg.gameMode
+    self.inRoom = true
+    self.localPlayerNumber = findLocalNumber(msg.players, self.publicId) or self.localPlayerNumber
+    logger.info(string.format("bot[%s]: in room %s as slot %s (%d players)",
+      self.name, tostring(self.roomNumber), tostring(self.localPlayerNumber),
+      countKeys(msg.players)))
+  elseif msg.playerJoinedRoom then
+    -- incremental notice to existing room members (not a full snapshot)
+    local j = msg.playerJoinedRoom
+    self.players = self.players or {}
+    self.players[j.playerNumber] = {
+      playerNumber = j.playerNumber, name = j.name, publicId = j.publicId, settings = j.settings,
+    }
+    logger.info(string.format("bot[%s]: player joined slot %s (%s); now %d players",
+      self.name, tostring(j.playerNumber), tostring(j.name), countKeys(self.players)))
+  elseif msg.playerLeftRoom and self.players then
+    for playerNumber, p in pairs(self.players) do
+      if p.publicId == msg.playerLeftRoom.publicId then self.players[playerNumber] = nil end
+    end
+  elseif msg.match_start then
+    self.matchStart = { replay = msg.replay, startInMs = msg.startInMs, startAtMs = msg.startAtMs }
+    logger.info(string.format("bot[%s]: MATCH START (startInMs=%s)",
+      self.name, tostring(msg.startInMs)))
+  elseif msg.leave_room then
+    self.inRoom = false
+    logger.info("bot[" .. self.name .. "]: left room (" .. tostring(msg.reason) .. ")")
+  end
+  -- menu_state / playerJoinedRoom / gameResult etc. are ignored for now.
+end
+
+-- Non-blocking: read the socket and drain all pushed messages into state.
+function BotClient:pump()
+  self.gameplay:processIncomingMessages()
+  local q = self.gameplay.receivedMessageQueue
+  local msg = q:pop()
+  while msg do
+    self:dispatch(msg)
+    msg = q:pop()
+  end
+end
+
+function BotClient:createRoom(gameMode, openRoom)
+  logger.info("bot[" .. self.name .. "]: creating room (" .. gameMode.name .. ")")
+  self.gameplay:sendRequest(ClientProtocol.sendRoomRequest(gameMode, "normal", openRoom, false))
+end
+
+function BotClient:joinRoom(roomNumber, slotNumber)
+  logger.info("bot[" .. self.name .. "]: joining room " .. tostring(roomNumber))
+  self.gameplay:sendRequest(ClientProtocol.requestJoinRoom(roomNumber, slotNumber))
+end
+
+-- Declare loaded + ready + wants_ready in one settings update. A bot has no
+-- assets, so it just asserts loaded=true. Server gate: wants_ready ∧ loaded ∧ ready.
+function BotClient:sendReady()
+  logger.info("bot[" .. self.name .. "]: readying up")
+  self.gameplay:sendRequest(ClientProtocol.sendPlayerSettings({
+    loaded = true,
+    ready = true,
+    wants_ready = true,
+    level = 5,
+    inputMethod = "controller",
+    cursor = "__Ready",
+  }))
+end
+
+function BotClient:disconnect()
+  pcall(function() self.gameplay:sendRequest(ClientProtocol.leaveRoom()) end)
+  self.gameplay:resetNetwork()
 end
 
 return BotClient

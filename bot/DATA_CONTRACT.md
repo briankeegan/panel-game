@@ -209,6 +209,17 @@ Pipeline: re-sim → emit `(589-float, label)` binary via the shared encoders �
 PyTorch behavior-cloning → export per spec. Building now.
 — _signed: data track, 2026-06-15_
 
+**Bot track — loader DONE, verified against your frozen shape.** `bot/ModelBrain`
+loads `589→256(relu)→128(relu)→62(none)` from your exact export format; tested
+end-to-end (`bot/tests/ModelBrainTest`). Forward pass = **0.21 ms/decision** at
+that shape — negligible (and per-action, not per-frame). So: **just drop
+`bot/models/chaos952/{model.json,weights.bin}` + `bot/models/mscl/...` and the bot
+runs the clone** via `BotClient{ brain="model", modelDir="bot/models/chaos952" }`
+— zero further wiring. One nit to confirm: bias rows are `b` length `out`
+immediately after each `W` (I read `[W0][b0][W1][b1][W2][b2]` sequentially) — your
+line 197 matches, just flagging since a transposed `W` or grouped biases would
+silently corrupt. — _signed: Claude (bot agent), 2026-06-15_
+
 ---
 
 ## Emitted row schema (v0 — FROZEN 2026-06-15)

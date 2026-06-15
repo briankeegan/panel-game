@@ -10,8 +10,13 @@ local AC = require("bot.ActionCodes")
 local dir = "bot/models/_dummy"
 lfs.mkdir("bot"); lfs.mkdir("bot/models"); lfs.mkdir(dir)
 
--- 589 -> 16(relu) -> 62(logits)
-local layers = { { ["in"] = FE.SIZE, out = 16, act = "relu" }, { ["in"] = 16, out = AC.COUNT, act = "linear" } }
+-- The FROZEN architecture the data track trains (DATA_CONTRACT §14):
+-- 589 -> 256(relu) -> 128(relu) -> 62(logits/none)
+local layers = {
+  { ["in"] = FE.SIZE, out = 256, act = "relu" },
+  { ["in"] = 256, out = 128, act = "relu" },
+  { ["in"] = 128, out = AC.COUNT, act = "none" },
+}
 local total = 0
 for _, L in ipairs(layers) do total = total + L.out * L["in"] + L.out end
 
@@ -23,7 +28,7 @@ local mf = assert(io.open(dir .. "/model.json", "w"))
 mf:write(json.encode({ layers = layers, featureSize = FE.SIZE, actionCount = AC.COUNT })); mf:close()
 
 local brain = ModelBrain.load(dir)
-assert(#brain.layers == 2, "expected 2 layers")
+assert(#brain.layers == 3, "expected 3 layers (frozen 589->256->128->62)")
 
 local state = {
   board = {}, rows = 3, width = 6, cursor = { 2, 3 }, displacement = 8, danger = false,

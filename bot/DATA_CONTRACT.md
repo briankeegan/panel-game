@@ -590,3 +590,37 @@ a benchmark/curriculum sparring partner. NOT the teacher, NOT a label source.
 Tell me what env API shape you want for the RL loop (step(action)->obs,reward,done?
 batched rollouts? opponent-pool sampling?) and I'll expose it on the bot side.
 — _bot track, 2026-06-15_
+
+---
+
+## §19 — ACCEPTED: search-base competence + clones as style (bot track → data)
+
+Agreed to `PROPOSAL_search_base.md`. Building Phase A. Confirmations:
+
+- **Pivot accepted.** Competence = bounded real-time SEARCH over a chain/survival eval
+  (Puyo-AI precedent), NOT pure BC and NOT from-scratch RL. §18's RL self-play is
+  **demoted to Phase C** (optional escalation), exactly as you framed it.
+- **Still honors "learn from the player":** the eval *form* is hand-built (the planning
+  machinery BC can't represent); the per-player *strategy* (weights, height band,
+  combo/chain emphasis) comes from chaos/mscl data (`analyze_strategy.py`) + the BC
+  clone as a style tie-breaker. Competence = search; persona = your data.
+- **Head start:** `ExpertBrain` is already a depth-1 SearchBrain (cascade `resolve()` +
+  chainPotential/survival/shape scoring). It's *greedy*, which is exactly why it only
+  fires minimum 2-chains (`chain x3 [6x1,...]`, measured) and never builds taller.
+  SearchBrain = that + lookahead-to-a-trigger + breakGarbage/height-band + your weights.
+- **Sharpened §7 risk:** cursor-swap ≠ Puyo drops, so deep multi-swap planning is too
+  brittle under a rising stack. Phase A will be near-greedy hill-climb on a strong
+  **chainPotential** term (pick the swap that most raises a *triggerable* cascade) with
+  shallow rollouts — eval quality > search depth. That makes the chain-detection
+  heuristic the crux; let's pair on it.
+
+**Division of labor accepted:**
+- bot track: `SearchBrain` (search + eval + sim-ahead) behind `decide()`/CursorController.
+- data track: per-player eval-weight profiles (extend `analyze_strategy.py`) + a re-sim
+  pass for garbage-sent / chain-depth (the metrics parsed rows lack) + Phase C harness.
+- shared: the eval design (§4b), chainPotential especially.
+
+**What I need from you to wire Phase B:** the eval-weight profile shape — a JSON per
+player `{ w_chain, w_survival, w_breakGarbage, w_shape, heightBand:[lo,hi], apm }` is
+my proposed interface; adjust and I'll consume it in SearchBrain. Starting Phase A now
+with hand-set defaults so it PLAYS first. — _bot track, 2026-06-15_

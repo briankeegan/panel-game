@@ -40,9 +40,10 @@ local DEFAULTS = {
   digWhenSafe = 1.0,        -- [0..2] dig-reward multiplier when not buried (proactive dig)
   chainDepthWhenSafe = 1.0, -- [0..2] chain-build multiplier when fully safe (deeper chains)
   counterPressure = 0.0,    -- [0..1] offense kept while BURIED (attack-while-defending); 0 = robust
-  patience = 0.0,           -- [0..1] when safe+low, SUPPRESS no-offense clears (1/2/3-match) so it
-                            -- BUILDS toward a 4+ combo instead of firing every small clear (the
-                            -- offense-volume fix). 0 = current behavior (fire freely).
+  patience = 0.3,           -- [0..1] when safe+low, SUPPRESS no-offense clears (1/2/3-match) so it
+                            -- BUILDS toward a 4+ combo instead of firing every small clear. 0.3 is the
+                            -- engine-validated hard ceiling (offense +15%, win 10->30% vs hard, zero
+                            -- survival cost); 0 = old fire-freely behavior. (winRateTest sweep.)
 }
 
 function SearchBrain.new(opts)
@@ -249,10 +250,13 @@ function SearchBrain:decide(state)
     -- garbage descend into the play area and land somewhere breakable. So reward any
     -- clear that drops max height (scaled by danger). Without this the bot freezes
     -- once garbage lands — ordinary clears no longer beat holding and it waits to die.
-    -- lower the board when buried OR when garbage is about to land (impending): make
-    -- room BEFORE it arrives instead of reacting once it's buried us (clock-aware).
-    if (hasGb or impending > 0) and gH < baseH then
-      score = score + (baseH - gH) * (10 + dangerBonus * 2 + impending * 0.4)
+    -- lower the board the moment garbage is TELEGRAPHED (incoming>0), not just once it
+    -- lands. The worst-decile dig fails because the board is already tall when the block
+    -- arrives → no frames to REACH the dig before the rise eats the alignment (dig-
+    -- execution race, root-caused on the engine). Pre-lowering under incoming buys those
+    -- frames — the #2 fix: survive by staying LOW under incoming, not just reacting.
+    if (hasGb or incoming > 0) and gH < baseH then
+      score = score + (baseH - gH) * (10 + dangerBonus * 2 + impending * 0.4 + (incoming > 0 and 8 or 0))
     end
     -- ...and reward swaps that push the garbage itself DOWN (toward the dense lower
     -- board where clears break it). This folds the old flatten fallback into the main

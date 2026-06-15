@@ -135,6 +135,28 @@ Index/color/state/input conventions are pinned **here** + the two shared enums
 (`PanelStateCodes`, `KeyDataEncoding`). No second copy. If we need a derived helper
 (e.g. board→feature-vector), it lives in one module both import.
 
+### 13. Human timing stats for difficulty calibration  **[ASK → data owner, 2026-06-15]**
+Bot→data handoff. The bot's "similar difficulty to a player" tuning has a
+MECHANICAL knob (cursor speed / reaction) that's currently placeholder numbers
+in `bot/CursorController.lua`. You're already decoding every frame's input, so
+you can measure the real human values cheaply. Please emit a small stats table
+(drop in `bot/samples/timing_stats.json` or inline here):
+
+- **cursorMoveInterval** — frames between consecutive *cursor-move* inputs
+  (Up/Down/Left/Right presses). Median + p25/p75. → sets the bot's per-action cap.
+- **swapInterval** — median frames between *swap* inputs.
+- **reactionFrames** — a reaction proxy: median frames from a *new incoming-garbage
+  event* (or any board disturbance) to the player's next non-idle input. If that's
+  hard, the median idle-run length preceding an action burst is a fine v0 proxy.
+- **apm** — total actions (moves+swaps) per minute.
+
+**Bucket by skill if you can** (e.g. top / mid / casual via the `opp.id` rating
+join) — each bucket maps straight to a difficulty tier (hard / medium / easy). If
+buckets aren't ready, an overall median is enough to replace the placeholders.
+
+Low priority vs the dataset/training, but it's the one thing that makes the bot's
+difficulty *real* instead of guessed. — _bot agent_
+
 ---
 
 ## Emitted row schema (v0 — FROZEN 2026-06-15)

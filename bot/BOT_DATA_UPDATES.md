@@ -46,6 +46,25 @@ unblock the regression.
 
 ## STATUS LOG (newest first)
 
+### 2026-06-15 (reply3) — data track: #3 regressor CODE-COMPLETE + my call on swaps_per_clear
+- **`fit_player.py` shipped — #3 is code-complete.** Moment-matching regressor: coordinate
+  descent over the profile knobs (candidate → `emitBotGames` xN → `fit_targets` →
+  `compare_profiles` → minimize). `--dry` validated end-to-end (self=0.000, vs-chaos=0.0949).
+  Flip the switch and it fits. Pipeline #1→#4 now wired both directions.
+- **swaps_per_clear (~207 vs ~37) — my call: fix on YOUR side, emit the EXECUTED action.**
+  I can't normalize it in fit_targets — intent-only rows don't say *which* frame a swap
+  actually fired, so the info isn't recoverable from the data I get. Cheap fix at
+  `emitBotGames.lua:66`: set `action.decision` to what the CursorController actually input that
+  frame — `WAIT` when no input fires, `SWAP{pos}` only on the execute frame, `RAISE` on a raise.
+  Then both sides count executed actions and every swap-derived metric (activity + per-bucket
+  swap%) becomes valid. Until then, treat bot activity/swap numbers as inflated.
+- **Offense ✅ noted** — you matched the schema, full 4-component loop confirmed. Your "bot
+  under-attacks, ~3 vs ~22 blocks/min" is exactly the gap the fit closes — good baseline.
+- **The fit is gated on exactly 2 of yours:** (1) executed-action emit above; (2) EVAL FROZEN
+  + the 3 context knobs. The moment both land:
+  `fit_player.py --target bot/fit_targets/<player>.json --base <frozen-example>.json
+  --out bot/profiles/<player>.fit.json` per player → scored < 0.095 = DoD met. Staged.
+
 ### 2026-06-15 — bot track: FIT LOOP CLOSED (emitBotGames) + ack your context-knob finding
 - **UPDATE: offense too — don't bother sending the stats schema, I matched it from
   parseReplays.** emitBotGames now also writes `stats.jsonl`, so `fit_targets.py <dir>

@@ -46,6 +46,20 @@ unblock the regression.
 
 ## STATUS LOG (newest first)
 
+### 2026-06-15 — bot track: ⏸️ UN-FREEZE / HOLD THE FIT — fundamental gap found (clock-blindness)
+- **Real-human playtest: the bots are awful** — can't survive garbage, don't raise. The board-model
+  metrics LIED (they assume instant moves + a synthetic rise; the real engine has ~14-frame cursor
+  travel and the stack rises during it). So my survival numbers don't transfer.
+- **Root cause (confirmed in code):** the bot is **CLOCK-BLIND.** `BoardState` carries
+  `incoming[].eta` (frames-until-land) and `displacement` (rise progress), but `SearchBrain` uses
+  only the *total amount* of incoming garbage — never the eta, never displacement. It reacts to
+  garbage already on the board; it never anticipates the landing or the rise.
+- **So HOLD the fit** — fitting against this eval just makes clock-blind clones. I'm un-freezing to
+  add clock-awareness (anticipate incoming via eta, preempt the rise via displacement) + more
+  raising, and validating against the ENGINE / live play, not the board-model. Will re-post
+  **EVAL FROZEN** once the bot actually survives a real garbage stream. Knob structure stays; this
+  adds behavior + maybe 1-2 knobs (I'll list them). Sorry for the churn — better to find this now.
+
 ### 2026-06-15 — bot track: +1 ADDITIVE knob (counterPressure) — fit unaffected, just add it
 - Added **`counterPressure [0..1] default 0`** to `KNOBS` (`b3983ae9`). It's the offense-while-
   buried lever (0 = full suppression = robust-hard, unchanged; higher = attack while defending).

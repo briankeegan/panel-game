@@ -10,8 +10,11 @@
 --    Command grammar (one per line; '#' = comment):
 --      tap <key>           one key tap (return/escape/up/down/left/right/f2/a-z)
 --      hold <key> <frames> press, hold N frames, release (claim a device etc.)
---      menusel <label>     move the current menu's cursor to a loc-key/label item
---                          and press Return (e.g. `menusel mm_1_vs`, `menusel og stuff`)
+--      where               report what the cursor is on: `where: <i>/<n> "<label>"
+--                          in <scene>` — VALIDATE position by text, navigate by tap
+--      menusel <label>     auto-jump: cursor to a loc-key/label menu item + Return
+--                          (only works on ui.Menu, not the Lobby ScrollMenu;
+--                          prefer tap up/down + `where` for hand navigation)
 --      waitscene <name> [t] block until that scene is active (t = timeout frames)
 --      wait <frames>       idle
 --      shoot [name]        screenshot to <name>.png in the shared save dir
@@ -23,6 +26,12 @@
 --    Sync: wait for the `ready=<scene>` line in PA_OUT_FILE before sending
 --    commands (boot settled + polling live). Cleanup with `find -delete`, not a
 --    zsh `rm *.png` glob (aborts the line on no-match). Quit via the `quit` cmd.
+--
+--    Hand-navigation pattern (works on any menu, incl. the Lobby ScrollMenu):
+--      tap down            # step
+--      where               # -> e.g. `where: 4/9 "Create FFA" in Lobby`
+--      tap down            # adjust until `where` shows the target, then:
+--      tap return
 --
 -- B) SCRIPTED (PA_AUTO_REPLAY / PA_AUTO_ONLINE_ROOM) — one-and-forget journeys.
 --    From boot it walks the scenes: Main Menu -> Replay Browser -> open the target
@@ -305,6 +314,40 @@ local function stepMenusel()
   st.busy = st.tapGap -- pace cursor steps so each tap registers
 end
 
+-- Best-effort text of a UI node: its own label, a button's label, or the first
+-- labelled descendant. Used to read what's under the cursor for validation.
+local function nodeText(node, depth)
+  if not node or depth > 4 then return nil end
+  if type(node.text) == "string" and node.text ~= "" then return node.text end
+  if node.label and type(node.label.text) == "string" and node.label.text ~= "" then return node.label.text end
+  if node.textButton and node.textButton.label and type(node.textButton.label.text) == "string" then
+    return node.textButton.label.text
+  end
+  if node.children then
+    for _, ch in ipairs(node.children) do
+      local t = nodeText(ch, depth + 1)
+      if t then return t end
+    end
+  end
+  return nil
+end
+
+-- Report what the cursor is on in the active menu, so navigation can be VALIDATED
+-- by text (not by eyeballing a screenshot). Handles ui.Menu (scene.menu:
+-- selectedIndex + menuItems) and the Lobby's ScrollMenu (scene.lobbyMenu:
+-- selectedIndex + children). Writes `where: <i>/<n> "<label>" in <scene>`.
+local function whereAmI()
+  local s = scene()
+  local menu = s and (s.menu or s.lobbyMenu)
+  local items = menu and (menu.menuItems or menu.children)
+  if not (menu and items) then
+    writeOut("where: no menu in " .. tostring(sceneName())); return
+  end
+  local idx = menu.selectedIndex or 0
+  local label = nodeText(items[idx], 0)
+  writeOut(string.format("where: %d/%d %q in %s", idx, #items, label or "?", tostring(sceneName())))
+end
+
 local function execCommand(c)
   local op, args, rest = c.op, c.args, c.rest
   if op == "tap" or op == "key" then tap(args[1]); st.busy = st.tapGap
@@ -315,6 +358,7 @@ local function execCommand(c)
   elseif op == "waitscene" then st.waitScene = { name = args[1], timeout = tonumber(args[2]) or 1800 }
   elseif op == "wait" then st.busy = tonumber(args[1]) or 30
   elseif op == "scene" then writeOut("scene=" .. tostring(sceneName()))
+  elseif op == "where" then whereAmI()
   elseif op == "run" then local m = MACROS[args[1]]; if m then enqueueFront(m) else writeOut("unknown macro: " .. tostring(args[1])) end
   elseif op == "quit" then writeOut("quit"); love.event.quit()
   else writeOut("unknown cmd: " .. tostring(op)) end

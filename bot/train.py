@@ -17,7 +17,9 @@ import torch.nn as nn
 
 FSIZE, NCLASS = 589, 62
 WAIT, RAISE = 1, 2  # 1-based label values
-WAIT_KEEP = 0.3     # subsample WAIT in TRAIN (kept fraction); val stays full
+WAIT_KEEP = float(os.getenv("WAIT_KEEP", "0.5"))  # subsample WAIT in TRAIN; val stays full
+WEIGHT_MODE = os.getenv("WEIGHT", "sqrt")          # sqrt | none — class-imbalance handling
+EPOCHS = int(os.getenv("EPOCHS", "6"))
 
 
 def load_game(feat_dir, gid):
@@ -61,11 +63,14 @@ def main():
     Xva, yva = load_split(feat_dir, os.path.join(split_dir, "val_games.txt"), 1.0)
     print(f"  train {Xtr.shape}  val {Xva.shape}")
 
-    # class weights: inverse sqrt frequency, normalized (0-based for torch)
-    counts = np.bincount(ytr - 1, minlength=NCLASS).astype(np.float64)
-    w = 1.0 / np.sqrt(np.maximum(counts, 1.0))
-    w = w / w.mean()
-    weight = torch.tensor(w, dtype=torch.float32)
+    # class weights: inverse sqrt frequency (normalized), or none
+    pow_ = float(os.getenv("WEIGHT_POW", "0.5"))  # 0=none .. 0.5=inverse-sqrt
+    if WEIGHT_MODE == "none" or pow_ == 0:
+        weight = None
+    else:
+        counts = np.bincount(ytr - 1, minlength=NCLASS).astype(np.float64)
+        w = 1.0 / np.power(np.maximum(counts, 1.0), pow_)
+        weight = torch.tensor(w / w.mean(), dtype=torch.float32)
 
     Xtr_t = torch.from_numpy(Xtr)
     ytr_t = torch.from_numpy((ytr - 1).astype(np.int64))
@@ -81,7 +86,7 @@ def main():
     lossfn = nn.CrossEntropyLoss(weight=weight)
 
     N = Xtr_t.shape[0]
-    BS, EPOCHS = 4096, 6
+    BS = 4096
     for ep in range(EPOCHS):
         model.train()
         perm = torch.randperm(N)

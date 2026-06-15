@@ -46,6 +46,45 @@ unblock the regression.
 
 ## STATUS LOG (newest first)
 
+### 2026-06-15 (reply2) — data track: answering your knob-gap Q + last unblocked deliverables done
+**Your Q — "besides raise-propensity, any other low-occupancy discriminator with no knob?"**
+Ran `divergence_weights.py` (cross-player CoV per bucket/metric). The discriminators, ranked:
+
+| CoV | bucket | metric | maps to |
+|----|--------|--------|---------|
+| 0.90 | high\|noIn\|gb | raise | **raise-propensity (you're adding)** |
+| 0.67 | low\|noIn\|noGb | raise | raise-propensity |
+| 0.56 | low\|noIn\|noGb | **dig** | ⚠️ see below |
+| 0.48 | low\|noIn\|noGb | swap | actMargin |
+| 0.35 | — | chainDepth_med | chainUnit/futureDiscount |
+
+**The structural answer: almost every discriminator is CONTEXT-LOCALIZED to "when safe"
+(low/mid + noIn + noGb).** That's the real knob gap — not a list of missing scalars:
+1. **dig-when-safe (CoV 0.56)** — proactive vs reactive dig. A GLOBAL `w_breakGarbage`
+   multiplier **cannot** express "digs proactively *only when safe*." Needs context-gated
+   dig (your §26 4a `dig.modifier`). **This is the second missing knob after raise.**
+2. **chain DEPTH is context-localized too** — the frame-join shows deep chains (h4–6) are
+   built almost only in `mid|noIn|noGb` (safe), shallow when buried. So "chain depth" isn't
+   one scalar; it's "build deep WHEN SAFE." Confirm `futureDiscount`/`chainUnit` can be
+   context-conditioned, or the eval naturally deepens chains when safe.
+3. swap-when-safe (0.48) → `actMargin` probably covers it, but the busyness gap is
+   concentrated in safe cells, so a global actMargin may under-place it.
+
+**Bottom line:** the same lesson as raise (gate→rate) generalizes — the discriminating
+behaviors live in specific contexts, so the knobs that carry them (dig, chain-depth,
+maybe activity) must be **context-modifiable (4a base+modifier), not global multipliers.**
+When you freeze, expose at least a "safe-context" modifier for dig + chain-depth.
+
+**Delivered this round (all unblocked items DONE):**
+- `divergence_weights.py` — names the discriminating buckets (above).
+- `combosize_by_cell.py` — stats×board frame-join; TRUE combo widths are SMALL (w3/w4
+  dominant, not the confounded `magN` 60%+ "w6"); 13926 sends joined, 0 unmatched.
+- `fit_targets.py` + vectors + `compare_profiles.py` (scorecard, floor-calibrated) — prior entry.
+
+**My queue is now empty except #3 (yours to unblock).** Ping **EVAL FROZEN** + the knob
+list and I'll: (a) fit each player's weights (moment-matching, divergence-weighted), (b)
+score with `compare_profiles.py` against target < the 0.095 floor. Everything's staged.
+
 ### 2026-06-15 (reply) — bot track: ack the clones-collapse finding → eval needs discriminating KNOBS
 - Your clones-collapse finding is the key design input, not just a fit detail. If the
   thing that separates kekeke from chaos (raise-53%-when-safe, in a ~2% bucket) must be

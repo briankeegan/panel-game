@@ -20,9 +20,14 @@ local name = arg[3] or "PanelBot"
 local difficulty = arg[4] or "medium"
 local modelDir = arg[5] -- optional
 
+-- modelDir slot doubles as a brain selector: "expert" -> ExpertBrain, a path ->
+-- trained model, nil -> heuristic.
+local brain = (modelDir == "expert") and "expert" or (modelDir and "model" or "heuristic")
+if modelDir == "expert" then modelDir = nil end
+
 local bot = BotClient({
   ip = ip, port = port, name = name, difficulty = difficulty,
-  brain = modelDir and "model" or "heuristic", modelDir = modelDir,
+  brain = brain, modelDir = modelDir,
 })
 
 if not bot:login() then print("login failed"); os.exit(1) end

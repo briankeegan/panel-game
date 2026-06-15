@@ -339,9 +339,11 @@ function BotClient:startMatch()
   -- the bot simulates an EMPTY board from frame 0 (no panels -> brain always
   -- WAITs -> cursor never moves -> the human sees a blank board).
   self.match:start()
-  if self.brainKind == "heuristic" or self.brainKind == "model" then
+  if self.brainKind == "heuristic" or self.brainKind == "model" or self.brainKind == "expert" then
     if self.brainKind == "model" then
       self.brain = require("bot.ModelBrain").load(assert(self.modelDir, "bot: brain='model' requires modelDir"))
+    elseif self.brainKind == "expert" then
+      self.brain = require("bot.ExpertBrain").new()
     else
       self.brain = require("bot.HeuristicBrain").new()
     end

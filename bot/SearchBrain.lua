@@ -151,12 +151,17 @@ function SearchBrain:decide(state)
   local cfg = self.cfg
   local board, rows = state.board, state.rows
 
-  local incoming = 0
-  for _, g in ipairs(state.incoming or {}) do incoming = incoming + (g.w or 0) * (g.h or 0) end
+  local incoming, minEta = 0, math.huge
+  for _, g in ipairs(state.incoming or {}) do
+    incoming = incoming + (g.w or 0) * (g.h or 0)
+    local e = g.eta or math.huge; if e < minEta then minEta = e end
+  end
+  local riseSoon = (state.displacement or 16) <= 3 -- displacement 16->0; row commits at 0
 
-  -- cache keyed on board colors + incoming (the only things the decision depends
-  -- on); skips the search while the cursor merely travels to its locked target.
-  local sig = boardSig(board, rows, state.width or 6) * 31 + incoming
+  -- cache keyed on the things the decision depends on (board + incoming + the clock
+  -- buckets); skips the search while the cursor merely travels to its locked target.
+  local etaBucket = (minEta < math.huge) and math.floor(minEta / 30) or 99
+  local sig = boardSig(board, rows, state.width or 6) * 31 + incoming + etaBucket * 1009 + (riseSoon and 7919 or 0)
   if sig == self._sig and self._decision then return self._decision end
 
   local maxH = state.maxColHeight or 0
@@ -178,7 +183,12 @@ function SearchBrain:decide(state)
   -- even when buried. Only relaxes the buried case; safe play is unchanged.
   local buriedOffense = 0.35 + 0.65 * (cfg.counterPressure or 0)
   local offenseScale = (buried >= 0) and buriedOffense or 1
-  local dangerBonus = math.max(0, buried) * 7
+  -- CLOCK AWARENESS (the eval used to ignore the timing it's handed):
+  -- riseSoon = a row is about to commit -> treat us as one row more buried.
+  -- impending = incoming garbage about to LAND -> lower the board NOW so it lands with
+  -- room, instead of reacting once it has buried us (grows with area, as eta shrinks).
+  local dangerBonus = math.max(0, buried + (riseSoon and 1 or 0)) * 7
+  local impending = (incoming > 0 and minEta < 240) and incoming * (240 - math.max(0, minEta)) / 240 or 0
 
   local hasGb = BoardSim.hasGarbage(baseGrid, rows)
   local baseH = maxH
@@ -219,7 +229,11 @@ function SearchBrain:decide(state)
     -- garbage descend into the play area and land somewhere breakable. So reward any
     -- clear that drops max height (scaled by danger). Without this the bot freezes
     -- once garbage lands — ordinary clears no longer beat holding and it waits to die.
-    if hasGb and gH < baseH then score = score + (baseH - gH) * (10 + dangerBonus * 2) end
+    -- lower the board when buried OR when garbage is about to land (impending): make
+    -- room BEFORE it arrives instead of reacting once it's buried us (clock-aware).
+    if (hasGb or impending > 0) and gH < baseH then
+      score = score + (baseH - gH) * (10 + dangerBonus * 2 + impending * 0.4)
+    end
     -- ...and reward swaps that push the garbage itself DOWN (toward the dense lower
     -- board where clears break it). This folds the old flatten fallback into the main
     -- ranking, so every move is judged on getting garbage lower + breaking it.

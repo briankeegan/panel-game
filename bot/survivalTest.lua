@@ -5,8 +5,10 @@
 -- garbage block drops on top on a schedule. Top-out = a row pushed past the
 -- ceiling. Reports median / p10 (worst-decile) / mean of survival + garbage-broken.
 --
--- Usage: luajit bot/survivalTest.lua [garbageEvery] [riseEvery] [frames] [difficulty] [seeds]
---   defaults: garbageEvery=300 riseEvery=250 frames=3600 difficulty=hard seeds=25
+-- Usage: luajit bot/survivalTest.lua [garbageEvery] [riseEvery] [frames] [difficulty] [seeds] [profile]
+--   defaults: garbageEvery=300 riseEvery=250 frames=3600 difficulty=hard seeds=25 profile=nil
+--   profile (optional): a bot/profiles/*.json path to load (e.g. the excellent-hard config).
+--   With NO profile arg the behavior is unchanged (the robust-hard invariant baseline).
 -- A 6-wide block every ~5s + a row every ~4s is "moderate" pressure; riseEvery 250
 -- ≈ the real early-game rise (consts.SPEED_TO_RISE_TIME).
 io.stdout:setvbuf("no")
@@ -22,6 +24,7 @@ local riseEvery = tonumber(arg[2]) or 250
 local maxFrames = tonumber(arg[3]) or 3600
 local difficulty = arg[4] or "hard"
 local seeds = tonumber(arg[5]) or 25
+local profile = (arg[6] and arg[6] ~= "") and arg[6] or nil
 
 local rndState
 local function rnd(n) return math.floor(math.random() * n) + 1 end
@@ -39,7 +42,7 @@ local function asState(g)
   local board, ch, mx = {}, {}, 0
   for r = 1, R do board[r] = {} for c = 1, W do board[r][c] = { c = g[r][c], s = 0, reveal = g.reveal[r][c] } end end
   for c = 1, W do ch[c] = 0; for r = R, 1, -1 do if g[r][c] ~= 0 then ch[c] = r; break end end; if ch[c] > mx then mx = ch[c] end end
-  return { board = board, width = W, rows = R, cursor = { 1, 1 }, displacement = 0, height = R,
+  return { board = board, width = W, rows = R, cursor = { 1, 1 }, displacement = 8, height = R,
            columnHeights = ch, maxColHeight = mx, danger = mx >= R - 1, incoming = {} }
 end
 local function riseRow(g)
@@ -61,7 +64,8 @@ local swapEvery = (cfg.cursorMoveInterval or 11) + 3
 -- one match against the garbage schedule -> survivalFrames, garbageBroken
 local function runOne(seed)
   math.randomseed(seed)
-  local brain = SearchBrain.new({ difficulty = difficulty }) -- fresh cache per run
+  -- fresh cache per run; load the profile if one was passed (else robust-hard defaults)
+  local brain = profile and SearchBrain.load(profile, difficulty) or SearchBrain.new({ difficulty = difficulty })
   local g = newGrid(); fillBottom(g, 5)
   local broke, lastSwap, toppedAt = 0, -999, nil
   for frame = 1, maxFrames do
@@ -104,8 +108,8 @@ end
 
 local sMed, sP10, sMean, sMax, sMin = stats(survs)
 local bMed, bP10, bMean = stats(brokes)
-print(string.format("difficulty=%s  garbageEvery=%d (%.1fs/block)  riseEvery=%d  frames=%d  seeds=%d",
-  difficulty, garbageEvery, garbageEvery / 60, riseEvery, maxFrames, seeds))
+print(string.format("difficulty=%s%s  garbageEvery=%d (%.1fs/block)  riseEvery=%d  frames=%d  seeds=%d",
+  difficulty, profile and (" profile=" .. profile) or "", garbageEvery, garbageEvery / 60, riseEvery, maxFrames, seeds))
 print(string.format("SURVIVAL (s):  median %.1f  p10 %.1f  mean %.1f  [min %.1f, max %.1f]  fullRuns %d/%d",
   sMed, sP10, sMean, sMin, sMax, fullRuns, seeds))
 print(string.format("GARBAGE BROKEN: median %d  p10 %d  mean %.1f", bMed, bP10, bMean))

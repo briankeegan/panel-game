@@ -63,7 +63,9 @@ local function emitRow(b)
     height = st.maxColHeight or 0,
     incoming = st.incoming or {},
     board = st.board,
-    action = { decision = b.lastDecision or { type = "WAIT" } },
+    -- executed action (matches the human corpus's executed-action labeling), not
+    -- the brain's per-frame intent — so swap-derived metrics are comparable.
+    action = { decision = b.lastExecuted or { type = "WAIT" } },
   }
   sink:write(json.encode(row) .. "\n"); emitted = emitted + 1
 end

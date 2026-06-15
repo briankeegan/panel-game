@@ -414,6 +414,16 @@ function BotClient:tickMatch()
     else
       char = randomInputChar()
     end
+    -- EXECUTED action this frame (what the controller actually input) for the game
+    -- emitter — the human corpus counts executed actions, so emit those, not the
+    -- brain's per-frame intent (else swaps_per_clear is inflated). Movement/idle = WAIT.
+    if char == KeyDataEncoding.swap then
+      self.lastExecuted = { type = "SWAP", pos = { stack.cur_row, stack.cur_col } }
+    elseif char == KeyDataEncoding.raise then
+      self.lastExecuted = { type = "RAISE" }
+    else
+      self.lastExecuted = { type = "WAIT" }
+    end
     stack:receiveConfirmedInput(char)
     self.gameplay:send(NetworkProtocol.markedMessageForTypeAndBody(I_PREFIX, char))
   end

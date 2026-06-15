@@ -101,6 +101,9 @@ print(string.format("join(random):    %s", surv(join)))
 print(string.format("outcomes: host=%s, join=%s", tostring(host.outcome), tostring(join.outcome)))
 print(string.format("display snapshots shipped: host=%s, join=%s",
   tostring(host._displaySendCount), tostring(join._displaySendCount)))
+print(string.format("garbage sent/recv: host=%s/%s, join=%s/%s",
+  tostring(host._garbageSendCount), tostring(host._garbageRecvCount),
+  tostring(join._garbageSendCount), tostring(join._garbageRecvCount)))
 if host.matchEnded and join.matchEnded then
   print("=== MATCH SPIKE OK: full random bot-vs-bot match played to completion in room "
     .. tostring(host.roomNumber) .. " ===")

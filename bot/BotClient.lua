@@ -21,21 +21,20 @@ local IDENTITY_DIR = "bot/identities"
 -- wire prefixes
 local I_PREFIX = NetworkProtocol.clientMessageTypes.playerInput.prefix -- "I"
 local D_PREFIX = NetworkProtocol.clientMessageTypes.deathEvent.prefix  -- "D"
+local G_PREFIX = NetworkProtocol.clientMessageTypes.garbageEvent.prefix -- "G" (send attack)
 local Y_PREFIX = NetworkProtocol.clientMessageTypes.displayEvent.prefix -- "Y" (display snapshot)
 local SRV_D_PREFIX = NetworkProtocol.serverMessageTypes.deathEvent.prefix -- "D" (relayed)
+local SRV_G_PREFIX = NetworkProtocol.serverMessageTypes.garbageEvent.prefix -- "G" (relayed attack)
 
--- Display-snapshot shipping so a HUMAN sees the bot's board (opponents render
--- from snapshots, not from inputs). DisplayEventCapture ships via
--- GAME.netClient:sendDisplayEvents; we route by batch.from (publicId) to the
--- owning bot's socket so multiple bots can share one process.
-local displayRegistry = {}
-local function ensureDisplayNetClient()
+-- The engine (GarbageDelivery, inside match:run) and DisplayEventCapture both
+-- ship via GAME.netClient. Route to the bot currently ticking — set in
+-- startMatch/tickMatch — so it works for one or many bots in a process.
+local currentBot = nil
+local function ensureNetClient()
   if GAME.netClient then return end
   GAME.netClient = {
-    sendDisplayEvents = function(_, batch)
-      local bot = batch and batch.from and displayRegistry[batch.from]
-      if bot then bot:_shipDisplaySnapshot(batch) end
-    end,
+    sendDisplayEvents = function(_, batch) if currentBot then currentBot:_shipDisplaySnapshot(batch) end end,
+    sendGarbageEvent  = function(_, body) if currentBot then currentBot:_shipGarbageEvent(body) end end,
     flushDisplayEvents = function() end,
   }
 end
@@ -155,7 +154,6 @@ function BotClient:login()
   end
 
   self.publicId = value.publicId
-  if self.publicId then displayRegistry[self.publicId] = self end
   if value.new_user_id then
     self.userId = value.new_user_id
     self:writeIdentity(self.userId)
@@ -210,6 +208,20 @@ function BotClient:dispatch(msg)
     self.matchStart = { replay = msg.replay, startInMs = msg.startInMs, startAtMs = msg.startAtMs }
     logger.info(string.format("bot[%s]: MATCH START (startInMs=%s)",
       self.name, tostring(msg.startInMs)))
+  elseif msg[SRV_G_PREFIX] then
+    -- relayed GarbageEvent: an attack. Apply to our stack if we're a recipient
+    -- (and it isn't our own echo). Server stamped body.sender.
+    local body = msg[SRV_G_PREFIX]
+    if self.myStack and body.sender ~= self.localPlayerNumber
+        and type(body.recipients) == "table" then
+      for _, r in ipairs(body.recipients) do
+        if r == self.localPlayerNumber then
+          self.myStack:applyNetworkGarbage(body.garbage, body.sender)
+          self._garbageRecvCount = (self._garbageRecvCount or 0) + 1
+          break
+        end
+      end
+    end
   elseif msg[SRV_D_PREFIX] then
     -- relayed DeathEvent. For 2p, a death we didn't send = the opponent's.
     self.oppDied = true
@@ -255,6 +267,13 @@ function BotClient:_shipDisplaySnapshot(batch)
   self._displaySendCount = (self._displaySendCount or 0) + 1
 end
 
+-- Ship a garbage attack the engine produced. body = {senderFrame, recipients,
+-- garbage}; the server stamps `sender` on relay.
+function BotClient:_shipGarbageEvent(body)
+  self.gameplay:send(NetworkProtocol.markedMessageForTypeAndBody(G_PREFIX, json.encode(body)))
+  self._garbageSendCount = (self._garbageSendCount or 0) + 1
+end
+
 function BotClient:joinRoom(roomNumber, slotNumber)
   logger.info("bot[" .. self.name .. "]: joining room " .. tostring(roomNumber))
   self.gameplay:sendRequest(ClientProtocol.requestJoinRoom(roomNumber, slotNumber))
@@ -295,8 +314,8 @@ function BotClient:startMatch()
     self.boardState = require("bot.BoardState")
   end
   -- Display-snapshot capture so a human opponent sees the bot's board.
-  ensureDisplayNetClient()
-  displayRegistry[self.publicId or 0] = self
+  ensureNetClient()
+  currentBot = self
   self.capture = require("client.src.network.DisplayEventCapture").new(self.myStack, self.publicId or self.localPlayerNumber, self.myStack, nil)
   self.capture:start()
 
@@ -313,6 +332,7 @@ end
 function BotClient:tickMatch()
   if not self.match or self.matchEnded then return end
   if socket.gettime() * 1000 < self.scheduledStartMs then return end -- hold for the aligned start instant
+  currentBot = self -- route engine/capture sends (G, Y) to this bot's socket
 
   local stack = self.myStack
   -- Feed+send input while the stack is still running. NOTE: alive sentinel is

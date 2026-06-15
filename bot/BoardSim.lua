@@ -91,11 +91,37 @@ local function labelGarbage(g, rows)
   return id, comps
 end
 
+-- any garbage on the grid? (early-exit scan)
+function BoardSim.hasGarbage(g, rows)
+  for r = 1, rows do
+    for c = 1, WIDTH do if isGarbage(g[r][c]) then return true end end
+  end
+  return false
+end
+
 -- gravity: play panels fall through empty space; each garbage block falls as a
 -- rigid unit (it can't tear) and rests on the highest obstruction beneath any of
 -- its columns. Iterates until nothing moves so blocks settle on falling panels.
 function BoardSim.applyGravity(g, rows)
   local reveal = g.reveal
+  -- fast path: no garbage -> one-pass per-column compact. The common case, and it
+  -- avoids the per-iteration connected-component labeling that blew the search
+  -- budget (24ms/decide -> the bot couldn't keep up at 60Hz). Identical result.
+  if not BoardSim.hasGarbage(g, rows) then
+    for c = 1, WIDTH do
+      local write = 1
+      for r = 1, rows do
+        if isPlay(g[r][c]) then
+          if write ~= r then
+            g[write][c] = g[r][c]; g[r][c] = 0
+            if reveal then reveal[write][c] = reveal[r][c]; reveal[r][c] = nil end
+          end
+          write = write + 1
+        end
+      end
+    end
+    return
+  end
   local moved = true
   while moved do
     moved = false

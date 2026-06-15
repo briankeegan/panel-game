@@ -88,20 +88,30 @@ local function shapeScore(grid, rows, band)
   return s - bump * 0.5
 end
 
--- positional value of a settled board (no immediate attack): set-up COMBO/chain
--- potential (discounted) + survival + shape. Used for candidates AND for holding,
--- so valuing "one swap from a 4+ combo" is what makes the search BUILD an attack
--- instead of taking a survival 3-match.
+-- cheap build proxy: same-color adjacencies (H+V) set up future matches/combos.
+-- O(cells) — replaces the chainPotential lookahead, whose per-candidate inner
+-- trigger-search was O(candidates^2) board sims and blew the 60Hz frame budget
+-- (24ms/decide). The actual combo/chain a swap FIRES is still valued exactly, in
+-- decide; this only nudges toward grouping colors, no nested search.
+local function buildProxy(grid, rows, top)
+  local p = 0
+  for r = 1, top do
+    for c = 1, WIDTH do
+      local v = grid[r][c]
+      if v >= 1 and v <= 6 then
+        if c < WIDTH and grid[r][c + 1] == v then p = p + 1 end
+        if r < top and grid[r + 1][c] == v then p = p + 1 end
+      end
+    end
+  end
+  return p
+end
+
+-- positional value of a settled board (no immediate attack): build proxy + survival
+-- + shape + dig. Used for candidates AND for holding.
 function SearchBrain:evalBoard(grid, rows, top, boardHeight)
   local cfg = self.cfg
-  local potChain, potTotal, potCombo = BoardSim.chainPotential(grid, rows, top)
-  local v = 0
-  if potChain >= 2 then
-    v = v + potChain * cfg.chainUnit * cfg.w_chain * cfg.futureDiscount
-  end
-  if potCombo >= 4 then -- one swap from a combo: build toward it (humans' main offense)
-    v = v + (potCombo - 3) * cfg.comboUnit * cfg.futureDiscount
-  end
+  local v = buildProxy(grid, rows, top) * cfg.comboUnit * cfg.futureDiscount * 0.04
   local h = BoardSim.maxHeight(grid, rows)
   v = v - topoutRisk(h, boardHeight, cfg.heightBand) * cfg.w_survival
   v = v + shapeScore(grid, rows, cfg.heightBand) * cfg.w_shape

@@ -1,13 +1,18 @@
 {
-  "player": "chaos952", "id": 935, "version": "v1",
-  "apm": 406, "swapIntervalFrames": 15,
+  "_comment": "chaos952 (id 935) SearchBrain profile. Schema = bot/profiles/example.json. Weights are multipliers (default 1.0); chainUnit/comboUnit/futureDiscount/actMargin are absolute (defaults 60/15/0.7/1.0). Grounded in corpus (analyze_strategy + re-sim offense fingerprint).",
+  "w_chain": 0.85,
+  "w_survival": 1.2,
+  "w_shape": 1.0,
+  "w_breakGarbage": 1.3,
+  "chainUnit": 55,
+  "comboUnit": 22,
+  "futureDiscount": 0.6,
   "heightBand": [8, 11],
-  "weights": { "w_chain": 0.25, "w_survival": 0.35, "w_breakGarbage": 0.28, "w_shape": 0.12 },
-  "tempo": { "swapPct": 21, "waitPct": 74, "raisePct": 4 },
-  "offense": { "chainPct": 28, "comboPct": 72, "maxChainMedian": 4, "maxChainPeak": 7,
-               "garbagePerGame": 18, "biggestBlockArea": 36, "sendStyle": "steady (~2.2s), not bursty" },
-  "style": "COMBO-PRESSURE player. Faster (apm 406), swaps more (21%), combo-dominant (72% combo / 28% chain), shallow chains. Wins by out-lasting + out-volume over longer games; digs garbage PROACTIVELY (breaks more when winning) -> higher w_breakGarbage. Not a deep-chain builder.",
-  "derivedFrom": "analyze_strategy.py (height band [8,11] = won-game p25..p75) + timing_stats (apm) + re-sim offense fingerprint (100 games, chain/combo/depth). w_chain set LOWER than mscl (chaos chains less).",
-  "opponentReactive": false,
-  "notes": "opp-state is NOT a decision driver for this player (verified) -> opp stays out of v1 features/eval. Kill-timing not detectable in aggregate; revisit opp for v2 only if clone lacks killer instinct."
+  "actMargin": 0.8,
+  "_meta": {
+    "style": "COMBO-PRESSURE: combo-dominant (72% combo / 28% chain), shallow chains (med 4 / peak 7), wins by volume over longer games; digs garbage PROACTIVELY; fast/active (apm 406, swap 21%).",
+    "knobRationale": "comboUnit up (combo-happy) + w_breakGarbage up (proactive dig) + w_survival up (keeps board low) + actMargin down (acts readily); w_chain/futureDiscount down (shallow chains, bird-in-hand).",
+    "offenseTarget": { "chainPct": 28, "comboPct": 72, "maxChainMedian": 4, "garbagePerGame": 18 },
+    "opponentReactive": false
+  }
 }

@@ -189,6 +189,15 @@ function SearchBrain:decide(state)
   -- room, instead of reacting once it has buried us (grows with area, as eta shrinks).
   local dangerBonus = math.max(0, buried + (riseSoon and 1 or 0)) * 7
   local impending = (incoming > 0 and minEta < 240) and incoming * (240 - math.max(0, minEta)) / 240 or 0
+  -- STOP WINDOW: after a clear the rise FREEZES (stop_time/pre_stop_time) — free
+  -- frames to build/extend offense without the stack climbing. Humans pack their
+  -- combos into these windows. Value offense more here; it's "safe" regardless of
+  -- height because the board isn't rising. This is the main fix for the offense gap.
+  local freeOffense = ((state.stopTime or 0) > 0) and 1.6 or 1
+  -- ACTIVE CHAIN: chain_counter>0 means a cascade is resolving NOW — any clear we
+  -- land keeps it going (the engine extends the chain), which is the highest-value
+  -- offense in the game. Reward landing a clear while chaining.
+  local extending = state.chaining and 1 or 0
 
   local hasGb = BoardSim.hasGarbage(baseGrid, rows)
   local baseH = maxH
@@ -241,8 +250,10 @@ function SearchBrain:decide(state)
       local gd = BoardSim.garbageDepthSum(g, rows)
       if gd < baseGd then score = score + (baseGd - gd) * (4 + dangerBonus) end
     end
-    if chain >= 2 then score = score + chain * cfg.chainUnit * cfg.w_chain * offenseScale * chainSafeScale end
-    if firstClear >= 4 then score = score + (firstClear - 3) * cfg.comboUnit * offenseScale end
+    if chain >= 2 then score = score + chain * cfg.chainUnit * cfg.w_chain * offenseScale * chainSafeScale * freeOffense end
+    if firstClear >= 4 then score = score + (firstClear - 3) * cfg.comboUnit * offenseScale * freeOffense end
+    -- extend the active chain: while chaining, any clear we land continues the cascade
+    if extending > 0 and total > 0 then score = score + total * cfg.chainUnit * cfg.w_chain * 0.6 end
     if garbageCleared > 0 then                                                        -- dig dominates when buried
       score = score + garbageCleared * (6 + incoming + dangerBonus) * cfg.w_breakGarbage * digSafeScale
     end
@@ -263,8 +274,8 @@ function SearchBrain:decide(state)
     local e = scored[i]
     local gtop = math.min(rows, BoardSim.maxHeight(e.g, rows) + 1)
     local potChain, _, potCombo, potDig = BoardSim.chainPotential(e.g, rows, gtop)
-    if potChain >= 2 then e.score = e.score + potChain * cfg.chainUnit * cfg.w_chain * cfg.futureDiscount * offenseScale * chainSafeScale end
-    if potCombo >= 4 then e.score = e.score + (potCombo - 3) * cfg.comboUnit * cfg.futureDiscount * offenseScale end
+    if potChain >= 2 then e.score = e.score + potChain * cfg.chainUnit * cfg.w_chain * cfg.futureDiscount * offenseScale * chainSafeScale * freeOffense end
+    if potCombo >= 4 then e.score = e.score + (potCombo - 3) * cfg.comboUnit * cfg.futureDiscount * offenseScale * freeOffense end
     if potDig > 0 then e.score = e.score + potDig * (3 + dangerBonus) * cfg.w_breakGarbage * cfg.futureDiscount * digSafeScale end
     if not best or e.score > bestScore then best, bestScore = e.sw, e.score end
   end

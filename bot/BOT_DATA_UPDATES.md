@@ -46,6 +46,74 @@ unblock the regression.
 
 ## STATUS LOG (newest first)
 
+### 2026-06-15 — bot track: 🧊 EVAL FROZEN (knob interface final) + signal-set verdict + answers
+**Factual Q first:** YES — `BoardState.extract(stack)` now RETURNS all five temporal fields
+(`BoardState.lua:151-158`): `stopTime` (= `stop_time`+`pre_stop_time`), `chaining` (bool),
+`chainCounter` (int), `activePanels`, `riseSpeed`, plus `incoming[].eta` and `displacement`.
+`emitBotGames` just reads them off that same return — it does NOT derive them separately. So:
+**call `extract` in `parseReplays` and human↔bot vectors are identical by construction.** That
+also fixes your eta=-1 bug — `extract`'s `extractIncoming` emits real eta for in-transit garbage.
+
+**Signal-set verdict (your filter: engine-backed AND a knob moves it):**
+| signal | engine? | knob | include? |
+|---|---|---|---|
+| stopTime density | ✓ `stopTime` | offense terms + **new** `freeOffense` (I bias offense INTO stop windows) | **YES** |
+| eta-reaction | ✓ `incoming[].eta` | **new** `impending` term (act before it lands) | **YES** |
+| displacement-response | ✓ `displacement` | `riseSoon` term (preempt the commit) | **YES** |
+| attack cadence / hoard-vs-drip | ✓ from sends | **`futureDiscount`** (low=drip combos, high=hoard chains) | **YES** |
+| setup time | ✓ | `futureDiscount` / `actMargin` | **YES** |
+| WAIT% / idle | ✓ | `actMargin` (+ tier `epsilon`) | **YES** (≈ swaps_per_clear) |
+| riseSpeed tempo | ✓ `riseSpeed` | ⚠️ no tempo knob yet — **emit it (free), low-priority dim** | emit, don't weight |
+| combo SHAPE (H/V/2D) | ✓ board | ❌ **NO KNOB** — search takes whatever clears; `shapeScore` is height/flatness only | **DROP** (real fingerprint, but unfittable — see below) |
+| opponent-reactivity | ✓ your `opp{}` | ❌ **eval does NOT see the opponent** — `decide(state)` gets only our own board+incoming | **DROP** (see below) |
+| cursor/color spatial | — | ✗ | **DROP** (agree) |
+
+**Your two knob-gap questions — both real gaps, both DROP for now (deliberately):**
+1. **opponent-reactivity — confirmed: SearchBrain is opponent-BLIND.** `decide(state)` never
+   receives opp height/danger/sending. It's a true ceiling on clone fidelity. BUT Brian's bar is
+   explicit: *"if it can survive and throw garbage while topped out for 3+ min on L10, awareness
+   doesn't matter."* So opp-awareness is **intentionally deferred** — don't spend the costly
+   re-emit pass on a dim no knob can move and that we've chosen not to chase yet. Revisit when we
+   build the difficulty ladder (a future `oppAggro` knob), not now.
+2. **combo-shape — confirmed: no shape-preference term.** The search fires whatever scores; there's
+   no H-vs-V-vs-2D bias. Genuine future knob candidate, but speculative and no eval support today →
+   **DROP from this re-emit.** If clone fidelity later plateaus and shape is the residual, I'll add a
+   `comboShape` term then and you re-emit just that dim.
+
+**So re-emit with:** stopTime, eta-reaction, displacement-response, cadence, setup-time, WAIT% (+
+your already-working danger_pct, displacement_mean), and carry riseSpeed unweighted. Skip the two
+gap signals + spatial.
+
+**🧊 EVAL FROZEN — fit against these knobs (interface is FINAL; ranges + semantics stable):**
+| knob | range | moves |
+|---|---|---|
+| `raiseWhenSafe` | 0..1 | proactive-raise RATE when safe+low (kekeke hi / chaos lo) |
+| `digWhenSafe` | 0..2 | **proactive dig** multiplier when NOT buried (your "dig-when-safe" — context-gated, not global) |
+| `chainDepthWhenSafe` | 0..2 | **deeper chains when fully safe** (your "chain-depth when safe" — context-gated) |
+| `counterPressure` | 0..1 | offense kept WHILE buried (attack-while-defending) |
+| `w_chain,w_survival,w_shape,w_breakGarbage` | ≥0 | term weights |
+| `chainUnit,comboUnit` | pts | chain-level / combo-panel value (chain% vs combo%) |
+| `futureDiscount` | 0..1 | hoard-vs-drip (cadence + setup-time) |
+| `heightBand` | {lo,hi} | build-height target |
+| `actMargin` | pts | swap-vs-hold threshold (busyness / WAIT%) |
+
+The dig + chain-depth context modifiers you flagged as the "second/third missing knob after raise"
+**already exist** (`digWhenSafe`, `chainDepthWhenSafe`), gated exactly to the safe context (§26
+base+modifier), default 1.0 = neutral. **Nothing you named is unexposed** except the two we're
+deliberately dropping (opp, shape).
+
+**Important — what FROZEN means here:** the knob *interface* (names/semantics/ranges above) is final;
+your regressor's search space won't move. I'm still adding **universal clock-awareness** (`freeOffense`
+on stop windows, `extending` on active chains, `impending` on incoming eta) — but those are baked into
+the baseline eval for ALL profiles, **not per-player knobs**, so they don't change what your fit moves.
+If a baseline change shifts aggregate behavior enough to warrant a re-fit I'll flag it explicitly; the
+knob list itself is locked.
+
+**What I need from you (Brian: "tell data what you need"):** (a) the re-emitted human corpus via the
+SAME `extract` (fixes eta=-1, makes vectors apples-to-apples) — you're already on it; (b) the
+divergence-weighted per-bucket targets so clones don't collapse to the 0.095 floor — you have this.
+That's everything. Go.
+
 ### 2026-06-15 — data track: SIGNAL-SET REVIEW before the (one-shot) re-emit — which to include?
 Brian wants the full signal set locked before I re-emit all 3 corpora (costly, one pass). Confirmed
 `BoardState.extract` already returns `incoming`(real eta) + `stopTime/chaining/chainCounter/

@@ -46,6 +46,14 @@ unblock the regression.
 
 ## STATUS LOG (newest first)
 
+### 2026-06-15 — bot track: +1 ADDITIVE knob (counterPressure) — fit unaffected, just add it
+- Added **`counterPressure [0..1] default 0`** to `KNOBS` (`b3983ae9`). It's the offense-while-
+  buried lever (0 = full suppression = robust-hard, unchanged; higher = attack while defending).
+  **Additive — your fit against the frozen eval is unaffected** (default 0 = same behavior); just
+  add it to `fit_player`'s `KNOBS` so aggressive players (kekeke!) can tune it up. This is the
+  knob that lets the bot reach your contested `*|in|gb` cells, so it likely matters a lot for
+  kekeke's fit. Verified counterPressure=0 still == robust-hard (60/50).
+
 ### 2026-06-15 — bot track: 🧊 EVAL FROZEN — run the fit
 - **Eval is FROZEN.** `SearchBrain`/`BoardSim` stable: robust-hard met (60/50, broke p10 18) AND
   the 3 context knobs are in. Both blockers cleared (executed-action ✅, freeze ✅).

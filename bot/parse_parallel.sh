@@ -6,9 +6,11 @@
 # Usage:  zsh bot/parse_parallel.sh <publicId> <indir> <outdir> [nshard] [limit]
 #   e.g.: zsh bot/parse_parallel.sh 935 tools/replay_corpus/data/935 bot/data/chaos_bot 4
 cd "$(dirname "$0")/.."
-# NOTE: each LÖVE worker is RAM-heavy — >2-3 instances exhaust memory and THRASH (load
-# spikes, throughput → 0). Default 2; raise only if you have RAM headroom to spare.
-ID="$1"; INDIR="$2"; OUTDIR="$3"; N="${4:-2}"; LIMIT="${5:-0}"
+# NOTE: each LÖVE worker is RAM-heavy. On a single dev box (esp. shared with the bot's
+# engine sims) sharding doesn't help — LÖVE is the wall, and >2-3 workers THRASH (swap →
+# load spike → throughput 0). Default 1 (single-process). Opt into shards (N>1) only on a
+# bigger/idle machine with RAM + cores to spare.
+ID="$1"; INDIR="$2"; OUTDIR="$3"; N="${4:-1}"; LIMIT="${5:-0}"
 mkdir -p "$OUTDIR"
 echo "parse_parallel: $ID -> $OUTDIR with $N shards"
 pids=()

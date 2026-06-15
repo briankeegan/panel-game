@@ -26,12 +26,12 @@ reemit_one() {  # <name> <publicId> <nshard>
 
 arg1="${1:?usage: reemit.sh <name|all> [publicId] [nshard]}"
 if [[ "$arg1" == "all" ]]; then
-  n="${2:-2}"
+  n="${2:-1}"
   for name in ${(k)PLAYERS}; do reemit_one "$name" "${PLAYERS[$name]}" "$n"; done
 elif [[ -n "$2" && "$2" == <-> && -z "${PLAYERS[$arg1]}" ]]; then
-  reemit_one "$arg1" "$2" "${3:-2}"          # ad-hoc: name + explicit publicId
+  reemit_one "$arg1" "$2" "${3:-1}"          # ad-hoc: name + explicit publicId
 else
   id="${PLAYERS[$arg1]:?unknown player '$arg1' — pass an explicit publicId}"
-  reemit_one "$arg1" "$id" "${2:-2}"
+  reemit_one "$arg1" "$id" "${2:-1}"
 fi
 echo "reemit DONE"

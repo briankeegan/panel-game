@@ -71,24 +71,51 @@ function BoardSim.applyGravity(g, rows)
   end
 end
 
--- resolve a grid to quiescence (mutates g) -> chainDepth, totalCleared, firstClear
+-- resolve a grid to quiescence (mutates g) -> chainDepth, totalCleared, firstClear,
+-- garbageCleared. Garbage adjacent to a clearing match is peeled (engine converts
+-- it to panels; we remove the touched cells — captures digging + lets panels above
+-- fall into the gap and continue the cascade, an approximate garbage chain).
 function BoardSim.resolve(g, rows)
-  local chain, total, firstClear = 0, 0, 0
+  local chain, total, firstClear, garbageCleared = 0, 0, 0, 0
   while true do
     local hit, any = BoardSim.findMatches(g, rows)
     if not any then break end
     chain = chain + 1
+    -- garbage cells orthogonally adjacent to a matched cell get peeled this step
+    local peel = {}
+    for r = 1, rows do
+      for c = 1, WIDTH do
+        local v = g[r][c]
+        if v >= 7 and v <= 9 then
+          if (r > 1 and hit[(r - 2) * WIDTH + c]) or (r < rows and hit[r * WIDTH + c])
+            or (c > 1 and hit[(r - 1) * WIDTH + c - 1]) or (c < WIDTH and hit[(r - 1) * WIDTH + c + 1]) then
+            peel[(r - 1) * WIDTH + c] = true
+          end
+        end
+      end
+    end
     local n = 0
     for r = 1, rows do
       for c = 1, WIDTH do
-        if hit[(r - 1) * WIDTH + c] then g[r][c] = 0; n = n + 1 end
+        local k = (r - 1) * WIDTH + c
+        if hit[k] then g[r][c] = 0; n = n + 1
+        elseif peel[k] then g[r][c] = 0; garbageCleared = garbageCleared + 1 end
       end
     end
     total = total + n
     if chain == 1 then firstClear = n end
     BoardSim.applyGravity(g, rows)
   end
-  return chain, total, firstClear
+  return chain, total, firstClear, garbageCleared
+end
+
+-- garbage cells currently on a grid (obstruction to penalize / dig out)
+function BoardSim.garbageCount(grid, rows)
+  local n = 0
+  for r = 1, rows do
+    for c = 1, WIDTH do if grid[r][c] >= 7 and grid[r][c] <= 9 then n = n + 1 end end
+  end
+  return n
 end
 
 -- board-cell swap legality: both settled (state 0), neither garbage (color<=6),
@@ -119,12 +146,13 @@ function BoardSim.cloneGrid(grid, rows)
   return g
 end
 
--- copy `grid`, apply swap (r,c)<->(r,c+1), resolve -> newGrid, chain, total, firstClear
+-- copy `grid`, apply swap (r,c)<->(r,c+1), resolve
+-- -> newGrid, chain, total, firstClear, garbageCleared
 function BoardSim.simSwap(grid, rows, r, c)
   local g = BoardSim.cloneGrid(grid, rows)
   g[r][c], g[r][c + 1] = g[r][c + 1], g[r][c]
-  local chain, total, firstClear = BoardSim.resolve(g, rows)
-  return g, chain, total, firstClear
+  local chain, total, firstClear, garbageCleared = BoardSim.resolve(g, rows)
+  return g, chain, total, firstClear, garbageCleared
 end
 
 -- highest occupied row across columns

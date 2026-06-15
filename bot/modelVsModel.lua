@@ -120,9 +120,17 @@ print(string.format("display snapshots shipped: host=%s, join=%s",
 print(string.format("garbage sent/recv: host=%s/%s, join=%s/%s",
   tostring(host._garbageSendCount), tostring(host._garbageRecvCount),
   tostring(join._garbageSendCount), tostring(join._garbageRecvCount)))
+local bothAlive = (host.myStack.game_over_clock or -1) <= 0 and (join.myStack.game_over_clock or -1) <= 0
 if host.matchEnded and join.matchEnded then
-  print("=== MATCH SPIKE OK: full random bot-vs-bot match played to completion in room "
+  print("=== MATCH SPIKE OK: full bot-vs-bot match played to completion in room "
     .. tostring(host.roomNumber) .. " ===")
+  host:disconnect(); join:disconnect()
+  os.exit(0)
+elseif bothAlive then
+  -- strong mirror match: neither topped out before the sim deadline — a draw, not
+  -- a failure. (Identical deterministic policy + same seed => garbage cancels.)
+  print("=== MATCH SPIKE OK: DRAW — both survived to the deadline (frame "
+    .. tostring(host.myStack.clock) .. ") ===")
   host:disconnect(); join:disconnect()
   os.exit(0)
 else

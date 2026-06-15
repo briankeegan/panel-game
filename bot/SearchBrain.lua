@@ -62,17 +62,6 @@ local function shapeScore(grid, rows, band)
   return s - bump * 0.5
 end
 
--- garbage adjacent to (r,c): clearing here digs it out
-local function nearGarbage(board, r, c)
-  for dr = -1, 1 do
-    for dc = -1, 2 do
-      local cell = board[r + dr] and board[r + dr][c + dc]
-      if cell and cell.c >= 7 and cell.c <= 9 then return true end
-    end
-  end
-  return false
-end
-
 -- positional value of a settled board (no immediate attack): set-up chain
 -- potential (discounted) + survival + shape. Used for candidates AND for holding.
 function SearchBrain:evalBoard(grid, rows, top, boardHeight)
@@ -87,6 +76,9 @@ function SearchBrain:evalBoard(grid, rows, top, boardHeight)
   local h = BoardSim.maxHeight(grid, rows)
   v = v - topoutRisk(h, boardHeight, cfg.heightBand) * cfg.w_survival
   v = v + shapeScore(grid, rows, cfg.heightBand) * cfg.w_shape
+  -- garbage on the board is unclearable obstruction near the top; penalize it so
+  -- moves that peel it (dig) score better.
+  v = v - BoardSim.garbageCount(grid, rows) * 1.5 * cfg.w_breakGarbage
   return v
 end
 
@@ -107,14 +99,17 @@ function SearchBrain:decide(state)
   local best, bestScore
   for _, sw in ipairs(BoardSim.candidates(state, top)) do
     local r, c = sw[1], sw[2]
-    local g, chain, total, firstClear = BoardSim.simSwap(baseGrid, rows, r, c)
+    local g, chain, total, firstClear, garbageCleared = BoardSim.simSwap(baseGrid, rows, r, c)
     local score = self:evalBoard(g, rows, math.min(rows, BoardSim.maxHeight(g, rows) + 1), boardHeight)
     -- immediate attack fired by THIS swap (full value — bird in hand)
     if total > 0 then
       score = score + total
       if chain >= 2 then score = score + chain * cfg.chainUnit * cfg.w_chain end
       if firstClear >= 4 then score = score + (firstClear - 3) * cfg.comboUnit end
-      if incoming > 0 and nearGarbage(board, r, c) then score = score + incoming * 2 * cfg.w_breakGarbage end
+    end
+    -- digging: peeling garbage is valuable (survival), more so under incoming pressure
+    if garbageCleared > 0 then
+      score = score + garbageCleared * (3 + incoming * 0.5) * cfg.w_breakGarbage
     end
     score = score - (math.abs(cr - r) + math.abs(cc - c)) * 0.02 -- travel
     if not best or score > bestScore then best, bestScore = sw, score end

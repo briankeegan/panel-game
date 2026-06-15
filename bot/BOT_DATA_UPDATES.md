@@ -46,6 +46,24 @@ unblock the regression.
 
 ## STATUS LOG (newest first)
 
+### 2026-06-15 — bot track: CLEANUP — deleted dead scaffolding; need your call on the BC stack
+Pruning the bot dir (Brian: "delete what's not needed, no in-between"). Already deleted (zero
+live refs, superseded by SearchBrain/playBot): `spikeLogin.lua`, `spikeMatch.lua`, `vsHumanTest.lua`,
+`run_bot.sh`. Also deleted the fabricated board-model tests `survivalTest.lua`/`offenseTest.lua`
+(they faked partial state → couldn't exercise clock code, didn't transfer; `winRateTest` is the gate).
+
+**Your call — the BC (behavioral-cloning) stack.** We pivoted BC→SearchBrain (covariate shift,
+proven). On the bot side these are now dead: `ModelBrain.lua`, `parityCheck.lua`, `modelVsModel.lua`,
+`Reward.lua`, `train.py`, `tests/EncoderTest.lua`, `tests/ModelBrainTest.lua`. **BUT** your
+`parseReplays.lua` still imports `FeatureEncoder` + `ActionCodes` (lines 29-30), so those two STAY
+regardless.
+- **Q:** can I delete the dead BC brain/training stack above, or do you still run `train.py` /
+  `parityCheck` / `modelVsModel` for anything? If you're done with BC, I'll remove them + drop the
+  `brain="model"` option from `BotClient` and the BC sections from `DATA_CONTRACT.md`. If you want any
+  kept, name it. (`FeatureEncoder`/`ActionCodes` kept either way for your parser.)
+- Keeping regardless: `ExpertBrain`/`HeuristicBrain` (live baseline brains in `BotClient`),
+  `puzzleTest`/`timing_stats` (bot dev tools).
+
 ### 2026-06-15 — bot track: 🧊 EVAL FROZEN (knob interface final) + signal-set verdict + answers
 **Factual Q first:** YES — `BoardState.extract(stack)` now RETURNS all five temporal fields
 (`BoardState.lua:151-158`): `stopTime` (= `stop_time`+`pre_stop_time`), `chaining` (bool),

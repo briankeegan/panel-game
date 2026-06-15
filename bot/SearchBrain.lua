@@ -26,11 +26,11 @@ SearchBrain.__index = SearchBrain
 -- 3-clear has ~no offense value (only its board-lowering counts), and the eval
 -- values being one swap FROM a combo so it builds toward one.
 local DEFAULTS = {
-  w_chain = 1.0, w_survival = 1.0, w_shape = 1.0, w_breakGarbage = 1.0,
+  w_chain = 1.0, w_survival = 1.6, w_shape = 1.0, w_breakGarbage = 1.8,
   chainUnit = 60,       -- value per chain level
   comboUnit = 40,       -- value per combo panel beyond 3 (humans are combo-heavy)
   futureDiscount = 0.6, -- moderate: fire combos as reachable, don't hoard for chains
-  heightBand = { 8, 11 }, -- keep material to build a 4-combo (>=8); flatten only above 11
+  heightBand = { 8, 10 }, -- build at >=8; flatten above 10 (defend earlier than 11)
   actMargin = 1.0,      -- only swap if it beats holding by this
 }
 
@@ -60,12 +60,14 @@ function SearchBrain.load(path, difficulty)
   return SearchBrain.new(profile)
 end
 
--- steepening top-out risk: cheap below the band, explosive near the ceiling
+-- steepening top-out risk: cheap below the band, explosive near the ceiling.
+-- Starts steepening earlier (0.70) so it flattens BEFORE it's buried — the
+-- "really bad defense" was it letting the stack climb while chasing combos.
 local function topoutRisk(h, H, band)
   H = H or 12
   local frac = h / H
-  local pen = math.max(0, h - band[2]) * 8 -- over the band
-  if frac >= 0.85 then pen = pen + (frac - 0.85) * 2000 end
+  local pen = math.max(0, h - band[2]) * 14 -- over the band
+  if frac >= 0.70 then pen = pen + (frac - 0.70) * 2200 end
   return pen
 end
 
@@ -105,7 +107,7 @@ function SearchBrain:evalBoard(grid, rows, top, boardHeight)
   v = v + shapeScore(grid, rows, cfg.heightBand) * cfg.w_shape
   -- garbage on the board is unclearable obstruction near the top; penalize it so
   -- moves that peel it (dig) score better.
-  v = v - BoardSim.garbageCount(grid, rows) * 1.5 * cfg.w_breakGarbage
+  v = v - BoardSim.garbageCount(grid, rows) * 3 * cfg.w_breakGarbage
   return v
 end
 
@@ -154,7 +156,7 @@ function SearchBrain:decide(state)
     if firstClear >= 4 then score = score + (firstClear - 3) * cfg.comboUnit end
     -- digging: peeling garbage is valuable (survival), more so under incoming pressure
     if garbageCleared > 0 then
-      score = score + garbageCleared * (3 + incoming * 0.5) * cfg.w_breakGarbage
+      score = score + garbageCleared * (6 + incoming) * cfg.w_breakGarbage
     end
     score = score - (math.abs(cr - r) + math.abs(cc - c)) * 0.02 -- travel
     if not best or score > bestScore then best, bestScore = sw, score end

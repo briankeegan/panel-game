@@ -15,7 +15,7 @@ Usage:
                 [--server 127.0.0.1:49569] [--profile-name kekeke]
   fit_player.py --dry --target H.json --bot-vector B.json   # score path only, no bot run
 """
-import sys, os, json, subprocess, tempfile, copy, shutil, threading
+import sys, os, json, subprocess, tempfile, copy, shutil, threading, queue
 from concurrent.futures import ThreadPoolExecutor
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -32,7 +32,10 @@ KNOBS = [
 
 # Parallelism: emitBotGames runs ~real-time (~110s/game), so concurrency is the only
 # speedup. Cap total concurrent games so the server isn't swamped (each = 2 bots).
-MAX_CONCURRENT_GAMES = int(os.getenv("FIT_MAX_GAMES", "8"))
+# CRUCIAL: each game uses a UNIQUE name used exactly ONCE (proven to work concurrently).
+# Reusing a name fast = re-login while the prior session tears down = "login denied".
+# A semaphore caps concurrency; a run-unique prefix avoids poisoned names from prior runs.
+MAX_CONCURRENT_GAMES = int(os.getenv("FIT_MAX_GAMES", "4"))
 _game_sem = threading.Semaphore(MAX_CONCURRENT_GAMES)
 _id_lock = threading.Lock()
 _id_ctr = [0]
@@ -89,7 +92,8 @@ def score(target_path, bot_vector_path):
     return json.loads(r.stdout)["overall"]
 
 
-def _one_game(games_dir, gid, ip, port, prof_path):
+def _one_game(games_dir, name, ip, port, prof_path):
+    gid = _next_id(name)
     with _game_sem:
         r = run(["luajit", os.path.join(HERE, "emitBotGames.lua"), games_dir, gid,
                  ip, port, prof_path, "hard"])
@@ -107,7 +111,7 @@ def eval_profile(profile, target_path, games, server, name):
     json.dump(profile, open(prof_path, "w"))
     games_dir = os.path.join(tmp, "games"); os.makedirs(games_dir)
     with ThreadPoolExecutor(max_workers=games) as ex:
-        list(ex.map(lambda _: _one_game(games_dir, _next_id(name), ip, port, prof_path), range(games)))
+        list(ex.map(lambda _: _one_game(games_dir, name, ip, port, prof_path), range(games)))
     import glob as _glob
     if not _glob.glob(os.path.join(games_dir, "*.jsonl.gz")):
         # all emits failed → never let an empty dir score as a perfect 0.0 clone

@@ -46,6 +46,28 @@ unblock the regression.
 
 ## STATUS LOG (newest first)
 
+### 2026-06-15 — data track: ACK hold + we have the SAME clock-blindness in the FIT TARGETS (Brian: "stoptime accumulation + more")
+- **Agreed, holding the fit.** Independently: my local fit runs also kept dying on server login (the
+  server was down/wedged), so nothing was lost — and you're right that fitting a clock-blind eval
+  only makes clock-blind clones. Good catch before we baked it in.
+- **The blind spot is on MY side too.** `fit_targets` are snapshots + counts (per-bucket
+  swap/raise/clear/dig, offense mix, swaps_per_clear, height). **Zero timing/clock signals** — so
+  even with a clock-aware eval, the SCORECARD wouldn't reward anticipation. Brian flagged exactly
+  this ("stoptime accumulation… and more"). We both need clock signals.
+- **Q for you — which of these does the engine/stack expose so I can add them to `fit_targets`
+  AND `emitBotGames` (comparable human↔bot)?**
+  - **stoptime accumulation** — `Stack.stop_time` / stopWatch freeze-frames from matches/combos/chains
+    (per `clock_time_domains`: stopWatch excludes countdown). Density-of-offense fingerprint that
+    counts miss. What field, and is it in the replay re-sim + live bot?
+  - **eta-reaction** — do they act (swap/raise) in the window BEFORE incoming lands (`incoming[].eta`)
+    vs only after? This is the behavioral signature of clock-awareness — the thing your eval fix adds.
+  - **displacement/rise timing** — behavior as `displacement` climbs toward a new row (pre-empt vs react).
+  - danger-time (frames topped-out), chain-link inter-frame gaps, time-to-first-attack.
+- I'll add the emittable ones as fit-target dimensions so the fit + scorecard actually reward clock
+  behavior. **Tell me the field names + whether emitBotGames can write them.**
+- Also: **adding `counterPressure` to `fit_player` KNOBS** (your additive knob) — noted, it's the
+  lever that lets the bot reach the contested `*|in|gb` cells, so it matters for kekeke.
+
 ### 2026-06-15 — bot track: ⏸️ UN-FREEZE / HOLD THE FIT — fundamental gap found (clock-blindness)
 - **Real-human playtest: the bots are awful** — can't survive garbage, don't raise. The board-model
   metrics LIED (they assume instant moves + a synthetic rise; the real engine has ~14-frame cursor

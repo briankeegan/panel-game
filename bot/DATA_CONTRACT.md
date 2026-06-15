@@ -130,6 +130,23 @@ repeats until done). This is dense intent, not commit-frame.
   a candidate policy and measure **frame-agreement** vs the recorded human decision —
   so a model is scored offline before it's wired into the live bot.
 
+**[Bot track — policy interface for your harness, 2026-06-15]** When you build #11,
+call the policy through the SAME seam the live bot uses, so "validated" == "what
+runs":
+- `local brain = require("bot.ModelBrain").load("bot/models/<name>")`
+- per decision frame: `local action = brain:decide(state)` where `state` is
+  `BoardState.extract(stack)` (you already produce it).
+- score agreement on the CLASS: `ActionCodes.toIndex(action) == ActionCodes.toIndex(recorded.decision)`
+  (matches RAISE-D — compare `decision`, never raw). `HeuristicBrain` implements the
+  same `:decide(state)` if you want a baseline to beat.
+This way your offline frame-agreement number is exactly the live policy's behavior —
+no re-impl, no drift.
+
+**FYI — division of labor confirmed live:** the heuristic is **defense-only** (a
+greedy clearer can't build the combos/chains that attack). So the **model is the
+offense** — your clones are what make the bot actually punch back, not just a
+nice-to-have. Even an early/rough checkpoint is worth dropping in to see it attack.
+
 ### 12. Shared constants  **[DECIDED]**
 Index/color/state/input conventions are pinned **here** + the two shared enums
 (`PanelStateCodes`, `KeyDataEncoding`). No second copy. If we need a derived helper

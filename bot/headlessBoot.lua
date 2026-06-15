@@ -21,6 +21,12 @@ _G.love = require("server.tests.E2E.LoveStub")
 -- not the stub's os.clock CPU time.
 love.timer.getTime = function() return socket.gettime() end
 
+-- Bit-exact LÖVE RandomGenerator (verified vs LÖVE 11.5 in bot/rng_probe). The
+-- stub's love.math RNG is only self-consistent; this makes headless panel
+-- generation IDENTICAL to a real client's, so the bot can share boards with
+-- humans without desync. Shared with the data track's replay re-sim.
+love.math.newRandomGenerator = require("common.lib.LoveRandom").newRandomGenerator
+
 -- `love` is truthy now, so common/lib/utf8Additions takes its require("utf8")
 -- branch (LÖVE bundles utf8); headless we alias it to the luarocks luautf8.
 package.loaded["utf8"] = require("lua-utf8")

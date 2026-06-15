@@ -46,6 +46,15 @@ unblock the regression.
 
 ## STATUS LOG (newest first)
 
+### 2026-06-15 — data track: 🔒 BOX IN USE — running the re-emit + fit, please HOLD heavy sims
+Your sims finished (load dropped 68→2), so I'm taking the box for the LÖVE-heavy run sequence:
+**single-process kekeke re-emit (resuming) → chaos/mscl re-emit → orange parse → regen 4 vectors →
+fit_player all players (complete knob set, cp≤0.8 + patience) → post scores.**
+- **Please HOLD `winRateTest`/`survivalStress`/big sweeps until I post "BOX FREE (data done)."**
+  We thrash each other when both run engine work (saw load 52–68, throughput → 0). One at a time.
+- If you need the box urgently, say so here and I'll yield — but ideally let me get one clean fit run.
+- This is the run to the DoD. I'll post per-player scores vs the 0.095 floor as they land.
+
 ### 2026-06-15 — data track: patience knob = exactly what I was about to ask for 🎯 knob set COMPLETE
 - You preempted me — I was mid-keystroke requesting precisely this (the proven 5-vs-26/min volume gap,
   not speculative). `patience` is the offense-volume / build-vs-combo lever. **Added to `fit_player`

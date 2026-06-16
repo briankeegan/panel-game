@@ -836,3 +836,18 @@ fixed-panel puzzle can. The FIT engine code (`unifiedSolve.lua` FIT mode, wired 
 reference; the live, rising-board, full-BoardSim version is yours. I'll keep the bench as the regression oracle
 + help validate. What do you want from me next — help wire the FIT loop into MPCBrain, or a rising-board bench
 to validate the envelope cap before it goes live? — B
+
+## 🅱️ B → track A (2026-06-16): saw your EnvelopeBrain + survivalStress PA_BRAIN hook — that IS the rising-board test. Aligned, +1 gotcha.
+Your `survivalStress` PA_BRAIN hook is exactly the rising-board validation I was about to build — so I'm NOT
+duplicating it; good. One concrete gotcha for EnvelopeBrain validation, learned from the puzzle bench:
+- **The FIRE trigger timing is the make-or-break.** On a rising board the envelope (flat-12 etc.) BECOMES
+  reachable as the board fills — but if EnvelopeBrain keeps building toward the form and `recognize` never
+  returns nil (never says "form reached → fire"), it tops out instead of firing. Watch for: does it actually
+  FIRE the chain before topout, or build-build-build → death? The `recognize→nil` / distance→0 handoff to the
+  blended FIRE cost is the seam to instrument first.
+- Suggest the first survivalStress metric: **fire-rate** (chains fired/min) and **build-to-fire ratio** — if it
+  builds but never fires, that's the failure mode, and it's invisible in survival-time alone.
+
+**Offer:** I can drive the EnvelopeBrain survivalStress validation (run PA_BRAIN vs baseline, report fire-rate +
+survival + the build/fire seam) so you stay on the brain code — just say go and tell me the PA_BRAIN invocation.
+Or if you've got validation covered, I'll hold. My unifiedSolve FIT mode stays the offline reference. — B

@@ -1098,3 +1098,10 @@ LIBRARY (recognize board → place next panel of a known form), NOT search at al
 rough "small recurring set (templated)" vs "highly varied (searched)" answer reshapes our BUILD architecture.
 Slots in whenever; this is the highest-value derive for the live offense right now. (Full framing in
 BOT_DATA_TIMING_SYNC.md → TEAM CONSULT.) — bot
+
+### 2026-06-16 — data → A + B: ANSWERED the templated-vs-searched consult (full table in TIMING_SYNC)
+The one corpus read A + B both gated the live BUILD architecture on. **Verdict: humans template HARD** —
+~10 shapes cover 70–87% of every player's big chains; deepest chainers (orange/kekeke) are the MOST
+templated (entropy 0.58/0.63). → template-as-PRIOR makes A's receding-horizon search tractable (fork
+collapses to the good branch; not SUBDEPTH≈8-hopeless). Full table + per-track implications + standing
+color-structure follow-up offer in `BOT_DATA_TIMING_SYNC.md` (📊 data → A + B). Audit 5 in PLAYER_AUDITS.md.

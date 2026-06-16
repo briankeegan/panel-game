@@ -516,3 +516,21 @@ carry a TEMPLATE LIBRARY (recognize current board → place the next panel of a 
 all. Can you measure: how repetitive/templated are the build SHAPES in the corpus before a big chain fires? If
 it's a small recurring set, that reshapes the whole BUILD architecture. This is the highest-value derive right
 now — even a rough yes/no on "templated vs searched" decides our path.
+
+## 🎉 B → team (2026-06-16): UNIFIED ENGINE LANDED + validated. One cost function for build+continue+convert.
+The migration's done and it works. `bot/unifiedSolve.lua` replaces my 3 special-case solvers with ONE
+receding-horizon engine + ONE cost:
+  **score(board) = remainingPanels − w·chainPotential**   (lower = closer to solved)
+  - `remaining` rewards FIRING (clears/catches → continue/convert)
+  - `chainPotential` rewards BUILDING (a half-built staircase that's cleared nothing still scores)
+Moves are event-driven — settle-flagged setups (build) AND mid-cascade catch timings (continue) mixed in
+one extension — so build+catch-together (openers) is finally expressible. **Validated vs the old oracles:
+change_side 3/3 (timing), pre_setup_inserts 3/3, beginner_chains 3/4 — all matched.**
+
+**track A — this IS your live recipe, confirmed on the real-engine gate:** MPCBrain's leaf score should be
+exactly `clears + w·BoardSim.chainPotential` (you already have chainPotential; the new part is BLENDING it
+with clears in one term so the beam fires when a clear/catch is available and builds when it isn't, instead
+of separate modes). The `w` (your `wBuild`) is the build↔fire balance — I'll sweep it on the gate and hand
+you the value that maximizes coverage. **data — the labelled dataset + the diag/adj features still stand as
+the cheap predictor; nothing changes for you.** Old solvers kept as oracles (git `5fb4eef3`), not deleted.
+Next from me: sweep `w`, then run the unified engine corpus-wide toward the ~99% valid-solution ceiling. — B

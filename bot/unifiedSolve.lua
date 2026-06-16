@@ -288,6 +288,23 @@ if ORACLE_STACK and not os.getenv("ORACLE_LINE") then  -- ORACLE_LINE re-sim is 
     local t = {}
     for _, s in ipairs(soln) do t[#t + 1] = string.format("%s%d@%d,%d", s[4] and "*" or "+", s[1], s[2], s[3]) end
     print(string.format("ORACLE: SOLVED swaps=%d nodes=%d  [%s]", #soln, nodes, table.concat(t, " ")))
+    -- SURFACE-RELATIVE (rise-invariant) emit — Brian's fix for the live drift bug. Each step's
+    -- row becomes DEPTH below the stack top at that step (depth = surfaceHeight - row). A uniform
+    -- board rise lifts BOTH the surface and every panel by the same amount, so depth is unchanged
+    -- → the plan doesn't drift as the board rises. Live driver: liveRow = currentSurface - depth,
+    -- and re-plan only on a real disturbance (garbage), not on every rise. Format: <flag>W@dDEPTH,c
+    local sm, sst = build(p)
+    for i = 1, PROBE_CAP do if sst:game_ended() then break end sst:receiveConfirmedInput(IDLE); sm:run(); if i >= 2 and settled(sst) then break end end
+    local rel = {}
+    for _, s in ipairs(soln) do
+      if s[4] then for i = 1, PROBE_CAP do if sst:game_ended() then break end sst:receiveConfirmedInput(IDLE); sm:run(); if i >= 2 and settled(sst) then break end end end
+      for _ = 1, s[1] do if sst:game_ended() then break end sst:receiveConfirmedInput(IDLE); sm:run() end
+      if sst:game_ended() then break end
+      local _, H = readGrid(sst)  -- stack top at this step
+      rel[#rel + 1] = string.format("%s%d@d%d,%d", s[4] and "*" or "+", s[1], H - s[2], s[3])
+      sst.cur_row, sst.cur_col = s[2], s[3]; sst:receiveConfirmedInput(SWAP); sm:run()
+    end
+    print(string.format("ORACLE rise-invariant (liveRow = currentSurface - d): [%s]", table.concat(rel, " ")))
   else
     print(string.format("ORACLE: no line found (nodes=%d)", nodes))
   end

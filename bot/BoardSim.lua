@@ -330,6 +330,71 @@ function BoardSim.digPlan(grid, rows, maxDepth)
   return nil, 0, 0
 end
 
+-- COMBO PLAN: goal-directed beam search for a short swap sequence that FIRES a 4+
+-- combo, mirroring digPlan (which does this for digs). The bot only sees combos 1
+-- swap away (chainPotential) so it fires bare 3-matches (~13% combos vs humans' ~69%);
+-- this SEARCHES for the 2-3 move setup that creates+fires a combo, and the eval injects
+-- the plan's FIRST move as a high-value candidate. Returns firstSwap, depth, comboSize
+-- (the firstClear), or nil. Prefers SHALLOW plans, then BIGGER combos. Budget-bounded.
+function BoardSim.comboPlan(grid, rows, top, maxDepth)
+  maxDepth = maxDepth or 3
+  local hi = math.min(rows, (top or rows) + 1) -- swaps in the material band (+1 to complete a clear)
+  local function regionSwaps(g)
+    local out = {}
+    for r = 1, hi do
+      for c = 1, WIDTH - 1 do
+        local a, b = g[r][c], g[r][c + 1]
+        if a <= 6 and b <= 6 and a ~= b and (a ~= 0 or b ~= 0) then out[#out + 1] = { r, c } end
+      end
+    end
+    return out
+  end
+  -- progress toward a combo: same-color adjacencies (clusters) — more clustering is
+  -- closer to a 4+ clear; the beam keeps cost bounded so legit setups survive.
+  local function progress(g)
+    local s = 0
+    for r = 1, hi do
+      for c = 1, WIDTH do
+        local v = g[r][c]
+        if v >= 1 and v <= 6 then
+          if c < WIDTH and g[r][c + 1] == v then s = s + 1 end
+          if r < hi and g[r + 1][c] == v then s = s + 1 end
+        end
+      end
+    end
+    return s
+  end
+  local bestDepth, bestSize, bestFirst = math.huge, 0, nil
+  local function beamAt(d) return d == 1 and 10 or (d == 2 and 5 or 3) end
+  local budget = 1000
+  local function dfs(g, depth, firstMove)
+    if depth > maxDepth or budget <= 0 then return end
+    local kids = {}
+    for _, sw in ipairs(regionSwaps(g)) do
+      if budget <= 0 then break end
+      budget = budget - 1
+      local ng = BoardSim.cloneGrid(g, rows)
+      ng[sw[1]][sw[2]], ng[sw[1]][sw[2] + 1] = ng[sw[1]][sw[2] + 1], ng[sw[1]][sw[2]]
+      local _, _, firstClear = BoardSim.resolve(ng, rows)
+      local fm = firstMove or sw
+      if firstClear >= 4 then
+        if depth < bestDepth or (depth == bestDepth and firstClear > bestSize) then
+          bestDepth, bestSize, bestFirst = depth, firstClear, fm
+        end
+      else
+        kids[#kids + 1] = { g = ng, fm = fm, p = progress(ng) }
+      end
+    end
+    if depth < bestDepth and depth < maxDepth then
+      table.sort(kids, function(a, b) return a.p > b.p end)
+      for i = 1, math.min(beamAt(depth), #kids) do dfs(kids[i].g, depth + 1, kids[i].fm) end
+    end
+  end
+  dfs(grid, 1, nil)
+  if bestFirst then return bestFirst, bestDepth, bestSize end
+  return nil, 0, 0
+end
+
 -- FLATTEN MOVE. When garbage is perched on a spike and no clear/dig exists, the bot
 -- would otherwise WAIT and die. Find the swap that most flattens the board — moving
 -- a panel off a tall column into a lower neighbor — which lowers the column the

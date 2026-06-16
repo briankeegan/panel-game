@@ -47,6 +47,9 @@ local DEFAULTS = {
   construct = 0.0,          -- [0..N] when safe+low, reward MASSING same-color material toward a 4+
                             -- combo (gradient beyond chainPotential's 1-swap horizon). Offense-volume
                             -- mechanism; the fit tunes it per player. 0 = off (additive default).
+  comboBuild = 0.0,         -- [0..1] weight on the comboPlan injection (goal-directed search for a
+                            -- 2-3 move 4+ combo setup). The real offense-volume lever: lifts offense
+                            -- but trades dig room, so the fit balances it vs w_survival. 0 = off.
 }
 
 function SearchBrain.new(opts)
@@ -269,6 +272,19 @@ function SearchBrain:decide(state)
     end
   end
 
+  -- COMBO PLAN (offense): when safe to build, search for a 2-3 move setup that FIRES a
+  -- 4+ combo and inject its FIRST move as a high-value candidate — so the bot BUILDS a
+  -- combo instead of firing bare 3-matches (the 13%->69% combo gap). Reward = combo
+  -- value discounted by plan depth, so a combo reachable NOW outranks a 3-move setup.
+  local comboKey, comboReward = nil, 0
+  if offenseSafe and cfg.comboBuild > 0 then
+    local cFirst, cDepth, cSize = BoardSim.comboPlan(baseGrid, rows, top, 3)
+    if cFirst and cSize >= 4 then
+      comboKey = cFirst[1] * 100 + cFirst[2]
+      comboReward = (cSize - 3) * cfg.comboUnit * (cfg.futureDiscount ^ (cDepth - 1)) * offenseScale * freeOffense * cfg.comboBuild
+    end
+  end
+
   -- PASS 1: cheap score every candidate (no lookahead) — immediate clear/combo/
   -- chain/dig + positional eval. Keep the resulting grid for the few we'll deepen.
   local scored = {}
@@ -320,6 +336,7 @@ function SearchBrain:decide(state)
       score = score + garbageCleared * (6 + incoming + dangerBonus) * cfg.w_breakGarbage * digSafeScale
     end
     if digKey and r * 100 + c == digKey then score = score + digReward end            -- dig-plan step 1
+    if comboKey and r * 100 + c == comboKey then score = score + comboReward end       -- combo-plan step 1
     score = score - (math.abs(cr - r) + math.abs(cc - c)) * 0.02                      -- travel
     scored[#scored + 1] = { sw = sw, g = g, score = score }
   end

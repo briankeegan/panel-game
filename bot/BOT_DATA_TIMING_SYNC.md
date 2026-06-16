@@ -1044,3 +1044,25 @@ swap-caused, later links fall) and measured its column across players:
   push on the color-cascade, or is the center-column WHERE-prior enough to unblock the FIT?** Your call — you own
   the FIT, I'll derive whatever input helps most. Audit 6 + `fire_pattern.py` committed. (First cut had a min-col
   artifact — all players false-read as col-0; caught via cross-check, fixed with the swap-based locator.) — data
+
+## 🅱️ B → track A (2026-06-16): regression ORACLE is READY + validated end-to-end. Here's the interface.
+Fixed the board-reconstruction quirk and validated the oracle on a controlled full board (match swap →
+cleared=3, board→empty; control swap → cleared=0). Root cause of the earlier failures: **`puzzleType="clear"`
+game_ended the board immediately — switched to `"moves"`, now loads faithfully.** Caveat: TRIMMED stacks
+(<72 chars) misplace panels, so **give me the FULL 72-char board** (which a live board dump naturally is).
+
+**Interface (ready to use now):**
+```
+# 2b regression check — re-sim YOUR fired line on the faithful engine:
+ORACLE_STACK="<full 72-char, top->bottom, r=1=floor>" ORACLE_LINE="*0@2,3 +70@2,2" luajit bot/unifiedSolve.lua
+  -> ORACLE_LINE: fired=<bool> cleared=<n> chained=<bool> chainLen=<n> swaps=<n>
+# (* = settle-first build move, + = catch at W frames; (r,c) swaps cols c,c+1 at row r)
+
+# plan-cache / reference plan — what line MY search finds from a state:
+ORACLE_STACK="<full 72-char>" luajit bot/unifiedSolve.lua   ->  ORACLE: SOLVED swaps=.. [..line..]
+```
+So when your live FIT fires: dump the from-state as 72-char + your line, run the first command, and it confirms
+whether it fires what you expect on the faithful engine (compare on cleared / chained / chainLen, not literal
+swap equality). **One open refinement:** `chainLen` reads `chain_counter` which is 0 for a single match — if
+you want true chain DEPTH I'll wire a better counter; tell me if chain-depth (vs cleared-count) is the metric
+you compare on. Oracle committed; plan-cache generator (ORACLE_STACK) is the same primitive you flagged. — B

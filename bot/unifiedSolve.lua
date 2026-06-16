@@ -280,7 +280,7 @@ end
 local ORACLE_STACK = os.getenv("ORACLE_STACK")
 if ORACLE_STACK and not os.getenv("ORACLE_LINE") then  -- ORACLE_LINE re-sim is handled below
   local Puzzle = require("common.engine.Puzzle")
-  local p = Puzzle({ puzzleType = "clear", stack = ORACLE_STACK, moves = 1 })
+  local p = Puzzle({ puzzleType = "moves", stack = ORACLE_STACK, moves = 1 })
   nodes = 0
   local ok, soln = pcall(solve, p)
   if not ok then print("ORACLE ERR: " .. tostring(soln):sub(1, 80)); os.exit(1) end
@@ -302,7 +302,7 @@ end
 local ORACLE_LINE = os.getenv("ORACLE_LINE")
 if ORACLE_LINE and ORACLE_STACK then
   local Puzzle = require("common.engine.Puzzle")
-  local p = Puzzle({ puzzleType = "clear", stack = ORACLE_STACK, moves = 1 })
+  local p = Puzzle({ puzzleType = "moves", stack = ORACLE_STACK, moves = 1 })
   local steps = {}
   for tok in ORACLE_LINE:gmatch("%S+") do
     local sf, w, r, c = tok:match("([%*%+])(%d+)@(%d+),(%d+)")
@@ -329,8 +329,9 @@ if ORACLE_LINE and ORACLE_STACK then
   end
   for i = 1, PROBE_CAP do if st:game_ended() then break end st:receiveConfirmedInput(IDLE); m:run(); if i >= 2 and settled(st) then break end end
   local cleared = base - panelCount(st)
-  print(string.format("ORACLE_LINE: fired=%s chainLen=%d cleared=%d swaps=%d  (base=%d -> %d)",
-    tostring(chained and cleared > 0), maxChain, cleared, #steps, base, panelCount(st)))
+  -- fired = it cleared something (a single match counts); chained = multi-step chain (>=2)
+  print(string.format("ORACLE_LINE: fired=%s cleared=%d chained=%s chainLen=%d swaps=%d  (base=%d -> %d)",
+    tostring(cleared > 0), cleared, tostring(chained), maxChain, #steps, base, panelCount(st)))
   os.exit(0)
 end
 

@@ -20,6 +20,8 @@ local DEFAULTS = {
   fireClear   = 6,   -- ...or clears >= this many panels (a fat combo)
   dangerFrac  = 0.80, -- board height >= this fraction of rows => emergency: fire/clear to survive
   opportunism = tonumber(os.getenv("PA_OPP")) or 4, -- while building, fire anyway if a swap chains >= this
+  fireFill    = tonumber(os.getenv("PA_FILL")) or 54, -- fire a ready chain once board fill reaches ~here (data:
+                                                      -- humans ignite ~57-58 fill); fires EARLIER+LOWER than flat-12
   -- FIT search (ports B's subdepth+capped receding-horizon): build a chain over several swaps.
   subDepth    = tonumber(os.getenv("PA_SUBDEPTH")) or 2, -- swaps of lookahead per commit
   beam        = tonumber(os.getenv("PA_BEAM")) or 3,     -- children expanded per level
@@ -111,11 +113,18 @@ function EnvelopeBrain:generatePlan(grid, rows, top, danger)
   local cfg = self.cfg
   local firePos, fireChain, fireClear = bestFireSwap(grid, rows, top)
   if danger and firePos then return { firePos } end                       -- emergency: fire to survive
+  -- fill-based ignition (data: humans fire ~57-58 fill, not at topout). Count play panels; fire a ready chain
+  -- once the board is built enough — keeps the board LOWER (survival) and matches the human ignition point.
+  local fill = 0
+  for r = 1, top do for c = 1, BoardSim.WIDTH do
+    local v = grid[r][c]; if v ~= 0 and v ~= BoardSim.GARBAGE then fill = fill + 1 end
+  end end
   local envelope = BuildEnvelope.recognize(grid, rows)
   local built = (envelope == nil)
   if firePos and ((built and (fireChain >= cfg.fireChain or fireClear >= cfg.fireClear))
-                  or fireChain >= cfg.opportunism) then
-    return { firePos }                                                    -- built / big chain ready: FIRE
+                  or fireChain >= cfg.opportunism
+                  or (fill >= cfg.fireFill and fireChain >= cfg.fireChain)) then
+    return { firePos }                                                    -- built / big chain / filled: FIRE
   end
   -- BUILD then FIRE in ONE committed plan (closes the never-fire gap: don't build a chain-ready board and
   -- then leave firing to chance — append the trigger that fires it, like B's blended search does).

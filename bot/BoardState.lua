@@ -8,6 +8,7 @@
 -- DATA_CONTRACT §1). board[r][c] = { c = colorInt(0-9), s = stateCode }.
 
 local PanelStateCodes = require("client.src.network.PanelStateCodes")
+local StackEventRecorder = require("bot.StackEventRecorder")
 
 local M = {}
 
@@ -103,18 +104,39 @@ local function captureReveals(stack, rows, width)
   return reveal
 end
 
----@return table state { board, width, rows, cursor, displacement, height, danger, columnHeights, incoming }
-function M.extract(stack)
+-- The bot's OWN outgoing attack queue (it was blind to its own pressure). Best-effort
+-- summary: count + total area of pending/in-transit garbage we're sending. Defensive
+-- (GarbageQueue internals vary); never throws.
+function M.extractOutgoing(stack)
+  local oq = stack.outgoingGarbage
+  if type(oq) ~= "table" then return { count = 0, totalArea = 0 } end
+  local count, area = 0, 0
+  local function scan(list)
+    if type(list) ~= "table" then return end
+    for _, g in pairs(list) do
+      if type(g) == "table" then
+        if g.width and g.height then count = count + 1; area = area + g.width * g.height
+        else scan(g) end
+      end
+    end
+  end
+  scan(oq.stagedGarbage); scan(oq.garbageInTransit); scan(oq.garbage)
+  return { count = count, totalArea = area }
+end
+
+-- v1 CONTRACT (bot/STATE_CAPTURE_DESIGN.md): CAPTURE is dumb + COMPLETE. It dumps the full
+-- decision-relevant engine state + RAW per-frame events + schemaVersion. NO derived features
+-- live here — those go in derive() / FeatureEncoder / data's analyzers, so a new signal is a
+-- re-DERIVE, never a corpus re-PARSE. One capture, live == replay (faithfulness preserved).
+---@return table captured
+function M.capture(stack)
   local width = stack.width
   local panels = stack.panels
   local rows = #panels
-
-  local board = {}
-  local columnHeights = {}
-  for c = 1, width do columnHeights[c] = 0 end
-
   local reveal = captureReveals(stack, rows, width)
 
+  -- raw board: per cell { c(olor), s(tate code), isGarbage, garbageId, reveal }
+  local board = {}
   for r = 1, rows do
     local prow = panels[r]
     local outRow = {}
@@ -122,9 +144,8 @@ function M.extract(stack)
     for c = 1, width do
       local p = prow and prow[c]
       if p then
-        local color = p.color or 0
-        outRow[c] = { c = color, s = PanelStateCodes.toCode(p.state), reveal = revRow and revRow[c] }
-        if color ~= 0 then columnHeights[c] = r end -- highest occupied row in this column
+        outRow[c] = { c = p.color or 0, s = PanelStateCodes.toCode(p.state),
+          isGarbage = p.isGarbage or false, garbageId = p.garbageId, reveal = revRow and revRow[c] }
       else
         outRow[c] = { c = 0, s = 0 }
       end
@@ -132,30 +153,86 @@ function M.extract(stack)
     board[r] = outRow
   end
 
-  local maxColHeight = 0
-  for c = 1, width do
-    if columnHeights[c] > maxColHeight then maxColHeight = columnHeights[c] end
+  return {
+    schemaVersion = 1,
+    board = board, width = width, rows = rows,
+    -- cursor / geometry (raw)
+    cur_row = stack.cur_row, cur_col = stack.cur_col, top_cur_row = stack.top_cur_row,
+    height = stack.height,
+    -- timers / invincibility (raw — derive does max/critical/etc.)
+    displacement = stack.displacement,
+    stop_time = stack.stop_time or 0, pre_stop_time = stack.pre_stop_time or 0,
+    shake_time = stack.shake_time or 0, peak_shake_time = stack.peak_shake_time or 0,
+    rise_timer = stack.rise_timer, health = stack.health,
+    speed = stack.speed, nextSpeedIncreaseClock = stack.nextSpeedIncreaseClock,
+    -- chain / active (raw)
+    chain_counter = stack.chain_counter or 0,
+    n_active_panels = stack.n_active_panels or 0, n_prev_active_panels = stack.n_prev_active_panels or 0,
+    swapThisFrame = stack.swapThisFrame, swappingPanelCount = stack.swappingPanelCount,
+    -- clock / top-out (raw)
+    clock = stack.clock, stopWatch = stack.stopWatch,
+    wasToppedOut = stack.wasToppedOut, has_risen = stack.has_risen,
+    -- garbage: incoming queue, our OWN outgoing, what landed this frame
+    incoming = M.extractIncoming(stack),
+    outgoing = M.extractOutgoing(stack),
+    garbageLandedThisFrame = stack.garbageLandedThisFrame,
+    -- RAW per-frame events drained from the recorder (edges, not just levels)
+    events = StackEventRecorder.drain(stack),
+  }
+end
+
+-- DERIVE: compute the feature struct the live bot's eval consumes, FROM a captured struct.
+-- This is the bot-side derive layer (data owns the corpus-side derive in FeatureEncoder /
+-- fit_targets). Adding/changing a feature = edit here only; capture + corpus never move.
+---@param cap table result of M.capture
+---@return table state
+function M.derive(cap)
+  local board, width, rows = cap.board, cap.width, cap.rows
+  local columnHeights = {}
+  for c = 1, width do columnHeights[c] = 0 end
+  for r = 1, rows do
+    local row = board[r]
+    for c = 1, width do
+      if row[c].c ~= 0 then columnHeights[c] = r end -- highest occupied row per column
+    end
   end
+  local maxColHeight = 0
+  for c = 1, width do if columnHeights[c] > maxColHeight then maxColHeight = columnHeights[c] end end
+  local height = cap.height or 12
 
   return {
-    board = board,
-    width = width,
-    rows = rows,
-    cursor = { stack.cur_row, stack.cur_col },
-    displacement = stack.displacement,
-    height = stack.height,            -- rows of play before top-out
-    columnHeights = columnHeights,    -- highest occupied row per column
+    board = board, width = width, rows = rows,
+    cursor = { cap.cur_row, cap.cur_col },
+    displacement = cap.displacement,
+    height = height,
+    columnHeights = columnHeights,
     maxColHeight = maxColHeight,
-    danger = maxColHeight >= (stack.height - 1),
-    incoming = M.extractIncoming(stack),
-    -- TEMPORAL signals (the game is a live system, not a static board):
-    stopTime = (stack.stop_time or 0) + (stack.pre_stop_time or 0), -- frames the rise is FROZEN
-                                                                    -- (after a clear) = free build time
-    chaining = (stack.chain_counter or 0) > 0,   -- a chain is ACTIVE now -> extend it
-    chainCounter = stack.chain_counter or 0,
-    activePanels = stack.n_active_panels or 0,   -- panels mid-clear/fall; board is settling
-    riseSpeed = stack.speed,                     -- current rise tier (ramps up over the match)
+    danger = maxColHeight >= (height - 1),
+    incoming = cap.incoming,
+    -- INVINCIBILITY (derived from the raw timers; see bot/TIMING_L10.md): three sources of
+    -- "can't rise / can't top out", do NOT stack (max-based). The bot must SEE its window.
+    stopTime = cap.stop_time + cap.pre_stop_time,
+    shakeTime = cap.shake_time,                          -- earned when garbage LANDS (≤76f @L10)
+    frozenFrames = math.max(cap.stop_time, cap.pre_stop_time, cap.shake_time), -- window remaining
+    critical = maxColHeight >= height,                   -- top row occupied -> BIGGEST stop time
+    -- newly-surfaced signals the eval was blind to (retune consumes these):
+    health = cap.health,                                 -- top-out grace (rise-ticks until death)
+    riseTimer = cap.rise_timer,                           -- exact frames to next row commit
+    peakShake = cap.peak_shake_time,
+    outgoing = cap.outgoing,                              -- our own pressure
+    events = cap.events,                                  -- edges: chainEnded ("fire now"), etc.
+    chaining = cap.chain_counter > 0,
+    chainCounter = cap.chain_counter,
+    activePanels = cap.n_active_panels,
+    riseSpeed = cap.speed,
   }
+end
+
+-- Live-bot entry point: capture (complete) then derive (features). Same shape consumers
+-- already use, plus the newly-surfaced fields. The corpus parser calls M.capture directly.
+---@return table state
+function M.extract(stack)
+  return M.derive(M.capture(stack))
 end
 
 return M

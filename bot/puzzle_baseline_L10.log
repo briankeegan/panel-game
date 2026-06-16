@@ -1,0 +1,49 @@
+PUZZLE-BENCH (real engine + real loader): filter=all profile=(plain) difficulty=hard level=10 maxFrames=2000
+
+=== PER-SET PASS-RATE ===
+      0%    0/8    puzzle_set_name_advanced_clear_puzzles_1
+      0%    0/8    puzzle_set_name_advanced_clear_puzzles_2
+      0%    0/8    puzzle_set_name_advanced_clear_puzzles_3
+      0%    0/10   puzzle_set_name_advanced_clear_puzzles_4
+      0%    0/6    puzzle_set_name_advanced_clear_puzzles_5
+     25%    1/4    puzzle_set_name_advanced_clear_puzzles_6
+     10%    1/10   puzzle_set_name_advanced_shoguns
+      0%    0/6    puzzle_set_name_advanced_transitions_1
+      0%    0/3    puzzle_set_name_advanced_transitions_2
+     25%    1/4    puzzle_set_name_beginner_chains
+      0%    0/6    puzzle_set_name_beginner_combos
+     60%    6/10   puzzle_set_name_classic_set_1
+     30%    3/10   puzzle_set_name_classic_set_2
+      0%    0/10   puzzle_set_name_classic_set_3
+      0%    0/10   puzzle_set_name_classic_set_4
+      0%    0/10   puzzle_set_name_classic_set_5
+      0%    0/10   puzzle_set_name_classic_set_6
+      0%    0/2    puzzle_set_name_intermediate_chains
+     33%    1/3    puzzle_set_name_intermediate_chains_from_huge_tower
+      0%    0/3    puzzle_set_name_intermediate_change_side_inserts
+      0%    0/8    puzzle_set_name_intermediate_clear_puzzles_1
+      0%    0/3    puzzle_set_name_intermediate_clear_puzzles_2
+      0%    0/2    puzzle_set_name_intermediate_combo_chain_inserts
+      0%    0/4    puzzle_set_name_intermediate_combo_chains
+      0%    0/3    puzzle_set_name_intermediate_extended_horizontal_chains
+      0%    0/2    puzzle_set_name_intermediate_horizontal_chain_from_side
+      0%    0/9    puzzle_set_name_intermediate_inserts
+      0%    0/3    puzzle_set_name_intermediate_openers
+      0%    0/1    puzzle_set_name_intermediate_pre_setup_combo_chains
+      0%    0/3    puzzle_set_name_intermediate_pre_setup_inserts
+      0%    0/2    puzzle_set_name_intermediate_removes
+      0%    0/4    puzzle_set_name_novice_chains
+     33%    3/9    puzzle_set_name_novice_clear_puzzles_1
+      0%    0/8    puzzle_set_name_novice_clear_puzzles_2
+     12%    1/8    puzzle_set_name_novice_combos
+      0%    0/4    puzzle_set_name_novice_convert_horizontal_chains
+      0%    0/9    puzzle_set_name_novice_deeper_earthquake_chains
+      0%    0/9    puzzle_set_name_novice_earthquake_chains
+     67%    2/3    puzzle_set_name_novice_horizontal_chain_from_tower
+
+=== PER-TYPE ===
+     14%   10/71   moves
+      6%    5/84   chain
+      5%    4/80   clear
+
+OVERALL: 19/235 solved (8.1%)

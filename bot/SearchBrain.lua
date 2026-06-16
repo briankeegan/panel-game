@@ -39,17 +39,21 @@ local DEFAULTS = {
   raiseWhenSafe = 0.0,      -- [0..1] proactive-raise propensity when safe + low (0 = robust default)
   digWhenSafe = 1.0,        -- [0..2] dig-reward multiplier when not buried (proactive dig)
   chainDepthWhenSafe = 1.0, -- [0..2] chain-build multiplier when fully safe (deeper chains)
-  counterPressure = 0.0,    -- [0..1] offense kept while BURIED (attack-while-defending); 0 = robust
+  counterPressure = 0.5,    -- [0..1] offense kept while BURIED (attack-while-defending). SHIPPED 0.5:
+                            -- un-gates comboBuild/construct under garbage. Worthless ALONE (regresses),
+                            -- but as a SYSTEM with comboBuild+construct: survivalStress survival +10% /
+                            -- dig +50% vs prior defaults (C2 vs C0, 25 seeds). Scaled by chainAware.
   patience = 0.3,           -- [0..1] when safe+low, SUPPRESS no-offense clears (1/2/3-match) so it
                             -- BUILDS toward a 4+ combo instead of firing every small clear. 0.3 is the
                             -- engine-validated hard ceiling (offense +15%, win 10->30% vs hard, zero
                             -- survival cost); 0 = old fire-freely behavior. (winRateTest sweep.)
-  construct = 0.0,          -- [0..N] when safe+low, reward MASSING same-color material toward a 4+
-                            -- combo (gradient beyond chainPotential's 1-swap horizon). Offense-volume
-                            -- mechanism; the fit tunes it per player. 0 = off (additive default).
-  comboBuild = 0.0,         -- [0..1] weight on the comboPlan injection (goal-directed search for a
-                            -- 2-3 move 4+ combo setup). The real offense-volume lever: lifts offense
-                            -- but trades dig room, so the fit balances it vs w_survival. 0 = off.
+  construct = 1.5,          -- [0..N] reward MASSING same-color material toward a 4+ combo (gradient
+                            -- beyond chainPotential's 1-swap horizon). SHIPPED 1.5 (part of the C2
+                            -- system; scaled by chainAware). Values not yet swept — tune candidate.
+  comboBuild = 1.0,         -- [0..1] weight on the comboPlan injection (goal-directed search for a
+                            -- 2-3 move 4+ combo setup). The offense-volume lever: lifts offense, and
+                            -- WITH counterPressure now also digs under garbage. SHIPPED 1.0 (C2 system;
+                            -- scaled by chainAware). Values not yet swept — tune candidate.
 }
 
 function SearchBrain.new(opts)
@@ -64,6 +68,12 @@ function SearchBrain.new(opts)
   local epsilon = tier.epsilon or 0
   for k, v in pairs(opts) do if k ~= "difficulty" then cfg[k] = v end end -- profile weights override
   cfg.w_chain = cfg.w_chain * chainAware -- weak tiers barely build chains (just clear)
+  -- PLAN: build hard, pull back. The offense-construction system scales with move-quality too, so
+  -- weak tiers inherit it but barely use it (pulled back on OFFENSE, not just speed/fumble) — keeps
+  -- the difficulty ladder monotonic. hard (chainAware=1) runs the full validated C2 config.
+  cfg.comboBuild = cfg.comboBuild * chainAware
+  cfg.construct = cfg.construct * chainAware
+  cfg.counterPressure = cfg.counterPressure * chainAware
   return setmetatable({ cfg = cfg, epsilon = epsilon }, SearchBrain)
 end
 
@@ -253,7 +263,16 @@ function SearchBrain:decide(state)
   -- they were gated on safeBuild (buried<0 = BELOW the band), which the bot is rarely in
   -- once it builds up, so they almost never fired (measured: inert vs default).
   local offenseSafe = (incoming == 0 and not hasGb and maxH < cfg.heightBand[2])
-  local baseComboLoad = (offenseSafe and cfg.construct > 0) and comboLoad(baseGrid, top) or 0 -- construction ref
+  -- ATTACK-WHILE-BURIED (counterPressure): the bot's offense was hard-OFF the instant garbage
+  -- appeared (offenseSafe requires not hasGb), so it dropped all construction under pressure —
+  -- exactly when a human combos TO dig and survive (a combo next to garbage breaks it: offense=
+  -- defense). offenseAllowed relaxes the garbage/incoming gate so the CONSTRUCTIVE knobs
+  -- (comboBuild/construct) keep firing while buried. Gated by counterPressure → default (0) is
+  -- byte-identical. PATIENCE stays on strict offenseSafe — never WITHHOLD a clear under pressure
+  -- (that starves the dig); only firing-a-combo relaxes. Measured on survivalStress, not the bench
+  -- (the bench's garbage puzzles are wall-to-wall garbage; live garbage is mixed, where this helps).
+  local offenseAllowed = offenseSafe or (cfg.counterPressure > 0 and maxH < cfg.heightBand[2] + 2)
+  local baseComboLoad = (offenseAllowed and cfg.construct > 0) and comboLoad(baseGrid, top) or 0 -- construction ref
   local chainSafeScale = safeBuild and cfg.chainDepthWhenSafe or 1
 
   -- DIG PLAN: when garbage is present, find the first move of a short (≤3-move,
@@ -277,7 +296,7 @@ function SearchBrain:decide(state)
   -- combo instead of firing bare 3-matches (the 13%->69% combo gap). Reward = combo
   -- value discounted by plan depth, so a combo reachable NOW outranks a 3-move setup.
   local comboKey, comboReward = nil, 0
-  if offenseSafe and cfg.comboBuild > 0 then
+  if offenseAllowed and cfg.comboBuild > 0 then
     local cFirst, cDepth, cSize = BoardSim.comboPlan(baseGrid, rows, top, 3)
     if cFirst and cSize >= 4 then
       comboKey = cFirst[1] * 100 + cFirst[2]
@@ -329,7 +348,7 @@ function SearchBrain:decide(state)
     -- vs the base board, so neutral swaps match holding). Gated to safe-build; this is
     -- the offense-volume gradient chainPotential's 1-swap horizon can't give. (experimental
     -- weight, tuning on offenseGate.)
-    if offenseSafe and cfg.construct > 0 then
+    if offenseAllowed and cfg.construct > 0 then
       score = score + (comboLoad(g, math.min(rows, gH + 1)) - baseComboLoad) * cfg.construct
     end
     if garbageCleared > 0 then                                                        -- dig dominates when buried

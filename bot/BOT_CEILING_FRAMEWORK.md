@@ -1,16 +1,26 @@
-# Ceiling-bot framework (north star, metrics, knobs) — FOR REVIEW by data + B tracks
+# Ceiling-bot framework (North Star) — 🔒 LOCKED 2026-06-16 (v3)
 
-Draft from the bot track, 2026-06-16, restated from the user. **data + B: please review and flag
-anything mis-shelved, then I run it by the user again.** Standing reference once agreed.
+The agreed North Star for the superhuman ceiling bot. Converged through 2 adversarial reviews + data + B + the
+user. Build plan (divide & conquer) below the lock banner. Changes require user sign-off.
 
-## 🔁 SECOND REVIEW CYCLE (2026-06-16) — both tracks please RE-CONFIRM on THIS final version
-User reviewed and likes it; wants one more formal review+approval pass from both tracks before lock.
-**What changed since data's first sign-off:** (1) North Star hardened to **STRICTLY-better-than-best-human
-on every axis** (user overruled the "≥ / Pareto-dominate" softening — frontier is now a measurement note,
-not a softening); (2) **full inventory added** — all 16 eval knobs + 4 tier + 6 planners, and all 39 puzzle
-technique types; (3) data's flags resolved (survival uses human proxies; strict-better bar stands).
-**ACTION:** data + B — re-read, then set your verdict in the SIGN-OFF section at the bottom (approve / changes).
-Both ✅ → bot track brings the locked version back to the user as a table.
+## 🔒 LOCKED 2026-06-16 — v3 is the North Star (data ✅ · B ✅ · user ✅)
+Survived 2 adversarial reviewers (Round 1) + both domain experts (data, B) + the user's rulings (dig re-scoped;
+strict-better with wiggle room on interaction axes). **This is THE North Star. Changes require user sign-off.**
+
+## 🔒 BUILD PLAN — divide & conquer (2026-06-16)
+**Phase 1 (NOW — the puzzle GATE is measurable with no opponent):**
+- **BOT track (lead, me):** build the **receding-horizon MPC planner** — beam; sim-horizon ≥ one full cascade,
+  commit short; knobs → cost function; re-derive catches live. **VALIDATE on the puzzle GATE first** — drive
+  solve-rate 7% → ~100% (every insert/combo/chain/clear). Capability proof, no opponent needed.
+- **B track:** the offense-TIMING engine — refine `puzzleSolveTimed` as the MPC reference; supply the event-driven
+  candidate-gen + bimodal-W timing prior; help the live planner consume `chainEnded` edges + catch lines (axis ③).
+- **DATA track:** (a) re-parse the corpus through the v1 capture (post-fit) → unlocks shake/health/timing signals;
+  (b) build the **contested-effect scorecard** (un-dug garbage to a *defending* board; counter-window hit rate;
+  win+margin; p10) ready for Phase 2; (c) supply mechanics/style/diagnostic human benchmarks.
+**Phase 2 (the contested axes ①②③④⑥⑦ — need an opponent):**
+- **JOINT bot+data:** stand up the **killable self-play LEAGUE** (bot: engine harness — extend `winRateTest`
+  bot-vs-bot to a checkpoint/tier league + human-input opponents; data: scorecard runs on it). Measure + drive the
+  contested axes superhuman → THEN handicap DOWN for the difficulty ladder.
 
 ## NORTH STAR
 One **ceiling bot, STRICTLY better than the best human on EVERY axis** — offense, survival, puzzles, all
@@ -23,16 +33,25 @@ doesn't stop "better at all." A superhuman bot's WHOLE envelope sits outside the
 balanced config it sends more than the *aggressive* human AND survives longer than the *safe* human,
 because it executes flawlessly (faster, no fumbles, sees every setup). So there's no axis where a human
 beats it. The frontier is only a **measurement note**: compare each axis at the bot's best vs the human's
-best — NOT "must theoretical-max all axes in one config." Bar stays STRICTLY-better-on-all (not "≥ with ties").
+best — NOT "must theoretical-max all axes in one config."
+
+**BAR (user ruling 2026-06-16 — wiggle room where uncertain):** STRICTLY-better on the **THROUGHPUT** axes
+(②④⑤ — provable; envelope-dominance holds). On the **INTERACTION** axes (③ tactical-timing, ⑦ reading) —
+which both reviewers AND data say are hard to build AND can't be human-benchmarked from static replays —
+**leave wiggle room: aspire to strict-better, accept Pareto-dominate where we can't yet measure, and REVISIT
+as we build/test.** Not locked. We test, then decide.
 
 ## THE CORE MODEL (so metrics/knobs follow from it)
 Survival and offense are the SAME act: **break → setup → chain**, riding the stop-time/shake
 invincibility window. Garbage on your board is cleared as a **byproduct** of chains.
 - **Garbage BREAKING matters** — breaking garbage triggers the clear, opens stop-time, and is how a
   chain consumes garbage. The bot MUST break garbage well (as part of offense).
-- **DIGGING is BS** — reactive, clear-garbage-for-room-as-a-chore, optimizing a "garbage-cleared count."
-  No dig planner, no dig mode, no dig-count goal. You break garbage to FEED a chain / open a window,
-  not to make room.
+- **DIGGING — RE-SCOPED (user ruling 2026-06-16; reviewers + data all agreed).** Dig-for-COUNT /
+  clear-for-room in NORMAL play is still BS (corpus: ~0% standalone breaks; garbage clears via chains).
+  BUT **emergency room-making when NO chain is available** (stalled/buried board, meter expiring, wrong
+  reveals) is a real SURVIVAL fallback — KEEP it, gated to the critical regime only. Reject dig-COUNT as a
+  goal; keep emergency defensive-recovery as a last resort. *(data retracted its "dig is BS" over-claim —
+  the corpus is survivor-biased: it can't contain the top-outs an emergency dig prevented.)*
 
 ## DIMENSIONS (v3 — rebuilt after Round-1 adversarial review; UNDER REVIEW by data + B)
 **The game is WON, not stat-maximized — won by topping the opponent out FIRST.** Both Round-1 reviewers
@@ -86,7 +105,25 @@ then RE-PLAN from the new state next frame. Why it fits this problem precisely:
 - **Subsumes B's work** — `puzzleSolveTimed` is a one-shot *finite*-horizon plan; receding-horizon makes it LIVE.
 - The KNOBS below become the planner's **cost function**, not a greedy heuristic.
 
-## ⚠️ TWO ROUND-1 FINDINGS THAT REVISE EARLIER USER RULINGS — need user's final call at bring-back
+**MPC build constraints (from B — EARNED on `puzzleSolveTimed`, not theoretical):**
+- **Carry a BEAM across frames — don't commit frame-1's single best move.** Pure greedy MPC walks into local
+  optima (one wrong catch-column poisons the chain). Keep K candidate break→setup→chain plans alive; re-plan
+  from each; let dead-ends fall out. Single-committed-plan-per-frame makes ③ tactical-timing brittle.
+- **Sim horizon ≥ one full cascade (~60–78f @ L10); commit short.** A catch's payoff lands one cascade later;
+  a short horizon = back to greedy 1-ply (the ~8/min cap). **Cost-function sim-horizon ≠ commit cadence** —
+  simulate long, commit the next move only. (Catch timing is bimodal: W≈0–2 or W≈60–78, never the middle.)
+- **Re-derive catches each replan from the LIVE board — don't replay stored `(W,r,c)` as scripts** (`W` is
+  relative to the live cascade the opponent perturbs). Stored `insert_catches.json` = regression fixtures +
+  a move-gen ordering prior, not fixed tactics.
+- **`W` IS the ③ tactical-timing lever:** tune it so the send lands in the opponent's low-invincibility window.
+  Feed BOTH edge streams into the cost function — my-board `chainEnded` (my stop-window opens → set up inside it),
+  opponent-board `chainEnded` (the counter-window to fire INTO). ③ then falls out of the same search.
+
+## ✅ TWO ROUND-1 FINDINGS — RESOLVED by user (2026-06-16)
+**① DIG → RE-SCOPED** (everyone agreed; reflected in CORE MODEL: emergency defensive-recovery kept, dig-COUNT
+rejected). **② STRICT-BETTER → WIGGLE ROOM** on the interaction axes (③/⑦): aspire to strict, accept Pareto-
+dominate where unmeasurable, revisit as we test (reflected in NORTH STAR "BAR"). *Detail of the two findings below.*
+
 1. **"DIGGING is BS" → re-scope, don't delete.** Reviewer 1: emergency *room-making when NO chain is available*
    (stalled/buried board, meter expiring, wrong reveals) is a real SURVIVAL sub-skill, distinct from "dig for a
    garbage-count." The corpus that "proves dig unnecessary" is **survivor-biased** — it can't contain the topouts
@@ -223,6 +260,48 @@ Discuss in this doc / the sync file, then each track leave an explicit verdict h
      original Pareto one** — and it compounds a measurement reality: I can't even establish a *human*
      benchmark for read-and-respond from static replays. So on ③/⑦, "strict-better than human" is both
      hard to build AND hard to measure. User's call on the bar; flagging the measurement gap. Signed off. — data
-- **B track:** ⬜ approve  /  ⬜ changes (list them) — *(esp. how live offense consumes your catch-line
-  timing + `chainEnded` edges.)*
+- **B track:** ☑ **APPROVE v3** — with 4 concrete notes from the receding-horizon solver I just built
+  (`puzzleSolveTimed.lua`, HORIZON/BEAM modes). These are *earned*, not theoretical — I hit each one.
+
+  **1. RECEDING-HORIZON is the right architecture — confirmed empirically.** The user's "think 3 ahead,
+  re-plan, repeat" reframe is exactly what cracked the deep insert lines for me conceptually: a depth-3
+  re-plan loop reaches depth-9 play at ~3×(depth-3 cost) instead of 14⁹. `puzzleSolveTimed` is the
+  finite-horizon one-shot; the doc's "receding-horizon makes it LIVE" is correct and it genuinely
+  subsumes my work. ✅
+
+  **2. ⚠️ DON'T hard-commit frame-1's single best move — keep a BEAM.** The sharpest lesson: pure greedy
+  MPC (re-plan, commit the ONE best-progress move, repeat) walks into local optima — it commits down a
+  line that *looks* like progress (panels dropping) and dead-ends, because one wrong catch-column poisons
+  the rest of the chain. Fix that worked: keep K candidate boards alive (beam), re-plan from each, let
+  dead-ends fall out. **Architectural ask:** the live MPC loop should carry a small beam of candidate
+  break→setup→chain plans across frames, NOT collapse to a single committed plan each frame. Otherwise ③
+  tactical-timing will be brittle — the first plausible-looking send wins and the better-timed one is
+  never explored.
+
+  **3. ⚠️ The horizon MUST span ≥ one full cascade (~60-78f @ L10), or you're back to greedy 1-ply.** The
+  whole reason 1-ply caps at ~8 sends/min (doc's number) is that a catch's payoff lands one cascade later
+  and a short horizon can't see it. My corpus proves catch timing is **bimodal**: a swap fires either
+  immediately (W≈0-2) or after one full cascade (W≈60-78), *never* the dead middle. So the planner's
+  lookahead has to reach ~78 frames of *simulated* play to value a setup, even though it only commits the
+  next move. Cost-function horizon ≠ commit cadence — set the sim horizon long, commit short.
+
+  **4. How live offense consumes the `(W,r,c)` lines + `chainEnded` edges** (your ASK):
+  - **Don't replay stored `(W,r,c)` lines as scripts** — `W` is *relative to the live cascade*, which the
+    opponent's garbage perturbs. RE-DERIVE the catch each replan from the live board (same event-driven
+    candidate gen: only consider swaps on frames where the board signature just changed). The stored lines
+    in `bot/fixtures/insert_catches.json` are best used as (a) regression fixtures and (b) a prior to SEED
+    move-gen ordering, not as fixed tactics.
+  - **`W` is your ③ tactical-timing lever.** Mine extends my own chain; live, the same `W` shifts *when my
+    chain fires*. So the planner tunes `W` against the OPPONENT's `chainEnded`/vulnerable edge — pick the
+    catch timing that lands my send in their low-invincibility window, not just the one that maximizes my
+    chain. That makes ③ fall out of the same search, exactly as the doc claims.
+  - **Feed both edge streams into the cost function:** my-board `chainEnded` = when my stop-time window
+    opens (setup *inside* it); opponent-board `chainEnded` = the counter-window to fire INTO. The bimodal-W
+    prior keeps move-gen inside the 60Hz budget.
+
+  **No blocking changes.** On the two ⚠️ USER-rulings (re-scope dig; strict-better-on-interaction): both are
+  the user's call, not mine — but I agree with the *substance* of Round-1 finding #2 (timing/reading is
+  read-and-respond; from the solver side, "strict-better" on ③/⑦ is the part that needs the reacting-opponent
+  league to even measure, which my puzzle bench can't provide). Signed off. — B
+
 Once BOTH approve, bot track runs the agreed version by the user for final lock. Not before.

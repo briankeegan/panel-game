@@ -19,10 +19,18 @@
 -- OPTIONS:
 --   --profile=PATH       bot profile json (bot/profiles/*.json); drives survival+league test bot.
 --   --difficulty=hard    tier for the gate bot + as fallback when no profile (hard|medium|easy).
+--   --brain=search|mpc   which brain the GATE scenario runs (default search). mpc = MPCBrain planner.
+--   --wbuild=N           MPCBrain BUILD-term weight (only with --brain=mpc).
 --   --scenarios=a,b,c    subset of {gate,survival,league} (default: all).
 --   --quick              small/fast sizes (smoke). Default is FULL sizes.
 --   --ab=PATH            A/B mode: also eval this second profile, print side-by-side + deltas.
+--   --ab-brain=X         A/B mode: eval a second BRAIN (e.g. --brain=mpc --ab-brain=search).
+--   --ab-wbuild=N        A/B mode: eval a second wbuild weight (compare MPCBuild settings).
 --   --raw                also dump each harness's full stdout (debugging the parse).
+--
+-- NOTE: --brain affects the GATE scenario only — survival/league harnesses construct SearchBrain
+-- internally (MPCBrain not yet wired into them). Gate is where the planner is developed, so that's
+-- the high-value 80%; wiring MPCBrain into survival/league is a follow-up.
 --
 -- This is the script the user asked for: "good script set up for running and evaluating
 -- different scenarios." Add a scenario by appending to SCENARIOS; add an axis by extending the
@@ -31,13 +39,18 @@
 ----------------------------------------------------------------------
 -- args
 ----------------------------------------------------------------------
-local opt = { profile = nil, difficulty = "hard", scenarios = nil, quick = false, ab = nil, raw = false }
+local opt = { profile = nil, difficulty = "hard", scenarios = nil, quick = false, ab = nil, raw = false,
+              brain = "search", wbuild = nil, abBrain = nil, abWbuild = nil }
 for _, a in ipairs(arg) do
   if a == "--quick" then opt.quick = true
   elseif a == "--raw" then opt.raw = true
   elseif a:match("^--profile=") then opt.profile = a:match("=(.+)$")
   elseif a:match("^--difficulty=") then opt.difficulty = a:match("=(.+)$")
-  elseif a:match("^--ab=") then opt.ab = a:match("=(.+)$")
+  elseif a:match("^--brain=") then opt.brain = a:match("=(.+)$")          -- search|mpc (gate scenario)
+  elseif a:match("^--wbuild=") then opt.wbuild = tonumber(a:match("=(.+)$"))
+  elseif a:match("^--ab=") then opt.ab = a:match("=(.+)$")               -- A/B a second PROFILE
+  elseif a:match("^--ab%-brain=") then opt.abBrain = a:match("=(.+)$")    -- A/B a second BRAIN
+  elseif a:match("^--ab%-wbuild=") then opt.abWbuild = tonumber(a:match("=(.+)$"))
   elseif a:match("^--scenarios=") then
     opt.scenarios = {}
     for s in a:match("=(.+)$"):gmatch("[^,]+") do opt.scenarios[s] = true end
@@ -74,8 +87,10 @@ local SCENARIOS = {
     cmd = function(cfg)
       local variants = opt.quick and 1 or 3
       local cap = opt.quick and " --max=40" or ""
-      return ("luajit bot/gateBench.lua --bot --difficulty=%s --variants=%d%s")
-        :format(cfg.difficulty, variants, cap)
+      local brain = (cfg.brain and cfg.brain ~= "search") and (" --brain=" .. cfg.brain) or ""
+      local wb = cfg.wbuild and (" --wbuild=" .. cfg.wbuild) or ""
+      return ("luajit bot/gateBench.lua --bot --difficulty=%s --variants=%d%s%s%s")
+        :format(cfg.difficulty, variants, cap, brain, wb)
     end,
     parse = function(out)
       local fixed, held, rand =
@@ -210,19 +225,27 @@ end
 ----------------------------------------------------------------------
 -- main
 ----------------------------------------------------------------------
-print(string.format("EVAL SUITE  profile=%s  difficulty=%s  scenarios=%s  mode=%s",
-  tostring(opt.profile or "(plain)"), opt.difficulty,
+local function tag(cfg)
+  local t = cfg.profile or cfg.difficulty
+  if cfg.brain == "mpc" then t = t .. "/mpc" .. (cfg.wbuild and ("+wb" .. cfg.wbuild) or "") end
+  return t
+end
+
+print(string.format("EVAL SUITE  profile=%s  difficulty=%s  brain=%s  scenarios=%s  mode=%s",
+  tostring(opt.profile or "(plain)"), opt.difficulty, opt.brain,
   opt.scenarios and table.concat((function() local t = {} for k in pairs(opt.scenarios) do t[#t+1]=k end return t end)(), ",") or "all",
   opt.quick and "quick" or "full"))
 
-local cfgA = { profile = opt.profile, difficulty = opt.difficulty }
+local cfgA = { profile = opt.profile, difficulty = opt.difficulty, brain = opt.brain, wbuild = opt.wbuild }
 local resA = evaluate(cfgA, "A")
 
-if opt.ab then
-  local cfgB = { profile = opt.ab, difficulty = opt.difficulty }
+-- A/B if a second profile (--ab) OR a second brain (--ab-brain/--ab-wbuild) is given.
+if opt.ab or opt.abBrain or opt.abWbuild then
+  local cfgB = { profile = opt.ab or opt.profile, difficulty = opt.difficulty,
+                 brain = opt.abBrain or opt.brain, wbuild = opt.abWbuild or (opt.abBrain and opt.wbuild) }
   local resB = evaluate(cfgB, "B")
   render(resA, "A", resB, "B")
-  print(" A = " .. tostring(opt.profile or "(plain)") .. "   B = " .. opt.ab)
+  print(" A = " .. tag(cfgA) .. "   B = " .. tag(cfgB))
 else
   render(resA, "score")
 end

@@ -442,3 +442,17 @@ gradient even on boards too sparse for any trigger to fire yet (the deepest-buil
      emit a labelled (board → true-potential) dataset from the puzzle probe to seed/validate your
      corpus derive?
   **Please post your verdict (approve / changes) here.** That's the last sign-off open on the B work.
+
+- **B → data track (2026-06-16): thanks for the ✅ — both your notes accepted, they sharpen it.**
+  1. **Correlations are a cheap PRIOR, not a score — agreed.** 0.33/0.30 each ≈ ~10% variance; I flagged
+     "single features modest, combine them" too. Don't build a potential SCORE on one feature — ensemble
+     `diag_same`+`adj_col_same` (+ lookahead) for ranking only. If track A wants, I'll fit the 2-feature
+     linear predictor and report R² vs the full probe so the accuracy/speed tradeoff is explicit.
+  2. **Puzzle-distribution caveat — fully agreed, this is the BC trap.** The labelled dataset is
+     engine-truth GROUND TRUTH but puzzle-board distributed (curated setups). Learn from it, but validate
+     the derived signal on sampled CORPUS boards before trusting it live — your call to corpus-validate is
+     exactly right. The real-engine LABELS transfer; the board DISTRIBUTION doesn't.
+  Good league idea (clones as human-grounded opponents vs self-play degeneracy) — that's track A's call,
+  but it's the right instinct. Per-human insert-catch frequency is yours; ping me if you want the
+  searchable-vs-actual comparison alongside it. Both engines (timing + chain-potential) are committed and
+  in your hands. — B

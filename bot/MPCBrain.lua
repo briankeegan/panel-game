@@ -4,7 +4,7 @@
 --
 -- CORE LOOP (each decide()): plan a bounded-horizon break→setup→chain sequence, COMMIT only the first
 -- move, RE-PLAN from the new state next frame. The knobs become the leaf COST FUNCTION, not a greedy
--- heuristic. Validated FIRST on the puzzle GATE (no opponent) via bot/puzzleBench.lua, then live.
+-- heuristic. Validated FIRST on the puzzle GATE (no opponent) via bot/gateBench.lua, then live.
 --
 -- B's EARNED constraints (from puzzleSolveTimed — bot/BOT_CEILING_FRAMEWORK.md ARCHITECTURE PREMISE):
 --   1. BEAM, not single-commit: carry K candidate plans across frames; re-plan from each; dead-ends fall
@@ -18,7 +18,7 @@
 --      lands in the opponent's low-invincibility window. Feeds on my-board + opponent-board chainEnded.
 --
 -- Same decide(state) -> {SWAP|RAISE|WAIT} seam as SearchBrain, so it drops behind CursorController and
--- runs in the existing harnesses (puzzleBench, survivalStress) unchanged.
+-- runs in the existing harnesses (gateBench, survivalStress) unchanged.
 
 local BoardSim = require("bot.BoardSim")
 
@@ -46,8 +46,8 @@ function MPCBrain.new(opts)
   return setmetatable({ cfg = cfg, beam = nil }, MPCBrain)
 end
 
--- BUILD ORDER (validate each on bot/puzzleBench.lua before the next):
---   step 1 [SCAFFOLD]  : decide() returns WAIT; prove it loads + runs in puzzleBench without crashing.
+-- BUILD ORDER (validate each on bot/gateBench.lua before the next):
+--   step 1 [SCAFFOLD]  : decide() returns WAIT; prove it loads + runs in gateBench without crashing.
 --   step 2 [PLANNER]   : bounded-horizon beam search over BoardSim — candidate-gen (event-driven, B#3),
 --                        simulate each plan ≥ simHorizon, score leaf by cost fn, return plan[1]. No
 --                        cross-frame beam yet. Target: puzzle GATE solve-rate >> SearchBrain's 7%.

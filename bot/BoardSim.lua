@@ -544,34 +544,6 @@ function BoardSim.simSwap(grid, rows, r, c)
   return g, chain, total, firstClear, garbageCleared
 end
 
--- BUILD-POTENTIAL — a STATIC, cheap proxy for the latent CHAIN DEPTH an arrangement
--- could fire, scored WITHOUT a trigger (the BUILD half of B's build-vs-continue split:
--- construction clears nothing until the whole staircase fires, so simSwap's
--- panels-cleared reward is flat and a beam can't climb toward it). Distinct from
--- chainPotential (1-swap fires-now) and comboPlan/setupMove (combo BREADTH). This
--- rewards cascade-ready STRUCTURE: vertical same-color pairs (the literal fuel a clear
--- drops onto) and diagonal staircase links (same color in adjacent columns one row
--- apart — the canonical chain step). FIRST-CUT proxy, validated/replaced against the
--- gate chain sets; intentionally monotone (stacking + aligning matching colors raises
--- it) so beam search gets a gradient toward a setup that hasn't paid off yet.
-function BoardSim.buildPotential(grid, rows, top)
-  top = top or BoardSim.maxHeight(grid, rows)
-  local vpair, hpair, stair = 0, 0, 0
-  for r = 1, top do
-    for c = 1, WIDTH do
-      local v = grid[r][c]
-      if v >= 1 and v <= 6 then
-        if r < top and grid[r + 1][c] == v then vpair = vpair + 1 end           -- vertical fuel
-        if c < WIDTH and grid[r][c + 1] == v then hpair = hpair + 1 end          -- horizontal seed
-        -- diagonal staircase link: same color one column over, one row up/down. After a
-        -- lower clear, gravity drops one of these into line to complete the next match.
-        if c < WIDTH and r < top and grid[r + 1][c + 1] == v then stair = stair + 1 end
-        if c < WIDTH and r > 1 and grid[r - 1][c + 1] == v then stair = stair + 1 end
-      end
-    end
-  end
-  return vpair * 3 + stair * 2 + hpair
-end
 
 -- highest occupied row across columns
 function BoardSim.maxHeight(grid, rows)

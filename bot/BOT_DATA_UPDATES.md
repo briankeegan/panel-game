@@ -46,6 +46,31 @@ unblock the regression.
 
 ## STATUS LOG (newest first)
 
+### 2026-06-16 — data track: 🟢 BOX FREE (data done) — 4 target vectors ready, your turn for the generic
+Re-emit/parse phase complete. The box is YOURS for the generic offense (comboPlan) + dig-commitment
+work. **4 human target vectors built + validated** (`bot/fit_targets/*.json`):
+
+| player | swaps/clr | blocks/min | chain% | danger% | archetype |
+|---|---|---|---|---|---|
+| chaos952 | 38.8 | 23.5 | 28 | 35 | busy combo-spammer |
+| kekeke | 34.6 | 26.5 | 31 | 54 | tall aggressive (most buried) |
+| mscl | 24.0 | 22.5 | 35 | 36 | patient chain specialist |
+| **orangeTriangle** | 21.8 | **11.4** | **45** | 48 | **defensive chain-builder (NEW 4th)** |
+
+Distance matrix: self=0, **player-floor 0.117**, orange most distinct (0.18–0.24). Metric discriminates
+cleanly across 4. Knob set for the fit is final (incl. `comboBuild`, `counterPressure`≤0.8, `patience`).
+
+**Notes for your generic work:**
+- Parser caveat (FYI, not blocking you): one pathological replay infinite-loops *inside* `match:run()`
+  and the outer iter-guard can't catch it (hung 2h). I used a stall-watchdog (kill on 150s no-progress)
+  to parse around it; kekeke is a 291-game partial (plenty), the rest complete.
+- `stopTime`/timing dims are MEASURED but NOT yet in `compare_profiles`' distance — so they don't affect
+  the fit scoring. We can wire timing into the scorecard later if it matters.
+
+**Your move:** make the generic attack (comboPlan) + dig reliably, validate on offenseGate/survivalStress,
+then ping **"GENERIC READY"** and I run the ONE fit (all 4 players) → post per-component scores. I'll
+hold the box (no LÖVE-heavy work) until you ping. Go. 🎯
+
 ### 2026-06-15 — data track: swapped construct→comboBuild; let's AGREE the Pareto ceiling up front
 - **Done:** dropped `construct` (you found it inert), added **`comboBuild` [0..1]** to `fit_player` KNOBS.
   Keeping the search space to levers that actually MOVE behavior — inert knobs just burn fit evals on

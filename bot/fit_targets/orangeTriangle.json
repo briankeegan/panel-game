@@ -1,0 +1,97 @@
+{
+  "source": "bot/data/orangeTriangle_bot",
+  "_schema": "fit_targets/v1",
+  "board": {
+    "buckets": {
+      "low|noIn|noGb": {
+        "occupancy": 0.0595,
+        "swap": 3.19,
+        "raise": 69.43,
+        "clearStart_per1k": 0.89,
+        "dig_per1k": 0.7
+      },
+      "mid|noIn|noGb": {
+        "occupancy": 0.0899,
+        "swap": 13.94,
+        "raise": 15.33,
+        "clearStart_per1k": 10.98,
+        "dig_per1k": 6.1
+      },
+      "mid|in|noGb": {
+        "occupancy": 0.0195,
+        "swap": 16.25,
+        "raise": 0.01,
+        "clearStart_per1k": 11.2,
+        "dig_per1k": 18.23
+      },
+      "high|in|gb": {
+        "occupancy": 0.4423,
+        "swap": 17.46,
+        "raise": 0.02,
+        "clearStart_per1k": 7.09,
+        "dig_per1k": 20.35
+      },
+      "mid|in|gb": {
+        "occupancy": 0.2302,
+        "swap": 17.79,
+        "raise": 0.15,
+        "clearStart_per1k": 8.23,
+        "dig_per1k": 23.99
+      },
+      "mid|noIn|gb": {
+        "occupancy": 0.08,
+        "swap": 18.04,
+        "raise": 6.08,
+        "clearStart_per1k": 7.87,
+        "dig_per1k": 36.36
+      },
+      "high|noIn|gb": {
+        "occupancy": 0.0422,
+        "swap": 18.41,
+        "raise": 0.42,
+        "clearStart_per1k": 8.35,
+        "dig_per1k": 30.36
+      },
+      "low|in|gb": {
+        "occupancy": 0.0196,
+        "swap": 20.8,
+        "raise": 1.77,
+        "clearStart_per1k": 10.12,
+        "dig_per1k": 13.82
+      }
+    },
+    "swaps_per_clear": 21.75,
+    "height_med": 11,
+    "height_p90": 12,
+    "garbage_on_board_pct": 82.2,
+    "timing": {
+      "act_prelanding_pct": 22.71,
+      "act_baseline_pct": 22.81,
+      "anticipation": -0.11,
+      "landings_per_1k": 5.0,
+      "danger_pct": 48.19,
+      "displacement_mean": 9.506,
+      "wait_pct": 77.19,
+      "stoptime_density": 117.8365
+    },
+    "n_games": 70
+  },
+  "offense": {
+    "chainPct": 44.7,
+    "comboPct": 55.3,
+    "blocksPerMin": 11.4,
+    "chainDepth_med": 3.0,
+    "chainDepth_peak": 35,
+    "chainDepth_hist": {
+      "1": 1042,
+      "2": 745,
+      "3": 598,
+      "4": 458,
+      "5": 328,
+      "6": 264,
+      "7": 163,
+      "8": 714
+    },
+    "n_pieces": 9639
+  }
+}

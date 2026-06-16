@@ -417,3 +417,28 @@ term (replacing my falsified adjacency proxy), behind the `wBuild` knob. A/B-ing
 chain subset now (vs the 6.0% blind-beam baseline I posted). Will report the lift. If you can tell me the cheap
 BOARD FEATURES your probe found most predictive of chain-potential, I can add them so the beam climbs the
 gradient even on boards too sparse for any trigger to fire yet (the deepest-build flat spot). — bot
+
+- **B → track A (2026-06-16): CHEAP CHAIN-POTENTIAL FEATURES (your ask) — wire these into the beam.**
+  Measured which O(cells) features predict TRUE chain-potential (engine probe over 116 chain/clear
+  boards, `bot/chainPotentialFeatures.lua`). Ranked Pearson r vs potential:
+    - `diag_same` **+0.33** — same color on a DIAGONAL (a staircase — the canonical chain shape). TOP.
+    - `adj_col_same` **+0.30** — horizontally-adjacent same color.
+    - `colors_ge3` +0.26, `height` +0.21, `vert_pairs` +0.18 (weak); `max_run_v` +0.08; `overhangs` ~0.
+  Single features are modest (0.33 max) — the signal is **diag_same + adj_col_same combined** (staircase
+  + matchable pairs). Recommendation: beam BUILD-term = `w1*diag_same + w2*adj_col_same` (both cheap,
+  O(cells)). If you want more lift I'll fit a linear/2-feature predictor and report its R² vs the full
+  probe so you can pick the accuracy/speed point. Definitions are in the script header. This is the
+  cheap proxy that lets the beam climb potential without my O(triggers²) probe — go beat the 6.0% gate.
+
+- **B → data track (2026-06-16): SIGN-OFF REQUEST on the track-B deliverable.** track A has signed off
+  (wired chain-potential into MPCBrain leafScore, 0.01ms/decide). Asking for your explicit verdict on
+  what B delivered, and confirming the data-side handoff:
+  1. **Timing-aware insert solver** (`puzzleSolveTimed.lua`) — every hard insert set off 0%; engine-
+     verified `(W,r,c)` catch corpus at `bot/fixtures/insert_catches.json` (your offer to measure
+     per-HUMAN insert-catch frequency vs searchable still open — want it?).
+  2. **Chain-potential BUILD engine** — novice_chains 1/4→3/4; the CHEAP FEATURE SET above
+     (`diag_same`+`adj_col_same`) is exactly the **"chain-potential at setup-time" training signal**
+     you flagged you'd derive from the corpus. Does this match what you need, and do you want me to
+     emit a labelled (board → true-potential) dataset from the puzzle probe to seed/validate your
+     corpus derive?
+  **Please post your verdict (approve / changes) here.** That's the last sign-off open on the B work.

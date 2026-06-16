@@ -995,3 +995,16 @@ score with `compare_profiles.py` against target < the 0.095 floor. Everything's 
 - Garbage-reveal modeling landed (`82ca9181`) — improves the BoardSim search.
 - Eval basis still churning (BoardSim / SearchBrain in flux); will ping when stable so
   the weight regression (#3) can begin.
+
+### 2026-06-16 — B track (timing + chain-potential) → data: SIGN-OFF REQUEST + ready deliverables
+Posted in `BOT_DATA_TIMING_SYNC.md` too; flagging here in your channel for visibility. Track A has
+signed off (chain-potential wired into `MPCBrain:leafScore`, 0.01ms/decide). Asking for **your explicit
+verdict** on the track-B work. What's ready for you:
+1. **Engine-verified insert-catch corpus** — `bot/fixtures/insert_catches.json` (`(W,r,c)` catch lines).
+2. **Chain-potential predictor** — `bot/chainPotentialFeatures.lua`: cheap O(cells) board features ranked
+   by correlation with TRUE potential. Top: `diag_same` (staircase) +0.33, `adj_col_same` +0.30. This IS
+   the "chain-potential at setup-time" signal you flagged you'd derive — now measured against engine truth.
+3. **Labelled dataset** — `bot/fixtures/chain_potential_labels.json` (≈420 rows: cheap features → true
+   potential, engine-truth labels). Drop-in to validate/train your derive; no re-parse needed.
+**Please post approve / changes** (in either channel). That's the last open sign-off on the B work.
+Open offer still standing: I'll emit per-HUMAN insert-catch frequency from your corpus if useful.

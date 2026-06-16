@@ -197,3 +197,43 @@ The corpus splits cleanly: **CONTINUE/inserts = timing** (reset loop) · **BUILD
 - **Track A Phase-1 ask:** package the event-driven candidate-gen + bimodal-W prior as a callable
   `bot/catchTiming.lua` the live MPC re-derives catches from, weighing `W` vs the opponent's `chainEnded`
   edge (axis ③ tactical-timing). Pending corpus confirmation that the candidate-gen generalizes.
+
+---
+
+# FINAL STATE (2026-06-16) — converged with the live-bot team
+
+The work converged into ONE engine + a clear team division. Current canonical files/state:
+
+## 5. UNIFIED ENGINE (`bot/unifiedSolve.lua`) — the migration target, replaces modes 1-4
+ONE receding-horizon solver, ONE cost: `score(board) = remainingPanels − w·chainPotential`
+(remaining rewards FIRING; potential rewards BUILDING). Moves are event-driven: settle-flagged
+BUILD setups + mid-cascade CATCH timings, mixed — so build+catch-together (openers) is expressible.
+Receding-horizon + subdepth lookahead + backtracking (the robust search). Validated vs the old
+oracles: change_side 3/3, pre_setup_inserts 3/3, beginner_chains 3/4.
+- **FAST_POT (default):** potential via `BoardSim.chainPotential` (the live signal, ~0.01ms) instead
+  of the real-engine probe → ~100-1000x faster (change_side 3/3 in ~50 nodes/seconds). Win is still
+  real-engine adjudicated. `SLOWPOT=1` restores the faithful probe.
+- **FIT=1:** goal-directed toward track A's `bot/buildEnvelope.lua` (recognize→cap branching toward the
+  form→fire when reached→uncapped fallback). NOTE: the envelope cap is **LIVE-ONLY** — puzzles have fixed
+  panels so the height-envelopes are unreachable; validate FIT on a rising board (survivalStress), not the
+  puzzle gate.
+- **ORACLE_STACK / ORACLE_LINE:** the regression-oracle + plan-cache primitive. `ORACLE_STACK="<full
+  72-char board>" luajit bot/unifiedSolve.lua` → reference plan; add `ORACLE_LINE="*0@3,3"` → re-sim a line
+  on the faithful engine, report `fired/cleared/chained/chainLen`. Use `puzzleType="moves"` to load a board
+  faithfully (clear-type game_ends immediately; trimmed <72-char stacks misplace panels — give FULL 72-char).
+  Validated against track A's real sample: exact agreement (fired/clears=6/combo), no BoardSim↔engine divergence.
+
+## TEAM DIVISION (live BUILD = template-THEN-fit, all 3 tracks aligned)
+- **data:** the template LIBRARY (`buildEnvelope.LIBRARY`, orange top-10 ≈85% cover) + fill@ignition fire
+  threshold (deep chainers fire at ~57-58 fill).
+- **B (this track):** the FIT engine (`unifiedSolve` FIT mode) as reference + the `ORACLE_STACK` plan-generator
+  + the chain-potential signal + the cheap predictive features (`diag_same` staircase + `adj_col_same`).
+- **track A:** the live `MPCBrain`/`EnvelopeBrain` + the every-K-frames open-loop driver (re-plan every K
+  frames, execute the committed plan between — solves the ~300ms FIT-per-frame cost; BUILD isn't frame-reactive).
+
+## KEY FINDINGS (so a fresh agent doesn't re-discover them)
+- Inserts = TIMING (reset/catch); chains = DEPTH/BUILD (chain-potential); clears = build-a-chain-into-garbage
+  (same BUILD engine). openers = deep build + many catches (hardest).
+- chain-potential, NOT panels-cleared, is the BUILD cost-function (a half-built staircase clears nothing).
+- color-9 = garbage (Panel.lua:109), unmatchable; `chain_counter` (Stack.lua:405) = chain depth (0=combo, ≥2=chain).
+- live BUILD search is too slow per-frame (~300ms); fix is cadence (re-plan every K frames), NOT a faster search.

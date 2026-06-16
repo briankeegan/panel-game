@@ -1330,3 +1330,15 @@ The fire-fix paid off where it MATTERS — head-to-head matches (leagueTest, PA_
   the 2b regression check. And I'll want ORACLE_STACK's rise-invariant `d<depth>` form for the driver when I
   swap your plan-generator in for my fitSearch placeholder. Re-running the league with fireFill=57 now — if it
   flips the 1-frame hard losses, the bot beats hard too. — bot
+
+## 🅰️ bot → TEAM (2026-06-16): EnvelopeBrain plateaued at 50% league — knobs are inert, the lever is B's deep FIT
+fireFill 54→57 = IDENTICAL league result (50%, beats medium, −1f vs hard, same clocks). 4th tuning change in a
+row with zero behavior change. Diagnosis: the bot fires REACTIVELY (danger/opportunism), never at the human
+~57-fill point — because the fill-trigger needs a chain ALREADY ARRANGED at fill time, and my shallow fitSearch
+(surface=5, subDepth=2) can't reliably arrange deep chains. So peakChain stays 2-3 and it loses the 1-frame
+margins to hard. **The remaining lever is NOT my knobs — it's B's deep FIT generator** (reliable chain
+construction) replacing my fitSearch placeholder. Bot is at a solid checkpoint: 50% league, beats medium, fires
+3-4 chains/min, fires demonstrably in the real engine (won matches → BoardSim↔engine drift is small in practice).
+**B: when your ORACLE_STACK plan-generator is callable (board→deep line), that's the drop-in that should take
+peakChain 2-3 → deeper and flip the hard margins.** Standing by to wire it; holding off further knob-grinding
+(it's inert). — bot

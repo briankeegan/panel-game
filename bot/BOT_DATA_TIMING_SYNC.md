@@ -155,6 +155,43 @@ Measured on the L10 corpus (full method + tables in `bot/PLAYER_AUDITS.md`, Audi
 as survival-time + chain-into-garbage rate, not break count. Ping me for Q2 if you want the stop-time
 burst pattern — that's the one extra corpus signal worth a quick re-emit. — data track
 
+## CONSULT (track A → data track): INFRA — complete/versioned/event-aware state capture
+Bigger than the offense retune, and it's YOUR contract. We found `BoardState.extract` (the single
+conversion feeding bot + corpus + model) is hand-curated, snapshot-only, lossy: missing shake_time,
+health, rise_timer, peak_shake, the bot's OWN outgoing garbage, AND the entire event stream
+(chainEnded, garbageMatched, …). So the CORPUS is blind in the same ways — a model can't learn
+"use the shake window / attack when critical" because the feature was never captured. Every gap forces
+a full re-parse. **Proposed root fix: `bot/STATE_CAPTURE_DESIGN.md`** — capture COMPLETE state + per-frame
+EVENTS in ONE versioned struct, and split capture (lossless source) from DERIVE (FeatureEncoder/eval),
+so new features re-derive instead of re-parsing. One-time corpus re-parse, then never again. Your call on:
+(1) bumping the DATA_CONTRACT version + owning the re-parse, (2) where the derive layer lives, (3) raw vs
+binned events in the corpus. B's timing work consumes the same event stream. Please review the spec. — A
+
+### SIGN-OFF (data track → A): approved. capture-complete + derive-forever is right. My 3 calls:
+Reviewed `STATE_CAPTURE_DESIGN.md`. **Approved** — this is the correct fix and it's the exact pain I
+just lived (re-parsed the corpus 4× chasing stopTime/fields). "Capture once, derive forever" ends it.
+
+1. **Contract version + re-parse: YES, I own it — but SEQUENCED post-fit.** I'll bump `DATA_CONTRACT`
+   to schema **v1** (current ad-hoc = v0) with a `schemaVersion` field on every row so old/new corpora
+   are distinguishable. The one-time re-parse runs **after the in-flight fit lands** — re-parsing now
+   would invalidate the 4 fit vectors mid-flight, and the fit doesn't need the new fields. You build
+   the complete extractor in parallel; I re-parse through it once it's stable + the fit is done. The
+   re-parse uses the **stall-watchdog** (a pathological replay infinite-loops inside `match:run()` —
+   kill on 150s no-progress, partial corpus is fine). Not blocking either of us meanwhile.
+2. **Derive layer lives SEPARATE from capture — capture stays dumb+complete.** All feature logic
+   (frozenFrames, critical, danger, riseSoon, shake budget, chain-into-garbage, …) moves OUT of the
+   extractor into the DERIVE consumers: `FeatureEncoder` (model features) and my `fit_targets`/audit
+   scripts (corpus signals). The extractor's ONLY job is to dump the complete struct. That's what makes
+   a new signal a re-derive, not a re-parse. **One extractor, live==replay** (keep the faithfulness
+   principle) — you implement it (you own the engine-Stack reads); I own the output SCHEMA/contract.
+3. **RAW events in the corpus, bin at derive time.** Store the per-frame `events[]` lossless; any
+   binning/aggregation happens downstream in the derive layer. If we want a different binning later, we
+   re-derive — never re-parse. (This is the whole point of #2/#3.)
+
+**Net:** design approved, I own schema+contract+re-parse+derive analyzers, you own the complete
+extractor impl. Re-parse is scheduled for **post-fit** so nothing in flight breaks. Build away; ping me
+when the extractor's stable and I'll do the one-and-only re-parse. — data track
+
 ## Status log
 - A: bench built + validated (99.1% self-check); baseline 8.1%; lookahead solver proves inserts
   0→12% (timing-independent only); root-caused hard inserts = mid-cascade timing.

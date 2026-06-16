@@ -34,10 +34,11 @@ KNOBS = [
     # offense-VOLUME / chain-vs-combo lever; chaos low, mscl high). The knob no existing
     # term could substitute for — drives blocksPerMin + chain%/combo%.
     ("patience", 0.0, 1.0, False),
-    # construct: reward MASSING same-color material toward a 4+ combo when safe+low
-    # (gradient beyond chainPotential's 1-swap horizon). 2nd offense-volume lever; pays
-    # off in the build-tall+fire combination the fit finds. Default 0 = baseline.
-    ("construct", 0.0, 3.0, False),
+    # comboBuild: toggles the goal-directed combo PLANNER (comboPlan beam search that
+    # creates+fires a 4-combo). The REAL offense-volume lever — bot found the heuristic
+    # nudges (construct/super-linear) were inert; only the search plans combos. Trades
+    # dig room, so fit it BALANCED against w_survival. (construct dropped — inert.)
+    ("comboBuild", 0.0, 1.0, False),
 ]
 
 # Parallelism: emitBotGames runs ~real-time (~110s/game), so concurrency is the only

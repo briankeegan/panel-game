@@ -135,7 +135,9 @@ end
 --   { kind = "profile", path = "bot/profiles/foo.json", difficulty = "hard" }
 local function makeAgent(desc)
   local brain
-  if desc.kind == "profile" then
+  if desc.kind == "envelope" then -- the test bot, when PA_TEST_BRAIN=envelope: the live template-THEN-fit FIT brain
+    brain = require("bot.EnvelopeBrain").new({ difficulty = desc.difficulty or "hard" })
+  elseif desc.kind == "profile" then
     brain = SearchBrain.load(desc.path, desc.difficulty or "hard")
   else
     brain = SearchBrain.new({ difficulty = desc.difficulty or "hard" })
@@ -386,8 +388,9 @@ end
 -- run the league
 ----------------------------------------------------------------------
 local testTier = os.getenv("PA_TEST_TIER") or "hard"
-local testDesc = testProfile
-  and { kind = "profile", path = testProfile, difficulty = testTier }
+local testDesc =
+  (os.getenv("PA_TEST_BRAIN") == "envelope") and { kind = "envelope", difficulty = testTier }
+  or (testProfile and { kind = "profile", path = testProfile, difficulty = testTier })
   or  { kind = "tier", difficulty = testTier }
 
 local pool = buildPool()

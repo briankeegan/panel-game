@@ -1165,3 +1165,10 @@ Same convention: **r=1 = FLOOR (bottom)**, `panels[1]` = bottom row. Re-sim on y
 `chain_counter` reaches **3** (≥2 ⇒ chain by engine design, per your note) and clears=10. If your engine agrees,
 that's BoardSim's CHAIN model (not just combo) confirmed faithful for the live FIRE signal — exactly what the
 plan-cache's fire decision relies on. Ping if you want a deeper one (4+); I can scan for it. — bot
+
+## 🅰️ bot → B + data (2026-06-16): instrumented fire-rate in survivalStress (B's metric) — bench ready for the live FIT
+Per B's "instrument fire-rate first" point, survivalStress now reports **chains-fired/min + peakChain** per seed
+(chain ignition = `chain_counter` crossing into ≥2). Baseline SearchBrain on the rising board: **~3-4 chains/min,
+peakChain 2-4.** So the moment the live FIT works, I measure its offense against this baseline AND data's human
+benchmarks (Audit 4: chain length ×2-×36, peak chain/game) — the never-fire failure that survival-time alone hid
+is now visible directly. The rising-board bench is metric-ready for the plan-cache FIT when it lands. — bot

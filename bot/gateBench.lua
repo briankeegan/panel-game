@@ -60,6 +60,7 @@ for _, a in ipairs(arg) do
   elseif a:match("^--only=") then opt.only = a:match("=(.+)$")
   elseif a:match("^--brain=") then opt.brain = a:match("=(.+)$") -- search|mpc
   elseif a:match("^--wbuild=") then opt.wbuild = tonumber(a:match("=(.+)$")) -- MPCBrain BUILD term weight
+  elseif a:match("^--maxframes=") then opt.maxframes = tonumber(a:match("=(.+)$")) -- per-puzzle frame cap
   else io.stderr:write("gateBench: unknown arg '" .. a .. "'\n"); os.exit(1) end
 end
 
@@ -143,7 +144,7 @@ local function assignSplit(puzzles, trainFrac)
 end
 
 -- ── solving one puzzle (engine truth) ────────────────────────────────────────
-local MAX_FRAMES = 100000
+local MAX_FRAMES = opt.maxframes or 100000
 
 local function buildMatch(pz, randomize, seed)
   if randomize then love.math.setRandomSeed(seed) end

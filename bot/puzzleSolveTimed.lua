@@ -72,6 +72,11 @@ local RESET_SETTLE = os.getenv("RESET_SETTLE") == "1"
 -- maxSwaps, fall back to the greedy reset loop (solves deeper, but not guaranteed shortest).
 -- Gives minimal solutions everywhere they're findable + a working line for the deepest.
 local TIER = os.getenv("TIER") == "1"
+
+-- BUILD=k : chain-potential build solver (subDepth k). For CHAIN puzzles, which can't be
+-- solved by a panels-cleared signal (a half-built staircase clears nothing). Climbs
+-- "biggest triggerable chain" toward a chain-ready setup, then fires.
+local BUILD = tonumber(os.getenv("BUILD"))
 -- score a candidate move; higher = try first. Constants learned from the solved corpus.
 local function priorScore(off, r)
   local t = 0
@@ -523,6 +528,105 @@ local function solveIterated(puzzle, subDepth)
   return nil, nodes, 0
 end
 
+-- CHAIN-POTENTIAL BUILD solver. Chains can't be solved by a "panels cleared" signal — a
+-- half-built staircase clears nothing, so greedy/reset search sees 0 progress and quits.
+-- The signal that works is POTENTIAL: "the biggest single-swap clear available from this
+-- board" (a faithful engine probe — try each trigger swap, settle, measure panels removed).
+-- A board one swap away from firing a 4-chain scores high even though it's cleared nothing.
+-- The search CLIMBS potential with setup swaps until a trigger wins.
+local function solveBuild(puzzle, subDepth)
+  local nodes = 0
+  local function append(list, x)
+    local t = {}; for i = 1, #list do t[i] = list[i] end; t[#t + 1] = x; return t
+  end
+  local function concat(a, b)
+    local t = {}; for i = 1, #a do t[i] = a[i] end; for i = 1, #b do t[#t + 1] = b[i] end; return t
+  end
+  local function settleCount(steps)
+    local match, stack = replay(puzzle, steps)
+    for i = 1, PROBE_CAP do
+      if stack:game_ended() then break end
+      stack:receiveConfirmedInput(IDLE); match:run()
+      if i >= 2 and settled(stack) then break end
+    end
+    return remainingPanels(stack), won(stack), died(stack)
+  end
+  -- POTENTIAL of the settled board reached by `steps`: the most panels a single trigger
+  -- swap removes (after full settle), and a winning trigger if one clears the board.
+  local function potential(steps, base)
+    local mb, sb = replay(puzzle, steps)
+    for i = 1, PROBE_CAP do
+      if sb:game_ended() then break end
+      sb:receiveConfirmedInput(IDLE); mb:run()
+      if i >= 2 and settled(sb) then break end
+    end
+    if won(sb) then return base, nil end
+    local grid, H = readGrid(sb)
+    local best, winMove = 0, nil
+    for _, c in ipairs(candidates(grid, H)) do
+      nodes = nodes + 1
+      if nodes > nodeBudget then break end
+      local trig = { 0, c[1], c[2], true }
+      local bb, ww = settleCount(append(steps, trig))
+      if ww then winMove = trig end
+      local cleared = base - bb
+      if cleared > best then best = cleared end
+    end
+    return best, winMove
+  end
+  -- shortest setup extension (<=subDepth, settle-separated) that raises potential above cur.
+  local function findRaise(committed, base, cur, maxAlt)
+    local results = {}
+    for d = 1, subDepth do
+      local function dfs(extra, depth)
+        if #results >= maxAlt or nodes > nodeBudget then return end
+        local pot, winMove = potential(concat(committed, extra), base)
+        if #extra > 0 and (winMove or pot > cur) then
+          results[#results + 1] = { steps = extra, pot = pot, winMove = winMove }
+          return
+        end
+        if depth >= d then return end
+        local _, stack = replay(puzzle, concat(committed, extra))
+        for i = 1, PROBE_CAP do
+          if stack:game_ended() then break end
+          stack:receiveConfirmedInput(IDLE)
+          if i >= 2 and settled(stack) then break end
+        end
+        local grid, H = readGrid(stack)
+        local cands = candidates(grid, H)
+        for ci = 1, math.min(#cands, branchCap) do
+          dfs(append(extra, { 0, cands[ci][1], cands[ci][2], true }), depth + 1)
+          if #results >= maxAlt or nodes > nodeBudget then return end
+        end
+      end
+      dfs({}, 0)
+      if #results > 0 then break end
+    end
+    return results
+  end
+  local function solveFrom(committed, base, cur)
+    if nodes > nodeBudget then return nil end
+    -- can we win outright from here?
+    local pot, winMove = potential(committed, base)
+    if winMove then return concat(committed, { winMove }) end
+    if base == 0 then return committed end
+    for _, r in ipairs(findRaise(committed, base, cur, RESET_BT or 3)) do
+      if r.winMove then return concat(concat(committed, r.steps), { r.winMove }) end
+      local nc = concat(committed, r.steps)
+      local nbase = settleCount(nc)
+      local sol = solveFrom(nc, nbase, r.pot)
+      if sol then return sol end
+    end
+    return nil
+  end
+  local base0, won0 = settleCount({})
+  if won0 then return {}, nodes, 0 end
+  local pot0 = potential({}, base0)
+  local sol = solveFrom({}, base0, pot0)
+  if sol then return sol, nodes, #sol end
+  return nil, nodes, 0
+end
+
 -- run over the filtered set
 local results = {}
 local function bump(set, ok)
@@ -543,7 +647,9 @@ for _, e in ipairs(flat) do
   local nameMatch = (not setFilter) or (e.set and e.set:lower():find(setFilter, 1, true))
   if nameMatch and n < maxPuzzles then
     local ok, soln, nodes, d, tier
-    if TIER then
+    if BUILD then
+      ok, soln, nodes, d = pcall(solveBuild, e.puzzle, BUILD)
+    elseif TIER then
       ok, soln, nodes, d = pcall(solve, e.puzzle)            -- shortest reachable
       tier = "short"
       if ok and soln == nil then                              -- fall back to the reset loop

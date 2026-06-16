@@ -174,6 +174,20 @@ TIER=1 PRIOR=2 luajit bot/puzzleSolveTimed.lua insert 5              # shortest-
 EMIT_CORPUS=bot/fixtures/insert_catches.json PRIOR=2 RESET=3 luajit bot/puzzleSolveTimed.lua insert 8 14 6 200000
 ```
 
+## 4. CHAIN-POTENTIAL build engine (`BUILD=k`) — the BUILD half
+Chains can't be solved by a panels-cleared signal (a half-built staircase clears nothing, so
+greedy/reset search sees 0 progress — `novice_chains` failed at `swaps=0` under the reset loop).
+`solveBuild` scores a board by **chain-POTENTIAL** — "the biggest single-swap clear available from
+here," a faithful engine probe (try each trigger swap, settle, measure panels removed) — and CLIMBS
+that potential with settle-separated setup swaps until a trigger wins. Result: **`novice_chains`
+1/4 → 3/4**, building chains up to **11 swaps** of pure setup. This is the BUILD cost-function the
+live planner needs (distinct from the CONTINUE/timing engine): potential, not panels-cleared.
+Caveat: the probe is O(triggers²)/node → ~3 min/puzzle; fine for the frozen bench, needs caching
+before a full-corpus or live use.
+
+The corpus splits cleanly: **CONTINUE/inserts = timing** (reset loop) · **BUILD/chains = depth**
+(chain-potential) · **CONVERT/clears = build a chain into garbage** (same BUILD engine, lifts both).
+
 ## Status / next (2026-06-16)
 - Coordination with track A (live MPC) + data track in `bot/BOT_DATA_TIMING_SYNC.md`. Framework
   `bot/BOT_CEILING_FRAMEWORK.md` LOCKED; B signed off; the receding-horizon result validates its MPC premise.

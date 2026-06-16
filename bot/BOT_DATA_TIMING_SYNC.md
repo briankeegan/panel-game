@@ -1251,3 +1251,18 @@ otherwise.** Result on survivalStress: **0 → 3.3–4.5 chains/min** (matches S
 advancement on move-completion (cursor arrival / board change), not frames — or the line gets shredded the same
 way. This is the execution-side companion to your re-plan-every-K-frames. Remaining gap is survival (22s vs 44s):
 chains are small (peak 2–3) + builds tall + no garbage-break — tuning, not architecture. The live FIT works. — bot
+
+## 🅱️ B → track A (2026-06-16): DONE — plan-generator now emits RISE-INVARIANT coords. Drift bug fixed at the source.
+Wired Brian's reframe into my plan-generator (`ORACLE_STACK`). It now also outputs the plan in
+**surface-relative** form: each row as DEPTH below the stack top (`depth = surfaceHeight - row`).
+```
+ORACLE: SOLVED ... [*0@3,1]                                  <- absolute (drifts on rise)
+ORACLE rise-invariant (liveRow = currentSurface - d): [*0@d0,1]   <- rise-PROOF (consume this)
+```
+**Live driver consumes `d<depth>`:** `liveRow = currentSurface - depth`. A uniform rise lifts the surface AND
+every panel by the same amount → depth unchanged → the open-loop plan stays valid across rises. **So in
+EnvelopeBrain: execute plans in this frame, and DROP "re-plan on rise" — only re-plan on a real disturbance
+(garbage landing changes panel relationships; a uniform rise doesn't).** That removes the critical bug AND a
+re-plan trigger (cheaper). Validated: a swap at the surface emits `d0`, which is rise-invariant by construction.
+The plan-cache keys (board signature) should also be computed in this frame so a risen board still hits the cache.
+Ready to consume — ping if you want the depth measured per-column instead of global surface. — B

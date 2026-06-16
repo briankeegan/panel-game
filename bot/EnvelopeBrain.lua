@@ -1,11 +1,13 @@
 -- EnvelopeBrain — PROTOTYPE layer-3 live brain for template-THEN-fit BUILD (team consensus 2026-06-16).
--- Tests the hypothesis the corpus gave us: humans build toward a FLAT NEAR-FULL board (a template envelope)
--- then FIRE a chain. This brain: keep the board flat as it rises (placeholder FIT = greedy envelope-distance
--- descent), and FIRE the biggest available chain when the board is built OR when it's getting dangerous.
+-- v3: MPC CADENCE (B's fix for the per-frame slowness). The subdepth FIT search is ~300ms on a full board —
+-- too slow PER FRAME, but BUILD isn't frame-reactive. So: re-plan a multi-swap PLAN occasionally, execute it
+-- OPEN-LOOP over the next K frames, re-plan only every `replanEvery` frames / when the plan is exhausted / on
+-- danger. The expensive search runs ~once per K frames; between, decide() is O(1) (pop the next planned move).
+-- 300ms amortized over K=30 frames ≈ 10ms/frame. (B's plan-cache over data's top-10 envelopes removes even the
+-- per-replan spike — that's the next layer, keyed by board signature; here we validate the cadence itself.)
 --
--- Placeholder FIT (greedy distance descent) stands in until B's goal-directed FIT engine lands; same
--- decide(state) -> {SWAP|RAISE|WAIT} seam as SearchBrain/MPCBrain, so it runs in survivalStress/leagueTest.
--- This is a PROTOTYPE to get a first "can the template idea win?" signal, not the final planner.
+-- Generator is still the local fitSearch placeholder; B's ORACLE_STACK plan-generator drops in behind
+-- generatePlan() once it's solid. Same decide(state) -> {SWAP|RAISE|WAIT} seam as SearchBrain/MPCBrain.
 
 local BoardSim = require("bot.BoardSim")
 local BuildEnvelope = require("bot.buildEnvelope")
@@ -21,7 +23,8 @@ local DEFAULTS = {
   -- FIT search (ports B's subdepth+capped receding-horizon): build a chain over several swaps.
   subDepth    = tonumber(os.getenv("PA_SUBDEPTH")) or 2, -- swaps of lookahead per commit
   beam        = tonumber(os.getenv("PA_BEAM")) or 3,     -- children expanded per level
-  nodeBudget  = 1500, -- hard cap on board sims per decide() (live frame-budget guard)
+  nodeBudget  = 1500, -- hard cap on board sims per re-plan (frame-budget guard for the spike)
+  replanEvery = tonumber(os.getenv("PA_REPLAN")) or 30,  -- MPC cadence K: re-plan every K frames, else open-loop
 }
 
 function EnvelopeBrain.new(opts)
@@ -29,7 +32,20 @@ function EnvelopeBrain.new(opts)
   local cfg = {}
   for k, v in pairs(DEFAULTS) do cfg[k] = v end
   for k, v in pairs(opts) do if k ~= "difficulty" then cfg[k] = v end end
-  return setmetatable({ cfg = cfg }, EnvelopeBrain)
+  return setmetatable({ cfg = cfg, plan = nil, planIdx = 1, sinceReplan = 0 }, EnvelopeBrain)
+end
+
+local function swaps(grid, top)
+  local out = {}
+  for r = 1, top do
+    for c = 1, BoardSim.WIDTH - 1 do
+      local a, b = grid[r][c], grid[r][c + 1]
+      if a ~= BoardSim.GARBAGE and b ~= BoardSim.GARBAGE and a ~= b and (a ~= 0 or b ~= 0) then
+        out[#out + 1] = { r, c }
+      end
+    end
+  end
+  return out
 end
 
 -- the single swap that fires the BIGGEST clear (chain depth first, then panels). Returns pos,chain,clear.
@@ -49,30 +65,18 @@ local function bestFireSwap(grid, rows, top)
   return bestPos, bestChain, bestClear
 end
 
-local function swaps(grid, top)
-  local out = {}
-  for r = 1, top do
-    for c = 1, BoardSim.WIDTH - 1 do
-      local a, b = grid[r][c], grid[r][c + 1]
-      if a ~= BoardSim.GARBAGE and b ~= BoardSim.GARBAGE and a ~= b and (a ~= 0 or b ~= 0) then
-        out[#out + 1] = { r, c }
-      end
-    end
-  end
-  return out
-end
-
--- FIT SEARCH (ports B's unifiedSolve FIT loop to a live brain): subdepth DFS that, while building toward
--- the envelope, finds the first swap of the sequence that best RAISES chain-POTENTIAL (arranges a firing
--- chain). The envelope acts as B's branching CAP: we expand the children that flatten toward the form
--- (a SMOOTH gradient — no valley to stall in), and score leaves by the latent chain (bestClear) they set
--- up. Returns the FIRST move; the brain commits it and re-plans next frame (receding-horizon). This is the
--- piece the greedy 1-ply placeholder lacked: a multi-swap sequence can raise potential where 1 swap can't.
+-- FIT SEARCH (ports B's unifiedSolve FIT loop): subdepth DFS that, while building toward the envelope, finds
+-- the swap SEQUENCE that best RAISES chain-POTENTIAL (arranges a firing chain). The envelope CAPS branching
+-- (expand the children that flatten toward the form — a smooth gradient, no valley to stall in); score leaves
+-- by the latent chain (bestClear) they set up. Returns the full best SEQUENCE (the open-loop plan) so the
+-- cadence driver can execute it over K frames before re-planning. A multi-swap sequence raises potential
+-- where 1 swap can't (the valley-crossing the greedy 1-ply placeholder lacked).
 local function fitSearch(grid, rows, envelope, top, cfg)
-  local bestFirst, bestPot = nil, select(5, BoardSim.chainPotential(grid, rows, top)) or 0
+  local _, _, _, _, base = BoardSim.chainPotential(grid, rows, top)
+  local bestSeq, bestPot = {}, base or 0
   local budget = cfg.nodeBudget
   local function envDist(g) return envelope and BuildEnvelope.distance(g, rows, envelope) or 0 end
-  local function dfs(g, depth, firstMove)
+  local function dfs(g, depth, path)
     if depth >= cfg.subDepth or budget <= 0 then return end
     local kids = {}
     for _, sw in ipairs(swaps(g, top)) do
@@ -81,15 +85,35 @@ local function fitSearch(grid, rows, envelope, top, cfg)
       local ng = BoardSim.simSwap(g, rows, sw[1], sw[2])
       local _, _, _, _, pot = BoardSim.chainPotential(ng, rows, top)
       pot = pot or 0
-      local first = firstMove or sw
-      if pot > bestPot then bestFirst, bestPot = first, pot end
-      kids[#kids + 1] = { g = ng, fm = first, d = envDist(ng) }
+      local npath = {}
+      for i = 1, #path do npath[i] = path[i] end
+      npath[#npath + 1] = sw
+      if pot > bestPot then bestPot, bestSeq = pot, npath end
+      kids[#kids + 1] = { g = ng, path = npath, d = envDist(ng) }
     end
     table.sort(kids, function(a, b) return a.d < b.d end) -- expand the flattest-toward-form first
-    for i = 1, math.min(cfg.beam, #kids) do dfs(kids[i].g, depth + 1, kids[i].fm) end
+    for i = 1, math.min(cfg.beam, #kids) do dfs(kids[i].g, depth + 1, kids[i].path) end
   end
-  dfs(grid, 0, nil)
-  return bestFirst
+  dfs(grid, 0, {})
+  return bestSeq
+end
+
+-- GENERATE PLAN (the expensive step — runs ~once per `replanEvery` frames via the cadence). Decides BUILD vs
+-- FIRE and returns a move sequence to execute open-loop. B's ORACLE_STACK plan-generator slots in here later.
+function EnvelopeBrain:generatePlan(grid, rows, top, danger)
+  local cfg = self.cfg
+  local firePos, fireChain, fireClear = bestFireSwap(grid, rows, top)
+  if danger and firePos then return { firePos } end                       -- emergency: fire to survive
+  local envelope = BuildEnvelope.recognize(grid, rows)
+  local built = (envelope == nil)
+  if firePos and ((built and (fireChain >= cfg.fireChain or fireClear >= cfg.fireClear))
+                  or fireChain >= cfg.opportunism) then
+    return { firePos }                                                    -- built / big chain ready: FIRE
+  end
+  local seq = fitSearch(grid, rows, envelope, top, cfg)                    -- BUILD: open-loop fit sequence
+  if #seq > 0 then return seq end
+  if firePos then return { firePos } end
+  return {}
 end
 
 function EnvelopeBrain:decide(state)
@@ -98,28 +122,24 @@ function EnvelopeBrain:decide(state)
   local grid = BoardSim.colorGrid(state.board, rows)
   local height = state.maxColHeight or BoardSim.maxHeight(grid, rows)
   local top = math.min(rows, height + 1)
-
-  local firePos, fireChain, fireClear = bestFireSwap(grid, rows, top)
   local danger = height >= rows * cfg.dangerFrac
 
-  -- 1) EMERGENCY: too high — fire anything that clears to make room (survival over offense).
-  if danger and firePos then return { type = "SWAP", pos = firePos } end
-
-  -- 2) FIRE: a worthwhile trigger is available and the board is "built" (no buildable envelope left),
-  --    or the trigger is big enough that building further would waste it.
-  local envelope = BuildEnvelope.recognize(grid, rows)
-  local built = (envelope == nil)
-  if firePos and ((built and (fireChain >= cfg.fireChain or fireClear >= cfg.fireClear))
-                  or fireChain >= cfg.opportunism) then
-    return { type = "SWAP", pos = firePos }
+  -- MPC CADENCE: re-plan only every K frames / when the plan is exhausted / on danger. The expensive search
+  -- lives in generatePlan; between re-plans decide() is O(1). (Disturbance triggers — garbage land / board
+  -- rise invalidating coordinates — are a refinement; danger + exhaustion cover the basics here.)
+  if (not self.plan) or self.planIdx > #self.plan or self.sinceReplan >= cfg.replanEvery or danger then
+    self.plan = self:generatePlan(grid, rows, top, danger)
+    self.planIdx = 1
+    self.sinceReplan = 0
+  else
+    self.sinceReplan = self.sinceReplan + 1
   end
 
-  -- 3) BUILD/FIT: subdepth search for the swap that best sets up a firing chain toward the form.
-  local buildPos = fitSearch(grid, rows, envelope, top, cfg)
-  if buildPos then return { type = "SWAP", pos = buildPos } end
-
-  -- 4) nothing improves the form and no worthwhile fire: take any available clear, else hold.
-  if firePos then return { type = "SWAP", pos = firePos } end
+  local mv = self.plan and self.plan[self.planIdx]
+  if mv then
+    self.planIdx = self.planIdx + 1
+    return { type = "SWAP", pos = mv }
+  end
   return { type = "WAIT" }
 end
 

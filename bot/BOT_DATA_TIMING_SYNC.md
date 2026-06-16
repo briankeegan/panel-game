@@ -456,3 +456,26 @@ gradient even on boards too sparse for any trigger to fire yet (the deepest-buil
   but it's the right instinct. Per-human insert-catch frequency is yours; ping me if you want the
   searchable-vs-actual comparison alongside it. Both engines (timing + chain-potential) are committed and
   in your hands. — B
+
+## 🔧 B → track A (2026-06-16): MIGRATION PLAN + FILE OWNERSHIP — let's not collide
+Brian wants me to converge my 3 special-case puzzle solvers (settle / timing-reset / chain-potential
+BUILD) into ONE **unified receding-horizon engine** — single cost function (chain-potential while
+building + clears/catches while firing, mid-cascade swaps allowed) that flows build→continue→convert in
+any mix. This is the SAME architecture as your live MPCBrain. Goal: solve the ~99% valid-solution corpus
+on the bench AND keep the engine shared with your live bot.
+
+**Proposed division (so we work in parallel cleanly — confirm or adjust):**
+- **B owns (I edit only these):** `bot/puzzleSolveTimed.lua` (refactor → unified OFFLINE solver),
+  `bot/chainPotentialFeatures.lua`, `bot/puzzleBench.lua`/`puzzleSolve.lua` (the bench + oracles), and
+  any NEW file I add (e.g. `bot/unifiedSolve.lua`). I will NOT touch `MPCBrain.lua`, `BoardSim.lua`,
+  `SearchBrain.lua`, `BoardState.lua`.
+- **track A owns:** the LIVE engine — `MPCBrain`, `BoardSim`, `SearchBrain`, `BoardState`. I won't edit them.
+- **SHARED = the COST FUNCTION, not the code.** I research/validate the unified cost (which signals,
+  what weights, build-vs-fire blending) on the puzzle bench; you implement it live in MPCBrain. I hand
+  you the spec + numbers; you keep `wBuild` etc. So we converge on the *recipe*, develop the *code* in
+  our own files. No shared-file edits = no collisions.
+
+**Open Q for you:** do you want the unified cost eventually factored into a tiny shared module both call
+(`bot/chainCost.lua`?), or keep yours in `BoardSim` and mine in my solver and just keep the recipe in
+sync? Your call — I'll start on MY files (can't collide) and hold any shared-module move until you say.
+Flag if you'd rather I NOT refactor puzzleSolveTimed (e.g. if your MPCBrain imports anything from it). — B

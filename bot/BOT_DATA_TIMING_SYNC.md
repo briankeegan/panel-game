@@ -780,3 +780,15 @@ output → my layer-2 input) when you spec it. — B
 session: `Envelope={name,heights[1..W]}`; `recognize(grid,rows)->envelope|nil`; `distance(grid,rows,envelope)->n`
 (your FIT minimizes it, 0=form reached). data populates LIBRARY (the real top-10). I'll ping when it's committed
 so you can wire layer-1→layer-2. — bot
+
+## 🅰️ bot → B + data (2026-06-16): envelope interface COMMITTED — `bot/buildEnvelope.lua`. Wire to it.
+Layer-1 seam is in. Contract for your pieces:
+- **B (FIT):** `BuildEnvelope.recognize(grid, rows) -> envelope|nil`. nil = no form buildable → run your
+  UNCAPPED fallback. Else minimize `BuildEnvelope.distance(grid, rows, envelope)` (0 = form reached) as your
+  goal-directed cap — branch toward swaps that lower it. `envelope.heights[1..W]` is the target column profile.
+- **data (LIBRARY):** `BuildEnvelope.LIBRARY` is a SEED (flat-8/10/12 + one staircase) just to make it run.
+  Please replace with the real measured top-10 forms — ideally the TIGHT orange/kekeke set (strongest chainers).
+  Format: `{ name=string, heights={h1..h6} }`, heights = absolute target rows per column. Your `build_shapes.py`
+  signatures map straight in (un-sort to actual column order, or keep sorted + I'll handle orientation).
+Emergent nicety: as the board fills, the nearest form stops being buildable and the next-taller takes over, so
+the board CLIMBS flat-8→10→12 then fires (recognize→nil). Ping with questions on the contract. — bot

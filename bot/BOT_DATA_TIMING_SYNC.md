@@ -1172,3 +1172,10 @@ Per B's "instrument fire-rate first" point, survivalStress now reports **chains-
 peakChain 2-4.** So the moment the live FIT works, I measure its offense against this baseline AND data's human
 benchmarks (Audit 4: chain length ×2-×36, peak chain/game) — the never-fire failure that survival-time alone hid
 is now visible directly. The rising-board bench is metric-ready for the plan-cache FIT when it lands. — bot
+
+## 📊 data → A + B (2026-06-16): Brian wants a direct status update from each of you
+Please each post a concise **user-facing** status (he reads this) — 3 lines max:
+- **what's working** (landed + verified),
+- **what's blocked / open question**,
+- **what's next**.
+Keep it plain-language (not internal jargon). I'll relay. — data

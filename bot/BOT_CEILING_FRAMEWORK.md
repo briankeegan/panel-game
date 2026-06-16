@@ -34,16 +34,36 @@ invincibility window. Garbage on your board is cleared as a **byproduct** of cha
   No dig planner, no dig mode, no dig-count goal. You break garbage to FEED a chain / open a window,
   not to make room.
 
-## METRICS — old → new
-| axis | OLD (reactive) | NEW (offense-centric) |
-|---|---|---|
-| mechanics | puzzle pass-rate (~7%) | puzzle pass-rate → **target 100%** (every insert/combo/chain/clear) |
-| offense | barely measured | **blocks SENT / min** — must *exceed* best human (>26.5) |
-| garbage **breaking** | **dig-COUNT maximized (reactive)** ❌ | **chain-into-garbage RATE** = fraction of garbage-breaks inside an active chain. **data MEASURED: humans 38–60% chained, ~0% standalone 3-match** → breaking matters, but only as offense. Drop raw break-count. |
-| survival | survival seconds (separate skill) | **time-to-topout under fixed garbage** (data's call — pure survival, no dig bias); **byproduct** of the loop; **clean board must be indefinite** |
-| timing | blind to it | **stop-time utilization** — % invincible / loop continuity (the offense-as-defense signature) |
-| shape | chain depth, combo size | chain depth, combo size — match/beat human |
-| verdict | win-rate (noisy) | per-axis vs **data's human benchmarks** (asked; pending) |
+## DIMENSIONS (winning-centric — v2 re-think, supersedes the old per-axis "metrics" table; UNDER REVIEW)
+**The game is WON, not stat-maximized.** The north metric is **WINNING**; every other dimension is a
+*component* of it. And **solving puzzles ≠ winning** — puzzles are a **capability gate**, not the strength score.
+
+- **① WIN — the integral.** Beats the best human head-to-head. *Measure:* contested vs an opponent sending
+  garbage at a real human's measured rate/pattern (corpus-derived) → bot out-survives their offense AND out-pressures them.
+- **Performance components (must EXCEED best human; measured CONTESTED, not solo):**
+  - **② Offense output** — garbage SENT/min (> kekeke 26.5).
+  - **③ Offense quality** — chain depth + combo-size dist (hard-to-dig pressure, not spam — guards ② vs tiny-combo gaming).
+  - **④ Survival** — time-to-topout under the corpus-derived human pressure; clean board indefinite. *(hardest to measure; needs ①'s rig.)*
+  - **⑤ Execution** — speed (APM) + accuracy. The native edge; the dial we **HANDICAP** for the ladder.
+- **Capability GATE (necessary, not sufficient):**
+  - **⑥ Mechanics** — ~100% of the 235 puzzles (minus frame-perfect air-catches; self-check tops 99.1%). Proves it CAN do every technique.
+- **Reliability:**
+  - **⑦ Robustness** — wins/survives across seeds + opponents (report p10, not just median).
+- **STYLE (NOT ceiling axes — only for the per-player CLONES):** combo-width mix, swaps/clear, danger-dwell. The clones match these; the ceiling dominates ①–⑦.
+
+## ARCHITECTURE PREMISE (the bar likely needs more than knobs)
+Hitting ②–④ superhuman almost certainly requires a **break→setup→chain LOOKAHEAD planner**, NOT knob tuning:
+the greedy 1-ply eval caps ~8 sends/min, can't construct through garbage, solves ~7% of puzzles; only a real
+sequence-search (`puzzleSolveTimed`) solved inserts. The KNOBS below are the eval surface — but reaching the
+bar is an architecture change, not a tuning pass. *(If a reviewer believes a tuned eval CAN reach it, say why.)*
+
+## OPEN QUESTIONS (reviewers — pressure-test these)
+- Is "win vs a corpus-derived human-RATE/PATTERN opponent" a sound integral, or does it hide skills —
+  garbage TIMING/telegraph play, counter-attacking on vulnerable frames, comeback, opponent adaptation?
+- Are ①–⑦ the right set? missing or redundant dimension?
+- Each dimension: well-defined + measurable vs humans + non-gameable (Goodhart)? where's the worst perverse incentive?
+- Is the puzzles-as-GATE vs winning-as-SCORE split correct?
+- Is the architecture premise right, or could a sufficiently-tuned eval reach the bar?
 
 ## KNOBS — old → new (SearchBrain eval levers)
 | group | OLD | NEW |
@@ -139,6 +159,15 @@ Thanks — benchmark table + Audit 2 confirmation accepted. On your two flags (r
   note* (compare each axis at bot-best vs human-best), not a softening. So please read benchmarks as
   "ceiling must EXCEED best-human on every axis," not "≥". If you think strict-better is unreachable on a
   *specific* axis with evidence, flag THAT axis concretely — but the default bar is strict-better-everywhere.
+
+### DATA reply to "flag a specific unreachable axis with evidence" (2026-06-16)
+No axis I can call *unreachable* with proof — so not blocking. But the **risk axis to watch is
+offense-volume-while-surviving**: your own sweeps had offense top ITSELF out at ~20/min and the current
+eval sits ~5/min, vs best-human **26.5/min** — and the survival↔full-board tension is real. comboPlan +
+flawless execution *should* clear it (your argument, I accept it), but this is the one axis where
+strict-better isn't yet *demonstrated*. Treat it as the prove-it axis at validation: if anything
+under-delivers strict-better, it'll be sustained 26.5+/min without topping out. Everything else
+(puzzles, chain depth, survival proxies) I expect flawless execution to exceed. — data
 
 ## SIGN-OFF (required before this locks — user wants both tracks bought in, THEN it goes to the user)
 Discuss in this doc / the sync file, then each track leave an explicit verdict here:

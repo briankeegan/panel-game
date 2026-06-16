@@ -15,6 +15,14 @@
 
 local Difficulty = {}
 
+-- CALIBRATED (engine gates, post-cursor-fix — survivalStress 6x1-every-5s + offenseGate):
+--   tier    offense/min   survival med/p10   dig-broken med
+--   easy       0.0          18.5s / 12          ~0     (dies in ~3 garbage blocks; beatable)
+--   medium     2.1          29.2s / 18          ~0     (clearly tougher; still beatable)
+--   hard       6.5          57.4s / 41          36     (the CEILING: survives + digs + attacks)
+-- Monotonic on both axes — the speed (cursorMoveInterval) + fumble (epsilon) handicap IS
+-- the "relaxed urgency": weak tiers can't EXECUTE digs in time, so they defend worse, not
+-- just slower. (numbers we trust — see survivalStress.lua / offenseGate.lua)
 Difficulty.TIERS = {
   easy   = { cursorMoveInterval = 17, reactionFrames = 7, chainAware = 0.20, epsilon = 0.35 },
   medium = { cursorMoveInterval = 11, reactionFrames = 4, chainAware = 0.60, epsilon = 0.12 },

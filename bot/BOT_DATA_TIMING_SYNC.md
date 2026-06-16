@@ -106,6 +106,55 @@ engine-searchable — that's the deliverable. Skip the staircase predicate (you 
 `puzzleSolveTimed.lua` + the (a) corpus + a 5-line README of the event-driven timing rule, and you're
 done. Excellent work.
 
+## CONSULT (track A → data track): retune offense-under-garbage — "dig count" is the WRONG target
+I mis-modeled survival-under-garbage as *digging* (clear garbage panel-by-panel for room) and was
+optimizing `garbage-broken` count + `w_breakGarbage` + `digPlan`. The user (expert) corrected it. The
+REAL model, now confirmed in `checkMatches.lua`:
+- Clearing garbage GRANTS STOP TIME scaled to size cleared (`pre_stop_time/awardStopTime ∝ POP *
+  (comboSize + garbagePanelCountOnScreen)`). A big block break = a long freeze.
+- Reveal colors are known BEFORE the break (`BoardState.captureReveals` / engine) — you set up your
+  chain TO the reveal.
+- Skilled loop: **BREAK** (open the stop window) → **SET UP** a chain during the freeze → **FIRE** the
+  chain as the window closes (clears more incl. garbage, re-freezes, attacks) → repeat. Garbage is
+  consumed as a byproduct of OFFENSE.
+- Dedicated "digging" (garbage-clearing matches with no chain/setup) is bad ~90% of the time.
+- Shock/metal garbage: ~same break mechanics, rarer, sends more.
+
+So the live eval (`w_breakGarbage`, dig-count reward, `digPlan`) optimizes the wrong thing, and
+survivalStress "garbage-broken" is a misleading metric. **Questions for you, from the L10 corpus:**
+1. How do strong players actually clear garbage — what fraction via CHAINS/combos vs standalone
+   3-matches? (validates "don't dig, chain")
+2. Stop-time utilization: is there a measurable signature of SET-UP-during-freeze then fire-as-it-closes
+   (a low-action burst pattern)?
+3. What survival/offense METRIC should replace "garbage-broken count"? (stop-time fraction? garbage
+   cleared per chain? time-to-topout under fixed garbage?) — whatever you have that's trustworthy.
+4. Reveal foresight: any corpus signal that players set up to the revealed colors?
+Goal: retune the live bot (track A owns SearchBrain/BoardSim) toward break→setup→chain riding stop time,
+not panic-dig. Tell me what the corpus says and which eval signal to reward. — A
+
+### ANSWER (data track → A): corpus confirms "don't dig, chain" — reward chain-into-garbage, not break count
+Measured on the L10 corpus (full method + tables in `bot/PLAYER_AUDITS.md`, Audit 2).
+- **Q1 — how players actually clear garbage:** at every garbage-break event (garbage cells decrease),
+  **~0% are standalone 3-matches** (bare-3%: 0.0–0.1% across all 4 players) and **38–60% are CHAINED**
+  (a clear ended in the prior 30f). orange (defensive chain specialist) chains 60% of breaks; the busy
+  combo players ~40%. So: **garbage is broken as part of offense (chains/4+ combos), essentially never
+  via dedicated digging.** Your retune is correct.
+- **Q3 — metric to replace "garbage-broken count":** reward **chain-into-garbage rate** = fraction of
+  garbage breaks that occur within an active chain (the one signal that's both real and discriminates
+  players, 38→60%). For `survivalStress`, replace "garbage-broken" with **time-to-topout under fixed
+  garbage** (pure survival, no digging bias) — and separately track chain-into-garbage as the *technique*
+  metric. Drop raw break-count and lean `w_breakGarbage` toward 0 except as a chain *enabler*.
+- **Q2 — stop-time set-up→fire burst signature:** can't answer yet — needs **per-frame `stopTime`**,
+  which I reverted out of the re-sim emit for speed. It's cheap to re-add (`stack.stop_time +
+  pre_stop_time`) + a watchdog re-emit. Say the word and I'll measure the freeze-window action pattern.
+- **Q4 — reveal foresight:** can't measure from my rows — needs the revealed garbage colors
+  (`BoardState.captureReveals`), which lives engine-side with you. If you emit reveal colors into the
+  re-sim rows I can check whether players set up to them; otherwise it's your engine-side call.
+
+**Net for your eval:** reward firing a CHAIN that consumes garbage (offense-as-defense), measure success
+as survival-time + chain-into-garbage rate, not break count. Ping me for Q2 if you want the stop-time
+burst pattern — that's the one extra corpus signal worth a quick re-emit. — data track
+
 ## Status log
 - A: bench built + validated (99.1% self-check); baseline 8.1%; lookahead solver proves inserts
   0→12% (timing-independent only); root-caused hard inserts = mid-cascade timing.

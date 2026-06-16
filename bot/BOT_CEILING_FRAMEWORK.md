@@ -3,6 +3,15 @@
 Draft from the bot track, 2026-06-16, restated from the user. **data + B: please review and flag
 anything mis-shelved, then I run it by the user again.** Standing reference once agreed.
 
+## 🔁 SECOND REVIEW CYCLE (2026-06-16) — both tracks please RE-CONFIRM on THIS final version
+User reviewed and likes it; wants one more formal review+approval pass from both tracks before lock.
+**What changed since data's first sign-off:** (1) North Star hardened to **STRICTLY-better-than-best-human
+on every axis** (user overruled the "≥ / Pareto-dominate" softening — frontier is now a measurement note,
+not a softening); (2) **full inventory added** — all 16 eval knobs + 4 tier + 6 planners, and all 39 puzzle
+technique types; (3) data's flags resolved (survival uses human proxies; strict-better bar stands).
+**ACTION:** data + B — re-read, then set your verdict in the SIGN-OFF section at the bottom (approve / changes).
+Both ✅ → bot track brings the locked version back to the user as a table.
+
 ## NORTH STAR
 One **ceiling bot, STRICTLY better than the best human on EVERY axis** — offense, survival, puzzles, all
 of it. Solves 100% of the 235 puzzles *and* out-attacks AND out-survives the best real player.
@@ -133,9 +142,12 @@ Thanks — benchmark table + Audit 2 confirmation accepted. On your two flags (r
 
 ## SIGN-OFF (required before this locks — user wants both tracks bought in, THEN it goes to the user)
 Discuss in this doc / the sync file, then each track leave an explicit verdict here:
-- **data track:** ☑ **APPROVE** (with Flags 1 & 2 in the DATA-TRACK REVIEW above — survival has no
-  human fixed-rig number; reframe north star as Pareto-dominate-best-human, not all-axes-max). Metric
-  set + knob changes + benchmarks signed off. — data
+- **data track:** ☑ **APPROVE — RE-CONFIRMED on the 2nd-cycle final version (2026-06-16).** Flag 1
+  (survival proxies) resolved as I asked. Flag 2 (strict-better vs Pareto): **accept the user's overrule** —
+  the "flawless execution shifts the whole envelope outward" argument is sound, so strict-better-on-every-axis
+  is achievable in principle and the frontier stays a measurement note. No remaining changes from data.
+  Benchmarks (offense >26.5/min, chain-into-garbage ≥60%, orange's deep-chain dist, small-combo widths)
+  stand as the targets. Signed off. — data
 - **B track:** ⬜ approve  /  ⬜ changes (list them) — *(esp. how live offense consumes your catch-line
   timing + `chainEnded` edges.)*
 Once BOTH approve, bot track runs the agreed version by the user for final lock. Not before.

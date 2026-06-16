@@ -110,6 +110,11 @@ if not lfs_ok then
         "luarocks install --local luafilesystem --lua-version 5.1")
 end
 
+-- Sweep STALE sandbox dirs (each process leaks one; they accumulate and can fill
+-- /tmp). -mmin +10 only removes dirs untouched for 10 min, so a concurrent run's
+-- active dir is never deleted. Best-effort; ignore failures.
+os.execute("find /tmp -maxdepth 1 -name 'panel-game-test-*' -mmin +10 -exec rm -rf {} + 2>/dev/null")
+
 local TEST_SAVE_ROOT = "/tmp/panel-game-test-" .. tostring(os.time()) .. "-" .. tostring(math.random(1000, 9999))
 lfs.mkdir(TEST_SAVE_ROOT)
 

@@ -1,16 +1,28 @@
 -- Board-model simulation shared by ExpertBrain and SearchBrain. Pure color math
 -- on a BoardState board (no engine sim -> no garbage/telegraph side effects).
--- 1-based [row,col], row 1 = floor. Colors: 0 empty, 1..6 play, >=7 garbage/
--- metal/square (immovable, unmatchable).
+-- 1-based [row,col], row 1 = floor. Cell colors: 0 empty, 1..9 play (matchable),
+-- GARBAGE sentinel = flagged garbage (immovable, unmatchable). Garbage is identified by
+-- the engine isGarbage flag, NOT a color range — see colorGrid / the GARBAGE const below.
 
 local BoardSim = {}
 local WIDTH = 6
 BoardSim.WIDTH = WIDTH
 
+-- Garbage is identified by the engine's isGarbage FLAG, NOT by color value: colors 7/8/9
+-- are real PLAY colors in puzzles (color-9 play panels are common in chain puzzles), and
+-- the engine matches by color-equality + the garbage flag, never by color range. colorGrid
+-- encodes any flagged-garbage cell as this out-of-range SENTINEL so the grid stays a single
+-- 2D color array (sentinel rides through clone/gravity/resolve unchanged); real play colors
+-- 1..9 are all matchable. (Was: isPlay=c<=6 / isGarbage=c>=7 — wrong, blind to color-7/8/9.)
+local GARBAGE = 99
+BoardSim.GARBAGE = GARBAGE
+
+-- MATCHABLE play colors only (1-6). Color 9 (and 7/8) are non-matchable puzzle BLOCKERS:
+-- swappable (see candidate filters) but they never form a match — so isPlay excludes them.
 local function isPlay(c) return c >= 1 and c <= 6 end
 BoardSim.isPlay = isPlay
 
-local function isGarbage(c) return c >= 7 and c <= 9 end
+local function isGarbage(c) return c == GARBAGE end
 BoardSim.isGarbage = isGarbage
 
 -- color-only grid copy from a BoardState board. Carries a parallel `reveal` map
@@ -22,7 +34,7 @@ function BoardSim.colorGrid(board, rows)
   local g, reveal = {}, {}
   for r = 1, rows do
     local src, dst, rev = board[r], {}, {}
-    for c = 1, WIDTH do dst[c] = src[c].c; rev[c] = src[c].reveal end
+    for c = 1, WIDTH do dst[c] = src[c].isGarbage and GARBAGE or src[c].c; rev[c] = src[c].reveal end
     g[r] = dst; reveal[r] = rev
   end
   g.reveal = reveal
@@ -257,7 +269,7 @@ function BoardSim.digPlan(grid, rows, maxDepth)
     for r = lo, hi do
       for c = 1, WIDTH - 1 do
         local a, b = g[r][c], g[r][c + 1]
-        if a <= 6 and b <= 6 and a ~= b and (a ~= 0 or b ~= 0) then out[#out + 1] = { r, c } end
+        if a ~= GARBAGE and b ~= GARBAGE and a ~= b and (a ~= 0 or b ~= 0) then out[#out + 1] = { r, c } end
       end
     end
     return out
@@ -277,7 +289,7 @@ function BoardSim.digPlan(grid, rows, maxDepth)
     for r = math.max(1, lg - 2), math.min(rows, lg - 1) do
       for c = 1, WIDTH do
         local v = g[r][c]
-        if v >= 1 and v <= 6 then
+        if isPlay(v) then
           if c < WIDTH and g[r][c + 1] == v then s = s + 2 end          -- horizontal pair
           if r > 1 and g[r - 1][c] == v then s = s + 1 end              -- vertical pair
           -- a play cell directly under garbage is one step from a touching match
@@ -344,7 +356,7 @@ function BoardSim.comboPlan(grid, rows, top, maxDepth)
     for r = 1, hi do
       for c = 1, WIDTH - 1 do
         local a, b = g[r][c], g[r][c + 1]
-        if a <= 6 and b <= 6 and a ~= b and (a ~= 0 or b ~= 0) then out[#out + 1] = { r, c } end
+        if a ~= GARBAGE and b ~= GARBAGE and a ~= b and (a ~= 0 or b ~= 0) then out[#out + 1] = { r, c } end
       end
     end
     return out
@@ -356,7 +368,7 @@ function BoardSim.comboPlan(grid, rows, top, maxDepth)
     for r = 1, hi do
       for c = 1, WIDTH do
         local v = g[r][c]
-        if v >= 1 and v <= 6 then
+        if isPlay(v) then
           if c < WIDTH and g[r][c + 1] == v then s = s + 1 end
           if r < hi and g[r + 1][c] == v then s = s + 1 end
         end
@@ -423,7 +435,7 @@ function BoardSim.flattenMove(grid, rows)
   for r = 1, rows do
     for c = 1, WIDTH - 1 do
       local a, b = grid[r][c], grid[r][c + 1]
-      if a <= 6 and b <= 6 and a ~= b and (a ~= 0 or b ~= 0) then
+      if a ~= GARBAGE and b ~= GARBAGE and a ~= b and (a ~= 0 or b ~= 0) then
         local ng = BoardSim.cloneGrid(grid, rows)
         ng[r][c], ng[r][c + 1] = ng[r][c + 1], ng[r][c]
         BoardSim.applyGravity(ng, rows)
@@ -450,7 +462,7 @@ function BoardSim.setupMove(grid, rows)
     for r = 1, top do
       for c = 1, WIDTH do
         local v = g[r][c]
-        if v >= 1 and v <= 6 then
+        if isPlay(v) then
           if c < WIDTH and g[r][c + 1] == v then s = s + 2 end
           if r < top and g[r + 1][c] == v then s = s + 2 end
         end
@@ -467,7 +479,7 @@ function BoardSim.setupMove(grid, rows)
   for r = 1, top do
     for c = 1, WIDTH - 1 do
       local a, b = grid[r][c], grid[r][c + 1]
-      if a <= 6 and b <= 6 and a ~= b and (a ~= 0 or b ~= 0) then
+      if a ~= GARBAGE and b ~= GARBAGE and a ~= b and (a ~= 0 or b ~= 0) then
         local ng = BoardSim.cloneGrid(grid, rows)
         ng[r][c], ng[r][c + 1] = ng[r][c + 1], ng[r][c]
         BoardSim.applyGravity(ng, rows)
@@ -495,15 +507,15 @@ end
 function BoardSim.garbageCount(grid, rows)
   local n = 0
   for r = 1, rows do
-    for c = 1, WIDTH do if grid[r][c] >= 7 and grid[r][c] <= 9 then n = n + 1 end end
+    for c = 1, WIDTH do if grid[r][c] == GARBAGE then n = n + 1 end end
   end
   return n
 end
 
--- board-cell swap legality: both settled (state 0), neither garbage (color<=6),
+-- board-cell swap legality: both settled (state 0), neither garbage (isGarbage flag),
 -- colors differ, not empty<->empty
 function BoardSim.canSwapCells(a, b)
-  return a.s == 0 and b.s == 0 and a.c <= 6 and b.c <= 6 and a.c ~= b.c and (a.c ~= 0 or b.c ~= 0)
+  return a.s == 0 and b.s == 0 and not a.isGarbage and not b.isGarbage and a.c ~= b.c and (a.c ~= 0 or b.c ~= 0)
 end
 
 -- legal candidate swaps {r,c} (pair c,c+1) up to row `top`
@@ -573,7 +585,7 @@ function BoardSim.chainPotential(grid, rows, top)
   for r = 1, top do
     for c = 1, WIDTH - 1 do
       local a, b = grid[r][c], grid[r][c + 1]
-      if a <= 6 and b <= 6 and a ~= b and (a ~= 0 or b ~= 0) then
+      if a ~= GARBAGE and b ~= GARBAGE and a ~= b and (a ~= 0 or b ~= 0) then
         local _, chain, total, firstClear, gbCleared = BoardSim.simSwap(grid, rows, r, c)
         if total > 0 and (chain > bestChain or (chain == bestChain and total > bestTotal)) then
           bestChain, bestTotal = chain, total

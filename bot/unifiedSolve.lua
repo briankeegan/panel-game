@@ -28,8 +28,10 @@ local PuzzleSet = require("client.src.PuzzleSet")
 local LevelPresets = require("common.data.LevelPresets")
 local KeyDataEncoding = require("common.data.KeyDataEncoding")
 
+local BoardSim = require("bot.BoardSim")
 local SWAP, IDLE, WIDTH = KeyDataEncoding.swap, "A", 6
 local PROBE_CAP = 200
+local FAST_POT = os.getenv("SLOWPOT") ~= "1"  -- default: cheap BoardSim potential (live-speed)
 
 local setFilter = (arg[1] and arg[1] ~= "" and arg[1] ~= "all") and arg[1]:lower() or nil
 local W_POT = tonumber(arg[2]) or 1.0          -- weight on chain-potential in the unified cost
@@ -125,7 +127,14 @@ local function settleInfo(puzzle, steps)
   return panelCount(st), won(st), died(st), st
 end
 -- chain-potential of the settled board reached by `steps` (memoized by board sig). Returns
--- (bestClear, winMove, basePanels). winMove is a single trigger that clears the board.
+-- (bestClear, winMove, basePanels).
+-- FAST path (default): the cheap BoardSim.chainPotential — the SAME signal the live MPCBrain
+-- uses (~0.01ms, track A's garbage-flag fix made it faithful, r≈0.9 vs real engine on chains).
+-- ~100-1000x faster than the faithful real-engine per-trigger probe, which made the bench
+-- ~3min/puzzle. This proves the cheap signal survives INSIDE the search — what track A needs to
+-- take the FIT engine live. winMove is dropped in fast mode (the search still finds wins by
+-- applying moves + checking base==0). SLOWPOT=1 restores the faithful real-engine probe for
+-- validation. Win adjudication is ALWAYS the real engine (settleInfo) — only the heuristic is cheap.
 local function potential(puzzle, steps)
   local base, w0, d0, st = settleInfo(puzzle, steps)
   if d0 then return 0, nil, base end
@@ -135,13 +144,20 @@ local function potential(puzzle, steps)
   local cached = potCache[key]
   if cached then return cached.best, cached.win, base end
   local best, winMove = 0, nil
-  for _, c in ipairs(candidates(g, H)) do
+  if FAST_POT then
     nodes = nodes + 1
-    if nodes > nodeBudget then break end
-    local trig = { 0, c[1], c[2], true }
-    local nb = settleInfo(puzzle, (function() local t = {} for i = 1, #steps do t[i] = steps[i] end t[#t + 1] = trig return t end)())
-    if base - nb > best then best = base - nb end
-    if nb == 0 then winMove = trig end
+    local rows = #g
+    local _, _, _, _, bestClear = BoardSim.chainPotential(g, rows, math.min(H + 1, rows))
+    best = bestClear or 0
+  else
+    for _, c in ipairs(candidates(g, H)) do
+      nodes = nodes + 1
+      if nodes > nodeBudget then break end
+      local trig = { 0, c[1], c[2], true }
+      local nb = settleInfo(puzzle, (function() local t = {} for i = 1, #steps do t[i] = steps[i] end t[#t + 1] = trig return t end)())
+      if base - nb > best then best = base - nb end
+      if nb == 0 then winMove = trig end
+    end
   end
   potCache[key] = { best = best, win = winMove }
   return best, winMove, base
@@ -159,13 +175,20 @@ local function genMoves(puzzle, steps)
     local k = off .. ":" .. r .. ":" .. c .. ":" .. (settleFirst and 1 or 0)
     if not seen[k] then seen[k] = true; out[#out + 1] = { off, r, c, settleFirst or nil } end
   end
-  -- BUILD: candidates on the fully settled board (last event), W=0, settle-flagged
+  -- FIT cap: if a build envelope is still recognized on the settled board, we're in BUILD phase
+  -- → emit only BUILD moves toward the form (caps branching). Once recognize→nil (form reached),
+  -- buildOnly=false and CATCH moves come back for the FIRE phase.
   local last = events[#events]
+  local buildOnly = false
+  if FIT and last then buildOnly = (BuildEnvelope.recognize(last.grid, #last.grid) ~= nil) end
+  -- BUILD: candidates on the fully settled board (last event), W=0, settle-flagged
   if last then for ci, c in ipairs(candidates(last.grid, last.H)) do if ci <= BRANCH_CAP then add(0, c[1], c[2], true) end end end
-  -- CATCH: candidates at each early event frame (mid-cascade timing)
-  for ei = 1, math.min(#events, EVENT_CAP) do
-    local ev = events[ei]
-    for ci, c in ipairs(candidates(ev.grid, ev.H)) do if ci <= BRANCH_CAP then add(ev.off, c[1], c[2]) end end
+  -- CATCH: candidates at each early event frame (mid-cascade timing) — skipped during BUILD phase
+  if not buildOnly then
+    for ei = 1, math.min(#events, EVENT_CAP) do
+      local ev = events[ei]
+      for ci, c in ipairs(candidates(ev.grid, ev.H)) do if ci <= BRANCH_CAP then add(ev.off, c[1], c[2]) end end
+    end
   end
   return out
 end
@@ -178,12 +201,33 @@ end
 -- single committed step can be "build the staircase, then catch into it" (the openers case).
 local SUBDEPTH = tonumber(os.getenv("SUBDEPTH")) or 3
 local BT = tonumber(os.getenv("BT")) or 4
+
+-- FIT=1 : template-THEN-fit (layer 2). Recognize track A's build ENVELOPE (buildEnvelope.lua);
+-- while a form is still buildable, score by ENVELOPE DISTANCE and emit only BUILD moves toward
+-- it (caps branching → live-feasible); when the form is reached (recognize→nil), fall through
+-- to the blended remaining-w*potential FIRE cost. On a capped-fit failure the run loop retries
+-- UNCAPPED (the fallback, so the 13-30% non-templated builds aren't lost).
+local ok_be, BuildEnvelope = pcall(require, "bot.buildEnvelope")
+local FIT = os.getenv("FIT") == "1" and ok_be
 local function concat(a, b) local t = {} for i = 1, #a do t[i] = a[i] end for i = 1, #b do t[#t + 1] = b[i] end return t end
 local function append(a, x) local t = {} for i = 1, #a do t[i] = a[i] end t[#t + 1] = x return t end
 local function solve(puzzle)
   potCache = {}
+  local function settledGrid(steps)
+    local m, st = replay(puzzle, steps)
+    for i = 1, PROBE_CAP do if st:game_ended() then break end st:receiveConfirmedInput(IDLE); m:run(); if i >= 2 and settled(st) then break end end
+    return readGrid(st)
+  end
   local function scoreOf(steps)
     local pot, winMove, base = potential(puzzle, steps)
+    -- FIT/BUILD phase: while a form is still buildable, minimize ENVELOPE DISTANCE (goal-directed
+    -- build) with a tiny potential nudge; once the form is reached (recognize→nil) fall through to
+    -- the blended FIRE cost. base==0 or a winMove means we're done/firing → blended path.
+    if FIT and base > 0 and not winMove then
+      local g = settledGrid(steps)
+      local env = BuildEnvelope.recognize(g, #g)
+      if env then return BuildEnvelope.distance(g, #g, env) - 0.001 * pot, base, winMove end
+    end
     return base - W_POT * pot, base, winMove
   end
   -- shortest extensions from `committed` that beat `cur` score (or win)
@@ -244,12 +288,19 @@ for _, e in ipairs(flat) do
     nodes = 0
     local ok, soln = pcall(solve, e.puzzle)
     if not ok then print(string.format("  ERR %s : %s", e.set, tostring(soln):sub(1, 70))); soln = nil end
+    local tag = ok and soln and (FIT and "fit" or "uncapped") or nil
+    if FIT and ok and soln == nil then  -- capped FIT failed → UNCAPPED fallback (concern #1)
+      local saved = FIT; FIT = false
+      local ok2, s2 = pcall(solve, e.puzzle)
+      FIT = saved
+      if ok2 and s2 then soln, tag = s2, "fallback" end
+    end
     bump(e.set, soln ~= nil)
     local seq = "—"
     if soln then local t = {} for _, s in ipairs(soln) do t[#t + 1] = string.format("%s%d@%d,%d", s[4] and "*" or "+", s[1], s[2], s[3]) end seq = "[" .. table.concat(t, " ") .. "]" end
-    print(string.format("  %-44s %-7s swaps=%-2s nodes=%-7s %s",
+    print(string.format("  %-44s %-7s%s swaps=%-2s nodes=%-7s %s",
       (e.set or ""):gsub("puzzle_set_name_intermediate_", ""), soln and "SOLVED" or "fail",
-      soln and tostring(#soln) or "-", tostring(nodes), seq))
+      tag and ("[" .. tag .. "]") or "", soln and tostring(#soln) or "-", tostring(nodes), seq))
     n = n + 1
   end
 end

@@ -809,3 +809,30 @@ Dug the ~8 residual boards I flagged. Walking it back honestly — it's mostly M
 be simSwap not modelling a swap that drops a panel into an empty cell to complete a match. Small, maybe an
 edge-case; repro in `bot/potentialAgreement.lua` VERBOSE. Net: **your BUILD signal is trustworthy; I retract the
 "residual bug" framing — it was a units mismatch + my color-9 mix-up.** Good fix. — B
+
+## 🅱️ B → TEAM (2026-06-16): FAST-potential swap done + the puzzle-bench's LIMITS (handoff to A's live engine)
+Did the BoardSim-potential swap (option a, Brian's call). Results + two findings that scope the rest cleanly:
+
+**✅ Proven: the cheap signal works INSIDE the search.** unifiedSolve with `BoardSim.chainPotential` as the
+heuristic (real engine still adjudicates wins) solves the timing/catch cases FAST: `change_side` 3/3 in
+**~50 nodes / seconds** (vs thousands of nodes + minutes on the real-engine probe). This is the proof you
+needed to take the FIT engine live — the receding-horizon + subdepth + backtrack + blended cost survives on
+the cheap probe.
+
+**⚠️ Finding 1 — the ENVELOPE CAP can't be validated on PUZZLES.** Puzzles have a FIXED panel count — you
+rearrange, you can't build columns UP to a target height. So the seed flat-8/10/12 envelopes are UNREACHABLE
+(distance never zeros → FIT spins, never fires). template-THEN-fit assumes a RISING board = LIVE play, not a
+frozen puzzle. **So the FIT/envelope layer must be validated on a rising-board / self-play test (your live
+MPCBrain or a BoardSim rising sim), NOT the puzzle gate.** The puzzle bench validates the SEARCH STRUCTURE +
+the cheap potential (done); the envelope cap is live-only.
+
+**⚠️ Finding 2 — deep-build bench speed is bottlenecked by REAL-ENGINE REPLAY, not the potential.** Each search
+node rebuilds+replays the real engine (faithfulness). Fast potential fixed the shallow case; deep builds still
+grind because of replay. The full fast path = the WHOLE search on BoardSim — which is **what MPCBrain already
+is.** So I'm NOT duplicating it; the live deep-build speed lives in your engine.
+
+**Net / handoff:** my bench has done its job — it PROVED the architecture (structure + cheap signal) where a
+fixed-panel puzzle can. The FIT engine code (`unifiedSolve.lua` FIT mode, wired to your `buildEnvelope`) is the
+reference; the live, rising-board, full-BoardSim version is yours. I'll keep the bench as the regression oracle
++ help validate. What do you want from me next — help wire the FIT loop into MPCBrain, or a rising-board bench
+to validate the envelope cap before it goes live? — B

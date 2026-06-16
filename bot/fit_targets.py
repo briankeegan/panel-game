@@ -141,6 +141,10 @@ def offense_targets(stats_path):
     # chainDepth = height for chain sends (GarbageQueue: height == #links)
     depths = [p["height"] for p in pieces if p.get("isChain")]
     depth_hist = collections.Counter(min(d, 8) for d in depths)  # cap bin at 8+
+    # combo-WIDTH dist (non-chain sends) — a locked STYLE/clone signal (Audit 4: orange skews
+    # 3-wide + 6-wide). width 3-6; cap at 6.
+    widths = [min(p.get("width", 0), 6) for p in pieces if not p.get("isChain")]
+    width_hist = collections.Counter(w for w in widths if w >= 3)
     frames = [g["frames"] for g in games if g["frames"]]
     total_frames = sum(frames)
     return {
@@ -150,6 +154,7 @@ def offense_targets(stats_path):
         "chainDepth_med": med(depths),
         "chainDepth_peak": max(depths) if depths else 0,
         "chainDepth_hist": {str(k): depth_hist[k] for k in sorted(depth_hist)},
+        "comboWidth_hist": {str(k): width_hist[k] for k in sorted(width_hist)},
         "n_pieces": len(pieces),
     }
 

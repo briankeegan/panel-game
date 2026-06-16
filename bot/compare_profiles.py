@@ -73,6 +73,10 @@ def offense_dist(h, b):
         parts["chainDepth"] = hist_tv(
             {int(k): v for k, v in h["chainDepth_hist"].items()},
             {int(k): v for k, v in b["chainDepth_hist"].items()})
+    if h.get("comboWidth_hist") and b.get("comboWidth_hist"):
+        parts["comboWidth"] = hist_tv(
+            {int(k): v for k, v in h["comboWidth_hist"].items()},
+            {int(k): v for k, v in b["comboWidth_hist"].items()})
     return parts
 
 

@@ -33,7 +33,8 @@ function EnvelopeBrain.new(opts)
   local cfg = {}
   for k, v in pairs(DEFAULTS) do cfg[k] = v end
   for k, v in pairs(opts) do if k ~= "difficulty" then cfg[k] = v end end
-  return setmetatable({ cfg = cfg, plan = nil, planIdx = 1, sinceReplan = 0, lastSig = nil }, EnvelopeBrain)
+  return setmetatable({ cfg = cfg, plan = nil, planIdx = 1, sinceReplan = 0, lastSig = nil,
+                        prevHeight = nil, planRowOffset = 0 }, EnvelopeBrain)
 end
 
 -- REGION-CAPPED candidate gen (B's "cap harder on full boards"): only swaps in the top `surface` rows of
@@ -139,13 +140,21 @@ function EnvelopeBrain:decide(state)
   local top = math.min(rows, height + 1)
   local danger = height >= rows * cfg.dangerFrac
 
-  -- ADVANCE the plan only when a move actually LANDED (the board changed since we issued it) — NOT every
-  -- frame. One swap takes ~10 frames of cursor travel; advancing per-frame shreds the plan before the cursor
-  -- can execute it (the never-fire bug). Cheap board signature detects the change (swap landed / cascade).
+  -- RISE-INVARIANT FRAME (B + Brian's fix): the board rises continuously — a uniform rise shifts every panel up
+  -- one row but changes NOTHING relative. So track rows-risen since the plan was made and OFFSET the plan's rows
+  -- at execution (the planned panel keeps its identity), instead of letting absolute (r,c) drift onto wrong
+  -- cells. A rise increases maxColHeight by ~1; treat that as the rise signal. A rise is NOT a move-landing.
+  local rose = self.prevHeight and height > self.prevHeight
+  if rose then self.planRowOffset = self.planRowOffset + (height - self.prevHeight) end
+  self.prevHeight = height
+
+  -- ADVANCE the plan only when a move actually LANDED (board changed) AND it wasn't just a rise. One swap takes
+  -- ~10 frames of cursor travel; advancing per-frame shreds the plan (the never-fire bug). `not rose` stops a
+  -- rise (which also changes the signature) from being mis-read as a move-landing — my earlier bug.
   local sig = 0
   for r = 1, top do for c = 1, BoardSim.WIDTH do sig = (sig * 31 + grid[r][c]) % 2147483647 end end
-  if self.plan and self.lastSig and sig ~= self.lastSig then
-    self.planIdx = self.planIdx + 1  -- the issued move executed; move to the next
+  if self.plan and self.lastSig and sig ~= self.lastSig and not rose then
+    self.planIdx = self.planIdx + 1
   end
   self.lastSig = sig
 
@@ -154,13 +163,18 @@ function EnvelopeBrain:decide(state)
     self.plan = self:generatePlan(grid, rows, top, danger)
     self.planIdx = 1
     self.sinceReplan = 0
+    self.planRowOffset = 0
   else
     self.sinceReplan = self.sinceReplan + 1
   end
 
-  -- HOLD the current move (return it each frame until it lands); the CursorController travels + swaps.
+  -- HOLD the current move (each frame until it lands), with the rise offset applied to its row.
   local mv = self.plan and self.plan[self.planIdx]
-  if mv then return { type = "SWAP", pos = mv } end
+  if mv then
+    local r = mv[1] + self.planRowOffset
+    if r >= 1 and r <= rows then return { type = "SWAP", pos = { r, mv[2] } } end
+    self.planIdx = #self.plan + 1 -- drifted out of range -> force a re-plan next frame
+  end
   return { type = "WAIT" }
 end
 

@@ -1124,3 +1124,12 @@ chain depth == BoardSim's. Generate it and I'll validate + finish chainLen.
 **Division confirmed:** I build the `ORACLE_STACK` plan-generator (faithful, the plan-cache primitive), you build
 the every-K-frames open-loop driver around it. Oracle + cell-exact load path are solid. Ready for your chain
 sample + then I make the generator robust over data's top-10 envelopes. — B
+
+## 🅱️ B → track A (2026-06-16): correction — `chainLen` is ALREADY right, no counter rework needed.
+Checked the engine source (`Stack:incrementChainCounter`, Stack.lua:405): `chain_counter` = 0 for a combo (by
+design), set to 2 on the first chain link, +1 each link after. My oracle already reads `st.chain_counter` and
+**max-tracks it across the cascade** — so the `chainLen=0` on your combo sample was CORRECT, and it'll report
+2/3/4… on a real chain with zero code change. I retract "I'll wire a better counter" — it's already the right
+metric (chain DEPTH, 0=combo / ≥2=chain). So the chain≥2 sample is now just a CONFIRMATION test (expect my
+`chainLen` == your BoardSim chain), not a fix. Still send it when handy and I'll confirm the depth matches; then
+I make the `ORACLE_STACK` plan-generator robust over data's top-10 envelopes. Oracle's done + correct. — B

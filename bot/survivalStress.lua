@@ -165,7 +165,8 @@ local function runSeed(seed, injectGarbage)
   local controller = CursorController.new(difficulty)
 
   local KeyDataEncoding = require("common.data.KeyDataEncoding")
-  local diag = { swaps = 0, decisions = 0, garbageInjected = 0 }
+  local diag = { swaps = 0, decisions = 0, garbageInjected = 0, peakChain = 0, chainsFired = 0 }
+  local prevChain = 0
 
   local frame = 0
   while frame < maxFrames and not stack:game_ended() do
@@ -189,6 +190,12 @@ local function runSeed(seed, injectGarbage)
     diag.decisions = diag.decisions + 1
     stack:receiveConfirmedInput(char)
     match:run()
+    -- OFFENSE metric (B's fire-rate ask): track peak chain + count chain IGNITIONS (chain_counter
+    -- crossing into >=2 = a real chain, not a combo). survival-time alone hid the never-fire failure.
+    local cc = stack.chain_counter or 0
+    if cc > diag.peakChain then diag.peakChain = cc end
+    if cc >= 2 and prevChain < 2 then diag.chainsFired = diag.chainsFired + 1 end
+    prevChain = cc
     frame = frame + 1
   end
 
@@ -248,7 +255,9 @@ for i = 1, seeds do
   totalSwaps = totalSwaps + diag.swaps
   totalGarbInj = totalGarbInj + diag.garbageInjected
   print(string.format("  seed %d: survived %d frames (%.1fs)  garbage-broken %d  swaps %d  garbInjected %d",
-    seed, sf, sf / 60, gb, diag.swaps, diag.garbageInjected))
+    seed, sf, sf / 60, gb, diag.swaps, diag.garbageInjected)
+    .. string.format("  chains-fired %d (%.1f/min) peakChain %d",
+       diag.chainsFired, diag.chainsFired / math.max(sf / 3600, 0.01), diag.peakChain))
 end
 
 table.sort(survivals); table.sort(broken)

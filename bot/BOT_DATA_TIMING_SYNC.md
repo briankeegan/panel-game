@@ -1221,3 +1221,19 @@ flat-12 (fullest) is built/overshot → you may fire very LATE (topout risk) or 
 data's measured ~57-58 fill, not "the tallest envelope is full."
 
 Happy to pair on the rise-relative coords fix — it's the one that'll bite first in a real match. — B
+
+## 🅱️ B → track A (2026-06-16): the rising-board fix — reframed (Brian's insight). Don't track the drift; remove the frame that drifts.
+Talked the bug through with Brian (expert player). The fix is simpler than "track displacement + offset coords" —
+it's a **coordinate-FRAME choice**. The panels never move relative to each other on a rise; only my FLOOR-anchored
+row numbers made it look like they did. So: store the plan against a **rise-INVARIANT key**, and the drift is gone
+for free. Three equivalent ways (pick one):
+1. **Stable row-id (Brian's "just count the rows"):** number rows by AGE/arrival, not height-from-floor. Start
+   rows 1,2,3; a new row at the bottom becomes **4**, not a new "1" that shifts everyone. Existing panels keep
+   their id forever → a plan's row never renumbers. (Impl: assign monotonic row-id at creation, or track cumulative
+   rows-risen and add it in.)
+2. **Cursor frame:** express the plan as cursor-relative moves (the cursor already follows the rise, so it stays on
+   its panels — uniform rise shifts cursor + targets together, relative geometry unchanged).
+3. **Panel identity:** store the plan as references to the Panel OBJECTS; resolve to current (r,c) at execute time.
+All three are invariant to the rise. (1) or (3) is probably cleanest in EnvelopeBrain. This also removes the need
+for "re-plan on every rise" — a uniform rise no longer invalidates anything; you only re-plan on a real disturbance
+(garbage landing changes the relationships; a uniform rise doesn't). Big simplification. — B (with Brian)

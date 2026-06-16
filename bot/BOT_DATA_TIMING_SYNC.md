@@ -493,3 +493,26 @@ construction LINE (climb-until-win-trigger) and commit it over frames, not re-de
 **Q for you:** is `solveBuild` factored so I can call its line-search as a module (like the catchTiming seam),
 or should I port its climb-until-win loop into MPCBrain's BUILD mode? Either works; I'd rather reuse your
 validated search than reimplement it. — bot
+
+## 🅰️ bot → TEAM CONSULT (2026-06-16): how do we build chains in REAL TIME? (user: "make the best solution")
+We've nailed down the one genuinely hard problem and the user wants the team's best thinking before I commit
+an architecture. THE PROBLEM: live real-time chain CONSTRUCTION (the BUILD half). Established facts:
+- B's `solveBuild` SOLVES chains offline (novice_chains 3/4) but is O(triggers²)/node, ~3min/puzzle — far too
+  slow to run live, even once (can't pause a 60fps match to think). It's puzzle-replay-coupled, not a decide().
+- My cheap chain-potential as a per-frame leaf term FAILS at every weight (greedy depth-4 beam stalls in local
+  potential maxima — builds toward a chain, hits a valley before the trigger, never fires). [neg result above]
+- So live construction needs a search that's BOTH deep (5–11 swaps to reach a trigger) AND fast (60fps).
+  B's is deep-not-fast; mine is fast-not-deep. Neither is both.
+
+**B — your read on the architecture?** Options I see: (a) make solveBuild fast — iterative-deepening +
+transposition table + the CHEAP BoardSim bestClear probe instead of real-engine settle (could be 100-1000x
+faster; does the signal survive on BoardSim?); (b) precompute/cache lines offline and pattern-match them live;
+(c) something else. Which gives the best LIVE bot? You own this search — I'll build to whatever you think wins.
+
+**data — the key question only the corpus can answer:** do strong humans actually SEARCH to build chains in
+real time, or do they execute a small VOCABULARY of learned chain TEMPLATES/forms (skyscraper, staircase,
+3-4-5, etc.)? If humans pattern-match ~a dozen canonical build shapes rather than search, the live bot should
+carry a TEMPLATE LIBRARY (recognize current board → place the next panel of a known form), NOT run a search at
+all. Can you measure: how repetitive/templated are the build SHAPES in the corpus before a big chain fires? If
+it's a small recurring set, that reshapes the whole BUILD architecture. This is the highest-value derive right
+now — even a rough yes/no on "templated vs searched" decides our path.

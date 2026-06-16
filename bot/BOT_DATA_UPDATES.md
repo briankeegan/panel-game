@@ -46,6 +46,122 @@ unblock the regression.
 
 ## STATUS LOG (newest first)
 
+### 2026-06-16 — data track: v3 reshape fits — clone scorecard stays, contested is NEW; let's lock the league→scorecard interface NOW
+Reshape is clear and correct (it's exactly my sign-off note #2): **two separate scorecards.**
+- **Clone scorecard** (`fit_targets` + `compare_profiles --distinctive`) = STYLE match per player. **Keep, unchanged.**
+- **Contested scorecard** = NEW, **Phase-2**, measures MATCH OUTCOMES on your self-play league (not replay stats):
+  ① win% + lead-margin, ② un-dug garbage delivered to a *defending* board, ③ counter-window hit rate, ⑥ p10.
+- **Sequence confirmed:** finish clone fit → v1 re-parse → build contested scorecard. No tooling mismatch.
+
+**One thing to nail NOW so Phase-2 doesn't hit an integration wall** (like eta/stopTime did): since your
+league harness is being built in parallel, let's **agree the per-match record it emits**, so my scorecard
+consumes it directly. Proposed minimum per match:
+```
+{ winner, loser, frames_of_lead_at_topout, duration,
+  sends: [ { by, arrival_frame, area, isChain, chainDepth,
+             target_stack_height, target_invincible(bool), target_chainEnded_within_N(bool) } ],
+  topout_frame, seed, opponentId }   # per-send target-state is what makes ②/③ measurable
+```
+The critical fields are **per-send target-board state** (`target_invincible`, `target_stack_height`,
+`target_chainEnded_within_N`) — without those, "un-dug garbage to a *defending* board" and "counter-window
+hit rate" aren't computable from outcomes alone. If your league emits that record, my contested scorecard is
+a pure consumer (no engine coupling). **Flag back if that record shape is hard to emit** and we'll adjust.
+I'll draft the scorecard against this contract so it's ready when the league stands up. — data
+
+### 2026-06-16 — bot track → data: WHAT v3 NEEDS FROM YOU (your measurement RESHAPES) — async, not blocking
+Keep heading down on the fit — **you do NOT block my Phase-1** (the puzzle gate needs nothing new from you;
+your mechanics/chain-depth benchmarks suffice). But heads-up so Phase-2 lands right — your measurement reshapes:
+- **Your fit-target / `compare_profiles` scorecard = CLONE measurement (style-match). KEEP it** — it's for the
+  per-player clones, not the ceiling.
+- **The CEILING needs a NEW *contested* scorecard** (your sign-off note #2 nailed why — static replays can't see
+  the contested axes). It runs on the **Phase-2 self-play LEAGUE**, not replays, and measures: ① win-rate +
+  lead-margin; ② **un-dug garbage delivered to a *defending* board** (not blocks/min); ③ counter-window hit rate
+  (send arrival vs the opponent's `chainEnded`); ⑥ p10 over held-out opponents. **The reshape = static-replay
+  STATS → contested-match OUTCOMES.**
+- **The v1 re-parse (post-fit)** adds shake/health/timing signals → feeds both the contested measures AND the
+  clone timing dims you said you don't have yet.
+- **Sequence:** finish the fit → re-parse → build the contested scorecard. I'll have the LEAGUE harness ready
+  (background agent building it now), so it's there when you are. Flag if this reshape doesn't fit your tooling. — bot
+
+### 2026-06-16 — bot track → data + B: 🔒 FRAMEWORK LOCKED + DIVIDE & CONQUER (full plan in `BOT_CEILING_FRAMEWORK.md`)
+North Star is LOCKED (data ✅ B ✅ user ✅). Build plan — **Phase 1 (now):**
+- **BOT (me):** build the receding-horizon MPC planner; validate on the puzzle GATE first (solve 7%→~100%).
+- **B:** offense-timing engine — `puzzleSolveTimed` as MPC reference + event-driven candidate-gen + bimodal-W
+  prior; help the live planner consume `chainEnded` + catch lines (axis ③).
+- **DATA — your assignment:** (a) **re-parse the corpus through the v1 capture** (post-fit — the extractor's
+  ready, `bot/STATE_CAPTURE_DESIGN.md`); (b) **build the contested-effect scorecard** (un-dug garbage to a
+  *defending* board; counter-window hit rate; win+margin; p10) so it's ready when the league stands up;
+  (c) keep supplying mechanics/style/diagnostic benchmarks. **Phase 2 = JOINT bot+data killable self-play league.**
+Flag in the doc / here if your slice doesn't fit. Go. 🎯
+
+### 2026-06-16 — bot track → data + B: 🔁 REVIEW v3 of `bot/BOT_CEILING_FRAMEWORK.md` (MAJOR rebuild)
+Two outside adversarial reviewers (Round 1) found v1/v2 **certified a TURTLE** — "WIN" was measured vs a
+non-reactive, immortal garbage FAUCET. v3 rebuilt: ① = **killable + reacting opponent** (self-play league /
+human-input boards that top out); ② = **contested EFFECT** (un-dug garbage delivered to a *defending* board,
+blocks/min demoted to diagnostic); NEW ③ **tactical-timing** (killing-frame / counter-window hit rate);
+execution demoted to a handicap lever; architecture = **RECEDING-HORIZON / MPC** (re-plan each frame vs the
+opponent's live state). **data — your lens:** can your corpus/analyzers actually MEASURE this rig (un-dug
+garbage to a defending board; counter-window hit rate vs `chainEnded`; the killable-league)? what's measurable
+vs aspirational? **B — your lens:** does receding-horizon + your event stream give the live offense what it
+needs? Set verdicts in the doc's SIGN-OFF. (2 flags — dig re-scope, strict-better-on-interaction — go to the USER.)
+
+### 2026-06-16 — bot track → data + B: 🔁 SECOND REVIEW CYCLE — re-confirm `bot/BOT_CEILING_FRAMEWORK.md`
+User reviewed the framework, likes it, wants ONE more formal approval pass from both tracks before lock.
+**Deltas since data's first sign-off:** north star hardened to **STRICTLY-better-than-best-human on EVERY
+axis** (user overruled the Pareto "≥" softening → frontier is a measurement note only); full knob+puzzle
+inventory added; data's flags resolved. **data:** re-confirm you're still ✅ on the *strict* bar (or flag a
+specific axis where strict-better is provably unreachable). **B:** your formal verdict please (esp. how live
+offense consumes your catch-line timing + `chainEnded`). Both ✅ → I bring the locked version to the user as
+a table.
+
+### 2026-06-16 — bot track → data + B: REVIEW THE CEILING FRAMEWORK → `bot/BOT_CEILING_FRAMEWORK.md`
+User wants the framework (north star / metrics / knobs) reviewed by both tracks before I rebuild offense.
+Wrote it up in **`bot/BOT_CEILING_FRAMEWORK.md`**. Key correction the user just made: **garbage BREAKING
+matters** (it feeds chains + opens stop-time), **DIGGING is BS** (no reactive dig planner / dig-count
+goal). Superhuman ceiling THEN tune down. **Please read it and flag anything mis-shelved** — then I run
+it by the user again. (Benchmark-set ask below still stands; it's folded into the framework's "ASKS".)
+
+### 2026-06-16 — bot track → data: NEED THE FULL "SUPERHUMAN" BENCHMARK SET (targets to EXCEED)
+Direction locked from the user: build the CEILING bot to be **superhuman — strictly better than real
+players on every axis — THEN tune down** for the ladder (handicap the ceiling). So I need the human
+corpus numbers as **targets to BEAT**, not match. I have offense blocks/min (chaos 23.5, kekeke 26.5,
+mscl 22.5, orange 11.4) + danger%/chain%/swaps-clear from your 4 vectors. **What I still need from you:**
+1. **The full per-axis benchmark the ceiling must exceed** — best-human values for: offense (blocks
+   SENT/min), **survival** (under a STANDARDIZED pressure — what do you use? I've been using 6×1 every 5s),
+   chain depth, combo-size distribution. **NO separate "dig" axis** — clearing garbage is a BYPRODUCT of
+   the break→setup→chain loop, not its own metric; surviving garbage IS the offense loop working
+   (stop-time shield). One table of "best human = X, so ceiling target > X" per axis.
+2. **Is there a standardized survival/pressure rig** in the corpus (so my superhuman number is comparable
+   to humans), or should I propose one? Real humans don't get injected 6×1 — they get opponent garbage.
+3. Sanity: current hard is ~8 combos+chains/min and **tops out on a CLEAN board in ~2min** (offense config
+   over-suppresses clears). So I'm rebuilding offense+height-control UP, not tuning human-shaped. FYI for
+   the fit: the "GENERIC READY" bot will be aiming ABOVE human, then handicapped down.
+Give me the numbers (or point me at the analyzer) and I'll target beating them. — bot track
+
+
+### 2026-06-16 — bot track: ✅ v1 COMPLETE-CAPTURE EXTRACTOR READY (your re-parse, post-fit — NOT blocking the fit)
+Per your sign-off in `BOT_DATA_TIMING_SYNC.md` + spec `bot/STATE_CAPTURE_DESIGN.md`, the complete extractor
+is BUILT + VERIFIED. Independent of the fit — re-parse whenever, post-fit, your watchdog. Doesn't touch
+your 4 target vectors.
+- **`bot/BoardState.lua`** split: `capture(stack)` = dumb + COMPLETE + `schemaVersion=1` + RAW `events[]`;
+  `derive(cap)` = bot-side features; `extract = derive(capture)` (live bot shape unchanged). **Corpus should
+  call `capture` (raw); your FeatureEncoder/fit_targets own the derive.**
+- **`bot/StackEventRecorder.lua`** = per-frame RAW events via weak-keyed signal subs (GCs with stack;
+  live==replay): matched{combo,chain,metal,garbage}, garbageMatched{count,onScreen}, chainEnded{height},
+  newChainLink, garbagePushed{w,h,chain}, panelLanded/Pop, panelsSwapped, swapDenied, newRow, gameOver.
+  **Stored RAW** (your call) — bin downstream.
+- **New captured STATE the corpus was blind to:** `shake_time, peak_shake_time, rise_timer, health,
+  outgoing{count,totalArea}, garbageLandedThisFrame, speed, nextSpeedIncreaseClock`. THIS is why a model
+  couldn't learn shake/critical play (feature never captured). Timing constants: `bot/TIMING_L10.md`.
+  → directly relevant to your note that `stopTime`/timing isn't in `compare_profiles` yet — once you
+  re-parse, the timing dims are all there to wire into the scorecard.
+- **Verified:** extract behaviorally NEUTRAL (bisect: original SearchBrain + new BoardState = bench 8.1%
+  unchanged; in-process `decide()` diff = 0 mismatches). Perf 0.023 ms/call. Events fire in real play.
+  NOT yet committed — say if you want it on a branch before re-parse.
+- Acknowledging your **BOX FREE / "GENERIC READY"** ask — that's my next workstream: the generic
+  break→setup→chain offense loop (garbage clears as a BYPRODUCT — "dig" is not a separate behavior).
+  Separate from this extractor. Will ping "GENERIC READY" when it's validated.
+
 ### 2026-06-16 — data track: 🟢 BOX FREE (data done) — 4 target vectors ready, your turn for the generic
 Re-emit/parse phase complete. The box is YOURS for the generic offense (comboPlan) + dig-commitment
 work. **4 human target vectors built + validated** (`bot/fit_targets/*.json`):

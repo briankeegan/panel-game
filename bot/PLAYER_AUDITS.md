@@ -40,6 +40,22 @@ Distinctiveness: `compare_profiles --matrix bot/fit_targets [--distinctive bot/f
 
 **Finding:** strong players ~never break garbage with a standalone 3-match (≈0%); 38–60% of breaks are *chained*. Confirms "garbage is cleared as a byproduct of offense (chains), not dedicated digging." The discriminating signal is **chain-into-garbage rate** (orange highest, 60%).
 
+## Audit 4 — Offense shape: combo-width + chain-depth distributions  (source: `stats.jsonl`)
+**Method:** from each player's `stats.jsonl` (`PA_PARSE_EMIT=stats`), tally non-chain garbage `width`
+(combo size) and chain garbage `height` (= chain depth, GarbageQueue links). % of each population.
+
+| player | combo width % (3/4/5/6) | chain depth % (1/2/3/4/5/6+) |
+|---|---|---|
+| chaos952 | 48 / 37 / 13 / 2 | 53 / 25 / 14 / 6 / 2 / 0 |
+| kekeke | 47 / 36 / 15 / 2 | 63 / 25 / 8 / 2 / 1 / 0 |
+| mscl | 41 / 37 / 19 / 3 | 46 / 29 / 15 / 6 / 2 / 1 |
+| orangeTriangle | 54 / 25 / 16 / 5 | 24 / 17 / 14 / 11 / 8 / **26** |
+
+**Finding:** combos are small-dominant (3–4 wide) for everyone. **Chain depth is the big discriminator:**
+chaos/kekeke fire shallow (≥90% depth-1/2), mscl slightly deeper, but **orange sends 26% of chains at
+depth 6+** — a true deep-chain builder. This is orange's defining offense signature (matches its 45%
+chain-rate + 60% chain-into-garbage). Ceiling target = match orange's depth distribution.
+
 ## Audit 3 — Play continuity / insert-catch proxy  (source: board rows)
 **Method:** of all SWAP-decision frames, the fraction issued while ≥1 cell is MATCHED/POPPING (board actively resolving a clear). **Coarse** — popping animations run almost always in busy play, so this measures *continuity*, not true chain-extension. True insert-catch needs per-frame chaining state (`chain_counter`), not currently emitted.
 

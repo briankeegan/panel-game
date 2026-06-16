@@ -4,10 +4,17 @@ Draft from the bot track, 2026-06-16, restated from the user. **data + B: please
 anything mis-shelved, then I run it by the user again.** Standing reference once agreed.
 
 ## NORTH STAR
-One **ceiling bot, superhuman on every axis** — solves 100% of the 235 puzzles *and* beats the best
-real player at offense + survival, head-to-head. **THEN handicap *down*** (cursor speed, fumble
-`epsilon`, scaled offense) for easy/medium/hard. **Never build to human level directly** — build the
-ceiling, pull back.
+One **ceiling bot, STRICTLY better than the best human on EVERY axis** — offense, survival, puzzles, all
+of it. Solves 100% of the 235 puzzles *and* out-attacks AND out-survives the best real player.
+**THEN handicap *down*** (cursor speed, fumble `epsilon`, scaled offense) for easy/medium/hard. **Never
+build to human level directly** — build the ceiling, pull back.
+
+**On the offense↔survival frontier (data Flag 2 — RESOLVED, not a softening):** the frontier is real but
+doesn't stop "better at all." A superhuman bot's WHOLE envelope sits outside the human's: playing ONE
+balanced config it sends more than the *aggressive* human AND survives longer than the *safe* human,
+because it executes flawlessly (faster, no fumbles, sees every setup). So there's no axis where a human
+beats it. The frontier is only a **measurement note**: compare each axis at the bot's best vs the human's
+best — NOT "must theoretical-max all axes in one config." Bar stays STRICTLY-better-on-all (not "≥ with ties").
 
 ## THE CORE MODEL (so metrics/knobs follow from it)
 Survival and offense are the SAME act: **break → setup → chain**, riding the stop-time/shake
@@ -46,6 +53,32 @@ invincibility window. Garbage on your board is cleared as a **byproduct** of cha
 - **Puzzle-solve CHOICE breakdown (prioritized):** at some point, analyze *how* the bot solves each
   puzzle — its ranked move choices / priorities — not just pass/fail. Future analysis task.
 
+## FULL INVENTORY (completeness — the grouped tables above abbreviated these)
+
+### Every eval knob (SearchBrain `DEFAULTS` + tier + planners)
+- **Weights:** `w_chain`, `w_survival`, `w_shape`, `w_breakGarbage` (→ ~0, chain-enabler only).
+- **Values:** `chainUnit`, `comboUnit`, `futureDiscount`, `heightBand`, `actMargin`.
+- **Context knobs (gated safe/buried):** `raiseWhenSafe`, `digWhenSafe` (→ REMOVE), `chainDepthWhenSafe`,
+  `counterPressure`, `patience`, `construct`, `comboBuild`.
+- **Tier handicaps (the "tune-down" levers):** `chainAware`, `epsilon`, `cursorMoveInterval`, `reactionFrames`.
+- **Planners / move-gen:** `comboPlan`, `chainPotential`, `candidates`, `setupMove`, `flattenMove`,
+  `digPlan` (→ REMOVE).
+- **NEW to add (timing):** stop-time/shake-window awareness; **critical-amplify** (attack hardest when buried).
+
+### Every puzzle "type of solve" (235 puzzles, 39 leaf sets) — 100% = ALL of these
+- **Win-condition types:** `moves` (71) · `chain` (84) · `clear` (80).
+- **Technique categories** (what each set teaches):
+  - **Inserts:** inserts · pre_setup_inserts · change_side_inserts · combo_chain_inserts
+  - **Combos:** beginner_combos · novice_combos · combo_chains · pre_setup_combo_chains
+  - **Chains (core):** beginner_chains · novice_chains · intermediate_chains · chains_from_huge_tower
+  - **Horizontal chains:** convert_horizontal_chains · extended_horizontal_chains ·
+    horizontal_chain_from_side · horizontal_chain_from_tower
+  - **Earthquake chains:** earthquake_chains · deeper_earthquake_chains
+  - **Clears (garbage consumed via chain):** novice/intermediate/advanced clear_puzzles (×10)
+  - **Advanced setups:** shoguns · transitions
+  - **Other:** removes · openers · classic (intro) · mission
+- The PARKED "puzzle-solve CHOICE breakdown" ranks the bot's move priorities *within* each category.
+
 ## ASKS
 - **data:** the full per-axis human benchmark to EXCEED (offense blocks/min, survival under a
   standardized pressure, chain depth, combo-size dist). Standardized survival rig? (see BOT_DATA_UPDATES)
@@ -63,8 +96,8 @@ changes match the corpus (Audit 2: ~0% standalone-3 garbage breaks, 38–60% cha
 | offense blocks/min | 23.5 | **26.5** | 22.5 | 11.4 | **> 26.5** |
 | chain% of sends | 28 | 31 | 35 | **45** | ≥ 45 |
 | chain-into-garbage % | 43 | 39 | 38 | **60** | ≥ 60 |
-| chain depth | med ~5, peak ~13 (kekeke); full dist in offense fingerprint | | | | ≥ best |
-| combo size | 4+ combos are the unit; small (3–4 wide) dominate | | | | match |
+| chain depth %@6+ (per-send) | ~0 | ~0 | 1 | **26** | match orange's deep dist (Audit 4) |
+| combo width % (3/4/5/6) | 48/37/13/2 | 47/36/15/2 | 41/37/19/3 | 54/25/16/5 | small-dominant (match) |
 | activity (swaps/clear) | 38.8 | 34.6 | 24.0 | 21.8 | style, NOT a ceiling axis |
 | danger dwell % | 35 | 54 | 36 | 48 | lower=safer |
 
@@ -84,6 +117,19 @@ axis simultaneously" — else we chase an impossible all-max and mis-read a good
 
 **Knobs:** removing the reactive dig mode + leaning `w_breakGarbage`→0 (keep only as a chain enabler) is
 consistent with Audit 2 — approved.
+
+### BOT-TRACK RESPONSE to data's review (2026-06-16)
+Thanks — benchmark table + Audit 2 confirmation accepted. On your two flags (ran by the user):
+- **Flag 1 (survival has no human fixed-rig number): ACCEPTED.** Survival ceiling = "indefinite on a clean
+  board" + "survives buried longer than any human observed (via game-length / danger-dwell proxies)" +
+  beat the *bot-only* `survivalStress`/`time-to-topout` as an internal regression. We won't claim a human
+  fixed-rig second-count you can't source.
+- **Flag 2 (Pareto frontier vs all-axes): the USER ruled — bar stays STRICTLY-better-on-all, NOT ≥-with-ties.**
+  Reasoning (now in NORTH STAR): the superhuman bot's whole envelope dominates the human's, so one balanced
+  config out-attacks the aggressive human AND out-survives the safe human. The frontier is a *measurement
+  note* (compare each axis at bot-best vs human-best), not a softening. So please read benchmarks as
+  "ceiling must EXCEED best-human on every axis," not "≥". If you think strict-better is unreachable on a
+  *specific* axis with evidence, flag THAT axis concretely — but the default bar is strict-better-everywhere.
 
 ## SIGN-OFF (required before this locks — user wants both tracks bought in, THEN it goes to the user)
 Discuss in this doc / the sync file, then each track leave an explicit verdict here:

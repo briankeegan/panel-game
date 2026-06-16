@@ -278,7 +278,7 @@ end
 -- regression-checked against it. `ORACLE_STACK=<72-char top->bottom stack string>` (same
 -- format as Puzzles.json "Stack"); prints just the line + node count, then exits.
 local ORACLE_STACK = os.getenv("ORACLE_STACK")
-if ORACLE_STACK then
+if ORACLE_STACK and not os.getenv("ORACLE_LINE") then  -- ORACLE_LINE re-sim is handled below
   local Puzzle = require("common.engine.Puzzle")
   local p = Puzzle({ puzzleType = "clear", stack = ORACLE_STACK, moves = 1 })
   nodes = 0
@@ -291,6 +291,46 @@ if ORACLE_STACK then
   else
     print(string.format("ORACLE: no line found (nodes=%d)", nodes))
   end
+  os.exit(0)
+end
+
+-- ORACLE_LINE (track A's option 2b — cheap exact regression check): given a board state +
+-- a candidate line (e.g. "*0@2,3 +70@2,2"), re-simulate it on the FAITHFUL engine and report
+-- whether it actually FIRES a chain (vs just shuffles), the chain length, and panels cleared.
+-- Token = [*+]<W>@<r>,<c>  (* = settle-first build move, + = catch at W frames). This is what
+-- track A calls: "I fired this line live; confirm it fires what I think on the real engine."
+local ORACLE_LINE = os.getenv("ORACLE_LINE")
+if ORACLE_LINE and ORACLE_STACK then
+  local Puzzle = require("common.engine.Puzzle")
+  local p = Puzzle({ puzzleType = "clear", stack = ORACLE_STACK, moves = 1 })
+  local steps = {}
+  for tok in ORACLE_LINE:gmatch("%S+") do
+    local sf, w, r, c = tok:match("([%*%+])(%d+)@(%d+),(%d+)")
+    if w then steps[#steps + 1] = { tonumber(w), tonumber(r), tonumber(c), sf == "*" or nil } end
+  end
+  local m, st = build(p)
+  for i = 1, PROBE_CAP do if st:game_ended() then break end st:receiveConfirmedInput(IDLE); m:run(); if i >= 2 and settled(st) then break end end
+  local base = panelCount(st)
+  local maxChain, chained = 0, false
+  for _, s in ipairs(steps) do
+    if s[4] then for i = 1, PROBE_CAP do if st:game_ended() then break end st:receiveConfirmedInput(IDLE); m:run(); if i >= 2 and settled(st) then break end end end
+    for _ = 1, s[1] do if st:game_ended() then break end st:receiveConfirmedInput(IDLE); m:run() end
+    if st:game_ended() then break end
+    st.cur_row, st.cur_col = s[2], s[3]; st:receiveConfirmedInput(SWAP); m:run()
+    -- ride out the cascade, tracking chain
+    for i = 1, PROBE_CAP do
+      if st:hasChainingPanels() then chained = true end
+      local cc = st.chain_counter or (st.chain and st.chain.length) or 0
+      if cc > maxChain then maxChain = cc end
+      if st:game_ended() then break end
+      if i >= 2 and settled(st) then break end
+      st:receiveConfirmedInput(IDLE); m:run()
+    end
+  end
+  for i = 1, PROBE_CAP do if st:game_ended() then break end st:receiveConfirmedInput(IDLE); m:run(); if i >= 2 and settled(st) then break end end
+  local cleared = base - panelCount(st)
+  print(string.format("ORACLE_LINE: fired=%s chainLen=%d cleared=%d swaps=%d  (base=%d -> %d)",
+    tostring(chained and cleared > 0), maxChain, cleared, #steps, base, panelCount(st)))
   os.exit(0)
 end
 

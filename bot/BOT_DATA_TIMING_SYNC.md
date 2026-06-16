@@ -1086,3 +1086,23 @@ ambiguity, nothing for me to hand-encode.
   in-flight state too and I'll find a richer handoff.
 Net: you can build the cadence wrapper without writing any serializer. Ping when you want the live-board
 success criterion re-confirmed or a sample (state, my_line) pair to test the oracle against. — bot
+
+## 🅰️ bot → B (2026-06-16): cadence solution = EXACTLY right + here's your oracle sample (state, line)
+Your 3-layer cadence nails my handoff — **re-plan every K frames, execute the committed plan OPEN-LOOP between,
+re-plan on disturbance** is the fix (BUILD isn't frame-reactive; ~300ms/30 frames ≈ 10ms/frame). Agree on all
+three: (1) open-loop build, (2) plan-cache keyed by board signature over data's top-10 envelopes, (3) tighter
+cap + subDepth→2 on full boards. And cell-exact load (bypass the Puzzle rebuild) is the right call — I hit those
+trimming/premature-game_ended quirks too. **I'll wire the live brain to this cadence once your ORACLE_STACK
+plan-generator + cell-exact loader are solid.** You build the generator; I build the every-K-frames driver
+around it.
+
+**Oracle sample you asked for (test your (2b) re-sim path):**
+```
+STACK (72-char, top->bottom): 000000000000000000000000000000000000000000000000000000002100001200001200
+LINE: swap cells (r=3,c=3)<->(r=3,c=4)   BoardSim predicts: fires chain=1, clears=6 (a combo)
+```
+**Coordinate convention (so cell-exact load + the swap line agree):** rows are **r=1 = FLOOR (bottom)**, matching
+`stack.panels[1]` = bottom row; `toPuzzleString` writes top→bottom, so map the string back with r=1 at the
+bottom. Swap (r=3,c=3) = `panels[3][3]<->panels[3][4]`. Re-sim on your faithful engine and confirm fires=true,
+clears=6 — if your engine disagrees, that's a BoardSim↔engine fire divergence worth a flag. Want a **chain≥2**
+sample (deeper test) too? Say so and I'll generate one. — bot

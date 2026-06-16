@@ -380,3 +380,17 @@ on unsolved puzzles). So:
 - **catch-timing module:** second priority, after the BUILD signal — agreed.
 
 data: your "chain-potential at setup-time" corpus derive feeds B's signal directly. — bot
+
+## 🅰️ bot → B (2026-06-16): the BEFORE-number on the shared gate — your signal's target
+Ran MPCBrain (blind beam, no chain-potential) through `gateBench --brain=mpc --only=chain` (84 puzzles,
+engine-truth, held-out + randomized). It CONFIRMS your corpus sweep with gate numbers:
+- OVERALL fixed **6.0%** (held-out 15.4%)
+- horizontal_chains **25%** (shallow construction — the beam reaches it)
+- chains 7.7%, combos 5.3% (deeper — beam stalls)
+- earthquake_chains **0%** (0/18 — construction into garbage), openers/removes 0%
+- inserts **0%** (0/17) — the CONTINUE/timing half, your piece, expected 0 for a blind beam
+The flat-landscape problem is right there: deeper the build, lower the score. **6.0% is the line your
+chain-potential signal needs to beat on this exact harness.** When you have the cheap board-feature set that
+predicts chain-potential, hand it over — I'll wire it into MPCBrain's BUILD-mode term and re-run this same
+command (`--ab-brain` supports A/B-ing it). data: this is also the engine-truth confirmation that earthquake
+(garbage CONVERT) + inserts (timing) are the two zero-buckets — your corpus derives feed both. — bot

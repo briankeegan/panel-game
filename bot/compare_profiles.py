@@ -69,14 +69,14 @@ def offense_dist(h, b):
         e = relerr(h.get(k), b.get(k))
         if e is not None:
             parts[k] = e
-    if "chainDepth_hist" in h and "chainDepth_hist" in b:
-        parts["chainDepth"] = hist_tv(
-            {int(k): v for k, v in h["chainDepth_hist"].items()},
-            {int(k): v for k, v in b["chainDepth_hist"].items()})
-    if h.get("comboWidth_hist") and b.get("comboWidth_hist"):
-        parts["comboWidth"] = hist_tv(
-            {int(k): v for k, v in h["comboWidth_hist"].items()},
-            {int(k): v for k, v in b["comboWidth_hist"].items()})
+    if "chainLen_hist" in h and "chainLen_hist" in b:
+        parts["chainLen"] = hist_tv(
+            {int(k): v for k, v in h["chainLen_hist"].items()},
+            {int(k): v for k, v in b["chainLen_hist"].items()})
+    if h.get("comboSize_hist") and b.get("comboSize_hist"):
+        parts["comboSize"] = hist_tv(
+            {int(k): v for k, v in h["comboSize_hist"].items()},
+            {int(k): v for k, v in b["comboSize_hist"].items()})
     return parts
 
 

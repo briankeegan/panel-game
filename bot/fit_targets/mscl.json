@@ -94,23 +94,23 @@
     "chainPct": 34.7,
     "comboPct": 65.3,
     "blocksPerMin": 22.5,
-    "chainDepth_med": 2.0,
-    "chainDepth_peak": 25,
-    "chainDepth_hist": {
-      "1": 552,
-      "2": 350,
-      "3": 182,
-      "4": 75,
-      "5": 28,
-      "6": 10,
-      "7": 2,
-      "8": 3
+    "chainLen_med": 3.0,
+    "chainLen_peak": 26,
+    "chainLen_hist": {
+      "2": 552,
+      "3": 350,
+      "4": 182,
+      "5": 75,
+      "6": 28,
+      "7": 10,
+      "8": 2,
+      "9": 3
     },
-    "comboWidth_hist": {
-      "3": 934,
-      "4": 836,
-      "5": 434,
-      "6": 60
+    "comboSize_hist": {
+      "4": 934,
+      "5": 836,
+      "6": 434,
+      "7": 60
     },
     "n_pieces": 3466
   }

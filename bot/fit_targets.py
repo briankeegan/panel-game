@@ -4,13 +4,13 @@ ground truth the weight-fit regresses against and compare_profiles.py scores aga
 
 Same code runs on a human board-row corpus OR a bot's parsed games, so both sides are
 measured identically (apples-to-apples). Combines:
-  - offense   : chain% / combo% / blocksPerMin / chainDepth (median + histogram)   [from stats.jsonl]
+  - offense   : chain% / combo% / blocksPerMin / chainLen (median + histogram, x-notation)   [from stats.jsonl]
   - priority  : per-bucket {swap, raise, clearStart, dig} over the joint 12-cell schema  [board rows]
   - activity  : swaps_per_clear                                                     [board rows]
   - survival  : height median/p90, garbage_on_board_pct                            [board rows]
 
-chainDepth is recoverable WITHOUT a re-emit: chain garbage height == chain links
-(GarbageQueue:addChainLink starts height 1, +1/link), so depth = height for isChain sends.
+chainLen is recoverable WITHOUT a re-emit: chain garbage height == chain links
+(GarbageQueue:addChainLink starts height 1, +1/link), so chainLen = height + 1 for isChain sends.
 
 Usage: fit_targets.py <board_corpus_dir> [stats.jsonl] [sample] > targets.json
 """
@@ -138,23 +138,25 @@ def offense_targets(stats_path):
     pieces = [g for game in games for g in game["garbage"]]
     n = len(pieces) or 1
     n_chain = sum(1 for p in pieces if p.get("isChain"))
-    # chainDepth = height for chain sends (GarbageQueue: height == #links)
-    depths = [p["height"] for p in pieces if p.get("isChain")]
-    depth_hist = collections.Counter(min(d, 8) for d in depths)  # cap bin at 8+
-    # combo-WIDTH dist (non-chain sends) — a locked STYLE/clone signal (Audit 4: orange skews
-    # 3-wide + 6-wide). width 3-6; cap at 6.
-    widths = [min(p.get("width", 0), 6) for p in pieces if not p.get("isChain")]
-    width_hist = collections.Counter(w for w in widths if w >= 3)
+    # chain LENGTH (x-notation) = chain-garbage height + 1 (GarbageQueue: height == #links == chainLen-1;
+    # verified maxChain=8 <-> tallest chain garbage height 7). Audit 4. Hist bins x2..x8, x9+ catch-all
+    # (orange's defining tail runs x9->x36; collapse to one bin for the clone-fit TV distance, keep the
+    # true peak as a scalar).
+    lengths = [p["height"] + 1 for p in pieces if p.get("isChain")]
+    len_hist = collections.Counter(min(L, 9) for L in lengths)
+    # combo SIZE (panels cleared) = garbage width + 1 (width-6 = 7+). Sizes +4..+6, +7 catch-all.
+    sizes = [min(p.get("width", 0) + 1, 7) for p in pieces if not p.get("isChain")]
+    size_hist = collections.Counter(s for s in sizes if s >= 4)
     frames = [g["frames"] for g in games if g["frames"]]
     total_frames = sum(frames)
     return {
         "chainPct": round(100 * n_chain / n, 1),
         "comboPct": round(100 * (n - n_chain) / n, 1),
         "blocksPerMin": round(60 * 60 * len(pieces) / total_frames, 1) if total_frames else None,
-        "chainDepth_med": med(depths),
-        "chainDepth_peak": max(depths) if depths else 0,
-        "chainDepth_hist": {str(k): depth_hist[k] for k in sorted(depth_hist)},
-        "comboWidth_hist": {str(k): width_hist[k] for k in sorted(width_hist)},
+        "chainLen_med": med(lengths),
+        "chainLen_peak": max(lengths) if lengths else 0,
+        "chainLen_hist": {str(k): len_hist[k] for k in sorted(len_hist)},
+        "comboSize_hist": {str(k): size_hist[k] for k in sorted(size_hist)},
         "n_pieces": len(pieces),
     }
 

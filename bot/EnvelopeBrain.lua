@@ -25,6 +25,7 @@ local DEFAULTS = {
   beam        = tonumber(os.getenv("PA_BEAM")) or 3,     -- children expanded per level
   nodeBudget  = 1500, -- hard cap on board sims per re-plan (frame-budget guard for the spike)
   replanEvery = tonumber(os.getenv("PA_REPLAN")) or 30,  -- MPC cadence K: re-plan every K frames, else open-loop
+  surface     = tonumber(os.getenv("PA_SURFACE")) or 5,  -- region cap: only search the top N stack rows
 }
 
 function EnvelopeBrain.new(opts)
@@ -35,9 +36,14 @@ function EnvelopeBrain.new(opts)
   return setmetatable({ cfg = cfg, plan = nil, planIdx = 1, sinceReplan = 0 }, EnvelopeBrain)
 end
 
-local function swaps(grid, top)
+-- REGION-CAPPED candidate gen (B's "cap harder on full boards"): only swaps in the top `surface` rows of
+-- the stack. Bounds the candidate count (and thus the simSwap count, the real cost ~1.8ms each) to a fixed
+-- ~surface×5 regardless of board height — so decide() doesn't blow up as the envelope builds toward full.
+-- The surface is where rearrangement matters in live play (lower panels are locked in under the rising stack).
+local function swaps(grid, top, surface)
   local out = {}
-  for r = 1, top do
+  local lo = surface and math.max(1, top - surface + 1) or 1
+  for r = lo, top do
     for c = 1, BoardSim.WIDTH - 1 do
       local a, b = grid[r][c], grid[r][c + 1]
       if a ~= BoardSim.GARBAGE and b ~= BoardSim.GARBAGE and a ~= b and (a ~= 0 or b ~= 0) then
@@ -79,7 +85,7 @@ local function fitSearch(grid, rows, envelope, top, cfg)
   local function dfs(g, depth, path)
     if depth >= cfg.subDepth or budget <= 0 then return end
     local kids = {}
-    for _, sw in ipairs(swaps(g, top)) do
+    for _, sw in ipairs(swaps(g, top, cfg.surface)) do
       if budget <= 0 then break end
       budget = budget - 1
       local ng = BoardSim.simSwap(g, rows, sw[1], sw[2])

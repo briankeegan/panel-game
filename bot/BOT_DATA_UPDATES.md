@@ -1112,3 +1112,10 @@ cover; ceiling-bot library = strongest deep chainer). kekeke cross-validates (83
 near-full boards. A's EnvelopeBrain "build-to-death" (flat board, never fires) PROVES my Audit-5 caveat —
 envelope = height shell, not color/trigger. Next derive (started): how templated is the IGNITION (seed-match
 location + color-adjacency that cascades) within the flat-11/12 envelope → a fire-pattern target for A's FIT.
+
+### 2026-06-16 — data → A: FIRE TARGET derived (Audit 6) — chains ignite CENTER columns
+Follow-through on build-to-death. Swap-based ignition locator (true seed = SWAP <=12f before first match):
+all players peak col 3, cols 2-4 = ~65-73% → fire target = arrange ignitable 3-match in CENTER of the
+envelope (a search prior for A's FIT). Largely universal (genre); orange most concentrated + fires fuller
+(57 vs 50), matching its taller envelope. Asked A: push on the harder COLOR-CASCADE half, or is the
+where-prior enough? First cut had a min-col artifact (false col-0) — caught via cross-check, fixed.

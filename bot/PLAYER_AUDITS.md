@@ -96,6 +96,29 @@ Tally signatures; concentration = templated-vs-searched. Answers track A's BUILD
 (entropy 0.58/0.63). → live BUILD should be a template library, not global search. Caveat: measures the
 geometric ENVELOPE (height profile), not color/trigger structure — residual search may live there.
 
+## Audit 6 — Fire pattern: where chains IGNITE (source: board state + SWAP decisions; `fire_pattern.py`)
+**Method:** the envelope (Audit 5) is the height SHELL; A's EnvelopeBrain proved a flat board with no chain
+*arranged* inside it never fires (build-to-death). This measures the IGNITION. Per big chain (isChain,h≥3) at
+`frameEarned`, cluster MATCHED-state frames in [fe−200,fe], take the run nearest fe; its earliest matched frame
+= ignition. The TRUE trigger = the `SWAP`-decision frame ≤12f before ignition (only a chain's SEED is
+swap-caused; later links fall naturally → no swap → this isolates real seeds, free of the match-footprint
+min-col bias that contaminated the first cut). Record the trigger swap's cursor column (1-6, swap = cols c,c+1).
+
+| player | swap-seeds | trig col % (1/2/3/4/5) | col concentration | fill@ignition (median) |
+|---|---|---|---|---|
+| chaos952 | 80 | 15 / 25 / 28 / 14 / 19 | 27.5 | 51.5 |
+| mscl | 149 | 22 / 24 / 27 / 19 / 9 | 26.8 | 50.0 |
+| orangeTriangle | 206 | 11 / 21 / 34 / 18 / 16 | 34.0 | 57.0 |
+
+**Finding:** chain ignition is **center-column dominant and largely universal** — every player peaks at col 3,
+cols 2-4 carry ~65-73%. (Genre property: chains fire mid-board where mass accumulates + can cascade both ways.)
+Orange-specific deltas: **most concentrated** (34% vs ~27%) and **fires on a FULLER board** (57 vs 50 cells),
+matching its taller flat-12 envelope. → the live FIT's "fire target" = arrange the ignitable 3-match in the
+CENTER columns of the built envelope. **Caveat:** this is the *WHERE* half; the *color-cascade* structure (which
+colors stack above the seed so clearing it cascades) is the remaining open derive — harder from board snapshots.
+**Method note:** the first cut used `min(col)` of the match footprint → false "all players ignite col-0"
+(min-col bias on wide matches); caught via cross-player check, fixed with the swap-based locator above.
+
 ## Not-yet-measurable (need more data)
 - **Stop-time utilization** (set-up-during-freeze → fire-as-window-closes): needs per-frame `stopTime` — was reverted out of the emit for speed; re-add cheaply (`stack.stop_time + pre_stop_time`) + watchdog re-emit.
 - **Reveal foresight** (setting up to revealed garbage colors): needs reveal colors (`BoardState.captureReveals`), not in the re-sim rows.

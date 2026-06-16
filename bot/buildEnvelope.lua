@@ -35,15 +35,25 @@ end
 BuildEnvelope.columnHeights = columnHeights
 
 -- LIBRARY (SEED). data's top forms are flat near-full boards (all columns ~equal height) + the staircase
--- (B's diag_same feature). Heights are absolute rows; data refines to the measured per-player vocabulary.
--- A flat form at height H = build every column up to H, then fire — the canonical chain setup.
-local function flat(name, H) local t = {} for c = 1, W do t[c] = H end return { name = name, heights = t } end
+-- (B's diag_same feature). Heights are absolute rows, SORTED ascending (canonical orientation; recognize
+-- handles mirror for non-flat forms — flat forms are orientation-free).
+--
+-- MEASURED LIBRARY (data, build_library.py): orangeTriangle's top-10 build forms — 476 big chains
+-- (isChain,h>=3), top-10 cover 85.1%. Orange is the strongest deep-chain builder (26% of chains depth-6+),
+-- so its vocabulary is the ceiling-bot library. Per-rank median column height per cluster; cov = share of
+-- big chains. Confirms Audit 5: humans template — flat near-full boards dominate (top form flat-12 = 40%).
+-- Repro: python3 bot/build_library.py bot/data/orangeTriangle_bot /tmp/orange_stats/stats.jsonl 120 10
 BuildEnvelope.LIBRARY = {
-  flat("flat-8",  8),
-  flat("flat-10", 10),
-  flat("flat-12", 12),
-  -- staircase seed (ascending); data confirms whether the strong players actually use it
-  { name = "stair-asc", heights = { 4, 5, 6, 7, 8, 9 } },
+  { name = "orange-01-flat",      heights = { 12, 12, 12, 12, 12, 12 } },  -- 40.1%
+  { name = "orange-02-flat",      heights = { 11, 11, 11, 11, 11, 11 } },  -- 15.1%
+  { name = "orange-03-flat",      heights = {  9,  9,  9,  9,  9,  9 } },  -- 10.3%
+  { name = "orange-04-near-flat", heights = {  9, 10, 11, 11, 11, 11 } },  --  5.5%
+  { name = "orange-05-flat",      heights = { 11, 11, 11, 12, 12, 12 } },  --  5.3%
+  { name = "orange-06-flat",      heights = {  9,  9,  9, 10, 10, 10 } },  --  3.2%
+  { name = "orange-07-near-flat", heights = {  9,  9, 10, 10, 11, 11 } },  --  2.3%
+  { name = "orange-08-flat",      heights = {  6,  6,  7,  7,  7,  7 } },  --  1.7%
+  { name = "orange-09-stair",     heights = {  6,  8, 10, 10, 11, 11 } },  --  0.8%
+  { name = "orange-10-stair",     heights = {  6,  8,  9,  9, 10, 11 } },  --  0.8%
 }
 
 -- DISTANCE the FIT engine minimizes: total SHORTFALL below the target form (how much more to build),

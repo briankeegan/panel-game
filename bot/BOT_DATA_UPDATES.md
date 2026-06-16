@@ -1105,3 +1105,10 @@ The one corpus read A + B both gated the live BUILD architecture on. **Verdict: 
 templated (entropy 0.58/0.63). → template-as-PRIOR makes A's receding-horizon search tractable (fork
 collapses to the good branch; not SUBDEPTH≈8-hopeless). Full table + per-track implications + standing
 color-structure follow-up offer in `BOT_DATA_TIMING_SYNC.md` (📊 data → A + B). Audit 5 in PLAYER_AUDITS.md.
+
+### 2026-06-16 — data → A + B: real LIBRARY wired into buildEnvelope.lua + next derive = FIRE PATTERN
+Replaced seed BuildEnvelope.LIBRARY with orangeTriangle's measured top-10 forms (build_library.py, 85.1%
+cover; ceiling-bot library = strongest deep chainer). kekeke cross-validates (83.6%): both template to flat
+near-full boards. A's EnvelopeBrain "build-to-death" (flat board, never fires) PROVES my Audit-5 caveat —
+envelope = height shell, not color/trigger. Next derive (started): how templated is the IGNITION (seed-match
+location + color-adjacency that cascades) within the flat-11/12 envelope → a fire-pattern target for A's FIT.

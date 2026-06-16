@@ -40,21 +40,44 @@ Distinctiveness: `compare_profiles --matrix bot/fit_targets [--distinctive bot/f
 
 **Finding:** strong players ~never break garbage with a standalone 3-match (≈0%); 38–60% of breaks are *chained*. Confirms "garbage is cleared as a byproduct of offense (chains), not dedicated digging." The discriminating signal is **chain-into-garbage rate** (orange highest, 60%).
 
-## Audit 4 — Offense shape: combo-width + chain-depth distributions  (source: `stats.jsonl`)
-**Method:** from each player's `stats.jsonl` (`PA_PARSE_EMIT=stats`), tally non-chain garbage `width`
-(combo size) and chain garbage `height` (= chain depth, GarbageQueue links). % of each population.
+## Audit 4 — Offense breakdown: chain LENGTH, combo SIZE, peak chain  (source: full `stats.jsonl`)
+**Method:** decode garbage shape into player terms. **Chain length** = chain-garbage `height` + 1 (verified:
+a game with maxChain=8 has its tallest chain-garbage at height 7). **Combo size** (panels cleared) =
+garbage `width` + 1 (width-6 = 7+). **Peak chain** = per-game max `chain_counter` (`maxChain`). Full corpus,
+not sampled (chaos 619 chains, mscl 1202, kekeke 12048, orange 4312).
 
-| player | combo width % (3/4/5/6) | chain depth % (1/2/3/4/5/6+) |
-|---|---|---|
-| chaos952 | 48 / 37 / 13 / 2 | 53 / 25 / 14 / 6 / 2 / 0 |
-| kekeke | 47 / 36 / 15 / 2 | 63 / 25 / 8 / 2 / 1 / 0 |
-| mscl | 41 / 37 / 19 / 3 | 46 / 29 / 15 / 6 / 2 / 1 |
-| orangeTriangle | 54 / 25 / 16 / 5 | 24 / 17 / 14 / 11 / 8 / **26** |
+**Chain length** (% of chains):
+| player | x2 | x3 | x4 | x5 | x6 | x7 | x8 | x9+ |
+|---|---|---|---|---|---|---|---|---|
+| chaos952 | 53 | 25 | 14 | 6 | 2 | 0 | 0 | 0 |
+| kekeke | 63 | 25 | 8 | 2 | 1 | 0 | 0 | 0 |
+| mscl | 46 | 29 | 15 | 6 | 2 | 1 | 0 | 0 |
+| orangeTriangle | 24 | 17 | 14 | 11 | 8 | 6 | 4 | **17** |
 
-**Finding:** combos are small-dominant (3–4 wide) for everyone. **Chain depth is the big discriminator:**
-chaos/kekeke fire shallow (≥90% depth-1/2), mscl slightly deeper, but **orange sends 26% of chains at
-depth 6+** — a true deep-chain builder. This is orange's defining offense signature (matches its 45%
-chain-rate + 60% chain-into-garbage). Ceiling target = match orange's depth distribution.
+**Combo size** (% of combos, panels cleared):
+| player | +4 | +5 | +6 | +7 |
+|---|---|---|---|---|
+| chaos952 | 48 | 37 | 13 | 2 |
+| kekeke | 47 | 36 | 15 | 2 |
+| mscl | 41 | 37 | 19 | 3 |
+| orangeTriangle | 54 | 25 | 16 | 5 |
+
+**Peak chain per game** (median / p90 / max):
+| player | median | p90 | max |
+|---|---|---|---|
+| chaos952 | x4 | x6 | x7 |
+| kekeke | x5 | x6 | x14 |
+| mscl | x5 | x7 | x26* |
+| orangeTriangle | **x11** | **x18** | **x36** |
+
+**Finding:** **combos are small for everyone** (+4/+5 dominate) — combos are *not* the discriminator. **Chain
+length is, and the gap is enormous.** chaos/kekeke spam short chains (x2 = 53–63%, ~nothing past x5); mscl is
+marginally deeper. **orange is a different species:** only 24% x2, a long flat tail through x8, and **17% of
+chains are x9+** (reaching x36). The per-game peak makes it undeniable — orange's *median* game peaks at x11
+(p90 x18) while everyone else medians x4–x5. (*mscl's x26 max is a lone outlier on an x5 median; orange's x36
+sits atop a whole distribution of long chains.) Orange builds monster chains as its core game; the others use
+chains as quick pressure. Ceiling target = orange's chain-length distribution. (Prior version capped this at
+"depth 6+ = 26%", hiding the entire x7→x36 tail — the tail IS orange's signature.)
 
 ## Audit 3 — Play continuity / insert-catch proxy  (source: board rows)
 **Method:** of all SWAP-decision frames, the fraction issued while ≥1 cell is MATCHED/POPPING (board actively resolving a clear). **Coarse** — popping animations run almost always in busy play, so this measures *continuity*, not true chain-extension. True insert-catch needs per-frame chaining state (`chain_counter`), not currently emitted.

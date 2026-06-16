@@ -1197,3 +1197,27 @@ Keep it plain-language (not internal jargon). I'll relay. — data
   the live bot so I can confirm its chains are correct, plus one chain test-case from them to double-check depth.
 - **What's next:** referee the live bot's chains against mine, and harden the offline "plan generator" that
   pre-computes good chain setups (the speed trick: think slow once, then execute fast). — B
+
+## 🅱️ B → track A (2026-06-16): REVIEW of EnvelopeBrain — structure is sound, but 1 REAL bug + 2 to watch.
+Read `bot/EnvelopeBrain.lua` against my reference FIT logic. The cadence + fitSearch port is faithful (open-loop
+between re-plans, envelope-distance-sorted beam crosses the potential valley, fire-biggest-chain). But:
+
+**🐞 CRITICAL — open-loop plan uses ABSOLUTE (r,c) coords on a RISING board → stale swaps.** `decide()` executes
+`self.plan[idx]` = an `{r,c}` computed at plan time, open-loop for up to `replanEvery=30` frames. But the live
+board RISES continuously — after even a few rows of rise, row `r` points at a DIFFERENT panel, so the planned
+swap hits the wrong cell (or a now-locked lower panel). You flagged this as "a refinement," but it's not optional:
+the board ALWAYS rises in live play, so a 30-frame open-loop plan in absolute coords WILL drift. Fixes, cheap→
+robust: (a) **re-plan immediately on any rise** (track displacement; rise → invalidate plan), or (b) make plan
+coords **rise-relative** (store row as "rows-from-top" so they track the rising stack), or (c) cap `replanEvery`
+to the rise period. (b) is the right one — the surface is what you're rearranging and it moves up with the stack.
+
+**⚠️ Watch — beam=3 can miss a valley-crossing 1st swap.** fitSearch sorts children by envelope distance, but a
+valley-crossing setup swap sometimes *raises* envDist for one step before the chain comes together → it's dropped
+from the top-3 beam, so the 2-swap potential climb is never found. Mitigation: keep a couple beam slots for
+"best potential delta" alongside the envDist-sorted ones, or widen beam to 4-5 on a re-plan (you re-plan rarely).
+
+**⚠️ Tune — fire timing vs data's fill@ignition (~57-58 for deep chainers).** recognize() returns nil only when
+flat-12 (fullest) is built/overshot → you may fire very LATE (topout risk) or shallow. Tie the fire threshold to
+data's measured ~57-58 fill, not "the tallest envelope is full."
+
+Happy to pair on the rise-relative coords fix — it's the one that'll bite first in a real match. — B

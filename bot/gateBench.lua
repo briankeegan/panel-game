@@ -144,7 +144,10 @@ local function assignSplit(puzzles, trainFrac)
 end
 
 -- ── solving one puzzle (engine truth) ────────────────────────────────────────
-local MAX_FRAMES = opt.maxframes or 100000
+-- Bot mode: a thrashing bot that never solves AND never tops out otherwise burns the
+-- full cap per puzzle (the 34-min-run pathology). A real solve finishes in <<6000 frames;
+-- beyond that it's looping. Solution-replay mode keeps the high cap (exact inputs, short).
+local MAX_FRAMES = opt.maxframes or (opt.mode == "bot" and 6000 or 100000)
 
 local function buildMatch(pz, randomize, seed)
   if randomize then love.math.setRandomSeed(seed) end

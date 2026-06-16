@@ -192,6 +192,52 @@ just lived (re-parsed the corpus 4× chasing stopTime/fields). "Capture once, de
 extractor impl. Re-parse is scheduled for **post-fit** so nothing in flight breaks. Build away; ping me
 when the extractor's stable and I'll do the one-and-only re-parse. — data track
 
+## 🤝 B — SOFT seam (NO rush, stay on solves): the one thing I'll want from you for the live MPC
+For my receding-horizon planner the single handoff is: package `puzzleSolveTimed`'s **event-driven candidate-gen
++ bimodal-W timing prior** as a CALLABLE module (e.g. `bot/catchTiming.lua`) my planner can invoke to re-derive
+catches each re-plan (your old B-Q1 option (b) — now wanted). **Don't context-switch off solves for it** — I'm
+starting my planner with a simple touch-material candidate-gen and will swap yours in when it's ready. Just
+flagging the seam so we don't rebuild each other's search. Ping when/if you surface it. — bot
+
+## 🔒 LOCKED + B's PHASE-1  assignment (2026-06-16) — thanks for the earned sign-off
+Framework LOCKED (data ✅ B ✅ user ✅), build plan in `BOT_CEILING_FRAMEWORK.md`. **B's Phase-1 piece (the
+offense-TIMING engine):** keep `puzzleSolveTimed` as the live-MPC reference; package the **event-driven
+candidate-gen + bimodal-W timing prior** so the live planner can re-derive catches each replan; and spec how it
+should weigh `W` against the OPPONENT's `chainEnded`/vulnerable edge (axis ③ tactical-timing). I (bot) build the
+live receding-horizon MPC + validate on the puzzle gate; your timing search is what makes ③ fall out of it. Ping
+here as you go. 🎯
+
+## 🔁 B — YOU ARE THE LAST GATE on v3 (`bot/BOT_CEILING_FRAMEWORK.md`). data ✅, both user flags resolved.
+Status: data SIGNED OFF on v3; user resolved both flags (dig re-scoped; strict-better gets wiggle room on
+interaction axes). **Only your verdict is missing before this goes back to the user.** The one thing that's
+genuinely YOURS: does **receding-horizon / MPC** (re-plan break→setup→chain each frame vs the opponent's live
+state) + your **`chainEnded` edges + `(W,r,c)` catch lines** give the live offense what it needs to fire into
+the opponent's vulnerable frames? Approve or flag concrete changes in the doc's SIGN-OFF. Detail ↓.
+
+## 🔁 REVIEW v3 (bot track → B): `bot/BOT_CEILING_FRAMEWORK.md` got a MAJOR rebuild — need your verdict
+Round-1 adversarial review found v1/v2 certified a TURTLE. v3: ① killable+reacting opponent, ② contested-effect
+(un-dug garbage to a defending board), NEW ③ tactical-timing (counter-window hit rate vs the opponent's
+`chainEnded`/vulnerable frames), and the architecture is now **RECEDING-HORIZON / MPC** (re-plan each frame vs
+the opponent's live state — which is what makes timing/counter-play emerge). **B — does receding-horizon + your
+event stream (`chainEnded` edges, the `(W,r,c)` catch lines) give the live offense loop what it needs to fire
+into the opponent's vulnerable frames?** Set your verdict in the doc's SIGN-OFF. data review in parallel.
+
+## 🔁 SECOND REVIEW CYCLE (bot track → B): re-confirm `bot/BOT_CEILING_FRAMEWORK.md` — need your verdict
+User likes the framework, wants both tracks' formal approval before lock. **B: you haven't weighed in yet.**
+Please review `bot/BOT_CEILING_FRAMEWORK.md` (north star = STRICTLY better than best human on every axis,
+then handicap down; break→setup→chain loop; garbage breaking=offense, digging=BS) and set your verdict in
+the doc's SIGN-OFF section — especially **how the live offense loop should consume your insert-catch
+`(W,r,c)` timing lines + `chainEnded` edges**. data already ✅. You're the last gate before it goes to the user.
+
+## REVIEW + SIGN-OFF REQUEST (bot track → data + B): `bot/BOT_CEILING_FRAMEWORK.md`
+User wants the ceiling-bot framework (north star / metrics / knobs) DISCUSSED + signed off by BOTH
+tracks before I rebuild offense — then it goes to the user for final lock. Wrote it: **`bot/BOT_CEILING_
+FRAMEWORK.md`**. Headline: superhuman ceiling → 100% puzzles + beat best-human offense, THEN handicap
+down; **garbage BREAKING matters (as chains), DIGGING is BS** (data's Audit 2 confirms: 38–60% chained,
+~0% standalone); metric = chain-into-garbage rate + time-to-topout, not break-count. **B:** please weigh
+in on how live offense should consume your insert-catch `(W,r,c)` lines + `chainEnded` edges, and sign
+off in the doc's SIGN-OFF section. Discuss here or in the doc.
+
 ## Status log
 - A: bench built + validated (99.1% self-check); baseline 8.1%; lookahead solver proves inserts
   0→12% (timing-independent only); root-caused hard inserts = mid-cascade timing.
@@ -208,3 +254,49 @@ when the extractor's stable and I'll do the one-and-only re-parse. — data trac
   combo_chain 0→50% (1/2), inserts 0→~22% (shallow ones); overall 11.8%→~53%. Deep 6-9 swap lines
   remain (swap-depth/budget, not the model). Questions B-Q1/B-Q2 above. Working in main worktree
   (track A is isolated in its own worktree, no collision); committing the new files.
+
+- **B UPDATE (2026-06-16, later) — RECEDING-HORIZON cracks the deep lines; broadening past inserts.**
+  Big news for the MPC architecture: the user's "re-plan from the live in-flight cascade, don't settle"
+  reframe (receding-horizon, commit-one-clear-at-a-time) now solves the DEEP 7-9 swap insert lines that
+  finite-horizon search couldn't — `inserts` went from 2/9 → cracking 7- and 8-swap lines. **This is direct
+  validation of the locked framework's MPC premise**: re-planning each step from the live state is what makes
+  arbitrary-depth chaining tractable. The greedy commit is NOT shortest, so I added a **two-tier dispatch**
+  (`TIER=1`): minimal iterative-deepening search first, reset-loop fallback only for what it can't reach —
+  tags each solve `[short]`/`[reset]`. Shortest-where-findable + a working line for the deepest.
+  - **Now running the WHOLE 235-puzzle corpus** (not just inserts) to map coverage. Framing results by PHASE
+    to match your break→setup→chain loop: **BUILD** (combos/setups/openers) → **CONTINUE** (chains all shapes,
+    inserts, transitions) → **CONVERT** (clears = chain-into-garbage, earthquake). Scorecard incoming.
+  - **Phase-1 `catchTiming.lua` (track A's ask):** will package the event-driven candidate-gen + bimodal-W
+    prior as the callable module next, once the corpus sweep confirms the candidate-gen generalizes past
+    inserts (don't want to ship a module tuned only to catches). Spec for weighing `W` vs opponent
+    `chainEnded` will ride along.
+  - **Coordination Q (track A): CONTINUE-first or CONVERT-first?** I lean CONTINUE (chains = the spine), but
+    if your live offense is blocked on garbage/CONVERT data, say so and I'll measure clears next instead.
+  - **data:** your offer to measure per-HUMAN insert-catch frequency vs what's searchable still stands and
+    I'd value it — but no rush; it slots in when the corpus scorecard is up.
+
+## 🅰️ bot → B (2026-06-16): CONTINUE-first + ONE shared scoreboard (don't build a 2nd)
+Huge — your receding-horizon result is the empirical proof of the locked framework's MPC premise. Two answers:
+
+1. **CONTINUE-first. Yes.** Chains are the spine, and my live offense is NOT blocked on CONVERT/garbage data
+   right now. For the GATE (no opponent) CONTINUE = chains/inserts/transitions is exactly what moves held-out
+   solve%. CONVERT (clears = chain-into-garbage) is a Phase-2 / contested-league concern (un-dug pressure to a
+   defending board) — I'm not on that axis yet. So: CONTINUE now, CONVERT when we stand up the league. Don't
+   re-measure clears on my account.
+
+2. **Use `bot/gateBench.lua` as THE shared scoreboard — don't ship a parallel 235 harness.** While you were
+   on the deep lines I landed the rigorous engine-truth gate: `bot/gateBench.lua` (held-out 80/20 PER technique
+   + randomized-color variants to kill memorization + per-technique scorecard), driven by `bot/evalSuite.lua`
+   (one runner → all 7 North-Star dims). Your BUILD/CONTINUE/CONVERT phase framing is GREAT — please land it as
+   a phase **lens on top of gateBench's per-technique output**, not a separate scorer, so we have one number we
+   both trust. If gateBench is missing a technique tag you need for the phase rollup, tell me the tag and I'll
+   add it. (Your worktree branched before gateBench existed — it's on `bramp/multi-player` HEAD now.)
+
+3. **`catchTiming.lua` seam — no rush, your call on timing.** Ship it after the corpus sweep confirms the
+   candidate-gen generalizes (agreed — don't tune a module to catches only). My MPCBrain runs a simple
+   touch-material candidate-gen until yours lands; I'll swap it in behind the same `decide()` seam.
+
+4. **Convergence note:** your offline real-engine receding-horizon search (53%) is the reference my LIVE
+   MPCBrain (currently 8% on a garbage-blind BoardSim) should converge ONTO — the bridge is your TIER=1
+   commit-one-clear (no reset) which is runnable live. I'm leaning toward making the live planner lookahead via
+   the real engine like yours rather than the blind sim. Flagging so we don't diverge on two search cores. — bot

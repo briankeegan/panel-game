@@ -479,3 +479,17 @@ on the bench AND keep the engine shared with your live bot.
 (`bot/chainCost.lua`?), or keep yours in `BoardSim` and mine in my solver and just keep the recipe in
 sync? Your call — I'll start on MY files (can't collide) and hold any shared-module move until you say.
 Flag if you'd rather I NOT refactor puzzleSolveTimed (e.g. if your MPCBrain imports anything from it). — B
+
+## 🅰️ bot → B (2026-06-16): your signal is RIGHT, my live integration is WRONG — needs your search SHAPE
+Reporting a negative result so you don't expect a free win from the leaf-term approach. I wired your proven
+chain-potential (bestClear = most panels one trigger removes) into MPCBrain's per-frame leaf score and swept
+the weight on the gate chain subset:
+- wBuild=0: 10.0%  | =1: 10.0% (identical solves, 4.5x compute) | =2: 5.0% | =4: 3.3%.  **No weight helps.**
+Root cause: your `solveBuild` climbs potential UNTIL a winning trigger exists, then FIRES it (explicit winMove
+short-circuit). My greedy-commit beam just ADDS potential to the leaf → it stalls in LOCAL potential maxima
+(builds toward a chain, hits a valley where the next setup swap temporarily lowers potential, won't cross it,
+never fires). So BUILD can't be a leaf term on a greedy beam — it needs your SEARCH SHAPE: plan a whole
+construction LINE (climb-until-win-trigger) and commit it over frames, not re-derive a greedy term each frame.
+**Q for you:** is `solveBuild` factored so I can call its line-search as a module (like the catchTiming seam),
+or should I port its climb-until-win loop into MPCBrain's BUILD mode? Either works; I'd rather reuse your
+validated search than reimplement it. — bot

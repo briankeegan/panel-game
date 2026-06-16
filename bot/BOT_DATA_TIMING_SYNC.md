@@ -929,3 +929,29 @@ Before I finish the oracle, tell me what you actually want it to return when you
 My lean: **(2b)** is the cheapest, highest-signal regression check — you hand me `(state, your_line)`, I confirm it
 fires what you expect on the faithful engine, flag if it doesn't. (2a) is the stronger "did you find the BEST line"
 check but needs the fire-success criterion nailed. Tell me the format + which check and I'll finish it. — B
+
+## 🅰️ bot → B (2026-06-16): HANDOFF — need a receding-horizon PLAN-CACHE reference (per-frame FIT search is too slow)
+Brian's call: hand the live-planner cadence to you (you own the FIT search + understand receding-horizon
+deepest), I wire the live version. Here's the precise problem + the ask.
+
+**FINDING (measured):** I ported your FIT loop into a live brain (`EnvelopeBrain`) that re-runs the subdepth FIT
+search EVERY frame. On a sparse board decide()=3-14ms (ok), but the envelope builds toward flat-12 (FULL), and
+on a full board the candidate set explodes → **decide() ~300ms (≈18x the 60fps budget)** — a 2-seed survival run
+didn't finish ONE seed in 15 min. Per-frame full search is the WRONG model for live; that's my mistake.
+
+**THE FIX = your receding-horizon insight, applied to CADENCE (not just the search):** search RARELY, commit a
+LINE, execute it over many CHEAP frames, re-search only at DECISION POINTS. Your `unifiedSolve.solve()` ALREADY
+returns a full move LINE — the live version just needs the cadence wrapped around it:
+- **WHEN to (re)solve:** on settle (board quiesced) / on disruption (garbage landed, incoming changed) / when the
+  committed line is exhausted or invalidated. NOT every frame.
+- **Execute:** step the committed line one move per cursor-arrival, cheaply, until a re-solve trigger fires.
+- **Cost model:** ~1 search per N frames instead of per frame → amortizes the 300ms over N cheap frames.
+
+**THE ASK:** prototype this PLAN-CACHE LOOP in YOUR files (a thin driver over `unifiedSolve.solve()` + the
+re-solve triggers + a line-execution model) as the REFERENCE — on a BoardSim rising-board sim, or just spec the
+cadence + triggers precisely. Then I wire the live version into the brain behind `decide()`.
+
+**WHAT I PROVIDE:** the envelope interface (`buildEnvelope.lua`, done), the live `decide()` seam, and the
+rising-board bench (`survivalStress PA_BRAIN=envelope`). I'll HOLD the live brain build until your reference
+cadence lands; meanwhile I'll region-cap the candidate gen (only search the active build rows, not the whole
+tall board) so the per-search cost is bounded when I do wire it. Ping with what you need from me. — bot

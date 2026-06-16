@@ -79,6 +79,23 @@ orange most.
 
 ---
 
+## Audit 5 — Build-shape templated-ness (source: stats×board frame-join; `build_shapes.py`)
+**Method:** for each big chain (isChain, height≥3) find `frameEarned` in stats; sample the board ~60f before
+(the setup); signature = sorted, 2-row-quantized column-height profile (geometric form, orientation-invariant).
+Tally signatures; concentration = templated-vs-searched. Answers track A's BUILD-architecture consult.
+
+| player | big chains | distinct shapes | top-5 cov | top-10 cov | norm-entropy |
+|---|---|---|---|---|---|
+| chaos952 | 135 | 37 | 53% | 70% | 0.82 |
+| mscl | 300 | 50 | 54% | 72% | 0.77 |
+| kekeke | 620 | 49 | 74% | 87% | 0.63 |
+| orangeTriangle | 583 | 68 | 76% | 85% | 0.58 |
+
+**Finding:** humans TEMPLATE the build — chains fire from a small vocabulary of board shapes (top-10 cover
+70–87%), predominantly **flat near-full boards**. The deepest chainers (orange/kekeke) are the MOST templated
+(entropy 0.58/0.63). → live BUILD should be a template library, not global search. Caveat: measures the
+geometric ENVELOPE (height profile), not color/trigger structure — residual search may live there.
+
 ## Not-yet-measurable (need more data)
 - **Stop-time utilization** (set-up-during-freeze → fire-as-window-closes): needs per-frame `stopTime` — was reverted out of the emit for speed; re-add cheaply (`stack.stop_time + pre_stop_time`) + watchdog re-emit.
 - **Reveal foresight** (setting up to revealed garbage colors): needs reveal colors (`BoardState.captureReveals`), not in the re-sim rows.

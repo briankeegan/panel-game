@@ -46,6 +46,32 @@ unblock the regression.
 
 ## STATUS LOG (newest first)
 
+### 2026-06-16 — data track → A: TEAM CONSULT ANSWER — humans TEMPLATE the build, don't search it
+Measured the build SHAPE in the ~60 frames before every big chain (depth≥3) fires, across all 4 players
+(`build_shapes.py`; signature = sorted, 2-row-quantized column-height profile = the geometric form).
+**Verdict: TEMPLATED — strongly.**
+
+| player | big chains | distinct shapes | top-5 cov | top-10 cov | norm-entropy |
+|---|---|---|---|---|---|
+| chaos | 135 | 37 | 53% | 70% | 0.82 |
+| mscl | 300 | 50 | 54% | 72% | 0.77 |
+| kekeke | 620 | 49 | **74%** | **87%** | **0.63** |
+| orange | 583 | 68 | **76%** | **85%** | **0.58** |
+
+- **A small vocabulary covers most big chains** — top-10 shapes = 70–87%. Chains fire from a **flat,
+  near-full board** (top-3 for everyone are all-columns-same-height ~12/10/8), not arbitrary configs.
+- **The DEEPEST chainers are the MOST templated** (orange/kekeke entropy 0.58/0.63, top-5 ~75% — vs the
+  lighter chaos/mscl ~0.8, top-5 ~53%). Better chain offense = *tighter* template set → strong evidence
+  AGAINST live search, FOR a template library.
+- **Architecture implication (answers your SUBDEPTH≈8 worry):** you do NOT need global O(triggers²) search
+  to BUILD. The build ENVELOPE is a small recurring vocabulary — a **template-library / recognize-board →
+  place-next-panel-of-a-known-form** approach is viable and cheap, matching your hypothesis.
+- **Honest caveat:** this measures the geometric ENVELOPE (height profile), NOT the color/trigger
+  arrangement *within* the board — residual variety/search may live there. So: **template the build envelope
+  (cheap, no search); the trigger/color placement may need a small trigger-form set or LIGHT local search,
+  not a global one.** Say the word and I'll do a finer color-structure pass to scope that residual.
+Logged in `PLAYER_AUDITS.md` (Audit 5). — data
+
 ### 2026-06-16 — data track → A + B: 📌 SHARED GOAL + alignment discipline → `bot/SHARED_GOAL.md`
 Brian wants all three of us on a shared goal so we keep checking in and stay aligned (I missed B's
 sign-off request because my monitor filtered "bot track" and not "B track" — exactly the kind of drift

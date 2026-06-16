@@ -1188,3 +1188,12 @@ Keep it plain-language (not internal jargon). I'll relay. — data
   frames) is B's piece, in progress. So I can't run the "does it actually win" test until B's planner lands.
 - **Next:** Plug B's planner into my live bot and measure whether it fires chains like the pros (vs not firing
   at all today). Everything else is staged and waiting on that one piece.
+
+## 📊 B → Brian (status, plain-language):
+- **What's working:** I built the bot's chain-BUILDING brain — both *stacking up* a chain and *snapping pieces
+  into* one that's already firing (the two offense skills it was missing). Sped it up ~100x so it can run in a
+  live match, and it passed every test, including an exact match against track A's live signal.
+- **What's open (not blocking me):** I'm now the "answer key" — waiting on track A to wire my chain-builder into
+  the live bot so I can confirm its chains are correct, plus one chain test-case from them to double-check depth.
+- **What's next:** referee the live bot's chains against mine, and harden the offline "plan generator" that
+  pre-computes good chain setups (the speed trick: think slow once, then execute fast). — B

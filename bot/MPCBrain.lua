@@ -89,8 +89,9 @@ function MPCBrain:leafScore(g, rows, chain, total, firstClear)
   -- the real engine (novice_chains 1/4→3/4, 11-swap builds); we get the same signal at BoardSim
   -- speed (measured ~1000x under frame budget). bestCombo lightly valued (combo breadth).
   if cfg.wBuild ~= 0 then
-    local bestChain, _, bestCombo = BoardSim.chainPotential(g, rows, top)
-    s = s + bestChain * cfg.wBuild + bestCombo * (cfg.wBuild * 0.25)
+    -- B's PROVEN signal = MOST PANELS a single trigger removes (bestClear), not chain depth.
+    local _, _, _, _, bestClear = BoardSim.chainPotential(g, rows, top)
+    s = s + bestClear * cfg.wBuild
   end
   return s
 end

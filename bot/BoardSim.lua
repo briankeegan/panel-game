@@ -591,8 +591,13 @@ end
 -- also returns bestDig = most garbage a single follow-up swap could break, so the
 -- eval can value SETTING UP a dig (a match landing next to garbage), not just one
 -- that's already available.
+-- bestClear (5th) = the MOST PANELS any single trigger swap removes (whole cascade),
+-- independent of chain depth — this is B's PROVEN chain-POTENTIAL signal (solveBuild:
+-- "biggest single-swap clear available", panels removed = base - settled). It's the
+-- smooth magnitude the BUILD beam climbs (a board one swap from a big cascade scores
+-- high though it's cleared nothing); finer-grained than the small-int chain depth.
 function BoardSim.chainPotential(grid, rows, top)
-  local bestChain, bestTotal, bestCombo, bestDig = 0, 0, 0, 0
+  local bestChain, bestTotal, bestCombo, bestDig, bestClear = 0, 0, 0, 0, 0
   for r = 1, top do
     for c = 1, WIDTH - 1 do
       local a, b = grid[r][c], grid[r][c + 1]
@@ -601,12 +606,13 @@ function BoardSim.chainPotential(grid, rows, top)
         if total > 0 and (chain > bestChain or (chain == bestChain and total > bestTotal)) then
           bestChain, bestTotal = chain, total
         end
+        if total > bestClear then bestClear = total end
         if firstClear > bestCombo then bestCombo = firstClear end
         if gbCleared > bestDig then bestDig = gbCleared end
       end
     end
   end
-  return bestChain, bestTotal, bestCombo, bestDig
+  return bestChain, bestTotal, bestCombo, bestDig, bestClear
 end
 
 return BoardSim

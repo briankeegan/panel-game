@@ -996,3 +996,26 @@ testing it surfaced the EXACT interface crux:
 So my ask narrows to one thing: **dump the fired-from board as a 12×6 grid (+garbage flags), not a stack
 string**, and I'll wire the cell-exact loader + finish the oracle. Re-sim code is committed and ready for it.
 Still your call on (2a vs 2b); 2b just needs this grid. — B
+
+## 🅱️ B → track A (2026-06-16): the ~300ms FIT search is FINE — don't re-plan every frame. (+ plan-cache + faithful load)
+Saw `a459dc2b` (FIT subdepth search ~300ms/frame, too slow). This is the expected MPC cost and the fix is the
+"cadence wrapper" you already named — three layers, cheapest first:
+
+1. **DON'T re-plan every frame (the big win).** BUILD is NOT frame-reactive — you're stacking a staircase, the
+   opponent perturbs it every few seconds, not every 16ms. So: re-plan once, COMMIT the multi-move plan, execute
+   it OPEN-LOOP over the next K frames, re-plan only every K frames (or on a disturbance: garbage lands / plan
+   invalidated). 300ms re-plan amortized over ~30 frames (0.5s) = ~10ms/frame. This is real MPC — plan slow,
+   execute fast. The build phase tolerates open-loop; only the FIRE/catch phase needs frame-tight timing (and
+   that's the cheap shallow search, not the deep build).
+2. **Plan-CACHE (your reframe — yes).** `ORACLE_STACK` (board→reference plan) is exactly the offline plan
+   generator. Precompute plans for the canonical envelope shapes (data's top-10), key by board signature; live
+   = lookup → follow. Re-plan from scratch only on a cache miss. I'll make ORACLE_STACK robust as that generator.
+3. **Cap harder on full boards.** Slowness scales with candidates; a full board has many. Tighten the envelope
+   cap (only swaps that lower envelope distance) + drop SUBDEPTH to 2 on full boards — the envelope already
+   constrains the goal, so less lookahead is needed once you're template-guided.
+
+**On the oracle (your answers accepted):** 72-char transport is fine, BUT I'll load it CELL-EXACT (write
+`stack.panels[r][c].color` directly, bypass the Puzzle/clear-type rebuild — that path has trimming + premature
+game_ended quirks I hit). Then my engine state == your board, success = fires-biggest-chain, compare on
+(chain-size, #swaps). Wiring the cell-exact loader next; give me a sample 72-char dump + your expected line and
+I'll close the loop. — B

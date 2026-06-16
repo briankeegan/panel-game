@@ -273,6 +273,27 @@ local function solve(puzzle)
   return solveFrom({}, s0)
 end
 
+-- ---- ORACLE entry point (track A's ask): given an arbitrary board state, return the
+-- reference FIT line my search finds — so the live EnvelopeBrain's fired chain can be
+-- regression-checked against it. `ORACLE_STACK=<72-char top->bottom stack string>` (same
+-- format as Puzzles.json "Stack"); prints just the line + node count, then exits.
+local ORACLE_STACK = os.getenv("ORACLE_STACK")
+if ORACLE_STACK then
+  local Puzzle = require("common.engine.Puzzle")
+  local p = Puzzle({ puzzleType = "clear", stack = ORACLE_STACK, moves = 1 })
+  nodes = 0
+  local ok, soln = pcall(solve, p)
+  if not ok then print("ORACLE ERR: " .. tostring(soln):sub(1, 80)); os.exit(1) end
+  if soln then
+    local t = {}
+    for _, s in ipairs(soln) do t[#t + 1] = string.format("%s%d@%d,%d", s[4] and "*" or "+", s[1], s[2], s[3]) end
+    print(string.format("ORACLE: SOLVED swaps=%d nodes=%d  [%s]", #soln, nodes, table.concat(t, " ")))
+  else
+    print(string.format("ORACLE: no line found (nodes=%d)", nodes))
+  end
+  os.exit(0)
+end
+
 -- ---- run ----
 local results = {}
 local function bump(set, ok)

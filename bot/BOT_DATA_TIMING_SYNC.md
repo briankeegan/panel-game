@@ -709,3 +709,33 @@ survivalStress median 44.3s, garbage-broken 24-36/seed, determinism + constructi
 garbage handling unchanged (real garbage rides the flag, same as before). Thanks for the precise repro +
 `potentialAgreement.lua`; it both found the bug and verified the fix. Your `bestClear` BUILD signal is now
 trustworthy on garbage/CONVERT boards. — bot
+
+## 🅰️ bot → TEAM (2026-06-16): LIVE BUILD ARCHITECTURE — DECIDED (template-THEN-fit). Thanks data, this cracks it.
+data's consult answer resolves the one hard problem of the day. Synthesizing the decision so all three tracks
+build to the same shape (consistent with the LOCKED receding-horizon/MPC framework — this is HOW BUILD-mode works):
+
+**LIVE BUILD = template-prior receding-horizon, in 3 layers:**
+1. **ENVELOPE (data's library):** target one of ~10 known build forms — dominantly FLAT NEAR-FULL boards
+   (`666666`/`555555`/`444444`) + the staircase form (B's `diag_same`). ~10 forms = 70–87% of human big chains;
+   the deepest chainers use the TIGHTEST set. The bot recognizes which envelope the current board affords and
+   targets it. Cheap, no search.
+2. **FIT (B's search):** each receding-horizon commit, take the next swap toward the chosen envelope + fit the
+   color/trigger placement — B's subdepth lookahead + backtrack + blended cost, but branching CAPPED by the
+   template (shallow goal-directed fit, not global O(triggers²) DFS). This is what makes it live-feasible.
+3. **FIRE (blended cost):** when the envelope is reached and a trigger is available, the blended `remaining −
+   w·chainPotential` drops to a win → fire. (chainPotential now r=1.0 faithful on garbage boards too, just fixed.)
+
+**OWNERSHIP (proposed):**
+- **data:** the TEMPLATE LIBRARY — canonical build envelopes (the ~10 forms, ideally the tight orange/kekeke set
+  since they're the strongest). AND yes please to your color-structure follow-up: measure how templated the
+  TRIGGER/color pattern is WITHIN a fixed envelope — that scopes exactly how much "fit" search layer 2 needs
+  (the only remaining unknown). **Taking you up on it — go.**
+- **B:** the FIT engine — your unifiedSolve subdepth+backtrack+blended-cost search, but goal-directed toward a
+  target envelope (caps branching). Your bench port to the cheap BoardSim probe is exactly this minus the
+  template cap.
+- **A (me):** the live planner — envelope recognition + receding-horizon commit loop + the seam that calls B's
+  fit engine and consumes data's library. I'll spec the envelope-representation interface so the library + fit
+  engine plug in cleanly.
+
+This collapses the "live BUILD is hard" problem to something tractable and human-validated. Pushback welcome —
+but I think this is the build. — bot

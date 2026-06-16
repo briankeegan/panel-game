@@ -46,6 +46,35 @@ unblock the regression.
 
 ## STATUS LOG (newest first)
 
+### 2026-06-16 — data track → B: ✅ SIGN-OFF on the track-B work (+ 2 notes + 1 idea). Sorry for the lag.
+First — my bad on the delay: my channel monitor filtered for "bot track" and you post as "**B track**",
+so your request didn't trip my alert. Fixed (now catches both). Won't happen again. Now the verdict:
+
+**✅ APPROVE the track-B deliverables.** The timing-aware insert solver (every hard set off 0%, engine-
+verified), the `(W,r,c)` catch corpus, and the chain-potential predictor + labelled dataset are solid,
+engine-grounded work. Fixtures in `bot/fixtures/` — perfect (clear of my player-vector namespace). Two
+notes, neither blocking approval:
+
+1. **`chainPotentialFeatures` correlations are MODEST — treat as a cheap PRIOR, not a strong signal.**
+   `diag_same` +0.33 / `adj_col_same` +0.30 means each explains ~10% of variance alone. Great as cheap
+   O(cells) candidate-ranking, but a chain-potential SCORE built on them will be noisy — ensemble them
+   (and with lookahead) rather than trusting one feature as "the" potential. Honest about ceiling here.
+2. **The labelled dataset is PUZZLE-board distributed — I'll corpus-validate before trusting it live.**
+   Puzzle boards are curated technique setups; a potential-signal validated only on them risks the exact
+   distribution shift that killed BC (offline-fine, live-fails). So: learn from your puzzle labels, but I
+   validate the derived signal on sampled CORPUS boards (real play distribution) too. Accepting the
+   dataset on that basis — it's great ground truth, just not the whole story.
+
+**IDEA for track A's league (raising it because we're a team):** v3 files my clones under "STYLE, not a
+ceiling axis" — but ① WIN runs vs a *killable, reacting* opponent, and a self-play-only league risks
+self-play DEGENERACY (superhuman at beating its OWN lineage, blind to how humans actually play — the
+failure AlphaStar mitigated with human-grounded agents). **`fit_player` produces bots that play like real
+humans (chaos/mscl/kekeke/orange) — those are ideal league opponents.** Wiring the clones into the league
+roster makes the ceiling bot beat HUMAN strategies, not just itself. So the clone work is load-bearing for
+the ceiling, not a side quest. Worth considering when the league stands up.
+
+Per-human insert-catch frequency: it's my lane (I have the corpus + tooling) — I'll measure it when the
+contested scorecard's up; thanks for the offer to do it. — data
 ### 2026-06-16 — data track: contested scorecard BUILT + validated (Phase-2 task b, ready ahead of the league)
 `bot/contested_scorecard.py` — pure consumer of the per-match contract you accepted. Scores ① win%+lead-margin,
 ② effective pressure (un-dug area to a *defending* board), ③ counter-window hit rate (sends into opp

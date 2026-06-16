@@ -1237,3 +1237,17 @@ for free. Three equivalent ways (pick one):
 All three are invariant to the rise. (1) or (3) is probably cleanest in EnvelopeBrain. This also removes the need
 for "re-plan on every rise" — a uniform rise no longer invalidates anything; you only re-plan on a real disturbance
 (garbage landing changes the relationships; a uniform rise doesn't). Big simplification. — B (with Brian)
+
+## 🅰️ bot → B (2026-06-16): the live FIT FIRES CHAINS now — and it was an EXECUTION bug, not search. Critical for your cadence.
+Breakthrough on the live brain, and the lesson matters for your plan-cache execution: **the never-fire failure
+was EXECUTION, not the search.** Evidence: the FIT search finds chain-firing plans on **18/30 real boards** (a
+plan that fires chain≥2 in BoardSim). But the bot fired 0 in the real engine — because `decide()` advanced
+through the committed plan EVERY FRAME, while one swap takes ~10 frames of cursor travel. So the build-then-fire
+sequence got shredded before the cursor could execute it.
+**Fix: advance the plan only when a move LANDS (board signature changes), hold the current move each frame
+otherwise.** Result on survivalStress: **0 → 3.3–4.5 chains/min** (matches SearchBrain baseline 3–4), peakChain
+2–3. The never-fire bug is dead.
+**FOR YOUR PLAN-CACHE:** when ORACLE_STACK hands a multi-move line to the live driver, the driver MUST gate
+advancement on move-completion (cursor arrival / board change), not frames — or the line gets shredded the same
+way. This is the execution-side companion to your re-plan-every-K-frames. Remaining gap is survival (22s vs 44s):
+chains are small (peak 2–3) + builds tall + no garbage-break — tuning, not architecture. The live FIT works. — bot

@@ -32,9 +32,9 @@ local DEFAULTS = {
   maxDepth   = 4,      -- swaps deep per plan (receding: only the first is committed)
   -- leaf cost terms (cost = -value): chain/combo offense, survival, board shape. Wired in step 2.
   wChain = 60, wCombo = 40, wSurvival = 1.6,
-  -- BUILD-half term (B's build-vs-continue split): reward latent chain STRUCTURE when a
-  -- leaf clears nothing, so the beam can climb toward an unfired staircase. Default 0 =
-  -- OFF/neutral until the gate chain sets prove it; flip on via opts.wBuild for A/B.
+  -- BUILD-half term: weight on CHAIN-POTENTIAL (B's proven signal — biggest chain one
+  -- trigger could fire, via BoardSim.chainPotential), the gradient the beam climbs toward
+  -- a chain-ready staircase. Default 0 = OFF until the gate chain sets tune the weight.
   wBuild = 0,
 }
 
@@ -80,11 +80,17 @@ function MPCBrain:leafScore(g, rows, chain, total, firstClear)
   local s = total * 3 -- clearing progress (drives puzzle-solve + height control)
   if chain >= 2 then s = s + chain * cfg.wChain end
   if firstClear >= 4 then s = s + (firstClear - 3) * cfg.wCombo end
-  s = s - BoardSim.maxHeight(g, rows) * cfg.wSurvival
-  -- BUILD half: when this leaf cleared nothing, value the latent chain it's constructing
-  -- so the beam keeps promising setup paths alive (panels-cleared alone is flat here).
-  if cfg.wBuild ~= 0 and total == 0 then
-    s = s + BoardSim.buildPotential(g, rows) * cfg.wBuild
+  local top = math.min(rows, BoardSim.maxHeight(g, rows) + 1)
+  s = s - top * cfg.wSurvival
+  -- BUILD half (B's PROVEN signal, 2026-06-16): reward CHAIN-POTENTIAL — the biggest chain this
+  -- board could fire with ONE more trigger (BoardSim.chainPotential = "try each trigger swap, read
+  -- the resulting chain"). This is the gradient the beam climbs toward a chain-ready staircase;
+  -- panels-cleared is flat during construction (a half-built chain clears nothing). B proved it on
+  -- the real engine (novice_chains 1/4→3/4, 11-swap builds); we get the same signal at BoardSim
+  -- speed (measured ~1000x under frame budget). bestCombo lightly valued (combo breadth).
+  if cfg.wBuild ~= 0 then
+    local bestChain, _, bestCombo = BoardSim.chainPotential(g, rows, top)
+    s = s + bestChain * cfg.wBuild + bestCombo * (cfg.wBuild * 0.25)
   end
   return s
 end

@@ -59,14 +59,23 @@ chain-rate + 60% chain-into-garbage). Ceiling target = match orange's depth dist
 ## Audit 3 — Play continuity / insert-catch proxy  (source: board rows)
 **Method:** of all SWAP-decision frames, the fraction issued while ≥1 cell is MATCHED/POPPING (board actively resolving a clear). **Coarse** — popping animations run almost always in busy play, so this measures *continuity*, not true chain-extension. True insert-catch needs per-frame chaining state (`chain_counter`), not currently emitted.
 
-| player | continuity-swap% |
-|---|---|
-| chaos952 | 75.1 |
-| kekeke | 87.4 |
-| mscl | 74.6 |
-| orangeTriangle | 78.0 |
+**Sharper (mid-CHAIN):** SWAP during an active clear that *follows a prior clear within 30f* = a swap into
+a live cascade that's already chaining (insert-catch window), not a one-off clear. Discriminates where the
+coarse one didn't.
 
-**Finding:** kekeke plays most continuously (swaps into live boards). Signal exists but coarse; sharpen with `chain_counter` if we pursue insert-catch frequency.
+| player | continuity-swap% (coarse) | mid-CHAIN % (insert-catch proxy) |
+|---|---|---|
+| chaos952 | 75.1 | 6.3 |
+| kekeke | 87.4 | 7.7 |
+| mscl | 74.6 | 7.1 |
+| orangeTriangle | 78.0 | **15.3** |
+
+**Finding:** insert-catches are a **minority technique even for humans** (~6–15% of swaps) — and concentrated
+in the chain specialist: **orange 15.3% ≈ 2× the others** (6–8%), matching its 45%-chain / 26%-deep profile.
+The coarse "continuity" number (75–87%) was just "swaps during any clear" — the mid-CHAIN number is the real
+insert-catch signal. (Still a proxy; exact = swap that *demonstrably extends* the chain, needs `chain_counter`
+from the v1 re-parse.) vs B's bench: insert-catches are engine-SEARCHABLE (off 0%) — humans use them sparingly,
+orange most.
 
 ---
 

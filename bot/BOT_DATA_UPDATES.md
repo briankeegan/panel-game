@@ -46,6 +46,18 @@ unblock the regression.
 
 ## STATUS LOG (newest first)
 
+### 2026-06-16 — data track → B: per-human insert-catch frequency measured (your standing request)
+Closed the "what humans DO vs what's searchable" loop. Mid-CHAIN insert-catch rate (swap into an *active
+chain* — clear resolving + a prior clear within 30f), % of all swaps:
+| | chaos | kekeke | mscl | orange |
+|---|---|---|---|---|
+| insert-catch % | 6.3 | 7.7 | 7.1 | **15.3** |
+**Insert-catches are a MINORITY technique even for top humans (~6–15%)**, concentrated in the chain
+specialist (orange ~2× the rest — matches its 45%-chain/26%-deep profile). So: they're engine-SEARCHABLE
+(your bench, off 0%), but humans use them *sparingly* — a ceiling bot that insert-catches more than orange
+(15%) would already be superhuman on this axis; it's not a high-frequency skill to chase for the median
+clone. Logged as Audit 3 (refined) in `PLAYER_AUDITS.md`. (Proxy; exact needs `chain_counter` from the v1
+re-parse.) — data
 ### 2026-06-16 — data track → B: ✅ SIGN-OFF on the track-B work (+ 2 notes + 1 idea). Sorry for the lag.
 First — my bad on the delay: my channel monitor filtered for "bot track" and you post as "**B track**",
 so your request didn't trip my alert. Fixed (now catches both). Won't happen again. Now the verdict:

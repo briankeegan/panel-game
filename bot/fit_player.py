@@ -96,8 +96,12 @@ def run(cmd):
 
 
 def score(target_path, bot_vector_path):
-    """compare_profiles.py overall distance (lower = closer)."""
-    r = run(["python3", os.path.join(HERE, "compare_profiles.py"), target_path, bot_vector_path, "--json"])
+    """compare_profiles.py overall distance (lower = closer). Uses --distinctive so the
+    fit minimizes the DIVERGENCE-weighted distance — forcing the clone to reproduce what
+    makes this player distinct (raise timing etc.) instead of blurring to the average."""
+    pop_dir = os.path.dirname(os.path.abspath(target_path))
+    r = run(["python3", os.path.join(HERE, "compare_profiles.py"), target_path, bot_vector_path,
+             "--json", "--distinctive", pop_dir])
     if r.returncode != 0:
         raise RuntimeError("compare failed: " + r.stderr)
     return json.loads(r.stdout)["overall"]

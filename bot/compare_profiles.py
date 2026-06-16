@@ -11,11 +11,42 @@ are occupancy-weighted by the HUMAN (matching where the player actually spends t
 
 Usage: compare_profiles.py <human_targets.json> <bot_targets.json> [--json]
 """
-import sys, json
+import sys, json, glob, os, statistics
 
 EPS = 1e-9
 WEIGHTS = {"offense": 0.35, "priority": 0.35, "activity": 0.15, "survival": 0.15}
 PRIORITY_METRICS = ["swap", "raise", "clearStart_per1k", "dig_per1k"]
+
+# Optional per-(bucket,metric) divergence weights, set by --distinctive. When present,
+# priority_dist weights each metric by how much players DIVERGE on it (cross-player CoV)
+# instead of by occupancy — so the distance rewards reproducing what makes THIS player
+# distinct, not matching the high-traffic cells where everyone behaves the same (the §26
+# collapse that makes occupancy-weighted clones blur toward the average).
+DIVERGENCE = None
+
+
+def load_divergence(dirpath):
+    """Cross-player coefficient-of-variation per (bucket, metric) over the population of
+    fit_targets vectors in dirpath. High CoV = discriminating dim → high fit weight."""
+    profs = []
+    for f in sorted(glob.glob(os.path.join(dirpath, "*.json"))):
+        try:
+            d = json.load(open(f))
+            if "board" in d and "buckets" in d["board"]:
+                profs.append(d)
+        except Exception:
+            pass
+    common = set.intersection(*[set(p["board"]["buckets"]) for p in profs]) if profs else set()
+    div = {}
+    for bk in common:
+        div[bk] = {}
+        for m in PRIORITY_METRICS:
+            xs = [p["board"]["buckets"][bk][m] for p in profs if p["board"]["buckets"][bk].get(m) is not None]
+            if len(xs) >= 2 and abs(statistics.mean(xs)) > 1e-9:
+                div[bk][m] = statistics.pstdev(xs) / abs(statistics.mean(xs))
+            else:
+                div[bk][m] = 0.0
+    return div
 
 
 def relerr(a, b):
@@ -46,19 +77,26 @@ def offense_dist(h, b):
 
 
 def priority_dist(h, b):
-    """Occupancy-weighted (human) mean relerr over shared buckets/metrics."""
+    """Weighted mean relerr over shared buckets/metrics. Per-(bucket,metric) weight is
+    cross-player DIVERGENCE when --distinctive is set (rewards reproducing what's distinct),
+    else the bucket's occupancy (time-weighted, the default — blurs clones together)."""
     hb, bb = h.get("buckets", {}), b.get("buckets", {})
     shared = [k for k in hb if k in bb]
     missing = [k for k in hb if k not in bb]
     num = den = 0.0
     per_bucket = {}
     for k in shared:
-        w = hb[k]["occupancy"]
-        errs = [relerr(hb[k][m], bb[k][m]) for m in PRIORITY_METRICS]
-        errs = [e for e in errs if e is not None]
-        bmean = sum(errs) / len(errs) if errs else 0
-        per_bucket[k] = round(bmean, 3)
-        num += w * bmean; den += w
+        occ = hb[k]["occupancy"]
+        bnum = bden = 0.0
+        for m in PRIORITY_METRICS:
+            e = relerr(hb[k][m], bb[k][m])
+            if e is None:
+                continue
+            w = DIVERGENCE.get(k, {}).get(m, 0.0) if DIVERGENCE else occ
+            bnum += w * e; bden += w
+        if bden:
+            per_bucket[k] = round(bnum / bden, 3)
+            num += bnum; den += bden
     return (num / den if den else None), per_bucket, missing
 
 
@@ -76,12 +114,15 @@ def survival_dist(h, b):
 # faithful AND distinct; at/above the floor it's as far from its target as a different
 # player is (the §26 collapse). Re-derive with `--matrix` if the corpus changes.
 FLOOR = 0.095
+DISTINCTIVE_FLOOR = 0.161  # measured player-to-player floor under divergence weighting
 
 
 def verdict(d):
-    return ("EXCELLENT — indistinguishable from target" if d < 0.03
-            else "GOOD clone" if d < 0.05
-            else "FAIR — recognizable but blurs toward other players" if d < FLOOR
+    floor = DISTINCTIVE_FLOOR if DIVERGENCE else FLOOR
+    lo, mid = floor * 0.32, floor * 0.53  # scale bands to the active floor
+    return ("EXCELLENT — indistinguishable from target" if d < lo
+            else "GOOD clone" if d < mid
+            else "FAIR — recognizable but blurs toward other players" if d < floor
             else "POOR — as far from target as a different player (collapsed)")
 
 
@@ -121,6 +162,9 @@ def matrix_mode(dirpath):
 
 
 def main():
+    global DIVERGENCE
+    if "--distinctive" in sys.argv:
+        DIVERGENCE = load_divergence(sys.argv[sys.argv.index("--distinctive") + 1])
     if "--matrix" in sys.argv:
         matrix_mode(sys.argv[sys.argv.index("--matrix") + 1])
         return

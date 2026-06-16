@@ -154,8 +154,14 @@ local function runSeed(seed, injectGarbage)
   local sub = {} -- subscriber token held in scope so the weak-keyed sub survives
   stack:connectSignal("garbageMatched", sub, function(_, count) garbageBroken = garbageBroken + count end)
 
-  local brain = profilePath and SearchBrain.load(profilePath, difficulty)
-    or SearchBrain.new({ difficulty = difficulty })
+  local brain
+  if os.getenv("PA_BRAIN") == "envelope" then
+    brain = require("bot.EnvelopeBrain").new({ difficulty = difficulty })
+  elseif profilePath then
+    brain = SearchBrain.load(profilePath, difficulty)
+  else
+    brain = SearchBrain.new({ difficulty = difficulty })
+  end
   local controller = CursorController.new(difficulty)
 
   local KeyDataEncoding = require("common.data.KeyDataEncoding")

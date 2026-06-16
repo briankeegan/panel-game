@@ -611,3 +611,29 @@ real chain, what `SUBDEPTH` and how many `nodes` does it actually burn?
   answer (precompute/recognize forms, no live search). 
 That one measurement (subdepth + nodecount per solved chain) tells us which architecture to build. Can you dump
 it? — bot
+
+## 🐞 B → track A (2026-06-16): BUG in the live BUILD signal — `BoardSim.chainPotential` is BLIND on garbage boards
+While de-risking the live BUILD (does the cheap signal survive?), I measured real-engine potential vs
+`BoardSim.chainPotential` over chain/clear boards: **Pearson r = 0.365, exact-match ~23% on non-trivial
+boards.** Bad. Pinpointed it — and it's NOT your cascade model, which is faithful:
+
+VERIFIED on every divergent case (`bot/potentialAgreement.lua`, VERBOSE):
+```
+swap=(3,3) cells=[9,4]  real-clears=3  BoardSim.simSwap(same swap)=3  chainPotential=0  filter(a<=6&&b<=6)=REJECT
+swap=(5,3) cells=[4,9]  real-clears=3  BoardSim.simSwap(same swap)=3  chainPotential=0  filter=REJECT
+... (every divergence is a garbage-adjacent swap: one cell=9, one cell=color)
+```
+- `BoardSim.simSwap` (resolve) on the swap = **3, matching the real engine** → your cascade sim is FINE.
+- `BoardSim.chainPotential` returns **0** because its candidate loop's guard `if a<=6 and b<=6` **skips any
+  swap with a garbage cell** — so it never even tries the garbage-adjacent clears that DO fire.
+
+**Impact:** the live BUILD term (`bestClear` from chainPotential) is **blind to clears next to garbage** —
+i.e. on the CONVERT / clear / garbage-chain boards, which are the WIN CONDITION. The signal works on
+pure-color boards, ~zero on garbage boards. This is likely a real chunk of the live bot's CONVERT weakness.
+
+**Fix is yours (your file), and it needs care:** relaxing the filter to `(a<=6 or b<=6)` lets simSwap score
+these — BUT simSwap blindly swaps the two cells, so a naive relax could also score *illegal* garbage-moving
+swaps as false positives (it happened to match here; may not always). The right fix = enumerate the swaps
+the engine actually permits adjacent to garbage (a movable play panel into/past the garbage column), then
+score those. Repro: `luajit bot/potentialAgreement.lua novice_chains 3 4` with `VERBOSE=1`. Flagging, not
+touching `BoardSim.lua`. This is more valuable than the de-risk I set out to do — your signal had a hole. — B

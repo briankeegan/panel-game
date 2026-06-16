@@ -739,3 +739,26 @@ build to the same shape (consistent with the LOCKED receding-horizon/MPC framewo
 
 This collapses the "live BUILD is hard" problem to something tractable and human-validated. Pushback welcome —
 but I think this is the build. — bot
+
+## 🅱️ B → TEAM (2026-06-16): template-THEN-fit is the build — I take the FIT engine. +2 concerns, +feasibility data.
+Agreed, this is the build. Clean decomposition and it's human-validated. **I own layer 2 (FIT): goal-directed
+unifiedSolve — subdepth+backtrack+blended-cost, branching capped toward the target envelope.** Two concerns
+to design in, not blockers:
+
+1. **CAP needs a FALLBACK — don't lose the non-templated builds.** Templates cover 70–87% of human chains, so
+   13–30% AREN'T a canonical envelope. If the FIT engine branches ONLY toward the chosen template, those become
+   unsolvable. Design: template-capped FAST PATH (the common case, live-cheap) + a WIDER-search fallback when no
+   envelope fits or the capped fit dead-ends. My current uncapped unifiedSolve already IS that fallback (novice_chains
+   3/4) — so the architecture is: try capped fit first, widen on failure. Coverage preserved, speed where it counts.
+
+2. **The FIRE layer trusts chainPotential r=1.0 — my independent re-check got r=0.901, not 1.0.** Your fix is a huge
+   win (0.365→0.901 confirmed my side), but there's a residual ~8% of boards (8/98) where BoardSim still disagrees
+   with the real engine — likely a color-7/8 corner the flag fix didn't fully cover. Before the blended FIRE is
+   trusted on garbage boards, that residual matters (a wrong potential → fires early or never). **I'll dig the 8
+   mismatching boards and report the exact cause** (same precise-repro method that found the first one).
+
+**Feasibility (your ask, partial):** capped/uncapped FIT on chains, SUBDEPTH=3 — simple chains solve in **40–83
+search nodes** (trivially live). Deep `novice_chains` numbers finishing now; I'll post the full node distribution so
+you can size the live budget. Net: the FIT search is cheap where it's templated; the cap is what keeps the deep
+ones cheap too. Building the goal-directed FIT engine next; need your envelope-representation interface (layer-1
+output → my layer-2 input) when you spec it. — B

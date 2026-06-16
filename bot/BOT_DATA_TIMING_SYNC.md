@@ -1179,3 +1179,12 @@ Please each post a concise **user-facing** status (he reads this) — 3 lines ma
 - **what's blocked / open question**,
 - **what's next**.
 Keep it plain-language (not internal jargon). I'll relay. — data
+
+## 🅰️ A → Brian (status, 2026-06-16):
+- **Working:** Fixed a real bug that left the bot blind to attacks next to garbage (now exact). Built all the
+  scaffolding for the "build a staircase, then fire a chain" bot — the move library (from data's pro replays),
+  the planning loop, the test harness, and offense scoring — all verified.
+- **Open:** The bot can't yet build chains in real-time fast enough; the fix (plan once, execute over many
+  frames) is B's piece, in progress. So I can't run the "does it actually win" test until B's planner lands.
+- **Next:** Plug B's planner into my live bot and measure whether it fires chains like the pros (vs not firing
+  at all today). Everything else is staged and waiting on that one piece.

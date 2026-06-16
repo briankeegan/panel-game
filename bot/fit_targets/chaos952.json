@@ -4,81 +4,84 @@
   "board": {
     "buckets": {
       "low|noIn|noGb": {
-        "occupancy": 0.0916,
-        "swap": 9.65,
-        "raise": 14.73,
-        "clearStart_per1k": 1.46,
-        "dig_per1k": 1.56
+        "occupancy": 0.0989,
+        "swap": 10.69,
+        "raise": 14.87,
+        "clearStart_per1k": 1.41,
+        "dig_per1k": 2.61
       },
       "mid|noIn|noGb": {
-        "occupancy": 0.1017,
-        "swap": 21.97,
-        "raise": 9.44,
-        "clearStart_per1k": 7.05,
-        "dig_per1k": 16.31
+        "occupancy": 0.1134,
+        "swap": 21.74,
+        "raise": 11.99,
+        "clearStart_per1k": 7.98,
+        "dig_per1k": 19.4
       },
       "mid|in|noGb": {
-        "occupancy": 0.0288,
-        "swap": 22.61,
-        "raise": 0.79,
-        "clearStart_per1k": 5.84,
-        "dig_per1k": 31.75
+        "occupancy": 0.0359,
+        "swap": 20.5,
+        "raise": 0.1,
+        "clearStart_per1k": 6.74,
+        "dig_per1k": 18.17
       },
       "high|in|gb": {
-        "occupancy": 0.3393,
-        "swap": 20.83,
-        "raise": 0.04,
-        "clearStart_per1k": 4.98,
-        "dig_per1k": 28.05
+        "occupancy": 0.2991,
+        "swap": 22.08,
+        "raise": 0.02,
+        "clearStart_per1k": 5.25,
+        "dig_per1k": 27.85
       },
       "mid|in|gb": {
-        "occupancy": 0.2072,
-        "swap": 21.65,
-        "raise": 0.35,
-        "clearStart_per1k": 5.71,
-        "dig_per1k": 20.65
+        "occupancy": 0.2004,
+        "swap": 22.06,
+        "raise": 0.16,
+        "clearStart_per1k": 5.46,
+        "dig_per1k": 19.65
       },
       "mid|noIn|gb": {
-        "occupancy": 0.1392,
-        "swap": 24.73,
-        "raise": 3.65,
-        "clearStart_per1k": 6.24,
-        "dig_per1k": 38.23
+        "occupancy": 0.1504,
+        "swap": 25.63,
+        "raise": 3.36,
+        "clearStart_per1k": 6.4,
+        "dig_per1k": 38.67
       },
       "high|noIn|gb": {
-        "occupancy": 0.0526,
-        "swap": 23.96,
-        "raise": 0.28,
-        "clearStart_per1k": 6.16,
-        "dig_per1k": 34.91
+        "occupancy": 0.0516,
+        "swap": 22.27,
+        "raise": 0.14,
+        "clearStart_per1k": 6.6,
+        "dig_per1k": 28.84
       },
       "low|in|gb": {
-        "occupancy": 0.0128,
-        "swap": 20.72,
-        "raise": 3.62,
-        "clearStart_per1k": 6.1,
-        "dig_per1k": 16.25
+        "occupancy": 0.0144,
+        "swap": 25.09,
+        "raise": 2.56,
+        "clearStart_per1k": 5.69,
+        "dig_per1k": 13.67
       },
       "low|noIn|gb": {
-        "occupancy": 0.011,
-        "swap": 18.37,
-        "raise": 19.19,
-        "clearStart_per1k": 6.65,
-        "dig_per1k": 17.59
+        "occupancy": 0.0175,
+        "swap": 20.03,
+        "raise": 20.59,
+        "clearStart_per1k": 6.31,
+        "dig_per1k": 9.58
       }
     },
-    "swaps_per_clear": 39.19,
-    "height_med": 11,
+    "swaps_per_clear": 38.82,
+    "height_med": 11.0,
     "height_p90": 12,
-    "garbage_on_board_pct": 76.2,
+    "garbage_on_board_pct": 73.3,
     "timing": {
-      "act_imminent_pct": null,
-      "act_calm_pct": 27.93,
-      "anticipation": null,
-      "danger_pct": 39.41,
-      "displacement_mean": 10.853
+      "act_prelanding_pct": 25.52,
+      "act_baseline_pct": 25.28,
+      "anticipation": 0.24,
+      "landings_per_1k": 5.84,
+      "danger_pct": 35.47,
+      "displacement_mean": 10.292,
+      "wait_pct": 74.72,
+      "stoptime_density": 0.0
     },
-    "n_games": 60
+    "n_games": 70
   },
   "offense": {
     "chainPct": 28.1,

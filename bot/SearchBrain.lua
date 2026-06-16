@@ -215,7 +215,11 @@ function SearchBrain:decide(state)
   -- contested matches). 0 = full suppression (robust-hard default); 1 = full offense
   -- even when buried. Only relaxes the buried case; safe play is unchanged.
   local buriedOffense = 0.35 + 0.65 * (cfg.counterPressure or 0)
-  local offenseScale = (buried >= 0) and buriedOffense or 1
+  -- Suppress offense only at/above the TOP band, not the bottom: the bot was firing
+  -- 89% no-offense 3-matches because offense got suppressed the instant it reached the
+  -- BUILD band (maxH>=heightBand[1]), so it height-controlled instead of attacking from
+  -- a built-up board. Keep full offense through the build zone; suppress near top-out.
+  local offenseScale = (maxH >= cfg.heightBand[2]) and buriedOffense or 1
   -- CLOCK AWARENESS (the eval used to ignore the timing it's handed):
   -- riseSoon = a row is about to commit -> treat us as one row more buried.
   -- impending = incoming garbage about to LAND -> lower the board NOW so it lands with

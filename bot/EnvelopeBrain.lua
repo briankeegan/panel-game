@@ -18,6 +18,10 @@ local DEFAULTS = {
   fireClear   = 6,   -- ...or clears >= this many panels (a fat combo)
   dangerFrac  = 0.80, -- board height >= this fraction of rows => emergency: fire/clear to survive
   opportunism = 4,   -- while still building, fire anyway if a swap chains >= this (don't waste a big one)
+  -- FIT search (ports B's subdepth+capped receding-horizon): build a chain over several swaps.
+  subDepth    = tonumber(os.getenv("PA_SUBDEPTH")) or 2, -- swaps of lookahead per commit
+  beam        = tonumber(os.getenv("PA_BEAM")) or 3,     -- children expanded per level
+  nodeBudget  = 1500, -- hard cap on board sims per decide() (live frame-budget guard)
 }
 
 function EnvelopeBrain.new(opts)
@@ -45,23 +49,47 @@ local function bestFireSwap(grid, rows, top)
   return bestPos, bestChain, bestClear
 end
 
--- the swap that most REDUCES envelope distance (build toward the target form / flatten as it rises).
--- Placeholder for B's goal-directed FIT: greedy 1-ply descent on BuildEnvelope.distance.
-local function bestBuildSwap(grid, rows, envelope, top)
-  if not envelope then return nil end
-  local base = BuildEnvelope.distance(grid, rows, envelope)
-  local bestPos, bestD = nil, base
+local function swaps(grid, top)
+  local out = {}
   for r = 1, top do
     for c = 1, BoardSim.WIDTH - 1 do
       local a, b = grid[r][c], grid[r][c + 1]
       if a ~= BoardSim.GARBAGE and b ~= BoardSim.GARBAGE and a ~= b and (a ~= 0 or b ~= 0) then
-        local g = BoardSim.simSwap(grid, rows, r, c) -- settle, then measure the resulting form
-        local d = BuildEnvelope.distance(g, rows, envelope)
-        if d < bestD then bestPos, bestD = { r, c }, d end
+        out[#out + 1] = { r, c }
       end
     end
   end
-  return bestPos
+  return out
+end
+
+-- FIT SEARCH (ports B's unifiedSolve FIT loop to a live brain): subdepth DFS that, while building toward
+-- the envelope, finds the first swap of the sequence that best RAISES chain-POTENTIAL (arranges a firing
+-- chain). The envelope acts as B's branching CAP: we expand the children that flatten toward the form
+-- (a SMOOTH gradient — no valley to stall in), and score leaves by the latent chain (bestClear) they set
+-- up. Returns the FIRST move; the brain commits it and re-plans next frame (receding-horizon). This is the
+-- piece the greedy 1-ply placeholder lacked: a multi-swap sequence can raise potential where 1 swap can't.
+local function fitSearch(grid, rows, envelope, top, cfg)
+  local bestFirst, bestPot = nil, select(5, BoardSim.chainPotential(grid, rows, top)) or 0
+  local budget = cfg.nodeBudget
+  local function envDist(g) return envelope and BuildEnvelope.distance(g, rows, envelope) or 0 end
+  local function dfs(g, depth, firstMove)
+    if depth >= cfg.subDepth or budget <= 0 then return end
+    local kids = {}
+    for _, sw in ipairs(swaps(g, top)) do
+      if budget <= 0 then break end
+      budget = budget - 1
+      local ng = BoardSim.simSwap(g, rows, sw[1], sw[2])
+      local _, _, _, _, pot = BoardSim.chainPotential(ng, rows, top)
+      pot = pot or 0
+      local first = firstMove or sw
+      if pot > bestPot then bestFirst, bestPot = first, pot end
+      kids[#kids + 1] = { g = ng, fm = first, d = envDist(ng) }
+    end
+    table.sort(kids, function(a, b) return a.d < b.d end) -- expand the flattest-toward-form first
+    for i = 1, math.min(cfg.beam, #kids) do dfs(kids[i].g, depth + 1, kids[i].fm) end
+  end
+  dfs(grid, 0, nil)
+  return bestFirst
 end
 
 function EnvelopeBrain:decide(state)
@@ -86,8 +114,8 @@ function EnvelopeBrain:decide(state)
     return { type = "SWAP", pos = firePos }
   end
 
-  -- 3) BUILD: greedily flatten toward the target envelope (placeholder FIT).
-  local buildPos = bestBuildSwap(grid, rows, envelope, top)
+  -- 3) BUILD/FIT: subdepth search for the swap that best sets up a firing chain toward the form.
+  local buildPos = fitSearch(grid, rows, envelope, top, cfg)
   if buildPos then return { type = "SWAP", pos = buildPos } end
 
   -- 4) nothing improves the form and no worthwhile fire: take any available clear, else hold.

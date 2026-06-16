@@ -141,10 +141,22 @@ def overall_distance(human, bot):
     return sum(WEIGHTS[k] * v for k, v in avail.items()) / wsum
 
 
+def _load_vectors(dirpath):
+    """Load only files that are player fit-target vectors (board.buckets) — so stray
+    JSON in the dir (fixtures, results) can't break --matrix/--distinctive."""
+    out = {}
+    for f in sorted(glob.glob(os.path.join(dirpath, "*.json"))):
+        try:
+            d = json.load(open(f))
+            if isinstance(d, dict) and d.get("board", {}).get("buckets"):
+                out[os.path.basename(f)[:-5]] = d
+        except Exception:
+            pass
+    return out
+
+
 def matrix_mode(dirpath):
-    import glob, os
-    files = sorted(glob.glob(os.path.join(dirpath, "*.json")))
-    profs = {os.path.basename(f)[:-5]: json.load(open(f)) for f in files}
+    profs = _load_vectors(dirpath)
     names = list(profs)
     print("\n  pairwise OVERALL distance (0=identical; the off-diagonal min is the\n"
           "  player-to-player FLOOR — a faithful clone must score well below it):\n")

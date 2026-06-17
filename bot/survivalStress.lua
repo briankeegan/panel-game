@@ -86,7 +86,7 @@ local CursorController = require("bot.CursorController")
 local tableUtils = require("common.lib.tableUtils")
 
 -- CLI args
-local garbageEveryFrames = tonumber(arg[1]) or 300    -- ~5s @ 60fps; 0 disables injection
+local garbageEveryFrames = tonumber(arg[1]) or 600    -- 10s @ 60fps (human-rate w/ 6x4 block = 144 area/min); 0 disables
 local maxFrames          = tonumber(arg[2]) or 10800  -- 3 min cap
 local seeds              = tonumber(arg[3]) or 25
 local profilePath        = (arg[4] and arg[4] ~= "") and arg[4] or nil
@@ -167,8 +167,10 @@ local function runSeed(seed, injectGarbage)
     -- block stages/telegraphs/lands/digs IDENTICALLY to real opponent garbage —
     -- NOT a raw queue poke. senderId=2 = a notional opponent slot.
     if injectGarbage and garbageEveryFrames > 0 and frame > 0 and frame % garbageEveryFrames == 0 then
+      -- HUMAN-RATE pressure (data's bench_targets.json): a 6x4 chain-block every 10s = 144 area/min,
+      -- = median real-player offense. The old 6x1-every-5s (72/min) was too gentle (a turtle survived).
       stack:applyNetworkGarbage({
-        { width = 6, height = 1, isMetal = false, isChain = false,
+        { width = 6, height = 4, isMetal = false, isChain = true,
           frameEarned = stack.stopWatch, rowEarned = 1, colEarned = 1 },
       }, 2)
       diag.garbageInjected = diag.garbageInjected + 1
@@ -260,13 +262,13 @@ print(string.format("SURVIVAL: median %.1fs p10 %.1fs mean %.1fs",
 print(string.format("GARBAGE-BROKEN: median %.1f p10 %.1f mean %.1f",
   median(broken), p10(broken), mean(broken)))
 
--- ════════ THE BENCHMARK: two numbers. survival time + attack rate. that's it. ════════
-local attackRate = totalChains / math.max(totalFrames / 3600, 0.01) -- chains fired per minute of play
+-- ════════ THE BENCHMARK: ONE number. survival time under pressure. longer = better. ════════
+-- Offense shows up here automatically: firing chains gives stop-time (can't die while sending), so a
+-- bot that attacks well SURVIVES LONGER. No separate attack metric needed — good offense = more survival.
 print("")
 print("════════════════════ BENCHMARK ════════════════════")
-print(string.format("   SURVIVAL TIME :  %.1f s   (median; higher = lives longer)", median(survivals) / 60))
-print(string.format("   ATTACK RATE   :  %.1f chains/min   (higher = hits harder)", attackRate))
-print("   (run with PA_BRAIN=envelope for the new bot; plain = old SearchBrain baseline)")
+print(string.format("   SURVIVAL UNDER PRESSURE :  %.1f s   (median — the only number; longer = better)",
+  median(survivals) / 60))
 print("════════════════════════════════════════════════════")
 
 ----------------------------------------------------------------------

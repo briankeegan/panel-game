@@ -152,7 +152,7 @@
   "_north_star": "CEILING FIRST. Build strictly-better-than-best-human on every axis, THEN tune DOWN for the ladder. NOTHING is tuned toward human level. Every human number here is a FLOOR TO EXCEED, not a match-target. The timing-controller per-band mix is the MECHANISM to adopt (clock0->RAISE, high->FIRE), NOT percentages to reproduce. Down-tuning (cursor speed, fumble, scaled offense) happens ONLY after the bot is superhuman. Style-matched clones are a SEPARATE later layer, not this.",
   "protocol": {
     "_doc": "FROZEN benchmark protocol \u2014 run IDENTICALLY every time so numbers are comparable across commits (Brian: track numbers, check the same way as we go). If any param changes, BUMP version and label runs with it, so old/new numbers are never silently compared. Harness-specific values marked PROPOSE pending B's confirmation (B owns survivalStress.lua).",
-    "version": "v1-draft",
+    "version": "v1 (BLESSED by B 2026-06-17)",
     "rules": [
       "FIXED seeds \u2014 same seed set every run, never random (else survival/offense numbers aren't comparable).",
       "FROZEN params \u2014 window, seed count, rate range, durations are constants of the protocol version.",
@@ -161,15 +161,16 @@
     ],
     "axes": {
       "survival": {
-        "cmd": "luajit bot/survivalStress.lua <fixed-rate args> (A used `600 5400 3` = 144/min, 90s cap, 3 seeds)",
-        "metric": "survival TIME (seconds) at FIXED 144 area/min (human rate) \u2014 a REAL number, never a '<' bound; once the bot clears the window, RAISE the rate. Adopted per Brian 2026-06-17.",
-        "propose": {
+        "cmd": "luajit bot/survivalStress.lua 600 3600 10",
+        "params": {
           "rate_areamin": 144,
-          "seeds": 10,
-          "cap_s": 90
+          "window_cap_s": 60,
+          "seeds": "10 FIXED deterministic (1001-1010)"
         },
-        "secondary_diagnostic": "ceiling = max area/min survived (ramp-to-failure) \u2014 keep ONLY when it resolves to a number, not a bound",
-        "human_ref": "infinite (a strong human survives 144/min indefinitely)"
+        "metric": "median survival TIME (seconds) at fixed 144/min \u2014 REAL number, never a bound (also log p10 + mean)",
+        "human_ref": "infinite (strong human survives 144/min indefinitely)",
+        "target": "survive the full 60s window, THEN raise rate toward 156+ (superhuman)",
+        "secondary_diagnostic": "ceiling (max area/min survived) \u2014 dropped from primary: it can return a '<' bound, banned by the real-numbers-only rule"
       },
       "offense": {
         "cmd": "(harness TBD \u2014 B)",

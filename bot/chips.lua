@@ -95,7 +95,10 @@ end
 -- 2-move search (the recognition narrows; the search guarantees it fires). Returns {{r1,c1},{r2,c2}} or nil. 100% by
 -- construction (only returns a sequence that actually clears). The setup moves are board-specific, so they're FOUND, not
 -- recalled — but bounded to the cursor's local band, exactly Brian's "you just put it together."
-function chips.setupPlay(grid, rows)
+-- verify(seq) -> bool is the caller's REAL-ENGINE check (the bot has the engine; BoardSim mispredicts garbage-heavy
+-- boards — 2/21 phantom setups). With verify supplied we iterate BoardSim candidates and return the first the ENGINE
+-- confirms -> 100% (phantom rejected, bot plays nothing rather than misfire). Without verify, returns first candidate.
+function chips.setupPlay(grid, rows, verify)
   local top = BoardSim.maxHeight(grid, rows)
   local lo, hi = math.max(1, top - 6), math.min(top + 1, rows)
   for r1 = lo, hi do for c1 = 1, 5 do
@@ -104,7 +107,10 @@ function chips.setupPlay(grid, rows)
       local t2 = math.min(BoardSim.maxHeight(g1, rows) + 1, rows)
       for r2 = math.max(1, t2 - 6), t2 do for c2 = 1, 5 do
         local _, _, tot = BoardSim.simSwap(g1, rows, r2, c2)
-        if (tot or 0) > 0 then return { { r1, c1 }, { r2, c2 } } end
+        if (tot or 0) > 0 then
+          local seq = { { r1, c1 }, { r2, c2 } }
+          if not verify or verify(seq) then return seq end   -- engine-confirm before committing
+        end
       end end
     end
   end end

@@ -51,11 +51,10 @@ end
 -- CONTRACT (CACHE_CONTRACT.md): authoring + recognition MUST key a fire-site identically. This is the ONE shared
 -- keying function both sides call — so the same small tactic always produces the same key.
 function planCache.siteKey(grid, site)
-  -- GEOMETRIC key (color-blind): a 3-line is a 3-line regardless of color. Drop the same/diff color mask -> all
-  -- participating cells become 1. This is the MINIMAL pattern (CACHE_CONTRACT) and collapses hardest -> highest recall.
-  local region = regionFromCells(grid, site.cells)
-  for r = 1, #region do for c = 1, #region[r] do if region[r][c] ~= 0 then region[r][c] = 1 end end end
-  return shapeCache.canonShape(region)
+  -- COLOR minimal-match key (same/diff mask of the directly-matched cells). Minimal pattern, but keeps the color
+  -- structure so different tactics with the same geometry DON'T collide -> the recalled move reliably FIRES
+  -- (consistency > raw hit-rate). Geometric (color-blind) over-collapses: 52% hit but recalled move fired only 54%.
+  return shapeCache.canonShape(regionFromCells(grid, site.cells))
 end
 
 -- AUTHOR (contract v1) — per-swap SMALL fire shapes from a live board: scan fire-sites, key each by the SAME function

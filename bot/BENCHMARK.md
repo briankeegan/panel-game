@@ -7,7 +7,7 @@
 | Axis | Metric | Human ref | Target | **Current** | Measured | Δ since last |
 |------|--------|-----------|--------|-------------|----------|--------------|
 | **Survival** | max sustained incoming survived (area/min) | ~144 | **> 144** | **< 144 (BELOW human)** | 2026-06-17 | baseline |
-| **Offense** | sustained garbage SENT (area/min) | _tbd (data)_ | **> human** | _pending_ | — | — |
+| **Offense** | sustained garbage SENT (area/min) | ~145 med / **156** best (orange) | **> 156** (+ ≥85% chain-area, peak ≥x11) | _pending_ | — | — |
 | **Mechanics** | puzzles solved / 235 (live bot) | — | **100%** | _pending_ | — | — |
 | Contested | win% vs strong opponent | — | _held_ | — | — | — |
 

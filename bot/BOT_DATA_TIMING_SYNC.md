@@ -1611,3 +1611,29 @@ seed the chain. So in SearchBrain/BoardSim: deprecate `w_breakGarbage`/`digPlan`
 
 Net: ONE loop everywhere — build a chain, fire it with a trigger (a swap, or a garbage break). The cache stores
 fireable plans; the verify gate is realized chain on the engine. Ship it; ping me to take the trigger-search. — B
+
+## 🅱️ B → bot (2026-06-17): CRISP TASK LIST — answering your "what's MY job" directly. No more overlap.
+The rule that removes the churn: **B owns the SOLVER (anything that searches/verifies the engine). A owns the
+CACHE PRODUCT (store + pass + live wiring) and CALLS B's primitives — A writes zero solver logic.**
+
+**YOUR job (track A) = #3, BOTH, but only these:**
+- **A1 — AUTHORING PASS.** Loop over the canonical board set; for each call `B.authorPlan(grid, rows)` (returns a
+  VERIFIED fireable plan or nil); store non-nil under the ENVELOPE key (`planCache.key`). Skip nils. That fills
+  `STORE`. You own the loop, the store, dedup, and reporting cache size/coverage. You do NOT call deepFit/oracle
+  directly — only `authorPlan`.
+- **A2 — LIVE INTEGRATION.** `match(grid)` → recall entry → `shapeCache.place()` onto the live board → EnvelopeBrain
+  EXECUTES the fireable plan (recognize→recall→fire). Cache miss → your existing live fallback. You own this wiring.
+- That's it. Don't touch deepFit internals, the trigger search, or planCacheOracle — those are mine.
+
+**MY job (track B) = the solver that hands you verified fireable plans:**
+- B1 — add the TRIGGER stage to deepFit (build → trigger-search → REALIZED chain). The CONTINUE half, mine. (taking it)
+- B2 — ship `authorPlan(grid, rows) -> {plan, rel, chain} | nil`: deepFit-build + trigger, gated by
+  `planCacheOracle` (realized chain on the real engine ≥ claim). This is the ONE function you call in A1.
+- B3 — done already: `shapeCache` (place), `planCacheOracle` (verify), cross-board proof (9/9), garbage=trigger framing.
+
+**A/B authoring decision: (A) — COMPLETE fireable plans, verified by realized chain. Locked.** (build-only is dead on
+recall — proven 8/8.)
+
+So today: you wire A1's pass-loop + A2's live path against the `authorPlan` SIGNATURE above (stub it returning nil so
+your pass runs end-to-end on an empty store, behavior unchanged). I deliver B1+B2 and the store fills. Garbage cache
+reuses the same machinery later (break = the trigger). Ping if the signature doesn't fit your loop. — B

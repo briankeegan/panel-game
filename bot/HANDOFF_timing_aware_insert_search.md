@@ -235,5 +235,44 @@ oracles: change_side 3/3, pre_setup_inserts 3/3, beginner_chains 3/4.
 - Inserts = TIMING (reset/catch); chains = DEPTH/BUILD (chain-potential); clears = build-a-chain-into-garbage
   (same BUILD engine). openers = deep build + many catches (hardest).
 - chain-potential, NOT panels-cleared, is the BUILD cost-function (a half-built staircase clears nothing).
-- color-9 = garbage (Panel.lua:109), unmatchable; `chain_counter` (Stack.lua:405) = chain depth (0=combo, ≥2=chain).
+- **CORRECTION (06-17): color-9 is an unmatchable BLOCKER/wall, NOT garbage.** Real garbage = `panel.isGarbage`
+  (breakable, grants stop-time), in 91/235 puzzles. They coexist. Use isGarbage for garbage logic. `chain_counter`
+  (Stack.lua:405) = chain depth (0=combo, ≥2=chain).
 - live BUILD search is too slow per-frame (~300ms); fix is cadence (re-plan every K frames), NOT a faster search.
+
+# 2026-06-17 — THE PLAN-CACHE ARC (authoring, key, FSM, bounds, garbage). Tools: `bot/authorPlan.lua`, `planCacheOracle.lua`, `timingController.lua`.
+
+## Authoring source: recorded SOLUTIONS, not search.
+SEARCH can't author chains — deepFit AND the oracle both score `chainPotential` and never complete build→trigger→fire
+(0/12 fire on the real engine; "build-only" — potential N, realized 0, proven 8/8). The puzzles' RECORDED solutions
+fire by construction. `authorPlan.lua M.authorFromSolution(puzzle)` replays the recorded input on the real engine →
+**207/235 (88%) author a VERIFIED fireable plan.** "Know the puzzle, know the answer."
+- REPLAY FIDELITY (don't re-derive — see memory replay_drift_solved): replay the recorded input VERBATIM and override
+  only the cursor at swaps. NEVER idle-replace non-swap frames — that drops manual RAISE/combo inputs (chars R/S/U/J)
+  → "drift" (chain collapses). Verbatim = 13/14 chains faithful; idle-replace = 7/14.
+- `M.verifyReplay(puzzle, plan, inputs)` = the faithful gate. `planCacheOracle.verifyEntry` = real-engine realized-chain gate.
+
+## The KEY: participating-cell canonShape (NOT the envelope).
+`BuildEnvelope.recognize` is DEGENERATE as a key (194/235 → one envelope). The validated key is `shapeCache.canonShape`
+of the participating region (swap + cleared cells; color-blind/position-free/mirror-folded). Envelope = the BUILD-state
+RECOGNIZER (coarse prior); canonShape = the exact cache KEY. authorFromSolution emits `key`, `tf`, `origin`, `canon`
+(canonical-frame plan, recall-ready for `shapeCache.place`).
+
+## BOUNDS (what the cache can and can't do):
+- cross-VARIANT recall (same board recolored/mirrored/shifted): **9/9** — solid.
+- cross-PUZZLE recall (different board, same key): **30% (15/50)** — weak; chains don't transfer (cascade + timing are
+  board-context-specific). **So the cache is a small-tactic / exact-recall library, NOT a chain generalizer.** Novel
+  chains → recognize → template-then-FIT (live deepFit), not stored-plan replay.
+
+## TIMING FSM (the WHEN) — `bot/timingController.lua`.
+Data's Audit 7: offense is gated on the stop-time freeze clock. B's call: a thin FSM ABOVE the FIT (not folded into the
+cost — timing as a leaf term stalls greedy search). `decide({stopClock,danger,incomingEta,chainReady,breakReady}) ->
+RAISE|BUILD|FIRE|BREAK`. clock0→RAISE, low→BUILD, high/imminent→FIRE(else BREAK), danger+break→BREAK (survival).
+Cutoffs TUNABLE vs data's Audit-7b human targets. A wires it into the live brain (mode gates which subsystem runs;
+skip deep-FIT in RAISE/BUILD).
+
+## GARBAGE-BREAK = survival (the loop, measured).
+Break opens stop-time (`stack.stop_time`, ~48 frames avg) and the reveal colors seed a chain. **11/21 garbage breaks
+ride INTO a chain (≥2)** = break→stop-time→chain is the survival loop, NOT dig-count (garbage_stoptime_model). Garbage
+breaks are SMALL recurring tactics = exactly the cache's sweet spot. authorFromSolution tags `stopTime`/`garbageBroke`
+for live BREAK/FIRE priority.

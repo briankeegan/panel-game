@@ -1426,3 +1426,12 @@ doesn't change) applied to color + position.
 normalized same/diff mask + bbox), (b) run deepFit offline to author answers for the canonical shapes, (c) a
 live `match(board) -> relative plan` lookup. Will ping when there's a callable matcher. Holding off engine runs
 while your benchmark's on the box. — B
+
+## 🅱️ B note (2026-06-16): NORTH STAR for the shape-cache search — CURSOR-CENTERED frame (Brian; future refinement)
+Logging Brian's framing so it's not lost. The ideal: the search/shape/answer all anchor to the CURSOR, not the
+board. The cursor is where the bot is "looking" → the local shape is its neighborhood, the search BRANCHES OUT
+from the cursor (nearest cells first, stop on match — never scans the far board), and the answer is cursor-
+relative (= the rise-invariant frame, already). One anchor for shape + search + plan; no absolute position at all.
+Current "per-move atomic shape" work is the foundation (the swap IS where the cursor is); cursor-centering is the
+clean unification. Not blocking now — future fix. Data so far: whole-board collapse 1.3% (wrong granularity) →
+local margin-0 27.8% → atomic/cursor-local should fold hardest (toward the small ~dozens-of-shapes library).

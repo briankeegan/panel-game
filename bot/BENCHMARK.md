@@ -6,7 +6,7 @@
 
 | Axis | Metric | Human ref | Target | **Current** | Measured | Δ since last |
 |------|--------|-----------|--------|-------------|----------|--------------|
-| **Survival** | max sustained incoming survived (area/min) | ~144 | **> 144** | _pending_ | — | — |
+| **Survival** | max sustained incoming survived (area/min) | ~144 | **> 144** | **< 144 (BELOW human)** | 2026-06-17 | baseline |
 | **Offense** | sustained garbage SENT (area/min) | _tbd (data)_ | **> human** | _pending_ | — | — |
 | **Mechanics** | puzzles solved / 235 (live bot) | — | **100%** | _pending_ | — | — |
 | Contested | win% vs strong opponent | — | _held_ | — | — | — |
@@ -22,6 +22,11 @@ _"pending" = harness ready, number not yet captured. "tbd" = needs a human-ref f
   hits 88% verified-fireable; this row is the LIVE bot solving, not the author harness.
 
 ## Changelog (newest first)
+- **2026-06-17** — **FIRST SURVIVAL NUMBER: < 144 area/min (BELOW human).** Current live bot (EnvelopeBrain) died at
+  every tested rate down to 144/min (human floor) on a 30s window, 2 seeds. Honest baseline — the bot can't yet survive
+  30s at human pressure. This is PRE-integration: the timing FSM + cache aren't wired into the live brain yet (A's
+  step), so this measures the un-improved bot. Caveats: 30s window + 2 seeds (thin); the rate range bottomed at 144, so
+  the exact sub-human ceiling needs an easier-range re-run. The lever to move this: FSM/cache integration → re-measure.
 - **2026-06-17** — Survival-ceiling harness built (`survivalStress.lua ceiling`, ramp-to-failure bisection on the real
-  brain). Fixed rate bounds (60–600 f = 1440–144 area/min, human→superhuman span). First number capturing now.
+  brain). Fixed rate bounds (60–600 f = 1440–144 area/min, human→superhuman span).
 - **2026-06-17** — Benchmark redirect: pause human-profile tuning; build this harder/more-accurate benchmark first.

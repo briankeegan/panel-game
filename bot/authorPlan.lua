@@ -117,9 +117,21 @@ function M.authorFromSolution(puzzle)
   rmin = math.max(1, rmin - 1); rmax = math.min(st.height, rmax + 1); cmin = math.max(1, cmin - 1); cmax = math.min(6, cmax + 1)
   local region = {}
   for r = rmin, rmax do local row = {} for c = cmin, cmax do row[#row + 1] = mcol[b4[r][c] or 0] and (b4[r][c] or 0) or 0 end region[#region + 1] = row end
-  local key = shapeCache.canonShape(region)
+  local key, tf = shapeCache.canonShape(region)
+  -- CANONICAL-frame plan (recall-ready): each swap in {dr,dc} relative to the canonShape frame (mirror-folded),
+  -- so place(canon, otherTf) re-targets it onto ANY board with the same key. region origin = (rmin,cmin) on the board.
+  local canon
+  if key and tf then
+    canon = {}
+    for _, sw in ipairs(plan) do
+      local rr = (sw[1] - rmin + 1) - tf.r0          -- dr (canonical row, invariant under mirror)
+      local lc = (sw[2] - cmin + 1) - tf.c0          -- local dc within the cropped shape
+      local dc = tf.mirror and (tf.w - 1 - lc) or lc -- fold to canonical dc
+      canon[#canon + 1] = { dr = rr, dc = dc, gap = sw.gap }
+    end
+  end
   return { plan = plan, rel = rel, chain = maxChain, swaps = #plan, cleared = cleared, inputs = inputs, key = key,
-           stopTime = peakStop, garbageBroke = garbageBroke }
+           tf = tf, origin = { rmin, cmin }, canon = canon, stopTime = peakStop, garbageBroke = garbageBroke }
 end
 
 -- replay a plan on a fresh board, OVERRIDING only the cursor at each swap (template timing + raises preserved).
@@ -165,7 +177,50 @@ if arg and arg[0] and arg[0]:find("authorPlan") then
       if g[r] then g[r][c] = (d == 9) and 99 or d end end
     return g, rows
   end
-  local mode = arg[2] or "solution"  -- "solution" | "search" | "replay" | "corpus" | "garbage"
+  local mode = arg[2] or "solution"  -- "solution" | "search" | "replay" | "corpus" | "garbage" | "crosspuzzle"
+  if mode == "crosspuzzle" then
+    -- THE end-to-end test: does a plan authored from puzzle A FIRE when recalled + placed onto a DIFFERENT puzzle B
+    -- with the same canonShape key? (cross-VARIANT was 9/9; this is cross-PUZZLE — genuinely different boards.)
+    -- Place A's canonical plan onto B via B's own tf/origin (isolates recall+place from the separate live-scan step),
+    -- then replay A's input TEMPLATE on B overriding the cursor with the placed positions.
+    local byKey = {}
+    for _, e in ipairs(flat) do
+      local entry = M.authorFromSolution(e.puzzle)
+      if entry and entry.key and entry.canon and entry.tf then
+        byKey[entry.key] = byKey[entry.key] or {}
+        table.insert(byKey[entry.key], { entry = entry, puzzle = e.puzzle, set = (e.set or ""):gsub("puzzle_set_name_", "") })
+      end
+    end
+    local pairsTested, fired, chainOk = 0, 0, 0
+    for key, group in pairs(byKey) do
+      if #group >= 2 then
+        for ai = 1, #group do for bi = 1, #group do
+          if ai ~= bi and pairsTested < 60 then
+            local A, B = group[ai], group[bi]
+            local placed, valid = {}, true
+            for _, cs in ipairs(A.entry.canon) do
+              local rr, cc = shapeCache.place(cs, B.entry.tf)   -- region-index on B
+              local br, bc = B.entry.origin[1] + rr - 1, B.entry.origin[2] + cc - 1
+              if br < 1 or br > 12 or bc < 1 or bc > 5 then valid = false end
+              placed[#placed + 1] = { br, bc }
+            end
+            local cleared, chain = 0, 0
+            if valid then cleared, chain = M.verifyReplay(B.puzzle, placed, A.entry.inputs) end
+            pairsTested = pairsTested + 1
+            if cleared > 0 then fired = fired + 1 end
+            if chain >= A.entry.chain then chainOk = chainOk + 1 end
+            if pairsTested <= 12 then
+              print(string.format("  %-16s A:%-18s -> B:%-18s  fire=%s chain=%d (A claimed %d)",
+                key:gsub("/", "|"):sub(1, 16), A.set:sub(1, 18), B.set:sub(1, 18), cleared > 0 and "Y" or "n", chain, A.entry.chain))
+            end
+          end
+        end end
+      end
+    end
+    print(string.format("CROSS-PUZZLE RECALL: %d pairs (recurring keys) | %d FIRE (%.0f%%) | %d match A's chain depth",
+      pairsTested, fired, pairsTested > 0 and 100 * fired / pairsTested or 0, chainOk))
+    os.exit(0)
+  end
   if mode == "garbage" then
     -- GARBAGE-BREAK tactic library: author every puzzle whose solution BREAKS garbage; key by canonShape; measure
     -- recurrence (does the small break shape repeat?) + the survival signals (stop-time opened, chain ridden) — NOT

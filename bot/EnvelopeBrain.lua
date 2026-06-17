@@ -13,6 +13,9 @@ local BoardSim = require("bot.BoardSim")
 local BuildEnvelope = require("bot.buildEnvelope")
 local deepFit = require("bot.deepFit") -- B's deep BoardSim FIT generator (the lever past the 50% plateau)
 local planCache = require("bot.planCache") -- envelope-keyed plan cache (offline-authored, live lookup)
+local timingController = require("bot.timingController") -- B's WHEN-FSM: picks the MODE (RAISE/BUILD/FIRE/BREAK)
+local liveRecognize = require("bot.liveRecognize") -- B's live fire-site scan: chainReady/breakReady/best in one band scan
+local chips = require("bot.chips") -- B's chip cache: guaranteed 1-move fire/break (play) + 2-move setup (setupPlay)
 
 local EnvelopeBrain = {}
 EnvelopeBrain.__index = EnvelopeBrain
@@ -34,6 +37,9 @@ local DEFAULTS = {
   deepDepth   = tonumber(os.getenv("PA_DEEP")) or 4,
   deepBeam    = tonumber(os.getenv("PA_DEEPBEAM")) or 4,
   deepBudget  = tonumber(os.getenv("PA_DEEPBUDGET")) or 2000,
+  -- B's timing FSM gates the mode (Audit 7: offense is gated on the stop-time clock, not board shape). Off ->
+  -- legacy fill/fire path. A/B both via survivalStress before locking the default. PA_TIMINGFSM=0 disables.
+  useTimingFSM = (os.getenv("PA_TIMINGFSM") ~= "0"),
 }
 
 function EnvelopeBrain.new(opts)
@@ -113,11 +119,35 @@ local function fitSearch(grid, rows, envelope, top, cfg)
   return bestSeq, bestLeaf -- the build line + the chain-READY board it produces (to append the trigger to)
 end
 
+-- CHIP VERIFY: the REAL-ENGINE check chips.setupPlay calls per candidate. It applies the 2 swaps and returns
+-- true iff panels clear OR garbage breaks. IDEAL = copy the live Stack, apply, run frames, check, discard. But the
+-- engine's rollback copy reuses buffers and is bound to the live Match (panelSource RNG, garbage queues, signals) —
+-- forking it cleanly mid online-match risks desyncing the real game, so we verify on BoardSim's resolve instead
+-- (post-swap1 grid -> swap2 -> resolve), which catches the common phantoms. TODO(track A/B): BoardSim mispredicts
+-- GARBAGE-HEAVY boards (B: 2/21 phantom setups) — a setup whose fire depends on a garbage-break that BoardSim
+-- gets wrong can still misfire. Swap to a forked-Stack verify once a detachable Stack clone exists.
+function EnvelopeBrain:chipVerify(grid, rows)
+  return function(seq)
+    local g1 = BoardSim.simSwap(grid, rows, seq[1][1], seq[1][2])
+    if not g1 then return false end
+    local _, _, tot, _, gbroke = BoardSim.simSwap(g1, rows, seq[2][1], seq[2][2])
+    return (tot or 0) > 0 or (gbroke or 0) > 0
+  end
+end
+
 -- GENERATE PLAN (the expensive step — runs ~once per `replanEvery` frames via the cadence). Decides BUILD vs
 -- FIRE and returns a move sequence to execute open-loop. B's ORACLE_STACK plan-generator slots in here later.
-function EnvelopeBrain:generatePlan(grid, rows, top, danger)
+function EnvelopeBrain:generatePlan(grid, rows, top, danger, mode)
   local cfg = self.cfg
-  local firePos, fireChain, fireClear = bestFireSwap(grid, rows, top)
+  -- B's live fire-site scan (one band scan): the best trigger + chain/break readiness for the FSM. `best` favors
+  -- chain, then GARBAGE-BREAK (opens stop-time = survival), then panels. Cached on self for the FSM (read each
+  -- frame between re-plans; the cadence lag is benign — clock/danger move slowly).
+  local scan = liveRecognize.scanFireSites(grid, rows, { bandDepth = cfg.surface + 1 })
+  self.chainReady = scan.chainReady
+  self.breakReady = scan.breakReady
+  local firePos = scan.best and { scan.best.r, scan.best.c } or nil
+  local fireChain = scan.best and scan.best.chain or 0
+  local fireClear = scan.best and scan.best.total or 0
   if danger and firePos then return { firePos } end                       -- emergency: fire to survive
   -- fill-based ignition (data: humans fire ~57-58 fill, not at topout). Count play panels; fire a ready chain
   -- once the board is built enough — keeps the board LOWER (survival) and matches the human ignition point.
@@ -127,10 +157,29 @@ function EnvelopeBrain:generatePlan(grid, rows, top, danger)
   end end
   local envelope = BuildEnvelope.recognize(grid, rows)
   local built = (envelope == nil)
-  if firePos and ((built and (fireChain >= cfg.fireChain or fireClear >= cfg.fireClear))
-                  or fireChain >= cfg.opportunism
-                  or (fill >= cfg.fireFill and fireChain >= cfg.fireChain)) then
-    return { firePos }                                                    -- built / big chain / filled: FIRE
+  -- FIRE gate. With the timing FSM on (mode set), the WHEN is the FSM's call: FIRE/BREAK -> spend the window
+  -- (fire any real trigger); BUILD -> hold fire (only grab a big opportunistic chain). With it off (mode nil),
+  -- the legacy fill/built ignition decides.
+  local fsmFire = (mode == "FIRE" or mode == "BREAK")
+  local legacyFire = (mode == nil) and ((built and (fireChain >= cfg.fireChain or fireClear >= cfg.fireClear))
+                                        or (fill >= cfg.fireFill and fireChain >= cfg.fireChain))
+  if firePos and (fsmFire or fireChain >= cfg.opportunism or legacyFire) then
+    return { firePos }                                                    -- spend the window / big chain / built
+  end
+  -- CHIPS (B's chip cache): guaranteed plays the band-scan above may have missed.
+  -- 1) chips.play -> a verified IMMEDIATE 1-move fire/break. Take it whenever the FSM/legacy gate wants to fire
+  --    (or always when in danger). chips.play already RECOGNIZE+VERIFYs, so a non-nil result is guaranteed to fire.
+  if (fsmFire or legacyFire or danger) then
+    local p = chips.play(grid, rows)
+    if p then return { { p.r, p.c } } end
+  end
+  -- 2) chips.setupPlay -> a 2-MOVE setup (alignment now, fire next tick). This is the CONSTRUCTION step the live
+  --    fitSearch couldn't reliably reach. Play seq[1] now; the fire becomes immediate next tick and the FIRE gate
+  --    above takes it. Only attempt when we actually want offense (a fire mode / built / danger), so BUILD-mode
+  --    holding-fire is preserved. `chipVerify` (built below) confirms the seq on a real simSwap before committing.
+  if (fsmFire or legacyFire or danger) then
+    local seq = chips.setupPlay(grid, rows, self:chipVerify(grid, rows))
+    if seq then return seq end
   end
   -- CACHE FIRST: if the plan-cache has a plan for this envelope, recall it (zero live search). Miss -> fall
   -- through to a live deepFit search. Cache is authored offline, so this is the fast path once it's populated.
@@ -166,6 +215,21 @@ function EnvelopeBrain:decide(state)
   local top = math.min(rows, height + 1)
   local danger = height >= rows * cfg.dangerFrac
 
+  -- TIMING FSM (B's timingController, Audit 7): pick the MODE from the stop-time clock + pressure; the FIT/cache
+  -- decides the WHAT within the mode. RAISE lets us SKIP the deep search (offense can't land with no freeze).
+  local mode = nil
+  if cfg.useTimingFSM then
+    local eta = math.huge
+    for _, g in ipairs(state.incoming or {}) do if g.eta and g.eta < eta then eta = g.eta end end
+    mode = timingController.decide({
+      stopClock   = state.frozenFrames or state.stopTime or 0,
+      danger      = height / rows,
+      incomingEta = eta,
+      chainReady  = self.chainReady,
+      breakReady  = self.breakReady,
+    })
+  end
+
   -- RISE-INVARIANT FRAME (B + Brian's fix): the board rises continuously — a uniform rise shifts every panel up
   -- one row but changes NOTHING relative. So track rows-risen since the plan was made and OFFSET the plan's rows
   -- at execution (the planned panel keeps its identity), instead of letting absolute (r,c) drift onto wrong
@@ -184,9 +248,19 @@ function EnvelopeBrain:decide(state)
   end
   self.lastSig = sig
 
-  -- MPC CADENCE: re-plan when there's no plan / it's exhausted / every K frames / on danger.
-  if (not self.plan) or self.planIdx > #self.plan or self.sinceReplan >= cfg.replanEvery or danger then
-    self.plan = self:generatePlan(grid, rows, top, danger)
+  -- RAISE means "no freeze to SPEND yet" — NOT "stop playing". Idling the cursor here lets the board rise into
+  -- death (measured: FSM-on 11.3s vs off 15.3s, the whole regression). So RAISE keeps ARRANGING via the build
+  -- path (same as BUILD); the only thing the clock gates is the FIRE timing (FIRE/BREAK spend the window). Treat
+  -- RAISE as BUILD for plan generation.
+  if mode == "RAISE" then mode = "BUILD" end
+
+  -- MPC CADENCE: re-plan when there's no plan / it's exhausted / every K frames / on danger / when the FSM just
+  -- switched to a fire mode and the current plan isn't already a fire.
+  local wantFire = (mode == "FIRE" or mode == "BREAK")
+  if (not self.plan) or self.planIdx > #self.plan or self.sinceReplan >= cfg.replanEvery or danger
+     or (wantFire and not self._planIsFire) then
+    self.plan = self:generatePlan(grid, rows, top, danger, mode)
+    self._planIsFire = (wantFire and self.plan and #self.plan == 1) or nil
     self.planIdx = 1
     self.sinceReplan = 0
     self.planRowOffset = 0

@@ -1967,3 +1967,36 @@ patterns* humans actually fire within them. If a footprint has only a few viable
 constrained search (cheap, your "footprint-constrained FIT" wins big). If many → the fit is the real cost and the
 cache mostly saves the geometry. Either way it tells A how hard the color-fit search is BEFORE building it. Say
 the word and I'll run it (extends Audit 8; no box-heavy engine work). Not blocking your build — offering the map. — data
+
+## 🅱️ B → team (2026-06-17): BOSS REDIRECT — PAUSE human-profile tuning. Build a HARDER, MORE ACCURATE benchmark FIRST.
+Brian's call, and it's right + matches the north star. We're drifting toward tuning the bot to imitate orange/chaos/
+kekeke profiles. That's premature and out of order: **build a SUPERHUMAN ceiling to the benchmark FIRST, then tune
+DOWN for the ladder — never calibrate UP to imitate a human.** And the current benchmark is too soft to tune against
+(survival was a fixed gentle rate, offense leaned on proxies, contested risks meaningless self-play tiers).
+
+**PAUSE (until the benchmark exists):**
+- **data:** HOLD the chaos/mscl stopTime re-emit — that completes the HUMAN clock policy = the profiling we're pausing.
+  The box + your cycles go to the benchmark instead. Your human-corpus work stays a SOURCE/sizing tool, never a target.
+- **No tuning `timing_controller` to the `bench_targets.json` human bands yet.** Use sensible placeholder cutoffs.
+
+**CONTINUE (goal-serving infra, not tuning):**
+- **A:** wire `timingController.decide(...)` into EnvelopeBrain (mode gates which subsystem runs) — keep going; the bot
+  needs timing logic regardless. Just don't tune its cutoffs to human bands yet. And cache wiring continues (A2 below).
+
+**NEW PRIORITY — the harder/more-accurate benchmark (I'm starting it, design):**
+1. **Survival CEILING (ramp-to-failure, not pass/fail):** ramp incoming garbage rate until the bot tops out; report the
+   MAX sustained area/min it survives. One hard number, real engine, seed-averaged. Superhuman bar = exceed best human.
+2. **Offense CEILING (real units):** sustained garbage AREA/min actually SENT (engine telegraph, long run) — not chains/min.
+3. **Accuracy:** faithful engine, reproducible, variance-reported. No self-play "hard tier."
+Contested axis: holding it for now (solo ramp-to-failure first — cleaner, dodges the self-play trap) pending Brian.
+**data:** instead of profile re-emit, help me build this — you own measurement rigor; I own the engine harness.
+
+## 🅱️ B → A (2026-06-17): A2 live-key answer (sorry for the lag — my miss). Fire-site recognition, NOT a general canonShape scan.
+You're blocked on "how does live recognition derive the key from a bare board." The honest answer: a general
+canonShape scan WON'T work — authoring ZEROES non-participating cells, and live you can't know which cells participate,
+so a raw-window canonShape won't match the stored (zeroed) key. So for the cache's SWEET SPOT (small tactics — combos,
+breaks), recognize by **fire-site**, not shape: for each swap in the active band, `BoardSim.simSwap(grid,rows,r,c)`
+returns (chain, total); a swap with chain/clear>0 (or that drops `isGarbage`) is a fire site. Key the small footprint
+AROUND the fire site (participating cells = the cells that cleared in the sim — now known) → match the STORE. Cheap,
+no real engine. Deep chains: DON'T live-key-recall (the zeroing problem + ~30% hit) — go to live FIT. I'll ship
+`scanFireSites(grid,rows)` when the benchmark's underway; for now this unblocks your A2 design. — B

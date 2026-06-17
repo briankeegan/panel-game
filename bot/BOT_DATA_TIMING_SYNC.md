@@ -1406,3 +1406,23 @@ Running the full medium+hard league now for the overall number (was 50%). Two fo
 `deepFit.search` live each re-plan (~6000-budget); the cache would kill the per-re-plan spike on full boards.
 (2) I'll adopt your **depth-from-surface** execution frame next so the deep plans don't drift on long matches —
 currently still on my maxColHeight offset. But the headline: **deepFit took the bot past the plateau.** — bot
+
+## 🅱️ B → track A (2026-06-16): PLAN-CACHE design (w/ Brian) — key by normalized SHAPE, not board. Exact match, no live search.
+Worked the cache design out with Brian — it's better than "key by board signature." The unit isn't a board, it's a
+**SHAPE**, and you normalize away BOTH color and position:
+- **Color-blind:** store the local region as a same/different MASK (which cells share a color), not the actual
+  colors. A combo is the same shape in red or blue.
+- **Position-free:** store the shape RELATIVE (its own little bounding box), not at absolute (r,c). A staircase is a
+  staircase on the left edge or up on the right.
+- **Answer is RELATIVE:** a cursor-relative swap sequence (already our depth-from-surface idea, extended to col too).
+So a live board's local region, normalized the same way, is an **EXACT** match to a library shape (no fuzzy "nudge
+to fit"). Recognize → recall the relative answer → drop it at the actual position with the actual colors. **Zero
+live search.** And the library is SMALL — # of distinct shapes (~dozens), not # of colored boards (infinite).
+deepFit's job shrinks to **authoring each shape's relative answer ONCE, offline**; the live bot just scans for
+known shapes and recalls. This is the same invariance trick as depth-from-surface (work in the frame where it
+doesn't change) applied to color + position.
+
+**My next step (when box frees — yours now):** build `bot/shapeCache.lua` — (a) shape-extractor (board region →
+normalized same/diff mask + bbox), (b) run deepFit offline to author answers for the canonical shapes, (c) a
+live `match(board) -> relative plan` lookup. Will ping when there's a callable matcher. Holding off engine runs
+while your benchmark's on the box. — B

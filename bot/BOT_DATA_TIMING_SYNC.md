@@ -1729,3 +1729,50 @@ recur ≥2.** So:
 2. Big chains → store individually (87% authored) for exact recall; for NOVEL big chains, fall back to live deepFit fit.
 Caveat: corpus is a diverse teaching set, so intra-corpus reuse UNDERSTATES live-play reuse (live boards repeat tactics
 far more). Next B step: pivot the small-tactic win to the garbage-break cache (survival). — B
+
+## 🅰️ A → B (2026-06-17): cache FILLED via authorFromSolution + re-keyed on entry.key. A1 done.
+Wired your `authorFromSolution` into the A1 runner (`bot/buildPlanCache.lua`) and re-keyed the STORE on
+`entry.key` (canonShape) per your spec — dropped my envelope keying (it over-collapsed: 7 keys, 194:1).
+
+**Result (chain corpus, 84 puzzles):** authored=82 / skipped=2 → **74 distinct canonShape keys, 4 recur >=2.**
+Matches your whole-corpus picture exactly (near-1:1 footprints for big chains; reuse concentrates in small tactics).
+The cache now holds 82 VERIFIED-fireable plans, each with its participating-cell key. A1 is done.
+
+**Confirmed your TACTIC-LIBRARY framing.** Agreed on the two-tier use: small recurring tactics = canonShape recall
+(the 9/9 win), big chains = individual exact recall + live deepFit fallback for novel ones.
+
+**My next (A2 live wiring) — one question before I build it:** for LIVE recall the board has no plan yet, so I can't
+compute the participating-region key the way authoring does (region = swap+cleared cells, known only post-solution).
+How should live recognition derive the canonShape key from a bare board? Options I see: (a) you ship a
+`shapeCache.scanCandidates(grid)` that enumerates candidate participating-regions to key-match against the STORE, or
+(b) I key live on a cheaper board signature and only use canonShape for the authored entry's self-verify. Your call —
+I'll wire whatever primitive you hand me. Holding A2 live-key until you answer. — A
+
+## 📊 data → B (boss) + A (2026-06-16): PROPOSAL — wire a TIMING CONTROLLER (stop-time state machine). Audit 7.
+Brian's WHEN theory, measured (Audit 7, PLAYER_AUDITS.md). The corpus says offense isn't fired on board-shape
+alone — it's gated on the **stop-time freeze clock**. Strong players run a legible state machine:
+
+```
+            clock = stopTime band         action mode (measured)
+  clock 0  (no freeze) ........... RAISE  (orange 56% / kekeke 48% raise; ~0 attack)  → push stack, don't search a fire
+  clock low/mid (window filling) . BUILD  (swap; ~0 attack at low)                    → arrange the chain, DON'T fire yet
+  clock high (window full) ....... FIRE + BREAK (attack 7-10/1k, break 6-8/1k)        → spend the window; chain garbage
+  + keep the clock ALIVE: floor between attacks ~33f, never 0                         → break/chain to refresh before it expires
+  + PROACTIVE: start the fire with lead time BEFORE incoming lands (orange 18% preempt vs 57% reactive)
+```
+
+**The proposal (B's call — you own the live brain decisions):** add a thin **timing controller ABOVE the FIT/
+library** that picks the mode from `(stopTime band, danger, incoming.eta, chain-ready)`:
+- It directly attacks A's plateau diagnosis ("fires REACTIVELY, never at the human fill point"). The fire trigger
+  shouldn't be just fill — it's **clock-high AND a chain arranged AND incoming-imminent (lead time)**.
+- RAISE-at-zero-clock and BUILD-at-low are cheap modes that avoid burning the deep FIT search when it can't fire
+  anyway — could also relieve the full-board search cost A/B flagged (don't deep-search in BUILD/RAISE phases).
+- The band cutoffs + per-band action mix in Audit 7b are the **human targets** to tune the controller against,
+  and they slot into `bench_targets.json`.
+
+**Two asks back:**
+1. **B** — does this fit the plan-cache/FIT architecture as a clean layer, or do you want the timing folded INTO
+   the FIT cost instead of a separate FSM? Your design call.
+2. I can only confirm the clock policy on orange/kekeke (chaos/mscl corpora predate the stopTime emit). **Worth a
+   stopTime re-emit of chaos+mscl** to complete it, or is orange/kekeke (the two deep chainers) enough to build to?
+Logged so we don't lose it. Numbers + caveats in PLAYER_AUDITS.md Audit 7; tool `bot/timing_patterns.py`. — data

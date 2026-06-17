@@ -144,6 +144,47 @@ colors stack above the seed so clearing it cascades) is the remaining open deriv
 **Method note:** the first cut used `min(col)` of the match footprint → false "all players ignite col-0"
 (min-col bias on wide matches); caught via cross-player check, fixed with the swap-based locator above.
 
+## Audit 7 — Timing / Tempo: the WHEN (source: board rows + stopTime; `timing_patterns.py`)
+**Method:** Brian's theory — *when* you act (relative to the stop-time freeze clock + incoming garbage) is its
+own skill. Attack = a big clear (chain/combo); gap = frames between attacks; clock = `stopTime` (freeze
+remaining); landing = garbage-cell count rises. preempt/reactive = of all landings, did a clear start in the 60f
+BEFORE (preempt) vs only AFTER (reactive). Clock bands = tertiles of pooled stopTime>0: low 1-89, mid 90-139,
+high >139 (frames). **Caveats:** stopTime present only in orange/kekeke (chaos/mscl parsed pre-field → clock N/A);
+chain-vs-combo not split (a cascade is one continuous MATCHED span = one event); 30 games/player.
+
+**7a — Tempo + proactive/reactive (all 4):**
+| player | gap med (f) | gap p90 (f) | build-in-gap % | preempt % | reactive % |
+|---|---|---|---|---|---|
+| chaos952 | 183 | 371 | 22.3 | 15.4 | 61.9 |
+| kekeke | 207 | 408 | 19.5 | 8.5 | **83.3** |
+| mscl | 229 | 450 | 15.7 | 11.2 | 68.3 |
+| orangeTriangle | **246** | **533** | 17.3 | **18.1** | **57.0** |
+
+**7b — Clock-conditioned policy (orange + kekeke; chaos/mscl pending stopTime re-emit):**
+clock-floor between attacks: orange **33**, kekeke **37** (they rarely let the freeze hit 0). stopT @ attack
+~200-210, @ break ~250-260 (offense fires with the window FULL — a clear grants stop time, chains ride it).
+| clock band | orange swap/raise/atk·1k/brk·1k | kekeke swap/raise/atk·1k/brk·1k |
+|---|---|---|
+| none (0) | 8.8 / **55.6** / 0 / 0 | 8.5 / **47.8** / 0 / 0 |
+| low (1-89) | 16.9 / 0.5 / 0 / 0.1 | 16.3 / 1.1 / 0 / 0 |
+| mid (90-139) | 18.5 / 0.1 / 3.3 / 0.5 | 20.7 / 0.5 / 3.2 / 0.2 |
+| high (>139) | 17.0 / 0.1 / **7.3** / **6.4** | 21.5 / 0.2 / **9.6** / **7.8** |
+
+**7c — DO/DON'T rules (from the ~0 / dominant cells):**
+- **Clock=0 → RAISE** (≈50-55%), never attack/break. (No freeze to spend → push the stack, don't waste cycles.)
+- **Clock low → BUILD** (swap), never attack. (Bank the window, arrange the chain.)
+- **Attacks AND breaks fire ONLY at mid/high clock** — concentrated at HIGH. Break garbage *inside* a freeze
+  window, never cold.
+- **Never let the clock floor hit 0 between attacks** (~33 min) — keep the window alive by chaining/breaking.
+- Everyone is majority **reactive** (act after garbage lands), but the deep chain-builder **orange pre-positions
+  most** (18% preempt, lowest 57% reactive); the spammer **kekeke is most reactive** (83%).
+
+**Finding:** the WHEN is a real, legible policy — a **stop-time state machine**: `clock 0 → RAISE`, `clock
+low/building → BUILD (don't fire)`, `clock high → FIRE + BREAK (spend the window, keep it topped up)`, and
+**solve with lead time before garbage lands** (proactive). Tempo also tracks archetype: orange has the longest
+gaps between attacks (246f, patient deep setup), chaos the shortest (183f, fast pressure). This is the missing
+"WHEN" layer above the envelope (WHAT) and FIT (HOW). chaos/mscl clock policy needs a stopTime re-emit to confirm.
+
 ## Not-yet-measurable (need more data)
 - **Stop-time utilization** (set-up-during-freeze → fire-as-window-closes): needs per-frame `stopTime` — was reverted out of the emit for speed; re-add cheaply (`stack.stop_time + pre_stop_time`) + watchdog re-emit.
 - **Reveal foresight** (setting up to revealed garbage colors): needs reveal colors (`BoardState.captureReveals`), not in the re-sim rows.

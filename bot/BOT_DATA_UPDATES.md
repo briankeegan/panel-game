@@ -1143,3 +1143,9 @@ garbage AREA/min (NOT chains/min — corpus proves orange sends fewest pieces bu
 Survival = time under human-rate incoming (~144-156 area/min; current 72/min too gentle). Two-tier: survivalStress
 = RAW offense+survival (no opponent); contested league = EFFECTIVE pressure+win% (with opponent). Exact metrics +
 targets in bot/bench_targets.json; full derivation in BOT_DATA_TIMING_SYNC.md.
+
+### 2026-06-16 — data: Audit 7 (TIMING/TEMPO) saved + wire-up proposal to B
+Brian's WHEN theory measured. Offense is gated on the stop-time clock: clock0→RAISE, low→BUILD, high→FIRE+BREAK;
+keep clock floor >0; proactive lead-time (orange 18% preempt vs kekeke 83% reactive). Proposed a TIMING CONTROLLER
+(stop-time state machine above the FIT) to B (boss). Audit 7 in PLAYER_AUDITS.md; tool timing_patterns.py.
+Caveat: clock policy confirmed on orange/kekeke only (chaos/mscl predate stopTime emit).

@@ -219,6 +219,24 @@ So the cache's realistic ceiling: ~60-72% of ALL clears (small recurring tactics
 BIG fireable tactics, lowest for the deep chainer — agreeing with B's 30% cross-puzzle. Cache pays on the common
 small stuff; the deep-chain ceiling is live-FIT territory.
 
+**Color-mask vs GEOMETRIC key (`--geom`, the positions-only footprint — drops the same/diff color mask):** big
+fireable tactics, distinct / top50-cov / hit-ceiling:
+| player | COLOR key | GEOMETRIC key |
+|---|---|---|
+| chaos952 | 288 / 51% / 41% | 198 / 69% / 59% |
+| mscl | 210 / 52% / 37% | 162 / 67% / 51% |
+| kekeke | 644 / 45% / 41% | 422 / 62% / 61% |
+| orangeTriangle | 361 / 39% / **29%** | 153 / 80% / **70%** |
+
+**Big finding:** the geometric footprint collapses deep tactics **~2× better** — orange's big-tactic hit-ceiling
+jumps 29% → **70%**. Direct tie to Audit 5: orange templates the GEOMETRY (flat-near-full forms) and varies only
+COLOR, so a color-blind key folds its deep chains together. → cache-key sweet spot = **key on the geometric
+footprint (high recall), then color-FIT the recalled plan to the live board** (template-THEN-fit at the cache
+level). The granularity spectrum: envelope=too coarse (194:1); color-canonShape=near-unique for deep play (29%);
+geometric footprint=the discriminating middle (70%), color-agnostic so the recalled plan is a TEMPLATE needing a
+color-fit/verify pass (consistent with B's 30% cross-puzzle fire-rate — coarser key = more candidates, each needs
+the verify gate).
+
 ## Not-yet-measurable (need more data)
 - **Stop-time utilization** (set-up-during-freeze → fire-as-window-closes): needs per-frame `stopTime` — was reverted out of the emit for speed; re-add cheaply (`stack.stop_time + pre_stop_time`) + watchdog re-emit.
 - **Reveal foresight** (setting up to revealed garbage colors): needs reveal colors (`BoardState.captureReveals`), not in the re-sim rows.

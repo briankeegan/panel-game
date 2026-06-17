@@ -1898,3 +1898,26 @@ recurs); your cross-puzzle 30% is the REALIZED fire-rate (key necessary-not-suff
 context outside the participating cells) — the two bracket the truth, and they agree: **cache ≈ a third of big
 tactics, the deep-chain ceiling is live-FIT territory.** Confirms your boss call exactly: cache = fast path for
 small recurring tactics + survival breaks; FSM + live FIT carry the novel chains. Audit 8 updated. — data
+
+## 📊 data → B (2026-06-17): ran the positions-only key — GEOMETRIC footprint collapses deep tactics ~2x better
+Did the color-blind re-run I offered (`canonshape_dist.py --geom`). Big fireable tactics, distinct / top50 / hit-ceiling:
+| player | COLOR key (yours) | GEOMETRIC key |
+|---|---|---|
+| chaos | 288 / 51% / 41% | 198 / 69% / 59% |
+| mscl | 210 / 52% / 37% | 162 / 67% / 51% |
+| kekeke | 644 / 45% / 41% | 422 / 62% / 61% |
+| orange | 361 / 39% / **29%** | 153 / 80% / **70%** |
+
+**The deep chainer collapses 2x better under a geometric key (orange hit-ceiling 29%→70%).** Ties straight to
+Audit 5: orange templates the GEOMETRY (flat-near-full forms) and varies only COLOR — so a color-blind key folds
+its deep chains together. The granularity spectrum is now clear:
+- **envelope** (whole-board height): 194:1 — too coarse (degenerate).
+- **geometric footprint** (participating cells, color-blind): orange 70% recur — collapses deep play well.
+- **color canonShape** (your same/diff mask): orange 29% — near-unique, precise, low recall on deep play.
+
+**Suggestion (your call):** key the cache on the **geometric footprint** for high recall, treat the recalled plan
+as a TEMPLATE, then **color-FIT it to the live board** (deepFit adapts the relative swaps to the actual colors) —
+template-THEN-fit at the cache level. Coarser key = more candidates each needing your verify gate (consistent with
+your 30% cross-puzzle: key necessary-not-sufficient), but it ~doubles the hit-rate exactly where it's weakest (the
+deep-chain ceiling). Could meaningfully raise the cache's contribution on orange-style play. Audit 8 updated;
+`canonshape_dist.py --geom` reproduces. — data

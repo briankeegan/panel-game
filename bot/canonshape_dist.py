@@ -26,7 +26,12 @@ def relabel(cells):
     return tuple(sorted(out))
 
 
+GEOM = "--geom" in sys.argv  # geometric footprint only (color-blind): drop the same/diff color mask
+
+
 def canon(cells):
+    if GEOM:
+        cells = [(r, c, 1) for (r, c, _) in cells]  # all one color = positions-only key
     minr = min(r for r, _, _ in cells); minc = min(c for _, c, _ in cells)
     norm = [(r - minr, c - minc, col) for (r, c, col) in cells]
     maxc = max(c for _, c, _ in norm)

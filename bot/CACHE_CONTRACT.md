@@ -124,7 +124,7 @@ CHIP = {
   swap-partner cell (29%→59%) — mechanism sound. ✓ works
 - **CHAIN (multi-move):** chip authored from one board, recognized held-out, replayed sequence → **chain fired 2/3
   (67% of recognized)**. Recognition lower (chains recur less). ✓ mechanism validated
-- **BREAK (garbage):** garbage-adjacency in template; needs the same held-out recall+fire validation. → next
+- **BREAK (garbage):** ✓ garbage-ANCHORED chip (garbage = fixed anchor, Brian) -> ~100% precision; mid-play authoring 77 chips -> 31% held-out recall (grows with more touching-configs). Garbage breaking > chaining in priority.
 - **INSERT / setup / openers:** → to validate
 Once all scenarios are validated chips, tuning/priority is trivial (Brian).
 

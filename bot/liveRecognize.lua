@@ -22,11 +22,15 @@ function M.scanFireSites(grid, rows, opts)
   local best = nil
   for r = lo, hi do
     for c = 1, 5 do  -- a swap at col c swaps c,c+1 (cols 1..6) so c in 1..5
-      local _, chain, total, _, garbageCleared = BoardSim.simSwap(grid, rows, r, c)
+      local newg, chain, total, _, garbageCleared = BoardSim.simSwap(grid, rows, r, c)
       chain = chain or 0; total = total or 0; garbageCleared = garbageCleared or 0
       if total > 0 or chain > 0 or garbageCleared > 0 then
         local kind = (garbageCleared > 0) and "break" or (chain >= 2 and "chain" or "combo")
-        local site = { r = r, c = c, chain = chain, total = total, garbageCleared = garbageCleared, kind = kind }
+        -- participating cells for A2 cache keying: the swap pair + cells that emptied (estimate; includes some
+        -- fall-vacated cells, but for small tactics the footprint is tight). A bbox+canonShapes this to match the STORE.
+        local cells = { { r, c }, { r, c + 1 } }
+        if newg then for rr = 1, rows do for cc = 1, 6 do if (grid[rr][cc] or 0) ~= 0 and (newg[rr] and (newg[rr][cc] or 0) == 0) then cells[#cells + 1] = { rr, cc } end end end end
+        local site = { r = r, c = c, chain = chain, total = total, garbageCleared = garbageCleared, kind = kind, cells = cells }
         sites[#sites + 1] = site
         if chain >= 2 then chainReady = true end
         if garbageCleared > 0 then breakReady = true end

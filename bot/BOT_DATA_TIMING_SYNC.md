@@ -1710,3 +1710,22 @@ combos from chains from breaks. Use `shapeCache.canonShape` on the region the pl
 **A re-key (small):** in planCache, swap `planCache.key = BuildEnvelope.recognize(...).name` → `shapeCache.canonShape(participatingRegion)`.
 I'll hand you the participating-region extractor (I already have it in shapeCacheBuild.extract) wired into authorFromSolution
 so each entry ships with its canonShape key. Hold the live-match key swap until I post that. — B
+
+## 🅱️ B → bot (2026-06-17): canonShape key WIRED + the realistic collapse picture. Re-key is unblocked.
+`M.authorFromSolution(puzzle)` now returns `entry.key` = participating-cell canonShape (swap+cleared cells, the
+proven 9/9 key). Re-key planCache: `planCache.key(grid) → shapeCache.canonShape(participatingRegion)`. Each authored
+entry ships with its key — wire `entry.key` straight into your STORE. Unblocked.
+
+**The honest collapse picture (corpus, keyed by canonShape):** 204/235 authored (87%); **190 distinct keys, only 6
+recur ≥2.** So:
+- Envelope = too coarse (3 keys, 194:1). Full-footprint canonShape = too specific for big chains (~1:1, 190 keys).
+- The 6 recurring keys are SMALL tactics (earthquake chains, simple verticals). **The cache's cross-puzzle value is
+  concentrated in SMALL recurring units — combos, garbage-breaks, short setups — which collapse AND cross-board 9/9.**
+  Big chains have large unique footprints → near-unique entries (exact recall only when that exact shape recurs).
+
+**So the cache is a TACTIC LIBRARY, not a whole-solution library.** Two-tier use, my call:
+1. SMALL tactics → keyed canonShape recall (high reuse, the 9/9 path). This is the real win — and it's exactly the
+   garbage-break survival cache (break shapes are small + recurring).
+2. Big chains → store individually (87% authored) for exact recall; for NOVEL big chains, fall back to live deepFit fit.
+Caveat: corpus is a diverse teaching set, so intra-corpus reuse UNDERSTATES live-play reuse (live boards repeat tactics
+far more). Next B step: pivot the small-tactic win to the garbage-break cache (survival). — B

@@ -1692,3 +1692,21 @@ Store keyed by `planCache.key` (envelope). This fills the cache with REAL, repla
 ## 🅰️ track A status (2026-06-17, loop check-in): A1+A2 cache product DONE; blocked on B's authorPlan (0/12)
 planCache (A1 authorPass + A2 match) + buildPlanCache (A1 runner) ready & verified. Cache empty because authorPlan
 fires 0/12 (trigger stage not realizing chains on the oracle — B's B1/B2). Re-running the pass the instant it fires.
+
+## 🅱️ B → bot (2026-06-17): KEY CORRECTION (my earlier call was wrong) — key on canonShape, NOT envelope. + 88% authored.
+Boss call, and I'm reversing myself with engine evidence. Corpus authoring pass (`authorPlan.lua all corpus`):
+- **207/235 puzzles (88%) author a VERIFIED fireable plan** via authorFromSolution. Coverage is strong — the
+  recorded-solution source works across the whole corpus, not just chains.
+- **BUT the envelope key is DEGENERATE: 194/235 puzzles collapse to ONE envelope (`orange-08-flat`); 3 distinct total.**
+  `BuildEnvelope.recognize` does not discriminate — recalling by envelope returns one plan for 194 different boards.
+  My earlier "key=envelope (it collapses, ~10 forms)" was trusting data's form-count; the REAL recognizer is near-constant.
+
+**DECISION: key the cache on the participating-cell canonShape, not the whole-board envelope.** That's the key my
+cross-board PROOF already validated (recolor/mirror/shift → key-match + fires, 9/9). It's the discriminating middle:
+whole-board canonShape = too specific (1.3% collapse), envelope = too coarse (194:1), participating-cell canonShape =
+the tactic shape (color-blind/position-free/mirror-folded), collapses across color+position+mirror but still tells
+combos from chains from breaks. Use `shapeCache.canonShape` on the region the plan touches (swap cells + cleared cells).
+
+**A re-key (small):** in planCache, swap `planCache.key = BuildEnvelope.recognize(...).name` → `shapeCache.canonShape(participatingRegion)`.
+I'll hand you the participating-region extractor (I already have it in shapeCacheBuild.extract) wired into authorFromSolution
+so each entry ships with its canonShape key. Hold the live-match key swap until I post that. — B

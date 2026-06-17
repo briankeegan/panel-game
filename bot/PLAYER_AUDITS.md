@@ -185,6 +185,27 @@ low/building → BUILD (don't fire)`, `clock high → FIRE + BREAK (spend the wi
 gaps between attacks (246f, patient deep setup), chaos the shortest (183f, fast pressure). This is the missing
 "WHEN" layer above the envelope (WHAT) and FIT (HOW). chaos/mscl clock policy needs a stopTime re-emit to confirm.
 
+## Audit 8 — Tactic canonShape collapse (cache-sizing for B; `canonshape_dist.py`)
+**Method:** B keys the plan-cache on participating-cell **canonShape** (after envelope proved degenerate 194:1).
+This sizes that key on the HUMAN corpus: participating cells = MATCHED panels at a clear; canonShape = position-
+free + color-relabeled (same/diff mask) + mirror-folded. Distinct count + top-N coverage = library size. 25
+games/player. Caveat: cleared-region only (no swap cell, which B's live key also folds); per-link for chains.
+
+| player | ALL clears: n/distinct/top10/top50 | BIG clears (4+): n/distinct/top10/top50 |
+|---|---|---|
+| chaos952 | 716 / 290 / 56% / 67% | 485 / 288 / 38% / 51% |
+| mscl | 604 / 212 / 64% / 73% | 334 / 210 / 36% / 52% |
+| kekeke | 1849 / 646 / 59% / 68% | 1090 / 644 / 32% / 45% |
+| orangeTriangle | 1305 / 363 / 72% / 76% | 508 / 361 / 29% / **39%** |
+
+**Finding:** **small clears collapse** (the ubiquitous bare-3 dominates → top-10 ~56-72%), but the **fireable
+big tactics (combos/chains) are near-unique** — distinct ≈ 0.6-0.7× count, top-50 covers <52%, and **the deep
+chainer (orange) collapses LEAST (39%)**. Confirms B's puzzle 190:1 on real play + echoes B's "atomic color
+shapes don't collapse (813 distinct)". **Implication:** the plan-cache is a *partial speedup* on common tactics,
+NOT a complete chain library; deep-chain ceiling play has the lowest hit-rate and must lean on the live FIT
+generator — the cache can't replace it. envelope=too coarse (194:1), color canonShape=near-unique for big
+tactics — no small-library sweet spot for deep play; it's genuinely diverse.
+
 ## Not-yet-measurable (need more data)
 - **Stop-time utilization** (set-up-during-freeze → fire-as-window-closes): needs per-frame `stopTime` — was reverted out of the emit for speed; re-add cheaply (`stack.stop_time + pre_stop_time`) + watchdog re-emit.
 - **Reveal foresight** (setting up to revealed garbage colors): needs reveal colors (`BoardState.captureReveals`), not in the re-sim rows.

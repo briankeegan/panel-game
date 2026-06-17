@@ -1,30 +1,59 @@
 {
-  "_doc": "Shared bot benchmark — ONE set of metrics + targets for all three tracks (A live bot, B FIT, data). Defined by data track from the L10 1v1 re-sim corpus. See BOT_DATA_TIMING_SYNC.md (data -> A, 2026-06-16) for derivation. Two tiers: survivalStress (no opponent, RAW offense + survival) and the contested league (WITH opponent, EFFECTIVE pressure + win%).",
-
+  "_doc": "Shared bot benchmark \u2014 ONE set of metrics + targets for all three tracks (A live bot, B FIT, data). Defined by data track from the L10 1v1 re-sim corpus. See BOT_DATA_TIMING_SYNC.md (data -> A, 2026-06-16) for derivation. Two tiers: survivalStress (no opponent, RAW offense + survival) and the contested league (WITH opponent, EFFECTIVE pressure + win%).",
   "offense": {
     "headline_metric": "garbage_area_per_min",
     "definition": "sum(width*height) over all garbage sent / game-minutes. Weights chain DEPTH (x8 chain=6x7=42) over combos (~3). Replaces chains/min, which mis-ranks the deep-chain bot.",
-    "quality_submetrics": ["chain_area_share_pct", "peak_chain_per_game"],
+    "quality_submetrics": [
+      "chain_area_share_pct",
+      "peak_chain_per_game"
+    ],
     "targets": {
-      "median_human": {"area_per_min": 145, "chain_area_share_pct": 55, "peak_chain_per_game": 5},
-      "best_human_orange": {"area_per_min": 156, "chain_area_share_pct": 85, "peak_chain_per_game": 11},
-      "superhuman": {"area_per_min": ">156", "chain_area_share_pct": ">=85", "peak_chain_per_game": ">=11"}
+      "median_human": {
+        "area_per_min": 145,
+        "chain_area_share_pct": 55,
+        "peak_chain_per_game": 5
+      },
+      "best_human_orange": {
+        "area_per_min": 156,
+        "chain_area_share_pct": 85,
+        "peak_chain_per_game": 11
+      },
+      "superhuman": {
+        "area_per_min": ">156",
+        "chain_area_share_pct": ">=85",
+        "peak_chain_per_game": ">=11"
+      }
     },
     "per_player_corpus": {
-      "chaos952": {"area_per_min": 133.3, "chain_area_share_pct": 53.3, "peak_chain_per_game_median": 4},
-      "kekeke":   {"area_per_min": 143.8, "chain_area_share_pct": 53.0, "peak_chain_per_game_median": 5},
-      "mscl":     {"area_per_min": 148.0, "chain_area_share_pct": 61.9, "peak_chain_per_game_median": 5},
-      "orangeTriangle": {"area_per_min": 155.7, "chain_area_share_pct": 84.9, "peak_chain_per_game_median": 11}
+      "chaos952": {
+        "area_per_min": 133.3,
+        "chain_area_share_pct": 53.3,
+        "peak_chain_per_game_median": 4
+      },
+      "kekeke": {
+        "area_per_min": 143.8,
+        "chain_area_share_pct": 53.0,
+        "peak_chain_per_game_median": 5
+      },
+      "mscl": {
+        "area_per_min": 148.0,
+        "chain_area_share_pct": 61.9,
+        "peak_chain_per_game_median": 5
+      },
+      "orangeTriangle": {
+        "area_per_min": 155.7,
+        "chain_area_share_pct": 84.9,
+        "peak_chain_per_game_median": 11
+      }
     }
   },
-
   "survival": {
     "metric": "time_to_topout_seconds",
     "definition": "Survival under standardized incoming garbage matched to human OFFENSE rate. The current '6-wide every 5s' (=72 area/min) is too gentle (~half real pressure).",
     "incoming_spec": {
       "standard": "6x4 chain-block every 10s ~= 144 area/min (median-human pressure)",
       "hard": "scale to 156 area/min (orange) or escalate until topout",
-      "shape_note": "bursty chain-blocks are realistic and exercise the break->stop-time loop; uniform rate ok for reproducibility — match the RATE first"
+      "shape_note": "bursty chain-blocks are realistic and exercise the break->stop-time loop; uniform rate ok for reproducibility \u2014 match the RATE first"
     },
     "clean_board": "pass/fail floor only (must NEVER self-topout); not a scored axis",
     "targets": {
@@ -32,6 +61,92 @@
       "hard_pressure_156_per_min": "max survival time = the discriminating score"
     }
   },
-
-  "effective_pressure_note": "RAW area/min (survivalStress) overcounts — a real opponent DIGS. EFFECTIVE pressure (un-dug garbage reaching a defending board) + win% require an opponent and live in the contested league (bot/contested_scorecard.py), NOT survivalStress."
+  "effective_pressure_note": "RAW area/min (survivalStress) overcounts \u2014 a real opponent DIGS. EFFECTIVE pressure (un-dug garbage reaching a defending board) + win% require an opponent and live in the contested league (bot/contested_scorecard.py), NOT survivalStress.",
+  "timing_controller": {
+    "_doc": "Audit-7 stop-time FSM tuning targets (data->B). Clock bands in frames; per-band action mix from the deep chainers (orange/kekeke). chaos/mscl pending stopTime re-emit.",
+    "clock_bands_frames": {
+      "none": "0",
+      "low": "1-89",
+      "mid": "90-139",
+      "high": ">139"
+    },
+    "per_band_action_mix_pct": {
+      "_cols": "swap% / raise% / attack_per1k / break_per1k",
+      "none": {
+        "orange": [
+          8.8,
+          55.6,
+          0,
+          0
+        ],
+        "kekeke": [
+          8.5,
+          47.8,
+          0,
+          0
+        ]
+      },
+      "low": {
+        "orange": [
+          16.9,
+          0.5,
+          0,
+          0.1
+        ],
+        "kekeke": [
+          16.3,
+          1.1,
+          0,
+          0
+        ]
+      },
+      "mid": {
+        "orange": [
+          18.5,
+          0.1,
+          3.3,
+          0.5
+        ],
+        "kekeke": [
+          20.7,
+          0.5,
+          3.2,
+          0.2
+        ]
+      },
+      "high": {
+        "orange": [
+          17.0,
+          0.1,
+          7.3,
+          6.4
+        ],
+        "kekeke": [
+          21.5,
+          0.2,
+          9.6,
+          7.8
+        ]
+      }
+    },
+    "rules": {
+      "clock0": "RAISE (never attack/break)",
+      "clock_low": "BUILD/swap (never attack)",
+      "clock_high": "FIRE+BREAK (attacks+breaks concentrate here)",
+      "clock_floor_between_attacks": "~33f, never 0 (keep the window alive)",
+      "proactive": "start fire within leadFrames BEFORE incoming lands (orange 18% preempt, kekeke 83% reactive)"
+    },
+    "tempo_gap_between_attacks_frames": {
+      "chaos952": 183,
+      "kekeke": 207,
+      "mscl": 230,
+      "orangeTriangle": 246
+    },
+    "proactive_preempt_pct": {
+      "chaos952": 15.4,
+      "kekeke": 8.5,
+      "mscl": 11.2,
+      "orangeTriangle": 18.1
+    }
+  }
 }

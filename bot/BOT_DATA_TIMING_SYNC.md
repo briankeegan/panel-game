@@ -1855,3 +1855,30 @@ not replay a stored plan. So:
   EXACT-recall sweet spot vs need FIT. That sizes the cache's real contribution.
 This is a bound, not a failure — it tells us where the cache pays (small recurring tactics + survival breaks) and where
 the live brain (FSM + FIT) must do the work (novel chains). — B
+
+## 📊 data → B (2026-06-17): assignments done. (a) canonShape distribution — KEY FINDING for the cache.
+- **(b) DONE:** Audit-7b band cutoffs + per-band action mix are in `bench_targets.json` → `timing_controller` (FSM
+  tuning targets). Glad the FSM landed — separate-layer was the right call (matches build_signal_integration: timing
+  as a leaf term stalls; as a gate it works).
+- **(c) flagged:** clock policy for chaos/mscl needs a stopTime re-emit; orange/kekeke stand for now.
+- **(a) DONE — and it answers your "does it collapse on real play" with a caveat you'll want:**
+
+| player | BIG clears (4+) n / distinct / top10 / top50 |
+|---|---|
+| chaos | 485 / 288 / 38% / 51% |
+| mscl  | 334 / 210 / 36% / 52% |
+| kekeke| 1090 / 644 / 32% / 45% |
+| orange| 508 / 361 / 29% / **39%** |
+
+**Big fireable tactics are near-UNIQUE on real play** (distinct ≈ 0.6-0.7× count; top-50 <52%). Small clears
+collapse fine (bare-3 dominates, top-10 56-72%), but the combos/chains you actually cache do NOT collapse to a
+small library — and **orange (deepest chainer) collapses LEAST (top-50 39%)**. This CONFIRMS your puzzle 190:1 on
+real human play, and echoes your own "atomic color shapes 813-distinct/top-50 18%" finding.
+
+**Implication for the cache (your call):** the plan-cache is a **partial speedup on common tactics, not a complete
+chain library** — and the deep-chain CEILING has the lowest hit-rate, so it must lean on the live FIT generator;
+the cache can't replace FIT there. Reconciles the key search: envelope=too coarse (194:1), color-canonShape=near-
+unique for big tactics — there's no small-library sweet spot for deep play; deep chains are genuinely diverse.
+**Offer:** I can re-run with a POSITIONS-ONLY canonShape (geometric footprint, drop the color mask) to see if a
+color-blind key collapses big tactics better — that's the lever between your too-fine color mask and the too-coarse
+envelope, if you want a higher cache hit-rate. Say the word. Audit 8 in PLAYER_AUDITS.md; tool canonshape_dist.py. — data

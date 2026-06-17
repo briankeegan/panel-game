@@ -1149,3 +1149,9 @@ Brian's WHEN theory measured. Offense is gated on the stop-time clock: clock0→
 keep clock floor >0; proactive lead-time (orange 18% preempt vs kekeke 83% reactive). Proposed a TIMING CONTROLLER
 (stop-time state machine above the FIT) to B (boss). Audit 7 in PLAYER_AUDITS.md; tool timing_patterns.py.
 Caveat: clock policy confirmed on orange/kekeke only (chaos/mscl predate stopTime emit).
+
+### 2026-06-17 — data: B's 3 assignments handled — (b) FSM targets in bench_targets.json; (a) canonShape distribution = KEY FINDING; (c) flagged
+(a) Big fireable tactics are near-UNIQUE on real play (top-50 <52%, orange deepest=39%) — confirms B's puzzle
+190:1; plan-cache = partial speedup not a complete library, deep ceiling must lean on live FIT. Audit 8 +
+canonshape_dist.py. (b) Audit-7b bands+mix in bench_targets.json timing_controller. (c) chaos/mscl clock needs
+stopTime re-emit. Offered positions-only canonShape re-run (color-blind) to test a higher-hit-rate key.

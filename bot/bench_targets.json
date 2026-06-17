@@ -63,7 +63,7 @@
   },
   "effective_pressure_note": "RAW area/min (survivalStress) overcounts \u2014 a real opponent DIGS. EFFECTIVE pressure (un-dug garbage reaching a defending board) + win% require an opponent and live in the contested league (bot/contested_scorecard.py), NOT survivalStress.",
   "timing_controller": {
-    "_doc": "Audit-7 stop-time FSM tuning targets (data->B). Clock bands in frames; per-band action mix from the deep chainers (orange/kekeke). chaos/mscl pending stopTime re-emit.",
+    "_doc": "Audit-7 stop-time FSM. Adopt the MECHANISM (clock0->RAISE, low->BUILD, high->FIRE+BREAK, proactive lead-time). The per-band human mix below is a REFERENCE/bar-to-exceed, NOT a tune-to-match target \u2014 the bot should play these phases OPTIMALLY (superhuman), not reproduce human percentages.",
     "clock_bands_frames": {
       "none": "0",
       "low": "1-89",
@@ -148,5 +148,6 @@
       "mscl": 11.2,
       "orangeTriangle": 18.1
     }
-  }
+  },
+  "_north_star": "CEILING FIRST. Build strictly-better-than-best-human on every axis, THEN tune DOWN for the ladder. NOTHING is tuned toward human level. Every human number here is a FLOOR TO EXCEED, not a match-target. The timing-controller per-band mix is the MECHANISM to adopt (clock0->RAISE, high->FIRE), NOT percentages to reproduce. Down-tuning (cursor speed, fumble, scaled offense) happens ONLY after the bot is superhuman. Style-matched clones are a SEPARATE later layer, not this."
 }

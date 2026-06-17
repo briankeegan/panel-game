@@ -42,6 +42,20 @@ function planCache.match(grid, rows)
   return k and STORE[k] or nil
 end
 
+-- REGRESSION ("the reg"): does this entry's plan actually FIRE the chain it claims? Apply the plan's swaps in
+-- order on BoardSim, take the deepest chain fired, compare to the stored claim. Layer-1 self-check (fast). A
+-- cache entry that fails verify must NOT be served. Layer-2 (next) = B's faithful ORACLE_LINE on the real engine.
+function planCache.verify(grid, rows, entry)
+  local g = BoardSim.cloneGrid(grid, rows)
+  local maxChain = 0
+  for _, sw in ipairs(entry.plan or {}) do
+    local ng, chain = BoardSim.simSwap(g, rows, sw[1], sw[2])
+    g = ng
+    if chain and chain > maxChain then maxChain = chain end
+  end
+  return maxChain >= (entry.chain or 2), maxChain
+end
+
 function planCache.store() return STORE end
 function planCache.size() local n = 0; for _ in pairs(STORE) do n = n + 1 end; return n end
 

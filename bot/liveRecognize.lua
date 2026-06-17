@@ -35,6 +35,15 @@ function M.scanFireSites(grid, rows, opts)
         -- participating cells = the directly matched cells (minimal) + the swap pair. canonShapes to a tight key.
         local cells = { { r, c }, { r, c + 1 } }
         for idx in pairs(hit) do local rr = math.floor((idx - 1) / 6) + 1; local cc = ((idx - 1) % 6) + 1; cells[#cells + 1] = { rr, cc } end
+        -- BREAK signature: include the GARBAGE cells adjacent to the match, so the key captures "match ADJACENT to
+        -- garbage" and a break is a DISTINCT tactic from a plain fire (else they collide on the same matched-cell key).
+        if garbageCleared > 0 then
+          local seen = {}; for _, cl in ipairs(cells) do seen[cl[1] * 10 + cl[2]] = true end
+          for idx in pairs(hit) do local rr = math.floor((idx - 1) / 6) + 1; local cc = ((idx - 1) % 6) + 1
+            for _, d in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do local nr, nc = rr + d[1], cc + d[2]
+              if nr >= 1 and nr <= rows and nc >= 1 and nc <= 6 and grid[nr] and grid[nr][nc] == BoardSim.GARBAGE then
+                local kk = nr * 10 + nc; if not seen[kk] then seen[kk] = true; cells[#cells + 1] = { nr, nc } end end end end
+        end
         local site = { r = r, c = c, chain = chain, total = total, garbageCleared = garbageCleared, kind = kind, cells = cells }
         sites[#sites + 1] = site
         if chain >= 2 then chainReady = true end

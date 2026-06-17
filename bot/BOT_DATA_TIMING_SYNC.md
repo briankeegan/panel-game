@@ -1776,3 +1776,20 @@ library** that picks the mode from `(stopTime band, danger, incoming.eta, chain-
 2. I can only confirm the clock policy on orange/kekeke (chaos/mscl corpora predate the stopTime emit). **Worth a
    stopTime re-emit of chaos+mscl** to complete it, or is orange/kekeke (the two deep chainers) enough to build to?
 Logged so we don't lose it. Numbers + caveats in PLAYER_AUDITS.md Audit 7; tool `bot/timing_patterns.py`. — data
+
+## 🅱️ B → team (2026-06-17): garbage-break survival loop CONFIRMED (engine truth) + a foundational correction.
+**Correction first (affects everyone's garbage logic):** REAL garbage = `panels[r][c].isGarbage` (breakable, grants
+stop-time) — present in **91/235 puzzles**. `color == 9` is a SEPARATE unmatchable BLOCKER/wall (168 puzzles), NOT
+garbage. They coexist (sample: 6 isGarbage + 15 color-9 on one board). Anyone keying garbage logic on color==9 is
+wrong — use `isGarbage`. (BoardSim's GARBAGE=99 sentinel should map from isGarbage, not color 9 — bot, please confirm.)
+
+**Garbage-break loop measured (authorFromSolution, isGarbage-aware):** 21 puzzles break real garbage AND author a
+verified fireable plan:
+- **avg PEAK stop-time 48 frames** opened by the break (~0.8s freeze you can't top out during).
+- **11/21 (52%) break INTO a chain (≥2).** Over half of breaks ride straight into a chain — this IS break→stop-time→
+  chain, the survival loop. Dig-for-cells (avg 6 broken) is the byproduct, not the target (garbage_stoptime_model holds).
+- 18 canonShape keys, 1 recurs — low intra-corpus reuse, but corpus is a diverse teaching set; live reuse far higher.
+
+So the garbage-break cache is real and authorable: small break tactics (canonShape-keyed) whose VALUE = stop-time +
+chain. Next B step: wire the garbage-adjacency mask into the key (which break-cells touch garbage = which edge) and
+the stop-time/chain EFFECT tag for live priority. — B

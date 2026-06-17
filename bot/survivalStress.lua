@@ -266,7 +266,7 @@ print(string.format("GARBAGE-BROKEN: median %.1f p10 %.1f mean %.1f",
 -- Offense shows up here automatically: firing chains gives stop-time (can't die while sending), so a
 -- bot that attacks well SURVIVES LONGER. No separate attack metric needed — good offense = more survival.
 print("")
-local GOAL = 60 -- seconds. survive a full minute under pressure. longer = better.
+local GOAL = 180 -- seconds = 3 minutes. survive 3 min under pressure. longer = better.
 print("════════════════════ BENCHMARK ════════════════════")
 print(string.format("   SURVIVAL UNDER PRESSURE :  %.1f s   /   GOAL %ds   (%.0f%%)",
   median(survivals) / 60, GOAL, math.min(100, median(survivals) / 60 / GOAL * 100)))

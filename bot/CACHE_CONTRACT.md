@@ -141,3 +141,17 @@ Once all scenarios are validated chips, tuning/priority is trivial (Brian).
 
 **Current focus = get the OTHER scenarios working as chips first** (combo â, obvious-chain â, BREAK â needs garbage-edge
 alignment, SETUP to do). Then the steady-build mode.
+
+---
+
+## STEADY-BUILD chain mode (Brian unparked it after setup hit 100%, 2026-06-17) — grounding
+A MODE, not a chip. **Chain-state signal = `st.chain_counter`** (engine-measured: climbs 1→2→3 as links resolve;
+`st:hasChainingPanels()` true during the cascade). Real chain-puzzle solutions peak chain_counter 2–3, built over
+200–440 input frames (raises + swaps) — steady, not one-shot.
+- **Enter** the mode when a chain starts (chain_counter ≥ 1 / a fire that will chain).
+- **While in it:** search ONLY the cursor's local ~5-block neighborhood for the swap that creates the NEXT link, and
+  land it inside the chain-continuation window (new match forms while prior panels still settle → chain_counter++).
+- **Exit** when no continuation exists in the window.
+**Next concrete step (B):** validate the CONTINUATION mechanism — fire a chain, and during the chaining frames apply a
+local swap that extends chain_counter beyond its natural peak. That's the timing-sensitive core; once shown, the mode
+is just: detect chain-state → continuation-search → land in window → repeat. (Setup's engine-verify pattern reused.)

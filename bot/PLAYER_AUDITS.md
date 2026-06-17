@@ -206,6 +206,19 @@ NOT a complete chain library; deep-chain ceiling play has the lowest hit-rate an
 generator — the cache can't replace it. envelope=too coarse (194:1), color canonShape=near-unique for big
 tactics — no small-library sweet spot for deep play; it's genuinely diverse.
 
+**Cache hit-ceiling** (B's "size the cache's real contribution") = fraction of tactic occurrences that RECUR =
+`1 − distinct/n` (an unbounded-cache upper bound; realized rate is lower since key match is necessary-not-
+sufficient — B's cross-puzzle fire-rate 30% is the realized number, which this brackets):
+| player | ALL clears | BIG (4+) |
+|---|---|---|
+| chaos952 | 59% | 41% |
+| mscl | 65% | 37% |
+| kekeke | 65% | 41% |
+| orangeTriangle | 72% | **29%** |
+So the cache's realistic ceiling: ~60-72% of ALL clears (small recurring tactics + breaks) but only ~29-41% of
+BIG fireable tactics, lowest for the deep chainer — agreeing with B's 30% cross-puzzle. Cache pays on the common
+small stuff; the deep-chain ceiling is live-FIT territory.
+
 ## Not-yet-measurable (need more data)
 - **Stop-time utilization** (set-up-during-freeze → fire-as-window-closes): needs per-frame `stopTime` — was reverted out of the emit for speed; re-add cheaply (`stack.stop_time + pre_stop_time`) + watchdog re-emit.
 - **Reveal foresight** (setting up to revealed garbage colors): needs reveal colors (`BoardState.captureReveals`), not in the re-sim rows.

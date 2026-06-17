@@ -1882,3 +1882,19 @@ unique for big tactics — there's no small-library sweet spot for deep play; de
 **Offer:** I can re-run with a POSITIONS-ONLY canonShape (geometric footprint, drop the color mask) to see if a
 color-blind key collapses big tactics better — that's the lever between your too-fine color mask and the too-coarse
 envelope, if you want a higher cache hit-rate. Say the word. Audit 8 in PLAYER_AUDITS.md; tool canonshape_dist.py. — data
+
+## 📊 data → B (2026-06-17): cache HIT-CEILING (sizing its real contribution — your follow-up)
+You asked how often live boards hit exact-recall vs need FIT. Hit ceiling = fraction of tactic occurrences that
+RECUR (`1 − distinct/n`), per Audit 8:
+| player | ALL clears | BIG (4+) fireable |
+|---|---|---|
+| chaos | 59% | 41% |
+| mscl | 65% | 37% |
+| kekeke | 65% | 41% |
+| orange | 72% | **29%** |
+**Read:** the cache realistically covers ~60-72% of ALL clears (small recurring tactics + breaks) but only
+~29-41% of the BIG fireable tactics, LOWEST for the deep chainer (orange 29%). This is an UPPER bound (key
+recurs); your cross-puzzle 30% is the REALIZED fire-rate (key necessary-not-sufficient — cascade needs board
+context outside the participating cells) — the two bracket the truth, and they agree: **cache ≈ a third of big
+tactics, the deep-chain ceiling is live-FIT territory.** Confirms your boss call exactly: cache = fast path for
+small recurring tactics + survival breaks; FSM + live FIT carry the novel chains. Audit 8 updated. — data

@@ -6,7 +6,7 @@
 
 | Axis | Metric | Human ref | Target | **Current** | Measured | Δ since last |
 |------|--------|-----------|--------|-------------|----------|--------------|
-| **Survival** | max sustained incoming survived (area/min) | ~144 | **> 144** | **< 144 (BELOW human)** | 2026-06-17 | baseline |
+| **Survival** | survival time at 144 area/min (human rate), seconds | ∞ (human survives) | survive 60s, then raise rate | **15.4 s** (FSM-on) / 15.3 s (FSM-off) | 2026-06-17 | baseline |
 | **Offense** | sustained garbage SENT (area/min) | ~145 med / **156** best (orange) | **> 156** (+ ≥85% chain-area, peak ≥x11) | _pending_ | — | — |
 | **Mechanics** | puzzles solved / 235 (live bot) | — | **100%** | _pending_ | — | — |
 | Contested | win% vs strong opponent | — | _held_ | — | — | — |
@@ -21,12 +21,18 @@ _"pending" = harness ready, number not yet captured. "tbd" = needs a human-ref f
 - **Mechanics** — the live bot's solve rate over the 235-puzzle corpus (engine-truth pass/fail). Authoring side already
   hits 88% verified-fireable; this row is the LIVE bot solving, not the author harness.
 
+## Metric note (Brian, 2026-06-17): REAL NUMBERS ONLY — never a "<" bound.
+Survival is tracked as **survival TIME (seconds) at a fixed rate**, which is always a real number (the bot dies at a
+real frame), NOT a "ceiling < X" bound. Primary cell = survival-time @ 144/min (human rate). The bound-style ceiling
+("max area/min survived") is kept only as a secondary diagnostic and only when it resolves to a number.
+
 ## Changelog (newest first)
-- **2026-06-17** — **FIRST SURVIVAL NUMBER: < 144 area/min (BELOW human).** Current live bot (EnvelopeBrain) died at
-  every tested rate down to 144/min (human floor) on a 30s window, 2 seeds. Honest baseline — the bot can't yet survive
-  30s at human pressure. This is PRE-integration: the timing FSM + cache aren't wired into the live brain yet (A's
-  step), so this measures the un-improved bot. Caveats: 30s window + 2 seeds (thin); the rate range bottomed at 144, so
-  the exact sub-human ceiling needs an easier-range re-run. The lever to move this: FSM/cache integration → re-measure.
+- **2026-06-17** — **SURVIVAL = 15.4 s @ 144 area/min (FSM-on), 15.3 s (FSM-off).** Real number (replaces the earlier
+  "<144" bound, per Brian). A strong human survives 144/min indefinitely, so the bot is far below — it lasts ~15 s.
+  Source: A's FSM A/B (fixed-rate `600 5400 3` = 144/min, 90s cap, 3 seeds). The timing FSM is currently NEUTRAL on
+  survival (15.4 vs 15.3) — note: it first REGRESSED to 11.3s, fixed by A's RAISE=build change. Caveat: 3 seeds (thin);
+  frozen-protocol 10-seed re-run pending. The lever now is breakReady (just shipped `scanFireSites`) + the cache.
+- **2026-06-17** — (superseded) ceiling ramp gave "<144" — a bound, not a number; switched the metric to survival-time.
 - **2026-06-17** — Survival-ceiling harness built (`survivalStress.lua ceiling`, ramp-to-failure bisection on the real
   brain). Fixed rate bounds (60–600 f = 1440–144 area/min, human→superhuman span).
 - **2026-06-17** — Benchmark redirect: pause human-profile tuning; build this harder/more-accurate benchmark first.

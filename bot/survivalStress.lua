@@ -232,6 +232,50 @@ local function boardSig(stack)
 end
 
 ----------------------------------------------------------------------
+-- SURVIVAL CEILING (ramp-to-failure) — the HARDER, MORE ACCURATE benchmark (Brian's redirect, 2026-06-17).
+-- Instead of pass/fail at a fixed gentle rate, BISECT the incoming rate to find the MAX area/min the bot survives
+-- for the target duration. One hard number, real engine, seed-majority. Superhuman bar = exceed best human (~144+).
+-- CLI: luajit bot/survivalStress.lua ceiling [surviveSeconds] [seeds]
+----------------------------------------------------------------------
+if arg[1] == "ceiling" then
+  maxFrames = (tonumber(arg[2]) or 30) * 60          -- survive-target frames (default 30s); upvalue runSeed reads
+  local nSeeds = tonumber(arg[3]) or 3
+  local BLOCK_AREA = 24                               -- 6x4 chain-block (same block the fixed harness uses)
+  local function areaPerMin(gef) return math.floor(BLOCK_AREA * 3600 / gef) end
+  -- survives at `gef` = majority of seeds reach the survive-target without topping out.
+  local function survivesAt(gef)
+    garbageEveryFrames = gef                          -- reassign the upvalue runSeed reads at line 169
+    local reached = 0
+    for i = 1, nSeeds do
+      local sf = runSeed(1000 + i, true)
+      if sf >= maxFrames * 0.95 then reached = reached + 1 end
+    end
+    return reached * 2 >= nSeeds                      -- majority survive
+  end
+  print(string.format("SURVIVAL CEILING (ramp-to-failure): survive-target %ds, %d seeds, real EnvelopeBrain. human ref ~144 area/min.", math.floor(maxFrames / 60), nSeeds))
+  -- bisect frames: survivesAt is TRUE for EASY (large frames), FALSE for HARD (small frames). Find the smallest
+  -- (hardest) frames it still survives → highest survivable area/min = the ceiling.
+  local lo, hi = 60, 600   -- hard (1440/min, superhuman) .. human (144/min)
+  local ceilingFrames = nil
+  for _ = 1, 7 do
+    local mid = math.floor((lo + hi) / 2)
+    local ok = survivesAt(mid)
+    print(string.format("  %d area/min (every %df): %s", areaPerMin(mid), mid, ok and "SURVIVED" or "died"))
+    if ok then ceilingFrames = mid; hi = mid else lo = mid end
+  end
+  print("════════════════════ SURVIVAL CEILING ════════════════════")
+  if ceilingFrames then
+    print(string.format("   CEILING : %d area/min  (survives %ds @ a 6x4 block every %df)  | human ref 144 | %s",
+      areaPerMin(ceilingFrames), math.floor(maxFrames / 60), ceilingFrames,
+      areaPerMin(ceilingFrames) > 144 and "ABOVE human" or "below human"))
+  else
+    print(string.format("   CEILING : <%d area/min — died even at the easiest tested rate (every %df)", areaPerMin(hi), hi))
+  end
+  print("═══════════════════════════════════════════════════════════")
+  os.exit(0)
+end
+
+----------------------------------------------------------------------
 -- run the distribution
 ----------------------------------------------------------------------
 print(string.format(

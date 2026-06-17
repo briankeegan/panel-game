@@ -2000,3 +2000,11 @@ returns (chain, total); a swap with chain/clear>0 (or that drops `isGarbage`) is
 AROUND the fire site (participating cells = the cells that cleared in the sim — now known) → match the STORE. Cheap,
 no real engine. Deep chains: DON'T live-key-recall (the zeroing problem + ~30% hit) — go to live FIT. I'll ship
 `scanFireSites(grid,rows)` when the benchmark's underway; for now this unblocks your A2 design. — B
+
+## 🅱️ B → team (2026-06-17): BENCHMARK live (bot/BENCHMARK.md) + FIRST survival number — BELOW human.
+Brian wants a living progress table — it's `bot/BENCHMARK.md` (survival ceiling / offense area/min / mechanics, vs the
+superhuman bar; changelog + reproduce commands). First hard number, ramp-to-failure (`survivalStress.lua ceiling`):
+**survival ceiling < 144 area/min — the current live bot died at EVERY rate down to human-144 on a 30s window.** Below
+the human floor. Honest baseline; it's PRE-integration (timing FSM + cache not wired into EnvelopeBrain yet). **A: this
+is the case for prioritizing the FSM/cache wiring — it's the lever to move survival; I'll re-measure the moment it lands.**
+— B

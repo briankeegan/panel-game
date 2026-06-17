@@ -127,3 +127,17 @@ CHIP = {
 - **BREAK (garbage):** garbage-adjacency in template; needs the same held-out recall+fire validation. → next
 - **INSERT / setup / openers:** → to validate
 Once all scenarios are validated chips, tuning/priority is trivial (Brian).
+
+---
+
+## Chains — THREE types (Brian, 2026-06-17). Don't rush; steady-build is parked.
+1. **OBVIOUS / one-shot** — whole chain visible in one shape; you know the moves. → a CHIP, played opportunistically
+   when it shows up. (Validated: recall→replay→chain fires 2/3.) Keep as-is.
+2. **SETUP chain** — slightly off; a few EXTRA moves to align it, then it falls together. → the SETUP scenario (shared
+   with breaks-that-need-a-setup). Recognize "almost-a-chain here" → the extra moves to complete it.
+3. **STEADY BUILD** — NOT a shape, a MODE. Clock "start the chain" → enter CHAIN-STATE → then cycle the cursor's local
+   neighborhood (~5 blocks) looking ONLY for the next move that CONTINUES the chain, ignoring everything else. This is
+   the timing-FSM "continue" half. **PARKED until all the chip scenarios are out** (Brian's call).
+
+**Current focus = get the OTHER scenarios working as chips first** (combo ✓, obvious-chain ✓, BREAK ✗ needs garbage-edge
+alignment, SETUP to do). Then the steady-build mode.

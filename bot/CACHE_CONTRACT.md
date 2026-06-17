@@ -80,3 +80,24 @@ enough blocks (sparse boards = the "not enough blocks" caveat, handled later).
 kind, effect }`. Author by: for each board, short-search (≤3) a fire/break sequence; key the minimal pattern the
 sequence operates on; store the sequence. Verify each on the real engine. Open question for Brian: key on the
 START pattern (recognize early, commit to the play) vs the END pattern (the match) — that's the design call.
+
+---
+
+## v2 BREAKTHROUGH — sliding minimal templates (Brian's cursor-spiral model, 2026-06-17). VALIDATED.
+**The recognition was the bug, not the bet.** v1 keyed a FIXED WINDOW at each position → all surrounding junk had to
+match → setups looked unique (8% recurrence). Brian's model: a shape is its **participating blocks only**; slide it
+over the board (spiral out from the cursor — close, then ±1, ±2 …), match ONLY the template's cells, **everything else
+is don't-care**. When it fits at an offset, the play = "move cursor there → run the sequence."
+
+**MEASURED (held-out, sliding minimal templates, junk=don't-care):** 74 templates → **97% of held-out boards have a
+template that fits somewhere** (was 8% with fixed windows). Corroborates data's Audit-5 setup recurrence (70-87%).
+
+**The model (locked):**
+- TEMPLATE = participating cells as relative `{dr, dc, colorClass}` (first-appearance same/diff), NO bbox window, NO junk.
+- MATCH = slide the template over the board; at each offset check ONLY its cells satisfy the same/diff classes; rest ignored.
+- RECALL = the offset gives the cursor move ("4 left"); the stored sequence gives the play from there.
+- `bot/slideMatchProto.lua` is the validated prototype.
+
+**Next:** (1) confirm the matched template's PLAY actually FIRES at the offset (recognition=97%, fire-given-match TBD),
+(2) rewrite `planCache.match` to slide templates instead of keying fixed windows, (3) extend to multi-move sequences +
+breaks. The recognition mechanism that blocked everything is solved.

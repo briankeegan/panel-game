@@ -22,14 +22,19 @@ function M.scanFireSites(grid, rows, opts)
   local best = nil
   for r = lo, hi do
     for c = 1, 5 do  -- a swap at col c swaps c,c+1 (cols 1..6) so c in 1..5
-      local newg, chain, total, _, garbageCleared = BoardSim.simSwap(grid, rows, r, c)
+      -- SHAPE (the cache key): apply JUST the swap and take the cells that DIRECTLY match — the minimal 3+ line,
+      -- not the cascade fallout. That's what collapses to a few recurring shapes (CACHE_CONTRACT). effect uses the
+      -- full simSwap for chain/garbage so FSM priority is real.
+      local gs = BoardSim.cloneGrid(grid, rows)
+      if gs[r] and gs[r][c + 1] then gs[r][c], gs[r][c + 1] = gs[r][c + 1], gs[r][c] end
+      local hit, any = BoardSim.findMatches(gs, rows)
+      local _, chain, total, _, garbageCleared = BoardSim.simSwap(grid, rows, r, c)
       chain = chain or 0; total = total or 0; garbageCleared = garbageCleared or 0
-      if total > 0 or chain > 0 or garbageCleared > 0 then
+      if any or total > 0 or chain > 0 or garbageCleared > 0 then
         local kind = (garbageCleared > 0) and "break" or (chain >= 2 and "chain" or "combo")
-        -- participating cells for A2 cache keying: the swap pair + cells that emptied (estimate; includes some
-        -- fall-vacated cells, but for small tactics the footprint is tight). A bbox+canonShapes this to match the STORE.
+        -- participating cells = the directly matched cells (minimal) + the swap pair. canonShapes to a tight key.
         local cells = { { r, c }, { r, c + 1 } }
-        if newg then for rr = 1, rows do for cc = 1, 6 do if (grid[rr][cc] or 0) ~= 0 and (newg[rr] and (newg[rr][cc] or 0) == 0) then cells[#cells + 1] = { rr, cc } end end end end
+        for idx in pairs(hit) do local rr = math.floor((idx - 1) / 6) + 1; local cc = ((idx - 1) % 6) + 1; cells[#cells + 1] = { rr, cc } end
         local site = { r = r, c = c, chain = chain, total = total, garbageCleared = garbageCleared, kind = kind, cells = cells }
         sites[#sites + 1] = site
         if chain >= 2 then chainReady = true end

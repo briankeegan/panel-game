@@ -48,7 +48,7 @@ local LevelPresets = require("common.data.LevelPresets")
 
 -- ── args ────────────────────────────────────────────────────────────────────
 local opt = { mode = "solutions", difficulty = "hard", variants = 3, split = 0.8,
-              max = math.huge, only = nil, verbose = false, brain = "search", wbuild = nil }
+              max = math.huge, only = nil, verbose = false, brain = "search" }
 for _, a in ipairs(arg) do
   if a == "--solutions" then opt.mode = "solutions"
   elseif a == "--bot" then opt.mode = "bot"
@@ -58,8 +58,7 @@ for _, a in ipairs(arg) do
   elseif a:match("^--split=") then opt.split = tonumber(a:match("=(.+)$"))
   elseif a:match("^--max=") then opt.max = tonumber(a:match("=(.+)$"))
   elseif a:match("^--only=") then opt.only = a:match("=(.+)$")
-  elseif a:match("^--brain=") then opt.brain = a:match("=(.+)$") -- search|mpc
-  elseif a:match("^--wbuild=") then opt.wbuild = tonumber(a:match("=(.+)$")) -- MPCBrain BUILD term weight
+  elseif a:match("^--brain=") then opt.brain = a:match("=(.+)$") -- search|envelope
   elseif a:match("^--maxframes=") then opt.maxframes = tonumber(a:match("=(.+)$")) -- per-puzzle frame cap
   else io.stderr:write("gateBench: unknown arg '" .. a .. "'\n"); os.exit(1) end
 end
@@ -178,8 +177,8 @@ end
 local _botBrain, _botController, _boardState
 local function botParts(difficulty)
   if not _botBrain then
-    if opt.brain == "mpc" then
-      _botBrain = require("bot.MPCBrain").new({ difficulty = difficulty, wBuild = opt.wbuild })
+    if opt.brain == "envelope" then
+      _botBrain = require("bot.EnvelopeBrain").new({ difficulty = difficulty })
     else
       _botBrain = require("bot.SearchBrain").new({ difficulty = difficulty })
     end
@@ -289,7 +288,7 @@ end
 local elapsed = os.clock() - t0
 
 -- ── report ───────────────────────────────────────────────────────────────────
-local _brainLabel = opt.brain == "mpc" and ("MPCBrain wBuild=" .. tostring(opt.wbuild or 0)) or "SearchBrain"
+local _brainLabel = opt.brain == "envelope" and "EnvelopeBrain" or "SearchBrain"
 local label = (opt.mode == "solutions") and "OPTIMAL-SOLUTION REPLAY (faithfulness oracle)"
   or ("LIVE BOT (" .. _brainLabel .. ", difficulty=" .. opt.difficulty .. ")")
 

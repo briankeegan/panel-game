@@ -246,7 +246,7 @@ print(string.format(
   garbageEveryFrames, maxFrames, seeds))
 
 local survivals, broken = {}, {}
-local totalSwaps, totalGarbInj = 0, 0
+local totalSwaps, totalGarbInj, totalChains, totalFrames = 0, 0, 0, 0
 for i = 1, seeds do
   local seed = 1000 + i -- deterministic, reproducible seed set
   local sf, gb, diag = runSeed(seed, true)
@@ -254,6 +254,8 @@ for i = 1, seeds do
   broken[#broken + 1] = gb
   totalSwaps = totalSwaps + diag.swaps
   totalGarbInj = totalGarbInj + diag.garbageInjected
+  totalChains = totalChains + diag.chainsFired
+  totalFrames = totalFrames + sf
   print(string.format("  seed %d: survived %d frames (%.1fs)  garbage-broken %d  swaps %d  garbInjected %d",
     seed, sf, sf / 60, gb, diag.swaps, diag.garbageInjected)
     .. string.format("  chains-fired %d (%.1f/min) peakChain %d",
@@ -265,6 +267,15 @@ print(string.format("SURVIVAL: median %.1fs p10 %.1fs mean %.1fs",
   median(survivals) / 60, p10(survivals) / 60, mean(survivals) / 60))
 print(string.format("GARBAGE-BROKEN: median %.1f p10 %.1f mean %.1f",
   median(broken), p10(broken), mean(broken)))
+
+-- ════════ THE BENCHMARK: two numbers. survival time + attack rate. that's it. ════════
+local attackRate = totalChains / math.max(totalFrames / 3600, 0.01) -- chains fired per minute of play
+print("")
+print("════════════════════ BENCHMARK ════════════════════")
+print(string.format("   SURVIVAL TIME :  %.1f s   (median; higher = lives longer)", median(survivals) / 60))
+print(string.format("   ATTACK RATE   :  %.1f chains/min   (higher = hits harder)", attackRate))
+print("   (run with PA_BRAIN=envelope for the new bot; plain = old SearchBrain baseline)")
+print("════════════════════════════════════════════════════")
 
 ----------------------------------------------------------------------
 -- PARITY VALIDATION — prove offline behaves the SAME as online.

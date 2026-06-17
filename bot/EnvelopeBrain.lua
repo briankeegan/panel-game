@@ -7,7 +7,7 @@
 -- per-replan spike — that's the next layer, keyed by board signature; here we validate the cadence itself.)
 --
 -- Generator is still the local fitSearch placeholder; B's ORACLE_STACK plan-generator drops in behind
--- generatePlan() once it's solid. Same decide(state) -> {SWAP|RAISE|WAIT} seam as SearchBrain/MPCBrain.
+-- generatePlan() once it's solid. Same decide(state) -> {SWAP|RAISE|WAIT} seam as SearchBrain.
 
 local BoardSim = require("bot.BoardSim")
 local BuildEnvelope = require("bot.buildEnvelope")
@@ -30,9 +30,9 @@ local DEFAULTS = {
   replanEvery = tonumber(os.getenv("PA_REPLAN")) or 30,  -- MPC cadence K: re-plan every K frames, else open-loop
   surface     = tonumber(os.getenv("PA_SURFACE")) or 5,  -- region cap: only search the top N stack rows
   -- B's deepFit generator (deeper chains than the live fitSearch can reach; amortized over the cadence).
-  deepDepth   = tonumber(os.getenv("PA_DEEP")) or 5,
+  deepDepth   = tonumber(os.getenv("PA_DEEP")) or 4,
   deepBeam    = tonumber(os.getenv("PA_DEEPBEAM")) or 4,
-  deepBudget  = tonumber(os.getenv("PA_DEEPBUDGET")) or 6000,
+  deepBudget  = tonumber(os.getenv("PA_DEEPBUDGET")) or 2000,
 }
 
 function EnvelopeBrain.new(opts)

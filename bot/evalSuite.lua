@@ -19,17 +19,17 @@
 -- OPTIONS:
 --   --profile=PATH       bot profile json (bot/profiles/*.json); drives survival+league test bot.
 --   --difficulty=hard    tier for the gate bot + as fallback when no profile (hard|medium|easy).
---   --brain=search|mpc   which brain the GATE scenario runs (default search). mpc = MPCBrain planner.
---   --wbuild=N           MPCBrain BUILD-term weight (only with --brain=mpc).
+--   --brain=search|envelope   which brain the GATE scenario runs (default search). envelope = the EnvelopeBrain chain bot.
+--   --wbuild=N           (unused; kept for compatibility)
 --   --scenarios=a,b,c    subset of {gate,survival,league} (default: all).
 --   --quick              small/fast sizes (smoke). Default is FULL sizes.
 --   --ab=PATH            A/B mode: also eval this second profile, print side-by-side + deltas.
---   --ab-brain=X         A/B mode: eval a second BRAIN (e.g. --brain=mpc --ab-brain=search).
+--   --ab-brain=X         A/B mode: eval a second BRAIN (e.g. --brain=envelope --ab-brain=search).
 --   --ab-wbuild=N        A/B mode: eval a second wbuild weight (compare MPCBuild settings).
 --   --raw                also dump each harness's full stdout (debugging the parse).
 --
 -- NOTE: --brain affects the GATE scenario only — survival/league harnesses construct SearchBrain
--- internally (MPCBrain not yet wired into them). Gate is where the planner is developed, so that's
+-- internally (EnvelopeBrain runs in survival via PA_BRAIN=envelope). Gate is where the planner is developed, so that's
 -- the high-value 80%; wiring MPCBrain into survival/league is a follow-up.
 --
 -- This is the script the user asked for: "good script set up for running and evaluating
@@ -46,7 +46,7 @@ for _, a in ipairs(arg) do
   elseif a == "--raw" then opt.raw = true
   elseif a:match("^--profile=") then opt.profile = a:match("=(.+)$")
   elseif a:match("^--difficulty=") then opt.difficulty = a:match("=(.+)$")
-  elseif a:match("^--brain=") then opt.brain = a:match("=(.+)$")          -- search|mpc (gate scenario)
+  elseif a:match("^--brain=") then opt.brain = a:match("=(.+)$")          -- search|envelope (gate scenario)
   elseif a:match("^--wbuild=") then opt.wbuild = tonumber(a:match("=(.+)$"))
   elseif a:match("^--ab=") then opt.ab = a:match("=(.+)$")               -- A/B a second PROFILE
   elseif a:match("^--ab%-brain=") then opt.abBrain = a:match("=(.+)$")    -- A/B a second BRAIN

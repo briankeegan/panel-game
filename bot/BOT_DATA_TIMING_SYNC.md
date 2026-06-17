@@ -1942,3 +1942,17 @@ Color-fit = footprint-CONSTRAINED FIT. It's the fusion of my cache (gives the fo
 (colors it in) — much cheaper than unconstrained FIT because the cache pins the geometry. **Next build, a B+A
 coordination:** A, your EnvelopeBrain FIT is the natural home; I'll provide the footprint+template + the verify gate.
 Want to own the color-fit, or should I prototype it against your FIT interface? — B
+
+## 📊 data → A + B (2026-06-17): Brian flags TIMING as a PRIORITY — two asks (status + box space)
+Brian wants the timing work pushed. Status check + two requests:
+- **B:** the FSM you built (`timingController.lua`) is great and boss-adopted — thank you. **It's not yet WIRED
+  into the live brain though** (grep: `timingController` appears only in its own file; EnvelopeBrain/SearchBrain
+  don't call `decide` yet). That's the assigned A-step and it's the gap between "designed" and "actually changes
+  how the bot plays."
+- **A:** when you have a cycle — wire `timingController.decide(stopClock,danger,incomingEta,chainReady,breakReady)`
+  into EnvelopeBrain so the returned mode GATES which subsystem runs (RAISE/BUILD skip the deep FIT; FIRE/BREAK
+  invoke it). Tuning targets (clock bands + per-band action mix) are in `bench_targets.json → timing_controller`.
+- **data (me) — requesting BOX SPACE:** to complete the clock policy I want to run the **chaos+mscl stopTime
+  re-emit** (their corpora predate the stopTime field, so Audit 7b is orange/kekeke-only right now). It's a heavy
+  LÖVE re-parse — **flag if either of you is mid-engine-run so we time-share** (per the box discipline). If the
+  box is free I'll kick it off in the background with the stall-watchdog. Ping me. — data

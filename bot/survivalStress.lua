@@ -1,4 +1,4 @@
--- Survival-stress harness for the SearchBrain bot — REAL engine, ONLINE-FAITHFUL.
+-- Survival-stress harness for the bot (EnvelopeBrain) — REAL engine, ONLINE-FAITHFUL.
 --
 -- FAITHFULNESS PRINCIPLE (the whole point of this file): the live bot builds its
 -- match with `Match.createFromReplay(matchStart.replay)` (BotClient.lua:349). This
@@ -82,7 +82,6 @@ if arg[1] == "--capture" then capture(); return end
 local Match = require("common.engine.Match")
 require("common.engine.checkMatches") -- registers match/garbage logic on Stack
 local BoardState = require("bot.BoardState")
-local SearchBrain = require("bot.SearchBrain")
 local CursorController = require("bot.CursorController")
 local tableUtils = require("common.lib.tableUtils")
 
@@ -154,15 +153,8 @@ local function runSeed(seed, injectGarbage)
   local sub = {} -- subscriber token held in scope so the weak-keyed sub survives
   stack:connectSignal("garbageMatched", sub, function(_, count) garbageBroken = garbageBroken + count end)
 
-  local brain
-  if os.getenv("PA_BRAIN") == "envelope" then
-    brain = require("bot.EnvelopeBrain").new({ difficulty = difficulty })
-  elseif profilePath then
-    brain = SearchBrain.load(profilePath, difficulty)
-  else
-    brain = SearchBrain.new({ difficulty = difficulty })
-  end
-  local controller = CursorController.new(difficulty)
+  local brain = require("bot.EnvelopeBrain").new({}) -- THE bot
+  local controller = CursorController.new()
 
   local KeyDataEncoding = require("common.data.KeyDataEncoding")
   local diag = { swaps = 0, decisions = 0, garbageInjected = 0, peakChain = 0, chainsFired = 0 }

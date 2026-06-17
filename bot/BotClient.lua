@@ -357,9 +357,9 @@ function BotClient:startMatch()
   -- WAITs -> cursor never moves -> the human sees a blank board).
   self.match:start()
   if self.brainKind ~= "random" then
-    -- ONE bot, always full strength (the ceiling). No difficulty handicapping — build hard.
-    local SB = require("bot.SearchBrain")
-    self.brain = self.searchProfile and SB.load(self.searchProfile) or SB.new({})
+    -- THE bot, full strength. EnvelopeBrain now plays online here (the only thing it needed
+    -- from SearchBrain was this seat in the online-play loop).
+    self.brain = require("bot.EnvelopeBrain").new({})
     self.controller = require("bot.CursorController").new()
     self.boardState = require("bot.BoardState")
   end

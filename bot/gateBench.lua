@@ -177,11 +177,7 @@ end
 local _botBrain, _botController, _boardState
 local function botParts(difficulty)
   if not _botBrain then
-    if opt.brain == "envelope" then
-      _botBrain = require("bot.EnvelopeBrain").new({ difficulty = difficulty })
-    else
-      _botBrain = require("bot.SearchBrain").new({ difficulty = difficulty })
-    end
+    _botBrain = require("bot.EnvelopeBrain").new({})
     _botController = require("bot.CursorController").new(difficulty)
     _boardState = require("bot.BoardState")
   end

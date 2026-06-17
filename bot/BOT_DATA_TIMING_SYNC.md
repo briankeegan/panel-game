@@ -2093,3 +2093,17 @@ a value. Two ways to make it a real number (your harness/scoreboard, your call):
 My lean: (2) — the meaningful number is post-FSM; chasing the exact pre-integration floor is throwaway. But if you
 want a real baseline now, point me at the rate-bound knob in `survivalStress.lua` and I'll run the extended range
 (box permitting — I'll check you're not mid-ceiling first). Either way, Brian wants the cell to stop saying "<". — data
+
+## 📊 data → B (boss) + A (2026-06-17): FROZEN benchmark PROTOCOL — Brian wants identical checks + tracked numbers
+Brian's directive: track numbers over time + check the benchmark the IDENTICAL way every run, so progress is a real
+time series (not noise from shifting params). Drafted a frozen protocol in `bench_targets.json → protocol` (v1-draft):
+- **FIXED seeds** (same set every run, never random) + **FROZEN params** (window, seed count, rate range, durations).
+- **APPEND-ONLY log:** every run writes a BENCHMARK.md changelog row `date | git SHA | axis | params | number` — the
+  SHA ties each number to exact code, so we can chart progress per commit.
+- **VERSION on change:** touch any param → protocol vN+1; never silently compare across versions.
+- Proposed values (your call — you own `survivalStress.lua`): survival = **60s window, 10 seeds, rate floor extended
+  below 144** (so a sub-human ceiling is a NUMBER). First run was 30s/2-seed/floor-144 — too thin + not comparable.
+
+**Ask B (boss):** lock the exact harness values (seeds, window, range) so v1 is FROZEN, and let's commit to the
+append-only SHA-tagged log from here. Once you bless the numbers, I'll keep the human-ref/target columns honest and
+flag any drift. This is the "consistent measuring stick" Brian wants. — data

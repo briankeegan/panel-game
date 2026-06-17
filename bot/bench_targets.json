@@ -149,5 +149,42 @@
       "orangeTriangle": 18.1
     }
   },
-  "_north_star": "CEILING FIRST. Build strictly-better-than-best-human on every axis, THEN tune DOWN for the ladder. NOTHING is tuned toward human level. Every human number here is a FLOOR TO EXCEED, not a match-target. The timing-controller per-band mix is the MECHANISM to adopt (clock0->RAISE, high->FIRE), NOT percentages to reproduce. Down-tuning (cursor speed, fumble, scaled offense) happens ONLY after the bot is superhuman. Style-matched clones are a SEPARATE later layer, not this."
+  "_north_star": "CEILING FIRST. Build strictly-better-than-best-human on every axis, THEN tune DOWN for the ladder. NOTHING is tuned toward human level. Every human number here is a FLOOR TO EXCEED, not a match-target. The timing-controller per-band mix is the MECHANISM to adopt (clock0->RAISE, high->FIRE), NOT percentages to reproduce. Down-tuning (cursor speed, fumble, scaled offense) happens ONLY after the bot is superhuman. Style-matched clones are a SEPARATE later layer, not this.",
+  "protocol": {
+    "_doc": "FROZEN benchmark protocol \u2014 run IDENTICALLY every time so numbers are comparable across commits (Brian: track numbers, check the same way as we go). If any param changes, BUMP version and label runs with it, so old/new numbers are never silently compared. Harness-specific values marked PROPOSE pending B's confirmation (B owns survivalStress.lua).",
+    "version": "v1-draft",
+    "rules": [
+      "FIXED seeds \u2014 same seed set every run, never random (else survival/offense numbers aren't comparable).",
+      "FROZEN params \u2014 window, seed count, rate range, durations are constants of the protocol version.",
+      "APPEND-ONLY log \u2014 every run adds a BENCHMARK.md changelog row: date | git SHA | axis | params | number. Never overwrite; the SHA ties the number to exact code.",
+      "VERSION on change \u2014 alter any param => protocol vN+1; don't compare across versions without a re-run."
+    ],
+    "axes": {
+      "survival": {
+        "cmd": "luajit bot/survivalStress.lua ceiling <window_s> <seeds>",
+        "propose": {
+          "window_s": 60,
+          "seeds": 10,
+          "rate_range_areamin": "72..1440 (extend floor below 144 so a sub-human ceiling is a NUMBER, not '<144')"
+        },
+        "metric": "max sustained incoming area/min survived for window_s"
+      },
+      "offense": {
+        "cmd": "(harness TBD \u2014 B)",
+        "propose": {
+          "duration_s": 120,
+          "seeds": 10
+        },
+        "metric": "garbage area/min SENT + chain-area-share% + peak-chain"
+      },
+      "mechanics": {
+        "cmd": "(live-bot solve over 235 puzzles)",
+        "metric": "puzzles solved /235 (engine-truth)"
+      },
+      "contested": {
+        "status": "held (Phase 2)",
+        "metric": "win% + effective pressure vs a digging opponent (contested_scorecard.py)"
+      }
+    }
+  }
 }

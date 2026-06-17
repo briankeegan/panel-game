@@ -357,18 +357,10 @@ function BotClient:startMatch()
   -- WAITs -> cursor never moves -> the human sees a blank board).
   self.match:start()
   if self.brainKind ~= "random" then
-    if self.brainKind == "search" then
-      -- searchProfile (JSON weight path) conditions the eval per player (Phase B);
-      -- self.difficulty sets move quality (chain awareness + fumble rate).
-      local SB = require("bot.SearchBrain")
-      self.brain = self.searchProfile and SB.load(self.searchProfile, self.difficulty)
-        or SB.new({ difficulty = self.difficulty })
-    elseif self.brainKind == "expert" then
-      self.brain = require("bot.ExpertBrain").new()
-    else
-      self.brain = require("bot.HeuristicBrain").new()
-    end
-    self.controller = require("bot.CursorController").new(self.difficulty)
+    -- ONE bot, always full strength (the ceiling). No difficulty handicapping — build hard.
+    local SB = require("bot.SearchBrain")
+    self.brain = self.searchProfile and SB.load(self.searchProfile) or SB.new({})
+    self.controller = require("bot.CursorController").new()
     self.boardState = require("bot.BoardState")
   end
   -- Display-snapshot capture so a human opponent sees the bot's board.

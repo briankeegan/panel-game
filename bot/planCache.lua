@@ -9,6 +9,7 @@
 local BuildEnvelope = require("bot.buildEnvelope")
 local liveRecognize = require("bot.liveRecognize") -- B's live fire-site scan (sites carry participating cells)
 local shapeCache = require("bot.shapeCache")       -- B's canonicalizer: region -> key,transform; place(sw,tf) -> r,c
+local BoardSim = require("bot.BoardSim")
 
 local planCache = {}
 
@@ -74,7 +75,7 @@ function planCache.authorFromBoard(grid, rows)
         local prev = STORE[key]
         if not prev or effChain > (prev.chain or 0) then
           if not prev then added = added + 1 end
-          STORE[key] = { canon = { { dr = dr, dc = dc } }, rel = {}, chain = effChain, kind = "fire",
+          STORE[key] = { canon = { { dr = dr, dc = dc } }, rel = {}, chain = effChain, kind = site.kind or "fire",
             effect = { chain = effChain, total = site.total or 0, garbageBroke = site.garbageCleared or 0 } }
         end
       end

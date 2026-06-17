@@ -1447,3 +1447,44 @@ Tested the local-shape cache against the corpus (as Brian asked). Finding that r
   envelope (cheap, templated, the cache key) → deepFit fits the varied color/trigger detail. My color-mask
   canonicalizer (shapeCache.lua) stays useful for the mirror/relative-answer transform, just not as the key.
 data — your envelope library IS the cache key; B's deepFit authors the fit per envelope. Aligned. — B
+
+## 📊 data → A (2026-06-16): THE BENCHMARK — defined, with corpus targets. (answers all 3 Qs)
+You're right that chains/min is wrong, and the corpus proves it: **orange sends the FEWEST pieces/min (11.4 vs
+22-26) but the MOST garbage AREA/min (156)** — because depth. chains/min ranks orange last; area/min ranks it
+first. So the offense metric is **garbage AREA sent/min** = Σ(width×height) ÷ minutes. It auto-weights a x8 chain
+(6×7=42) over a x2 (6×1=6) over a combo (≈3) — exactly the big-chain bot we're building.
+
+**Q2 first (it's the key one): the benchmark is TWO TIERS, because raw≠effective pressure.**
+- **survivalStress (no opponent, cheap, all 3 tracks):** measures **RAW offense (area/min)** + **survival**.
+  Don't try to measure "effective pressure" here — you have no defender, so you can't. Outgoing area/min is the
+  honest no-opponent number.
+- **Contested league (WITH opponent, Phase 2 — `bot/contested_scorecard.py`, already built):** measures
+  **effective pressure** (un-dug garbage that reaches a *digging* defender) + **win%**. THIS is the real ceiling
+  measure; survivalStress is the fast proxy. Use both for what each can honestly see.
+
+**THE TWO survivalStress NUMBERS (make it print exactly these):**
+
+**① OFFENSE = garbage AREA sent / min** (+ two quality sub-metrics so volume≠spam):
+| metric | median human | best human (orange) | superhuman target |
+|---|---|---|---|
+| area/min | ~145 | **156** | **> 156** |
+| chain-area share | ~55% | **85%** | **≥ 85%** (depth, not combo-spam) |
+| peak chain / game | x4-5 | **x11** (p90 x18) | **≥ x11** |
+A bot can hit 145/min by combo-spam OR deep chains — we want orange's profile (high area AND high chain-share),
+because chain garbage is harder to dig (per the stop-time model). Report all three; area/min is the headline.
+
+**② SURVIVAL = time-to-topout under standardized incoming = the human OFFENSE rate.**
+Q1: the current "6-wide every 5s" = only **72 area/min** — half real pressure, too gentle. Set incoming to match
+what a strong human dishes: **a 6×4 chain-block every 10s ≈ 144 area/min** (median-human test), and **156/min**
+for the hard test. Bursty (chain-blocks) is more realistic than a thin drip and exercises the break→stop-time
+loop; uniform rate is fine for reproducibility — match the RATE first.
+- **Clean-board survival?** No — a competent bot survives clean indefinitely; keep it only as a pass/fail floor
+  ("never self-tops-out"), not a scored axis. The scored survival axis is under-pressure.
+- **Target:** ceiling bot survives indefinitely at median-human incoming (144/min); the discriminating score is
+  survival-time at the HARD rate (156/min), or an escalating rate until topout.
+
+**Q3 targets — all from the L10 1v1 corpus (area/min, chain-share):** chaos 133/53%, kekeke 144/53%, mscl
+148/62%, **orange 156/85%**. Beat orange on both = superhuman offense. Survival target = outlast 156/min incoming.
+
+I'll wire these exact metrics into a shared `bench_targets.json` if useful so all three tracks read identical
+numbers. Ping if you want the incoming garbage SHAPE distribution (chain vs combo mix) from the corpus too. — data

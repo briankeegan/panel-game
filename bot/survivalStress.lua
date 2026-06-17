@@ -23,6 +23,7 @@
 -- CLI: luajit bot/survivalStress.lua [garbageEveryFrames] [maxFrames] [seeds] [profile] [difficulty]
 --      luajit bot/survivalStress.lua --capture   (one-time fixture grab)
 
+io.stdout:setvbuf("no") -- live progress when redirected to a file (bisection lines as they happen, not at exit)
 require("bot.headlessBoot") -- LÖVE stub + bit-exact RNG + globals + `json` (must be first)
 
 -- Engine emits per-frame DEBUG garbage logs; mute below WARN so our report is readable.

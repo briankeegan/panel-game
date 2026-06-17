@@ -118,6 +118,12 @@ function M.authorFromSolution(puzzle)
   local region = {}
   for r = rmin, rmax do local row = {} for c = cmin, cmax do row[#row + 1] = mcol[b4[r][c] or 0] and (b4[r][c] or 0) or 0 end region[#region + 1] = row end
   local key, tf = shapeCache.canonShape(region)
+  -- GEOMETRIC key (data's Audit 8): color-BLIND footprint — all participating cells -> 1. Top players template the
+  -- geometry and vary only color, so this folds deep chains ~2x better (orange hit-ceiling 29%->70%). Recall on this
+  -- key = TEMPLATE; the live board then needs COLOR-FIT. Same crop/mirror-fold, just a 1/0 footprint.
+  local geomRegion = {}
+  for r = 1, #region do local row = {} for c = 1, #region[r] do row[c] = (region[r][c] ~= 0) and 1 or 0 end geomRegion[r] = row end
+  local keyGeom = shapeCache.canonShape(geomRegion)
   -- CANONICAL-frame plan (recall-ready): each swap in {dr,dc} relative to the canonShape frame (mirror-folded),
   -- so place(canon, otherTf) re-targets it onto ANY board with the same key. region origin = (rmin,cmin) on the board.
   local canon
@@ -131,7 +137,7 @@ function M.authorFromSolution(puzzle)
     end
   end
   return { plan = plan, rel = rel, chain = maxChain, swaps = #plan, cleared = cleared, inputs = inputs, key = key,
-           tf = tf, origin = { rmin, cmin }, canon = canon, stopTime = peakStop, garbageBroke = garbageBroke }
+           keyGeom = keyGeom, tf = tf, origin = { rmin, cmin }, canon = canon, stopTime = peakStop, garbageBroke = garbageBroke }
 end
 
 -- replay a plan on a fresh board, OVERRIDING only the cursor at each swap (template timing + raises preserved).
@@ -183,12 +189,14 @@ if arg and arg[0] and arg[0]:find("authorPlan") then
     -- with the same canonShape key? (cross-VARIANT was 9/9; this is cross-PUZZLE — genuinely different boards.)
     -- Place A's canonical plan onto B via B's own tf/origin (isolates recall+place from the separate live-scan step),
     -- then replay A's input TEMPLATE on B overriding the cursor with the placed positions.
-    local byKey = {}
+    local keyField = (arg[3] == "geom") and "keyGeom" or "key"  -- which key to group by (color vs geometric footprint)
+    local byKey, authored = {}, 0
     for _, e in ipairs(flat) do
       local entry = M.authorFromSolution(e.puzzle)
-      if entry and entry.key and entry.canon and entry.tf then
-        byKey[entry.key] = byKey[entry.key] or {}
-        table.insert(byKey[entry.key], { entry = entry, puzzle = e.puzzle, set = (e.set or ""):gsub("puzzle_set_name_", "") })
+      if entry and entry[keyField] and entry.canon and entry.tf then
+        authored = authored + 1
+        byKey[entry[keyField]] = byKey[entry[keyField]] or {}
+        table.insert(byKey[entry[keyField]], { entry = entry, puzzle = e.puzzle, set = (e.set or ""):gsub("puzzle_set_name_", "") })
       end
     end
     local pairsTested, fired, chainOk = 0, 0, 0
@@ -217,7 +225,11 @@ if arg and arg[0] and arg[0]:find("authorPlan") then
         end end
       end
     end
-    print(string.format("CROSS-PUZZLE RECALL: %d pairs (recurring keys) | %d FIRE (%.0f%%) | %d match A's chain depth",
+    local distinct, recur = 0, 0
+    for _, g in pairs(byKey) do distinct = distinct + 1; if #g >= 2 then recur = recur + 1 end end
+    print(string.format("CROSS-PUZZLE RECALL (key=%s): %d authored, %d distinct keys, %d recur >=2",
+      keyField, authored, distinct, recur))
+    print(string.format("  %d pairs tested | %d FIRE (%.0f%%) | %d match A's chain depth  (raw replay, no color-fit yet)",
       pairsTested, fired, pairsTested > 0 and 100 * fired / pairsTested or 0, chainOk))
     os.exit(0)
   end

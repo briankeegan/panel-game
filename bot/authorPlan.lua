@@ -12,6 +12,7 @@ local BoardSim = require("bot.BoardSim")
 local BuildEnvelope = require("bot.buildEnvelope")
 local deepFit = require("bot.deepFit")
 local planCacheOracle = require("bot.planCacheOracle")
+local shapeCache = require("bot.shapeCache")
 
 local M = {}
 
@@ -76,9 +77,11 @@ function M.authorFromSolution(puzzle)
   st:setMaxRunsPerFrame(1); m:start()
   local function surface() local H = 0 for r = 1, st.height do for c = 1, 6 do if (st.panels[r][c].color or 0) ~= 0 then H = r end end end return H end
   local function panels() local n = 0 for r = 1, st.height do for c = 1, 6 do local v = st.panels[r][c].color or 0; if v ~= 0 and v ~= 9 then n = n + 1 end end end return n end
+  local function readGrid() local g = {} for r = 1, st.height do g[r] = {} for c = 1, 6 do g[r][c] = st.panels[r][c].color or 0 end end return g end
   local inputs = IC.decompressInputString2(puzzle.solution or "")
   if inputs == "" then return nil, "no solution" end
   local base = panels()
+  local b4 = readGrid()  -- initial board, for the participating-cell KEY (swap + cleared cells)
   local plan, rel, maxChain, lastSwapFrame = {}, {}, 0, 0
   for i = 1, #inputs do
     local ch = inputs:sub(i, i)
@@ -98,7 +101,18 @@ function M.authorFromSolution(puzzle)
   for k = 1, 300 do if (st.chain_counter or 0) > maxChain then maxChain = st.chain_counter end if st:game_ended() then break end st:receiveConfirmedInput("A"); m:run() if k >= 5 and not st:hasActivePanels() and not st:hasChainingPanels() then break end end
   local cleared = base - panels()
   if cleared <= 0 or #plan == 0 then return nil, "solution didn't fire" end
-  return { plan = plan, rel = rel, chain = maxChain, swaps = #plan, cleared = cleared, inputs = inputs }
+  -- KEY = participating-cell canonShape (the tactic shape the answer touches), the key proven by cross-board 9/9.
+  -- participating = swap cells + cleared cells (before≠0, after=0, a real color). bbox + margin; keep their colors.
+  local af = readGrid()
+  local mcol, rmin, rmax, cmin, cmax = {}, 99, -1, 99, -1
+  for r = 1, st.height do for c = 1, 6 do if (b4[r][c] or 0) ~= 0 and (af[r][c] or 0) == 0 then local v = b4[r][c]; if v >= 1 and v <= 6 then mcol[v] = true end end end end
+  for _, sw in ipairs(plan) do rmin = math.min(rmin, sw[1]); rmax = math.max(rmax, sw[1]); cmin = math.min(cmin, sw[2]); cmax = math.max(cmax, sw[2] + 1) end
+  for r = 1, st.height do for c = 1, 6 do if mcol[b4[r][c] or 0] then rmin = math.min(rmin, r); rmax = math.max(rmax, r); cmin = math.min(cmin, c); cmax = math.max(cmax, c) end end end
+  rmin = math.max(1, rmin - 1); rmax = math.min(st.height, rmax + 1); cmin = math.max(1, cmin - 1); cmax = math.min(6, cmax + 1)
+  local region = {}
+  for r = rmin, rmax do local row = {} for c = cmin, cmax do row[#row + 1] = mcol[b4[r][c] or 0] and (b4[r][c] or 0) or 0 end region[#region + 1] = row end
+  local key = shapeCache.canonShape(region)
+  return { plan = plan, rel = rel, chain = maxChain, swaps = #plan, cleared = cleared, inputs = inputs, key = key }
 end
 
 -- replay a plan on a fresh board, OVERRIDING only the cursor at each swap (template timing + raises preserved).
@@ -153,14 +167,12 @@ if arg and arg[0] and arg[0]:find("authorPlan") then
     for _, e in ipairs(flat) do
       if (not cf) or (e.set or ""):lower():find(cf, 1, true) then
         total = total + 1
-        local g, rows = stackToGrid(e.puzzle.stack)
-        local env = BuildEnvelope.recognize(g, rows)
         local entry = M.authorFromSolution(e.puzzle)
-        if entry and env then
+        if entry and entry.key then
           authored = authored + 1
-          byEnv[env.name] = byEnv[env.name] or { n = 0, sets = {} }
-          byEnv[env.name].n = byEnv[env.name].n + 1
-          byEnv[env.name].sets[(e.set or ""):gsub("puzzle_set_name_", "")] = true
+          byEnv[entry.key] = byEnv[entry.key] or { n = 0, sets = {} }
+          byEnv[entry.key].n = byEnv[entry.key].n + 1
+          byEnv[entry.key].sets[(e.set or ""):gsub("puzzle_set_name_", "")] = true
         end
       end
     end
@@ -169,8 +181,8 @@ if arg and arg[0] and arg[0]:find("authorPlan") then
     table.sort(groups, function(a, b) return a.v.n > b.v.n end)
     print(string.format("CORPUS AUTHORING (filter=%s): %d/%d puzzles -> VERIFIED fireable plan (%.0f%%)",
       cf or "all", authored, total, total > 0 and 100 * authored / total or 0))
-    print(string.format("  %d distinct envelopes; %d recur across >=2 authored puzzles (cross-puzzle recall possible there)", distinct, shared))
-    print("  top envelope groups (count : envelope : sets):")
+    print(string.format("  %d distinct canonShape keys; %d recur across >=2 authored puzzles (cross-puzzle recall possible there)", distinct, shared))
+    print("  top canonShape groups (count : key : sets):")
     for i = 1, math.min(12, #groups) do local gr = groups[i]
       local sl = {}; for s in pairs(gr.v.sets) do sl[#sl + 1] = s end
       print(string.format("    x%-2d  %-18s  %s", gr.v.n, gr.name:sub(1, 18), table.concat(sl, ","):sub(1, 46))) end

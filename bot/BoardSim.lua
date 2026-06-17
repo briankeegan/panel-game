@@ -550,6 +550,11 @@ end
 -- copy `grid`, apply swap (r,c)<->(r,c+1), resolve
 -- -> newGrid, chain, total, firstClear, garbageCleared
 function BoardSim.simSwap(grid, rows, r, c)
+  -- a swap off the board (row past the top / col out of range) is a NO-OP, not a crash. The build planner
+  -- (deepFit/EnvelopeBrain) can emit r > rows on a full/near-full board; guard so the bot doesn't die on it.
+  if not grid or not r or not c or r < 1 or r > rows or c < 1 or c >= WIDTH or not grid[r] then
+    return grid, 0, 0, nil, 0
+  end
   local g = BoardSim.cloneGrid(grid, rows)
   g[r][c], g[r][c + 1] = g[r][c + 1], g[r][c]
   local chain, total, firstClear, garbageCleared = BoardSim.resolve(g, rows)

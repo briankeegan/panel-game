@@ -1,0 +1,37 @@
+{
+  "_doc": "Shared bot benchmark — ONE set of metrics + targets for all three tracks (A live bot, B FIT, data). Defined by data track from the L10 1v1 re-sim corpus. See BOT_DATA_TIMING_SYNC.md (data -> A, 2026-06-16) for derivation. Two tiers: survivalStress (no opponent, RAW offense + survival) and the contested league (WITH opponent, EFFECTIVE pressure + win%).",
+
+  "offense": {
+    "headline_metric": "garbage_area_per_min",
+    "definition": "sum(width*height) over all garbage sent / game-minutes. Weights chain DEPTH (x8 chain=6x7=42) over combos (~3). Replaces chains/min, which mis-ranks the deep-chain bot.",
+    "quality_submetrics": ["chain_area_share_pct", "peak_chain_per_game"],
+    "targets": {
+      "median_human": {"area_per_min": 145, "chain_area_share_pct": 55, "peak_chain_per_game": 5},
+      "best_human_orange": {"area_per_min": 156, "chain_area_share_pct": 85, "peak_chain_per_game": 11},
+      "superhuman": {"area_per_min": ">156", "chain_area_share_pct": ">=85", "peak_chain_per_game": ">=11"}
+    },
+    "per_player_corpus": {
+      "chaos952": {"area_per_min": 133.3, "chain_area_share_pct": 53.3, "peak_chain_per_game_median": 4},
+      "kekeke":   {"area_per_min": 143.8, "chain_area_share_pct": 53.0, "peak_chain_per_game_median": 5},
+      "mscl":     {"area_per_min": 148.0, "chain_area_share_pct": 61.9, "peak_chain_per_game_median": 5},
+      "orangeTriangle": {"area_per_min": 155.7, "chain_area_share_pct": 84.9, "peak_chain_per_game_median": 11}
+    }
+  },
+
+  "survival": {
+    "metric": "time_to_topout_seconds",
+    "definition": "Survival under standardized incoming garbage matched to human OFFENSE rate. The current '6-wide every 5s' (=72 area/min) is too gentle (~half real pressure).",
+    "incoming_spec": {
+      "standard": "6x4 chain-block every 10s ~= 144 area/min (median-human pressure)",
+      "hard": "scale to 156 area/min (orange) or escalate until topout",
+      "shape_note": "bursty chain-blocks are realistic and exercise the break->stop-time loop; uniform rate ok for reproducibility — match the RATE first"
+    },
+    "clean_board": "pass/fail floor only (must NEVER self-topout); not a scored axis",
+    "targets": {
+      "median_pressure_144_per_min": "survive indefinitely",
+      "hard_pressure_156_per_min": "max survival time = the discriminating score"
+    }
+  },
+
+  "effective_pressure_note": "RAW area/min (survivalStress) overcounts — a real opponent DIGS. EFFECTIVE pressure (un-dug garbage reaching a defending board) + win% require an opponent and live in the contested league (bot/contested_scorecard.py), NOT survivalStress."
+}

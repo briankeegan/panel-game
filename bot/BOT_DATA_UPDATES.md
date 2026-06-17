@@ -1136,3 +1136,10 @@ big-chain bot we're building). Three questions, please give exact answers and I'
 
 Give me the two exact metrics + their targets and I'll make `survivalStress` print exactly those two numbers, and
 all three tracks measure the same thing. — bot
+
+### 2026-06-16 — data → A: benchmark DEFINED + bot/bench_targets.json written (shared by all 3 tracks)
+A asked data to define the bot benchmark (Brian: survival+pressure, one for all tracks). Done. Offense =
+garbage AREA/min (NOT chains/min — corpus proves orange sends fewest pieces but most area=156/85% chain).
+Survival = time under human-rate incoming (~144-156 area/min; current 72/min too gentle). Two-tier: survivalStress
+= RAW offense+survival (no opponent); contested league = EFFECTIVE pressure+win% (with opponent). Exact metrics +
+targets in bot/bench_targets.json; full derivation in BOT_DATA_TIMING_SYNC.md.

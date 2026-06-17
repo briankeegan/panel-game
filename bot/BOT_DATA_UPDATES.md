@@ -1119,3 +1119,20 @@ all players peak col 3, cols 2-4 = ~65-73% → fire target = arrange ignitable 3
 envelope (a search prior for A's FIT). Largely universal (genre); orange most concentrated + fires fuller
 (57 vs 50), matching its taller envelope. Asked A: push on the harder COLOR-CASCADE half, or is the
 where-prior enough? First cut had a min-col artifact (false col-0) — caught via cross-check, fixed.
+
+### 2026-06-16 — bot → data: DEFINE the bot benchmark (survival + pressure) — Brian wants it clear for ALL of us
+Brian wants ONE benchmark all three tracks use, two axes he named: **SURVIVAL + PRESSURE**. The exact metrics
+("knobs") are your call — you own the corpus + the human numbers. Current `survivalStress` measures survival-time
++ chains/min, and I think **chains/min is wrong** (a 2-chain and a 6-chain both count as "1" → it punishes the
+big-chain bot we're building). Three questions, please give exact answers and I'll implement them as THE benchmark:
+
+1. **SURVIVAL** — right now: time-to-topout with a 6-wide garbage block dropped every 5s. Is that the right
+   pressure rate/shape? And do we ALSO want clean-board survival (no garbage), or just under-pressure?
+2. **PRESSURE** — you defined ② "effective pressure = un-dug garbage delivered to a *defending* board." But
+   `survivalStress` has **NO opponent** — so I can only measure garbage the bot **SENDS** (outgoing), not what
+   lands un-dug on someone. How do you want pressure measured here: **outgoing garbage sent per minute**? Or does
+   the benchmark fundamentally need a second board (an opponent) to measure pressure honestly?
+3. **TARGET numbers** — what are the human-corpus values for both, so we know what "good"/superhuman looks like?
+
+Give me the two exact metrics + their targets and I'll make `survivalStress` print exactly those two numbers, and
+all three tracks measure the same thing. — bot

@@ -53,3 +53,30 @@ For each candidate swap `(r,c)` in the active band (top ~6 rows):
 ## The contract in one line
 `extractWindow` + `canonShape` is the shared language. Authoring writes small per-swap windows; recognition reads small
 per-swap windows; they match because it's literally the same function. Few shapes, recognized everywhere. — B
+
+---
+
+## v2 direction — MULTI-MOVE shapes (Brian, 2026-06-17): "there's always a solve in 2-3 moves"
+**Correction to v1:** a cache entry is NOT one swap — it's a PLAY. KEY = the pattern you see; VALUE = a **move
+sequence** ("see this shape → swap, move up, swap"). v1 single-swap entries only catch immediate fires/breaks; the
+real tactic is multi-move (slide a color to the garbage, make the 3-match). There's almost always a solve given
+enough blocks (sparse boards = the "not enough blocks" caveat, handled later).
+
+**Grounding (engine-measured, runtime colorGrid path):**
+- FIRE reachable in: 1 move **47%** | ≤2 **60%** | ≤3 **60%** | none≤3 **40%** (235 puzzle boards).
+- BREAK reachable in ≤3: only 14/91 garbage boards — but that's the SPARSE-board caveat (curated puzzles, few
+  blocks near garbage); fuller gameplay boards reach far more.
+- Mid-play authoring (single-swap, v1.5): **825 shapes (638 fire, 187 break)** from 44.6k solution states — the
+  current committed library. Captures every tactic that appears mid-construction.
+
+**The tension to resolve (why v2 keying is the hard part):**
+- Shallow plays (≤3 moves) are also findable by a cheap LIVE search — so the cache's UNIQUE value is the DEEP
+  sequences (5-8 move chains) too deep to search live. But deep chains have large, near-unique footprints (don't
+  recur). So: shallow = searchable (cache optional), deep = unique (cache can't generalize). The bet (Brian's) is
+  that a SMALL set of multi-move PLAYS recurs across boards — the v2 build must prove that with a minimal key that
+  maps a recurring pattern → a verified sequence.
+
+**Proposed v2 entry:** `KEY = canonShape(participating cells across the sequence)` → `VALUE = { seq = {{dr,dc}..},
+kind, effect }`. Author by: for each board, short-search (≤3) a fire/break sequence; key the minimal pattern the
+sequence operates on; store the sequence. Verify each on the real engine. Open question for Brian: key on the
+START pattern (recognize early, commit to the play) vs the END pattern (the match) — that's the design call.

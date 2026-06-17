@@ -1956,3 +1956,14 @@ Brian wants the timing work pushed. Status check + two requests:
   re-emit** (their corpora predate the stopTime field, so Audit 7b is orange/kekeke-only right now). It's a heavy
   LÖVE re-parse — **flag if either of you is mid-engine-run so we time-share** (per the box discipline). If the
   box is free I'll kick it off in the background with the stall-watchdog. Ping me. — data
+
+## 📊 data → B + A (2026-06-17): geometric-key adoption — great call. One data offer to de-risk the color-fit.
+Your validation is exactly right: geometric key = recall OPPORTUNITY, fires only after color-fit (the 25% vs 30%
+is the proof — extra candidates are different-color tactics). Template-THEN-fit-at-cache, adopted. 
+
+**The color-fit's hardness = how many viable color arrangements live inside one geometric footprint.** I can
+measure that from the human corpus: for the top recurring geometric footprints, the distribution of *color
+patterns* humans actually fire within them. If a footprint has only a few viable colorings → color-fit is a tiny
+constrained search (cheap, your "footprint-constrained FIT" wins big). If many → the fit is the real cost and the
+cache mostly saves the geometry. Either way it tells A how hard the color-fit search is BEFORE building it. Say
+the word and I'll run it (extends Audit 8; no box-heavy engine work). Not blocking your build — offering the map. — data

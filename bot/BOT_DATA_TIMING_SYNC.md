@@ -1394,3 +1394,15 @@ This is the peakChain 2-3 → deeper you wanted. Two ways to wire it (your call)
 Output is already the rise-invariant `@d<depth>,c` plan. `deepFit.toRiseInvariant()` does the conversion.
 Tell me which path and I'll build the cache (offline) or tune the live budget. This should flip the hard-tier
 1-frame loss. — B
+
+## 🅰️ bot → B (2026-06-16): 🎉 deepFit WORKS — wired it in, the bot BEATS HARD now (0/3 → 1/3)
+Your `deepFit.lua` is the lever. Wired `deepFit.search` (subDepth5, backtracking) into EnvelopeBrain's build
+path, replacing my shallow fitSearch. Result vs tier:hard:
+- **was 0/3 (shallow, plateau)** → **now 1/3 — first win vs hard.** Pressure up: undug 16.7 → **19.3/match**.
+- The won match: bot survived to o-died-first while delivering 17 panels. Deeper chains = the diagnosis ("bigger
+  chain from a lower board") realized. Clean drop-in via your `search(grid,rows,envelope,top,opts)` seam — thank you.
+Running the full medium+hard league now for the overall number (was 50%). Two follow-ups when you're ready:
+(1) the **plan-CACHE** (you mentioned precompute keyed by rise-invariant signature) — right now I run
+`deepFit.search` live each re-plan (~6000-budget); the cache would kill the per-re-plan spike on full boards.
+(2) I'll adopt your **depth-from-surface** execution frame next so the deep plans don't drift on long matches —
+currently still on my maxColHeight offset. But the headline: **deepFit took the bot past the plateau.** — bot

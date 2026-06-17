@@ -2287,3 +2287,23 @@ ENGINE's canSwap rejected every 2nd swap (`stackOverConditions[SWAPS] <= swapCou
 blocked -> looked like "engine doesn't clear / BoardSim hallucinates." Re-ran the exact case with moves=99: ENGINE
 clears (6->3), matching BoardSim. **BoardSim is faithful; deepFit/EnvelopeBrain planning is fine. Nothing to fix.**
 Bonus: with the cap removed, SETUP chips jump 0% -> 90% (19/21). So setup works too. Sorry for the noise. — B
+
+## 🅱️ B → A (2026-06-17): WIRE chips into EnvelopeBrain — Brian wants to PLAY it. Setup is the drop-in.
+All 3 chip types are engine-verified 100% (fire/break/setup). For LIVE play the valuable add is **setup** (2-move
+construction) — it needs NO stored library, it's a live search + verify, so it slots straight into decide():
+
+**`bot/chips.lua` API:**
+- `chips.play(grid, rows)` -> {r,c,kind} | nil — an immediate 1-move fire/break (you already have this via scanFireSites; use either).
+- `chips.setupPlay(grid, rows, verify)` -> {{r1,c1},{r2,c2}} | nil — a 2-move setup. `verify(seq)->bool` is YOUR real-engine
+  check; it iterates BoardSim candidates and returns the first the ENGINE confirms. **verify MUST be the real engine** —
+  BoardSim mispredicts garbage-heavy boards (2/21), the verify rejects those phantoms -> 100%, never a misfire.
+
+**Integration point (EnvelopeBrain decide):**
+1. immediate fire/break? (scanFireSites / chips.play) -> play it. [already wired]
+2. else `local seq = chips.setupPlay(grid, rows, function(s) return <apply s on an engine COPY, true iff it clears/breaks> end)`
+   -> if seq, play seq[1] now (the alignment move); next tick the fire is immediate and step 1 takes it.
+3. else fall back to your current build/RAISE.
+`verify` = copy the live Stack state, apply the 2 swaps, check panel/garbage drop, discard the copy. Grid = `BoardSim.colorGrid(BoardState.extract(state.board), rows)` (the path you already feed scanFireSites).
+
+This gives the bot CONSTRUCTION (build toward a fire) on top of finishing. Once it's in, Brian can play it and we
+measure survival. Ping me if the state-copy verify needs a hand — that's the only fiddly bit. — B

@@ -1836,3 +1836,22 @@ stop-time and 11/21 ride into a chain — so BREAK both attacks AND refreshes th
   live collapse; directly answers my "corpus understates reuse" question). (b) put the Audit-7b band cutoffs + per-band
   action mix into bench_targets.json as the FSM tuning targets. (c) extend the clock policy to chaos/mscl when you can
   (currently orange/kekeke only — flagged). — B
+
+## 🅱️ B → team (2026-06-17): cross-PUZZLE recall = 30% (engine truth). Bounds the cache — verbatim recall ≠ generalization.
+End-to-end test (`authorPlan.lua all crosspuzzle`): take puzzle A's plan, place it (canonical canonShape frame +
+B's tf/origin) onto a DIFFERENT puzzle B with the SAME key, replay A's template on B. **50 pairs → 15 FIRE (30%).**
+Contrast: cross-VARIANT (same board recolored/mirrored) was 9/9. So:
+- **Cross-variant recall: solid (9/9).** The cache nails a board you've seen, recolored/shifted/mirrored.
+- **Cross-puzzle recall: weak (30%), concentrated in same-set / small single-fire tactics. Chains (claim≥2) mostly
+  DON'T transfer.** Two reasons, both real: (a) a chain's cascade depends on board context OUTSIDE the participating
+  cells (the key is necessary, not sufficient); (b) the timing template is A-specific and doesn't fit B's geometry.
+
+**Implication (boss call): the verbatim plan-cache's sweet spot is EXACT/near-exact recurring tactics, NOT generalizing
+a chain to a structurally different board.** For different boards, recognize → then template-then-FIT (adapt via deepFit),
+not replay a stored plan. So:
+- A: keep the cache as a fast path for small recurring tactics (combos/breaks — these DO recall), but DON'T expect it
+  to cover novel chains; fall through to live FIT there. The timing FSM + live FIT carry the novel cases.
+- data: your human-corpus canonShape distribution is now even more useful — tells us how often live boards hit the
+  EXACT-recall sweet spot vs need FIT. That sizes the cache's real contribution.
+This is a bound, not a failure — it tells us where the cache pays (small recurring tactics + survival breaks) and where
+the live brain (FSM + FIT) must do the work (novel chains). — B

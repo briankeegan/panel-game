@@ -144,7 +144,38 @@ if arg and arg[0] and arg[0]:find("authorPlan") then
       if g[r] then g[r][c] = (d == 9) and 99 or d end end
     return g, rows
   end
-  local mode = arg[2] or "solution"  -- "solution" (recorded-answer authoring) or "search" (deepFit+trigger)
+  local mode = arg[2] or "solution"  -- "solution" | "search" | "replay" | "corpus"
+  if mode == "corpus" then
+    -- FILL the cache over the whole corpus via authorFromSolution, keyed by envelope; measure coverage + collapse.
+    -- Envelope groups with >=2 puzzles are where CROSS-PUZZLE recall is even possible (the generalization frontier).
+    local cf = (arg[1] and arg[1] ~= "all" and arg[1] ~= "") and arg[1]:lower() or nil  -- "all"/"" -> whole corpus
+    local authored, total, byEnv = 0, 0, {}
+    for _, e in ipairs(flat) do
+      if (not cf) or (e.set or ""):lower():find(cf, 1, true) then
+        total = total + 1
+        local g, rows = stackToGrid(e.puzzle.stack)
+        local env = BuildEnvelope.recognize(g, rows)
+        local entry = M.authorFromSolution(e.puzzle)
+        if entry and env then
+          authored = authored + 1
+          byEnv[env.name] = byEnv[env.name] or { n = 0, sets = {} }
+          byEnv[env.name].n = byEnv[env.name].n + 1
+          byEnv[env.name].sets[(e.set or ""):gsub("puzzle_set_name_", "")] = true
+        end
+      end
+    end
+    local distinct, shared, groups = 0, 0, {}
+    for name, v in pairs(byEnv) do distinct = distinct + 1; if v.n >= 2 then shared = shared + 1 end; groups[#groups + 1] = { name = name, v = v } end
+    table.sort(groups, function(a, b) return a.v.n > b.v.n end)
+    print(string.format("CORPUS AUTHORING (filter=%s): %d/%d puzzles -> VERIFIED fireable plan (%.0f%%)",
+      cf or "all", authored, total, total > 0 and 100 * authored / total or 0))
+    print(string.format("  %d distinct envelopes; %d recur across >=2 authored puzzles (cross-puzzle recall possible there)", distinct, shared))
+    print("  top envelope groups (count : envelope : sets):")
+    for i = 1, math.min(12, #groups) do local gr = groups[i]
+      local sl = {}; for s in pairs(gr.v.sets) do sl[#sl + 1] = s end
+      print(string.format("    x%-2d  %-18s  %s", gr.v.n, gr.name:sub(1, 18), table.concat(sl, ","):sub(1, 46))) end
+    os.exit(0)
+  end
   local n, fireable = 0, 0
   for _, e in ipairs(flat) do
     if (e.set or ""):lower():find(setFilter, 1, true) and n < 14 then

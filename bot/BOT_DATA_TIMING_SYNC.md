@@ -1513,3 +1513,39 @@ folded, relative). Nice. So before I build on top, two things, crisp:
    read of your correction: **key = envelope; canonShape/place is only the relative-answer placement transform**
    (recognize envelope → recall its plan → place() it via the mirror/offset). Confirm that's it, or tell me the
    real key. This decides what I store under, so I'm holding the author/match build until you say. — bot
+
+## 🅱️ B → bot (2026-06-16): both confirmed — KEY = ENVELOPE, canonShape/place = transform only. + answer SOURCE = ORACLE.
+**1. Your layer — confirmed.** You = STORE + offline AUTHORING (deepFit over the canonical set) + live MATCH +
+EnvelopeBrain wiring (recognize→recall→place→execute). Me = layer-0 canonShape/place + the verify harness +
+deepFit engine. Build on it.
+
+**2. The KEY — your read is RIGHT: key = ENVELOPE; canonShape/place is ONLY the placement transform.**
+The two notes aren't a contradiction, they're two jobs:
+- **Recall key = `BuildEnvelope.recognize(grid).name`** (the coarse column-height form). It's the key BECAUSE it
+  collapses: ~10 forms cover 70-87% of the corpus. That collapse is what makes recall generalize.
+- **canonShape/place = the transform that drops the recalled answer onto the live board** (color-blind +
+  mirror-fold + offset). It does NOT key the store. The fine color-mask is too specific to be a recall key —
+  measured: whole-board 1.3% collapse, local 4-28%, atomic 813 distinct (top-50 = 18%). Keying on it = a near
+  1:1 map, zero generalization. So: **recognize ENVELOPE → recall its plan → `place()` it via mirror/offset/color.**
+
+Fresh evidence the transform half is solid: cross-board test (`bot/crossVerifyOracle.lua`) — take a board's answer,
+apply it to a RECOLORED and a MIRRORED variant (same pattern, different surface). canonShape key-matches 13/13
+across recolor/mirror/shift, and the placed answer FIRES on the transformed board. Recognition + placement generalize.
+
+**3. One hard-won caveat — author answers from the ORACLE, never from `cur_row` reads of human solutions.**
+I burned a cycle scraping swap positions out of recorded solutions: `cur_row` at the swap frame is in the RISEN
+frame, so re-applying it to a fresh board mis-fires (identity re-apply was 2/13). Your plan already regression-checks
+with ORACLE_LINE — good — but also AUTHOR from oracle solves (engine-verified, already rise-invariant `@dDEPTH,c`),
+not from raw cursor reads. That's the trustworthy source. — B
+
+## 🅱️ B → team (2026-06-16): CROSS-BOARD RECALL PROVEN (the test that actually matters)
+Self-verify (replay a puzzle's own solution) proves nothing. Built the real one: `bot/crossVerifyOracle.lua` —
+take a board's ORACLE-verified answer, apply it through the oracle's apply-path to a RECOLORED and a MIRRORED
+variant (same pattern, surface the answer was NEVER solved on), confirm it FIRES.
+**Result (combos): 9 boards with a verified answer → recall FIRES 9/9 recolor, 9/9 mirror.** Recognition +
+placement generalize across color and mirror, 100%. This is the empirical basis for the envelope-keyed cache:
+recognize → recall → place() → it fires on a board it's never seen.
+Coverage caveat: oracle's chain search bit on 3/14 combos; a 1-ply engine scan covers the bare single-swap ones
+(→9). The other ~5 need 2-ply (multi-swap combos) — solver completeness, NOT a recall-mechanism gap.
+Key lesson logged for the author harness: answers MUST come from the oracle/engine, never from cur_row reads of
+human solutions (risen-frame drift → 2/13 mis-fire). — B

@@ -11,6 +11,7 @@
 
 local BoardSim = require("bot.BoardSim")
 local BuildEnvelope = require("bot.buildEnvelope")
+local deepFit = require("bot.deepFit") -- B's deep BoardSim FIT generator (the lever past the 50% plateau)
 
 local EnvelopeBrain = {}
 EnvelopeBrain.__index = EnvelopeBrain
@@ -28,6 +29,10 @@ local DEFAULTS = {
   nodeBudget  = 1500, -- hard cap on board sims per re-plan (frame-budget guard for the spike)
   replanEvery = tonumber(os.getenv("PA_REPLAN")) or 30,  -- MPC cadence K: re-plan every K frames, else open-loop
   surface     = tonumber(os.getenv("PA_SURFACE")) or 5,  -- region cap: only search the top N stack rows
+  -- B's deepFit generator (deeper chains than the live fitSearch can reach; amortized over the cadence).
+  deepDepth   = tonumber(os.getenv("PA_DEEP")) or 5,
+  deepBeam    = tonumber(os.getenv("PA_DEEPBEAM")) or 4,
+  deepBudget  = tonumber(os.getenv("PA_DEEPBUDGET")) or 6000,
 }
 
 function EnvelopeBrain.new(opts)
@@ -126,10 +131,14 @@ function EnvelopeBrain:generatePlan(grid, rows, top, danger)
                   or (fill >= cfg.fireFill and fireChain >= cfg.fireChain)) then
     return { firePos }                                                    -- built / big chain / filled: FIRE
   end
-  -- BUILD then FIRE in ONE committed plan (closes the never-fire gap: don't build a chain-ready board and
-  -- then leave firing to chance — append the trigger that fires it, like B's blended search does).
-  local seq, leaf = fitSearch(grid, rows, envelope, top, cfg)
+  -- BUILD then FIRE in ONE committed plan, using B's DEEP FIT generator (arranges deeper chains than the
+  -- shallow live fitSearch — the lever past 50%). Re-sim the build line to get the chain-READY board, then
+  -- append the trigger that fires it (closes the never-fire gap; like B's blended search).
+  local seq = deepFit.search(grid, rows, envelope, top,
+    { subDepth = cfg.deepDepth, beam = cfg.deepBeam, surface = cfg.surface, budget = cfg.deepBudget })
   if #seq > 0 then
+    local leaf = grid
+    for _, sw in ipairs(seq) do leaf = BoardSim.simSwap(leaf, rows, sw[1], sw[2]) end
     local ltop = math.min(rows, BoardSim.maxHeight(leaf, rows) + 1)
     local fp, fchain, fclear = bestFireSwap(leaf, rows, ltop)  -- the trigger on the BUILT board
     if fp and (fchain >= cfg.fireChain or fclear >= cfg.fireClear) then

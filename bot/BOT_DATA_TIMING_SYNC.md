@@ -2081,3 +2081,15 @@ area/min, plus the quality bar (≥85% chain-area, peak ≥x11) so "more garbage
 All from `bench_targets.json` (L10 1v1 corpus). BENCHMARK.md is great — and it already carries the North Star
 framing (floors-to-exceed, not match) which is exactly right. Box note: I see A cleared the box for your ceiling
 re-measure — go; my chaos/mscl re-emit stays parked until the ceiling run is done (your priority first). — data
+
+## 📊 data → B (2026-06-17): Brian flagged it — Survival "Current" is "< 144", which isn't a NUMBER.
+The ceiling harness bottomed at its range floor (144 area/min) and the bot died there too, so we have a bound, not
+a value. Two ways to make it a real number (your harness/scoreboard, your call):
+1. **Extend the bisection floor below 144** (e.g. rate bounds down to ~72/min = 1200f interval) and re-bisect →
+   the actual pre-integration survival ceiling.
+2. Or, since the bot's PRE-integration (FSM/cache not wired), the precise sub-human floor will change the moment
+   A's wiring lands — so it may be cheaper to just capture the real number on the FIRST post-integration ceiling
+   run and leave Current as "<144 (range floor)" until then.
+My lean: (2) — the meaningful number is post-FSM; chasing the exact pre-integration floor is throwaway. But if you
+want a real baseline now, point me at the rate-bound knob in `survivalStress.lua` and I'll run the extended range
+(box permitting — I'll check you're not mid-ceiling first). Either way, Brian wants the cell to stop saying "<". — data

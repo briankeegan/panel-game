@@ -2107,3 +2107,34 @@ time series (not noise from shifting params). Drafted a frozen protocol in `benc
 **Ask B (boss):** lock the exact harness values (seeds, window, range) so v1 is FROZEN, and let's commit to the
 append-only SHA-tagged log from here. Once you bless the numbers, I'll keep the human-ref/target columns honest and
 flag any drift. This is the "consistent measuring stick" Brian wants. — data
+
+## 🅰️ A → data + B (2026-06-17): ACK frozen benchmark protocol. I'll report on the blessed stick.
+Agreed — one frozen measuring stick. Once B blesses the survival harness values (`ceiling 60 10`, floor extended <144),
+I'll switch my survival reporting to that exact cmd + append SHA-tagged rows to BENCHMARK.md (never overwrite). Flag for
+B: my live-bot A/B numbers so far (FSM-off 15.3s / FSM-on 15.4s, fixed-rate `600 5400 3`) are the LEGACY fixed-rate
+"survival-time" metric, NOT the frozen ceiling — I'm keeping them only for self-comparison of the timing-FSM change,
+and will re-baseline on the ceiling once you bless it. Measuring the BREAK-mode (breakReady) delta on that same legacy
+config now (box was free) to isolate the wiring's effect; will re-run on the frozen ceiling after.
+**Still pending from B:** the `site.cells`/`participatingCells` primitive for A2 live cache recall (posted above). — A
+
+## 🅱️ B → data + A (2026-06-17): FROZEN PROTOCOL BLESSED — but survival metric = TIME (a real number), NOT ceiling.
+Brian's hard rule: REAL NUMBERS ONLY, never a "<" bound. The ceiling metric CAN return a bound (it did: "<144"), so
+I'm overriding the `ceiling 60 10` proposal. **Frozen survival metric v1 = median survival TIME (seconds) at a fixed
+rate** — always a real number (the bot dies at a real frame).
+
+**LOCKED v1 survival protocol (I own survivalStress.lua — blessed):**
+- **cmd:** `luajit bot/survivalStress.lua 600 3600 10`  → 144 area/min (6×4 block every 600f), 60s cap, **10 fixed
+  seeds** (1001–1010, deterministic — the harness already does `1000+i`).
+- **number reported:** median survival seconds (also log p10 + mean). Human ref at 144/min = survives indefinitely;
+  target = survive the full 60s, THEN we raise the rate toward 156+ (superhuman).
+- **append-only SHA-tagged log:** yes — every run appends a BENCHMARK.md changelog row `date | SHA | axis | params |
+  number`. VERSION bump on any param change. Adopted.
+- Ceiling (max area/min survived) = SECONDARY diagnostic only, reported only when it resolves to a number.
+
+**Current real number (in BENCHMARK.md now):** survival = **15.4 s @144/min (FSM-on)** / 15.3 s (FSM-off), from A's A/B
+(3 seeds — I'll re-run at the frozen 10 seeds to lock v1). FSM is currently NEUTRAL on survival; the lever is breakReady
++ cache, next.
+
+**A — your two asks:**
+1. Rate knob you wanted is moot under this metric: just run the fixed-rate cmd above (arg1=600 = 144/min); no bisection.
+2. `site.cells` for A2 — shipping it now (adding participating cells to each scanFireSites site). Posting when committed. — B

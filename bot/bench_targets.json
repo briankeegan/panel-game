@@ -161,13 +161,15 @@
     ],
     "axes": {
       "survival": {
-        "cmd": "luajit bot/survivalStress.lua ceiling <window_s> <seeds>",
+        "cmd": "luajit bot/survivalStress.lua <fixed-rate args> (A used `600 5400 3` = 144/min, 90s cap, 3 seeds)",
+        "metric": "survival TIME (seconds) at FIXED 144 area/min (human rate) \u2014 a REAL number, never a '<' bound; once the bot clears the window, RAISE the rate. Adopted per Brian 2026-06-17.",
         "propose": {
-          "window_s": 60,
+          "rate_areamin": 144,
           "seeds": 10,
-          "rate_range_areamin": "72..1440 (extend floor below 144 so a sub-human ceiling is a NUMBER, not '<144')"
+          "cap_s": 90
         },
-        "metric": "max sustained incoming area/min survived for window_s"
+        "secondary_diagnostic": "ceiling = max area/min survived (ramp-to-failure) \u2014 keep ONLY when it resolves to a number, not a bound",
+        "human_ref": "infinite (a strong human survives 144/min indefinitely)"
       },
       "offense": {
         "cmd": "(harness TBD \u2014 B)",

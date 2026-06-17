@@ -101,3 +101,29 @@ template that fits somewhere** (was 8% with fixed windows). Corroborates data's 
 **Next:** (1) confirm the matched template's PLAY actually FIRES at the offset (recognition=97%, fire-given-match TBD),
 (2) rewrite `planCache.match` to slide templates instead of keying fixed windows, (3) extend to multi-move sequences +
 breaks. The recognition mechanism that blocked everything is solved.
+
+---
+
+## The CHIP model (Brian, 2026-06-17): shapes carry their own metadata; the BRAIN prioritizes later
+A cache entry is a **CHIP**: a self-contained play with everything the brain needs to choose it.
+```
+CHIP = {
+  template = {{dr,dc,colorClass}..},   -- the sliding pattern (participating blocks only, rest don't-care)
+  seq      = {{dr,dc}..},              -- the move sequence, relative to the template anchor
+  inputs   = "<frames>",               -- timing template (verbatim replay, cursor overridden at swaps)
+  effect   = { chain=N, clears=N, breaksGarbage=N, stopTime=N },  -- what it GETS you
+  timeCost = <frames/moves to execute>,-- how LONG the play takes  (Brian: brain weighs this)
+  kind     = "fire" | "chain" | "break" | "setup",
+}
+```
+**Division of concern:** B builds + VALIDATES the chips (they recognize + their play fires, every scenario). The BRAIN
+(later) decides WHICH chip to play from `effect` + `timeCost` + situation. NOT building the brain/priority/game now.
+
+## Scenario validation status (the current job — make every scenario WORK)
+- **COMBO / single fire:** sliding template recall + move fires. Recognition 97% recall; precision improves with the
+  swap-partner cell (29%→59%) — mechanism sound. ✓ works
+- **CHAIN (multi-move):** chip authored from one board, recognized held-out, replayed sequence → **chain fired 2/3
+  (67% of recognized)**. Recognition lower (chains recur less). ✓ mechanism validated
+- **BREAK (garbage):** garbage-adjacency in template; needs the same held-out recall+fire validation. → next
+- **INSERT / setup / openers:** → to validate
+Once all scenarios are validated chips, tuning/priority is trivial (Brian).

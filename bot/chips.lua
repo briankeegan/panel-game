@@ -48,7 +48,27 @@ function chips.authorFire(grid, rows, r, c)
     local col = (grid[cl[1]] and (grid[cl[1]][cl[2]] or 0)) or 0
     local cls; if col == 0 then cls = "e" elseif col == BoardSim.GARBAGE then cls = "g" else if not rl[col] then nn = nn + 1; rl[col] = nn end cls = rl[col] end
     t[#t + 1] = { cl[1] - r, cl[2] - c, cls } end end
-  return { tmpl = t, kind = "fire" }
+  return { tmpl = t, kind = "fire", swap = { 0, 0 } }   -- fire anchors ON the swap
+end
+
+-- AUTHOR a break chip: anchored on the immovable GARBAGE (a hard anchor -> deterministic). template = garbage cell
+-- (class "g") + the match cells that touch it; the swap is stored as an offset from the garbage anchor.
+function chips.authorBreak(grid, rows, r, c)
+  local _, _, _, _, gbroke = BoardSim.simSwap(grid, rows, r, c)
+  if (gbroke or 0) <= 0 then return nil end
+  local hit = (function() local gs = BoardSim.cloneGrid(grid, rows); if gs[r] and gs[r][c + 1] then gs[r][c], gs[r][c + 1] = gs[r][c + 1], gs[r][c] end return (BoardSim.findMatches(gs, rows)) end)()
+  local part = { { r, c }, { r, c + 1 } }
+  for idx in pairs(hit) do part[#part + 1] = { math.floor((idx - 1) / 6) + 1, ((idx - 1) % 6) + 1 } end
+  local ar, ac
+  for _, cell in ipairs(part) do for _, d in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do local rr, cc = cell[1] + d[1], cell[2] + d[2]
+    if grid[rr] and grid[rr][cc] == BoardSim.GARBAGE then ar, ac = rr, cc break end end if ar then break end end
+  if not ar then return nil end
+  local rl, nn, t, seen = {}, 0, { { 0, 0, "g" } }, {}
+  for _, cell in ipairs(part) do local k = cell[1] * 10 + cell[2]; if not seen[k] then seen[k] = true
+    local col = (grid[cell[1]] and (grid[cell[1]][cell[2]] or 0)) or 0
+    local cls; if col == 0 then cls = "e" elseif col == BoardSim.GARBAGE then cls = "g" else if not rl[col] then nn = nn + 1; rl[col] = nn end cls = rl[col] end
+    t[#t + 1] = { cell[1] - ar, cell[2] - ac, cls } end end
+  return { tmpl = t, kind = "break", swap = { r - ar, c - ac } }
 end
 
 -- RECOGNIZE + VERIFY: slide every chip; on a fit, the play is the swap at the fit anchor; VERIFY it fires; return the
@@ -57,13 +77,37 @@ function chips.play(grid, rows)
   local top = BoardSim.maxHeight(grid, rows)
   local lo, hi = math.max(1, top - 6), math.min(top + 1, rows)
   for _, chip in ipairs(STORE) do
-    for R = lo, hi do for C = 1, 5 do
+    for R = lo, hi do for C = 1, 6 do
       if fits(grid, rows, chip.tmpl, R, C) then
-        local ok = fires(grid, rows, R, C)            -- the one-step verify
-        if ok then return { r = R, c = C, kind = chip.kind } end
+        local sr, sc = R + chip.swap[1], C + chip.swap[2]   -- the play is at the swap-offset from the anchor
+        if sr >= 1 and sr <= rows and sc >= 1 and sc <= 5 then
+          local any, gbroke = fires(grid, rows, sr, sc)      -- the one-step verify (kind-aware)
+          local ok = (chip.kind == "break") and (gbroke > 0) or any
+          if ok then return { r = sr, c = sc, kind = chip.kind } end
+        end
       end
     end end
   end
+  return nil
+end
+
+-- SETUP play: no single swap fires, but a 2-move sequence does. "Recognize buildable + put it together" = a tiny local
+-- 2-move search (the recognition narrows; the search guarantees it fires). Returns {{r1,c1},{r2,c2}} or nil. 100% by
+-- construction (only returns a sequence that actually clears). The setup moves are board-specific, so they're FOUND, not
+-- recalled — but bounded to the cursor's local band, exactly Brian's "you just put it together."
+function chips.setupPlay(grid, rows)
+  local top = BoardSim.maxHeight(grid, rows)
+  local lo, hi = math.max(1, top - 6), math.min(top + 1, rows)
+  for r1 = lo, hi do for c1 = 1, 5 do
+    local g1, _, t1 = BoardSim.simSwap(grid, rows, r1, c1)
+    if (t1 or 0) == 0 and g1 then                            -- move1 = alignment (doesn't itself clear)
+      local t2 = math.min(BoardSim.maxHeight(g1, rows) + 1, rows)
+      for r2 = math.max(1, t2 - 6), t2 do for c2 = 1, 5 do
+        local _, _, tot = BoardSim.simSwap(g1, rows, r2, c2)
+        if (tot or 0) > 0 then return { { r1, c1 }, { r2, c2 } } end
+      end end
+    end
+  end end
   return nil
 end
 
@@ -86,20 +130,30 @@ if arg and arg[0] and arg[0]:find("chips") then
     for i = 1, 200 do if st:game_ended() then break end st:receiveConfirmedInput("A"); m:run() if i >= 2 and not st:hasActivePanels() and not st:hasChainingPanels() then break end end return m, st end
   local function gridOf(st) return BoardSim.colorGrid(BoardState.extract(st).board, st.height), st.height end
   local function pan(st) local n = 0 for r = 1, st.height do for c = 1, 6 do local v = st.panels[r][c].color or 0; if v ~= 0 and v ~= 9 then n = n + 1 end end end return n end
+  -- apply a move sequence on a fresh real engine; true iff it cleared (the ground-truth precision check)
+  local function applyFires(stack, moves)
+    local m, st = bld(stack); local b = pan(st)
+    for _, mv in ipairs(moves) do st.cur_row, st.cur_col = mv[1], mv[2]; st:receiveConfirmedInput(KDE.swap); m:run()
+      for k = 1, 80 do if st:game_ended() then break end st:receiveConfirmedInput("A"); m:run() if k >= 2 and not st:hasActivePanels() and not st:hasChainingPanels() then break end end end
+    return pan(st) < b
+  end
+  -- author FIRE + BREAK chips from EVEN boards (mid-band)
   for i, e in ipairs(flat) do if i % 2 == 0 then local _, st = bld(e.p.stack); local g, rows = gridOf(st); local top = BoardSim.maxHeight(g, rows)
-    for r = math.max(1, top - 6), math.min(top + 1, rows) do for c = 1, 5 do local ch = chips.authorFire(g, rows, r, c); if ch then chips.add(ch) end end end end end
-  local n, played, fired = 0, 0, 0
+    for r = math.max(1, top - 6), math.min(top + 1, rows) do for c = 1, 5 do
+      local cf = chips.authorFire(g, rows, r, c); if cf then chips.add(cf) end
+      local cb = chips.authorBreak(g, rows, r, c); if cb then chips.add(cb) end
+    end end end end
+  -- held-out ODD: 1-move play (fire/break); where none, try the 2-move SETUP
+  local n, played, pfired, setup, sfired = 0, 0, 0, 0, 0
   for i, e in ipairs(flat) do if i % 2 == 1 then n = n + 1 local _, st0 = bld(e.p.stack); local g, rows = gridOf(st0)
     local mv = chips.play(g, rows)
-    if mv then played = played + 1 local _, st = bld(e.p.stack); local b = pan(st); st.cur_row, st.cur_col = mv.r, mv.c; st:receiveConfirmedInput(KDE.swap)
-      local mm = select(1, bld(e.p.stack)) -- unused; keep match via st's own
-      for k = 1, 200 do if st:game_ended() then break end st:receiveConfirmedInput("A") end
-      -- re-run faithfully: rebuild and apply the move
-      local m2, s2 = bld(e.p.stack); local bb = pan(s2); s2.cur_row, s2.cur_col = mv.r, mv.c; s2:receiveConfirmedInput(KDE.swap); m2:run()
-      for k = 1, 200 do if s2:game_ended() then break end s2:receiveConfirmedInput("A"); m2:run() if k >= 5 and not s2:hasActivePanels() and not s2:hasChainingPanels() then break end end
-      if pan(s2) < bb then fired = fired + 1 end end
+    if mv then played = played + 1; if applyFires(e.p.stack, { { mv.r, mv.c } }) then pfired = pfired + 1 end
+    else local seq = chips.setupPlay(g, rows); if seq then setup = setup + 1; if applyFires(e.p.stack, seq) then sfired = sfired + 1 end end end
   end end
-  print(string.format("CHIPS (recognize+verify): %d chips | played on %d/%d boards | FIRED %d (%.0f%% precision)", chips.size(), played, n, fired, played > 0 and 100 * fired / played or 0))
+  print(string.format("CHIPS: %d (fire+break)", chips.size()))
+  print(string.format("  1-move (fire/break): %d/%d boards | FIRED %d (%.0f%% precision)", played, n, pfired, played > 0 and 100 * pfired / played or 0))
+  print(string.format("  setup (2-move)     : %d more boards | FIRED %d (%.0f%% precision)", setup, sfired, setup > 0 and 100 * sfired / setup or 0))
+  print(string.format("  TOTAL coverage     : %d/%d (%.0f%%) at validated precision", played + setup, n, 100 * (played + setup) / n))
   os.exit(0)
 end
 

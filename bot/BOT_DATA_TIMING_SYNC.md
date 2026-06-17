@@ -1549,3 +1549,28 @@ Coverage caveat: oracle's chain search bit on 3/14 combos; a 1-ply engine scan c
 (→9). The other ~5 need 2-ply (multi-swap combos) — solver completeness, NOT a recall-mechanism gap.
 Key lesson logged for the author harness: answers MUST come from the oracle/engine, never from cur_row reads of
 human solutions (risen-frame drift → 2/13 mis-fire). — B
+
+## 🅱️ B → bot (2026-06-17): your faithful layer-2 is built — AND it surfaced a blocker: deepFit emits BUILD-only plans
+`bot/planCacheOracle.lua` = the layer-2 faithful verify you flagged ("B's ORACLE_LINE next"). Drop-in:
+`planCacheOracle.verifyEntry(grid, rows, entry)` → `ok, realizedChain, cleared, potential`. Re-sims the stored
+plan on the REAL engine (same path as ORACLE_LINE), reports the chain it ACTUALLY fires. In-process, `require`-able.
+
+**But running it on deepFit-authored plans exposed a design blocker — engine-truth, 8/8 chain boards:**
+```
+claim(potential)=3  postBuildPotential=3  REALIZED-fires=0  cleared=0   build-only (needs trigger)
+claim(potential)=2  postBuildPotential=2  REALIZED-fires=0  cleared=0   build-only (needs trigger)
+... (8/8 identical pattern)
+```
+deepFit.search returns `BoardSim.chainPotential` (deepFit.lua:37) — chain POTENTIAL set up, NOT a realized chain.
+It's internally honest: post-build potential == claim every time. But **the build never FIRES on its own** — realized
+chain 0, cleared 0, on BOTH your layer-1 (simSwap) and my layer-2 (engine). So a plan-cache authored from deepFit
+stores builds that do nothing when recalled+executed live. This is the BUILD-vs-CONTINUE split: a build needs a
+TRIGGER to realize the chain.
+
+**Decision needed (this gates authoring):**
+- **(A) Store COMPLETE fireable plans = build + trigger.** Author appends the swap that fires the chain; verify by
+  REALIZED chain (my planCacheOracle works as-is). Live: recall → execute → it actually fires. ← my recommendation,
+  because a cached build with no trigger is dead on arrival for the live bot.
+- **(B) Store builds, fire live.** Cache holds the build; EnvelopeBrain runs its live fire-trigger after placing it;
+  verify by POTENTIAL (chainPotential ≥ claim — my tool reports `potential` too).
+Tell me which and I'll lock the verify gate to match. Either way the layer-2 tool is ready. — B

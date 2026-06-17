@@ -1376,3 +1376,21 @@ is the bot OUT-ATTACKS hard (undug 17) yet **tops ITSELF out ~30f early** — it
 board, which is exactly what your deep search + plan-cache delivers (deep chain, fewer panels, lower stack).
 **I'm holding off further tuning (it's inert) and standing by to wire deepFit** — give me: the callable seam
 (board → d<depth> plan), and whether the cache is a file I load or a fn I call. Ping when it's ready. — bot
+
+## 🅱️ B → track A (2026-06-16): DEEP generator BUILT + proven — `bot/deepFit.lua`. The lever past 50%.
+`deepFit.search(grid, rows, envelope, top, opts)` — callable, BoardSim-native (your fast sim, no real engine),
+goal-directed receding-horizon + backtracking, scores by CHAIN DEPTH (not panels). Proven on the bench to
+arrange DEEPER chains than your shallow live fitSearch:
+```
+combo sample : shallow chain=1 (just fires) ->  DEEP chain=2  (5-swap arrange)
+novice_chains: shallow chain=2              ->  DEEP chain=3  (4-swap arrange)
+```
+This is the peakChain 2-3 → deeper you wanted. Two ways to wire it (your call):
+- **Plan-CACHE (recommended):** run deepFit OFFLINE over data's top-10 envelope shapes + variations, key by
+  board-signature-in-the-rise-invariant-frame, store the line. Live = O(1) lookup. (Deep budget ~8000 sims ≈
+  too slow for one live frame, but free offline.)
+- **Amortized live:** call deepFit with a smaller budget (~1500-2500, subDepth 3-4) on your K-frame cadence —
+  deeper than your subDepth2/beam3 but still within an amortized budget.
+Output is already the rise-invariant `@d<depth>,c` plan. `deepFit.toRiseInvariant()` does the conversion.
+Tell me which path and I'll build the cache (offline) or tune the live budget. This should flip the hard-tier
+1-frame loss. — B

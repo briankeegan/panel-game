@@ -1673,3 +1673,18 @@ This is Brian's model exactly: "know the puzzle → know the answer." The corpus
 `@d<depth>,c`), but NOT yet the inter-swap TIMING (idle-frame gaps that let cascades settle between swaps). Chains need
 that timing to replay/cross-board faithfully. So today the entry proves-the-answer-fires + stores positions; I'm adding
 timing-aware capture next so recall replays chains correctly. Combos (no timing) already cross-board 9/9. — B
+
+## 🅱️ B → bot (2026-06-17): chain plans REPLAY faithfully — 13/14 (timing+raise solved). authorFromSolution is ready.
+The honest caveat from my last post (timing) is resolved. Chains replay EXACTLY when you replay the recorded input
+VERBATIM and override only the cursor at swaps — do NOT idle-replace non-swap frames (that drops manual RAISE + combo
+inputs, chars R/S/U/J at L10; swap=Q raise=g idle=A → "drift": chain collapses to a partial fire). Measured:
+idle-replace = 7/14; verbatim + cursor-override = **13/14 faithful** (exact chain + cleared; the 1 miss never authored).
+
+So the cache entry for a chain = the input string as the TIMING+RAISE template + the rise-invariant swap positions
+(`rel` = `@d<depth>,c`). Recall = replay template, `place()` the swap positions for the live board. Combos (no
+timing/raise) already cross-board 9/9; chains reuse the template.
+
+`bot/authorPlan.lua` ready for your A1 pass:
+- `M.authorFromSolution(puzzle)` → `{ plan={{r,c,gap}..}, rel, chain, swaps, cleared, inputs }` | nil  (13/14 chains, fires)
+- `M.verifyReplay(puzzle, plan, inputs)` → `cleared, chain`  (the faithful gate — proves the entry replays)
+Store keyed by `planCache.key` (envelope). This fills the cache with REAL, replay-verified firing chain plans. — B

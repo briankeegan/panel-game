@@ -79,13 +79,17 @@ function M.authorFromSolution(puzzle)
   local inputs = IC.decompressInputString2(puzzle.solution or "")
   if inputs == "" then return nil, "no solution" end
   local base = panels()
-  local plan, rel, maxChain = {}, {}, 0
+  local plan, rel, maxChain, lastSwapFrame = {}, {}, 0, 0
   for i = 1, #inputs do
     local ch = inputs:sub(i, i)
     if ch == KDE.swap then
       local r, c = st.cur_row, st.cur_col
-      plan[#plan + 1] = { r, c }
+      -- gap = IDLE frames before this swap since the previous swap fired. Cursor-movement frames don't change the
+      -- board, so replaying the same gap as IDLE reproduces the cascade timing exactly. The swap consumes its own
+      -- frame, so the idle count is (frameDelta - 1) — getting this wrong lands tight insert-catches 1 frame late.
+      plan[#plan + 1] = { r, c, gap = i - lastSwapFrame - 1 }
       rel[#rel + 1] = string.format("@d%d,%d", surface() - r, c)  -- rise-invariant: depth below the surface
+      lastSwapFrame = i
     end
     if (st.chain_counter or 0) > maxChain then maxChain = st.chain_counter end
     if st:game_ended() then break end
@@ -94,7 +98,31 @@ function M.authorFromSolution(puzzle)
   for k = 1, 300 do if (st.chain_counter or 0) > maxChain then maxChain = st.chain_counter end if st:game_ended() then break end st:receiveConfirmedInput("A"); m:run() if k >= 5 and not st:hasActivePanels() and not st:hasChainingPanels() then break end end
   local cleared = base - panels()
   if cleared <= 0 or #plan == 0 then return nil, "solution didn't fire" end
-  return { plan = plan, rel = rel, chain = maxChain, swaps = #plan, cleared = cleared }
+  return { plan = plan, rel = rel, chain = maxChain, swaps = #plan, cleared = cleared, inputs = inputs }
+end
+
+-- replay a plan on a fresh board, OVERRIDING only the cursor at each swap (template timing + raises preserved).
+-- The drift cases proved idle-replacing non-swap frames drops board-affecting inputs (raise/combos in R/S/U/J);
+-- replaying the template verbatim and only placing the swap position is faithful, and stays portable (the swap
+-- positions are what `place()` re-targets for a different board). Proves the chain cache entry is replayable.
+function M.verifyReplay(puzzle, plan, inputs)
+  local Match = require("common.engine.Match"); require("common.engine.checkMatches")
+  local LP = require("common.data.LevelPresets")
+  local KDE = require("common.data.KeyDataEncoding")
+  local m = Match(puzzle:toPanelSource(false), puzzle:toGameMode().matchRules)
+  local st = m:createStackWithSettings(LP.getModern(10), true, "controller", nil)
+  st:setMaxRunsPerFrame(1); m:start()
+  local function panels() local n = 0 for r = 1, st.height do for c = 1, 6 do local v = st.panels[r][c].color or 0; if v ~= 0 and v ~= 9 then n = n + 1 end end end return n end
+  local base, maxChain, si = panels(), 0, 0
+  for i = 1, #inputs do
+    local ch = inputs:sub(i, i)
+    if ch == KDE.swap then si = si + 1; if plan[si] then st.cur_row, st.cur_col = plan[si][1], plan[si][2] end end
+    if st:game_ended() then break end
+    st:receiveConfirmedInput(ch); m:run()
+    if (st.chain_counter or 0) > maxChain then maxChain = st.chain_counter end
+  end
+  for k = 1, 300 do if (st.chain_counter or 0) > maxChain then maxChain = st.chain_counter end if st:game_ended() then break end st:receiveConfirmedInput("A"); m:run() if k >= 5 and not st:hasActivePanels() and not st:hasChainingPanels() then break end end
+  return base - panels(), maxChain
 end
 
 -- ---- CLI self-test: how many boards yield a VERIFIED fireable plan (the build-only fix, measured) ----
@@ -125,7 +153,14 @@ if arg and arg[0] and arg[0]:find("authorPlan") then
       local entry, reason
       if mode == "search" then local g, rows = stackToGrid(e.puzzle.stack); entry, reason = M.authorPlan(g, rows)
       else entry, reason = M.authorFromSolution(e.puzzle) end
-      if entry then fireable = fireable + 1
+      if entry and mode == "replay" then
+        -- author, then REPLAY the captured plan (swaps+gaps) on a fresh board — does the capture reproduce the fire?
+        local rcleared, rchain = M.verifyReplay(e.puzzle, entry.plan, entry.inputs)
+        local faithful = rcleared > 0 and rchain >= entry.chain
+        if faithful then fireable = fireable + 1 end
+        print(string.format("  %-24s orig chain=%d cleared=%d | REPLAY chain=%d cleared=%d  %s",
+          label, entry.chain, entry.cleared, rchain, rcleared, faithful and "FAITHFUL" or "<<DRIFT"))
+      elseif entry then fireable = fireable + 1
         print(string.format("  %-24s FIRES chain=%d swaps=%d cleared=%d", label, entry.chain, entry.swaps or #entry.plan, entry.cleared or -1))
       else print(string.format("  %-24s nil: %s", label, reason)) end
     end

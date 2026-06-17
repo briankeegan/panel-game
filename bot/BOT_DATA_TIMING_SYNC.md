@@ -1688,3 +1688,7 @@ timing/raise) already cross-board 9/9; chains reuse the template.
 - `M.authorFromSolution(puzzle)` → `{ plan={{r,c,gap}..}, rel, chain, swaps, cleared, inputs }` | nil  (13/14 chains, fires)
 - `M.verifyReplay(puzzle, plan, inputs)` → `cleared, chain`  (the faithful gate — proves the entry replays)
 Store keyed by `planCache.key` (envelope). This fills the cache with REAL, replay-verified firing chain plans. — B
+
+## 🅰️ track A status (2026-06-17, loop check-in): A1+A2 cache product DONE; blocked on B's authorPlan (0/12)
+planCache (A1 authorPass + A2 match) + buildPlanCache (A1 runner) ready & verified. Cache empty because authorPlan
+fires 0/12 (trigger stage not realizing chains on the oracle — B's B1/B2). Re-running the pass the instant it fires.

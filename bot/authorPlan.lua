@@ -77,14 +77,19 @@ function M.authorFromSolution(puzzle)
   st:setMaxRunsPerFrame(1); m:start()
   local function surface() local H = 0 for r = 1, st.height do for c = 1, 6 do if (st.panels[r][c].color or 0) ~= 0 then H = r end end end return H end
   local function panels() local n = 0 for r = 1, st.height do for c = 1, 6 do local v = st.panels[r][c].color or 0; if v ~= 0 and v ~= 9 then n = n + 1 end end end return n end
+  -- REAL garbage = isGarbage panels (breakable, grants stop-time), NOT color-9 (an unmatchable blocker/wall).
+  local function countGarbage() local n = 0 for r = 1, st.height do for c = 1, 6 do if st.panels[r][c].isGarbage then n = n + 1 end end end return n end
+  local peakStop, base9 = 0, 0
   local function readGrid() local g = {} for r = 1, st.height do g[r] = {} for c = 1, 6 do g[r][c] = st.panels[r][c].color or 0 end end return g end
   local inputs = IC.decompressInputString2(puzzle.solution or "")
   if inputs == "" then return nil, "no solution" end
   local base = panels()
+  base9 = countGarbage()
   local b4 = readGrid()  -- initial board, for the participating-cell KEY (swap + cleared cells)
   local plan, rel, maxChain, lastSwapFrame = {}, {}, 0, 0
   for i = 1, #inputs do
     local ch = inputs:sub(i, i)
+    if (st.stop_time or 0) > peakStop then peakStop = st.stop_time end
     if ch == KDE.swap then
       local r, c = st.cur_row, st.cur_col
       -- gap = IDLE frames before this swap since the previous swap fired. Cursor-movement frames don't change the
@@ -98,8 +103,9 @@ function M.authorFromSolution(puzzle)
     if st:game_ended() then break end
     st:receiveConfirmedInput(ch); m:run()
   end
-  for k = 1, 300 do if (st.chain_counter or 0) > maxChain then maxChain = st.chain_counter end if st:game_ended() then break end st:receiveConfirmedInput("A"); m:run() if k >= 5 and not st:hasActivePanels() and not st:hasChainingPanels() then break end end
+  for k = 1, 300 do if (st.chain_counter or 0) > maxChain then maxChain = st.chain_counter end if (st.stop_time or 0) > peakStop then peakStop = st.stop_time end if st:game_ended() then break end st:receiveConfirmedInput("A"); m:run() if k >= 5 and not st:hasActivePanels() and not st:hasChainingPanels() then break end end
   local cleared = base - panels()
+  local garbageBroke = base9 - countGarbage()  -- survival value byproduct (NOT the target — stop-time + chain is)
   if cleared <= 0 or #plan == 0 then return nil, "solution didn't fire" end
   -- KEY = participating-cell canonShape (the tactic shape the answer touches), the key proven by cross-board 9/9.
   -- participating = swap cells + cleared cells (before≠0, after=0, a real color). bbox + margin; keep their colors.
@@ -112,7 +118,8 @@ function M.authorFromSolution(puzzle)
   local region = {}
   for r = rmin, rmax do local row = {} for c = cmin, cmax do row[#row + 1] = mcol[b4[r][c] or 0] and (b4[r][c] or 0) or 0 end region[#region + 1] = row end
   local key = shapeCache.canonShape(region)
-  return { plan = plan, rel = rel, chain = maxChain, swaps = #plan, cleared = cleared, inputs = inputs, key = key }
+  return { plan = plan, rel = rel, chain = maxChain, swaps = #plan, cleared = cleared, inputs = inputs, key = key,
+           stopTime = peakStop, garbageBroke = garbageBroke }
 end
 
 -- replay a plan on a fresh board, OVERRIDING only the cursor at each swap (template timing + raises preserved).
@@ -158,7 +165,29 @@ if arg and arg[0] and arg[0]:find("authorPlan") then
       if g[r] then g[r][c] = (d == 9) and 99 or d end end
     return g, rows
   end
-  local mode = arg[2] or "solution"  -- "solution" | "search" | "replay" | "corpus"
+  local mode = arg[2] or "solution"  -- "solution" | "search" | "replay" | "corpus" | "garbage"
+  if mode == "garbage" then
+    -- GARBAGE-BREAK tactic library: author every puzzle whose solution BREAKS garbage; key by canonShape; measure
+    -- recurrence (does the small break shape repeat?) + the survival signals (stop-time opened, chain ridden) — NOT
+    -- dig-count (garbage_stoptime_model). The break is the chain trigger; value = stop-time + chain.
+    local n, sumStop, sumChain, sumBroke, intoChain, byKey = 0, 0, 0, 0, 0, {}
+    for _, e in ipairs(flat) do
+      local entry = M.authorFromSolution(e.puzzle)
+      if entry and (entry.garbageBroke or 0) > 0 then
+        n = n + 1; sumStop = sumStop + entry.stopTime; sumChain = sumChain + entry.chain; sumBroke = sumBroke + entry.garbageBroke
+        if entry.chain >= 2 then intoChain = intoChain + 1 end
+        if entry.key then byKey[entry.key] = (byKey[entry.key] or 0) + 1 end
+      end
+    end
+    local distinct, recur = 0, 0
+    for _, c in pairs(byKey) do distinct = distinct + 1; if c >= 2 then recur = recur + 1 end end
+    print(string.format("GARBAGE-BREAK TACTIC LIBRARY: %d puzzles break garbage & author a fireable plan", n))
+    print(string.format("  %d distinct canonShape keys; %d recur >=2 (break-shape reuse)", distinct, recur))
+    print(string.format("  survival value — avg PEAK stop-time %.0f frames | avg chain %.1f | %d/%d break INTO a chain (>=2)",
+      n > 0 and sumStop / n or 0, n > 0 and sumChain / n or 0, intoChain, n))
+    print(string.format("  (garbage cells broken avg %.1f — byproduct, NOT the target)", n > 0 and sumBroke / n or 0))
+    os.exit(0)
+  end
   if mode == "corpus" then
     -- FILL the cache over the whole corpus via authorFromSolution, keyed by envelope; measure coverage + collapse.
     -- Envelope groups with >=2 puzzles are where CROSS-PUZZLE recall is even possible (the generalization frontier).

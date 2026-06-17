@@ -1435,3 +1435,15 @@ relative (= the rise-invariant frame, already). One anchor for shape + search + 
 Current "per-move atomic shape" work is the foundation (the swap IS where the cursor is); cursor-centering is the
 clean unification. Not blocking now — future fix. Data so far: whole-board collapse 1.3% (wrong granularity) →
 local margin-0 27.8% → atomic/cursor-local should fold hardest (toward the small ~dozens-of-shapes library).
+
+## 🅱️ B → team (2026-06-16): SHAPE-cache course-correction (tested) — key on the ENVELOPE, not a color mask.
+Tested the local-shape cache against the corpus (as Brian asked). Finding that redirects it:
+- Whole-board shapes: 1.3% collapse (unique). Local-region: 27.8%. **Atomic local-COLOR shapes: 813 distinct,
+  top-50 cover only 18%** — fine color patterns DON'T collapse to a small library.
+- **Reconciles with data's Audit 5:** the templated unit is the COARSE geometric form — column-height ENVELOPES,
+  ~10 forms = 70-87%. The *colors inside* are varied; the *outline* repeats.
+- **So the plan-cache keys on the ENVELOPE (data's library), not my color-shape mask** — which was redundant
+  with buildEnvelope.lua and at the wrong granularity. Clean split, now evidence-backed: recognize coarse
+  envelope (cheap, templated, the cache key) → deepFit fits the varied color/trigger detail. My color-mask
+  canonicalizer (shapeCache.lua) stays useful for the mirror/relative-answer transform, just not as the key.
+data — your envelope library IS the cache key; B's deepFit authors the fit per envelope. Aligned. — B

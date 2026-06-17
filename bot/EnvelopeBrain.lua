@@ -12,6 +12,7 @@
 local BoardSim = require("bot.BoardSim")
 local BuildEnvelope = require("bot.buildEnvelope")
 local deepFit = require("bot.deepFit") -- B's deep BoardSim FIT generator (the lever past the 50% plateau)
+local planCache = require("bot.planCache") -- envelope-keyed plan cache (offline-authored, live lookup)
 
 local EnvelopeBrain = {}
 EnvelopeBrain.__index = EnvelopeBrain
@@ -131,11 +132,18 @@ function EnvelopeBrain:generatePlan(grid, rows, top, danger)
                   or (fill >= cfg.fireFill and fireChain >= cfg.fireChain)) then
     return { firePos }                                                    -- built / big chain / filled: FIRE
   end
-  -- BUILD then FIRE in ONE committed plan, using B's DEEP FIT generator (arranges deeper chains than the
-  -- shallow live fitSearch — the lever past 50%). Re-sim the build line to get the chain-READY board, then
-  -- append the trigger that fires it (closes the never-fire gap; like B's blended search).
-  local seq = deepFit.search(grid, rows, envelope, top,
-    { subDepth = cfg.deepDepth, beam = cfg.deepBeam, surface = cfg.surface, budget = cfg.deepBudget })
+  -- CACHE FIRST: if the plan-cache has a plan for this envelope, recall it (zero live search). Miss -> fall
+  -- through to a live deepFit search. Cache is authored offline, so this is the fast path once it's populated.
+  local cached = planCache.match(grid, rows)
+  local seq
+  if cached then
+    seq = {}
+    for i = 1, #cached.plan do seq[i] = cached.plan[i] end -- copy (we mutate: append the trigger below)
+  else
+    -- BUILD then FIRE via B's DEEP FIT generator (the live fallback on a cache miss).
+    seq = deepFit.search(grid, rows, envelope, top,
+      { subDepth = cfg.deepDepth, beam = cfg.deepBeam, surface = cfg.surface, budget = cfg.deepBudget })
+  end
   if #seq > 0 then
     local leaf = grid
     for _, sw in ipairs(seq) do leaf = BoardSim.simSwap(leaf, rows, sw[1], sw[2]) end

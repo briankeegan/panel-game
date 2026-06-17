@@ -125,7 +125,7 @@ if arg and arg[0] and arg[0]:find("chips") then
   local sets = PuzzleSet.loadFromFile("client/assets/default_data/puzzles/Puzzles.json"); local flat = {}
   local function w(s) if s.puzzles then for _, p in ipairs(s.puzzles) do flat[#flat + 1] = { p = p } end end for _, c in ipairs(s.puzzleSets or {}) do w(c) end end
   for _, s in ipairs(sets) do w(s) end
-  local function bld(stack) local p = Puzzle({ puzzleType = "moves", stack = stack, moves = 1 }); local m = Match(p:toPanelSource(false), p:toGameMode().matchRules)
+  local function bld(stack) local p = Puzzle({ puzzleType = "moves", stack = stack, moves = 99 }); local m = Match(p:toPanelSource(false), p:toGameMode().matchRules) -- moves=99: don't cap swaps (moves=1 blocked the 2nd swap -> false setup 0%)
     local st = m:createStackWithSettings(LP.getModern(10), true, "controller", nil); st:setMaxRunsPerFrame(1); m:start()
     for i = 1, 200 do if st:game_ended() then break end st:receiveConfirmedInput("A"); m:run() if i >= 2 and not st:hasActivePanels() and not st:hasChainingPanels() then break end end return m, st end
   local function gridOf(st) return BoardSim.colorGrid(BoardState.extract(st).board, st.height), st.height end

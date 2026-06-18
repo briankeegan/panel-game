@@ -1,0 +1,32 @@
+SURVIVAL-STRESS (createFromReplay, online-faithful): fixture=bot/fixtures/matchStart_vs.json slot=1 profile=(plain) difficulty=hard garbage=6x1-every-600f maxFrames=3600 seeds=10
+  seed 1001: survived 697 frames (11.6s)  garbage-broken 0  swaps 50  garbInjected 1  chains-fired 0 (0.0/min) peakChain 0
+  seed 1002: survived 861 frames (14.3s)  garbage-broken 0  swaps 30  garbInjected 1  chains-fired 1 (4.2/min) peakChain 2
+  seed 1003: survived 882 frames (14.7s)  garbage-broken 0  swaps 22  garbInjected 1  chains-fired 0 (0.0/min) peakChain 0
+  seed 1004: survived 682 frames (11.4s)  garbage-broken 0  swaps 43  garbInjected 1  chains-fired 0 (0.0/min) peakChain 0
+  seed 1005: survived 732 frames (12.2s)  garbage-broken 0  swaps 16  garbInjected 1  chains-fired 1 (4.9/min) peakChain 2
+  seed 1006: survived 682 frames (11.4s)  garbage-broken 0  swaps 21  garbInjected 1  chains-fired 0 (0.0/min) peakChain 0
+  seed 1007: survived 680 frames (11.3s)  garbage-broken 0  swaps 0  garbInjected 1  chains-fired 0 (0.0/min) peakChain 0
+  seed 1008: survived 741 frames (12.3s)  garbage-broken 0  swaps 28  garbInjected 1  chains-fired 0 (0.0/min) peakChain 0
+  seed 1009: survived 682 frames (11.4s)  garbage-broken 0  swaps 18  garbInjected 1  chains-fired 0 (0.0/min) peakChain 0
+  seed 1010: survived 697 frames (11.6s)  garbage-broken 0  swaps 48  garbInjected 1  chains-fired 0 (0.0/min) peakChain 0
+SURVIVAL: median 11.6s p10 11.3s mean 12.2s
+GARBAGE-BROKEN: median 0.0 p10 0.0 mean 0.0
+
+════════════════════ BENCHMARK ════════════════════
+   SURVIVAL UNDER PRESSURE :  11.6 s   /   GOAL 180s   (6%)
+════════════════════════════════════════════════════
+
+=== PARITY VALIDATION ===
+1) DETERMINISM: PASS (run1 survived 1798, run2 survived 1798; boards identical)
+2) CONSTRUCTION PARITY: PASS — match built via Match.createFromReplay on the REAL captured
+   matchStart.replay, so rules/levelData/panelSource(sourceType=3)/allowAdjacent are the LITERAL online values.
+   Starting board after match:start(): width=6 height=12 filledPanels=30 (non-empty, well-formed).
+3) BEHAVIORAL CROSS-CHECK: injection-OFF seed survived 13.1s; bot made 0 swaps over 789 decisions
+   Aggregate over the 10 stressed seeds: 276 swaps, 10 garbage blocks injected.
+   INTENTIONAL DIFFERENCES vs online (and why they don't break faithfulness):
+     - seed source: swapped per-run for distribution coverage; panelSource TYPE/flags are the captured online ones.
+     - no opponent: stacks reduced to 1, garbageFlows cleared — a solo no-pressure baseline (injection-OFF).
+     - direct injection: garbage applied via stack:applyNetworkGarbage, the EXACT online loose-sync receive call,
+       so staging/telegraph/landing/dig are byte-identical to a real relayed G event; only the SOURCE differs.
+   Compare injection-OFF survival (13.1s) against online hostClock from winRateTest/emitBotGames; with no opponent
+   garbage the bot should out-survive a contested online match (which it does), confirming a sane regime.

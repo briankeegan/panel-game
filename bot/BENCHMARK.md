@@ -6,7 +6,7 @@
 
 | Axis | Metric | Human ref | Target | **Current** | Measured | Δ since last |
 |------|--------|-----------|--------|-------------|----------|--------------|
-| **Survival** | survival time at 144 area/min (human rate), seconds | ∞ (human survives) | survive 60s, then raise rate | **15.4 s** (FSM-on) / 15.3 s (FSM-off) | 2026-06-17 | baseline |
+| **Survival** | survival time, frozen protocol `600 3600 10`, seconds | ∞ (human survives) | survive 60s, then raise rate | **11.6 s** median (p10 11.3 / mean 12.2) | 2026-06-17 (chips, 10 seeds) | first FROZEN number |
 | **Offense** | sustained garbage SENT (area/min) | ~145 med / **156** best (orange) | **> 156** (+ ≥85% chain-area, peak ≥x11) | _pending_ | — | — |
 | **Mechanics** | puzzles solved / 235 (live bot) | — | **100%** | _pending_ | — | — |
 | Contested | win% vs strong opponent | — | _held_ | — | — | — |
@@ -27,6 +27,18 @@ real frame), NOT a "ceiling < X" bound. Primary cell = survival-time @ 144/min (
 ("max area/min survived") is kept only as a secondary diagnostic and only when it resolves to a number.
 
 ## Changelog (newest first)
+- **2026-06-17** — **SURVIVAL = 11.6 s median (p10 11.3 / mean 12.2)** | SHA `da4684b7` (chips wired, BoardSim verify) |
+  frozen protocol v1 `luajit bot/survivalStress.lua 600 3600 10`, seeds 1001-1010 | log `bot/survival_run_3a2f360c.log`.
+  **FIRST frozen-protocol number — this is the comparable baseline from here on.** Not apples-to-apples with the
+  earlier 15.4s (that was 3 seeds, non-frozen, pre-chips) — frozen-to-frozen only going forward.
+  **KEY DIAGNOSTIC — failure mode is SELF-TOPOUT, not garbage.** Injection-OFF (zero pressure) the bot survives only
+  13.1 s and makes **0 swaps over 789 decisions**; garbage shaves just 13.1→11.6 s (only 1 block lands before death,
+  0 broken, ~0 chains fired in 8/10 seeds). The bot raises itself into the ceiling without entering the
+  break→setup→fire loop. ⇒ The survival lever right now is NOT "handle garbage better" — it's "stop self-topping /
+  actually play offense to ride stop-time." Aligns inversely with the stop-time theory: no break → no stop window → raise to death.
+  ⚠️ Protocol note for B (owner): the blessed cmd injects **6×1 every 600f = ~36 area/min**, not the 144/min the prose
+  claims (6×4 block). Doesn't change today's result (bot dies before pressure bites), but the cmd≠prose gap should be
+  reconciled (version bump if the block shape changes). Flagged in TIMING_SYNC.
 - **2026-06-17** — **SURVIVAL = 15.4 s @ 144 area/min (FSM-on), 15.3 s (FSM-off).** Real number (replaces the earlier
   "<144" bound, per Brian). A strong human survives 144/min indefinitely, so the bot is far below — it lasts ~15 s.
   Source: A's FSM A/B (fixed-rate `600 5400 3` = 144/min, 90s cap, 3 seeds). The timing FSM is currently NEUTRAL on

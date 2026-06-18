@@ -48,3 +48,9 @@ real frame), NOT a "ceiling < X" bound. Primary cell = survival-time @ 144/min (
 - **2026-06-17** — Survival-ceiling harness built (`survivalStress.lua ceiling`, ramp-to-failure bisection on the real
   brain). Fixed rate bounds (60–600 f = 1440–144 area/min, human→superhuman span).
 - **2026-06-17** — Benchmark redirect: pause human-profile tuning; build this harder/more-accurate benchmark first.
+
+- **2026-06-18** — **SURVIVAL 12.2 s → 15.4 s (+26%)** via WIRING fixes (frozen 10-seed `600 3600 10`). The bot was
+  decoding chains correctly but couldn't EXECUTE them: (1) cursor crawled at `cursorMoveInterval=8` (~68 frames to
+  reach+fire one chain), (2) the FSM read `chainReady` BEFORE generatePlan set it, so frame-1 picked BUILD and the
+  build swap destroyed the chain. Fixed both + fire-at-clock=0. Chain-fire on chain-ready boards 5%→65%. Sanity-check
+  ladder (SC1 detection, SC2 full-bot fire) drove the finds. Next: the remaining 35% chain-fire miss + the p10 seeds.

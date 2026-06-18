@@ -119,19 +119,85 @@ local function fitSearch(grid, rows, envelope, top, cfg)
   return bestSeq, bestLeaf -- the build line + the chain-READY board it produces (to append the trigger to)
 end
 
--- CHIP VERIFY: the REAL-ENGINE check chips.setupPlay calls per candidate. It applies the 2 swaps and returns
--- true iff panels clear OR garbage breaks. IDEAL = copy the live Stack, apply, run frames, check, discard. But the
--- engine's rollback copy reuses buffers and is bound to the live Match (panelSource RNG, garbage queues, signals) —
--- forking it cleanly mid online-match risks desyncing the real game, so we verify on BoardSim's resolve instead
--- (post-swap1 grid -> swap2 -> resolve), which catches the common phantoms. TODO(track A/B): BoardSim mispredicts
--- GARBAGE-HEAVY boards (B: 2/21 phantom setups) — a setup whose fire depends on a garbage-break that BoardSim
--- gets wrong can still misfire. Swap to a forked-Stack verify once a detachable Stack clone exists.
+-- CHIP VERIFY: the REAL-ENGINE check chips.setupPlay calls per candidate. setupPlay now falls through to B's
+-- goalSetup (goal-directed construction), which returns routes of 2..6 swaps where the FIRE is on the LAST swap
+-- and the intermediate swaps are non-clearing alignment moves. So we must apply the FULL sequence and check the
+-- FINAL state — the old "first 2 swaps" check rejected every deep (3+) construction (the fire was never reached).
+--
+-- We verify on a THROWAWAY Match rebuilt from the current board snapshot — NOT the live online Match. It's a
+-- separate disposable engine (Puzzle{moves=99} so the engine never caps the later swaps — moves=1 false-negatives
+-- everything after swap 1), so there's zero desync risk to the real game. BoardSim mispredicts multi-swap slide
+-- routes (~44% — gravity during slides), so the engine is the source of truth here.
+--
+-- GARBAGE CAVEAT: the throwaway Match is rebuilt from a flat color grid (gridToStack), which loses garbage block
+-- extent/reveal — garbage cells can't be faithfully reconstructed, so on a board WITH garbage we fall back to the
+-- full-sequence BoardSim verify (which rides the GARBAGE sentinel through gravity correctly). goalSetup only builds
+-- play-color triples (never garbage-break setups), so engine-verify covers the routes it actually produces.
+local KDE_swap = nil
+
+-- full-sequence BoardSim verify: apply every swap, check the FINAL resolve cleared panels or broke garbage.
+local function boardSimVerifyFull(grid, rows, seq)
+  local g = grid
+  for i = 1, #seq - 1 do
+    g = BoardSim.simSwap(g, rows, seq[i][1], seq[i][2]) -- intermediate alignment swaps (don't clear)
+    if not g then return false end
+  end
+  local last = seq[#seq]
+  local _, _, tot, _, gbroke = BoardSim.simSwap(g, rows, last[1], last[2])
+  return (tot or 0) > 0 or (gbroke or 0) > 0
+end
+
+-- reconstruct a Puzzle stack string from the grid (top row first, bottom-right last). Garbage -> empty (we only
+-- reach this path on garbage-free boards). nil = the grid has garbage (caller falls back to BoardSim).
+local function gridToStack(grid, rows)
+  local out = {}
+  for r = rows, 1, -1 do
+    for c = 1, BoardSim.WIDTH do
+      local v = grid[r][c] or 0
+      if v == BoardSim.GARBAGE then return nil end
+      out[#out + 1] = tostring(v)
+    end
+  end
+  return table.concat(out)
+end
+
+-- build a throwaway Match from a stack string, settle it, and apply a full swap route. Returns true iff the play
+-- panel count OR garbage count dropped. Lazy-requires the engine (pcall) so EnvelopeBrain stays loadable in pure
+-- BoardSim contexts; on any failure returns nil so the caller falls back to BoardSim.
+local function engineVerifyFull(stack, seq)
+  local ok, result = pcall(function()
+    local Match = require("common.engine.Match"); require("common.engine.checkMatches")
+    local Puzzle = require("common.engine.Puzzle")
+    local LP = require("common.data.LevelPresets")
+    local BoardState = require("bot.BoardState")
+    if not KDE_swap then KDE_swap = require("common.data.KeyDataEncoding").swap end
+    local p = Puzzle({ puzzleType = "moves", stack = stack, moves = 99 }) -- moves=99: don't cap the later swaps
+    local m = Match(p:toPanelSource(false), p:toGameMode().matchRules)
+    local st = m:createStackWithSettings(LP.getModern(10), true, "controller", nil)
+    st:setMaxRunsPerFrame(1); m:start()
+    local function pan() local n = 0 for r = 1, st.height do for c = 1, 6 do local v = st.panels[r][c].color or 0; if v ~= 0 and v ~= 9 then n = n + 1 end end end return n end
+    local function gar() local n = 0 for r = 1, st.height do for c = 1, 6 do if st.panels[r][c].isGarbage then n = n + 1 end end end return n end
+    for i = 1, 200 do if st:game_ended() then break end st:receiveConfirmedInput("A"); m:run() if i >= 2 and not st:hasActivePanels() and not st:hasChainingPanels() then break end end -- settle
+    local pb, gb = pan(), gar()
+    for _, mv in ipairs(seq) do
+      st.cur_row, st.cur_col = mv[1], mv[2]; st:receiveConfirmedInput(KDE_swap); m:run()
+      for k = 1, 80 do if st:game_ended() then break end st:receiveConfirmedInput("A"); m:run() if k >= 2 and not st:hasActivePanels() and not st:hasChainingPanels() then break end end
+    end
+    return pan() < pb or gar() < gb
+  end)
+  if not ok then return nil end
+  return result
+end
+
 function EnvelopeBrain:chipVerify(grid, rows)
   return function(seq)
-    local g1 = BoardSim.simSwap(grid, rows, seq[1][1], seq[1][2])
-    if not g1 then return false end
-    local _, _, tot, _, gbroke = BoardSim.simSwap(g1, rows, seq[2][1], seq[2][2])
-    return (tot or 0) > 0 or (gbroke or 0) > 0
+    if not seq or #seq == 0 then return false end
+    local stack = gridToStack(grid, rows)   -- nil on garbage boards
+    if stack then
+      local res = engineVerifyFull(stack, seq)
+      if res ~= nil then return res end     -- engine truth (garbage-free path)
+    end
+    return boardSimVerifyFull(grid, rows, seq) -- garbage board / engine unavailable: full-sequence BoardSim
   end
 end
 

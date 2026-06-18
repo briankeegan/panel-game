@@ -165,7 +165,7 @@ is just: detect chain-state → continuation-search → land in window → repea
 |------|-----------|------------------------------|--------|
 | FIRE / combo (1-move) | 100% (real-engine) | 45% | done; live via band-scan |
 | BREAK (garbage-anchored, 1-move) | 100% | ~31% of garbage boards | done |
-| SETUP (2-move construction) | 100% (engine-verify rejects phantoms) | +setup boards → 63% combined | done; **the live workhorse** |
+| SETUP (2-move + GOAL-DIRECTED construction) | 100% (engine-verify) | 23 needs-setup boards (2-5 swap routes) | done; the live workhorse |
 | 3-MOVE setup | (67% raw) | +2 of 42 unsolved boards | NOT WORTH IT — marginal; 2-move is the sweet spot |
 | STEADY-BUILD chain | — | — | LIVE-only: gravity-driven + frame-precise + setup-dependent; 0% offline across 3 experiments (puzzles/fire-extend/dense). Tune live. |
 

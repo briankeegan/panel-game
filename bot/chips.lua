@@ -114,6 +114,35 @@ function chips.setupPlay(grid, rows, verify)
       end end
     end
   end end
+  return chips.goalSetup(grid, rows, verify)                 -- no shallow 2-move? try DEEP target-directed construction
+end
+
+-- GOAL-DIRECTED construction (Brian's "target first, then route the colors in", 2026-06-17): pick a line you can COMPLETE
+-- (a vertical triple whose color is present nearby), then slide each missing block into its slot. The swap COUNT falls out
+-- of how far the pieces travel (2-5 swaps). This is the opposite of a blind swap-search — it AIMS at a makeable match and
+-- routes pieces to it (transport = 1-piece case, rearrange = multi-piece case). verify-iterate over targets -> 100%.
+function chips.goalSetup(grid, rows, verify)
+  local top = BoardSim.maxHeight(grid, rows)
+  local lo, hi = math.max(1, top - 6), math.min(top, rows)
+  for c = 1, 6 do for r0 = lo, math.min(hi, rows - 2) do
+    local present = {}
+    for _, ri in ipairs({ r0, r0 + 1, r0 + 2 }) do for cc = 1, 6 do
+      local v = grid[ri] and grid[ri][cc]; if v and v ~= 0 and v ~= BoardSim.GARBAGE then present[v] = true end
+    end end
+    for X in pairs(present) do
+      local wk = BoardSim.cloneGrid(grid, rows); local swaps = {}; local ok = true
+      for _, ri in ipairs({ r0, r0 + 1, r0 + 2 }) do
+        if wk[ri][c] ~= X then                                -- this slot needs an X — route the nearest one in
+          local bestc; for cc = 1, 6 do if cc ~= c and wk[ri][cc] == X and (not bestc or math.abs(cc - c) < math.abs(bestc - c)) then bestc = cc end end
+          if not bestc then ok = false; break end
+          if bestc > c then for k = bestc - 1, c, -1 do if k < 1 or k > 5 then ok = false; break end wk[ri][k], wk[ri][k + 1] = wk[ri][k + 1], wk[ri][k]; swaps[#swaps + 1] = { ri, k } end
+          else for k = bestc, c - 1 do if k < 1 or k > 5 then ok = false; break end wk[ri][k], wk[ri][k + 1] = wk[ri][k + 1], wk[ri][k]; swaps[#swaps + 1] = { ri, k } end end
+          if not ok then break end
+        end
+      end
+      if ok and #swaps > 0 and #swaps <= 6 and (not verify or verify(swaps)) then return swaps, { col = c, color = X } end
+    end
+  end end
   return nil
 end
 

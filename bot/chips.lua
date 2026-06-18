@@ -143,6 +143,26 @@ function chips.goalSetup(grid, rows, verify)
       if ok and #swaps > 0 and #swaps <= 6 and (not verify or verify(swaps)) then return swaps, { col = c, color = X } end
     end
   end end
+  -- HORIZONTAL targets: row r, cols c..c+2 all color X. Route each missing X in from the same row (prefer a source
+  -- OUTSIDE the target span, from the right, so it doesn't disturb already-placed left slots). Nearly doubles coverage.
+  for r = lo, hi do for c = 1, 4 do
+    local present = {}
+    for cc = 1, 6 do local v = grid[r] and grid[r][cc]; if v and v ~= 0 and v ~= BoardSim.GARBAGE then present[v] = true end end
+    for X in pairs(present) do
+      local wk = BoardSim.cloneGrid(grid, rows); local swaps = {}; local ok = true
+      for _, tc in ipairs({ c, c + 1, c + 2 }) do
+        if wk[r][tc] ~= X then
+          local src; for cc = 6, 1, -1 do if wk[r][cc] == X and (cc < c or cc > c + 2) then src = cc; break end end
+          if not src then for cc = 1, 6 do if wk[r][cc] == X and cc ~= tc then src = cc; break end end end
+          if not src then ok = false; break end
+          if src > tc then for k = src - 1, tc, -1 do if k < 1 or k > 5 then ok = false; break end wk[r][k], wk[r][k + 1] = wk[r][k + 1], wk[r][k]; swaps[#swaps + 1] = { r, k } end
+          else for k = src, tc - 1 do if k < 1 or k > 5 then ok = false; break end wk[r][k], wk[r][k + 1] = wk[r][k + 1], wk[r][k]; swaps[#swaps + 1] = { r, k } end end
+          if not ok then break end
+        end
+      end
+      if ok and #swaps > 0 and #swaps <= 6 and (not verify or verify(swaps)) then return swaps, { row = r, color = X, horizontal = true } end
+    end
+  end end
   return nil
 end
 

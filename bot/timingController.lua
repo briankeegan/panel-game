@@ -39,8 +39,15 @@ function M.decide(state, cfg)
   -- 1. SURVIVAL OVERRIDE: about to top out and a break is available → take it (opens stop-time, buys the window).
   if danger >= cfg.dangerHigh and breakReady then return "BREAK" end
 
-  -- 2. NO FREEZE: clock 0 → RAISE. Push the stack; don't burn the deep FIT search on a fire that can't land yet.
-  if clock <= 0 then return "RAISE" end
+  -- 2. NO FREEZE YET (clock 0): if a fire is ARRANGED, TAKE it — clearing OPENS the stop-time clock and starts the
+  --    cycle. Without this the bot never fires an available chain (gated on clock>0, but clock only rises AFTER a fire)
+  --    and builds into the ceiling. Measured: the bot fired a sitting chain on only 5% of chain-ready boards. Break
+  --    first (opens stop-time + chains garbage), else fire the chain. Else RAISE/build.
+  if clock <= 0 then
+    if breakReady then return "BREAK" end
+    if chainReady then return "FIRE" end
+    return "RAISE"
+  end
 
   -- 3. WINDOW FULL (clock high) OR incoming imminent: spend it. FIRE if a chain is arranged, else BREAK to chain
   --    garbage / refresh the clock. Proactive: a near-term incoming (within lead time) fires defensively even if the

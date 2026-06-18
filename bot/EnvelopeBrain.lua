@@ -208,7 +208,7 @@ function EnvelopeBrain:generatePlan(grid, rows, top, danger, mode)
   -- B's live fire-site scan (one band scan): the best trigger + chain/break readiness for the FSM. `best` favors
   -- chain, then GARBAGE-BREAK (opens stop-time = survival), then panels. Cached on self for the FSM (read each
   -- frame between re-plans; the cadence lag is benign — clock/danger move slowly).
-  local scan = liveRecognize.scanFireSites(grid, rows, { bandDepth = cfg.surface + 1 })
+  local scan = self._scan or liveRecognize.scanFireSites(grid, rows, { bandDepth = cfg.surface + 1 })
   self.chainReady = scan.chainReady
   self.breakReady = scan.breakReady
   local firePos = scan.best and { scan.best.r, scan.best.c } or nil
@@ -281,6 +281,14 @@ function EnvelopeBrain:decide(state)
   local top = math.min(rows, height + 1)
   local danger = height >= rows * cfg.dangerFrac
 
+  -- SCAN FIRST (B fix 2026-06-18): the FSM must read THIS frame's readiness, not last frame's. Previously the scan
+  -- ran inside generatePlan (AFTER the FSM), so frame 1 saw chainReady=nil → picked BUILD → the build swap DESTROYED
+  -- the chain before it ever fired (traced: bot swapped at 1,3 ×17 instead of firing the chain at 3,3). Scan here,
+  -- cache on self, and generatePlan reuses it.
+  local scan = liveRecognize.scanFireSites(grid, rows, { bandDepth = cfg.surface + 1 })
+  self.chainReady, self.breakReady, self.comboReady = scan.chainReady, scan.breakReady, scan.comboReady
+  self._scan = scan
+
   -- TIMING FSM (B's timingController, Audit 7): pick the MODE from the stop-time clock + pressure; the FIT/cache
   -- decides the WHAT within the mode. RAISE lets us SKIP the deep search (offense can't land with no freeze).
   local mode = nil
@@ -293,6 +301,7 @@ function EnvelopeBrain:decide(state)
       incomingEta = eta,
       chainReady  = self.chainReady,
       breakReady  = self.breakReady,
+      comboReady  = self.comboReady,
     })
   end
 

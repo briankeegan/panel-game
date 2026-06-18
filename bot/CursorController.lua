@@ -19,7 +19,7 @@ local function char(bits) return KeyDataEncoding.base64encode[bits + 1] end
 local IDLE = char(0)
 
 -- Cursor speed = two direct numeric knobs (no tiers). Defaults below = full speed.
-local DEFAULT_CURSOR_SPEED = { cursorMoveInterval = 8, reactionFrames = 3 }
+local DEFAULT_CURSOR_SPEED = { cursorMoveInterval = 1, reactionFrames = 1 }
 
 local CursorController = {}
 CursorController.__index = CursorController

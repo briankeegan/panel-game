@@ -178,11 +178,11 @@ local _botBrain, _botController, _boardState
 local function botParts(difficulty)
   if not _botBrain then
     _botBrain = require("bot.EnvelopeBrain").new({})
-    _botController = require("bot.CursorController").new(difficulty)
+    _botController = require("bot.CursorController").new()
     _boardState = require("bot.BoardState")
   end
   -- CursorController carries per-puzzle latch state; rebuild it each puzzle.
-  _botController = require("bot.CursorController").new(difficulty)
+  _botController = require("bot.CursorController").new()
   return _botBrain, _botController, _boardState
 end
 

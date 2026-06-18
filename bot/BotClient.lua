@@ -70,7 +70,7 @@ local BotClient = class(function(self, opts)
   self.name = opts.name or "BotBella"
   self.brainKind = opts.brain or "heuristic"   -- "heuristic"|"random"|"expert"|"search"
   self.searchProfile = opts.searchProfile       -- optional per-player eval weights (brain == "search")
-  self.difficulty = opts.difficulty or "hard" -- cursor SPEED tier (APM + reaction cap); bot always plays full-quality
+  self.cursorSpeed = opts.cursorSpeed -- { cursorMoveInterval, reactionFrames } direct knobs; nil = full speed
   self.gameplay = TcpClient({ name = "bot-gameplay", defaultPort = self.port })
   -- Persisted server identity so re-runs reuse the same account instead of
   -- re-registering (and tripping the server's name-already-taken guard).
@@ -360,7 +360,7 @@ function BotClient:startMatch()
     -- THE bot, full strength. EnvelopeBrain now plays online here (the only thing it needed
     -- from SearchBrain was this seat in the online-play loop).
     self.brain = require("bot.EnvelopeBrain").new({})
-    self.controller = require("bot.CursorController").new()
+    self.controller = require("bot.CursorController").new(self.cursorSpeed)
     self.boardState = require("bot.BoardState")
   end
   -- Display-snapshot capture so a human opponent sees the bot's board.

@@ -2,8 +2,9 @@
 -- challenge — so a human just challenges it in the lobby to play. Heuristic brain
 -- by default; pass "search"/"expert" to pick a brain. Rematches forever (Ctrl+C).
 --
--- Usage: zsh run_play.sh [ip] [port] [name] [difficulty] [brain]
---   defaults: 104.156.250.136 49569 PanelBot medium  (heuristic)
+-- Usage: zsh run_play.sh [ip] [port] [name] [cursorInterval] [reactionFrames] [brain]
+--   cursorInterval/reactionFrames: optional cursor-speed knobs (frames); omit for full speed.
+--   defaults: 104.156.250.136 49569 PanelBot  (full speed, heuristic) — the bot always plays full-quality.
 io.stdout:setvbuf("no")
 require("bot.headlessBoot")
 
@@ -16,13 +17,16 @@ local BotClient = require("bot.BotClient")
 local ip = arg[1] or "104.156.250.136"
 local port = tonumber(arg[2]) or 49569
 local name = arg[3] or "PanelBot"
-local difficulty = arg[4] or "hard"
-local brain = arg[5] or "heuristic" -- "heuristic" | "search" | "expert"
+local cursorInterval = tonumber(arg[4]) -- frames between cursor moves/swaps; nil = full speed
+local reactionFrames = tonumber(arg[5]) -- reaction-cap frames; nil = full speed
+local brain = arg[6] or "heuristic"     -- "heuristic" | "search" | "expert"
+local cursorSpeed = (cursorInterval or reactionFrames)
+  and { cursorMoveInterval = cursorInterval or 8, reactionFrames = reactionFrames or 3 } or nil
 
 -- PA_SEARCH_PROFILE=bot/profiles/<player>.json conditions the search eval per
 -- player (Phase B); ignored unless brain == "search".
 local bot = BotClient({
-  ip = ip, port = port, name = name, difficulty = difficulty,
+  ip = ip, port = port, name = name, cursorSpeed = cursorSpeed,
   brain = brain,
   searchProfile = (brain == "search") and os.getenv("PA_SEARCH_PROFILE") or nil,
 })
@@ -35,9 +39,10 @@ local t = socket.gettime()
 while socket.gettime() < t + 0.6 do bot:pump(); socket.sleep(0.01) end
 bot:leaveRoom()
 
+local speedDesc = cursorSpeed and string.format("cursor %d/%d", cursorSpeed.cursorMoveInterval, cursorSpeed.reactionFrames) or "full speed"
 print(string.format(
   "\n=== Bot '%s' (%s, L%d, %s) is idle in the lobby on %s ===\n    Open your client, CHALLENGE '%s' in the lobby, and play — it auto-accepts.\n    Ctrl+C to stop.\n",
-  name, brain, bot.level, difficulty, ip, name))
+  name, brain, bot.level, speedDesc, ip, name))
 
 local function playerCount()
   local n = 0

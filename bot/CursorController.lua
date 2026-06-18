@@ -2,13 +2,12 @@
 -- per-frame input char, routing the 1-wide cursor to the target then swapping —
 -- THROTTLED to human-plausible speed so the bot isn't mechanically superhuman.
 --
--- Two difficulty knobs (the "similar difficulty to a player" tuning):
+-- Two CURSOR-SPEED knobs (direct numbers — NOT a "difficulty" tier):
 --   cursorMoveInterval — min frames between cursor moves/swaps (APM cap).
---   reactionFrames     — delay before acting on a NEW engagement (reaction time),
+--   reactionFrames     — delay before acting on a NEW engagement (reaction cap),
 --                        applied only when coming out of idle, not between
 --                        back-to-back swaps in one flurry.
--- Presets are PLACEHOLDERS; recalibrate from the data track's measured human
--- cursor-move cadence + reaction-time distribution.
+-- The bot always plays FULL QUALITY; these only throttle cursor speed/reaction.
 --
 -- Commits to a target once engaged (anti-flicker) and is idempotent on a
 -- completed swap (DATA_CONTRACT §10) so it never swaps a pair back.
@@ -19,17 +18,17 @@ local KeyDataEncoding = require("common.data.KeyDataEncoding")
 local function char(bits) return KeyDataEncoding.base64encode[bits + 1] end
 local IDLE = char(0)
 
--- Speed tiers live in bot.Difficulty (single source of truth; APM/reaction are
--- §13 human-calibrated). This controller reads cursorMoveInterval + reactionFrames;
--- the move-quality knobs (chainAware/epsilon) are consumed by SearchBrain.
-local Difficulty = require("bot.Difficulty")
+-- Cursor speed = two direct numeric knobs (no tiers). Defaults below = full speed.
+local DEFAULT_CURSOR_SPEED = { cursorMoveInterval = 8, reactionFrames = 3 }
 
 local CursorController = {}
 CursorController.__index = CursorController
 
----@param difficulty string|table "easy"|"medium"|"hard" or a knob table
-function CursorController.new(difficulty)
-  local cfg = Difficulty.get(difficulty)
+---@param cursorSpeed table|nil { cursorMoveInterval, reactionFrames } — direct knobs; nil = full speed
+function CursorController.new(cursorSpeed)
+  local cfg = {}
+  for k, v in pairs(DEFAULT_CURSOR_SPEED) do cfg[k] = v end
+  if type(cursorSpeed) == "table" then for k, v in pairs(cursorSpeed) do cfg[k] = v end end
   return setmetatable({
     cfg = cfg,
     moveCooldown = 0,

@@ -16,7 +16,7 @@ local BotClient = require("bot.BotClient")
 local ip = arg[1] or "104.156.250.136"
 local port = tonumber(arg[2]) or 49569
 local name = arg[3] or "PanelBot"
-local difficulty = arg[4] or "medium"
+local difficulty = arg[4] or "hard"
 local brain = arg[5] or "heuristic" -- "heuristic" | "search" | "expert"
 
 -- PA_SEARCH_PROFILE=bot/profiles/<player>.json conditions the search eval per

@@ -70,7 +70,7 @@ local BotClient = class(function(self, opts)
   self.name = opts.name or "BotBella"
   self.brainKind = opts.brain or "heuristic"   -- "heuristic"|"random"|"expert"|"search"
   self.searchProfile = opts.searchProfile       -- optional per-player eval weights (brain == "search")
-  self.difficulty = opts.difficulty or "medium" -- "easy" | "medium" | "hard" (cursor-speed/reaction cap)
+  self.difficulty = opts.difficulty or "hard" -- cursor SPEED tier (APM + reaction cap); bot always plays full-quality
   self.gameplay = TcpClient({ name = "bot-gameplay", defaultPort = self.port })
   -- Persisted server identity so re-runs reuse the same account instead of
   -- re-registering (and tripping the server's name-already-taken guard).

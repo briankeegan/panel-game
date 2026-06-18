@@ -155,3 +155,29 @@ A MODE, not a chip. **Chain-state signal = `st.chain_counter`** (engine-measured
 **Next concrete step (B):** validate the CONTINUATION mechanism — fire a chain, and during the chaining frames apply a
 local swap that extends chain_counter beyond its natural peak. That's the timing-sensitive core; once shown, the mode
 is just: detect chain-state → continuation-search → land in window → repeat. (Setup's engine-verify pattern reused.)
+
+---
+
+## CURRENT STATE — cache complete (2026-06-17, end of B's chip pass)
+**All chips engine-verified to 100% precision. Cache wired into the live brain and PLAYABLE.**
+
+| Chip | Precision | Coverage (235-puzzle corpus) | Status |
+|------|-----------|------------------------------|--------|
+| FIRE / combo (1-move) | 100% (real-engine) | 45% | done; live via band-scan |
+| BREAK (garbage-anchored, 1-move) | 100% | ~31% of garbage boards | done |
+| SETUP (2-move construction) | 100% (engine-verify rejects phantoms) | +setup boards → 63% combined | done; **the live workhorse** |
+| 3-MOVE setup | (67% raw) | +2 of 42 unsolved boards | NOT WORTH IT — marginal; 2-move is the sweet spot |
+| STEADY-BUILD chain | — | — | LIVE-only: gravity-driven + frame-precise + setup-dependent; 0% offline across 3 experiments (puzzles/fire-extend/dense). Tune live. |
+
+**Module:** `bot/chips.lua` — `chips.play(grid,rows)` (1-move fire/break, recognize+verify), `chips.setupPlay(grid,rows,verify)`
+(2-move construction; `verify(seq)` is the REAL-ENGINE check that rejects BoardSim phantoms on garbage-heavy boards).
+**Key invariant:** a chip is never used unless verified to fire — 100% by construction (Brian's bar).
+
+**Wired (A's commit d7ddae62):** `chips.play` + `chips.setupPlay` added to EnvelopeBrain `generatePlan`, additive (existing
+FSM/build untouched). Smoke test: setup verified on 136/235 boards, used as the plan on 28. **Playable:** `zsh run_server.sh`
+→ `zsh run_play.sh 127.0.0.1 49569 PanelBot` → `zsh run_client.sh` → challenge `PanelBot`.
+**Caveat:** live `verify` is BoardSim-based (forking the online Stack risks desync — TODO swap to a Stack-clone verify);
+can rarely misfire on garbage-heavy setups. `chips.play` is inert live (empty template STORE) — fires/breaks still covered
+by the existing band-scan; `chips.setupPlay` is the active new behavior (CONSTRUCTION).
+
+**What's left:** STEADY-BUILD, live-only (tune against real cascades while playing). Offline cache work is COMPLETE.

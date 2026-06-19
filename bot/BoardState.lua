@@ -164,6 +164,7 @@ function M.capture(stack)
     stop_time = stack.stop_time or 0, pre_stop_time = stack.pre_stop_time or 0,
     shake_time = stack.shake_time or 0, peak_shake_time = stack.peak_shake_time or 0,
     rise_timer = stack.rise_timer, health = stack.health,
+    maxHealth = stack.levelData and stack.levelData.maxHealth,
     speed = stack.speed, nextSpeedIncreaseClock = stack.nextSpeedIncreaseClock,
     -- chain / active (raw)
     chain_counter = stack.chain_counter or 0,
@@ -217,6 +218,8 @@ function M.derive(cap)
     critical = maxColHeight >= height,                   -- top row occupied -> BIGGEST stop time
     -- newly-surfaced signals the eval was blind to (retune consumes these):
     health = cap.health,                                 -- top-out grace (rise-ticks until death)
+    maxHealth = cap.maxHealth,                            -- full grace value (for health trend / fraction)
+    toppedOut = cap.wasToppedOut or false,               -- DANGER signal: at the ceiling, the death timer is ticking
     riseTimer = cap.rise_timer,                           -- exact frames to next row commit
     peakShake = cap.peak_shake_time,
     outgoing = cap.outgoing,                              -- our own pressure

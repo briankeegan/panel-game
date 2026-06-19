@@ -34,7 +34,9 @@ local function fired(stack, moves, kind)
   if kind == "BREAK" then return broke else return pan(st) < b end
 end
 
+-- chip priority order from arg[2] (comma-sep) so we can force BREAK to the front to actually exercise it
 local PRIOS = { "FIRE", "BREAK", "SETUP3" }
+if arg[2] and arg[2] ~= "" then PRIOS = {}; for t in arg[2]:gmatch("[^,]+") do PRIOS[#PRIOS + 1] = t end end
 local SEARCH = { "LEFT", "RIGHT", "UP", "DOWN" }
 
 for _, mode in ipairs({ "NO-VERIFY", "VERIFY" }) do

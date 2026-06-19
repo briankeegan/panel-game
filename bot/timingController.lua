@@ -1,3 +1,4 @@
+-- DEPRECATED: old bot brain, being replaced by the chips-brain rebuild (see bot/CHIPS_BRAIN_PLAN.md). Do NOT build on this.
 -- timingController.lua — B-track. The WHEN, as a thin FSM ABOVE the FIT/cache (NOT folded into the FIT cost).
 -- Data's Audit 7 (Brian's WHEN theory, measured): offense is gated on the stop-time freeze clock, not board shape.
 -- This controller picks the MODE; the FIT/cache decides the WHAT within that mode. Keeping it a separate gate (vs a

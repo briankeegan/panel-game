@@ -1,3 +1,4 @@
+-- DEPRECATED: old bot brain, being replaced by the chips-brain rebuild (see bot/CHIPS_BRAIN_PLAN.md). Do NOT build on this.
 -- EnvelopeBrain — PROTOTYPE layer-3 live brain for template-THEN-fit BUILD (team consensus 2026-06-16).
 -- v3: MPC CADENCE (B's fix for the per-frame slowness). The subdepth FIT search is ~300ms on a full board —
 -- too slow PER FRAME, but BUILD isn't frame-reactive. So: re-plan a multi-swap PLAN occasionally, execute it

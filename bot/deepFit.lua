@@ -1,3 +1,4 @@
+-- DEPRECATED: old bot brain, being replaced by the chips-brain rebuild (see bot/CHIPS_BRAIN_PLAN.md). Do NOT build on this.
 -- deepFit.lua — DEEP FIT plan-generator on BoardSim (B's deliverable; the lever past the league's
 -- 50% plateau). track A's live EnvelopeBrain.fitSearch is shallow (subDepth 2, beam 3) by the per-frame
 -- budget, so the chain DEPTH it can arrange plateaus at ~2-3. This is the deep version: a goal-directed

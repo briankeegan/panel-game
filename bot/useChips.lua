@@ -11,7 +11,7 @@ local M = {}
 
 -- Candidate swap cells in the top band, ordered nearest-to-cursor first, ties broken by searchPriorities direction.
 -- A swap at (r,c) exchanges (r,c)<->(r,c+1), so c is 1..5.
-local function cellOrder(grid, rows, cursor, band, searchPriorities)
+local function cellOrder(grid, rows, cursor, band, searchPriorities, maxDistance)
   local top = BoardSim.maxHeight(grid, rows)
   local lo = math.max(1, top - (band or 6))
   local hi = math.min(top + 1, rows)
@@ -26,7 +26,10 @@ local function cellOrder(grid, rows, cursor, band, searchPriorities)
   local cells = {}
   for r = lo, hi do for c = 1, 5 do
     local dr, dc = r - cr, c - cc
-    cells[#cells + 1] = { r, c, math.abs(dr) + math.abs(dc), rank[dirOf(dr, dc)] or 9 }
+    local dist = math.abs(dr) + math.abs(dc)
+    if not maxDistance or dist <= maxDistance then -- cap: a far chip costs too many cursor moves to be worth it
+      cells[#cells + 1] = { r, c, dist, rank[dirOf(dr, dc)] or 9 }
+    end
   end end
   table.sort(cells, function(a, b)
     if a[3] ~= b[3] then return a[3] < b[3] end -- nearer the cursor first
@@ -54,7 +57,7 @@ end
 function M.useChips(grid, rows, cursor, opts)
   opts = opts or {}
   local verify = opts.verify
-  local cells = cellOrder(grid, rows, cursor, opts.band, opts.searchPriorities)
+  local cells = cellOrder(grid, rows, cursor, opts.band, opts.searchPriorities, opts.maxDistance)
   for _, chipType in ipairs(opts.chipPriorities or { "FIRE", "BREAK", "SETUP3" }) do
     if chipType == "SETUP3" then
       local seq = chips.goalSetup(grid, rows, verify)

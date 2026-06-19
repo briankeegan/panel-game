@@ -16,6 +16,16 @@ The bot should almost always have a playable chip; **scanning is a last-resort f
 Start with the chips we KNOW work → hook into `useChips` → get a small set working + MEASURED on botBench → expand,
 testing as we go. **Every chip in `useChips` must be 100% (recognized → it fires). Never list one that doesn't.**
 
+## HARD RULE — verify in its head before committing (Brian, 2026-06-19; the thing that makes precision 100%)
+`useChips` must **run the candidate chip in its head and confirm it fires** before returning it. MEASURED (P1, 80
+boards): BoardSim's guess alone is **65%** precision (goalSetup only 44%); run-it-first is **100%** at 95% coverage.
+So verify is not optional — it IS the primitive.
+- **Live mechanism:** `Stack:rollbackCopy()` clones the live stack (panels + full garbage state) → play the chip's
+  swaps on the clone → check it cleared/broke → discard. This is faithful on GARBAGE boards.
+- **Known gap to fix in P3:** the existing `EnvelopeBrain.engineVerifyFull` rebuilds the board from a *text string*,
+  which can't represent garbage, so it returns nil on garbage boards and falls back to BoardSim (the unreliable 65%).
+  Replace that with the `rollbackCopy` clone so DANGER/dig verifies are reliable.
+
 ## The architecture
 
 ### Board read — add the missing signals (`BoardState.extract`)
@@ -31,8 +41,21 @@ Today: grid, cursor, height, incoming. ADD: `toppedOut`, `health` + `healthTrend
 - **chipPriorities**: ordered chip types to try (e.g. `[COMBO_9, COMBO_8, … BREAK_8, …]`). All assumed 100%.
 - **searchPriorities**: directional order to look **outward FROM THE CURSOR**, e.g. `[LEFT,RIGHT,UP,DOWN]` =
   search left, then right, then up, then down, extending out, same order. `[LEFT,RIGHT,UP]` eases upward only.
+- **maxDistance**: only look for a chip within this radius of the cursor (a far chip costs too many cursor moves to
+  reach). If NO chip is found within maxDistance → useChips returns nil → **then the scan runs** (Brian, 2026-06-19).
+  So the order is: bounded local chip search → fail → construct (scan).
 - Returns the top-priority **playable** chip (recognized + verified).
 - **State (FALLING, IS_CHAINING) is read from ENGINE signals** (`garbageMatched`, `chain_counter`, fall state).
+
+### SCAN — the fallback construction search (Brian, 2026-06-19; only when NO immediate chip + in DANGER)
+The scan does NOT pick a swap. It **builds a path to a playable chip**, using `useChips` as its leaf test:
+1. Imagine one move (a swap, in its head — `rollbackCopy` clone).
+2. Re-run `useChips` on that hypothetical board.
+3. If a verified chip appears → plan = `[imagined move(s)] + [the chip]`. Done.
+4. Else imagine another move from there and repeat (deepen) until a chip surfaces or a budget is hit.
+**Why this beats the old `deepFit`:** the leaf test is a VERIFIED chip (run-in-its-head), not a chain-*potential*
+heuristic — so it can't chase phantoms (deepFit scored potential and stalled on mirages, the 65%/phantom problem).
+Keep it TARGETED (Brian: e.g. the 3 rows below the garbage break point), and it could run in parallel.
 
 ### Flows
 - **RAISE** → raise (per condition).

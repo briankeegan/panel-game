@@ -329,7 +329,11 @@ function EnvelopeBrain:decide(state)
   if self.lastSig and sig == self.lastSig then self._stuck = (self._stuck or 0) + 1 else self._stuck = 0 end
   self.lastSig = sig
   local incoming = state.incoming and #state.incoming > 0
-  if self._stuck >= 8 and not self.chainReady and not self.breakReady and height < rows * 0.6 and not incoming then
+  -- Raise ceiling: a measured TRADEOFF, not a free knob. Low (0.45) keeps garbage headroom -> large-garbage +2.8s,
+  -- BUT starves combo-storm of material -> sent 12->3, survival -4s. High (0.6) preserves offense (more material to
+  -- clear+attack) at the cost of big-block top-out. Offense wins for a ceiling bot, so default 0.6. Sweepable.
+  local raiseCeil = tonumber(os.getenv("PA_RAISECEIL")) or 0.6
+  if self._stuck >= 8 and not self.chainReady and not self.breakReady and height < rows * raiseCeil and not incoming then
     self._stuck = 0
     return { type = "RAISE" } -- LOW board, nothing to do: raise for new blocks. Gate on height so we don't raise a
     -- full/garbage-laden board into the ceiling (that just trades flailing-death for raising-death).

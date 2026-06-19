@@ -326,7 +326,8 @@ function EnvelopeBrain:decide(state)
   -- forever (measured: 100s of swaps, 0 panels cleared). RAISE to bring up NEW material instead of dying in place.
   if self.lastSig and sig == self.lastSig then self._stuck = (self._stuck or 0) + 1 else self._stuck = 0 end
   self.lastSig = sig
-  if self._stuck >= 8 and not self.chainReady and not self.breakReady and height < rows * 0.6 then
+  local incoming = state.incoming and #state.incoming > 0
+  if self._stuck >= 8 and not self.chainReady and not self.breakReady and height < rows * 0.6 and not incoming then
     self._stuck = 0
     return { type = "RAISE" } -- LOW board, nothing to do: raise for new blocks. Gate on height so we don't raise a
     -- full/garbage-laden board into the ceiling (that just trades flailing-death for raising-death).

@@ -1,11 +1,15 @@
 -- useChips.lua — Brian's state-first primitive (CHIPS_BRAIN_PLAN.md, P1). Given a PRIORITY list of chip types and a
 -- directional SEARCH order, return the highest-priority PLAYABLE chip, searching cells OUTWARD FROM THE CURSOR.
--- Only returns chips that pass `verify` (the real-engine check) when one is supplied — we never hand back one that
--- doesn't fire. P1 vocabulary (the proven-working set): FIRE (any immediate combo), BREAK (any garbage break),
--- SETUP3 (chips.goalSetup target-first 3-line). Sized/named chips come in P5.
+-- Only returns chips that pass `verify` (the run-it-in-its-head engine check) when one is supplied — never a dud.
+--
+-- PROGRAMMATIC: chips live in the CHIPS registry. A chip = ONE entry: find(grid, rows, cells, verify) -> {swaps,kind}|nil.
+-- Add a chip (sized combos, named setups, ...) = add a registry row. The 4 we KNOW work:
+--   FIRE   (1 swap) any immediate combo          BREAK  (1 swap) any garbage break
+--   SETUP3 (2+)     goalSetup target-first line   CACHE  (1+)     planCache recall (825 authored shape->plans)
 
 local BoardSim = require("bot.BoardSim")
 local chips = require("bot.chips")
+local planCache = require("bot.planCache") -- 825 authored shape->plan entries (CACHE chip type)
 
 local M = {}
 
@@ -38,37 +42,66 @@ local function cellOrder(grid, rows, cursor, band, searchPriorities, maxDistance
   return cells
 end
 
--- does swapping (r,c)<->(r,c+1) yield this chip type? FIRE = an immediate match appears; BREAK = garbage is broken.
-local function cellYields(grid, rows, r, c, chipType)
-  if chipType == "FIRE" then
-    local gs = BoardSim.cloneGrid(grid, rows)
-    if gs[r] and gs[r][c + 1] then gs[r][c], gs[r][c + 1] = gs[r][c + 1], gs[r][c] end
-    local _, any = BoardSim.findMatches(gs, rows)
-    return any
-  elseif chipType == "BREAK" then
-    local _, _, _, _, gb = BoardSim.simSwap(grid, rows, r, c)
-    return (gb or 0) > 0
-  end
-  return false
+----------------------------------------------------------------------
+-- chip predicates (cell-based chips) + the registry
+----------------------------------------------------------------------
+-- does swapping (r,c)<->(r,c+1) make an immediate match?
+local function makesMatch(grid, rows, r, c)
+  local gs = BoardSim.cloneGrid(grid, rows)
+  if gs[r] and gs[r][c + 1] then gs[r][c], gs[r][c + 1] = gs[r][c + 1], gs[r][c] end
+  local _, any = BoardSim.findMatches(gs, rows)
+  return any
+end
+-- does swapping (r,c)<->(r,c+1) break garbage?
+local function breaksGarbage(grid, rows, r, c)
+  local _, _, _, _, gb = BoardSim.simSwap(grid, rows, r, c)
+  return (gb or 0) > 0
 end
 
--- useChips(grid, rows, cursor, opts) -> { swaps = {{r,c},...}, kind = "FIRE"|"BREAK"|"SETUP3" } | nil
--- opts: { chipPriorities = {...}, searchPriorities = {...}, verify = fn(swaps, kind)->bool, band = n }
+-- a cell-based chip: scan cells in order, return the first swap where `predicate` holds AND verify passes
+local function cellChip(kind, predicate)
+  return function(grid, rows, cells, verify)
+    for _, cell in ipairs(cells) do
+      local r, c = cell[1], cell[2]
+      if predicate(grid, rows, r, c) and (not verify or verify({ { r, c } }, kind)) then
+        return { swaps = { { r, c } }, kind = kind }
+      end
+    end
+  end
+end
+
+-- THE CHIP REGISTRY. Each entry: find(grid, rows, cells, verify) -> {swaps={{r,c}..}, kind} | nil. Add a chip here.
+local CHIPS = {
+  FIRE  = cellChip("FIRE", makesMatch),
+  BREAK = cellChip("BREAK", breaksGarbage),
+  SETUP3 = function(grid, rows, _, verify)
+    local seq = chips.goalSetup(grid, rows, verify)
+    if seq then return { swaps = seq, kind = "SETUP3" } end
+  end,
+  CACHE = function(grid, rows, _, verify)
+    local m = planCache.match(grid, rows)
+    if not (m and m.plan and #m.plan > 0) then return nil end
+    for _, sw in ipairs(m.plan) do -- reject plans whose recalled coords fall off THIS board (shape-recall can mis-map)
+      if not sw[1] or not sw[2] or sw[1] < 1 or sw[1] > rows or sw[2] < 1 or sw[2] > 5 then return nil end
+    end
+    if not verify or verify(m.plan, "CACHE") then
+      return { swaps = m.plan, kind = "CACHE", rel = m.rel, chain = m.chain }
+    end
+  end,
+}
+M.CHIPS = CHIPS -- exposed so callers/tests can enumerate the registered chip types
+
+-- useChips(grid, rows, cursor, opts) -> { swaps = {{r,c},...}, kind } | nil
+-- opts: { chipPriorities = {...}, searchPriorities = {...}, verify = fn(swaps, kind)->bool, band = n, maxDistance = n }
 function M.useChips(grid, rows, cursor, opts)
   opts = opts or {}
   local verify = opts.verify
   local cells = cellOrder(grid, rows, cursor, opts.band, opts.searchPriorities, opts.maxDistance)
-  for _, chipType in ipairs(opts.chipPriorities or { "FIRE", "BREAK", "SETUP3" }) do
-    if chipType == "SETUP3" then
-      local seq = chips.goalSetup(grid, rows, verify)
-      if seq then return { swaps = seq, kind = "SETUP3" } end
-    else
-      for _, cell in ipairs(cells) do
-        local r, c = cell[1], cell[2]
-        if cellYields(grid, rows, r, c, chipType) and (not verify or verify({ { r, c } }, chipType)) then
-          return { swaps = { { r, c } }, kind = chipType }
-        end
-      end
+  for _, chipType in ipairs(opts.chipPriorities or { "CACHE", "FIRE", "BREAK", "SETUP3" }) do
+    local find = CHIPS[chipType]
+    if find then
+      local result = find(grid, rows, cells, verify)
+      if result then return result end
     end
   end
   return nil

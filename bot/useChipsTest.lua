@@ -24,18 +24,22 @@ end
 local function gridOf(st) return BoardSim.colorGrid(BoardState.extract(st).board, st.height), st.height end
 local function pan(st) local n = 0 for r = 1, st.height do for c = 1, 6 do local v = st.panels[r][c].color or 0; if v ~= 0 and v ~= 9 then n = n + 1 end end end return n end
 
--- play moves on a fresh engine; did it FIRE? (BREAK -> garbage broke; else -> panels cleared)
+-- play moves on a fresh engine; did it FIRE? (cleared panels OR broke garbage). pcall-safe: a plan with an invalid
+-- swap (off-board recall) counts as NOT fired instead of crashing.
 local function fired(stack, moves, kind)
-  local m, st = bld(stack); local broke = false; local sub = {}
-  st:connectSignal("garbageMatched", sub, function() broke = true end)
-  local b = pan(st)
-  for _, mv in ipairs(moves) do st.cur_row, st.cur_col = mv[1], mv[2]; st:receiveConfirmedInput(KDE.swap); m:run()
-    for k = 1, 80 do if st:game_ended() then break end st:receiveConfirmedInput("A"); m:run() if k >= 2 and not st:hasActivePanels() and not st:hasChainingPanels() then break end end end
-  if kind == "BREAK" then return broke else return pan(st) < b end
+  local ok, res = pcall(function()
+    local m, st = bld(stack); local broke = false; local sub = {}
+    st:connectSignal("garbageMatched", sub, function() broke = true end)
+    local b = pan(st)
+    for _, mv in ipairs(moves) do st.cur_row, st.cur_col = mv[1], mv[2]; st:receiveConfirmedInput(KDE.swap); m:run()
+      for k = 1, 80 do if st:game_ended() then break end st:receiveConfirmedInput("A"); m:run() if k >= 2 and not st:hasActivePanels() and not st:hasChainingPanels() then break end end end
+    return (pan(st) < b) or broke
+  end)
+  return ok and res
 end
 
--- chip priority order from arg[2] (comma-sep) so we can force BREAK to the front to actually exercise it
-local PRIOS = { "FIRE", "BREAK", "SETUP3" }
+-- chip priority order from arg[2] (comma-sep) so we can force a chip to the front to exercise it
+local PRIOS = { "CACHE", "FIRE", "BREAK", "SETUP3" }
 if arg[2] and arg[2] ~= "" then PRIOS = {}; for t in arg[2]:gmatch("[^,]+") do PRIOS[#PRIOS + 1] = t end end
 local SEARCH = { "LEFT", "RIGHT", "UP", "DOWN" }
 

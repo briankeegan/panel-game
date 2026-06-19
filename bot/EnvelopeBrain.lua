@@ -237,7 +237,7 @@ function EnvelopeBrain:generatePlan(grid, rows, top, danger, mode)
   --    (or always when in danger). chips.play already RECOGNIZE+VERIFYs, so a non-nil result is guaranteed to fire.
   if (fsmFire or legacyFire or danger) then
     local p = chips.play(grid, rows)
-    if p then return { { p.r, p.c } } end
+    if p then self._chipsUsed = (self._chipsUsed or 0) + 1; return { { p.r, p.c } } end
   end
   -- 2) chips.setupPlay -> a 2-MOVE setup (alignment now, fire next tick). This is the CONSTRUCTION step the live
   --    fitSearch couldn't reliably reach. Play seq[1] now; the fire becomes immediate next tick and the FIRE gate
@@ -245,7 +245,7 @@ function EnvelopeBrain:generatePlan(grid, rows, top, danger, mode)
   --    holding-fire is preserved. `chipVerify` (built below) confirms the seq on a real simSwap before committing.
   if (fsmFire or legacyFire or danger) then
     local seq = chips.setupPlay(grid, rows, self:chipVerify(grid, rows))
-    if seq then return seq end
+    if seq then self._chipsUsed = (self._chipsUsed or 0) + 1; return seq end
   end
   -- CACHE FIRST: if the plan-cache has a plan for this envelope, recall it (zero live search). Miss -> fall
   -- through to a live deepFit search. Cache is authored offline, so this is the fast path once it's populated.

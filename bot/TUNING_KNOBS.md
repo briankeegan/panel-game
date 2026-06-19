@@ -17,8 +17,13 @@ measure on the benchmark, keep what improves the numbers, iterate. Report the be
 ### Cursor / execution — `bot/CursorController.lua` (`DEFAULT_CURSOR_SPEED`, edit the table)
 | knob | now | what it does |
 |---|---|---|
-| `cursorMoveInterval` | 8 | min frames between cursor moves/swaps (lower = faster hands) |
-| `reactionFrames` | 3 | frames of delay before reacting to a new threat (lower = sharper) |
+| `cursorMoveInterval` | 1 | min frames between cursor moves/swaps (lower = faster hands; was 8 — the crawl that hid the FLAIL) |
+| `reactionFrames` | 1 | frames of delay before reacting to a new threat (lower = sharper) |
+
+### Raise-for-material — `bot/EnvelopeBrain.lua` (stuck-detector in `decide`)
+| knob | now | what it does | env var |
+|---|---|---|---|
+| `raiseCeil` | 0.6 | when stuck on a match-less board, RAISE for new blocks only below this height fraction. TRADEOFF: 0.45 helps large-garbage (headroom) but craters combo-storm offense (sent 12→3) | `PA_RAISECEIL` |
 
 ### Fire triggers — `bot/EnvelopeBrain.lua` (`DEFAULTS`)
 | knob | now | what it does | env var |
@@ -57,19 +62,23 @@ measure on the benchmark, keep what improves the numbers, iterate. Report the be
 | `surface` | 5 | only search the top N stack rows | `PA_SURFACE` |
 | `deepDepth` | 4 | deep chain-generator depth | `PA_DEEP` |
 | `deepBeam` | 4 | deep generator beam width | `PA_DEEPBEAM` |
-| `deepBudget` | 2000 | deep generator board-sim cap | `PA_DEEPBUDGET` |
+| `deepBudget` | 500 | deep generator board-sim cap (was 2000; A/B was byte-identical play — search converges <500) | `PA_DEEPBUDGET` |
 
 Knobs with an env var can be swept without editing code (e.g. `PA_FILL=60 PA_DEEP=5 luajit bot/survivalStress.lua ...`).
 Knobs marked "(edit default)" require changing the literal in the DEFAULTS/defaults table.
 
 ---
 
-## The benchmark (what to maximize) — `bot/BENCHMARK.md` is the living scoreboard
-- **Survival** (primary, has a real number today = 15.4s): survival time at a fixed human garbage rate.
-  Run `luajit bot/survivalStress.lua` (see its `--help`/usage and `bot/BENCHMARK.md` for the exact frozen-protocol
-  invocation — fixed seeds/params so runs are comparable). Higher seconds = better.
-- **Offense / Mechanics**: see `bot/BENCHMARK.md` (`offenseGate`/`gateBench`/`puzzleBench`) — capture if the harness is ready.
-- Use the FROZEN protocol (fixed seeds + params) so two configs are comparable. Average over the seed set, don't cherry-pick one seed.
+## The benchmark (what to maximize) — `bot/botBench.lua` is THE scoreboard
+Run: `luajit bot/botBench.lua [games] [maxFrames] [scenario]`. 4 scenarios (endless / large-garbage / factor / combo-storm),
+fixed seeds (1001+), identical engine-truth stats per game: timeSurvived · score · cleared (+big-combos≥4) · sent ·
+dug · chipsUsed · chains · peakChain · swaps · AND availability diagnostics (comboAvail/breakAvail/chainAvail — the
+gap vs cleared/dug/chains pinpoints detection-vs-execution-vs-construction failures).
+- **Run the 4 scenarios as PARALLEL processes** (4x wall): `for sc in endless large-garbage factor combo-storm; do
+  luajit bot/botBench.lua 5 1500 $sc > logs/b_$sc.log & done` — each scenario takes one core.
+- Current baseline (post-fixes, 3-game medians): endless 25s/cl31/sent9 · large-garbage 11.4s/cl12/sent4 ·
+  factor 16.1s/cl18/sent6 · combo-storm 18.5s/cl21/sent12. cleared = best near-term defense proxy; sent = offense.
+- Average over seeds, don't cherry-pick. Same seeds for A vs B (apples-to-apples). decide() must stay <16ms/frame (real-time).
 
 ## How to work
 1. Baseline: run the benchmark at current defaults, record the number.

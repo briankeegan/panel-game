@@ -72,8 +72,8 @@ Knobs marked "(edit default)" require changing the literal in the DEFAULTS/defau
 ## The benchmark (what to maximize) — `bot/botBench.lua` is THE scoreboard
 Run: `luajit bot/botBench.lua [games] [maxFrames] [scenario]`. 4 scenarios (endless / large-garbage / factor / combo-storm),
 fixed seeds (1001+), identical engine-truth stats per game: timeSurvived · score · cleared (+big-combos≥4) · sent ·
-dug · chipsUsed · chains · peakChain · swaps · AND availability diagnostics (comboAvail/breakAvail/chainAvail — the
-gap vs cleared/dug/chains pinpoints detection-vs-execution-vs-construction failures).
+garbageBroke · chipsUsed · chains · peakChain · swaps · AND availability diagnostics (comboAvail/breakAvail/chainAvail — the
+gap vs cleared/broke/chains pinpoints detection-vs-execution-vs-construction failures).
 - **Run the 4 scenarios as PARALLEL processes** (4x wall): `for sc in endless large-garbage factor combo-storm; do
   luajit bot/botBench.lua 5 1500 $sc > logs/b_$sc.log & done` — each scenario takes one core.
 - Current baseline (post-fixes, 3-game medians): endless 25s/cl31/sent9 · large-garbage 11.4s/cl12/sent4 ·

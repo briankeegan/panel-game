@@ -4,7 +4,7 @@
 -- decide->execute->run loop the live bot runs) so every number is engine-truth, not a proxy.
 --
 --   Scenarios (10 games each): endless (no garbage) · large-garbage · factor (escalating) · combo-storm
---   Per-game stats (IDENTICAL for every game): timeSurvived(s) · score · garbageSent(area) · garbageDug ·
+--   Per-game stats (IDENTICAL for every game): timeSurvived(s) · score · garbageSent(area) · garbageBroke ·
 --                                              chipsUsed · chainsFired · peakChain · swaps
 --
 -- CLI: luajit bot/botBench.lua [gamesPerScenario] [maxFrames]
@@ -62,9 +62,9 @@ local function runGame(scenario, seed)
   local stack = match.stacks[1]; assert(stack, "no stack")
   stack.is_local = true; stack:setMaxRunsPerFrame(1); match:start()
 
-  local s = { dug = 0, sent = 0, cleared = 0, bigCombos = 0, chains = 0, peakChain = 0, swaps = 0, comboAvail = 0, breakAvail = 0, chainAvail = 0 }
+  local s = { broke = 0, sent = 0, cleared = 0, bigCombos = 0, chains = 0, peakChain = 0, swaps = 0, comboAvail = 0, breakAvail = 0, chainAvail = 0 }
   local sub = {} -- weak-keyed sub token kept in scope
-  stack:connectSignal("garbageMatched", sub, function(_, count) s.dug = s.dug + (count or 0) end)
+  stack:connectSignal("garbageMatched", sub, function(_, count) s.broke = s.broke + (count or 0) end)
   -- OFFENSE: the "matched" signal fires on every clear with its comboSize (checkMatches.lua:142). cleared = total
   -- panels matched; bigCombos = clears of >=4 (the ones that actually SEND garbage). True "sent" needs an opponent
   -- queue (absent in survival), so this is the faithful offense proxy.
@@ -123,22 +123,22 @@ end
 local SEEDS = {} for i = 1, GAMES do SEEDS[i] = 1000 + i end
 
 print(string.format("=== BOT BENCHMARK — %d games/scenario, maxFrames=%d, seeds %d..%d ===", GAMES, MAXFRAMES, SEEDS[1], SEEDS[#SEEDS]))
-print("stats per game: timeSurvived(s) | score | garbageSent | garbageDug | chipsUsed | chainsFired | peakChain | swaps\n")
+print("stats per game: timeSurvived(s) | score | garbageSent | garbageBroke | chipsUsed | chainsFired | peakChain | swaps\n")
 for _, sc in ipairs(SCENARIOS) do
-  local agg = { time = {}, score = {}, sent = {}, dug = {}, chips = {}, chains = {}, peak = {}, swaps = {} }
+  local agg = { time = {}, score = {}, sent = {}, broke = {}, chips = {}, chains = {}, peak = {}, swaps = {} }
   print(string.format("### %s", sc.name))
   for _, seed in ipairs(SEEDS) do
     local r = runGame(sc, seed)
-    print(string.format("  seed %d | %5.1fs | score %6d | cleared %4d (big %2d) | sent %3d | dug %3d | chips %4d | chains %2d | peak %d | swaps %4d | comboAvail %4d breakAvail %3d chainAvail %3d",
-      seed, r.timeSurvived, r.score, r.cleared, r.bigCombos, r.sent, r.dug, r.chipsUsed, r.chains, r.peakChain, r.swaps, r.comboAvail, r.breakAvail, r.chainAvail))
+    print(string.format("  seed %d | %5.1fs | score %6d | cleared %4d (big %2d) | sent %3d | broke %3d | chips %4d | chains %2d | peak %d | swaps %4d | comboAvail %4d breakAvail %3d chainAvail %3d",
+      seed, r.timeSurvived, r.score, r.cleared, r.bigCombos, r.sent, r.broke, r.chipsUsed, r.chains, r.peakChain, r.swaps, r.comboAvail, r.breakAvail, r.chainAvail))
     agg.time[#agg.time + 1] = r.timeSurvived; agg.score[#agg.score + 1] = r.score; agg.sent[#agg.sent + 1] = r.sent
-    agg.dug[#agg.dug + 1] = r.dug; agg.chips[#agg.chips + 1] = r.chipsUsed; agg.chains[#agg.chains + 1] = r.chains
+    agg.broke[#agg.broke + 1] = r.broke; agg.chips[#agg.chips + 1] = r.chipsUsed; agg.chains[#agg.chains + 1] = r.chains
     agg.peak[#agg.peak + 1] = r.peakChain; agg.swaps[#agg.swaps + 1] = r.swaps; agg.cleared = agg.cleared or {}; agg.cleared[#agg.cleared+1]=r.cleared; agg.big = agg.big or {}; agg.big[#agg.big+1]=r.bigCombos; agg.ca=agg.ca or {}; agg.ca[#agg.ca+1]=r.comboAvail; agg.ba=agg.ba or {}; agg.ba[#agg.ba+1]=r.breakAvail; agg.cha=agg.cha or {}; agg.cha[#agg.cha+1]=r.chainAvail
   end
-  print(string.format("  -> MEDIAN: %.1fs | score %.0f | cleared %.0f (big %.0f) | sent %.0f | dug %.0f | chips %.0f | chains %.0f | peak %.0f | swaps %.0f",
-    median(agg.time), median(agg.score), median(agg.cleared), median(agg.big), median(agg.sent), median(agg.dug), median(agg.chips), median(agg.chains), median(agg.peak), median(agg.swaps)))
-  print(string.format("  -> MEAN  : %.1fs | score %.0f | sent %.1f | dug %.1f | chips %.1f | chains %.1f | peak %.1f | swaps %.1f\n",
-    mean(agg.time), mean(agg.score), mean(agg.sent), mean(agg.dug), mean(agg.chips), mean(agg.chains), mean(agg.peak), mean(agg.swaps)))
-  print(string.format("  -> AVAIL : comboAvail %.0f breakAvail %.0f chainAvail %.0f  (vs cleared %.0f / dug %.0f / chains %.0f -- the gap = execution/construction failure)\n",
-    median(agg.ca), median(agg.ba), median(agg.cha), median(agg.cleared), median(agg.dug), median(agg.chains)))
+  print(string.format("  -> MEDIAN: %.1fs | score %.0f | cleared %.0f (big %.0f) | sent %.0f | broke %.0f | chips %.0f | chains %.0f | peak %.0f | swaps %.0f",
+    median(agg.time), median(agg.score), median(agg.cleared), median(agg.big), median(agg.sent), median(agg.broke), median(agg.chips), median(agg.chains), median(agg.peak), median(agg.swaps)))
+  print(string.format("  -> MEAN  : %.1fs | score %.0f | sent %.1f | broke %.1f | chips %.1f | chains %.1f | peak %.1f | swaps %.1f\n",
+    mean(agg.time), mean(agg.score), mean(agg.sent), mean(agg.broke), mean(agg.chips), mean(agg.chains), mean(agg.peak), mean(agg.swaps)))
+  print(string.format("  -> AVAIL : comboAvail %.0f breakAvail %.0f chainAvail %.0f  (vs cleared %.0f / broke %.0f / chains %.0f -- the gap = execution/construction failure)\n",
+    median(agg.ca), median(agg.ba), median(agg.cha), median(agg.cleared), median(agg.broke), median(agg.chains)))
 end

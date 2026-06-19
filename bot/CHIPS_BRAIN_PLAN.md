@@ -24,7 +24,7 @@ So verify is not optional — it IS the primitive.
   swaps on the clone → check it cleared/broke → discard. This is faithful on GARBAGE boards.
 - **Known gap to fix in P3:** the existing `EnvelopeBrain.engineVerifyFull` rebuilds the board from a *text string*,
   which can't represent garbage, so it returns nil on garbage boards and falls back to BoardSim (the unreliable 65%).
-  Replace that with the `rollbackCopy` clone so DANGER/dig verifies are reliable.
+  Replace that with the `rollbackCopy` clone so DANGER/BREAK verifies are reliable.
 
 ## The architecture
 
@@ -84,7 +84,7 @@ fires on the engine (100%).
 RAISE/DANGER/OFFENSE per the defs. GATE: log state each frame over a botBench game; confirm it tracks the board.
 
 **P3 — DANGER + RAISE flows (solo-testable).** Wire RAISE + DANGER sub-states (engine signals for FALLING/BREAK_ZONE)
-→ `useChips`. New brain = flag-gated alternate decide path. GATE: botBench — **dug > 0** in large-garbage/factor
+→ `useChips`. New brain = flag-gated alternate decide path. GATE: botBench — BREAK FIRES under garbage (garbage-broken > 0, today 0; it OPENS STOP-TIME — break->setup->chain is the loop, garbage_stoptime_model, NOT a dig-count goal)
 (current bot = 0), survival holds/improves.
 
 **P4 — OFFENSE flow + opponent stub.** SAFE + IS_CHAINING (chain_counter); IS_OPPONENT_TOPPED_OUT = hook, false in

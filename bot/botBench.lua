@@ -110,6 +110,15 @@ local function median(t) local c = {} for _, v in ipairs(t) do c[#c + 1] = v end
   local n = #c; if n == 0 then return 0 end return (n % 2 == 1) and c[(n + 1) / 2] or (c[n / 2] + c[n / 2 + 1]) / 2 end
 local function mean(t) local sum = 0 for _, v in ipairs(t) do sum = sum + v end return #t > 0 and sum / #t or 0 end
 
+-- optional scenario filter (arg[3]) so the 4 scenarios can run as 4 parallel processes (4x wall speedup).
+local ONLY = arg[3]
+if ONLY and ONLY ~= "" then
+  local filtered = {}
+  for _, sc in ipairs(SCENARIOS) do if sc.name == ONLY then filtered[#filtered + 1] = sc end end
+  assert(#filtered > 0, "unknown scenario: " .. ONLY)
+  SCENARIOS = filtered
+end
+
 -- fixed, reproducible seeds — different per game, same set reused for every scenario (apples-to-apples)
 local SEEDS = {} for i = 1, GAMES do SEEDS[i] = 1000 + i end
 

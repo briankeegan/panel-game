@@ -36,7 +36,9 @@ local DEFAULTS = {
   -- B's deepFit generator (deeper chains than the live fitSearch can reach; amortized over the cadence).
   deepDepth   = tonumber(os.getenv("PA_DEEP")) or 4,
   deepBeam    = tonumber(os.getenv("PA_DEEPBEAM")) or 4,
-  deepBudget  = tonumber(os.getenv("PA_DEEPBUDGET")) or 2000,
+  deepBudget  = tonumber(os.getenv("PA_DEEPBUDGET")) or 500, -- was 2000: profiling showed deepFit was a ~25ms/frame
+  -- (39fps, sub-real-time) spike in the build phase; a 2000->500 A/B was BYTE-IDENTICAL play on every seed (the
+  -- search converges well under 500 board-sims), so the extra budget was pure wasted exploration. 2.4x faster decide.
   -- B's timing FSM gates the mode (Audit 7: offense is gated on the stop-time clock, not board shape). Off ->
   -- legacy fill/fire path. A/B both via survivalStress before locking the default. PA_TIMINGFSM=0 disables.
   useTimingFSM = (os.getenv("PA_TIMINGFSM") ~= "0"),

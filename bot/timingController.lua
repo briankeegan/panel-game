@@ -35,17 +35,18 @@ function M.decide(state, cfg)
   local eta = state.incomingEta or math.huge
   local chainReady = state.chainReady and true or false
   local breakReady = state.breakReady and true or false
+  local comboReady = state.comboReady and true or false
 
   -- 1. SURVIVAL OVERRIDE: about to top out and a break is available → take it (opens stop-time, buys the window).
   if danger >= cfg.dangerHigh and breakReady then return "BREAK" end
 
-  -- 2. NO FREEZE YET (clock 0): if a fire is ARRANGED, TAKE it — clearing OPENS the stop-time clock and starts the
-  --    cycle. Without this the bot never fires an available chain (gated on clock>0, but clock only rises AFTER a fire)
-  --    and builds into the ceiling. Measured: the bot fired a sitting chain on only 5% of chain-ready boards. Break
-  --    first (opens stop-time + chains garbage), else fire the chain. Else RAISE/build.
+  -- 2. NO FREEZE YET (clock 0): TAKE an available clear. Measured (botBench AVAIL diag): a combo is available ~75% of
+  --    frames but the bot fires almost none — it sits in BUILD/flails and clears 6-9 panels/game. Break first (opens
+  --    stop-time + chains garbage), else a chain, else FIRE THE COMBO to clear (keep the board down, make progress).
   if clock <= 0 then
     if breakReady then return "BREAK" end
     if chainReady then return "FIRE" end
+    if comboReady then return "FIRE" end
     return "RAISE"
   end
 

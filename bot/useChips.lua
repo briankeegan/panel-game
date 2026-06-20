@@ -2,17 +2,13 @@
 -- return the highest-priority PLAYABLE chip, searching cells OUTWARD FROM THE CURSOR. Only returns chips that pass
 -- `verify` (run-it-in-its-head engine check) when one is supplied — never a dud.
 --
--- THE REGISTRY is the working, NAMED, SIZED chip vocabulary. Each chip = one entry: find(grid,rows,cells,verify) ->
--- {swaps,kind}|nil. Ask for them by name in chipPriorities, e.g. {"COMBO_5","COMBO_4",...}.
---   COMBO_n        an engine-authored template (from getComboShapes, via bot/chipCache.lua) RECOGNIZED on the board;
---                  its swap clears EXACTLY n (no BoardSim -- pattern-match proposes, verify confirms it fires)
---   SETUP3         goalSetup (2-move build) -- to be replaced by a setup-generating function
---   CACHE          planCache recall (authored shape->plans)
--- (BREAK_COMBO_* deferred until break chips are authored; CHAIN_* later as their own thing.)
+-- THE REGISTRY is the NAMED chip vocabulary — only chips that EXIST. Each = one entry: find(grid,rows,cells,verify)
+-- -> {swaps,kind}|nil. Ask for them by name in chipPriorities, e.g. {"COMBO_5","COMBO_4"}.
+--   COMBO_n  an engine-authored template (getComboShapes -> bot/chipCache.lua) RECOGNIZED on the board; its swap
+--            clears EXACTLY n (no BoardSim -- pattern-match proposes, verify confirms it fires). Authored: 5, 4.
 
 local BoardSim = require("bot.BoardSim")
 local chips = require("bot.chips")
-local planCache = require("bot.planCache")
 
 local M = {}
 
@@ -54,36 +50,20 @@ local function comboChip(n)
   end
 end
 
--- THE REGISTRY
+-- THE REGISTRY — only chips that EXIST (engine-verified templates in the store). Add a size here when its templates
+-- are authored into bot/chipCache.lua.
 local CHIPS = {
-  SETUP3 = function(grid, rows, _, verify)
-    local seq = chips.goalSetup(grid, rows, verify)
-    if seq then return { swaps = seq, kind = "SETUP3" } end
-  end,
-  CACHE = function(grid, rows, _, verify)
-    local m = planCache.match(grid, rows)
-    if not (m and m.plan and #m.plan > 0) then return nil end
-    for _, sw in ipairs(m.plan) do
-      if not sw[1] or not sw[2] or sw[1] < 1 or sw[1] > rows or sw[2] < 1 or sw[2] > 5 then return nil end
-    end
-    if not verify or verify(m.plan, "CACHE") then return { swaps = m.plan, kind = "CACHE" } end
-  end,
+  COMBO_5 = comboChip(5),
+  COMBO_4 = comboChip(4),
 }
-for n = 3, 10 do CHIPS["COMBO_" .. n] = comboChip(n) end   -- only sizes with stored templates actually match
 M.CHIPS = CHIPS
 
--- default priority: biggest combos first, then setup, then cache (breaks return when we author break chips)
-local DEFAULT = {}
-for n = 10, 3, -1 do DEFAULT[#DEFAULT + 1] = "COMBO_" .. n end
-DEFAULT[#DEFAULT + 1] = "SETUP3"; DEFAULT[#DEFAULT + 1] = "CACHE"
-M.DEFAULT_PRIORITIES = DEFAULT
-
--- useChips(grid, rows, cursor, opts) -> { swaps, kind } | nil
+-- useChips(grid, rows, cursor, opts) -> { swaps, kind } | nil. Each call site (state) passes its own chipPriorities.
 function M.useChips(grid, rows, cursor, opts)
   opts = opts or {}
   local verify = opts.verify
   local cells = cellOrder(grid, rows, cursor, opts.band, opts.searchPriorities, opts.maxDistance)
-  for _, chipName in ipairs(opts.chipPriorities or DEFAULT) do
+  for _, chipName in ipairs(opts.chipPriorities or {}) do
     local find = CHIPS[chipName]
     if find then
       local result = find(grid, rows, cells, verify)

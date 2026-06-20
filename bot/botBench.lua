@@ -102,6 +102,8 @@ local function runGame(scenario, seed)
   s.timeSurvived = sf / 60
   s.score = stack.score or 0
   s.chipsUsed = brain._chipsUsed or 0
+  do local u = brain._comboUse or {}; s.c5 = u.COMBO_5 or 0; s.c4 = u.COMBO_4 or 0; s.setup = u.SETUP3 or 0; s.cache = u.CACHE or 0
+     s.chipsViaUseChips = 0; for _, n in pairs(u) do s.chipsViaUseChips = s.chipsViaUseChips + n end end  -- all useChips picks
   s.enginePanelsCleared = stack.panels_cleared or 0
   return s
 end
@@ -129,8 +131,8 @@ for _, sc in ipairs(SCENARIOS) do
   print(string.format("### %s", sc.name))
   for _, seed in ipairs(SEEDS) do
     local r = runGame(sc, seed)
-    print(string.format("  seed %d | %5.1fs | score %6d | cleared %4d (big %2d) | sent %3d | broke %3d | chips %4d | chains %2d | peak %d | swaps %4d | comboAvail %4d breakAvail %3d chainAvail %3d",
-      seed, r.timeSurvived, r.score, r.cleared, r.bigCombos, r.sent, r.broke, r.chipsUsed, r.chains, r.peakChain, r.swaps, r.comboAvail, r.breakAvail, r.chainAvail))
+    print(string.format("  seed %d | %5.1fs | score %6d | cleared %4d (big %2d) | garbageMade %3d | broke %3d | useChips %3d {C5=%d C4=%d SETUP=%d CACHE=%d} | swaps %4d",
+      seed, r.timeSurvived, r.score, r.cleared, r.bigCombos, r.sent, r.broke, r.chipsViaUseChips, r.c5, r.c4, r.setup, r.cache, r.swaps))
     agg.time[#agg.time + 1] = r.timeSurvived; agg.score[#agg.score + 1] = r.score; agg.sent[#agg.sent + 1] = r.sent
     agg.broke[#agg.broke + 1] = r.broke; agg.chips[#agg.chips + 1] = r.chipsUsed; agg.chains[#agg.chains + 1] = r.chains
     agg.peak[#agg.peak + 1] = r.peakChain; agg.swaps[#agg.swaps + 1] = r.swaps; agg.cleared = agg.cleared or {}; agg.cleared[#agg.cleared+1]=r.cleared; agg.big = agg.big or {}; agg.big[#agg.big+1]=r.bigCombos; agg.ca=agg.ca or {}; agg.ca[#agg.ca+1]=r.comboAvail; agg.ba=agg.ba or {}; agg.ba[#agg.ba+1]=r.breakAvail; agg.cha=agg.cha or {}; agg.cha[#agg.cha+1]=r.chainAvail

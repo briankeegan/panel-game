@@ -55,6 +55,7 @@ end
 local CHIPS = {
   COMBO_5 = comboChip(5),
   COMBO_4 = comboChip(4),
+  COMBO_3 = comboChip(3),
 }
 M.CHIPS = CHIPS
 

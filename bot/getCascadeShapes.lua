@@ -9,6 +9,7 @@ require("bot.headlessBoot"); do local l = require("common.lib.logger"); l.setLog
 _G.loc = _G.loc or function(s) return tostring(s) end
 local shapeCache = require("bot.shapeCache")
 local cascadeEnds = require("bot.getCascadeEnds")
+local getComboShapes = require("bot.getComboShapes")   -- the riser's unsolves (every way to build a COMBO_M, drops incl.)
 local Match = require("common.engine.Match"); require("common.engine.checkMatches")
 local LP = require("common.data.LevelPresets"); local KDE = require("common.data.KeyDataEncoding"); local Puzzle = require("common.engine.Puzzle")
 
@@ -19,9 +20,9 @@ local P, S, FIL = 1, 2, 5                        -- primary, secondary, filler (
 
 local function clone(g) local n = {}; for r = 1, H do n[r] = {}; for c = 1, W do n[r][c] = g[r][c] end end; return n end
 local function settle(g) for c = 1, W do local s = {}; for r = 1, H do if g[r][c] ~= 0 then s[#s+1] = g[r][c] end end; for r = 1, H do g[r][c] = s[r] or 0 end end end
-local function matches(g)                         -- any >=3 run of a real (non-support) color
+local function matches(g)                         -- any >=3 run of ANY color (incl. support) -- support must never match
   for r = 1, H do for c = 1, W do local v = g[r][c]
-    if v == P or v == S then
+    if v ~= 0 then
       if c <= W-2 and g[r][c+1]==v and g[r][c+2]==v then return true end
       if r <= H-2 and g[r+1][c]==v and g[r+2][c]==v then return true end
     end end end
@@ -40,13 +41,15 @@ local function firesCascade(g, r, c)
     local pz = Puzzle({ puzzleType = "moves", stack = stackString(g), moves = 99 })
     local m = Match(pz:toPanelSource(false), pz:toGameMode().matchRules)
     local st = m:createStackWithSettings(LP.getModern(10), true, "controller", nil); st:setMaxRunsPerFrame(1); m:start()
-    if matches(g) then return false end                          -- pre-state must not already be matched
-    local function np() local n=0; for rr=1,st.height do for cc=1,6 do if (st.panels[rr][cc].color or 0)==P then n=n+1 end end end return n end
+    if matches(g) then return false end                          -- pre-state must not already be matched (any color)
+    local function cnt(col) local n=0; for rr=1,st.height do for cc=1,6 do if (st.panels[rr][cc].color or 0)==col then n=n+1 end end end return n end
+    local function cntFill() local n=0; for rr=1,st.height do for cc=1,6 do local v=st.panels[rr][cc].color or 0; if v>=5 then n=n+1 end end end return n end
     for i = 1, 40 do if st:game_ended() then break end st:receiveConfirmedInput("A"); m:run(); if i>=2 and not st:hasActivePanels() and not st:hasChainingPanels() then break end end
-    local s0p = np()
+    local p0, s0, f0 = cnt(P), cnt(S), cntFill()
     st.cur_row, st.cur_col = r, c; st:receiveConfirmedInput(KDE.swap); m:run()
     for k = 1, 200 do if st:game_ended() then break end st:receiveConfirmedInput("A"); m:run(); if k>=3 and not st:hasActivePanels() and not st:hasChainingPanels() then break end end
-    return (s0p - np()) == N
+    -- N primary AND exactly the M-panel riser cleared, and ZERO support cleared (no wildcard/filler may ever match)
+    return (p0 - cnt(P)) == N and (s0 - cnt(S)) == M and (f0 - cntFill()) == 0
   end)
   return ok and res
 end
@@ -70,25 +73,58 @@ local function symbolOf(g, sr, sc, rr, cc)
   local lit = g[rr][cc]; return lit == 0 and "." or tostring(lit)
 end
 
------------------------------------------------------------------ PHASE 2: focused unsolve of each cascade end
+----------------------------------------------------------------- PHASE 2: unsolve each end with the riser's OWN solves
+-- The riser is a COMBO_M, and getComboShapes(M) is EVERY way to build one (direct AND drop-based). So: brute-force
+-- transplant each riser solve's secondary arrangement onto each cascade end's primary at every placement, then keep
+-- the ones the engine confirms fire the whole chain (secondary clears, then exactly N primary).
+local unsolves = {}
+for _, rec in ipairs(getComboShapes.enumerate(M).raw) do
+  local g = rec.sample; local mr, mc = 1e9, 1e9
+  for r = 1, H do for c = 1, W do if g[r][c] ~= 0 then mr = math.min(mr, r); mc = math.min(mc, c) end end end
+  local sec, fil = {}, {}                                        -- sec = riser panels; fil = the solve's OWN support
+  for r = 1, H do for c = 1, W do local v = g[r][c]             -- (defines where a dropped riser panel lands)
+    if v == 1 then sec[#sec+1] = { r-mr, c-mc }
+    elseif v >= 2 then fil[#fil+1] = { r-mr, c-mc } end
+  end end
+  unsolves[#unsolves+1] = { sec = sec, fil = fil, sdr = rec.sr - mr, sdc = rec.sc - mc }
+end
+
 local ends = cascadeEnds.enumerate(N, M)
 local found = {}
 for _, e in ipairs(ends) do
-  local g0 = e.g                                                 -- the END: riser present, primary set to drop
-  for r = 1, H do for c = 1, W - 1 do
-    if g0[r][c] == S or g0[r][c+1] == S then                     -- ONLY swaps that move a secondary 2
-      local pre = clone(g0); pre[r][c], pre[r][c+1] = pre[r][c+1], pre[r][c]   -- un-apply the swap
-      -- fill inert support (checkerboard, won't match) under any float, so the displaced 2 sits on a real board
-      for col = 1, W do local top = 0; for row = 1, H do if pre[row][col] ~= 0 then top = row end end
-        for row = 1, top do if pre[row][col] == 0 then pre[row][col] = ((row+col)%2==0) and 5 or 6 end end end
-      if not matches(pre) then                                   -- riser broken, primary not yet matched
-        if firesCascade(pre, r, c) then                          -- replaying the swap fires the whole chain -> N primary
-          local kk = shapeCache.canonShape(pre)
-          if kk and not found[kk] then found[kk] = { sample = pre, sr = r, sc = c, key = kk } end
+  local g0 = e.g                                                 -- the END: primary set to drop in
+  local prim, pr1, pc0, pc1 = {}, 0, 1e9, 0
+  for r = 1, H do for c = 1, W do if g0[r][c] == P then prim[#prim+1] = {r,c}; pr1=math.max(pr1,r); pc0=math.min(pc0,c); pc1=math.max(pc1,c) end end end
+  for _, U in ipairs(unsolves) do
+    for orr = 1, pr1 + 1 do for occ = pc0 - M, pc1 + 1 do        -- every placement of the riser-solve over the primary
+      local pre = {}; for r = 1, H do pre[r] = {}; for c = 1, W do pre[r][c] = 0 end end
+      for _, p in ipairs(prim) do pre[p[1]][p[2]] = P end
+      local okp = true
+      for _, s in ipairs(U.sec) do local r, c = orr + s[1], occ + s[2]
+        if r < 1 or r > H or c < 1 or c > W or pre[r][c] ~= 0 then okp = false; break end
+        pre[r][c] = S
+      end
+      if okp then
+        for _, f in ipairs(U.fil) do local r, c = orr + f[1], occ + f[2]   -- the solve's OWN support (keeps drop gaps)
+          if r >= 1 and r <= H and c >= 1 and c <= W and pre[r][c] == 0 then pre[r][c] = ((r+c)%2==0) and 5 or 6 end end
+        local maxRelC = 0                                            -- the solve is floor-anchored; raise it to orr by
+        for _, s in ipairs(U.sec) do maxRelC = math.max(maxRelC, s[2]) end   -- supporting the riser line's whole span up
+        for _, f in ipairs(U.fil) do maxRelC = math.max(maxRelC, f[2]) end   -- to row orr-1 (so a dropped 2 lands AT the line)
+        for c = occ, occ + maxRelC do if c >= 1 and c <= W then
+          for r = 1, orr - 1 do if pre[r][c] == 0 then pre[r][c] = ((r+c)%2==0) and 5 or 6 end end end end
+        for c = 1, W do local top = 0; for r = 1, H do if pre[r][c] ~= 0 then top = r end end   -- inert checkerboard support
+          for r = 1, top do if pre[r][c] == 0 then pre[r][c] = ((r+c)%2==0) and 5 or 6 end end end
+        local sr, scc = orr + U.sdr, occ + U.sdc
+        if sr >= 1 and sr <= H and scc >= 1 and scc <= W - 1 and not matches(pre)
+           and (pre[sr][scc] == S or pre[sr][scc+1] == S) then    -- the swap MUST move a riser panel (a 2)
+          if firesCascade(pre, sr, scc) then
+            local kk = shapeCache.canonShape(pre)
+            if kk and not found[kk] then found[kk] = { sample = pre, sr = sr, sc = scc, key = kk } end
+          end
         end
       end
-    end
-  end end
+    end end
+  end
 end
 
 ----------------------------------------------------------------- render with the swap shown

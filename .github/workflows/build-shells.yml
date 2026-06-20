@@ -305,6 +305,26 @@ jobs:
           sed -i 's/^APP_ABI := .*/APP_ABI := armeabi-v7a arm64-v8a/' la/love/src/jni/Application.mk
           grep '^APP_ABI' la/love/src/jni/Application.mk
 
+      - name: Rebrand — own app id, name, icon (not the generic LÖVE app)
+        run: |
+          VER="${{ steps.bv.outputs.version }}"
+          VCODE=$(echo "$VER" | tr -cd '0-9' | sed 's/^0*//')
+          cd la
+          # love-android reads these from gradle.properties (designed for rebranding).
+          sed -i 's|^app.application_id=.*|app.application_id=com.panelattack.ffateam|' gradle.properties
+          sed -i 's|^app.name_byte_array=|#app.name_byte_array=|' gradle.properties
+          sed -i '/^app.name=/d' gradle.properties
+          # NO literal '&' — a raw & breaks the merged AndroidManifest XML (android:label),
+          # same class of bug as the macOS Info.plist '&'.
+          echo 'app.name=Panel Attack FFA and Team' >> gradle.properties
+          sed -i "s|^app.version_name=.*|app.version_name=$VER|" gradle.properties
+          sed -i "s|^app.version_code=.*|app.version_code=$VCODE|" gradle.properties
+          grep -E '^app\.(name|application_id|version)' gradle.properties
+          # launcher icon is android:icon="@drawable/love" -> overwrite each density
+          for d in drawable-mdpi drawable-hdpi drawable-xhdpi drawable-xxhdpi drawable-xxxhdpi; do
+            cp "$GITHUB_WORKSPACE/updater-shell/icon.png" "app/src/main/res/$d/love.png"
+          done
+
       - name: Build the updater-shell boot .love (with embedded offline base)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

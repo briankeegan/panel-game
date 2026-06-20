@@ -1,0 +1,62 @@
+name: android-run
+
+# Install the PUBLISHED launcher APK on an x86_64 emulator, launch it, let the
+# updater run, and dump the crash/log to annotations (readable via the public
+# check-runs API — no auth). Diagnoses the "downloads then crashes" runtime issue
+# without needing a physical device. Trigger:  git tag android-run-N && git push ...
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'android-run-*'
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+
+      - name: Download published APK
+        run: |
+          curl -sL "https://github.com/briankeegan/panel-game/releases/download/launcher/unofficial-panel-attack-ffa-and-team-android.apk" -o app.apk
+          ls -lh app.apk
+
+      - name: Run on emulator + dump crash log
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          arch: x86_64
+          target: google_apis
+          script: |
+            set +e
+            # derive the package id from the APK so this works for both the generic
+            # org.love2d.android and the rebranded com.panelattack.ffateam
+            AAPT=$(ls "$ANDROID_HOME"/build-tools/*/aapt 2>/dev/null | sort | tail -1)
+            PKG=$("$AAPT" dump badging app.apk | sed -n "s/package: name='\([^']*\)'.*/\1/p")
+            echo "::warning title=PKG::${PKG:-UNKNOWN}"
+            adb install -r app.apk
+            echo "::warning title=INSTALL::$(adb install -r app.apk 2>&1 | tail -1 | tr -d '\r')"
+            adb logcat -c
+            adb shell monkey -p "$PKG" -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1
+            # let the updater check/download/launch (give the 50MB base time)
+            for i in $(seq 1 45); do sleep 2; done
+            # is it alive or did it crash?
+            PID=$(adb shell pidof "$PKG" | tr -d '\r')
+            echo "::warning title=PROC::${PID:-NOT_RUNNING_(crashed_or_exited)}"
+            # native crashes + java crashes + LÖVE error are the smoking guns
+            echo "::warning title=FATAL::$(adb logcat -d -b crash -s AndroidRuntime:E DEBUG:F libc:F 'LOVE:F' | tail -8 | tr '\n' '|' | cut -c1-1500)"
+            # LÖVE / lua / updater output (our logger + error handler)
+            n=0
+            adb logcat -d | grep -iE 'love|lua|https|updater|mount|game.love|error|exception|fatal|abort' | tail -25 > /tmp/log.txt
+            while IFS= read -r line; do
+              n=$((n+1))
+              echo "::warning title=LOG$n::$(printf '%s' "$line" | tr -d '\r' | cut -c1-700)"
+            done < /tmp/log.txt
+            echo "done"

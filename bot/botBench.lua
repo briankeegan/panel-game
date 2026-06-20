@@ -62,7 +62,7 @@ local function runGame(scenario, seed)
   local stack = match.stacks[1]; assert(stack, "no stack")
   stack.is_local = true; stack:setMaxRunsPerFrame(1); match:start()
 
-  local s = { broke = 0, sent = 0, cleared = 0, bigCombos = 0, chains = 0, peakChain = 0, swaps = 0, comboAvail = 0, breakAvail = 0, chainAvail = 0 }
+  local s = { broke = 0, sent = 0, cleared = 0, bigCombos = 0, chains = 0, peakChain = 0, swaps = 0, comboAvail = 0, breakAvail = 0, chainAvail = 0, stateR = 0, stateO = 0, stateD = 0 }
   local sub = {} -- weak-keyed sub token kept in scope
   stack:connectSignal("garbageMatched", sub, function(_, count) s.broke = s.broke + (count or 0) end)
   -- OFFENSE: the "matched" signal fires on every clear with its comboSize (checkMatches.lua:142). cleared = total
@@ -83,6 +83,8 @@ local function runGame(scenario, seed)
     if g then stack:applyNetworkGarbage(g, 2) end
     local st = BoardState.extract(stack)
     local decision = brain:decide(st)
+    local bs = brain._state  -- log which state the brain picked this frame
+    if bs == "RAISE" then s.stateR = s.stateR + 1 elseif bs == "DANGER" then s.stateD = s.stateD + 1 elseif bs == "OFFENSE" then s.stateO = s.stateO + 1 end
     -- DETECTION availability (read the brain's per-frame scan): how often a combo/break/chain was AVAILABLE. The gap
     -- between availability and what actually cleared/fired tells us if the failure is detection, execution, or construction.
     if brain.comboReady then s.comboAvail = (s.comboAvail or 0) + 1 end
@@ -131,8 +133,8 @@ for _, sc in ipairs(SCENARIOS) do
   print(string.format("### %s", sc.name))
   for _, seed in ipairs(SEEDS) do
     local r = runGame(sc, seed)
-    print(string.format("  seed %d | %5.1fs | score %6d | cleared %4d (big %2d) | garbageMade %3d | broke %3d | useChips %3d {C5=%d C4=%d SETUP=%d CACHE=%d} | swaps %4d",
-      seed, r.timeSurvived, r.score, r.cleared, r.bigCombos, r.sent, r.broke, r.chipsViaUseChips, r.c5, r.c4, r.setup, r.cache, r.swaps))
+    print(string.format("  seed %d | %5.1fs | score %6d | cleared %4d (big %2d) | garbageMade %3d | broke %3d | useChips %3d {C5=%d C4=%d} | swaps %4d | state R%d/O%d/D%d",
+      seed, r.timeSurvived, r.score, r.cleared, r.bigCombos, r.sent, r.broke, r.chipsViaUseChips, r.c5, r.c4, r.swaps, r.stateR, r.stateO, r.stateD))
     agg.time[#agg.time + 1] = r.timeSurvived; agg.score[#agg.score + 1] = r.score; agg.sent[#agg.sent + 1] = r.sent
     agg.broke[#agg.broke + 1] = r.broke; agg.chips[#agg.chips + 1] = r.chipsUsed; agg.chains[#agg.chains + 1] = r.chains
     agg.peak[#agg.peak + 1] = r.peakChain; agg.swaps[#agg.swaps + 1] = r.swaps; agg.cleared = agg.cleared or {}; agg.cleared[#agg.cleared+1]=r.cleared; agg.big = agg.big or {}; agg.big[#agg.big+1]=r.bigCombos; agg.ca=agg.ca or {}; agg.ca[#agg.ca+1]=r.comboAvail; agg.ba=agg.ba or {}; agg.ba[#agg.ba+1]=r.breakAvail; agg.cha=agg.cha or {}; agg.cha[#agg.cha+1]=r.chainAvail

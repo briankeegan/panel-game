@@ -56,36 +56,6 @@ function EnvelopeBrain:chipVerify(grid, rows)
   end
 end
 
------------------------------------------------------------------- CONSTRUCT one setup move toward a chip
--- No ready chip, so try one setup swap NEAR the cursor and ask "does a VERIFIED chip appear after it?" If so, that
--- setup move is the play -- after it lands the next frame recognizes the now-ready chip. The chip on the imagined
--- board is searched relative to where the cursor LANDS (the setup cell). Cached per board signature.
-function EnvelopeBrain:construct(grid, rows, cursor, sig)
-  if self._conSig == sig then return self._conResult or nil end
-  self._conSig = sig; self._conResult = false
-  local cr, cc = cursor[1], cursor[2]
-  local maxD = 4
-  local cands = {}
-  for r = math.max(1, cr - maxD), math.min(rows, cr + maxD) do for c = 1, BoardSim.WIDTH - 1 do
-    local dist = math.abs(r - cr) + math.abs(c - cc)
-    local a, b = grid[r][c], grid[r][c + 1]
-    if dist <= maxD and a ~= BoardSim.GARBAGE and b ~= BoardSim.GARBAGE and a ~= b and (a ~= 0 or b ~= 0) then
-      cands[#cands + 1] = { r, c, dist }
-    end
-  end end
-  table.sort(cands, function(x, y) return x[3] < y[3] end)   -- nearest first
-  for _, cand in ipairs(cands) do
-    local r, c = cand[1], cand[2]
-    local g2 = BoardSim.simSwap(grid, rows, r, c)
-    if g2 and useChips.useChips(g2, rows, { r, c }, { chipPriorities = { "COMBO_5", "COMBO_4" },
-         searchPriorities = { "UP", "DOWN", "LEFT", "RIGHT" }, verify = self:chipVerify(g2, rows) }) then
-      self._setupUsed = (self._setupUsed or 0) + 1
-      self._conResult = { { r, c } }
-      return self._conResult
-    end
-  end
-  return nil
-end
 
 -- a settled 3+ same-color run = a match mid-clear. While one exists, WAIT: don't swap into it or undo a combo we
 -- just made. The engine won't let us re-swap matched panels anyway -- this just stops us flailing at a clearing
@@ -100,6 +70,13 @@ local function hasPendingMatch(grid, rows)
   end end
   return false
 end
+
+-- STATE thresholds (knobs) by tallest-column height on the 12-row board:
+--   <= RAISE_BELOW  -> RAISE  (too little material; push the stack up)
+--   >= DANGER_ABOVE -> DANGER (near the top; must clear -- same combo chips for now, but never raise)
+--   in between      -> OFFENSE (hunt/build combos at leisure)
+local RAISE_BELOW = 4
+local DANGER_ABOVE = 9
 
 ------------------------------------------------------------------ DECIDE (stateless, re-measured every frame)
 function EnvelopeBrain:decide(state)
@@ -121,6 +98,11 @@ function EnvelopeBrain:decide(state)
     move = self._move
   else
     self._sig = sig
+    -- STATE by stack height. All states fire the same combo chips (DANGER uses the same chips for now); the state
+    -- only changes the no-play FALLBACK: RAISE pushes up for material, OFFENSE/DANGER never raise.
+    local st = (height >= DANGER_ABOVE and "DANGER") or (height <= RAISE_BELOW and "RAISE") or "OFFENSE"
+    self._state = st
+
     local chip = useChips.useChips(grid, rows, cursor, {                  -- READY chip, cursor-outward
       chipPriorities = { "COMBO_5", "COMBO_4" }, searchPriorities = { "UP", "DOWN", "LEFT", "RIGHT" },
       verify = self:chipVerify(grid, rows),
@@ -128,9 +110,10 @@ function EnvelopeBrain:decide(state)
     if chip then
       self._comboUse = self._comboUse or {}; self._comboUse[chip.kind] = (self._comboUse[chip.kind] or 0) + 1
       move = { type = "SWAP", pos = chip.swaps[1] }
+    elseif st == "RAISE" then
+      move = { type = "RAISE" }              -- no chip + too low -> push stack up for material
     else
-      local setup = self:construct(grid, rows, cursor, sig)             -- else CONSTRUCT one setup move toward a chip
-      move = setup and { type = "SWAP", pos = setup[1] } or { type = "WAIT" }
+      move = { type = "WAIT" }               -- no chip -> wait. (Building is a future SETUP *chip*, not a panel-mover.)
     end
     self._move = move
   end

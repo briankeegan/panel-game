@@ -1,8 +1,8 @@
--- tryCascadeSwap.lua — PROOF OF CONCEPT: take ONE cascade (COMBO_N_CASCADE_M) and run the same swap-unsolve we built
--- for getComboSetups, producing a COMBO_N_CASCADE_M_SWAP_2_MOVE_K (a cascade that also needs a setup swap). Engine-
--- verified: [setup, fire] fires the WHOLE cascade (N primary + M riser, 0 filler), fire-alone does nothing, no pre-match.
--- Self-contained; modifies no existing file. Cascade build loop is lifted from getCascadeShapes.
---   luajit bot/tryCascadeSwap.lua [N] [M] [radius]      (defaults 4, 3, 2)
+-- getCascadeSetups.lua — the 2-SWAP cousin of getCascadeShapes (as getComboSetups is to getComboShapes). Take a cascade
+-- (COMBO_N_CASCADE_M) and run the swap-unsolve, producing COMBO_N_CASCADE_M_SWAP_2_MOVE_K (a cascade that also needs a
+-- setup swap). Engine-verified: [setup, fire] fires the WHOLE cascade (N primary + M riser, 0 filler), no single swap
+-- wins it alone, no pre-match. Cascade build loop is lifted from getCascadeShapes.
+--   luajit bot/getCascadeSetups.lua [N] [M] [radius]      (defaults 4, 3, 2)
 require("bot.headlessBoot"); do local l = require("common.lib.logger"); l.setLogLevel(l.levels.ERROR) end
 _G.loc = _G.loc or function(s) return tostring(s) end
 local BoardSim = require("bot.BoardSim")

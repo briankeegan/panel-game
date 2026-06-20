@@ -92,23 +92,21 @@ jobs:
           script: |
             set +e   # collect ALL diagnostics regardless; decide pass/fail at the end
             # Emit key facts as ::warning:: annotations (readable via the public
-            # check-runs annotations API without auth). One fact per annotation;
-            # newlines in a value are joined with " | " since annotations are single-line.
-            ann() { printf '::%s title=%s::%s\n' "$1" "$2" "$(printf '%s' "$3" | tr '\n' '|' | cut -c1-900)"; }
+            # check-runs annotations API without auth). Inline echos only — NO shell
+            # function (the runner's sh treated a helper function as command-not-found
+            # -> exit 127). Values piped through tr to a single line.
 
-            # love-android renames its APK output, so don't match on '-debug' in the
-            # filename — find by the gradle /debug/ output dir instead.
-            ann warning APK_LIST "$(find la/app/build/outputs/apk -name '*.apk' 2>/dev/null)"
+            # love-android renames its APK output, so find by the gradle /debug/ dir,
+            # not the filename.
+            echo "::warning title=APK_LIST::$(find la/app/build/outputs/apk -name '*.apk' 2>/dev/null | tr '\n' '|')"
             APK=$(find la/app/build/outputs/apk -path '*/debug/*' -name '*.apk' 2>/dev/null | head -1)
             [ -z "$APK" ] && APK=$(find la/app/build/outputs/apk -name '*.apk' 2>/dev/null | head -1)
-            [ -z "$APK" ] && { echo "::error title=NO_APK::no .apk found under la/app/build/outputs/apk — see APK_LIST"; exit 1; }
-            ann warning APK_PICKED "$APK"
+            [ -z "$APK" ] && { echo "::error title=NO_APK::no .apk under la/app/build/outputs/apk — see APK_LIST"; exit 1; }
+            echo "::warning title=APK_PICKED::$APK"
+            echo "::warning title=APK_ABIS::$(unzip -l "$APK" | grep -o 'lib/[^/]*' | sort -u | tr '\n' ' ')"
+            echo "::warning title=EMU_ABILIST::$(adb shell getprop ro.product.cpu.abilist | tr -d '\r')"
 
-            ann warning APK_ABIS "$(unzip -l "$APK" | grep -o 'lib/[^/]*' | sort -u | tr '\n' ' ')"
-            ann warning EMU_ABILIST "$(adb shell getprop ro.product.cpu.abilist | tr -d '\r')"
-
-            adb install -r "$APK" 2>&1 | tail -2
-            ann warning INSTALL "$(adb install -r "$APK" 2>&1 | tail -1)"
+            echo "::warning title=INSTALL::$(adb install -r "$APK" 2>&1 | tail -1 | tr -d '\r')"
             adb logcat -c
             adb shell monkey -p org.love2d.android -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1
             for i in $(seq 1 30); do
@@ -117,16 +115,14 @@ jobs:
             done
 
             PID=$(adb shell pidof org.love2d.android | tr -d '\r')
-            ann warning LOVE_PID "${PID:-NOT_RUNNING}"
-            ann warning SENTINEL "$(adb logcat -d | grep 'HTTPS_SPIKE' | head -1)"
-            # crash / fatal signals (these explain a NOT_RUNNING app)
-            ann warning FATAL "$(adb logcat -d -s AndroidRuntime:E DEBUG:F libc:F SDL:F | tail -6)"
-            # anything love/lua/https-tagged near the failure
-            ann warning LOVELOG "$(adb logcat -d | grep -iE 'love|lua|https|dlopen|cannot' | tail -10)"
+            echo "::warning title=LOVE_PID::${PID:-NOT_RUNNING}"
+            echo "::warning title=SENTINEL::$(adb logcat -d | grep 'HTTPS_SPIKE' | head -1 | tr -d '\r')"
+            echo "::warning title=FATAL::$(adb logcat -d -s AndroidRuntime:E DEBUG:F libc:F SDL:F | tail -6 | tr '\n' '|' | cut -c1-900)"
+            echo "::warning title=LOVELOG::$(adb logcat -d | grep -iE 'love|lua|https|dlopen|cannot' | tail -10 | tr '\n' '|' | cut -c1-900)"
 
             if adb logcat -d | grep -q 'HTTPS_SPIKE OK'; then
               echo 'SPIKE PASSED'; exit 0
             else
-              echo "::error title=SPIKE::FAILED — see APK_ABIS / LOVE_PID / SENTINEL / FATAL / LOVELOG annotations"
+              echo "::error title=SPIKE::FAILED — see LOVE_PID / SENTINEL / FATAL / LOVELOG annotations"
               exit 1
             fi

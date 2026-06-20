@@ -81,20 +81,40 @@ jobs:
           arch: x86_64
           target: google_apis
           script: |
-            set -x
+            set +e   # collect ALL diagnostics regardless; decide pass/fail at the end
             APK=$(find la/app/build/outputs/apk -name '*-debug.apk' | head -1)
-            [ -z "$APK" ] && { echo "no debug apk built"; exit 1; }
+            S="$GITHUB_STEP_SUMMARY"
+            {
+              echo "## android-spike result"
+              echo "### APK ABIs (need x86_64 for this emulator)"; echo '```'
+              [ -n "$APK" ] && unzip -l "$APK" | grep 'lib/' || echo "(no APK / no lib entries)"
+              echo '```'
+              echo "### emulator abilist"; echo '```'
+              adb shell getprop ro.product.cpu.abilist; echo '```'
+            } >> "$S"
+
             adb install -r "$APK"
             adb logcat -c
             adb shell monkey -p org.love2d.android -c android.intent.category.LAUNCHER 1
-            # poll up to ~60s for the sentinel
             for i in $(seq 1 30); do
               adb logcat -d | grep -q 'HTTPS_SPIKE' && break
               sleep 2
             done
-            echo "--- LÖVE log ---"
-            adb logcat -d -s LOVE:V '*:S' | tail -40 || true
-            adb logcat -d | grep 'HTTPS_SPIKE' || true
-            adb logcat -d | grep -q 'HTTPS_SPIKE OK' \
-              || { echo 'SPIKE FAILED — no HTTPS_SPIKE OK in logcat'; exit 1; }
-            echo 'SPIKE PASSED'
+
+            {
+              echo "### LÖVE process running?"; echo '```'
+              adb shell pidof org.love2d.android || echo "(love process NOT running — app failed to start)"
+              echo '```'
+              echo "### LÖVE log (tail)"; echo '```'
+              adb logcat -d -s LOVE:V SDL:V AndroidRuntime:E '*:S' | tail -60
+              echo '```'
+              echo "### HTTPS_SPIKE sentinel"; echo '```'
+              adb logcat -d | grep 'HTTPS_SPIKE' || echo "(none — app never reached the https call)"
+              echo '```'
+            } >> "$S"
+
+            if adb logcat -d | grep -q 'HTTPS_SPIKE OK'; then
+              echo "### VERDICT: ✅ PASS" >> "$S"; echo 'SPIKE PASSED'; exit 0
+            else
+              echo "### VERDICT: ❌ FAIL" >> "$S"; echo 'SPIKE FAILED'; exit 1
+            fi

@@ -9,6 +9,7 @@ require("bot.headlessBoot"); do local l = require("common.lib.logger"); l.setLog
 _G.loc = _G.loc or function(s) return tostring(s) end
 local BoardSim = require("bot.BoardSim")
 local gcs = require("bot.getComboShapes")
+local bake = require("bot.chipBake")
 local Match = require("common.engine.Match"); require("common.engine.checkMatches")
 local LP = require("common.data.LevelPresets"); local KDE = require("common.data.KeyDataEncoding"); local Puzzle = require("common.engine.Puzzle")
 
@@ -184,6 +185,12 @@ if arg and arg[0] and arg[0]:match("getComboSetups") then
     print("")
   end
   print(string.format("---- %d valid COMBO_%d_SWAP_2 variants for base #%d ----", #found, N, BASE))
+  -- self-bake: running this script adds COMBO_N_SWAP_2 chips (ALL bases for size N) to the cache + catalog.
+  local all = M.enumerate(N, R)
+  local chips = {}
+  for _, v in ipairs(all) do chips[#chips+1] = bake.author(v.g, v.sr, v.sc, v.kind, { v.s1, { v.sr, v.sc } }) end
+  local n = bake.upsert("^COMBO_" .. N .. "_SWAP_2", chips)
+  print(string.format("baked %d COMBO_%d_SWAP_2 chips into cache (cache now %d total)", #chips, N, n))
 end
 
 return M

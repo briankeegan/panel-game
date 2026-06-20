@@ -36,20 +36,20 @@ local function stackString(g)
   for r = maxR, 1, -1 do local row = {}; for c = 1, 6 do row[c] = (g[r][c] ~= 0) and tostring(g[r][c]) or "0" end; rows[#rows+1] = table.concat(row) end
   return table.concat(rows)
 end
-local function firesCascade(g, r, c)
+local function firesCascade(g, r, c, n, m)
   local ok, res = pcall(function()
     local pz = Puzzle({ puzzleType = "moves", stack = stackString(g), moves = 99 })
-    local m = Match(pz:toPanelSource(false), pz:toGameMode().matchRules)
-    local st = m:createStackWithSettings(LP.getModern(10), true, "controller", nil); st:setMaxRunsPerFrame(1); m:start()
+    local mt = Match(pz:toPanelSource(false), pz:toGameMode().matchRules)
+    local st = mt:createStackWithSettings(LP.getModern(10), true, "controller", nil); st:setMaxRunsPerFrame(1); mt:start()
     if matches(g) then return false end                          -- pre-state must not already be matched (any color)
-    local function cnt(col) local n=0; for rr=1,st.height do for cc=1,6 do if (st.panels[rr][cc].color or 0)==col then n=n+1 end end end return n end
-    local function cntFill() local n=0; for rr=1,st.height do for cc=1,6 do local v=st.panels[rr][cc].color or 0; if v>=5 then n=n+1 end end end return n end
-    for i = 1, 40 do if st:game_ended() then break end st:receiveConfirmedInput("A"); m:run(); if i>=2 and not st:hasActivePanels() and not st:hasChainingPanels() then break end end
+    local function cnt(col) local k=0; for rr=1,st.height do for cc=1,6 do if (st.panels[rr][cc].color or 0)==col then k=k+1 end end end return k end
+    local function cntFill() local k=0; for rr=1,st.height do for cc=1,6 do local v=st.panels[rr][cc].color or 0; if v>=5 then k=k+1 end end end return k end
+    for i = 1, 40 do if st:game_ended() then break end st:receiveConfirmedInput("A"); mt:run(); if i>=2 and not st:hasActivePanels() and not st:hasChainingPanels() then break end end
     local p0, s0, f0 = cnt(P), cnt(S), cntFill()
-    st.cur_row, st.cur_col = r, c; st:receiveConfirmedInput(KDE.swap); m:run()
-    for k = 1, 200 do if st:game_ended() then break end st:receiveConfirmedInput("A"); m:run(); if k>=3 and not st:hasActivePanels() and not st:hasChainingPanels() then break end end
-    -- N primary AND exactly the M-panel riser cleared, and ZERO support cleared (no wildcard/filler may ever match)
-    return (p0 - cnt(P)) == N and (s0 - cnt(S)) == M and (f0 - cntFill()) == 0
+    st.cur_row, st.cur_col = r, c; st:receiveConfirmedInput(KDE.swap); mt:run()
+    for k = 1, 200 do if st:game_ended() then break end st:receiveConfirmedInput("A"); mt:run(); if k>=3 and not st:hasActivePanels() and not st:hasChainingPanels() then break end end
+    -- n primary AND exactly the m-panel riser cleared, and ZERO support cleared (no wildcard/filler may ever match)
+    return (p0 - cnt(P)) == n and (s0 - cnt(S)) == m and (f0 - cntFill()) == 0
   end)
   return ok and res
 end
@@ -57,12 +57,12 @@ end
 ----------------------------------------------------------------- generalize (uses firesCascade on the swap)
 local NC = 4
 local LOWER = { [1]="a", [2]="b", [3]="c", [4]="d" }; local UPPER = { [1]="A", [2]="B", [3]="C", [4]="D" }
-local function symbolOf(g, sr, sc, rr, cc)
+local function symbolOf(g, sr, sc, rr, cc, n, m)
   local works = {}
   for cand = 0, NC do local g2 = clone(g); g2[rr][cc] = cand
     local settled = true
     for col=1,W do local hole=false; for row=1,H do if g2[row][col]==0 then hole=true elseif hole then settled=false; break end end end
-    if settled and firesCascade(g2, sr, sc) then works[cand] = true end
+    if settled and firesCascade(g2, sr, sc, n, m) then works[cand] = true end
   end
   local wb = {}; for k = 1, NC do if works[k] then wb[#wb+1] = k end end
   if #wb == 0 then return "." end
@@ -77,54 +77,61 @@ end
 -- The riser is a COMBO_M, and getComboShapes(M) is EVERY way to build one (direct AND drop-based). So: brute-force
 -- transplant each riser solve's secondary arrangement onto each cascade end's primary at every placement, then keep
 -- the ones the engine confirms fire the whole chain (secondary clears, then exactly N primary).
-local unsolves = {}
-for _, rec in ipairs(getComboShapes.enumerate(M).raw) do
-  local g = rec.sample; local mr, mc = 1e9, 1e9
-  for r = 1, H do for c = 1, W do if g[r][c] ~= 0 then mr = math.min(mr, r); mc = math.min(mc, c) end end end
-  local sec, fil = {}, {}                                        -- sec = riser panels; fil = the solve's OWN support
-  for r = 1, H do for c = 1, W do local v = g[r][c]             -- (defines where a dropped riser panel lands)
-    if v == 1 then sec[#sec+1] = { r-mr, c-mc }
-    elseif v >= 2 then fil[#fil+1] = { r-mr, c-mc } end
-  end end
-  unsolves[#unsolves+1] = { sec = sec, fil = fil, sdr = rec.sr - mr, sdc = rec.sc - mc }
-end
+-- enumerate every COMBO_n_CASCADE_m: returns { g=pre grid, sr,sc=fire swap, kind, key } (one swap fires the chain).
+local function enumerate(n, m)
+  local unsolves = {}
+  for _, rec in ipairs(getComboShapes.enumerate(m).raw) do
+    local g = rec.sample; local mr, mc = 1e9, 1e9
+    for r = 1, H do for c = 1, W do if g[r][c] ~= 0 then mr = math.min(mr, r); mc = math.min(mc, c) end end end
+    local sec, fil = {}, {}                                        -- sec = riser panels; fil = the solve's OWN support
+    for r = 1, H do for c = 1, W do local v = g[r][c]             -- (defines where a dropped riser panel lands)
+      if v == 1 then sec[#sec+1] = { r-mr, c-mc }
+      elseif v >= 2 then fil[#fil+1] = { r-mr, c-mc } end
+    end end
+    unsolves[#unsolves+1] = { sec = sec, fil = fil, sdr = rec.sr - mr, sdc = rec.sc - mc }
+  end
 
-local ends = cascadeEnds.enumerate(N, M)
-local found = {}
-for _, e in ipairs(ends) do
-  local g0 = e.g                                                 -- the END: primary set to drop in
-  local prim, pr1, pc0, pc1 = {}, 0, 1e9, 0
-  for r = 1, H do for c = 1, W do if g0[r][c] == P then prim[#prim+1] = {r,c}; pr1=math.max(pr1,r); pc0=math.min(pc0,c); pc1=math.max(pc1,c) end end end
-  for _, U in ipairs(unsolves) do
-    for orr = 1, pr1 + 1 do for occ = pc0 - M, pc1 + 1 do        -- every placement of the riser-solve over the primary
-      local pre = {}; for r = 1, H do pre[r] = {}; for c = 1, W do pre[r][c] = 0 end end
-      for _, p in ipairs(prim) do pre[p[1]][p[2]] = P end
-      local okp = true
-      for _, s in ipairs(U.sec) do local r, c = orr + s[1], occ + s[2]
-        if r < 1 or r > H or c < 1 or c > W or pre[r][c] ~= 0 then okp = false; break end
-        pre[r][c] = S
-      end
-      if okp then
-        for _, f in ipairs(U.fil) do local r, c = orr + f[1], occ + f[2]   -- the solve's OWN support (keeps drop gaps)
-          if r >= 1 and r <= H and c >= 1 and c <= W and pre[r][c] == 0 then pre[r][c] = ((r+c)%2==0) and 5 or 6 end end
-        local maxRelC = 0                                            -- the solve is floor-anchored; raise it to orr by
-        for _, s in ipairs(U.sec) do maxRelC = math.max(maxRelC, s[2]) end   -- supporting the riser line's whole span up
-        for _, f in ipairs(U.fil) do maxRelC = math.max(maxRelC, f[2]) end   -- to row orr-1 (so a dropped 2 lands AT the line)
-        for c = occ, occ + maxRelC do if c >= 1 and c <= W then
-          for r = 1, orr - 1 do if pre[r][c] == 0 then pre[r][c] = ((r+c)%2==0) and 5 or 6 end end end end
-        for c = 1, W do local top = 0; for r = 1, H do if pre[r][c] ~= 0 then top = r end end   -- inert checkerboard support
-          for r = 1, top do if pre[r][c] == 0 then pre[r][c] = ((r+c)%2==0) and 5 or 6 end end end
-        local sr, scc = orr + U.sdr, occ + U.sdc
-        if sr >= 1 and sr <= H and scc >= 1 and scc <= W - 1 and not matches(pre)
-           and (pre[sr][scc] == S or pre[sr][scc+1] == S) then    -- the swap MUST move a riser panel (a 2)
-          if firesCascade(pre, sr, scc) then
-            local kk = shapeCache.canonShape(pre)
-            if kk and not found[kk] then found[kk] = { sample = pre, sr = sr, sc = scc, key = kk } end
+  local kind = string.format("COMBO_%d_CASCADE_%d", n, m)
+  local ends = cascadeEnds.enumerate(n, m)
+  local found = {}
+  for _, e in ipairs(ends) do
+    local g0 = e.g                                                 -- the END: primary set to drop in
+    local prim, pr1, pc0, pc1 = {}, 0, 1e9, 0
+    for r = 1, H do for c = 1, W do if g0[r][c] == P then prim[#prim+1] = {r,c}; pr1=math.max(pr1,r); pc0=math.min(pc0,c); pc1=math.max(pc1,c) end end end
+    for _, U in ipairs(unsolves) do
+      for orr = 1, pr1 + 1 do for occ = pc0 - m, pc1 + 1 do        -- every placement of the riser-solve over the primary
+        local pre = {}; for r = 1, H do pre[r] = {}; for c = 1, W do pre[r][c] = 0 end end
+        for _, p in ipairs(prim) do pre[p[1]][p[2]] = P end
+        local okp = true
+        for _, s in ipairs(U.sec) do local r, c = orr + s[1], occ + s[2]
+          if r < 1 or r > H or c < 1 or c > W or pre[r][c] ~= 0 then okp = false; break end
+          pre[r][c] = S
+        end
+        if okp then
+          for _, f in ipairs(U.fil) do local r, c = orr + f[1], occ + f[2]   -- the solve's OWN support (keeps drop gaps)
+            if r >= 1 and r <= H and c >= 1 and c <= W and pre[r][c] == 0 then pre[r][c] = ((r+c)%2==0) and 5 or 6 end end
+          local maxRelC = 0                                            -- the solve is floor-anchored; raise it to orr by
+          for _, s in ipairs(U.sec) do maxRelC = math.max(maxRelC, s[2]) end   -- supporting the riser line's whole span up
+          for _, f in ipairs(U.fil) do maxRelC = math.max(maxRelC, f[2]) end   -- to row orr-1 (so a dropped 2 lands AT the line)
+          for c = occ, occ + maxRelC do if c >= 1 and c <= W then
+            for r = 1, orr - 1 do if pre[r][c] == 0 then pre[r][c] = ((r+c)%2==0) and 5 or 6 end end end end
+          for c = 1, W do local top = 0; for r = 1, H do if pre[r][c] ~= 0 then top = r end end   -- inert checkerboard support
+            for r = 1, top do if pre[r][c] == 0 then pre[r][c] = ((r+c)%2==0) and 5 or 6 end end end
+          local sr, scc = orr + U.sdr, occ + U.sdc
+          if sr >= 1 and sr <= H and scc >= 1 and scc <= W - 1 and not matches(pre)
+             and (pre[sr][scc] == S or pre[sr][scc+1] == S) then    -- the swap MUST move a riser panel (a 2)
+            if firesCascade(pre, sr, scc, n, m) then
+              local kk = shapeCache.canonShape(pre)
+              if kk and not found[kk] then found[kk] = { g = pre, sample = pre, sr = sr, sc = scc, key = kk, kind = kind } end
+            end
           end
         end
-      end
-    end end
+      end end
+    end
   end
+  local list = {}; for _, rec in pairs(found) do list[#list+1] = rec end
+  table.sort(list, function(a, b) return a.key < b.key end)
+  return list
 end
 
 ----------------------------------------------------------------- render with the swap shown
@@ -142,7 +149,7 @@ local function render(rec)
       local v = g[rr][cc]; local isSwap = (rr == sr and (cc == sc or cc == sc + 1))
       if isSwap then toks[#toks+1] = (v == 0 and ".") or (v >= 5 and "*") or tostring(v)
       elseif v >= 5 then toks[#toks+1] = "*"
-      else toks[#toks+1] = symbolOf(g, sr, sc, rr, cc) end
+      else toks[#toks+1] = symbolOf(g, sr, sc, rr, cc, N, M) end
     end
     local n = #toks; local ch = {}; for i = 1, 2*n+1 do ch[i] = " " end
     for k = 1, n do ch[2*k] = toks[k] end

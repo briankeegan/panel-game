@@ -86,8 +86,13 @@ local function getTimer(match)
 end
 
 function PortraitGame:customLoad()
-  self.uiRoot.width = consts.CANVAS_HEIGHT
-  self.uiRoot.height = consts.CANVAS_WIDTH
+  -- uiRoot must be PORTRAIT (narrow x tall). Legacy hard-swapped consts assuming
+  -- a landscape base (HEIGHT=720 -> width, WIDTH=1280 -> height); our portrait
+  -- build already swaps consts, so that double-swaps into landscape and throws
+  -- the raise button / timer off-screen. Use short edge = width, long = height
+  -- so it's correct regardless of consts orientation.
+  self.uiRoot.width = math.min(consts.CANVAS_WIDTH, consts.CANVAS_HEIGHT)
+  self.uiRoot.height = math.max(consts.CANVAS_WIDTH, consts.CANVAS_HEIGHT)
 
   local communityMessage = ui.Label({
     text = "join_community",

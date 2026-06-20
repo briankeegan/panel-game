@@ -1,100 +1,30 @@
--- buildChipCache.lua — author the engine-verified combo catalog into recognizable chip TEMPLATES and write them to
--- bot/chipCache.lua (a plain Lua data file the live bot loads fast — no generation at runtime).
--- A template = the concrete game-color cells (the match shape) + the swap, relative to the swap anchor, as same/diff
--- color classes. FILLER (support, >=5) is don't-care (omitted). The live recognizer slides these; verify confirms.
---   luajit bot/buildChipCache.lua            -> writes bot/chipCache.lua
---   luajit bot/buildChipCache.lua 5 4 6      -> only those sizes
+-- buildChipCache.lua — the FULL rebuild: author every generator's chips and write bot/chipCache.lua (what the bot
+-- loads) + bot/chipCatalog.txt (the human view), via the shared bot/chipBake. Each generator can also self-bake its
+-- own family when run directly (see each script's CLI) — this is the all-at-once version.
+--   luajit bot/buildChipCache.lua            -> sizes 5,4
+--   luajit bot/buildChipCache.lua 5 4 3      -> only those sizes
 require("bot.headlessBoot"); do local l = require("common.lib.logger"); l.setLogLevel(l.levels.ERROR) end
 _G.loc = _G.loc or function(s) return tostring(s) end
+local bake = require("bot.chipBake")
 local getComboShapes = require("bot.getComboShapes")
 local getComboSetups = require("bot.getComboSetups")
-local H, W = 12, 6
 local SETUP_RADIUS = 2
 
 local sizes = {}
 for i = 1, #arg do sizes[#sizes+1] = tonumber(arg[i]) end
-if #sizes == 0 then sizes = { 5, 4 } end   -- Brian: fives and fours for now
+if #sizes == 0 then sizes = { 5, 4 } end
 
--- engine-truth author: concrete cells (1..4) + every swap cell, relative to the FIRE anchor (sr,sc), as same/diff
--- classes; filler (>=5) omitted (don't-care). absSwaps = list of {r,c} swap anchors played in order (the LAST is the
--- fire at (sr,sc)). One swap for a COMBO; two for a *_SWAP_2; works for any count.
-local function authorChip(g, sr, sc, kind, absSwaps)
-  local rl, nn = {}, 0
-  local function cls(col) if col == 0 then return "e" end; if not rl[col] then nn = nn + 1; rl[col] = nn end; return rl[col] end
-  local incl = {}
-  for r = 1, H do for c = 1, W do local v = g[r][c] or 0; if v >= 1 and v <= 4 then incl[r*100+c] = { r, c, cls(v) } end end end
-  for _, s in ipairs(absSwaps) do
-    for _, cc in ipairs({ s[2], s[2] + 1 }) do local v = g[s[1]][cc] or 0; local key = s[1]*100+cc
-      if not incl[key] then if v == 0 then incl[key] = { s[1], cc, "e" } elseif v <= 4 then incl[key] = { s[1], cc, cls(v) } end end end
-  end
-  local t = {}; for _, e in pairs(incl) do t[#t+1] = { e[1]-sr, e[2]-sc, e[3] } end
-  table.sort(t, function(a, b) if a[1] ~= b[1] then return a[1] < b[1] end return a[2] < b[2] end)
-  local swaps = {}; for _, s in ipairs(absSwaps) do swaps[#swaps+1] = { s[1]-sr, s[2]-sc } end
-  return { tmpl = t, kind = kind, swaps = swaps }
-end
-
-local function quote(v) return type(v) == "string" and ('"' .. v .. '"') or tostring(v) end
-local function serTmpl(t)
-  local parts = {}
-  for _, e in ipairs(t) do parts[#parts+1] = string.format("{%d,%d,%s}", e[1], e[2], quote(e[3])) end
-  return "{" .. table.concat(parts, ",") .. "}"
-end
-local function serSwaps(s)
-  local parts = {}
-  for _, o in ipairs(s) do parts[#parts+1] = string.format("{%d,%d}", o[1], o[2]) end
-  return "{" .. table.concat(parts, ",") .. "}"
-end
-
--- render ONE chip from its cached template (so the catalog is a faithful view of the cache, never drifts).
--- symbols: digit = color class · "." = must-be-empty · "·" = don't-care (junk allowed) · [ ] = a swap cell.
-local function renderChip(chip)
-  local minr, maxr, minc, maxc = 0, 0, 0, 1     -- the swap (0,0)-(0,1) is always present
-  for _, e in ipairs(chip.tmpl) do minr=math.min(minr,e[1]); maxr=math.max(maxr,e[1]); minc=math.min(minc,e[2]); maxc=math.max(maxc,e[2]) end
-  local at = {}; for _, e in ipairs(chip.tmpl) do at[e[1]*100+e[2]] = e[3] end
-  local sw = {}; for i, o in ipairs(chip.swaps) do sw[o[1]*100+o[2]] = i; sw[o[1]*100+o[2]+1] = i end  -- both cells of each swap
-  local lines = {}
-  for r = maxr, minr, -1 do
-    local row = {}
-    for c = minc, maxc do
-      local cls = at[r*100+c]
-      local ch = (cls == nil) and "·" or (cls == "e" and "." or tostring(cls))   -- nil = don't-care junk
-      row[#row+1] = sw[r*100+c] and ("["..ch.."]") or (" "..ch.." ")
-    end
-    lines[#lines+1] = ("    " .. table.concat(row)):gsub("%s+$", "")
-  end
-  return table.concat(lines, "\n")
-end
-
-local out, cat, total = {}, {}, 0
-local function emit(chip, i)
-  out[#out+1] = string.format("  { kind=%q, swaps=%s, tmpl=%s },", chip.kind, serSwaps(chip.swaps), serTmpl(chip.tmpl))
-  cat[#cat+1] = string.format("%s  #%d  swaps=%s\n%s", chip.kind, i, serSwaps(chip.swaps), renderChip(chip))
-  total = total + 1
-end
-
+local chips = {}
 for _, n in ipairs(sizes) do
   -- 1-swap combos
   local raw = getComboShapes.enumerate(n).raw
-  for i, rec in ipairs(raw) do emit(authorChip(rec.sample, rec.sr, rec.sc, "COMBO_" .. n, { { rec.sr, rec.sc } }), i) end
-  io.stderr:write(string.format("COMBO_%d: %d templates\n", n, #raw))
+  for _, rec in ipairs(raw) do chips[#chips+1] = bake.author(rec.sample, rec.sr, rec.sc, "COMBO_" .. n, { { rec.sr, rec.sc } }) end
+  io.stderr:write(string.format("COMBO_%d: %d\n", n, #raw))
   -- 2-swap combos (setup -> fire), all bases within SETUP_RADIUS
   local setups = getComboSetups.enumerate(n, SETUP_RADIUS)
-  for i, v in ipairs(setups) do emit(authorChip(v.g, v.sr, v.sc, v.kind, { v.s1, { v.sr, v.sc } }), i) end
-  io.stderr:write(string.format("COMBO_%d_SWAP_2: %d templates\n", n, #setups))
+  for _, v in ipairs(setups) do chips[#chips+1] = bake.author(v.g, v.sr, v.sc, v.kind, { v.s1, { v.sr, v.sc } }) end
+  io.stderr:write(string.format("COMBO_%d_SWAP_2: %d\n", n, #setups))
 end
 
-local f = assert(io.open("bot/chipCache.lua", "w"))
-f:write("-- AUTOGENERATED by bot/buildChipCache.lua — engine-verified combo chip templates. DO NOT EDIT BY HAND.\n")
-f:write("-- Each = { kind, swaps={{dr,dc}..}, tmpl={{dr,dc,class}..} }. swaps anchor-relative, played in order (one for a COMBO). class: int=same/diff color, \"e\"=empty. Filler is don't-care.\n")
-f:write("return {\n")
-f:write(table.concat(out, "\n"))
-f:write("\n}\n")
-f:close()
-
--- the catalog: a human-readable VIEW of the exact same cache entries, written every run so the two stay 1:1.
-local cf = assert(io.open("bot/chipCatalog.txt", "w"))
-cf:write(string.format("AUTOGENERATED by bot/buildChipCache.lua — a view of bot/chipCache.lua (%d chips). [ ]=swap cell · digit=color class · .=empty\n\n", total))
-cf:write(table.concat(cat, "\n\n"))
-cf:write("\n")
-cf:close()
-io.stderr:write(string.format("wrote bot/chipCache.lua + bot/chipCatalog.txt: %d templates\n", total))
+local total = bake.writeAll(chips)
+io.stderr:write(string.format("wrote bot/chipCache.lua + bot/chipCatalog.txt: %d chips\n", total))

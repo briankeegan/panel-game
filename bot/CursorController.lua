@@ -18,8 +18,16 @@ local KeyDataEncoding = require("common.data.KeyDataEncoding")
 local function char(bits) return KeyDataEncoding.base64encode[bits + 1] end
 local IDLE = char(0)
 
--- Cursor speed = two direct numeric knobs (no tiers). Defaults below = full speed.
-local DEFAULT_CURSOR_SPEED = { cursorMoveInterval = 1, reactionFrames = 1 }
+-- Cursor speed: each knob is a {min,max} RANGE (or a scalar). Human-like by default -- humans idle ~75-80% and act
+-- in fast bursts (fit_targets: act ~20-25%). A scalar = no jitter; full speed = 1.
+local DEFAULT_CURSOR_SPEED = { cursorMoveInterval = { 4, 9 }, reactionFrames = { 10, 16 } }
+
+-- deterministic jitter: pick a value in the range (scalar passes through). Seeded per controller -> reproducible.
+local function jitter(self, v)
+  if type(v) ~= "table" then return v end
+  self._rng = (self._rng * 1103515245 + 12345) % 2147483648
+  return v[1] + (self._rng % (v[2] - v[1] + 1))
+end
 
 local CursorController = {}
 CursorController.__index = CursorController
@@ -31,6 +39,7 @@ function CursorController.new(cursorSpeed)
   if type(cursorSpeed) == "table" then for k, v in pairs(cursorSpeed) do cfg[k] = v end end
   return setmetatable({
     cfg = cfg,
+    _rng = 305419896,   -- fixed seed -> jitter is varied but deterministic (botBench reproducible)
     moveCooldown = 0,
     reactionTimer = 0,
     locked = nil,    -- target key we're committed to
@@ -73,7 +82,7 @@ function CursorController:nextInput(state, decision)
   if not self.locked then
     self.locked, self.lockedPos, self.swapped = key, { tr, tc }, false
     -- reaction delay only when engaging out of idle (noticing a new situation)
-    self.reactionTimer = self.idle and self.cfg.reactionFrames or 0
+    self.reactionTimer = self.idle and jitter(self, self.cfg.reactionFrames) or 0
   end
   self.idle = false
 
@@ -97,7 +106,7 @@ function CursorController:nextInput(state, decision)
   elseif cc < ltc then bits = 1    -- Right
   elseif cc > ltc then bits = 2    -- Left
   else bits = 16; self.swapped = true end -- aligned: swap once
-  self.moveCooldown = self.cfg.cursorMoveInterval
+  self.moveCooldown = jitter(self, self.cfg.cursorMoveInterval)
   return char(bits)
 end
 

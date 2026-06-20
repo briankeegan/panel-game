@@ -1,3 +1,5 @@
+-- ★ CANONICAL chip-shape display — THIS is the format we use to eyeball combos. Don't build a new render/audit
+--   script; use this (and its 2-swap companion bot/getComboSetups.lua). See memory: combo_shape_catalog.
 -- getComboShapes.lua — generate EVERY COMBO_N chip: a board one swap from clearing exactly N, recognized as a
 -- shape + the swap to play. One generator for all N (straight AND bent L/T/plus shapes).
 -- Method (brute force, complete by construction): place N line panels every way in a tight floor-anchored window,

@@ -87,6 +87,20 @@ function EnvelopeBrain:construct(grid, rows, cursor, sig)
   return nil
 end
 
+-- a settled 3+ same-color run = a match mid-clear. While one exists, WAIT: don't swap into it or undo a combo we
+-- just made. The engine won't let us re-swap matched panels anyway -- this just stops us flailing at a clearing
+-- combo, with no magic cooldown. (Brian's intuition: "you can't re-swap somewhere active.")
+local function hasPendingMatch(grid, rows)
+  for r = 1, rows do for c = 1, BoardSim.WIDTH do
+    local v = grid[r] and grid[r][c]
+    if v and v ~= 0 and v ~= BoardSim.GARBAGE then
+      if grid[r][c + 1] == v and grid[r][c + 2] == v then return true end       -- horizontal 3-run
+      if grid[r + 1] and grid[r + 2] and grid[r + 1][c] == v and grid[r + 2][c] == v then return true end  -- vertical
+    end
+  end end
+  return false
+end
+
 ------------------------------------------------------------------ DECIDE (stateless, re-measured every frame)
 function EnvelopeBrain:decide(state)
   local rows = state.rows
@@ -97,12 +111,8 @@ function EnvelopeBrain:decide(state)
   local sig = 0
   for r = 1, top do for c = 1, BoardSim.WIDTH do sig = (sig * 31 + grid[r][c]) % 2147483647 end end
 
-  -- COOLDOWN: we just fired a swap at the target -- WAIT while the match resolves. Else the next frame re-decides on
-  -- the just-swapped board and swaps it right back, un-making the combo before it can lock + clear (the oscillation).
-  if (self._cooldown or 0) > 0 then
-    self._cooldown = self._cooldown - 1; self._sig = nil
-    return { type = "WAIT" }
-  end
+  -- a match is clearing -> WAIT (don't swap into it or undo the combo we just made). Replaces the old magic cooldown.
+  if hasPendingMatch(grid, rows) then self._sig, self._move = nil, nil; return { type = "WAIT" } end
 
   -- COMMIT (the memory the old plan had): hold our move while the board is UNCHANGED -- travel to it -- and re-decide
   -- ONLY when it actually changes. A rise (which changes the signature) re-targets us fresh.
@@ -125,10 +135,6 @@ function EnvelopeBrain:decide(state)
     self._move = move
   end
 
-  -- arrived on the swap target -> this frame FIRES it; cool down so we don't swap it back before it clears.
-  if move.type == "SWAP" and cursor[1] == move.pos[1] and cursor[2] == move.pos[2] then
-    self._cooldown = 24
-  end
   return move
 end
 

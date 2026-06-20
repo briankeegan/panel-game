@@ -65,6 +65,15 @@ jobs:
           cp android-spike/game.love la/app/src/embed/assets/game.love
           ls -la la/app/src/embed/assets/
 
+      # love-android 11.5a ships APP_ABI := armeabi-v7a ONLY, so the default APK
+      # has no x86_64 lib and won't run on the x86_64 emulator. Build x86_64 for
+      # the smoke test (arm compilation is already proven by this step passing on
+      # earlier runs). The real package-android job will use the arm ABIs.
+      - name: Target x86_64 ABI for the emulator
+        run: |
+          sed -i 's/^APP_ABI := .*/APP_ABI := x86_64/' la/love/src/jni/Application.mk
+          grep '^APP_ABI' la/love/src/jni/Application.mk
+
       - name: Build embedded debug APK
         run: |
           cd la

@@ -11,6 +11,16 @@ local MessageTransition = require("client.src.scenes.Transitions.MessageTransiti
 local GameModes = require("common.data.GameModes")
 local tableUtils = require("common.lib.tableUtils")
 
+-- Cascading lobby sub-menus (challenge a player, create-room option chains) open
+-- to the RIGHT of their parent button. On a narrow portrait screen that runs off
+-- the right edge and gets clipped. Clamp the x so the menu stays fully on-screen.
+-- Landscape is unaffected (the clamp only bites when the menu would overflow).
+local function clampSubmenuX(preferredX, menuWidth)
+  if not system.isPortraitMode() then return preferredX end
+  menuWidth = menuWidth or 240
+  return math.max(8, math.min(preferredX, consts.CANVAS_WIDTH - menuWidth - 8))
+end
+
 -- expects a serverIp and serverPort as a param (unless already set in GAME.connected_server_ip & GAME.connected_server_port respectively)
 ---@class LobbyScene : Scene
 ---@field lobbyMenu ScrollMenu
@@ -133,7 +143,7 @@ function Lobby:initLobbyMenu()
 
     local bx, by = parentButton:getScreenPos()
     local latMenu = ui.ScrollMenu({
-      x = bx + parentButton.width + 3,
+      x = clampSubmenuX(bx + parentButton.width + 3),
       y = by,
       hAlign = "left",
       vAlign = "top",
@@ -264,7 +274,7 @@ function Lobby:initLobbyMenu()
 
     local bx, by = parentButton:getScreenPos()
     local garbageMenu = ui.ScrollMenu({
-      x = bx + parentButton.width + 3,
+      x = clampSubmenuX(bx + parentButton.width + 3),
       y = by,
       hAlign = "left",
       vAlign = "top",
@@ -349,7 +359,7 @@ function Lobby:initLobbyMenu()
     local divisions = TEAM_DIVISIONS[playerCount] or {}
     local rowHeight = 32  -- TextButton default + childGap budget
     local compositionMenu = ui.ScrollMenu({
-      x = bx + parentButton.width + 3,
+      x = clampSubmenuX(bx + parentButton.width + 3),
       y = by,
       hAlign = "left",
       vAlign = "top",
@@ -411,7 +421,7 @@ function Lobby:initLobbyMenu()
 
     local bx, by = parentButton:getScreenPos()
     local playerCountMenu = ui.ScrollMenu({
-      x = bx + parentButton.width + 3,
+      x = clampSubmenuX(bx + parentButton.width + 3),
       y = by,
       hAlign = "left",
       vAlign = "top",
@@ -467,7 +477,7 @@ function Lobby:initLobbyMenu()
 
     local bx, by = parentButton:getScreenPos()
     local typeMenu = ui.ScrollMenu({
-      x = bx + parentButton.width + 3,
+      x = clampSubmenuX(bx + parentButton.width + 3),
       y = by,
       hAlign = "left",
       vAlign = "top",
@@ -542,7 +552,7 @@ function Lobby:initLobbyMenu()
 
     local bx, by = parentButton:getScreenPos()
     local ffaMenu = ui.ScrollMenu({
-      x = bx + parentButton.width + 3,
+      x = clampSubmenuX(bx + parentButton.width + 3),
       y = by,
       hAlign = "left",
       vAlign = "top",
@@ -638,7 +648,7 @@ function Lobby:initLobbyMenu()
 
     local bx, by = parentButton:getScreenPos()
     local typeMenu = ui.ScrollMenu({
-      x = bx + parentButton.width + 3,
+      x = clampSubmenuX(bx + parentButton.width + 3),
       y = by,
       hAlign = "left",
       vAlign = "top",
@@ -1531,7 +1541,7 @@ function Lobby:openRoomSubMenu(room, button)
   local x, y = button:getScreenPos()
 
   local subMenu = ui.ScrollMenu({
-    x = x + self.lobbyMenu.width + 3,
+    x = clampSubmenuX(x + self.lobbyMenu.width + 3),
     y = y,
     hAlign = "left",
     vAlign = "top",
@@ -1734,7 +1744,7 @@ function Lobby:openCannotJoinHintMenu(button)
 
   local x, y = button:getScreenPos()
   local subMenu = ui.ScrollMenu({
-    x = x + self.lobbyMenu.width + 3,
+    x = clampSubmenuX(x + self.lobbyMenu.width + 3),
     y = y,
     hAlign = "left",
     vAlign = "top",
@@ -1791,7 +1801,7 @@ function Lobby:openLocalRoomSubMenu(room, button)
   local x, y = button:getScreenPos()
 
   local subMenu = ui.ScrollMenu({
-    x = x + self.lobbyMenu.width + 3,
+    x = clampSubmenuX(x + self.lobbyMenu.width + 3),
     y = y,
     hAlign = "left",
     vAlign = "top",
@@ -1853,7 +1863,7 @@ function Lobby:openPlayerSubMenu(playerId, button)
   local x, y = button:getScreenPos()
 
   local subMenu = ui.ScrollMenu({
-    x = x + self.lobbyMenu.width + 3,
+    x = clampSubmenuX(x + self.lobbyMenu.width + 3),
     y = y,
     hAlign = "left",
     vAlign = "top",

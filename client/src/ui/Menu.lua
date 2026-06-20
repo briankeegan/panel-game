@@ -148,9 +148,9 @@ function Menu:layout()
     end
   end
 
-  -- mobile/portrait: center each button within the menu column (otherwise items
-  -- sit at the left edge with ragged right edges). Desktop layout is untouched.
-  if system.isMobileOS() or DebugSettings.simulateMobileOS() then
+  -- portrait: center each button within the menu column (otherwise items sit at
+  -- the left edge with ragged right edges). Desktop/landscape layout untouched.
+  if system.isPortraitMode() then
     for _, menuItem in ipairs(self.menuItems) do
       menuItem.x = (self.width - menuItem.width) / 2
     end

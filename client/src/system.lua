@@ -15,6 +15,29 @@ function system.isMobileOS()
   return false
 end
 
+local DebugSettings
+-- A phone, or mocking one (debug toggle / PA_SIMULATE_MOBILE). Device check only —
+-- independent of the portraitMode setting, so the Options toggle stays visible even
+-- when portrait is turned off.
+---@return boolean
+function system.isMobileLike()
+  if not DebugSettings then DebugSettings = require("client.src.debug.DebugSettings") end
+  if system.isMobileOS() or DebugSettings.simulateMobileOS() then
+    return true
+  end
+  return os.getenv ~= nil and os.getenv("PA_SIMULATE_MOBILE") == "1"
+end
+
+-- Whether to render in portrait: mobile-like AND the user hasn't turned portraitMode
+-- off. Single source of truth for all portrait gating.
+---@return boolean
+function system.isPortraitMode()
+  if not system.isMobileLike() then
+    return false
+  end
+  return not (config and config.portraitMode == false)
+end
+
 ---@return boolean
 ---@return string? problem detected problem
 ---@return string? reason why the system is not compatible

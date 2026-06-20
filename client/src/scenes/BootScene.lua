@@ -1,6 +1,7 @@
 local class = require("common.lib.class")
 local Scene = require("client.src.scenes.Scene")
 local consts = require("common.engine.consts")
+local system = require("client.src.system")
 local GraphicsUtil = require("client.src.graphics.graphics_util")
 local logger = require("common.lib.logger")
 local fileUtils = require("client.src.FileUtils")
@@ -138,6 +139,14 @@ function BootScene:migrate()
   self.migrationPath = nil
   self.migrationMessage = nil
   readConfigFile(config)
+  -- Config (incl. portraitMode) is now loaded; the early consts swap was OS-based.
+  -- Set the canvas to match the SETTING — love.load() below recreates it at this
+  -- size. Lets a mobile user turn portrait off and get the landscape canvas.
+  if system.isPortraitMode() then
+    consts.CANVAS_WIDTH, consts.CANVAS_HEIGHT = 720, 1280
+  else
+    consts.CANVAS_WIDTH, consts.CANVAS_HEIGHT = 1280, 720
+  end
   love.window.updateMode(config.windowWidth, config.windowHeight,
     {
       x = config.windowX,

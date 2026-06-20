@@ -126,16 +126,22 @@ function MainMenu:createMainMenu()
     ui.MenuItem.createButtonMenuItem("mm_replay_browser", nil, nil, function()
       switchToScene(ReplayBrowser())
     end),
-    ui.MenuItem.createButtonMenuItem("mm_fullscreen", {"\n(Alt+Enter)"}, nil, function()
+  }
+
+  -- Fullscreen is meaningless in portrait (the game fills the phone) — hide it
+  -- there. Desktop/landscape keeps it in its usual spot.
+  if not system.isPortraitMode() then
+    restItems[#restItems + 1] = ui.MenuItem.createButtonMenuItem("mm_fullscreen", {"\n(Alt+Enter)"}, nil, function()
       GAME.theme:playValidationSfx()
       GAME:toggleFullscreen()
-    end),
-    ui.MenuItem.createButtonMenuItem("og stuff", nil, false, function()
-      self.menu:detach()
-      self.menu = self:createOgMenu()
-      self.uiRoot:addChild(self.menu)
-    end),
-  }
+    end)
+  end
+
+  restItems[#restItems + 1] = ui.MenuItem.createButtonMenuItem("og stuff", nil, false, function()
+    self.menu:detach()
+    self.menu = self:createOgMenu()
+    self.uiRoot:addChild(self.menu)
+  end)
 
   for _, item in ipairs(restItems) do
     menuItems[#menuItems + 1] = item

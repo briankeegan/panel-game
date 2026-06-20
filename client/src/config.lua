@@ -146,6 +146,9 @@ config = {
 
     -- True if we immediately want to maximize the screen on startup
     maximizeOnStartup             = true,
+    -- Mobile only: render the game in portrait. Defaults on for phones; can be
+    -- turned off in Options (the toggle only shows on mobile). Ignored on desktop.
+    portraitMode                  = true,
     gameScaleType                 = "auto",
     gameScaleFixedValue           = 2,
 
@@ -321,6 +324,9 @@ config = {
           configTable.lobbyFfaPrefs = loadLobbyPrefs(
             configTable.lobbyFfaPrefs, read_data.lobbyFfaPrefs, lobby_ffa_player_count_values)
 
+          if type(read_data.portraitMode) == "boolean" then
+            configTable.portraitMode = read_data.portraitMode
+          end
           if type(read_data.maximizeOnStartup) == "boolean" then
             configTable.maximizeOnStartup = read_data.maximizeOnStartup
           end

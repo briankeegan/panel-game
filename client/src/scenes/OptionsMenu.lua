@@ -298,6 +298,11 @@ function OptionsMenu:loadGeneralMenu()
     generalMenuOptions[#generalMenuOptions+1] = ui.MenuItem.createToggleButtonGroupMenuItem("Release Stream", nil, false, releaseStreamSelection)
   end
 
+  -- Mobile only: portrait toggle (default on). Takes effect on restart.
+  if system.isMobileLike() then
+    generalMenuOptions[#generalMenuOptions+1] = ui.MenuItem.createToggleButtonGroupMenuItem("Portrait Mode", nil, false, createToggleButtonGroup("portraitMode"))
+  end
+
   generalMenuOptions[#generalMenuOptions + 1] = ui.MenuItem.createButtonMenuItem("back", nil, nil,
   function()
     GAME.theme:playCancelSfx()

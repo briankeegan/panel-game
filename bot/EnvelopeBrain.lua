@@ -17,6 +17,7 @@ local planCache = require("bot.planCache") -- envelope-keyed plan cache (offline
 local timingController = require("bot.timingController") -- B's WHEN-FSM: picks the MODE (RAISE/BUILD/FIRE/BREAK)
 local liveRecognize = require("bot.liveRecognize") -- B's live fire-site scan: chainReady/breakReady/best in one band scan
 local chips = require("bot.chips") -- B's chip cache: guaranteed 1-move fire/break (play) + 2-move setup (setupPlay)
+local useChips = require("bot.useChips") -- chips-brain primitive: recognize a VERIFIED sized combo from the store
 
 local EnvelopeBrain = {}
 EnvelopeBrain.__index = EnvelopeBrain
@@ -204,6 +205,16 @@ function EnvelopeBrain:chipVerify(grid, rows)
   end
 end
 
+-- CHIPS-FIRST plan source (chips-brain): ask useChips for the highest-priority VERIFIED combo near the cursor.
+-- Returns the chip's swap sequence (a plan) or nil -> caller falls through to construction. Engine-verified, no BoardSim.
+function EnvelopeBrain:tryChips(grid, rows, cursor)
+  local chip = useChips.useChips(grid, rows, cursor, {
+    chipPriorities = { "COMBO_5", "COMBO_4" },
+    verify = self:chipVerify(grid, rows),
+  })
+  return chip and chip.swaps or nil
+end
+
 -- GENERATE PLAN (the expensive step — runs ~once per `replanEvery` frames via the cadence). Decides BUILD vs
 -- FIRE and returns a move sequence to execute open-loop. B's ORACLE_STACK plan-generator slots in here later.
 function EnvelopeBrain:generatePlan(grid, rows, top, danger, mode)
@@ -351,7 +362,7 @@ function EnvelopeBrain:decide(state)
   local wantFire = (mode == "FIRE" or mode == "BREAK")
   if (not self.plan) or self.planIdx > #self.plan or self.sinceReplan >= cfg.replanEvery or danger
      or (wantFire and not self._planIsFire) then
-    self.plan = self:generatePlan(grid, rows, top, danger, mode)
+    self.plan = self:tryChips(grid, rows, state.cursor) or self:generatePlan(grid, rows, top, danger, mode)
     self._planIsFire = (wantFire and self.plan and #self.plan == 1) or nil
     self.planIdx = 1
     self.sinceReplan = 0

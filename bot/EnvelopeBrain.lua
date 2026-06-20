@@ -13,46 +13,29 @@ function EnvelopeBrain.new(_opts)
   return setmetatable({}, EnvelopeBrain)
 end
 
------------------------------------------------------------------- ENGINE VERIFY (the HARD RULE: never play unverified)
--- Rebuild a throwaway Match from the grid and play the route on the REAL engine -- engine truth, NO BoardSim. A flat
--- grid can't reconstruct garbage, so a garbage board returns false (no break chips yet).
+------------------------------------------------------------------ ENGINE VERIFY (garbage-faithful, via rollback)
+-- Run the candidate swaps on the LIVE stack itself -- save state, play the swaps, advance ONLY this stack
+-- (stack:run, so a 2p opponent is never touched), check it cleared, then rollbackToFrame to restore. No text
+-- rebuild -> faithful on GARBAGE boards. Needs the live stack (threaded through decide); without it, no verify.
 local KDE_swap = nil
-local function gridToStack(grid, rows)
-  local out = {}
-  for r = rows, 1, -1 do for c = 1, BoardSim.WIDTH do
-    local v = grid[r][c] or 0
-    if v == BoardSim.GARBAGE then return nil end
-    out[#out + 1] = tostring(v)
-  end end
-  return table.concat(out)
-end
-local function engineVerifyFull(stack, seq)
-  local ok, result = pcall(function()
-    local Match = require("common.engine.Match"); require("common.engine.checkMatches")
-    local Puzzle = require("common.engine.Puzzle"); local LP = require("common.data.LevelPresets")
-    if not KDE_swap then KDE_swap = require("common.data.KeyDataEncoding").swap end
-    local p = Puzzle({ puzzleType = "moves", stack = stack, moves = 99 })
-    local m = Match(p:toPanelSource(false), p:toGameMode().matchRules)
-    local st = m:createStackWithSettings(LP.getModern(10), true, "controller", nil)
-    st:setMaxRunsPerFrame(1); m:start()
-    local function pan() local n = 0 for r = 1, st.height do for c = 1, 6 do local v = st.panels[r][c].color or 0; if v ~= 0 and v ~= 9 then n = n + 1 end end end return n end
-    for i = 1, 200 do if st:game_ended() then break end st:receiveConfirmedInput("A"); m:run() if i >= 2 and not st:hasActivePanels() and not st:hasChainingPanels() then break end end
-    local pb = pan()
-    for _, mv in ipairs(seq) do
-      st.cur_row, st.cur_col = mv[1], mv[2]; st:receiveConfirmedInput(KDE_swap); m:run()
-      for k = 1, 80 do if st:game_ended() then break end st:receiveConfirmedInput("A"); m:run() if k >= 2 and not st:hasActivePanels() and not st:hasChainingPanels() then break end end
-    end
-    return pan() < pb
-  end)
-  if not ok then return false end
-  return result
-end
-function EnvelopeBrain:chipVerify(grid, rows)
+function EnvelopeBrain:chipVerify(stack)
   return function(seq)
-    if not seq or #seq == 0 then return false end
-    local stack = gridToStack(grid, rows)
-    if not stack then return false end
-    return engineVerifyFull(stack, seq) == true
+    if not stack or not seq or #seq == 0 then return false end
+    if not KDE_swap then KDE_swap = require("common.data.KeyDataEncoding").swap end
+    local ok, fired = pcall(function()
+      local function pan() local n = 0 for r = 1, stack.height do for c = 1, 6 do local p = stack.panels[r][c]; if p and not p.isGarbage and (p.color or 0) ~= 0 then n = n + 1 end end end return n end
+      local clock0 = stack.clock
+      stack:saveForRollback()
+      local before = pan()
+      for _, mv in ipairs(seq) do
+        stack.cur_row, stack.cur_col = mv[1], mv[2]; stack:receiveConfirmedInput(KDE_swap)
+        for k = 1, 40 do stack:run() if k >= 2 and not stack:hasActivePanels() and not stack:hasChainingPanels() then break end end
+      end
+      local cleared = before - pan()
+      stack:rollbackToFrame(clock0)
+      return cleared > 0
+    end)
+    return ok and fired or false
   end
 end
 
@@ -79,7 +62,7 @@ local RAISE_BELOW = 4
 local DANGER_ABOVE = 9
 
 ------------------------------------------------------------------ DECIDE (stateless, re-measured every frame)
-function EnvelopeBrain:decide(state)
+function EnvelopeBrain:decide(state, stack)
   local rows = state.rows
   local grid = BoardSim.colorGrid(state.board, rows)
   local height = state.maxColHeight or BoardSim.maxHeight(grid, rows)
@@ -105,7 +88,7 @@ function EnvelopeBrain:decide(state)
 
     local chip = useChips.useChips(grid, rows, cursor, {                  -- READY chip, cursor-outward
       chipPriorities = { "COMBO_5", "COMBO_4" }, searchPriorities = { "UP", "DOWN", "LEFT", "RIGHT" },
-      verify = self:chipVerify(grid, rows),
+      verify = self:chipVerify(stack),
     })
     if chip then
       self._comboUse = self._comboUse or {}; self._comboUse[chip.kind] = (self._comboUse[chip.kind] or 0) + 1

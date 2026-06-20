@@ -120,10 +120,14 @@ local function realMatch(g)
     end end end
   return false
 end
--- no-shortcut gate: true if SOME single swap makes an immediate 3+ run of a real color -> 1-swap-solvable, reject it
-local function anySwapMatches(g)
+-- no-shortcut gate: true if SOME single swap fires the WHOLE cascade (wins in one swap) -> not forced 2-swap, reject.
+-- prefilter with realMatch (a winning swap must first make a real match) so the engine only runs when it could matter.
+local function anySwapWins(g)
   for r = 1, H do for c = 1, W - 1 do
-    if g[r][c] ~= g[r][c+1] and realMatch(applySwapSettle(g, r, c)) then return true end
+    if g[r][c] ~= g[r][c+1] and realMatch(applySwapSettle(g, r, c)) then
+      local d = play(g, { { r, c } })
+      if d[1] == N and d[2] == M and d[3] == 0 then return true end
+    end
   end end
   return false
 end
@@ -193,7 +197,7 @@ for _, base in ipairs(list) do
       if moves >= 1 and moves <= R then
         local g = clone(B0)
         g[br][bc], g[br][bc+1] = g[br][bc+1], g[br][bc]; settle(g)
-        if not matches(g) and not anySwapMatches(g) then     -- no pre-match + no 1-swap shortcut anywhere
+        if not matches(g) and not anySwapWins(g) then        -- no pre-match + no single swap wins the whole cascade
           if not firesCascade(g, sr, sc) then                 -- fire alone must NOT fire the cascade
             local d = play(g, { { br, bc }, { sr, sc } })       -- setup then fire
             if d[1] == N and d[2] == M and d[3] == 0 then       -- fires the WHOLE cascade, no filler

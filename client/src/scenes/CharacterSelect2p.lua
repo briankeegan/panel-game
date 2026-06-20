@@ -1,6 +1,7 @@
 local CharacterSelect = require("client.src.scenes.CharacterSelect")
 local class = require("common.lib.class")
 local ui = require("client.src.ui")
+local system = require("client.src.system")
 
 ---@class CharacterSelect2p : CharacterSelect
 local CharacterSelect2p = class(
@@ -16,7 +17,16 @@ function CharacterSelect2p:customLoad(sceneParams)
 end
 
 function CharacterSelect2p:loadUserInterface()
-  self.ui.grid = ui.Grid({unitSize = 100, gridWidth = 9, gridHeight = 6, unitMargin = 8, hAlign = "center", vAlign = "center"})
+  -- portrait: a minimal waiting room — player-info row + character grid +
+  -- ready/leave. The panel/stage/level selectors are intentionally NOT shown on
+  -- phones (too cramped, and team play mostly wants quick character + ready).
+  local pm = system.isPortraitMode()
+  local unitSize, gridW, gridH = 100, 9, 6
+  if pm then
+    unitSize, gridW, gridH = 125, 4, 8
+  end
+  -- shift the main grid down in portrait to leave room for the icon row on top
+  self.ui.grid = ui.Grid({unitSize = unitSize, gridWidth = gridW, gridHeight = gridH, unitMargin = 8, hAlign = "center", vAlign = "center", y = pm and 120 or 0})
   self.uiRoot:addChild(self.ui.grid)
 
   self:createIconRow()
@@ -32,6 +42,7 @@ function CharacterSelect2p:loadUserInterface()
 
   local characterButtons = self:getCharacterButtons()
   local characterGridWidth, characterGridHeight = self.ui.grid.gridWidth, 3
+  if pm then characterGridWidth, characterGridHeight = 4, 5 end
   self.ui.characterGrid = self:createCharacterGrid(characterButtons, self.ui.grid, characterGridWidth, characterGridHeight)
 
   self.ui.pageIndicator = self:createPageIndicator(self.ui.characterGrid)
@@ -39,21 +50,30 @@ function CharacterSelect2p:loadUserInterface()
   self.ui.leaveButton = self:createLeaveButton()
   self.ui.changeInputButton = self:createChangeInputButton()
 
-  if self.battleRoom.online then
-    self.ui.grid:createElementAt(1, 2, 2, 1, "panelSelection", self.ui.panelSelection, nil, true)
-    self.ui.grid:createElementAt(5, 2, 2, 1, "stageSelection", self.ui.stageSelection, nil, true)
-    self.ui.grid:createElementAt(7, 2, 2, 1, "levelSelection", self.ui.levelSelection, nil, true)
+  if pm then
+    -- selectors omitted on purpose; just character grid + page + actions
+    self.ui.grid:createElementAt(1, 1, characterGridWidth, characterGridHeight, "characterSelection", self.ui.characterGrid, true)
+    self.ui.grid:createElementAt(2, 6, 1, 1, "pageIndicator", self.ui.pageIndicator)
+    self.ui.changeInputButton:setVisibility(false)
+    self.ui.grid:createElementAt(1, 8, 2, 1, "readyButton", self.ui.readyButton)
+    self.ui.grid:createElementAt(3, 8, 2, 1, "leaveButton", self.ui.leaveButton)
   else
-    self.ui.grid:createElementAt(1, 2, 2, 1, "panelSelection", self.ui.panelSelection, nil, true)
-    self.ui.grid:createElementAt(3, 2, 3, 1, "stageSelection", self.ui.stageSelection, nil, true)
-    self.ui.grid:createElementAt(6, 2, 3, 1, "levelSelection", self.ui.levelSelection, nil, true)
-  end
+    if self.battleRoom.online then
+      self.ui.grid:createElementAt(1, 2, 2, 1, "panelSelection", self.ui.panelSelection, nil, true)
+      self.ui.grid:createElementAt(5, 2, 2, 1, "stageSelection", self.ui.stageSelection, nil, true)
+      self.ui.grid:createElementAt(7, 2, 2, 1, "levelSelection", self.ui.levelSelection, nil, true)
+    else
+      self.ui.grid:createElementAt(1, 2, 2, 1, "panelSelection", self.ui.panelSelection, nil, true)
+      self.ui.grid:createElementAt(3, 2, 3, 1, "stageSelection", self.ui.stageSelection, nil, true)
+      self.ui.grid:createElementAt(6, 2, 3, 1, "levelSelection", self.ui.levelSelection, nil, true)
+    end
 
-  self.ui.grid:createElementAt(9, 2, 1, 1, "readyButton", self.ui.readyButton)
-  self.ui.grid:createElementAt(1, 3, characterGridWidth, characterGridHeight, "characterSelection", self.ui.characterGrid, true)
-  self.ui.grid:createElementAt(5, 6, 1, 1, "pageIndicator", self.ui.pageIndicator)
-  self.ui.grid:createElementAt(8, 6, 1, 1, "changeInputButton", self.ui.changeInputButton)
-  self.ui.grid:createElementAt(9, 6, 1, 1, "leaveButton", self.ui.leaveButton)
+    self.ui.grid:createElementAt(9, 2, 1, 1, "readyButton", self.ui.readyButton)
+    self.ui.grid:createElementAt(1, 3, characterGridWidth, characterGridHeight, "characterSelection", self.ui.characterGrid, true)
+    self.ui.grid:createElementAt(5, 6, 1, 1, "pageIndicator", self.ui.pageIndicator)
+    self.ui.grid:createElementAt(8, 6, 1, 1, "changeInputButton", self.ui.changeInputButton)
+    self.ui.grid:createElementAt(9, 6, 1, 1, "leaveButton", self.ui.leaveButton)
+  end
 
   self:setupRoster()
 
@@ -87,16 +107,20 @@ function CharacterSelect2p:setupRoster()
   self.ui.characterIcons = {}
   self.ui.playerInfos = {}
 
+  -- portrait: selectors are intentionally hidden (minimal waiting room), so skip
+  -- building the carousels/sliders entirely.
+  local pm = system.isPortraitMode()
+
   for i, player in ipairs(self.players) do
     -- Online: only add the local player's selectors. Stage was already
     -- local-only; panels and level now match.
-    local showSelectors = (not self.battleRoom.online) or player.isLocal
+    local showSelectors = ((not self.battleRoom.online) or player.isLocal) and not pm
     if showSelectors then
       local panelCarousel = self:createPanelCarousel(player, panelHeight)
       self.ui.panelSelection:addElement(panelCarousel, player)
     end
 
-    if player.isLocal then
+    if player.isLocal and not pm then
       local stageCarousel = self:createStageCarousel(player, stageWidth)
       self.ui.stageSelection:addElement(stageCarousel, player)
     end
@@ -125,7 +149,7 @@ function CharacterSelect2p:setupRoster()
         or (mode.minPlayers and mode.maxPlayers and mode.minPlayers < mode.maxPlayers))
       local localPlayer = GAME and GAME.localPlayer
       if isOpenRoom and ownerId and localPlayer and localPlayer.publicId == ownerId then
-        cursor.activeArea.y2 = 6
+        cursor.activeArea.y2 = pm and 7 or 6
       end
     end
     self.ui.cursors[i] = cursor
@@ -148,6 +172,17 @@ end
 -- (changeInputButton), and 9 (leaveButton) are owned by other widgets.
 -- 6 slots = open_ffa's maxPlayers (7) minus the host themselves.
 local BOOT_BUTTON_COLUMNS = {1, 2, 3, 4, 6, 7}
+-- portrait grid is only 4 wide (cols 6/7 don't exist) and row 6 is free there;
+-- give the boot buttons their own row of 4. Capped at 4 visible on phones.
+local BOOT_BUTTON_COLUMNS_PORTRAIT = {1, 2, 3, 4}
+local BOOT_BUTTON_ROW_PORTRAIT = 7
+
+local function bootButtonCells()
+  if system.isPortraitMode() then
+    return BOOT_BUTTON_COLUMNS_PORTRAIT, BOOT_BUTTON_ROW_PORTRAIT
+  end
+  return BOOT_BUTTON_COLUMNS, 6
+end
 
 ---Tear down any boot buttons from a previous setupRoster pass so refreshRoster
 ---(open-FFA drop-in/out) doesn't leave stale widgets attached to the main grid.
@@ -159,8 +194,9 @@ local BOOT_BUTTON_COLUMNS = {1, 2, 3, 4, 6, 7}
 ---AND clears the grid cells.
 function CharacterSelect2p:_clearHostBootButtons()
   if self.ui.grid and self.ui.grid.removeElementsIn then
-    for _, col in ipairs(BOOT_BUTTON_COLUMNS) do
-      self.ui.grid:removeElementsIn(col, 6, 1, 1)
+    local cols, row = bootButtonCells()
+    for _, col in ipairs(cols) do
+      self.ui.grid:removeElementsIn(col, row, 1, 1)
     end
   end
   self.ui.bootButtons = {}
@@ -185,11 +221,12 @@ function CharacterSelect2p:_setupHostBootButtons()
   local localPlayer = GAME and GAME.localPlayer
   if not (ownerId and localPlayer and localPlayer.publicId == ownerId) then return end
 
+  local cols, row = bootButtonCells()
   local slotIdx = 1
   for _, player in ipairs(self.battleRoom.players) do
-    if slotIdx > #BOOT_BUTTON_COLUMNS then break end
+    if slotIdx > #cols then break end
     if player.publicId ~= ownerId and not player.isLocal then
-      local col = BOOT_BUTTON_COLUMNS[slotIdx]
+      local col = cols[slotIdx]
       local pubId = player.publicId
       local labelText = "Boot " .. ((player.name or "?"):sub(1, 8))
       local btn = ui.TextButton({
@@ -205,7 +242,7 @@ function CharacterSelect2p:_setupHostBootButtons()
       })
       btn.onSelect = btn.onClick
       self.ui.bootButtons[col] = btn
-      self.ui.grid:createElementAt(col, 6, 1, 1, "bootButton" .. col, btn)
+      self.ui.grid:createElementAt(col, row, 1, 1, "bootButton" .. col, btn)
       slotIdx = slotIdx + 1
     end
   end
@@ -221,8 +258,12 @@ function CharacterSelect2p:createIconRow()
     self.ui.iconRow:detach()
   end
   local cols = math.max(2, #self.players * 2)
-  local unitSize = math.min(100, math.floor(1200 / cols))
-  self.ui.iconRow = ui.Grid({unitSize = unitSize, gridWidth = cols, gridHeight = 1, unitMargin = 8, hAlign = "center", vAlign = "center", y = -250})
+  -- portrait: fit the row to the narrow screen and pin it to the top (the main
+  -- grid is shifted down to make room).
+  local pm = system.isPortraitMode()
+  local widthBudget = pm and 700 or 1200
+  local unitSize = math.min(100, math.floor(widthBudget / cols))
+  self.ui.iconRow = ui.Grid({unitSize = unitSize, gridWidth = cols, gridHeight = 1, unitMargin = 8, hAlign = "center", vAlign = "center", y = pm and -510 or -250})
   self.uiRoot:addChild(self.ui.iconRow)
 end
 

@@ -55,10 +55,14 @@ local function realMatch(g)
     end end end
   return false
 end
--- no-shortcut gate: true if SOME single swap makes an immediate 3+ run of a real color -> 1-swap-solvable, reject it
-local function anySwapMatches(g)
+-- no-shortcut gate: true if SOME single swap CLEARS THE WHOLE combo (wins in one swap) -> not a forced 2-swap, reject.
+-- prefilter with realMatch (a winning swap must first make a real match) so the engine only runs when it could matter.
+-- a partial 3-run that strands a panel does NOT win and is fine.
+local function anySwapWins(str, g)
   for r = 1, H do for c = 1, W - 1 do
-    if g[r][c] ~= g[r][c+1] and realMatch(applySwapSettle(g, r, c)) then return true end
+    if g[r][c] ~= g[r][c+1] and realMatch(applySwapSettle(g, r, c)) then
+      if clearedBy(str, { { r, c } }) >= N then return true end
+    end
   end end
   return false
 end
@@ -141,12 +145,14 @@ for br = math.max(1, ar - R), math.min(H, ar + R) do
       g[br][bc], g[br][bc+1] = g[br][bc+1], g[br][bc]   -- the displacement (swap 1, reversed)
       settleCols(g)
       local _, preMatch = BoardSim.findMatches(g, H)
-      if not preMatch and not anySwapMatches(g) then                -- (a) no pre-match  +  (b') no 1-swap shortcut exists
+      if not preMatch then                                          -- (a) no pre-existing match
         local str = gridToStr(g)
-        if clearedBy(str, { { ar, ac } }) == 0 then                 -- (b) last swap alone clears nothing
-          if clearedBy(str, { { br, bc }, { ar, ac } }) == N then   -- (c) swap1+swap2 clears exactly N
-            local sig = str .. "|" .. br .. "," .. bc
-            if not seen[sig] then seen[sig] = true; found[#found+1] = { g = g, s1 = { br, bc }, moves = moves } end
+        if not anySwapWins(str, g) then                             -- (b') no single swap solves the whole combo
+          if clearedBy(str, { { ar, ac } }) == 0 then               -- (b) fire swap alone clears nothing
+            if clearedBy(str, { { br, bc }, { ar, ac } }) == N then -- (c) swap1+swap2 clears exactly N
+              local sig = str .. "|" .. br .. "," .. bc
+              if not seen[sig] then seen[sig] = true; found[#found+1] = { g = g, s1 = { br, bc }, moves = moves } end
+            end
           end
         end
       end

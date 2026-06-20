@@ -36,12 +36,13 @@ jobs:
           target: google_apis
           script: |
             set +e
+            echo "::warning title=APK_ABIS::$(unzip -l app.apk | grep -o 'lib/[^/]*' | sort -u | tr '\n' ' ')"
             adb install -r app.apk
             echo "::warning title=INSTALL::$(adb install -r app.apk 2>&1 | tail -1 | tr -d '\r')"
-            # find the installed package by our known names (works pre/post rebrand)
-            PKG=$(adb shell pm list packages 2>/dev/null | tr -d '\r' | sed 's/package://' | grep -E 'panelattack|love2d' | head -1)
-            echo "::warning title=PKG::${PKG:-NOT_FOUND}"
-            [ -z "$PKG" ] && { echo "::error::could not find installed package"; exit 1; }
+            sleep 5
+            PKG=com.panelattack.ffateam
+            adb shell pm path "$PKG" >/dev/null 2>&1 || PKG=org.love2d.android
+            echo "::warning title=PKG::$PKG"
             adb logcat -c
             adb shell monkey -p "$PKG" -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1
             # let the updater check/download/launch (give the 50MB base time)

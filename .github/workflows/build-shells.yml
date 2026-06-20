@@ -300,9 +300,11 @@ jobs:
             la/love/src/jni/lua-modules/lua-https
           test -f la/love/src/jni/lua-modules/lua-https/Android.mk
 
-      - name: Target arm ABIs (real devices)
+      - name: Target arm ABIs + x86_64 (real devices + emulator testing)
         run: |
-          sed -i 's/^APP_ABI := .*/APP_ABI := armeabi-v7a arm64-v8a/' la/love/src/jni/Application.mk
+          # x86_64 included so the APK runs on x86_64 Android (Chromebooks) AND the
+          # CI emulator, which lets android-run reproduce + capture crashes.
+          sed -i 's/^APP_ABI := .*/APP_ABI := armeabi-v7a arm64-v8a x86_64/' la/love/src/jni/Application.mk
           grep '^APP_ABI' la/love/src/jni/Application.mk
 
       - name: Rebrand — own app id, name, icon (not the generic LÖVE app)

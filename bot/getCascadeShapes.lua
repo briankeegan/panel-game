@@ -7,12 +7,13 @@
 require("bot.headlessBoot"); do local l = require("common.lib.logger"); l.setLogLevel(l.levels.ERROR) end
 _G.loc = _G.loc or function(s) return tostring(s) end
 local shapeCache = require("bot.shapeCache")
+local getComboShapes = require("bot.getComboShapes")   -- the riser is a COMBO_3 of color 2 -> pull from here
 local Match = require("common.engine.Match"); require("common.engine.checkMatches")
 local LP = require("common.data.LevelPresets"); local KDE = require("common.data.KeyDataEncoding"); local Puzzle = require("common.engine.Puzzle")
 
 local N = tonumber(arg[1]) or 4
 local P, S = 1, 2                       -- primary, secondary
-local Wb, Hb = math.min(6, N + 1), 5    -- sim window: line + riser(3) + cap fits in 5 tall
+local Wb, Hb = math.min(6, N + 1), tonumber(arg[2]) or 5   -- a cascade is only ~5 tall (line + 3-riser + cap) for any N
 local NSEC = 3                          -- secondary riser size (a COMBO_3 of color 2)
 
 ----------------------------------------------------------------- small-grid helpers (Wb x Hb)
@@ -100,42 +101,52 @@ local function symbolOf(g, r, c, rr, cc)
   local lit = g[rr][cc]; return lit == 0 and "." or tostring(lit)
 end
 
------------------------------------------------------------------ brute force: N primary + NSEC secondary
+----------------------------------------------------------------- seed the riser from the COMBO_3 solves
 local cells = {}; for r = 1, Hb do for c = 1, Wb do cells[#cells+1] = { r, c } end end
-local found, idxP, idxS = {}, {}, {}
-local function placeSecondary(base, startS, depthS)
-  if depthS > NSEC then
-    local sp = {}; for i = 1, NSEC do sp[i] = cells[idxS[i]] end   -- a riser needs >=2 secondary aligned
-    local aligned = false
-    for i = 1, NSEC do for j = i + 1, NSEC do if sp[i][1] == sp[j][1] or sp[i][2] == sp[j][2] then aligned = true end end end
-    if not aligned then return end
-    local g = clone(base)
-    -- a real cascade is SELF-SUPPORTING (riser on floor, cap on riser, line on floor) -- no synthetic support.
-    -- require a settled board (nothing floating) and no pre-existing match.
-    for c = 1, Wb do local hole = false; for r = 1, Hb do if g[r][c] == 0 then hole = true elseif hole then return end end end
-    if next(matches(g)) ~= nil then return end
-    for r = 1, Hb do for c = 1, Wb - 1 do
-      local a, b = g[r][c], g[r][c+1]
-      if a == P or a == S or b == P or b == S then         -- swap must move a real panel, not just support
-        if isCascade(g, r, c) then
-          local kk = shapeCache.canonShape(g)
-          if kk and not found[kk] then found[kk] = { sample = clone(g), sr = r, sc = c, key = kk } end
+local found, idxP = {}, {}
+
+-- the secondary riser IS a COMBO_3 of color 2: pull every solve straight from getComboShapes (build on it).
+-- each riser = its 3 cells (relative to the pattern's bottom-left) + the solving swap (also relative).
+local risers = {}
+for _, rec in ipairs(getComboShapes.enumerate(NSEC).raw) do
+  local g = rec.sample; local minr, minc, pts = 1e9, 1e9, {}
+  for r = 1, 12 do for c = 1, 6 do if g[r][c] == 1 then pts[#pts+1] = { r, c }; minr = math.min(minr, r); minc = math.min(minc, c) end end end
+  local rel = {}; for _, p in ipairs(pts) do rel[#rel+1] = { p[1]-minr, p[2]-minc } end
+  risers[#risers+1] = { cells = rel, sdr = rec.sr - minr, sdc = rec.sc - minc }
+end
+
+-- drop each riser into the primary board at every offset and play ITS swap; the engine verifies the cascade.
+-- This replaces the blind 3-secondary placement: ~17 risers x offsets instead of C(window,3) x every swap.
+local function placeRisers(base)
+  for _, riser in ipairs(risers) do
+    for baseR = 1, Hb do for baseC = 1, Wb do
+      local g = clone(base); local ok = true
+      for _, rc in ipairs(riser.cells) do
+        local r, c = baseR + rc[1], baseC + rc[2]
+        if r < 1 or r > Hb or c < 1 or c > Wb or g[r][c] ~= 0 then ok = false; break end
+        g[r][c] = S
+      end
+      if ok then
+        local settled = true                              -- self-supporting (no floating), no pre-match
+        for c = 1, Wb do local hole = false; for r = 1, Hb do if g[r][c] == 0 then hole = true elseif hole then settled = false; break end end end
+        if settled and next(matches(g)) == nil then
+          local sr, sc = baseR + riser.sdr, baseC + riser.sdc
+          if sr >= 1 and sr <= Hb and sc >= 1 and sc <= Wb - 1 and isCascade(g, sr, sc) then
+            local kk = shapeCache.canonShape(g)
+            if kk and not found[kk] then found[kk] = { sample = clone(g), sr = sr, sc = sc, key = kk } end
+          end
         end
       end
     end end
-    return
-  end
-  for i = startS, #cells do local p = cells[i]
-    if base[p[1]][p[2]] == 0 then base[p[1]][p[2]] = S; idxS[depthS] = i; placeSecondary(base, i + 1, depthS + 1); base[p[1]][p[2]] = 0 end
   end
 end
 local function placePrimary(startP, depthP)
   if depthP > N then
     local fl = false; for i = 1, N do if cells[idxP[i]][1] == 1 then fl = true end end
-    if not fl then return end                         -- floor-anchor
+    if not fl then return end                          -- floor-anchor
     local base = {}; for r = 1, Hb do base[r] = {}; for c = 1, Wb do base[r][c] = 0 end end
     for i = 1, N do local p = cells[idxP[i]]; base[p[1]][p[2]] = P end
-    placeSecondary(base, 1, 1)
+    placeRisers(base)
     return
   end
   for i = startP, #cells do idxP[depthP] = i; placePrimary(i + 1, depthP + 1) end

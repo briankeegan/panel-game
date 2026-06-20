@@ -96,8 +96,13 @@ jobs:
             # newlines in a value are joined with " | " since annotations are single-line.
             ann() { printf '::%s title=%s::%s\n' "$1" "$2" "$(printf '%s' "$3" | tr '\n' '|' | cut -c1-900)"; }
 
-            APK=$(find la/app/build/outputs/apk -name '*-debug.apk' | head -1)
-            [ -z "$APK" ] && { echo "::error title=NO_APK::no -debug.apk found under la/app/build/outputs/apk"; exit 1; }
+            # love-android renames its APK output, so don't match on '-debug' in the
+            # filename — find by the gradle /debug/ output dir instead.
+            ann warning APK_LIST "$(find la/app/build/outputs/apk -name '*.apk' 2>/dev/null)"
+            APK=$(find la/app/build/outputs/apk -path '*/debug/*' -name '*.apk' 2>/dev/null | head -1)
+            [ -z "$APK" ] && APK=$(find la/app/build/outputs/apk -name '*.apk' 2>/dev/null | head -1)
+            [ -z "$APK" ] && { echo "::error title=NO_APK::no .apk found under la/app/build/outputs/apk — see APK_LIST"; exit 1; }
+            ann warning APK_PICKED "$APK"
 
             ann warning APK_ABIS "$(unzip -l "$APK" | grep -o 'lib/[^/]*' | sort -u | tr '\n' ' ')"
             ann warning EMU_ABILIST "$(adb shell getprop ro.product.cpu.abilist | tr -d '\r')"

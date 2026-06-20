@@ -29,13 +29,18 @@ local function cellOrder(grid, rows, cursor, band, searchPriorities, maxDistance
   for r = lo, hi do for c = 1, 5 do
     local dr, dc = r - cr, c - cc
     local dist = math.abs(dr) + math.abs(dc)
-    if not maxDistance or dist <= maxDistance then
-      cells[#cells + 1] = { r, c, dist, rank[dirOf(dr, dc)] or 9 }
+    -- cursor cell is always first; a cell whose direction isn't in searchPriorities is EXCLUDED
+    -- (so [LEFT,RIGHT,UP] never looks down -- "eases upward only", per spec).
+    local drank = (dist == 0) and 0 or rank[dirOf(dr, dc)]
+    if drank and (not maxDistance or dist <= maxDistance) then
+      cells[#cells + 1] = { r, c, dist, drank }
     end
   end end
+  -- DIRECTION-major: search the FIRST priority direction fully (nearest-out), then the next, etc. -- per the spec
+  -- "search left, then right, then up, then down, extending out". Distance is the tie-break WITHIN a direction.
   table.sort(cells, function(a, b)
-    if a[3] ~= b[3] then return a[3] < b[3] end
-    return a[4] < b[4]
+    if a[4] ~= b[4] then return a[4] < b[4] end
+    return a[3] < b[3]
   end)
   return cells
 end

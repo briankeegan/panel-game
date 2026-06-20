@@ -264,11 +264,97 @@ jobs:
           path: dist/*.zip
 
   # ---------------------------------------------------------------------------
+  # Stage 2c — package the Android APK (love-android 11.5a + lua-https NDK module).
+  # NON-BLOCKING (continue-on-error): a broken Android leg must NEVER stop the
+  # three desktop shells from publishing. Same updater-shell, same build-<VERSION>
+  # GitHub releases as desktop. lua-https is proven on 11.5 Android (JNI ->
+  # HttpURLConnection backend, de-chunks). See the android_apk_plan notes.
+  # ---------------------------------------------------------------------------
+  package-android:
+    needs: lua-https
+    continue-on-error: true     # Android failures cannot block the desktop release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'    # love-android 11.5a requires JDK 17
+      - uses: android-actions/setup-android@v3
+      - name: Install pinned NDK + cmake (love-android 11.5a)
+        run: |
+          yes | sdkmanager "platforms;android-34" "build-tools;34.0.0" \
+                           "ndk;25.2.9519653" "cmake;3.22.1"
+
+      - name: Read BUILD_VERSION
+        id: bv
+        run: echo "version=$(grep -E 'consts\.BUILD_VERSION\s*=' common/engine/consts.lua | sed -E 's/.*\"([^\"]+)\".*/\1/')" >> "$GITHUB_OUTPUT"
+
+      - name: Clone love-android 11.5a and wire lua-https
+        run: |
+          git clone --depth 1 --branch 11.5a --recurse-submodules \
+            https://github.com/love2d/love-android.git la
+          # lua-https ships its own Android.mk (LOCAL_MODULE_FILENAME := https) and
+          # java.txt (= src/android/java); folder MUST be named `https` (AGP bug).
+          git clone --depth 1 https://github.com/love2d/lua-https.git \
+            la/love/src/jni/lua-modules/lua-https
+          test -f la/love/src/jni/lua-modules/lua-https/Android.mk
+
+      - name: Target arm ABIs (real devices)
+        run: |
+          sed -i 's/^APP_ABI := .*/APP_ABI := armeabi-v7a arm64-v8a/' la/love/src/jni/Application.mk
+          grep '^APP_ABI' la/love/src/jni/Application.mk
+
+      - name: Build the updater-shell boot .love (with embedded offline base)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VER="${{ steps.bv.outputs.version }}"
+          # Embed the current game .love where the updater discovers installed
+          # versions: updater/<stream>/<version>/game.love. buildVersion makes any
+          # newer build-<VERSION> supersede it, so this is just an offline first-run
+          # seed. Best-effort: if the release asset isn't found, first run needs net.
+          mkdir -p updater-shell/updater/team/"$VER"
+          gh release download "build-$VER" --repo "$GITHUB_REPOSITORY" \
+            --pattern '*.love' --output updater-shell/updater/team/"$VER"/game.love \
+            || echo "WARN: no base .love for build-$VER; first run will require network"
+          # Boot .love = the updater shell. Exclude the desktop https libs (Android
+          # gets https from the NDK module) and tests.
+          ( cd updater-shell && zip -qr "$GITHUB_WORKSPACE/boot.love" . \
+              -x 'https/*' -x 'updater/tests/*' -x '.git/*' -x '.DS_Store' )
+          mkdir -p la/app/src/embed/assets
+          cp "$GITHUB_WORKSPACE/boot.love" la/app/src/embed/assets/game.love
+
+      - name: Build APK
+        run: |
+          cd la && chmod +x gradlew
+          # Debug variant = auto-signed + sideload-installable. TODO: stable release
+          # keystore via secret (debug key differs per run -> APK in-place updates
+          # would need reinstall; game updates come via downloaded .love regardless).
+          ./gradlew --no-daemon assembleEmbedNoRecordDebug
+
+      - name: Collect APK
+        run: |
+          APK=$(find la/app/build/outputs/apk -path '*/debug/*' -name '*.apk' | head -1)
+          [ -z "$APK" ] && APK=$(find la/app/build/outputs/apk -name '*.apk' | head -1)
+          [ -z "$APK" ] && { echo "no apk produced"; exit 1; }
+          mkdir -p dist
+          cp "$APK" dist/unofficial-panel-attack-ffa-and-team-android.apk
+          ls -lh dist/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shells-android
+          path: dist/*.apk
+
+  # ---------------------------------------------------------------------------
   # Stage 3 — publish all three signed/working shells to the stable `launcher`
   # release that teammates download once.
   # ---------------------------------------------------------------------------
   release:
-    needs: [package-unix, package-macos]
+    # package-android is continue-on-error, so a failed Android leg still satisfies
+    # this `needs` and the three desktop shells publish regardless.
+    needs: [package-unix, package-macos, package-android]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -287,14 +373,23 @@ jobs:
       - name: Publish to the stable `launcher` release
         run: |
           ls -lh dist/
+          # Desktop shells are REQUIRED (assert). The Android APK is OPTIONAL — added
+          # only if package-android produced it, so a broken Android leg never blocks.
           test -f dist/unofficial-panel-attack-ffa-and-team-windows.zip
           test -f dist/unofficial-panel-attack-ffa-and-team-linux.zip
           test -f dist/unofficial-panel-attack-ffa-and-team-macos.zip
+          FILES="dist/unofficial-panel-attack-ffa-and-team-windows.zip dist/unofficial-panel-attack-ffa-and-team-linux.zip dist/unofficial-panel-attack-ffa-and-team-macos.zip"
+          if [ -f dist/unofficial-panel-attack-ffa-and-team-android.apk ]; then
+            FILES="$FILES dist/unofficial-panel-attack-ffa-and-team-android.apk"
+            echo "including Android APK"
+          else
+            echo "no Android APK this run (package-android failed or skipped) — publishing desktop only"
+          fi
           gh release delete launcher --yes --cleanup-tag 2>/dev/null || true
           gh release create launcher \
-            dist/unofficial-panel-attack-ffa-and-team-*.zip \
+            $FILES \
             --target bramp/multi-player \
             --title "Panel Attack FFA & Team — Launcher (${{ steps.bv.outputs.version }})" \
-            --notes "Download your platform's launcher once; it auto-updates the game on every launch. macOS is ad-hoc signed — if Gatekeeper still complains, right-click → Open the first time."
+            --notes "Download your platform's launcher once; it auto-updates the game on every launch. macOS is ad-hoc signed — if Gatekeeper still complains, right-click → Open the first time. Android: sideload the .apk (enable install from unknown sources)."
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

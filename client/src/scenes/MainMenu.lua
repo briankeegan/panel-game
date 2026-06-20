@@ -195,10 +195,15 @@ end
 function MainMenu:drawSelf()
   GAME.theme.images.bg_main:draw()
   local fontHeight = GraphicsUtil.getGlobalFont():getHeight()
-  local infoYPosition = 705 - fontHeight / 2
+  -- portrait: stamp the version/notices at the bottom, centered (landscape keeps
+  -- them at the old y=705, right-aligned).
+  local pm = system.isPortraitMode()
+  local infoAlign = pm and "center" or "right"
+  local infoX = pm and 0 or -5
+  local infoYPosition = (pm and (consts.CANVAS_HEIGHT - 18) or 705) - fontHeight / 2
 
   if not system.isRecommendedLoveVersion() then
-    GraphicsUtil.printf(loc("love_version_warning", system.loveVersionString()), -5, infoYPosition, consts.CANVAS_WIDTH, "right")
+    GraphicsUtil.printf(loc("love_version_warning", system.loveVersionString()), infoX, infoYPosition, consts.CANVAS_WIDTH, infoAlign)
     infoYPosition = infoYPosition - fontHeight
   end
 
@@ -213,7 +218,7 @@ function MainMenu:drawSelf()
   else
     version = "PA Version: " .. consts.BUILD_VERSION
   end
-  GraphicsUtil.printf(version, -5, infoYPosition, consts.CANVAS_WIDTH, "right")
+  GraphicsUtil.printf(version, infoX, infoYPosition, consts.CANVAS_WIDTH, infoAlign)
   infoYPosition = infoYPosition - fontHeight
 
   if GAME.updater then
@@ -230,7 +235,7 @@ function MainMenu:drawSelf()
     end
 
     if showUpdaterUpdateWarning then
-      GraphicsUtil.printf(loc("auto_updater_version_warning") .. " https://github.com/briankeegan/panel-game/releases", -5, infoYPosition, consts.CANVAS_WIDTH, "right")
+      GraphicsUtil.printf(loc("auto_updater_version_warning") .. " https://github.com/briankeegan/panel-game/releases", infoX, infoYPosition, consts.CANVAS_WIDTH, infoAlign)
       infoYPosition = infoYPosition - fontHeight
     end
   end

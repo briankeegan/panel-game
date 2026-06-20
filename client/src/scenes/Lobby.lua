@@ -5,6 +5,7 @@ local logger = require("common.lib.logger")
 local util = require("common.lib.util")
 local consts = require("common.engine.consts")
 local GraphicsUtil = require("client.src.graphics.graphics_util")
+local system = require("client.src.system")
 local NetClient = require("client.src.network.NetClient")
 local MessageTransition = require("client.src.scenes.Transitions.MessageTransition")
 local GameModes = require("common.data.GameModes")
@@ -91,7 +92,8 @@ function Lobby:initLobbyMenu()
   -- "Invite to Purple Team") and 1-2 player room titles fit on one line.
   -- Single-line guarantee matters here: room-card color stripes are indexed by
   -- logical line, so any wrap visually drifts the team tint off its row.
-  self.lobbyMenuWidth = 220
+  -- portrait: wider buttons (~2x) so they're big/tappable on a phone
+  self.lobbyMenuWidth = system.isPortraitMode() and 440 or 220
   self.onePlayerEndlessButton = ui.TextButton({
     label = ui.Label({text = "mm_1_endless"}),
     width = self.lobbyMenuWidth,
@@ -776,7 +778,11 @@ function Lobby:initLobbyMenu()
   self.roomPanel:addChild(self.roomTimer)
 
   self.lobbyMenuStartingUp = true
-  self.lobbyMenu = ui.ScrollMenu({height = 540, width = 300, hAlign = "center", vAlign = "center"})
+  -- portrait: taller, wider menu window so the bigger buttons fit (and scroll)
+  -- instead of getting clipped off the bottom.
+  local lmH = system.isPortraitMode() and 1040 or 540
+  local lmW = system.isPortraitMode() and 500 or 300
+  self.lobbyMenu = ui.ScrollMenu({height = lmH, width = lmW, hAlign = "center", vAlign = "center"})
   self.lobbyMenu.x = self.lobbyMenuXoffsetMap[false]
 
   self.uiRoot:addChild(self.lobbyMenu)

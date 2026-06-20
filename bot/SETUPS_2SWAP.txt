@@ -1,12 +1,12 @@
-=== COMBO_4 base #1 ===  fire swap (1,2)  [ key: . empty · digit color · * filler · <..> fire · [..] setup ]
+=== COMBO_4 base #1 ===  the 1-swap clear is swap (1,2)  [ key: . empty · digit color · * filler · [..] swap · <..> cursor ]
          c1 c2 c3 c4
     r 2  .  1  .  . 
     r 1  1 [1][.] 1 
 
---- 2-swap setups within cursor radius 2 (must need BOTH swaps) ---
+--- COMBO_4 in 2 swaps, within cursor radius 2 (must need BOTH swaps) ---
 
-#1  setup (2,1) -> fire (1,2)  | cursor 2 | clears 4
-  STEP 1 of 3 — setup swap (2,1):
+#1  COMBO_4_SWAP_2_MOVE_2  |  swap1 (2,1), swap2 (1,2)
+  STEP 1 of 3 — swap 1 (2,1):
          c1 c2 c3 c4
     r 2 [1][.] .  . 
     r 1  1  1  .  1 
@@ -14,7 +14,7 @@
          c1 c2 c3 c4
     r 2  .  1  .  . 
     r 1  1 <1><.> 1 
-  STEP 3 of 3 — last swap (1,2), clears 4:
+  STEP 3 of 3 — swap 2 (1,2), clears 4:
          c1 c2 c3 c4
     r 2  .  1  .  . 
     r 1  1 [1][.] 1 
@@ -23,46 +23,17 @@
     r 2  .  .  .  . 
     r 1  .  .  .  . 
 
----- 1 valid 2-swap variants for COMBO_4 base #1 ----
-=== COMBO_4 base #2 ===  fire swap (3,2)  [ key: . empty · digit color · * filler · <..> fire · [..] setup ]
-         c1 c2 c3 c4
-    r 3  . [1][.] . 
-    r 2  .  *  .  . 
-    r 1  1  1  .  1 
+---- 1 valid COMBO_4_SWAP_2 variants for base #1 ----
 
---- 2-swap setups within cursor radius 2 (must need BOTH swaps) ---
-
----- 0 valid 2-swap variants for COMBO_4 base #2 ----
-=== COMBO_4 base #3 ===  fire swap (4,2)  [ key: . empty · digit color · * filler · <..> fire · [..] setup ]
-         c1 c2 c3 c4
-    r 4  . [1][.] . 
-    r 3  .  *  .  . 
-    r 2  .  *  .  . 
-    r 1  1  1  .  1 
-
---- 2-swap setups within cursor radius 2 (must need BOTH swaps) ---
-
----- 0 valid 2-swap variants for COMBO_4 base #3 ----
-=== COMBO_4 base #4 ===  fire swap (5,2)  [ key: . empty · digit color · * filler · <..> fire · [..] setup ]
-         c1 c2 c3 c4
-    r 5  . [1][.] . 
-    r 4  .  *  .  . 
-    r 3  .  *  .  . 
-    r 2  .  *  .  . 
-    r 1  1  1  .  1 
-
---- 2-swap setups within cursor radius 2 (must need BOTH swaps) ---
-
----- 0 valid 2-swap variants for COMBO_4 base #4 ----
-=== COMBO_4 base #5 ===  fire swap (2,3)  [ key: . empty · digit color · * filler · <..> fire · [..] setup ]
+=== COMBO_4 base #5 ===  the 1-swap clear is swap (2,3)  [ key: . empty · digit color · * filler · [..] swap · <..> cursor ]
          c1 c2 c3 c4
     r 2  .  . [.][1]
     r 1  1  1  .  1 
 
---- 2-swap setups within cursor radius 2 (must need BOTH swaps) ---
+--- COMBO_4 in 2 swaps, within cursor radius 2 (must need BOTH swaps) ---
 
-#1  setup (1,2) -> fire (2,3)  | cursor 2 | clears 4
-  STEP 1 of 3 — setup swap (1,2):
+#1  COMBO_4_SWAP_2_MOVE_2  |  swap1 (1,2), swap2 (2,3)
+  STEP 1 of 3 — swap 1 (1,2):
          c1 c2 c3 c4
     r 2  .  .  .  1 
     r 1  1 [.][1] 1 
@@ -70,7 +41,7 @@
          c1 c2 c3 c4
     r 2  .  . <.><1>
     r 1  1  1  .  1 
-  STEP 3 of 3 — last swap (2,3), clears 4:
+  STEP 3 of 3 — swap 2 (2,3), clears 4:
          c1 c2 c3 c4
     r 2  .  . [.][1]
     r 1  1  1  .  1 
@@ -79,59 +50,19 @@
     r 2  .  .  .  . 
     r 1  .  .  .  . 
 
----- 1 valid 2-swap variants for COMBO_4 base #5 ----
-=== COMBO_4 base #6 ===  fire swap (3,3)  [ key: . empty · digit color · * filler · <..> fire · [..] setup ]
-         c1 c2 c3 c4
-    r 3  .  . [.][1]
-    r 2  .  .  .  * 
-    r 1  1  1  .  1 
+---- 1 valid COMBO_4_SWAP_2 variants for base #5 ----
 
---- 2-swap setups within cursor radius 2 (must need BOTH swaps) ---
-
----- 0 valid 2-swap variants for COMBO_4 base #6 ----
-=== COMBO_4 base #7 ===  fire swap (4,3)  [ key: . empty · digit color · * filler · <..> fire · [..] setup ]
-         c1 c2 c3 c4
-    r 4  .  . [.][1]
-    r 3  .  .  .  * 
-    r 2  .  .  .  * 
-    r 1  1  1  .  1 
-
---- 2-swap setups within cursor radius 2 (must need BOTH swaps) ---
-
----- 0 valid 2-swap variants for COMBO_4 base #7 ----
-=== COMBO_4 base #8 ===  fire swap (5,3)  [ key: . empty · digit color · * filler · <..> fire · [..] setup ]
-         c1 c2 c3 c4
-    r 5  .  . [.][1]
-    r 4  .  .  .  * 
-    r 3  .  .  .  * 
-    r 2  .  .  .  * 
-    r 1  1  1  .  1 
-
---- 2-swap setups within cursor radius 2 (must need BOTH swaps) ---
-
----- 0 valid 2-swap variants for COMBO_4 base #8 ----
-=== COMBO_4 base #9 ===  fire swap (3,1)  [ key: . empty · digit color · * filler · <..> fire · [..] setup ]
-         c1 c2
-    r 5  1  . 
-    r 4  1  . 
-    r 3 [*][.]
-    r 2  1  . 
-    r 1  1  . 
-
---- 2-swap setups within cursor radius 2 (must need BOTH swaps) ---
-
----- 0 valid 2-swap variants for COMBO_4 base #9 ----
-=== COMBO_4 base #10 ===  fire swap (3,1)  [ key: . empty · digit color · * filler · <..> fire · [..] setup ]
+=== COMBO_4 base #10 ===  the 1-swap clear is swap (3,1)  [ key: . empty · digit color · * filler · [..] swap · <..> cursor ]
          c1 c2
     r 4  1  . 
     r 3 [*][1]
     r 2  1  * 
     r 1  1  * 
 
---- 2-swap setups within cursor radius 2 (must need BOTH swaps) ---
+--- COMBO_4 in 2 swaps, within cursor radius 2 (must need BOTH swaps) ---
 
-#1  setup (2,1) -> fire (3,1)  | cursor 1 | clears 4
-  STEP 1 of 3 — setup swap (2,1):
+#1  COMBO_4_SWAP_2_MOVE_1  |  swap1 (2,1), swap2 (3,1)
+  STEP 1 of 3 — swap 1 (2,1):
          c1 c2
     r 4  1  . 
     r 3  *  1 
@@ -143,7 +74,7 @@
     r 3 <*><1>
     r 2  1  * 
     r 1  1  * 
-  STEP 3 of 3 — last swap (3,1), clears 4:
+  STEP 3 of 3 — swap 2 (3,1), clears 4:
          c1 c2
     r 4  1  . 
     r 3 [*][1]
@@ -156,28 +87,17 @@
     r 2  .  * 
     r 1  .  * 
 
----- 1 valid 2-swap variants for COMBO_4 base #10 ----
-=== COMBO_4 base #11 ===  fire swap (2,1)  [ key: . empty · digit color · * filler · <..> fire · [..] setup ]
-         c1 c2
-    r 4  1  . 
-    r 3  1  . 
-    r 2 [*][1]
-    r 1  1  * 
+---- 1 valid COMBO_4_SWAP_2 variants for base #10 ----
 
---- 2-swap setups within cursor radius 2 (must need BOTH swaps) ---
-
----- 0 valid 2-swap variants for COMBO_4 base #11 ----
-############### COMBO_5 ###############
-
-=== COMBO_5 base #1 ===  fire swap (2,2)  [ key: . empty · digit color · * filler · <..> fire · [..] setup ]
+=== COMBO_5 base #1 ===  the 1-swap clear is swap (2,2)  [ key: . empty · digit color · * filler · [..] swap · <..> cursor ]
          c1 c2 c3 c4 c5
     r 2  . [1][.] .  . 
     r 1  1  1  .  1  1 
 
---- 2-swap setups within cursor radius 2 (must need BOTH swaps) ---
+--- COMBO_5 in 2 swaps, within cursor radius 2 (must need BOTH swaps) ---
 
-#1  setup (2,1) -> fire (2,2)  | cursor 1 | clears 5
-  STEP 1 of 3 — setup swap (2,1):
+#1  COMBO_5_SWAP_2_MOVE_1  |  swap1 (2,1), swap2 (2,2)
+  STEP 1 of 3 — swap 1 (2,1):
          c1 c2 c3 c4 c5
     r 2 [1][.] .  .  . 
     r 1  1  1  .  1  1 
@@ -185,7 +105,7 @@
          c1 c2 c3 c4 c5
     r 2  . <1><.> .  . 
     r 1  1  1  .  1  1 
-  STEP 3 of 3 — last swap (2,2), clears 5:
+  STEP 3 of 3 — swap 2 (2,2), clears 5:
          c1 c2 c3 c4 c5
     r 2  . [1][.] .  . 
     r 1  1  1  .  1  1 
@@ -194,34 +114,112 @@
     r 2  .  .  .  .  . 
     r 1  .  .  .  .  . 
 
----- 1 valid 2-swap variants for COMBO_5 base #1 ----
-=== COMBO_5 base #2 ===  fire swap (3,2)  [ key: . empty · digit color · * filler · <..> fire · [..] setup ]
-         c1 c2 c3 c4 c5
-    r 3  . [1][.] .  . 
-    r 2  .  *  .  .  . 
-    r 1  1  1  .  1  1 
+---- 1 valid COMBO_5_SWAP_2 variants for base #1 ----
 
---- 2-swap setups within cursor radius 2 (must need BOTH swaps) ---
+=== COMBO_5 base #12 ===  the 1-swap clear is swap (4,1)  [ key: . empty · digit color · * filler · [..] swap · <..> cursor ]
+         c1 c2 c3 c4
+    r 4 [1][.] .  . 
+    r 3  *  .  1  1 
+    r 2  *  1  *  * 
+    r 1  *  1  *  * 
 
----- 0 valid 2-swap variants for COMBO_5 base #2 ----
-=== COMBO_5 base #3 ===  fire swap (4,2)  [ key: . empty · digit color · * filler · <..> fire · [..] setup ]
-         c1 c2 c3 c4 c5
-    r 4  . [1][.] .  . 
-    r 3  .  *  .  .  . 
-    r 2  .  *  .  .  . 
-    r 1  1  1  .  1  1 
+--- COMBO_5 in 2 swaps, within cursor radius 2 (must need BOTH swaps) ---
 
---- 2-swap setups within cursor radius 2 (must need BOTH swaps) ---
+#1  COMBO_5_SWAP_2_MOVE_1  |  swap1 (3,1), swap2 (4,1)
+  STEP 1 of 3 — swap 1 (3,1):
+         c1 c2 c3 c4
+    r 3 [1][*] 1  1 
+    r 2  *  1  *  * 
+    r 1  *  1  *  * 
+  STEP 2 of 3 — move cursor (up 1) to (4,1):
+         c1 c2 c3 c4
+    r 3  *  1  1  1 
+    r 2  *  1  *  * 
+    r 1  *  1  *  * 
+  STEP 3 of 3 — swap 2 (4,1), clears 5:
+         c1 c2 c3 c4
+    r 3  *  1  1  1 
+    r 2  *  1  *  * 
+    r 1  *  1  *  * 
+  RESULT (cleared):
+         c1 c2 c3 c4
+    r 3  *  .  .  . 
+    r 2  *  .  *  * 
+    r 1  *  .  *  * 
 
----- 0 valid 2-swap variants for COMBO_5 base #3 ----
-=== COMBO_5 base #4 ===  fire swap (5,2)  [ key: . empty · digit color · * filler · <..> fire · [..] setup ]
-         c1 c2 c3 c4 c5
-    r 5  . [1][.] .  . 
-    r 4  .  *  .  .  . 
-    r 3  .  *  .  .  . 
-    r 2  .  *  .  .  . 
-    r 1  1  1  .  1  1 
+---- 1 valid COMBO_5_SWAP_2 variants for base #12 ----
 
---- 2-swap setups within cursor radius 2 (must need BOTH swaps) ---
+=== COMBO_5 base #16 ===  the 1-swap clear is swap (4,1)  [ key: . empty · digit color · * filler · [..] swap · <..> cursor ]
+         c1 c2 c3
+    r 4 [.][1] . 
+    r 3  .  1  1 
+    r 2  1  *  * 
+    r 1  1  *  * 
 
----- 0 valid 2-swap variants for COMBO_5 base #4 ----
+--- COMBO_5 in 2 swaps, within cursor radius 2 (must need BOTH swaps) ---
+
+#1  COMBO_5_SWAP_2_MOVE_1  |  swap1 (4,2), swap2 (4,1)
+  STEP 1 of 3 — swap 1 (4,2):
+         c1 c2 c3
+    r 4  . [.][1]
+    r 3  .  1  1 
+    r 2  1  *  * 
+    r 1  1  *  * 
+  STEP 2 of 3 — move cursor (left 1) to (4,1):
+         c1 c2 c3
+    r 4 <.><1> . 
+    r 3  .  1  1 
+    r 2  1  *  * 
+    r 1  1  *  * 
+  STEP 3 of 3 — swap 2 (4,1), clears 5:
+         c1 c2 c3
+    r 4 [.][1] . 
+    r 3  .  1  1 
+    r 2  1  *  * 
+    r 1  1  *  * 
+  RESULT (cleared):
+         c1 c2 c3
+    r 4  .  .  . 
+    r 3  .  .  . 
+    r 2  .  *  * 
+    r 1  .  *  * 
+
+---- 1 valid COMBO_5_SWAP_2 variants for base #16 ----
+
+=== COMBO_5 base #19 ===  the 1-swap clear is swap (3,1)  [ key: . empty · digit color · * filler · [..] swap · <..> cursor ]
+         c1 c2 c3 c4
+    r 4  .  1  .  . 
+    r 3 [.][*] 1  1 
+    r 2  .  1  *  * 
+    r 1  .  1  *  * 
+
+--- COMBO_5 in 2 swaps, within cursor radius 2 (must need BOTH swaps) ---
+
+#1  COMBO_5_SWAP_2_MOVE_2  |  swap1 (4,2), swap2 (3,1)
+  STEP 1 of 3 — swap 1 (4,2):
+         c1 c2 c3 c4
+    r 4  . [.][1] . 
+    r 3  .  *  1  1 
+    r 2  .  1  *  * 
+    r 1  .  1  *  * 
+  STEP 2 of 3 — move cursor (down 1, left 1) to (3,1):
+         c1 c2 c3 c4
+    r 4  .  1  .  . 
+    r 3 <.><*> 1  1 
+    r 2  .  1  *  * 
+    r 1  .  1  *  * 
+  STEP 3 of 3 — swap 2 (3,1), clears 5:
+         c1 c2 c3 c4
+    r 4  .  1  .  . 
+    r 3 [.][*] 1  1 
+    r 2  .  1  *  * 
+    r 1  .  1  *  * 
+  RESULT (cleared):
+         c1 c2 c3 c4
+    r 4  .  .  .  . 
+    r 3  .  .  .  . 
+    r 2  .  .  *  * 
+    r 1  *  .  *  * 
+
+---- 1 valid COMBO_5_SWAP_2 variants for base #19 ----
+

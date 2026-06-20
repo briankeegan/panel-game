@@ -323,7 +323,10 @@ jobs:
           echo 'app.name=Unofficial Panel Attack FFA &amp; Team' >> gradle.properties
           sed -i "s|^app.version_name=.*|app.version_name=$VER|" gradle.properties
           sed -i "s|^app.version_code=.*|app.version_code=$VCODE|" gradle.properties
-          grep -E '^app\.(name|application_id|version)' gradle.properties
+          # Lock the device to PORTRAIT (love-android defaults to landscape, which made
+          # the portrait game render sideways). Mobile defaults to portrait mode.
+          sed -i 's|^app.orientation=.*|app.orientation=sensorPortrait|' gradle.properties
+          grep -E '^app\.(name|application_id|version|orientation)' gradle.properties
           # launcher icon is android:icon="@drawable/love" -> overwrite each density
           for d in drawable-mdpi drawable-hdpi drawable-xhdpi drawable-xxhdpi drawable-xxxhdpi; do
             cp "$GITHUB_WORKSPACE/updater-shell/icon.png" "app/src/main/res/$d/love.png"

@@ -6,6 +6,8 @@ local Label = require(PATH .. ".Label")
 local directsFocus = require(PATH .. ".FocusDirector")
 local class = require("common.lib.class")
 local input = require("client.src.inputManager")
+local system = require("client.src.system")
+local DebugSettings = require("client.src.debug.DebugSettings")
 
 local NAVIGATION_BUTTON_WIDTH = 30
 
@@ -146,6 +148,14 @@ function Menu:layout()
     end
   end
 
+  -- mobile/portrait: center each button within the menu column (otherwise items
+  -- sit at the left edge with ragged right edges). Desktop layout is untouched.
+  if system.isMobileOS() or DebugSettings.simulateMobileOS() then
+    for _, menuItem in ipairs(self.menuItems) do
+      menuItem.x = (self.width - menuItem.width) / 2
+    end
+  end
+
   if self.centerVertically then
     self.y = self.yMin + (self.height / 2) - (totalMenuHeight / 2)
   elseif not self.sizeToFit then
@@ -160,13 +170,10 @@ function Menu:addMenuItem(index, menuItem)
   end
   table.insert(self.menuItems, index, menuItem)
   self:addChild(menuItem)
-  -- layout BEFORE setSelectedIndex: the latter reads menuItemYOffsets for the new
-  -- item, which layout() (re)builds — calling it first left that offset nil and
-  -- crashed (Menu.lua:228 arithmetic on nil) when OptionsMenu inserted a button.
-  self:layout()
   if needsIncreasedIndex then
     self:setSelectedIndex(self.selectedIndex + 1)
   end
+  self:layout()
 end
 
 function Menu:removeMenuItemAtIndex(index)
@@ -227,15 +234,20 @@ function Menu:setSelectedIndex(index)
   elseif self.firstActiveIndex > index then
     self.yOffset = self.menuItemYOffsets[index]
   elseif self.lastActiveIndex < index then
-    local currentIndex = 1
-    local bottomOfDesiredIndex = self.menuItemYOffsets[index] + self.menuItems[index].height
-    while self.menuItemYOffsets[currentIndex] + self.height < bottomOfDesiredIndex do
-      currentIndex = currentIndex + 1
-      if currentIndex >= #self.menuItems then
-        break
+    -- guard: when an item is added then selected before layout() rebuilds the
+    -- offsets, menuItemYOffsets[index] is nil; skip rather than crash (layout()
+    -- runs right after and fixes the offset). Behaviour-neutral when offsets exist.
+    if self.menuItemYOffsets[index] and self.menuItems[index] then
+      local currentIndex = 1
+      local bottomOfDesiredIndex = self.menuItemYOffsets[index] + self.menuItems[index].height
+      while self.menuItemYOffsets[currentIndex] + self.height < bottomOfDesiredIndex do
+        currentIndex = currentIndex + 1
+        if currentIndex >= #self.menuItems then
+          break
+        end
       end
+      self.yOffset = self.menuItemYOffsets[currentIndex]
     end
-    self.yOffset = self.menuItemYOffsets[currentIndex]
   end
   self.selectedIndex = index
   if #self.menuItems > 0 then

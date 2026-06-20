@@ -30,7 +30,10 @@ local state = "browser"
 ---@type ReplayV3
 local selectedReplay
 
-local menu_x = 400
+local system = require("client.src.system")
+-- mobile/portrait: the browser is laid out for landscape at x=400 (left-of-center
+-- in 1280, but right-of-center in portrait 720). Shift it well to the left.
+local menu_x = (system.isMobileOS() or (os and os.getenv and os.getenv("PA_SIMULATE_MOBILE") == "1")) and 40 or 400
 local menu_y = 280
 local menu_h = 14
 local menu_cursor_offset = 16

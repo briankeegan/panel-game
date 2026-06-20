@@ -288,6 +288,11 @@ function GraphicsUtil.getGlobalFontWithSize(fontSize)
 end
 
 function GraphicsUtil.setGlobalFont(filepath, size, dpiScale)
+  -- Mobile/portrait only: scale the base font up so menus & buttons (sized from
+  -- the label font) grow proportionally. Gated — desktop keeps its exact size.
+  if isMobilePortrait() then
+    size = math.floor(size * 2)
+  end
   GraphicsUtil.setFontDpiScale(dpiScale)
   GraphicsUtil.fontCache = {}
   GraphicsUtil.fontFile = filepath

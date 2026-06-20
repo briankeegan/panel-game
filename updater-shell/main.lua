@@ -51,7 +51,7 @@ function love.load(args)
   GAME_UPDATER:getAvailableVersions(GAME_UPDATER.activeReleaseStream)
 end
 
-function love.update(dt)
+local function updateImpl(dt)
   GAME_UPDATER:update()
 
   if GAME_UPDATER.state ~= GAME_UPDATER_STATES.idle then
@@ -103,6 +103,19 @@ function love.update(dt)
   end
 end
 
+-- Crash NICELY: any error in the updater loop (version check, JSON parse, launch)
+-- paints the real error on the loading screen instead of silently closing the app.
+function love.update(dt)
+  local ok, err = pcall(updateImpl, dt)
+  if not ok then
+    pcall(function() logger:log("FATAL update error: " .. tostring(err)) end)
+    pcall(logger.write, logger)
+    updateString = "Updater error:\n" .. tostring(err)
+    stuck = true
+    loadingIndicator.draw = function() end
+  end
+end
+
 local width, height = love.graphics.getDimensions()
 function love.draw()
   love.graphics.printf(updateString, bigFont, 0, height / 2 - 12, width, "center")
@@ -121,7 +134,11 @@ end
 
 function love.threaderror(thread, errorstr)
   logger:log("Thread error!\n"..errorstr)
-  -- thread:getError() will return the same error string now.
+  pcall(logger.write, logger)
+  -- surface it on screen (the version-check / download runs in a thread)
+  updateString = "Network/updater thread error:\n" .. tostring(errorstr)
+  stuck = true
+  loadingIndicator.draw = function() end
 end
 
 

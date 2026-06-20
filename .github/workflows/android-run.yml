@@ -36,13 +36,12 @@ jobs:
           target: google_apis
           script: |
             set +e
-            # derive the package id from the APK so this works for both the generic
-            # org.love2d.android and the rebranded com.panelattack.ffateam
-            AAPT=$(ls "$ANDROID_HOME"/build-tools/*/aapt 2>/dev/null | sort | tail -1)
-            PKG=$("$AAPT" dump badging app.apk | sed -n "s/package: name='\([^']*\)'.*/\1/p")
-            echo "::warning title=PKG::${PKG:-UNKNOWN}"
             adb install -r app.apk
             echo "::warning title=INSTALL::$(adb install -r app.apk 2>&1 | tail -1 | tr -d '\r')"
+            # find the installed package by our known names (works pre/post rebrand)
+            PKG=$(adb shell pm list packages 2>/dev/null | tr -d '\r' | sed 's/package://' | grep -E 'panelattack|love2d' | head -1)
+            echo "::warning title=PKG::${PKG:-NOT_FOUND}"
+            [ -z "$PKG" ] && { echo "::error::could not find installed package"; exit 1; }
             adb logcat -c
             adb shell monkey -p "$PKG" -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1
             # let the updater check/download/launch (give the 50MB base time)

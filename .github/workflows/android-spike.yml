@@ -91,39 +91,37 @@ jobs:
           target: google_apis
           script: |
             set +e   # collect ALL diagnostics regardless; decide pass/fail at the end
-            APK=$(find la/app/build/outputs/apk -name '*-debug.apk' | head -1)
-            S="$GITHUB_STEP_SUMMARY"
-            {
-              echo "## android-spike result"
-              echo "### APK ABIs (need x86_64 for this emulator)"; echo '```'
-              [ -n "$APK" ] && unzip -l "$APK" | grep 'lib/' || echo "(no APK / no lib entries)"
-              echo '```'
-              echo "### emulator abilist"; echo '```'
-              adb shell getprop ro.product.cpu.abilist; echo '```'
-            } >> "$S"
+            # Emit key facts as ::warning:: annotations (readable via the public
+            # check-runs annotations API without auth). One fact per annotation;
+            # newlines in a value are joined with " | " since annotations are single-line.
+            ann() { printf '::%s title=%s::%s\n' "$1" "$2" "$(printf '%s' "$3" | tr '\n' '|' | cut -c1-900)"; }
 
-            adb install -r "$APK"
+            APK=$(find la/app/build/outputs/apk -name '*-debug.apk' | head -1)
+            [ -z "$APK" ] && { echo "::error title=NO_APK::no -debug.apk found under la/app/build/outputs/apk"; exit 1; }
+
+            ann warning APK_ABIS "$(unzip -l "$APK" | grep -o 'lib/[^/]*' | sort -u | tr '\n' ' ')"
+            ann warning EMU_ABILIST "$(adb shell getprop ro.product.cpu.abilist | tr -d '\r')"
+
+            adb install -r "$APK" 2>&1 | tail -2
+            ann warning INSTALL "$(adb install -r "$APK" 2>&1 | tail -1)"
             adb logcat -c
-            adb shell monkey -p org.love2d.android -c android.intent.category.LAUNCHER 1
+            adb shell monkey -p org.love2d.android -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1
             for i in $(seq 1 30); do
               adb logcat -d | grep -q 'HTTPS_SPIKE' && break
               sleep 2
             done
 
-            {
-              echo "### LÖVE process running?"; echo '```'
-              adb shell pidof org.love2d.android || echo "(love process NOT running — app failed to start)"
-              echo '```'
-              echo "### LÖVE log (tail)"; echo '```'
-              adb logcat -d -s LOVE:V SDL:V AndroidRuntime:E '*:S' | tail -60
-              echo '```'
-              echo "### HTTPS_SPIKE sentinel"; echo '```'
-              adb logcat -d | grep 'HTTPS_SPIKE' || echo "(none — app never reached the https call)"
-              echo '```'
-            } >> "$S"
+            PID=$(adb shell pidof org.love2d.android | tr -d '\r')
+            ann warning LOVE_PID "${PID:-NOT_RUNNING}"
+            ann warning SENTINEL "$(adb logcat -d | grep 'HTTPS_SPIKE' | head -1)"
+            # crash / fatal signals (these explain a NOT_RUNNING app)
+            ann warning FATAL "$(adb logcat -d -s AndroidRuntime:E DEBUG:F libc:F SDL:F | tail -6)"
+            # anything love/lua/https-tagged near the failure
+            ann warning LOVELOG "$(adb logcat -d | grep -iE 'love|lua|https|dlopen|cannot' | tail -10)"
 
             if adb logcat -d | grep -q 'HTTPS_SPIKE OK'; then
-              echo "### VERDICT: ✅ PASS" >> "$S"; echo 'SPIKE PASSED'; exit 0
+              echo 'SPIKE PASSED'; exit 0
             else
-              echo "### VERDICT: ❌ FAIL" >> "$S"; echo 'SPIKE FAILED'; exit 1
+              echo "::error title=SPIKE::FAILED — see APK_ABIS / LOVE_PID / SENTINEL / FATAL / LOVELOG annotations"
+              exit 1
             fi

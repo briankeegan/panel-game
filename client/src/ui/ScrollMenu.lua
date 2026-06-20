@@ -3,6 +3,7 @@ local ScrollContainer = import("./ScrollContainer")
 local class = require("common.lib.class")
 local util = require("common.lib.util")
 local GraphicsUtil = require("client.src.graphics.graphics_util")
+local system = require("client.src.system")
 local tableUtils = require("common.lib.tableUtils")
 local FocusDirector = import("./FocusDirector")
 
@@ -161,6 +162,11 @@ function ScrollMenu:addChild(uiElement)
     y = self.padding
   end
   uiElement.y = y
+  -- portrait: center each item within the menu width (no-op when the item already
+  -- fills the width, so flyout sub-menus are unaffected). Desktop/landscape untouched.
+  if system.isPortraitMode() and self.width and uiElement.width and uiElement.width < self.width then
+    uiElement.x = (self.width - uiElement.width) / 2
+  end
   ScrollContainer.addChild(self, uiElement)
 end
 

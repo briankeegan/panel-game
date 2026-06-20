@@ -76,12 +76,19 @@ local function updateImpl(dt)
         logger:log("No updates available")
         if GAME_UPDATER.activeVersion then
           local v = GAME_UPDATER.activeVersion
-          -- if the active version is an embedded version, we got to copy it to the save directory first
-          -- otherwise it won't be mountable
+          -- An embedded version lives INSIDE the APK's mounted source archive at this
+          -- same path, which shadows any save-dir copy and can't be mounted (nested
+          -- zip). Copy it to a DISTINCT save-dir-only filename (local.love) and mount
+          -- that — this is what the legacy auto_updater did with embedded.love.
           if love.filesystem.getRealDirectory(v.path) ~= love.filesystem.getSaveDirectory() then
-            love.filesystem.createDirectory(GAME_UPDATER.path .. v.releaseStream.name .. "/" .. tostring(v.version))
-            local file = love.filesystem.read(v.path)
-            love.filesystem.write(v.path, file)
+            local dir = GAME_UPDATER.path .. v.releaseStream.name .. "/" .. tostring(v.version)
+            love.filesystem.createDirectory(dir)
+            local data = love.filesystem.read(v.path)
+            if not data then error("embedded read failed: " .. tostring(v.path)) end
+            local localPath = dir .. "/local.love"
+            local okW, errW = love.filesystem.write(localPath, data)
+            if not okW then error("embedded write failed: " .. tostring(errW)) end
+            v.path = localPath
           end
           GAME_UPDATER:launch(GAME_UPDATER.activeVersion)
         else

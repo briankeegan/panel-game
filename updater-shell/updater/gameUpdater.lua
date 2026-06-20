@@ -245,23 +245,19 @@ function GameUpdater:updateAvailable(releaseStream)
 end
 
 local function launchWithVersion(version)
-  local _, _, vendor, _ = love.graphics.getRendererInfo( )
-
-  local amdWindows = love.system.getOS() == "Windows" and (vendor == "ATI Technologies Inc." or vendor == "AMD")
-  -- love.event.restart is LÖVE 12+. On 11.5 it's nil, so fall back to the same
-  -- manual in-process restart used for the AMD-windows silent-crash workaround.
-  if amdWindows or not love.event.restart then
-    package.loaded.main = nil
-    package.loaded.conf = nil
-    love.conf = nil
-    love.restart = { restartSource = "updater", startUpFile = version.path }
-    love.init()
-    -- command line args for love automatically are saved inside a global args table
-    love.load(arg)
-  else
-    -- cleaner solution but meh
-    love.event.restart({ restartSource = "updater", startUpFile = version.path })
-  end
+  -- Legacy-style in-process relaunch, forced on ALL platforms. The game .love is
+  -- already mounted by GameUpdater:launch (first on the require path), so love.init()
+  -- runs the mounted game's OWN conf.lua + main.lua directly. We deliberately do NOT
+  -- use love.event.restart: love-android 11.5a exposes it, so the shell took the
+  -- full-restart branch back into the updater's conf, whose Android save-external /
+  -- setIdentity re-entry crashed after download. This mirrors how the legacy
+  -- auto_updater launched: mount -> reset conf/main -> love.init -> love.load.
+  package.loaded.main = nil
+  package.loaded.conf = nil
+  love.conf = nil
+  -- command line args for love automatically are saved inside a global args table
+  love.init()
+  love.load(arg)
 end
 
 function GameUpdater:launch(version)

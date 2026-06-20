@@ -1,22 +1,10 @@
 local externalstorage = true
 
 function love.conf(t)
-  if love.restart then
-    love.filesystem._setAndroidSaveExternal(externalstorage)
-    love.filesystem.setIdentity("Unofficial Panel Attack FFA & Team")
-    if love.filesystem.mount(love.restart.startUpFile, '') then
-      -- the mount prepends the priority list of locations to check for file paths
-      -- this means the next require will prefer the mounted directory
-      -- so clear out the cached conf so we can reload it
-      package.loaded["conf"] = nil
-      require("conf")
-      -- and then execute that one (it overrode the function we're currently in)
-      love.conf(t)
-      love.restart = nil
-      GAME_UPDATER_STATES = { idle = 0, checkingForUpdates = 1, downloading = 2}
-      GAME_UPDATER = require("updater.gameUpdater")
-    end
-  else
+    -- Legacy-style launch (see gameUpdater.launchWithVersion) relaunches in-process
+    -- via love.init(), so this conf only ever configures the updater's own boot — the
+    -- mounted game supplies its own conf. No love.restart re-entry (that path's Android
+    -- _setAndroidSaveExternal/setIdentity calls crashed after download on 11.5a).
     t.identity = "Unofficial Panel Attack FFA & Team" -- The name of the save directory (string)
     t.appendidentity = false -- Search files in source directory before save directory (boolean)
     t.version = "11.5" -- The LÖVE version this game was made for (string)
@@ -66,5 +54,4 @@ function love.conf(t)
     t.modules.touch = false -- Enable the touch module (boolean)
     t.modules.video = false -- Enable the video module (boolean)
     t.modules.window = true -- Enable the window module (boolean)
-  end
 end

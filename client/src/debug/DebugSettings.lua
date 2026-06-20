@@ -293,6 +293,8 @@ end
 -- Returns whether to simulate mobile OS on desktop
 ---@return boolean
 function DebugSettings.simulateMobileOS()
+  -- test hook: PA_SIMULATE_MOBILE=1 mocks mobile for headless screenshot runs
+  if os.getenv("PA_SIMULATE_MOBILE") == "1" then return true end
   return DebugSettings.get("simulateMobileOS") --[[@as boolean]]
 end
 

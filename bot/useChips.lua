@@ -15,7 +15,7 @@ local M = {}
 -- Candidate swap cells in the top band, ordered nearest-to-cursor first, ties broken by searchPriorities direction.
 local function cellOrder(grid, rows, cursor, band, searchPriorities, maxDistance)
   local top = BoardSim.maxHeight(grid, rows)
-  local lo = math.max(1, top - (band or 6))
+  local lo = 1                              -- scan the WHOLE stack (floor up); stop at the top, don't look above it
   local hi = math.min(top + 1, rows)
   local cr = (cursor and cursor[1]) or top
   local cc = (cursor and cursor[2]) or 3

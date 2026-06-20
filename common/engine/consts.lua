@@ -83,4 +83,21 @@ consts.SPEED_TO_RISE_TIME = tableUtils.map(
 
 consts.ATTACK_TYPE = { combo=0, chain=1, shock=2 }
 
+-- On mobile (or when mocking it locally via PA_SIMULATE_MOBILE) the game runs in
+-- PORTRAIT: swap the canvas to a tall/narrow aspect so every scene — which reads
+-- these constants — lays out vertically (no rotation). Guarded so the headless
+-- server (no love) and desktop are unaffected.
+do
+  local mobile = false
+  if love and love.system and love.system.getOS then
+    local osName = love.system.getOS()
+    mobile = (osName == "Android" or osName == "iOS")
+  end
+  if os and os.getenv and os.getenv("PA_SIMULATE_MOBILE") == "1" then mobile = true end
+  if mobile then
+    consts.CANVAS_WIDTH = 720
+    consts.CANVAS_HEIGHT = 1280
+  end
+end
+
 return consts

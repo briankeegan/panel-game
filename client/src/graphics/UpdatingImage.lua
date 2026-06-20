@@ -39,6 +39,14 @@ function UpdatingImage:draw()
   if not self.tiled then
     x_scale = self.width / self.image:getWidth()
     y_scale = self.height / self.image:getHeight()
+    if self.height > self.width then
+      -- Portrait canvas (mobile): independent x/y scales stretch a landscape
+      -- background badly. COVER instead — uniform scale to fill, centered, crop.
+      local s = math.max(x_scale, y_scale)
+      local iw, ih = self.image:getDimensions()
+      GraphicsUtil.draw(self.image, (self.width - iw * s) / 2, (self.height - ih * s) / 2, 0, s, s)
+      return
+    end
     GraphicsUtil.draw(self.image, 0, 0, 0, x_scale, y_scale)
   else
     GraphicsUtil.drawQuad(self.image, self.quad, 0, 0, 0, x_scale, y_scale)

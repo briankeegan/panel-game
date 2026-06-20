@@ -76,6 +76,15 @@ function love.load(args, rawArgs)
     end
   end
 
+  if os.getenv("PA_SIMULATE_MOBILE") == "1" then
+    -- portrait phone window for local mobile-styling screenshots.
+    -- Size is configurable so we can mock different phones:
+    --   PA_MOBILE_W / PA_MOBILE_H  (default 540x960, a typical portrait phone)
+    local mw = tonumber(os.getenv("PA_MOBILE_W")) or 540
+    local mh = tonumber(os.getenv("PA_MOBILE_H")) or 960
+    love.window.updateMode(mw, mh, {fullscreen = false, resizable = true})
+  end
+
   local newPixelWidth, newPixelHeight = love.graphics.getWidth(), love.graphics.getHeight()
   logger.debug("Updating canvas scale from love.load")
   GAME:updateCanvasPositionAndScale(newPixelWidth, newPixelHeight)

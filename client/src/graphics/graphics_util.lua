@@ -14,6 +14,12 @@ local GraphicsUtil = {
   quadPool = {}
 }
 
+-- True only on a real phone, or when mocking it locally (PA_SIMULATE_MOBILE).
+-- Desktop is never affected by any of the mobile/portrait gating below.
+local function isMobilePortrait()
+  return system.isMobileOS() or (os and os.getenv and os.getenv("PA_SIMULATE_MOBILE") == "1")
+end
+
 -- a local table to quickly crosscheck whether a quad is in the quadpool or not by using the quad as the index
 -- the calling code can always try to release the same quad twice and by keeping a reference we can make sure that doesn't happen
 ---@type table<love.Quad, true?>

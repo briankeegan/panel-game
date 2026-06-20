@@ -160,10 +160,13 @@ function Menu:addMenuItem(index, menuItem)
   end
   table.insert(self.menuItems, index, menuItem)
   self:addChild(menuItem)
+  -- layout BEFORE setSelectedIndex: the latter reads menuItemYOffsets for the new
+  -- item, which layout() (re)builds — calling it first left that offset nil and
+  -- crashed (Menu.lua:228 arithmetic on nil) when OptionsMenu inserted a button.
+  self:layout()
   if needsIncreasedIndex then
     self:setSelectedIndex(self.selectedIndex + 1)
   end
-  self:layout()
 end
 
 function Menu:removeMenuItemAtIndex(index)

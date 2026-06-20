@@ -1,20 +1,22 @@
--- useChips.lua — Brian's state-first primitive (CHIPS_BRAIN_PLAN.md, P1). Given a PRIORITY list of chip types and a
--- directional SEARCH order, return the highest-priority PLAYABLE chip, searching cells OUTWARD FROM THE CURSOR.
--- Only returns chips that pass `verify` (the run-it-in-its-head engine check) when one is supplied — never a dud.
+-- useChips.lua — Brian's state-first primitive. Given a PRIORITY list of chip NAMES and a directional SEARCH order,
+-- return the highest-priority PLAYABLE chip, searching cells OUTWARD FROM THE CURSOR. Only returns chips that pass
+-- `verify` (run-it-in-its-head engine check) when one is supplied — never a dud.
 --
--- PROGRAMMATIC: chips live in the CHIPS registry. A chip = ONE entry: find(grid, rows, cells, verify) -> {swaps,kind}|nil.
--- Add a chip (sized combos, named setups, ...) = add a registry row. The 4 we KNOW work:
---   FIRE   (1 swap) any immediate combo          BREAK  (1 swap) any garbage break
---   SETUP3 (2+)     goalSetup target-first line   CACHE  (1+)     planCache recall (825 authored shape->plans)
+-- THE REGISTRY is the working, NAMED, SIZED chip vocabulary. Each chip = one entry: find(grid,rows,cells,verify) ->
+-- {swaps,kind}|nil. Ask for them by name in chipPriorities, e.g. {"COMBO_6","COMBO_4","BREAK_COMBO_4",...}.
+--   COMBO_n        a swap whose immediate match clears EXACTLY n panels (no garbage)
+--   BREAK_COMBO_n  a swap that breaks garbage AND its match clears n
+--   SETUP3         goalSetup (2-move build) -- to be replaced by a setup-generating function
+--   CACHE          planCache recall (authored shape->plans)
+-- (CHAIN_* deliberately absent — the cache's chains were fiction; chains come later as their own thing.)
 
 local BoardSim = require("bot.BoardSim")
 local chips = require("bot.chips")
-local planCache = require("bot.planCache") -- 825 authored shape->plan entries (CACHE chip type)
+local planCache = require("bot.planCache")
 
 local M = {}
 
 -- Candidate swap cells in the top band, ordered nearest-to-cursor first, ties broken by searchPriorities direction.
--- A swap at (r,c) exchanges (r,c)<->(r,c+1), so c is 1..5.
 local function cellOrder(grid, rows, cursor, band, searchPriorities, maxDistance)
   local top = BoardSim.maxHeight(grid, rows)
   local lo = math.max(1, top - (band or 6))
@@ -31,49 +33,58 @@ local function cellOrder(grid, rows, cursor, band, searchPriorities, maxDistance
   for r = lo, hi do for c = 1, 5 do
     local dr, dc = r - cr, c - cc
     local dist = math.abs(dr) + math.abs(dc)
-    if not maxDistance or dist <= maxDistance then -- cap: a far chip costs too many cursor moves to be worth it
+    if not maxDistance or dist <= maxDistance then
       cells[#cells + 1] = { r, c, dist, rank[dirOf(dr, dc)] or 9 }
     end
   end end
   table.sort(cells, function(a, b)
-    if a[3] ~= b[3] then return a[3] < b[3] end -- nearer the cursor first
-    return a[4] < b[4]                          -- then by direction priority
+    if a[3] ~= b[3] then return a[3] < b[3] end
+    return a[4] < b[4]
   end)
   return cells
 end
 
 ----------------------------------------------------------------------
--- chip predicates (cell-based chips) + the registry
+-- effect measurement (BoardSim) for the sized chips
 ----------------------------------------------------------------------
--- does swapping (r,c)<->(r,c+1) make an immediate match?
-local function makesMatch(grid, rows, r, c)
+-- how many panels the immediate match clears when swapping (r,c)<->(r,c+1); 0 = no match
+local function comboSizeAt(grid, rows, r, c)
   local gs = BoardSim.cloneGrid(grid, rows)
   if gs[r] and gs[r][c + 1] then gs[r][c], gs[r][c + 1] = gs[r][c + 1], gs[r][c] end
-  local _, any = BoardSim.findMatches(gs, rows)
-  return any
+  local hit = BoardSim.findMatches(gs, rows)
+  local n = 0; if hit then for _ in pairs(hit) do n = n + 1 end end
+  return n
 end
--- does swapping (r,c)<->(r,c+1) break garbage?
-local function breaksGarbage(grid, rows, r, c)
+local function breaksAt(grid, rows, r, c)
   local _, _, _, _, gb = BoardSim.simSwap(grid, rows, r, c)
   return (gb or 0) > 0
 end
 
--- a cell-based chip: scan cells in order, return the first swap where `predicate` holds AND verify passes
-local function cellChip(kind, predicate)
+-- COMBO_n: a swap clearing exactly n, NOT touching garbage
+local function comboChip(n)
   return function(grid, rows, cells, verify)
-    for _, cell in ipairs(cells) do
-      local r, c = cell[1], cell[2]
-      if predicate(grid, rows, r, c) and (not verify or verify({ { r, c } }, kind)) then
-        return { swaps = { { r, c } }, kind = kind }
+    for _, cell in ipairs(cells) do local r, c = cell[1], cell[2]
+      if comboSizeAt(grid, rows, r, c) == n and not breaksAt(grid, rows, r, c)
+         and (not verify or verify({ { r, c } }, "COMBO_" .. n)) then
+        return { swaps = { { r, c } }, kind = "COMBO_" .. n }
+      end
+    end
+  end
+end
+-- BREAK_COMBO_n: a swap that breaks garbage AND its match clears n
+local function breakComboChip(n)
+  return function(grid, rows, cells, verify)
+    for _, cell in ipairs(cells) do local r, c = cell[1], cell[2]
+      if breaksAt(grid, rows, r, c) and comboSizeAt(grid, rows, r, c) == n
+         and (not verify or verify({ { r, c } }, "BREAK_COMBO_" .. n)) then
+        return { swaps = { { r, c } }, kind = "BREAK_COMBO_" .. n }
       end
     end
   end
 end
 
--- THE CHIP REGISTRY. Each entry: find(grid, rows, cells, verify) -> {swaps={{r,c}..}, kind} | nil. Add a chip here.
+-- THE REGISTRY
 local CHIPS = {
-  FIRE  = cellChip("FIRE", makesMatch),
-  BREAK = cellChip("BREAK", breaksGarbage),
   SETUP3 = function(grid, rows, _, verify)
     local seq = chips.goalSetup(grid, rows, verify)
     if seq then return { swaps = seq, kind = "SETUP3" } end
@@ -81,24 +92,30 @@ local CHIPS = {
   CACHE = function(grid, rows, _, verify)
     local m = planCache.match(grid, rows)
     if not (m and m.plan and #m.plan > 0) then return nil end
-    for _, sw in ipairs(m.plan) do -- reject plans whose recalled coords fall off THIS board (shape-recall can mis-map)
+    for _, sw in ipairs(m.plan) do
       if not sw[1] or not sw[2] or sw[1] < 1 or sw[1] > rows or sw[2] < 1 or sw[2] > 5 then return nil end
     end
-    if not verify or verify(m.plan, "CACHE") then
-      return { swaps = m.plan, kind = "CACHE", rel = m.rel, chain = m.chain }
-    end
+    if not verify or verify(m.plan, "CACHE") then return { swaps = m.plan, kind = "CACHE" } end
   end,
 }
-M.CHIPS = CHIPS -- exposed so callers/tests can enumerate the registered chip types
+for n = 3, 10 do CHIPS["COMBO_" .. n] = comboChip(n) end
+for n = 3, 6 do CHIPS["BREAK_COMBO_" .. n] = breakComboChip(n) end
+M.CHIPS = CHIPS
 
--- useChips(grid, rows, cursor, opts) -> { swaps = {{r,c},...}, kind } | nil
--- opts: { chipPriorities = {...}, searchPriorities = {...}, verify = fn(swaps, kind)->bool, band = n, maxDistance = n }
+-- default priority: biggest combos first, then breaks, then setup, then cache
+local DEFAULT = {}
+for n = 10, 3, -1 do DEFAULT[#DEFAULT + 1] = "COMBO_" .. n end
+for n = 6, 3, -1 do DEFAULT[#DEFAULT + 1] = "BREAK_COMBO_" .. n end
+DEFAULT[#DEFAULT + 1] = "SETUP3"; DEFAULT[#DEFAULT + 1] = "CACHE"
+M.DEFAULT_PRIORITIES = DEFAULT
+
+-- useChips(grid, rows, cursor, opts) -> { swaps, kind } | nil
 function M.useChips(grid, rows, cursor, opts)
   opts = opts or {}
   local verify = opts.verify
   local cells = cellOrder(grid, rows, cursor, opts.band, opts.searchPriorities, opts.maxDistance)
-  for _, chipType in ipairs(opts.chipPriorities or { "CACHE", "FIRE", "BREAK", "SETUP3" }) do
-    local find = CHIPS[chipType]
+  for _, chipName in ipairs(opts.chipPriorities or DEFAULT) do
+    local find = CHIPS[chipName]
     if find then
       local result = find(grid, rows, cells, verify)
       if result then return result end

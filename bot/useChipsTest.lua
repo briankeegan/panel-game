@@ -39,7 +39,7 @@ local function fired(stack, moves, kind)
 end
 
 -- chip priority order from arg[2] (comma-sep) so we can force a chip to the front to exercise it
-local PRIOS = { "CACHE", "FIRE", "BREAK", "SETUP3" }
+local PRIOS = require("bot.useChips").DEFAULT_PRIORITIES
 if arg[2] and arg[2] ~= "" then PRIOS = {}; for t in arg[2]:gmatch("[^,]+") do PRIOS[#PRIOS + 1] = t end end
 local SEARCH = { "LEFT", "RIGHT", "UP", "DOWN" }
 

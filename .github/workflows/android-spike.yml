@@ -1,0 +1,100 @@
+name: android-spike
+
+# THROWAWAY spike: prove lua-https loads + does an HTTPS 200 to GitHub from
+# inside love-android 11.5a on an emulator. Gates the whole Android APK plan.
+# This is a FORK (we never touch the upstream `beta` default branch), so the
+# workflow_dispatch button is unavailable — trigger via a tag instead:
+#   git tag android-spike-1 && git push origin android-spike-1   (bump N each run)
+# Once the spike passes, this file + android-spike/ get folded into the real
+# package-android job in build-shells.yml and deleted.
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'android-spike-*'
+
+permissions:
+  contents: read
+
+jobs:
+  spike:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'      # love-android 11.5a requires JDK 17 exactly
+
+      - uses: android-actions/setup-android@v3
+
+      # NDK + cmake pinned to what the 11.5a tag expects (do NOT use main's newer NDK).
+      - name: Install pinned NDK + cmake
+        run: |
+          yes | sdkmanager "platforms;android-34" "build-tools;34.0.0" \
+                           "ndk;25.2.9519653" "cmake;3.22.1"
+
+      # KVM accel so the x86_64 emulator is usable on the Linux runner.
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+
+      - name: Clone love-android @ 11.5a (with submodules: the love engine source)
+        run: |
+          git clone --depth 1 --branch 11.5a --recurse-submodules \
+            https://github.com/love2d/love-android.git la
+
+      # lua-https ships its own Android.mk (LOCAL_MODULE_FILENAME := https) and
+      # java.txt (= src/android/java) — dropping it into lua-modules/ is the whole
+      # integration. Folder name MUST be `https` (AGP filename==folder bug).
+      - name: Wire lua-https as a lua-module
+        run: |
+          git clone --depth 1 https://github.com/love2d/lua-https.git \
+            la/love/src/jni/lua-modules/lua-https
+          test -f la/love/src/jni/lua-modules/lua-https/Android.mk || { echo "no Android.mk"; exit 1; }
+          test -f la/love/src/jni/lua-modules/lua-https/java.txt   || { echo "no java.txt";   exit 1; }
+          echo "java.txt -> $(cat la/love/src/jni/lua-modules/lua-https/java.txt)"
+
+      - name: Embed the spike game.love
+        run: |
+          ( cd android-spike/game && zip -qr ../game.love . )
+          mkdir -p la/app/src/embed/assets
+          cp android-spike/game.love la/app/src/embed/assets/game.love
+          ls -la la/app/src/embed/assets/
+
+      - name: Build embedded debug APK
+        run: |
+          cd la
+          chmod +x gradlew
+          # Debug variant: auto-signed with the debug keystore, installable, no
+          # release keystore needed for a smoke test. Embeds game.love.
+          ./gradlew --no-daemon assembleEmbedNoRecordDebug
+          echo "--- APKs ---"; find app/build/outputs/apk -name '*.apk'
+
+      - name: Run on emulator + assert HTTPS_SPIKE OK
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          arch: x86_64
+          target: google_apis
+          script: |
+            set -x
+            APK=$(find la/app/build/outputs/apk -name '*-debug.apk' | head -1)
+            [ -z "$APK" ] && { echo "no debug apk built"; exit 1; }
+            adb install -r "$APK"
+            adb logcat -c
+            adb shell monkey -p org.love2d.android -c android.intent.category.LAUNCHER 1
+            # poll up to ~60s for the sentinel
+            for i in $(seq 1 30); do
+              adb logcat -d | grep -q 'HTTPS_SPIKE' && break
+              sleep 2
+            done
+            echo "--- LÖVE log ---"
+            adb logcat -d -s LOVE:V '*:S' | tail -40 || true
+            adb logcat -d | grep 'HTTPS_SPIKE' || true
+            adb logcat -d | grep -q 'HTTPS_SPIKE OK' \
+              || { echo 'SPIKE FAILED — no HTTPS_SPIKE OK in logcat'; exit 1; }
+            echo 'SPIKE PASSED'

@@ -6,7 +6,7 @@
 local BoardSim = require("bot.BoardSim")
 
 local chips = {}
-local STORE = {}            -- list of { tmpl = {{dr,dc,class}..}, kind = "fire"|"break" }
+local STORE = {}            -- list of { tmpl = {{dr,dc,class}..}, kind, swaps = {{dr,dc}..} } (swaps anchor-relative)
 
 -- ---- recognition: slide a minimal template; only its cells must satisfy the same/diff color-classes ----
 -- class: an integer N = "same color across cells sharing N, different from other N"; "e" = empty(0); "g" = GARBAGE.
@@ -27,17 +27,23 @@ local function fits(grid, rows, t, R, C)
 end
 
 -- recognize a NAMED/SIZED chip from the store: slide every STORE chip of `kind` over the candidate cells (already
--- cursor-ordered by the caller); on a template fit, VERIFY the swap fires (caller's real-engine check) before
--- returning. No BoardSim, no prediction -- fits is a pure pattern-match, verify is engine-truth. nil = none here.
+-- cursor-ordered by the caller); on a template fit, map its swap offsets to absolute cells and VERIFY the whole
+-- sequence fires (caller's real-engine check) before returning. A chip carries `swaps` (a list of anchor-relative
+-- offsets); a single-swap chip is just a 1-element list. Legacy `swap` (one pair) is still accepted. No BoardSim, no
+-- prediction -- fits is a pure pattern-match, verify is engine-truth. nil = none here.
 function chips.recognize(grid, rows, cells, kind, verify)
   for _, cell in ipairs(cells) do local R, C = cell[1], cell[2]
     for _, chip in ipairs(STORE) do
       if chip.kind == kind and fits(grid, rows, chip.tmpl, R, C) then
-        local sr, sc = R + chip.swap[1], C + chip.swap[2]
-        if sr >= 1 and sr <= rows and sc >= 1 and sc <= 5 then
-          if not verify or verify({ { sr, sc } }, kind) then
-            return { swaps = { { sr, sc } }, kind = kind }
-          end
+        local offsets = chip.swaps or { chip.swap }       -- back-compat: a single `swap` is a 1-element list
+        local seq, ok = {}, true
+        for _, off in ipairs(offsets) do
+          local sr, sc = R + off[1], C + off[2]
+          if not (sr >= 1 and sr <= rows and sc >= 1 and sc <= 5) then ok = false; break end
+          seq[#seq + 1] = { sr, sc }
+        end
+        if ok and (not verify or verify(seq, kind)) then
+          return { swaps = seq, kind = kind }
         end
       end
     end
@@ -51,7 +57,7 @@ function chips.loadCache()
   local ok, data = pcall(require, "bot.chipCache")
   if not ok or type(data) ~= "table" then return 0 end
   local n = 0
-  for _, c in ipairs(data) do STORE[#STORE + 1] = { tmpl = c.tmpl, kind = c.kind, swap = c.swap or { 0, 0 } }; n = n + 1 end
+  for _, c in ipairs(data) do STORE[#STORE + 1] = { tmpl = c.tmpl, kind = c.kind, swaps = c.swaps or { c.swap or { 0, 0 } } }; n = n + 1 end
   return n
 end
 chips.loadCache()

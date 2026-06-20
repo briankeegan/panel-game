@@ -13,27 +13,34 @@ local function nameOf(e)
   return n
 end
 
--- draw one chip: key (the shape) + sw ({dr,dc})
+-- draw one chip: key (the shape) + sw ({dr,dc}). Swap = cells (dr,dc) <-> (dr,dc+1),
+-- both 0-based from the bbox bottom-left. Key segments are bottom->top; we print top->bottom.
 local function draw(key, sw)
   local segs = {}; for s in tostring(key):gmatch("[^/]+") do segs[#segs + 1] = s end
   local H = #segs
-  local sr = sw and sw.dr            -- swap row (0-based from bottom)
-  local sc = sw and sw.dc            -- swap left col (0-based from bbox left; can be negative)
-  local pad = (sc and sc < 0) and -sc or 0   -- left-pad so a negative-col swap is visible
-  for i = H, 1, -1 do                -- top row (i=H) down to bottom (i=1)
+  local sr = sw and sw.dr            -- swap row (0-based from floor)
+  local sc = sw and sw.dc            -- swap left col (0-based from bbox left)
+  for i = H, 1, -1 do                -- top row (i=H) down to floor (i=1)
     local seg, dr = segs[i], i - 1
-    local chars = {}
-    for _ = 1, pad do chars[#chars + 1] = "." end
-    for j = 1, #seg do chars[#chars + 1] = seg:sub(j, j) end
-    local leftIdx = (sr and dr == sr) and (pad + sc + 1) or nil  -- index in `chars` of the left swap cell
-    local out = {}
-    for k = 1, #chars do
-      local pre = (leftIdx and k == leftIdx) and "[" or ""
-      local post = (leftIdx and k == leftIdx + 1) and "]" or ""
-      out[#out + 1] = pre .. chars[k] .. post
+    local tok = {}; for j = 1, #seg do tok[j] = seg:sub(j, j) end
+    if sr == dr and sc and sc + 1 >= 1 and sc + 2 <= #tok then  -- bracket the two swapped cells
+      tok[sc + 1] = "[" .. tok[sc + 1]
+      tok[sc + 2] = tok[sc + 2] .. "]   <- swap"
     end
-    print("   " .. table.concat(out, " "))
+    print("   " .. table.concat(tok, " "))
   end
+  if sr and (sc + 1 < 1 or sc + 2 > #segs[sr + 1]) then
+    print("   (swap dr=" .. sr .. " dc=" .. sc .. " falls OFF the shape -- suspect entry)")
+  end
+end
+
+if arg[1] == "--key" then    -- render one exact entry by its shape key
+  local e = pc.store()[arg[2]]
+  if not e then print("no entry with that key"); return end
+  print(string.format("%s   swap dr=%s dc=%s", nameOf(e),
+    tostring(e.canon and e.canon[1] and e.canon[1].dr), tostring(e.canon and e.canon[1] and e.canon[1].dc)))
+  draw(arg[2], e.canon and e.canon[1])
+  return
 end
 
 local want = arg[1]          -- a chip name, or nil to list

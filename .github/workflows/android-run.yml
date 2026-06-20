@@ -38,25 +38,16 @@ jobs:
             set +e
             echo "::warning title=APK_ABIS::$(unzip -l app.apk | grep -o 'lib/[^/]*' | sort -u | tr '\n' ' ')"
             adb install -r app.apk
-            echo "::warning title=INSTALL::$(adb install -r app.apk 2>&1 | tail -1 | tr -d '\r')"
-            sleep 5
             PKG=com.panelattack.ffateam
-            adb shell pm path "$PKG" >/dev/null 2>&1 || PKG=org.love2d.android
-            echo "::warning title=PKG::$PKG"
             adb logcat -c
+            # stream ALL logcat to a file in the background so nothing is lost even if
+            # a foreground adb call flakes; hardcode PKG (pm path hung the emulator).
+            ( adb logcat -v brief > /tmp/full.log 2>&1 ) &
             adb shell monkey -p "$PKG" -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1
-            # let the updater check/download/launch (give the 50MB base time)
-            for i in $(seq 1 45); do sleep 2; done
-            # is it alive or did it crash?
-            PID=$(adb shell pidof "$PKG" | tr -d '\r')
-            echo "::warning title=PROC::${PID:-NOT_RUNNING_(crashed_or_exited)}"
-            # native crashes + java crashes + LÖVE error are the smoking guns
-            echo "::warning title=FATAL::$(adb logcat -d -b crash -s AndroidRuntime:E DEBUG:F libc:F 'LOVE:F' | tail -8 | tr '\n' '|' | cut -c1-1500)"
-            # LÖVE / lua / updater output (our logger + error handler)
-            n=0
-            adb logcat -d | grep -iE 'love|lua|https|updater|mount|game.love|error|exception|fatal|abort' | tail -25 > /tmp/log.txt
-            while IFS= read -r line; do
-              n=$((n+1))
-              echo "::warning title=LOG$n::$(printf '%s' "$line" | tr -d '\r' | cut -c1-700)"
-            done < /tmp/log.txt
-            echo "done"
+            for i in $(seq 1 30); do sleep 2; done
+            PROC=$(adb shell pidof "$PKG" 2>/dev/null | tr -d '\r')
+            echo "::warning title=PROC::${PROC:-DEAD_crashed_or_exited}"
+            echo "::warning title=CRASH::$(adb logcat -d -b crash 2>/dev/null | tail -12 | tr '\n' '|' | cut -c1-1600)"
+            echo "::warning title=FATAL::$(grep -aiE 'fatal|signal |sigsegv|abort|backtrace|dlopen|unsatisfiedlink|cannot load|java.lang' /tmp/full.log 2>/dev/null | tail -12 | tr '\n' '|' | cut -c1-1600)"
+            echo "::warning title=LOVE::$(grep -aiE 'love|lua|sdl|liblove|https|updater|game.love|mount' /tmp/full.log 2>/dev/null | tail -15 | tr '\n' '|' | cut -c1-1600)"
+            exit 0

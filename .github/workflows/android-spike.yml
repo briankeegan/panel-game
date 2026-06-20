@@ -42,7 +42,7 @@ jobs:
             | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
 
-      - name: Clone love-android @ 11.5a (with submodules: the love engine source)
+      - name: Clone love-android 11.5a with submodules (the love engine source)
         run: |
           git clone --depth 1 --branch 11.5a --recurse-submodules \
             https://github.com/love2d/love-android.git la

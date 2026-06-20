@@ -314,9 +314,11 @@ jobs:
           sed -i 's|^app.application_id=.*|app.application_id=com.panelattack.ffateam|' gradle.properties
           sed -i 's|^app.name_byte_array=|#app.name_byte_array=|' gradle.properties
           sed -i '/^app.name=/d' gradle.properties
-          # NO literal '&' — a raw & breaks the merged AndroidManifest XML (android:label),
-          # same class of bug as the macOS Info.plist '&'.
-          echo 'app.name=Panel Attack FFA and Team' >> gradle.properties
+          # Real name. The '&' is pre-escaped as &amp;: AGP substitutes the manifest
+          # placeholder as RAW text, so a literal '&' breaks android:label XML (same
+          # class of bug as the macOS Info.plist '&'); '&amp;' is valid XML and renders
+          # as '&' on the device.
+          echo 'app.name=Unofficial Panel Attack FFA &amp; Team' >> gradle.properties
           sed -i "s|^app.version_name=.*|app.version_name=$VER|" gradle.properties
           sed -i "s|^app.version_code=.*|app.version_code=$VCODE|" gradle.properties
           grep -E '^app\.(name|application_id|version)' gradle.properties

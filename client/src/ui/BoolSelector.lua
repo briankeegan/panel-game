@@ -4,6 +4,7 @@ local UiElement = require(PATH .. ".UIElement")
 local class = require("common.lib.class")
 local GraphicsUtil = require("client.src.graphics.graphics_util")
 local DebugSettings = require("client.src.debug.DebugSettings")
+local system = require("client.src.system")
 
 ---@class BoolSelectorOptions : UiElementOptions
 ---@field startValue boolean?
@@ -20,10 +21,12 @@ local DebugSettings = require("client.src.debug.DebugSettings")
 local BoolSelector = class(function(self, options)
   self.value = options.startValue or false
   self.vertical = false
-  self.circleRadius = 10
-  self.extraDistance = 16
-  self.lengthPadding = 2
-  self.widthPadding = 2
+  -- portrait: blow the toggle up so it's a usable touch target
+  local scale = system.isPortraitMode() and 3 or 1
+  self.circleRadius = 10 * scale
+  self.extraDistance = 16 * scale
+  self.lengthPadding = 2 * scale
+  self.widthPadding = 2 * scale
   self.onValueChange = options.onValueChange or function() end
 
   -- Calculate initial dimensions

@@ -46,6 +46,22 @@ local function sym(v) if v == 0 then return "." elseif v == BoardSim.GARBAGE the
 local function applySwapSettle(g, r, c)
   local n = BoardSim.cloneGrid(g, H); n[r][c], n[r][c+1] = n[r][c+1], n[r][c]; settleCols(n); return n
 end
+-- 3+ run of a REAL combo color (1-4); filler (>=5) is don't-care noise, never a "solution"
+local function realMatch(g)
+  for r = 1, H do for c = 1, W do local v = g[r][c]
+    if v >= 1 and v <= 4 then
+      if c <= W-2 and g[r][c+1]==v and g[r][c+2]==v then return true end
+      if r <= H-2 and g[r+1][c]==v and g[r+2][c]==v then return true end
+    end end end
+  return false
+end
+-- no-shortcut gate: true if SOME single swap makes an immediate 3+ run of a real color -> 1-swap-solvable, reject it
+local function anySwapMatches(g)
+  for r = 1, H do for c = 1, W - 1 do
+    if g[r][c] ~= g[r][c+1] and realMatch(applySwapSettle(g, r, c)) then return true end
+  end end
+  return false
+end
 local function clearMatches(g)
   local hit, any = BoardSim.findMatches(g, H)
   if any then for idx in pairs(hit) do local r = math.floor((idx-1)/W)+1; local c = ((idx-1)%W)+1; g[r][c] = 0 end settleCols(g) end
@@ -125,7 +141,7 @@ for br = math.max(1, ar - R), math.min(H, ar + R) do
       g[br][bc], g[br][bc+1] = g[br][bc+1], g[br][bc]   -- the displacement (swap 1, reversed)
       settleCols(g)
       local _, preMatch = BoardSim.findMatches(g, H)
-      if not preMatch then
+      if not preMatch and not anySwapMatches(g) then                -- (a) no pre-match  +  (b') no 1-swap shortcut exists
         local str = gridToStr(g)
         if clearedBy(str, { { ar, ac } }) == 0 then                 -- (b) last swap alone clears nothing
           if clearedBy(str, { { br, bc }, { ar, ac } }) == N then   -- (c) swap1+swap2 clears exactly N

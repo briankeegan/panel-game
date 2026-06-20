@@ -10,7 +10,7 @@ local system = require("client.src.system")
 -- portrait: width of the tappable left/right arrow zones on a carousel
 local function arrowZoneWidth(carousel)
   if not system.isPortraitMode() then return 0 end
-  return math.min(carousel.width * 0.3, 64)
+  return math.min(carousel.width * 0.34, 120)
 end
 
 local function calculateFontSize(height)
@@ -101,7 +101,7 @@ function Carousel:drawSelf()
   -- portrait: big tappable < > arrows on the sides (touch can't keyboard-arrow)
   local zoneW = arrowZoneWidth(self)
   if zoneW > 0 and #self.passengers > 1 then
-    local delta = math.max(10, math.floor(self.height * 0.45))
+    local delta = math.max(48, math.floor(self.height * 0.95))
     local cy = self.y + self.height / 2 - (GraphicsUtil.fontSize + delta) / 2
     GraphicsUtil.printf("<", self.x, cy, zoneW, "center", nil, 1, delta)
     GraphicsUtil.printf(">", self.x + self.width - zoneW, cy, zoneW, "center", nil, 1, delta)

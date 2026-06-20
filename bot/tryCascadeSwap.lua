@@ -111,6 +111,22 @@ print(string.format("=== built %d COMBO_%d_CASCADE_%d cascades; running swap-uns
 ----------------------------------------------------------------- render: 3-step filmstrip (the getComboSetups flavor)
 local function sym(v) if v == 0 then return "." elseif v >= 5 then return "*" else return tostring(v) end end
 local function applySwapSettle(g, r, c) local n = clone(g); n[r][c], n[r][c+1] = n[r][c+1], n[r][c]; settle(n); return n end
+-- 3+ run of a REAL panel color (1-4: primary/riser/combo); filler (>=5) is don't-care noise, never a "solution"
+local function realMatch(g)
+  for r = 1, H do for c = 1, W do local v = g[r][c]
+    if v >= 1 and v <= 4 then
+      if c <= W-2 and g[r][c+1]==v and g[r][c+2]==v then return true end
+      if r <= H-2 and g[r+1][c]==v and g[r+2][c]==v then return true end
+    end end end
+  return false
+end
+-- no-shortcut gate: true if SOME single swap makes an immediate 3+ run of a real color -> 1-swap-solvable, reject it
+local function anySwapMatches(g)
+  for r = 1, H do for c = 1, W - 1 do
+    if g[r][c] ~= g[r][c+1] and realMatch(applySwapSettle(g, r, c)) then return true end
+  end end
+  return false
+end
 local function matchCells(g)
   local hit = {}
   for r = 1, H do for c = 1, W do local v = g[r][c]
@@ -177,7 +193,7 @@ for _, base in ipairs(list) do
       if moves >= 1 and moves <= R then
         local g = clone(B0)
         g[br][bc], g[br][bc+1] = g[br][bc+1], g[br][bc]; settle(g)
-        if not matches(g) then
+        if not matches(g) and not anySwapMatches(g) then     -- no pre-match + no 1-swap shortcut anywhere
           if not firesCascade(g, sr, sc) then                 -- fire alone must NOT fire the cascade
             local d = play(g, { { br, bc }, { sr, sc } })       -- setup then fire
             if d[1] == N and d[2] == M and d[3] == 0 then       -- fires the WHOLE cascade, no filler

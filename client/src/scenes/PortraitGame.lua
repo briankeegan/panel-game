@@ -270,15 +270,19 @@ function PortraitGame:draw()
 end
 
 function PortraitGame:flipToPortrait()
-  -- recreate the global canvas in portrait dimensions
-  GAME.globalCanvas = love.graphics.newCanvas(consts.CANVAS_HEIGHT, consts.CANVAS_WIDTH, {dpiscale=GAME:newCanvasSnappedScale()})
+  -- Legacy assumes a LANDSCAPE base canvas/window and flips to portrait here.
+  -- In our portrait build the base is ALREADY portrait, so flipping would invert
+  -- it back to landscape (the squished-strip bug). Only flip in the legacy case.
+  if not system.isPortraitMode() then
+    -- recreate the global canvas in portrait dimensions
+    GAME.globalCanvas = love.graphics.newCanvas(consts.CANVAS_HEIGHT, consts.CANVAS_WIDTH, {dpiscale=GAME:newCanvasSnappedScale()})
 
-  local width, height, _ = love.window.getMode()
-  if system.isMobileOS() or DebugSettings.simulateMobileOS() then
-    -- flip the window dimensions to portrait
-    love.window.updateMode(height, width, {})
-    love.window.setFullscreen(true)
-    --GAME:updateCanvasPositionAndScale(width, height)
+    local width, height, _ = love.window.getMode()
+    if system.isMobileOS() or DebugSettings.simulateMobileOS() then
+      -- flip the window dimensions to portrait
+      love.window.updateMode(height, width, {})
+      love.window.setFullscreen(true)
+    end
   end
 
   for _, player in ipairs(self.match.players) do
@@ -322,14 +326,18 @@ function PortraitGame:flipToPortrait()
 end
 
 function PortraitGame:returnToLandscape()
-  -- recreate the global canvas in landscape dimensions
-  GAME.globalCanvas = love.graphics.newCanvas(consts.CANVAS_WIDTH, consts.CANVAS_HEIGHT, {dpiscale=GAME:newCanvasSnappedScale()})
-  -- flip the window dimensions to landscape
-  local width, height, _ = love.window.getMode()
-  if system.isMobileOS() or DebugSettings.simulateMobileOS() then
-    love.window.updateMode(height, width, {})
-    love.window.setFullscreen(false)
-    --GAME:updateCanvasPositionAndScale(width, height)
+  -- Mirror flipToPortrait: in our portrait build the menus are ALSO portrait, so
+  -- there is nothing to restore — leaving the canvas/window portrait keeps the
+  -- menus correct. Only the legacy (landscape-base) path flips back.
+  if not system.isPortraitMode() then
+    -- recreate the global canvas in landscape dimensions
+    GAME.globalCanvas = love.graphics.newCanvas(consts.CANVAS_WIDTH, consts.CANVAS_HEIGHT, {dpiscale=GAME:newCanvasSnappedScale()})
+    -- flip the window dimensions to landscape
+    local width, height, _ = love.window.getMode()
+    if system.isMobileOS() or DebugSettings.simulateMobileOS() then
+      love.window.updateMode(height, width, {})
+      love.window.setFullscreen(false)
+    end
   end
   for _, player in ipairs(self.match.players) do
     if player.isLocal and player.human and player.settings.inputMethod == "touch" then

@@ -3,6 +3,7 @@ local CharacterSelect = require("client.src.scenes.CharacterSelect")
 local GameModes = require("common.data.GameModes")
 local LevelPresets = require("common.data.LevelPresets")
 local ui = require("client.src.ui")
+local system = require("client.src.system")
 
 -- Scene for the time attack game setup menu
 local TimeAttackMenu = class(
@@ -22,8 +23,12 @@ end
 function TimeAttackMenu:loadUserInterface()
   local player = self.battleRoom.players[1]
 
-  local unitSize = 100
-  self.ui.grid = ui.Grid({unitSize = unitSize, gridWidth = 9, gridHeight = 6, unitMargin = 8, hAlign = "center", vAlign = "center"})
+  local pm = system.isPortraitMode()
+  local unitSize, gridW, gridH = 100, 9, 6
+  if pm then
+    unitSize, gridW, gridH = 125, 4, 9
+  end
+  self.ui.grid = ui.Grid({unitSize = unitSize, gridWidth = gridW, gridHeight = gridH, unitMargin = 8, hAlign = "center", vAlign = "center"})
   self.uiRoot:addChild(self.ui.grid)
 
   self.ui.characterIcons[1] = self:createPlayerIcon(player)
@@ -32,26 +37,34 @@ function TimeAttackMenu:loadUserInterface()
   self.ui.recordBox = self:createRecordsBox("Last Score")
   self.ui.recordBox:setVisibility(player.settings.style == GameModes.Styles.CLASSIC)
   self:refresh()
-  self.ui.grid:createElementAt(2, 1, 2, 1, "recordBox", self.ui.recordBox, nil, true)
+  self.ui.grid:createElementAt(2, 1, pm and 3 or 2, 1, "recordBox", self.ui.recordBox, nil, true)
 
   self.ui.panelSelection = ui.MultiPlayerSelectionWrapper({hFill = true, alignment = "top", hAlign = "center", vAlign = "top"})
   self.ui.panelSelection:setTitle("panels")
   local panelCarousel = self:createPanelCarousel(player, self.ui.grid.unitSize - self.ui.grid.unitMargin * 2 - self.ui.panelSelection.height)
   self.ui.panelSelection:addElement(panelCarousel, player)
-  self.ui.grid:createElementAt(1, 2, 2, 1, "panelSelection", self.ui.panelSelection, nil, true)
+  self.ui.grid:createElementAt(1, 2, pm and 4 or 2, 1, "panelSelection", self.ui.panelSelection, nil, true)
 
-  local stageCarousel = self:createStageCarousel(player, self.ui.grid.unitSize * 2 - self.ui.grid.unitMargin * 2)
+  local stageCarousel = self:createStageCarousel(player, (pm and self.ui.grid.unitSize or self.ui.grid.unitSize * 2) - self.ui.grid.unitMargin * 2)
   self.ui.stageSelection = ui.MultiPlayerSelectionWrapper({vFill = true, alignment = "left", hAlign = "center", vAlign = "center"})
   self.ui.stageSelection:setTitle("stage")
   self.ui.stageSelection:addElement(stageCarousel, player)
-  self.ui.grid:createElementAt(3, 2, 2, 1, "stageSelection", self.ui.stageSelection, nil, true)
+  if pm then
+    self.ui.grid:createElementAt(1, 3, 4, 1, "stageSelection", self.ui.stageSelection, nil, true)
+  else
+    self.ui.grid:createElementAt(3, 2, 2, 1, "stageSelection", self.ui.stageSelection, nil, true)
+  end
 
   self.ui.styleSelection = ui.MultiPlayerSelectionWrapper({vFill = true, alignment = "left", hAlign = "center", vAlign = "center"})
   self.ui.styleSelection:setTitle("endless_modern")
   local styleContainer, styleSelector = self:createStyleSelection(player, unitSize)
   self.ui.styleSelection:addElement(styleContainer, player)
 
-  self.ui.grid:createElementAt(5, 2, 1, 1, "styleSelection", self.ui.styleSelection, nil, true)
+  if pm then
+    self.ui.grid:createElementAt(1, 4, 4, 1, "styleSelection", self.ui.styleSelection, nil, true)
+  else
+    self.ui.grid:createElementAt(5, 2, 1, 1, "styleSelection", self.ui.styleSelection, nil, true)
+  end
 
   self.ui.speedSelection = ui.MultiPlayerSelectionWrapper({
     hFill = true,
@@ -91,23 +104,44 @@ function TimeAttackMenu:loadUserInterface()
   end
 
   self.ui.readyButton = self:createReadyButton()
-  self.ui.grid:createElementAt(9, 2, 1, 1, "readyButton", self.ui.readyButton)
+  if pm then
+    self.ui.grid:createElementAt(1, 9, 2, 1, "readyButton", self.ui.readyButton)
+  else
+    self.ui.grid:createElementAt(9, 2, 1, 1, "readyButton", self.ui.readyButton)
+  end
 
   local characterButtons = self:getCharacterButtons()
   local characterGridWidth, characterGridHeight = 9, 3
+  if pm then characterGridWidth, characterGridHeight = 4, 1 end
   self.ui.characterGrid = self:createCharacterGrid(characterButtons, self.ui.grid, characterGridWidth, characterGridHeight)
-  self.ui.grid:createElementAt(1, 3, characterGridWidth, characterGridHeight, "characterSelection", self.ui.characterGrid, true)
+  if pm then
+    self.ui.grid:createElementAt(1, 7, characterGridWidth, characterGridHeight, "characterSelection", self.ui.characterGrid, true)
+  else
+    self.ui.grid:createElementAt(1, 3, characterGridWidth, characterGridHeight, "characterSelection", self.ui.characterGrid, true)
+  end
 
   self.ui.pageIndicator = self:createPageIndicator(self.ui.characterGrid)
-  self.ui.grid:createElementAt(5, 6, 1, 1, "pageIndicator", self.ui.pageIndicator)
+  if pm then
+    self.ui.grid:createElementAt(2, 8, 1, 1, "pageIndicator", self.ui.pageIndicator)
+  else
+    self.ui.grid:createElementAt(5, 6, 1, 1, "pageIndicator", self.ui.pageIndicator)
+  end
 
   self.ui.pageTurnButtons = self:createPageTurnButtons(self.ui.characterGrid)
 
   self.ui.changeInputButton = self:createChangeInputButton()
-  self.ui.grid:createElementAt(8, 6, 1, 1, "changeInputButton", self.ui.changeInputButton)
+  if pm then
+    self.ui.changeInputButton:setVisibility(false)
+  else
+    self.ui.grid:createElementAt(8, 6, 1, 1, "changeInputButton", self.ui.changeInputButton)
+  end
 
   self.ui.leaveButton = self:createLeaveButton()
-  self.ui.grid:createElementAt(9, 6, 1, 1, "leaveButton", self.ui.leaveButton)
+  if pm then
+    self.ui.grid:createElementAt(3, 9, 2, 1, "leaveButton", self.ui.leaveButton)
+  else
+    self.ui.grid:createElementAt(9, 6, 1, 1, "leaveButton", self.ui.leaveButton)
+  end
 
   self.ui.cursors[1] = self:createCursor(self.ui.grid, player)
   self.ui.cursors[1].raise1Callback = function()
@@ -122,7 +156,17 @@ function TimeAttackMenu:loadUserInterface()
 end
 
 function TimeAttackMenu:onStyleChanged(style, player)
-  if style == GameModes.Styles.MODERN then
+  if system.isPortraitMode() then
+    self.ui.grid:removeElementsIn(1, 5, 4, 2)
+    if style == GameModes.Styles.MODERN then
+      self.ui.grid:createElementAt(1, 5, 4, 1, "levelSelection", self.ui.levelSelection, nil, true)
+      if self.ui.recordBox then self.ui.recordBox:setVisibility(false) end
+    else
+      self.ui.grid:createElementAt(1, 5, 4, 1, "speedSelection", self.ui.speedSelection, nil, true)
+      self.ui.grid:createElementAt(1, 6, 4, 1, "difficultySelection", self.ui.difficultySelection, nil, true)
+      if self.ui.recordBox then self.ui.recordBox:setVisibility(true) end
+    end
+  elseif style == GameModes.Styles.MODERN then
     self.ui.grid:removeElementsIn(6, 2, 3, 1)
     self.ui.grid:createElementAt(6, 2, 3, 1, "levelSelection", self.ui.levelSelection, nil, true)
     if self.ui.recordBox then self.ui.recordBox:setVisibility(false) end

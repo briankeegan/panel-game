@@ -103,23 +103,30 @@ local function updateImpl(dt)
   end
 end
 
--- Crash NICELY: any error in the updater loop (version check, JSON parse, launch)
--- paints the real error on the loading screen instead of silently closing the app.
+-- Surface the REAL error verbatim (message + file:line + stack traceback) on the
+-- loading screen instead of silently closing. No reshaping — raw error text.
 function love.update(dt)
-  local ok, err = pcall(updateImpl, dt)
+  local ok, err = xpcall(function() return updateImpl(dt) end, debug.traceback)
   if not ok then
-    pcall(function() logger:log("FATAL update error: " .. tostring(err)) end)
+    pcall(function() logger:log(tostring(err)) end)
     pcall(logger.write, logger)
-    updateString = "Updater error:\n" .. tostring(err)
+    updateString = tostring(err)
     stuck = true
     loadingIndicator.draw = function() end
   end
 end
 
 local width, height = love.graphics.getDimensions()
+local smallFont = love.graphics.newFont(13)
 function love.draw()
-  love.graphics.printf(updateString, bigFont, 0, height / 2 - 12, width, "center")
-  loadingIndicator:draw()
+  if stuck then
+    -- error state: render verbatim from the top in a small font so the whole
+    -- message + traceback is readable on a phone
+    love.graphics.printf(updateString, smallFont, 8, 8, width - 16, "left")
+  else
+    love.graphics.printf(updateString, bigFont, 0, height / 2 - 12, width, "center")
+    loadingIndicator:draw()
+  end
 end
 
 function love.errorhandler(msg)
@@ -133,10 +140,10 @@ function love.errorhandler(msg)
 end
 
 function love.threaderror(thread, errorstr)
-  logger:log("Thread error!\n"..errorstr)
+  logger:log(tostring(errorstr))
   pcall(logger.write, logger)
-  -- surface it on screen (the version-check / download runs in a thread)
-  updateString = "Network/updater thread error:\n" .. tostring(errorstr)
+  -- raw thread error verbatim (version-check / download runs in a thread)
+  updateString = tostring(errorstr)
   stuck = true
   loadingIndicator.draw = function() end
 end

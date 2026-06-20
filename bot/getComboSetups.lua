@@ -58,10 +58,10 @@ end
 -- no-shortcut gate: true if SOME single swap CLEARS THE WHOLE combo (wins in one swap) -> not a forced 2-swap, reject.
 -- prefilter with realMatch (a winning swap must first make a real match) so the engine only runs when it could matter.
 -- a partial 3-run that strands a panel does NOT win and is fine.
-local function anySwapWins(str, g)
+local function anySwapWins(str, g, n)
   for r = 1, H do for c = 1, W - 1 do
     if g[r][c] ~= g[r][c+1] and realMatch(applySwapSettle(g, r, c)) then
-      if clearedBy(str, { { r, c } }) >= N then return true end
+      if clearedBy(str, { { r, c } }) >= n then return true end
     end
   end end
   return false
@@ -125,44 +125,65 @@ local function filmstrip(start, s1, s2)
   frame(done, minc, maxc, maxr, nil)
 end
 
------------------------------------------------------------------- base shape
-local raw = gcs.enumerate(N).raw
-local rec = raw[BASE]
-if not rec then print("no base #" .. BASE .. " for COMBO_" .. N); os.exit(1) end
-local B0 = rec.sample; local ar, ac = rec.sr, rec.sc
-
-print(string.format("=== COMBO_%d base #%d ===  the 1-swap clear is swap (%d,%d)  [ key: . empty · digit color · * filler · [..] swap · <..> cursor ]", N, BASE, ar, ac))
-render(B0, { ar, ac })
-print(string.format("\n--- COMBO_%d in 2 swaps, within cursor radius %d (must need BOTH swaps) ---\n", N, R))
-
------------------------------------------------------------------- generate
-local found, seen = {}, {}
-for br = math.max(1, ar - R), math.min(H, ar + R) do
-  for bc = 1, W - 1 do
-    local moves = math.abs(br - ar) + math.abs(bc - ac)   -- cursor moves between the two swaps
-    if moves >= 1 and moves <= R then
-      local g = BoardSim.cloneGrid(B0, H)
-      g[br][bc], g[br][bc+1] = g[br][bc+1], g[br][bc]   -- the displacement (swap 1, reversed)
-      settleCols(g)
-      local _, preMatch = BoardSim.findMatches(g, H)
-      if not preMatch then                                          -- (a) no pre-existing match
-        local str = gridToStr(g)
-        if not anySwapWins(str, g) then                             -- (b') no single swap solves the whole combo
-          if clearedBy(str, { { ar, ac } }) == 0 then               -- (b) fire swap alone clears nothing
-            if clearedBy(str, { { br, bc }, { ar, ac } }) == N then -- (c) swap1+swap2 clears exactly N
-              local sig = str .. "|" .. br .. "," .. bc
-              if not seen[sig] then seen[sig] = true; found[#found+1] = { g = g, s1 = { br, bc }, moves = moves } end
+------------------------------------------------------------------ generate (per base): the swap-unsolve, gated
+-- returns records { g = puzzle grid, sr,sc = fire anchor, s1 = {br,bc} setup swap, moves, kind }
+local function genForBase(B0, ar, ac, n, R)
+  local found, seen = {}, {}
+  for br = math.max(1, ar - R), math.min(H, ar + R) do
+    for bc = 1, W - 1 do
+      local moves = math.abs(br - ar) + math.abs(bc - ac)   -- cursor moves between the two swaps
+      if moves >= 1 and moves <= R then
+        local g = BoardSim.cloneGrid(B0, H)
+        g[br][bc], g[br][bc+1] = g[br][bc+1], g[br][bc]   -- the displacement (swap 1, reversed)
+        settleCols(g)
+        local _, preMatch = BoardSim.findMatches(g, H)
+        if not preMatch then                                          -- (a) no pre-existing match
+          local str = gridToStr(g)
+          if not anySwapWins(str, g, n) then                          -- (b') no single swap solves the whole combo
+            if clearedBy(str, { { ar, ac } }) == 0 then               -- (b) fire swap alone clears nothing
+              if clearedBy(str, { { br, bc }, { ar, ac } }) == n then -- (c) swap1+swap2 clears exactly n
+                local sig = str .. "|" .. br .. "," .. bc
+                if not seen[sig] then seen[sig] = true
+                  found[#found+1] = { g = g, sr = ar, sc = ac, s1 = { br, bc }, moves = moves,
+                                      kind = string.format("COMBO_%d_SWAP_2_MOVE_%d", n, moves) }
+                end
+              end
             end
           end
         end
       end
     end
   end
+  return found
 end
 
-for i, v in ipairs(found) do
-  print(string.format("#%d  COMBO_%d_SWAP_2_MOVE_%d  |  swap1 (%d,%d), swap2 (%d,%d)", i, N, v.moves, v.s1[1], v.s1[2], ar, ac))
-  filmstrip(v.g, v.s1, { ar, ac })
-  print("")
+-- module API: every forced 2-swap across ALL bases for COMBO_n (this is what buildChipCache bakes)
+local M = {}
+function M.enumerate(n, R)
+  R = R or 2
+  local out = {}
+  for _, rec in ipairs(gcs.enumerate(n).raw) do
+    for _, v in ipairs(genForBase(rec.sample, rec.sr, rec.sc, n, R)) do out[#out+1] = v end
+  end
+  return out
 end
-print(string.format("---- %d valid COMBO_%d_SWAP_2 variants for base #%d ----", #found, N, BASE))
+
+------------------------------------------------------------------ CLI (only when run directly): one base, filmstrips
+if arg and arg[0] and arg[0]:match("getComboSetups") then
+  local raw = gcs.enumerate(N).raw
+  local rec = raw[BASE]
+  if not rec then print("no base #" .. BASE .. " for COMBO_" .. N); os.exit(1) end
+  local B0 = rec.sample; local ar, ac = rec.sr, rec.sc
+  print(string.format("=== COMBO_%d base #%d ===  the 1-swap clear is swap (%d,%d)  [ key: . empty · digit color · * filler · [..] swap · <..> cursor ]", N, BASE, ar, ac))
+  render(B0, { ar, ac })
+  print(string.format("\n--- COMBO_%d in 2 swaps, within cursor radius %d (must need BOTH swaps) ---\n", N, R))
+  local found = genForBase(B0, ar, ac, N, R)
+  for i, v in ipairs(found) do
+    print(string.format("#%d  %s  |  swap1 (%d,%d), swap2 (%d,%d)", i, v.kind, v.s1[1], v.s1[2], ar, ac))
+    filmstrip(v.g, v.s1, { ar, ac })
+    print("")
+  end
+  print(string.format("---- %d valid COMBO_%d_SWAP_2 variants for base #%d ----", #found, N, BASE))
+end
+
+return M

@@ -1,189 +1,87 @@
 -- dedupPlanCache.lua — collapse DUPLICATE tactics in bot/planCache.data to ONE representative each.
 --
--- THE DUP AXIS: the cache key (shapeCache.canonShape) already normalizes COLOR (first-appearance relabel)
--- and MIRROR (lex-smaller of normal/mirror). The ONE axis it does NOT normalize is the vertical GAP — the
--- count of fully-empty INTERIOR rows between the swap shape and the matched row (crop only trims border rows,
--- not interior). So the same tactic at different drop-heights becomes separate keys.
+-- A cache key (shapeCache.canonShape) already normalizes COLOR (first-appearance relabel) and MIRROR.
+-- The remaining duplication: the SAME core shape stored with extra surrounding board context glued on, so
+-- it lands at a different padded key. DEDUP RULE: a key is a duplicate if a SMALLER (fewer occupied cells)
+-- key's shape FITS INSIDE it — slide the small shape over the big one, under color-relabeling + mirror; if
+-- every small cell coincides with a big cell consistently (garbage maps to garbage), the small shape is the
+-- same tactic and the big key is redundant context. Keep the smallest representative of each containment
+-- chain; drop the rest. (Identity = the SHAPE, not the measured effect — this is a dedup.)
 --
--- CRUCIAL CAVEAT (verified, garbage_stoptime / chain-timing): the gap is NOT always free padding. For many
--- tactics the drop distance DETERMINES the chain depth (e.g. 111/.22 fires chain 3/4/5 at gap 4/3/6). Those
--- gap-variants are DISTINCT tactics, not dups. So the TACTIC SIGNATURE must include the EFFECT: two entries
--- are the same tactic only if they share geometry-without-gap AND (total, chain, garbageBroke). Anything that
--- yields a different engine effect at a different gap is kept.
---
--- SAFETY: recall keys on the EXACT padded string (gap-sensitive). Removing a gap-variant loses recall for any
--- live board at that exact gap — UNLESS the corpus never recalls+fires that variant. So before deleting we
--- replay the puzzle corpus on the real engine (same path as cleanPlanCache) and record which keys are
--- recalled+fired. A dup is SAFE to remove only if it is NOT independently recalled+fired by the corpus, OR if
--- the representative we keep is also recalled+fired for the same boards. If a removal WOULD drop coverage we
--- KEEP that entry and report it.
---
---   luajit bot/dedupPlanCache.lua --dry   # analyze + report, write nothing
---   luajit bot/dedupPlanCache.lua         # dedup safely + save bot/planCache.data
-require("bot.headlessBoot"); _G.loc = _G.loc or function(s) return tostring(s) end
-do local l = require("common.lib.logger"); l.setLogLevel(l.levels.ERROR) end
-local Match = require("common.engine.Match"); require("common.engine.checkMatches")
-local LP = require("common.data.LevelPresets"); local KDE = require("common.data.KeyDataEncoding")
-local IC = require("common.data.InputCompression"); local PuzzleSet = require("client.src.PuzzleSet")
-local BoardSim = require("bot.BoardSim"); local planCache = require("bot.planCache"); local STORE = planCache.store()
-
-local DRY = (arg[1] == "--dry")
+--   luajit bot/dedupPlanCache.lua --dry   # report, write nothing
+--   luajit bot/dedupPlanCache.lua         # dedup + save bot/planCache.data
+local planCache = require("bot.planCache"); local STORE = planCache.store()
+local DRY = (arg and arg[1] == "--dry")
 local before = planCache.size()
 
--- ---- tactic signature: geometry with INTERIOR EMPTY ROWS removed + effect (color/mirror already in the key) ----
-local function geomNoGap(k)
-  local kept = {}
-  for row in k:gmatch("[^/]+") do if row:match("[^%.]") then kept[#kept + 1] = row end end
-  return table.concat(kept, "/")
+local function cells(k)
+  local cs, r = {}, 0
+  for row in k:gmatch("[^/]+") do r = r + 1
+    for c = 1, #row do local ch = row:sub(c, c); if ch ~= "." then cs[#cs + 1] = { r = r, c = c, ch = ch } end end
+  end
+  return cs
 end
-local function sigOf(k, e)
-  return geomNoGap(k) .. "|t" .. (e.effect.total or 0) .. "|c" .. (e.chain or 0) .. "|g" .. (e.effect.garbageBroke or 0)
-end
-
-local groups = {}
-for k, e in pairs(STORE) do
-  local s = sigOf(k, e)
-  groups[s] = groups[s] or {}
-  table.insert(groups[s], k)
-end
-for _, ks in pairs(groups) do table.sort(ks) end
-
-local distinctTactics = 0
-local dupGroups = {}
-for s, ks in pairs(groups) do
-  distinctTactics = distinctTactics + 1
-  if #ks > 1 then dupGroups[s] = ks end
-end
-
--- ---- corpus replay (real engine) to learn which keys are recalled+fired — the safety oracle ----
-local function gridFromStack(st)
-  local rows = st.height; local g = {}
-  for r = 1, rows do g[r] = {}
-    for c = 1, 6 do local p = st.panels[r] and st.panels[r][c]
-      g[r][c] = (p and p.isGarbage) and BoardSim.GARBAGE or (p and p.color or 0) end end
-  return g, rows
-end
-local function freshStack(pz)
-  local m = Match(pz:toPanelSource(false), pz:toGameMode().matchRules)
-  local st = m:createStackWithSettings(LP.getModern(10), true, "controller", nil)
-  st:setMaxRunsPerFrame(1); m:start()
-  return m, st
-end
-local function measureRecall(pz, inputs, prefix, swaps)
-  local ok, res = pcall(function()
-    local m, st = freshStack(pz)
-    for i = 1, prefix do if st:game_ended() then break end st:receiveConfirmedInput(inputs:sub(i, i)); m:run() end
-    local combos, maxChain, garbage, sub = {}, 0, 0, {}
-    st:connectSignal("matched", sub, function(_, _, _, _, v) if type(v) == "number" then combos[#combos + 1] = v end end)
-    st:connectSignal("garbageMatched", sub, function(_, v) garbage = garbage + (v or 0) end)
-    for _, sw in ipairs(swaps) do
-      st.cur_row, st.cur_col = sw[1], sw[2]; st:receiveConfirmedInput(KDE.swap); m:run()
-      for k = 1, 120 do if st:game_ended() then break end st:receiveConfirmedInput("A"); m:run()
-        if (st.chain_counter or 0) > maxChain then maxChain = st.chain_counter end
-        if k >= 2 and not st:hasActivePanels() and not st:hasChainingPanels() then break end end
-    end
-    if #combos == 0 then return nil end
-    return { firstCombo = combos[1], maxChain = maxChain, garbage = garbage }
-  end)
-  if not ok then return nil end
-  return res
-end
-
-local sets = PuzzleSet.loadFromFile("client/assets/default_data/puzzles/Puzzles.json")
-local P = {}
-local function col(n)
-  if n.puzzles then for _, p in ipairs(n.puzzles) do P[#P + 1] = p end end
-  if n.puzzleSets then for _, c in ipairs(n.puzzleSets) do col(c) end end
-end
-for _, s in ipairs(sets) do col(s) end
-
--- per key: was it recalled? did some recall FIRE on the engine?
-local probe = {}    -- key -> { recalled=bool, fired=bool, phantom=N }
-local MAX_PHANTOM_PROBES = 6
-for _, pz in ipairs(P) do
-  local m, st = freshStack(pz)
-  local inputs = IC.decompressInputString2(pz.solution or "")
-  if inputs ~= "" then
-    for i = 1, #inputs do
-      local g, rows = gridFromStack(st)
-      local rec = planCache.match(g, rows)
-      if rec and rec.key and STORE[rec.key] then
-        local pk = probe[rec.key]; if not pk then pk = { recalled = false, fired = false, phantom = 0 }; probe[rec.key] = pk end
-        pk.recalled = true
-        if not pk.fired and pk.phantom < MAX_PHANTOM_PROBES then
-          local eff = measureRecall(pz, inputs, i - 1, rec.plan)
-          if eff then pk.fired = true else pk.phantom = pk.phantom + 1 end
-        end
-      end
-      if st:game_ended() then break end
-      st:receiveConfirmedInput(inputs:sub(i, i)); m:run()
+local function nocc(k) return #cells(k) end
+local function span(cs) local mr, mc = 0, 0
+  for _, x in ipairs(cs) do if x.r > mr then mr = x.r end if x.c > mc then mc = x.c end end return mr, mc end
+local function buildSet(cs, mirror) local _, mc = span(cs); local m = {}
+  for _, x in ipairs(cs) do local c = mirror and (mc - x.c + 1) or x.c; m[x.r .. "," .. c] = x.ch end return m end
+local function fitsOffset(small, bigSet, dr, dc)
+  local fwd, rev = {}, {}
+  for key, sch in pairs(small) do
+    local r, c = key:match("(%d+),(%d+)"); r = tonumber(r) + dr; c = tonumber(c) + dc
+    local bch = bigSet[r .. "," .. c]
+    if not bch then return false end
+    if (sch == "#") ~= (bch == "#") then return false end
+    if sch ~= "#" then
+      if fwd[sch] and fwd[sch] ~= bch then return false end
+      if rev[bch] and rev[bch] ~= sch then return false end
+      fwd[sch], rev[bch] = bch, sch
     end
   end
+  return true
 end
-local function recalledFired(k) local p = probe[k]; return p and p.fired end
-local function recalled(k) local p = probe[k]; return p and p.recalled end
+local function fitsIn(smallK, bigK)
+  local sc, bc = cells(smallK), cells(bigK)
+  local bigSet = buildSet(bc, false)
+  local bmr, bmc = span(bc)
+  for _, mirror in ipairs({ false, true }) do
+    local sset = buildSet(sc, mirror); local smr, smc = span(sc)
+    for dr = 0, bmr - smr do for dc = 0, bmc - smc do
+      if fitsOffset(sset, bigSet, dr, dc) then return true end
+    end end
+  end
+  return false
+end
 
--- ---- decide removals: within each dup group, keep ONE representative; remove the rest IF SAFE ----
--- Representative preference: a variant that the corpus RECALLS+FIRES (so the kept entry is proven live).
--- A removal is UNSAFE if the victim is itself independently recalled+fired by the corpus (its exact gap is
--- genuinely needed by some board) — because recall is gap-keyed, the representative's different key won't
--- match that board. Those we KEEP and report.
-local toRemove, kept_reps, unsafe = {}, {}, {}
-for s, ks in pairs(dupGroups) do
-  -- pick representative: prefer recalled+fired, else recalled, else first (sorted).
-  local rep = ks[1]
-  for _, k in ipairs(ks) do if recalledFired(k) then rep = k; break end end
-  if rep == ks[1] and not recalledFired(rep) then
-    for _, k in ipairs(ks) do if recalled(k) then rep = k; break end end
-  end
-  kept_reps[s] = rep
-  for _, k in ipairs(ks) do
-    if k ~= rep then
-      if recalledFired(k) then
-        unsafe[#unsafe + 1] = { group = s, key = k, rep = rep } -- victim is live at its own gap
-      else
-        toRemove[#toRemove + 1] = { group = s, key = k, rep = rep }
-      end
-    end
+local keys = {}; for k in pairs(STORE) do keys[#keys + 1] = k end
+table.sort(keys, function(a, b) if nocc(a) ~= nocc(b) then return nocc(a) < nocc(b) end return a < b end)
+
+-- big key is a dup if some strictly-smaller-or-earlier key fits inside it.
+local coveredBy = {}
+for i = 1, #keys do local big = keys[i]
+  for j = 1, i - 1 do local small = keys[j]
+    if not coveredBy[small] and fitsIn(small, big) then coveredBy[big] = small; break end
   end
 end
+
+local removed = {}
+for _, big in ipairs(keys) do if coveredBy[big] then removed[#removed + 1] = big end end
 
 print(string.format("BEFORE: %d entries", before))
-print(string.format("distinct tactics (geom-no-gap + effect): %d", distinctTactics))
-local ngroups = 0; for _ in pairs(dupGroups) do ngroups = ngroups + 1 end
-print(string.format("dup groups (>1 member): %d", ngroups))
-print("\nDUP GROUPS:")
-local gk = {}; for s in pairs(dupGroups) do gk[#gk + 1] = s end; table.sort(gk)
-for _, s in ipairs(gk) do
-  print("  [" .. s .. "]  rep=" .. kept_reps[s])
-  for _, k in ipairs(dupGroups[s]) do
-    local p = probe[k] or {}
-    print(string.format("      %-40s recalled=%s fired=%s%s", k, tostring(p.recalled or false),
-      tostring(p.fired or false), k == kept_reps[s] and "   <= KEEP" or ""))
-  end
-end
+print(string.format("distinct shapes (representatives): %d   duplicates: %d", before - #removed, #removed))
+print("\nDUPLICATES removed (big key contains a smaller-shape representative):")
+for _, big in ipairs(removed) do print(string.format("  %-44s  <= %s", big, coveredBy[big])) end
 
-print(string.format("\nSAFETY: %d removals SAFE, %d UNSAFE (victim independently recalled+fired)", #toRemove, #unsafe))
-if #unsafe > 0 then
-  print("UNSAFE removals (KEPT to preserve coverage):")
-  for _, u in ipairs(unsafe) do print("    " .. u.key .. "  (rep " .. u.rep .. ")") end
-end
-
--- apply removals (safe only) unless --dry
 if not DRY then
-  for _, r in ipairs(toRemove) do STORE[r.key] = nil end
+  for _, k in ipairs(removed) do STORE[k] = nil end
   local n = planCache.save("bot/planCache.data")
-  print(string.format("\nremoved %d duplicate entries -> saved bot/planCache.data with %d entries", #toRemove, n))
-
-  -- post-dedup distribution by kind/effect label
   local tally = {}
-  for _, e in pairs(STORE) do
-    local lbl = (e.kind or "?")
-    tally[lbl] = (tally[lbl] or 0) + 1
-  end
-  print("\nKIND distribution after:")
-  local ns = {}; for n2 in pairs(tally) do ns[#ns + 1] = n2 end; table.sort(ns)
-  for _, n2 in ipairs(ns) do print(string.format("  %-8s %d", n2, tally[n2])) end
+  for _, e in pairs(STORE) do tally[e.kind or "?"] = (tally[e.kind or "?"] or 0) + 1 end
+  print(string.format("\nremoved %d -> saved bot/planCache.data with %d entries", #removed, n))
+  print("KIND distribution after:")
+  local ns = {}; for nm in pairs(tally) do ns[#ns + 1] = nm end; table.sort(ns)
+  for _, nm in ipairs(ns) do print(string.format("  %-8s %d", nm, tally[nm])) end
 else
-  print(string.format("\n[--dry] would remove %d entries (81 -> %d); wrote nothing", #toRemove, before - #toRemove))
+  print(string.format("\n[--dry] would remove %d (%d -> %d)", #removed, before, before - #removed))
 end

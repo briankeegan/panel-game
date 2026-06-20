@@ -3,12 +3,12 @@
 -- `verify` (run-it-in-its-head engine check) when one is supplied — never a dud.
 --
 -- THE REGISTRY is the working, NAMED, SIZED chip vocabulary. Each chip = one entry: find(grid,rows,cells,verify) ->
--- {swaps,kind}|nil. Ask for them by name in chipPriorities, e.g. {"COMBO_6","COMBO_4","BREAK_COMBO_4",...}.
---   COMBO_n        a swap whose immediate match clears EXACTLY n panels (no garbage)
---   BREAK_COMBO_n  a swap that breaks garbage AND its match clears n
+-- {swaps,kind}|nil. Ask for them by name in chipPriorities, e.g. {"COMBO_5","COMBO_4",...}.
+--   COMBO_n        an engine-authored template (from getComboShapes, via bot/chipCache.lua) RECOGNIZED on the board;
+--                  its swap clears EXACTLY n (no BoardSim -- pattern-match proposes, verify confirms it fires)
 --   SETUP3         goalSetup (2-move build) -- to be replaced by a setup-generating function
 --   CACHE          planCache recall (authored shape->plans)
--- (CHAIN_* deliberately absent — the cache's chains were fiction; chains come later as their own thing.)
+-- (BREAK_COMBO_* deferred until break chips are authored; CHAIN_* later as their own thing.)
 
 local BoardSim = require("bot.BoardSim")
 local chips = require("bot.chips")
@@ -45,41 +45,12 @@ local function cellOrder(grid, rows, cursor, band, searchPriorities, maxDistance
 end
 
 ----------------------------------------------------------------------
--- effect measurement (BoardSim) for the sized chips
+-- sized chips = engine-authored templates RECOGNIZED from the store (no BoardSim prediction)
 ----------------------------------------------------------------------
--- how many panels the immediate match clears when swapping (r,c)<->(r,c+1); 0 = no match
-local function comboSizeAt(grid, rows, r, c)
-  local gs = BoardSim.cloneGrid(grid, rows)
-  if gs[r] and gs[r][c + 1] then gs[r][c], gs[r][c + 1] = gs[r][c + 1], gs[r][c] end
-  local hit = BoardSim.findMatches(gs, rows)
-  local n = 0; if hit then for _ in pairs(hit) do n = n + 1 end end
-  return n
-end
-local function breaksAt(grid, rows, r, c)
-  local _, _, _, _, gb = BoardSim.simSwap(grid, rows, r, c)
-  return (gb or 0) > 0
-end
-
--- COMBO_n: a swap clearing exactly n, NOT touching garbage
+-- COMBO_n: recognize a stored, engine-verified COMBO_n template at a cursor-local cell, then verify it fires.
 local function comboChip(n)
   return function(grid, rows, cells, verify)
-    for _, cell in ipairs(cells) do local r, c = cell[1], cell[2]
-      if comboSizeAt(grid, rows, r, c) == n and not breaksAt(grid, rows, r, c)
-         and (not verify or verify({ { r, c } }, "COMBO_" .. n)) then
-        return { swaps = { { r, c } }, kind = "COMBO_" .. n }
-      end
-    end
-  end
-end
--- BREAK_COMBO_n: a swap that breaks garbage AND its match clears n
-local function breakComboChip(n)
-  return function(grid, rows, cells, verify)
-    for _, cell in ipairs(cells) do local r, c = cell[1], cell[2]
-      if breaksAt(grid, rows, r, c) and comboSizeAt(grid, rows, r, c) == n
-         and (not verify or verify({ { r, c } }, "BREAK_COMBO_" .. n)) then
-        return { swaps = { { r, c } }, kind = "BREAK_COMBO_" .. n }
-      end
-    end
+    return chips.recognize(grid, rows, cells, "COMBO_" .. n, verify)
   end
 end
 
@@ -98,14 +69,12 @@ local CHIPS = {
     if not verify or verify(m.plan, "CACHE") then return { swaps = m.plan, kind = "CACHE" } end
   end,
 }
-for n = 3, 10 do CHIPS["COMBO_" .. n] = comboChip(n) end
-for n = 3, 6 do CHIPS["BREAK_COMBO_" .. n] = breakComboChip(n) end
+for n = 3, 10 do CHIPS["COMBO_" .. n] = comboChip(n) end   -- only sizes with stored templates actually match
 M.CHIPS = CHIPS
 
--- default priority: biggest combos first, then breaks, then setup, then cache
+-- default priority: biggest combos first, then setup, then cache (breaks return when we author break chips)
 local DEFAULT = {}
 for n = 10, 3, -1 do DEFAULT[#DEFAULT + 1] = "COMBO_" .. n end
-for n = 6, 3, -1 do DEFAULT[#DEFAULT + 1] = "BREAK_COMBO_" .. n end
 DEFAULT[#DEFAULT + 1] = "SETUP3"; DEFAULT[#DEFAULT + 1] = "CACHE"
 M.DEFAULT_PRIORITIES = DEFAULT
 

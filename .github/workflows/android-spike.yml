@@ -83,6 +83,17 @@ jobs:
           ./gradlew --no-daemon assembleEmbedNoRecordDebug
           echo "--- APKs ---"; find app/build/outputs/apk -name '*.apk'
 
+      # Resolve the APK path HERE in a normal bash step (predictable CWD/shell),
+      # not inside the emulator-runner action (its script wrapper resolved find
+      # inconsistently). Pass the absolute path to the emulator step via env.
+      - name: Locate APK
+        run: |
+          APK=$(find "$GITHUB_WORKSPACE/la/app/build/outputs/apk" -path '*/debug/*' -name '*.apk' | head -1)
+          [ -z "$APK" ] && APK=$(find "$GITHUB_WORKSPACE/la/app/build/outputs/apk" -name '*.apk' | head -1)
+          [ -z "$APK" ] && { echo "no apk found"; exit 1; }
+          echo "APK_PATH=$APK" >> "$GITHUB_ENV"
+          echo "resolved APK_PATH=$APK"
+
       - name: Run on emulator + assert HTTPS_SPIKE OK
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -96,12 +107,9 @@ jobs:
             # function (the runner's sh treated a helper function as command-not-found
             # -> exit 127). Values piped through tr to a single line.
 
-            # love-android renames its APK output, so find by the gradle /debug/ dir,
-            # not the filename.
-            echo "::warning title=APK_LIST::$(find la/app/build/outputs/apk -name '*.apk' 2>/dev/null | tr '\n' '|')"
-            APK=$(find la/app/build/outputs/apk -path '*/debug/*' -name '*.apk' 2>/dev/null | head -1)
-            [ -z "$APK" ] && APK=$(find la/app/build/outputs/apk -name '*.apk' 2>/dev/null | head -1)
-            [ -z "$APK" ] && { echo "::error title=NO_APK::no .apk under la/app/build/outputs/apk — see APK_LIST"; exit 1; }
+            # APK_PATH was resolved in the prior 'Locate APK' bash step (env).
+            APK="$APK_PATH"
+            [ -z "$APK" ] && { echo "::error title=NO_APK::APK_PATH env empty (Locate APK step)"; exit 1; }
             echo "::warning title=APK_PICKED::$APK"
             echo "::warning title=APK_ABIS::$(unzip -l "$APK" | grep -o 'lib/[^/]*' | sort -u | tr '\n' ' ')"
             echo "::warning title=EMU_ABILIST::$(adb shell getprop ro.product.cpu.abilist | tr -d '\r')"

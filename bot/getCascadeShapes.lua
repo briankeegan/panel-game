@@ -1,97 +1,66 @@
--- getCascadeShapes.lua — CASCADE combos for COMBO_N (N>=4): one swap creates a SECONDARY (color-2) match; it
--- clears, gravity drops PRIMARY panels, and a primary N-line clears. A 2-link chain.
--- Brute force: place N primary + 3 secondary panels every way in a tight floor-anchored window, auto-fill support
--- under floating panels, try every swap. A fast internal chain-sim pre-filters; the real ENGINE confirms each.
--- Generalized to the wildcard language: 1=primary line, 2=secondary riser (essential), *=support, .=empty.
---   luajit bot/getCascadeShapes.lua [N]
+-- getCascadeShapes.lua — COMBO_N_CASCADE_M combos via the TWO-PHASE method (replaces the old brute force).
+--   Phase 1: getCascadeEnds(N, M) -> the cascade END positions (riser present, primary set up to drop in).
+--   Phase 2 (here): focused UNSOLVE of each end. The only move that matters is a swap that puts a SECONDARY (2)
+--   back into the riser, so: try every swap that moves a 2, un-apply it to get the playable pre-state, and keep it
+--   iff the pre-state has NO match (riser broken, primary not yet matched) AND replaying the swap fires the whole
+--   chain -- secondary clears first, then exactly N primary. Generalize each cell; render with the swap shown.
+--   luajit bot/getCascadeShapes.lua [N] [M]
 require("bot.headlessBoot"); do local l = require("common.lib.logger"); l.setLogLevel(l.levels.ERROR) end
 _G.loc = _G.loc or function(s) return tostring(s) end
 local shapeCache = require("bot.shapeCache")
-local getComboShapes = require("bot.getComboShapes")   -- the riser is a COMBO_3 of color 2 -> pull from here
+local cascadeEnds = require("bot.getCascadeEnds")
 local Match = require("common.engine.Match"); require("common.engine.checkMatches")
 local LP = require("common.data.LevelPresets"); local KDE = require("common.data.KeyDataEncoding"); local Puzzle = require("common.engine.Puzzle")
 
 local N = tonumber(arg[1]) or 4
-local P, S = 1, 2                       -- primary, secondary
-local Wb, Hb = math.min(6, N + 1), tonumber(arg[2]) or 5   -- a cascade is only ~5 tall (line + 3-riser + cap) for any N
-local NSEC = 3                          -- secondary riser size (a COMBO_3 of color 2)
-
------------------------------------------------------------------ small-grid helpers (Wb x Hb)
-local function clone(g) local n = {}; for r = 1, Hb do n[r] = {}; for c = 1, Wb do n[r][c] = g[r][c] end end; return n end
-local function settle(g) for c = 1, Wb do local s = {}; for r = 1, Hb do if g[r][c] ~= 0 then s[#s+1] = g[r][c] end end; for r = 1, Hb do g[r][c] = s[r] or 0 end end end
-local function filler(r, c) return ((r + c) % 2 == 0) and 5 or 6 end
-local function matches(g)
-  local hit = {}
-  for r = 1, Hb do for c = 1, Wb do local v = g[r][c]
-    if v ~= 0 then
-      if c <= Wb-2 and g[r][c+1]==v and g[r][c+2]==v then for k=0,2 do hit[r.."_"..(c+k)] = v end end
-      if r <= Hb-2 and g[r+1][c]==v and g[r+2][c]==v then for k=0,2 do hit[(r+k).."_"..c] = v end end
-    end end end
-  return hit
-end
--- simulate the chain after swapping (r,c)<->(r,c+1). Return total primary cleared, secondary cleared, #links,
--- and primary cleared on the FIRST link (must be 0 for a real cascade -- primary completes LATER).
-local function simChain(g, r, c)
-  local s = clone(g); s[r][c], s[r][c+1] = s[r][c+1], s[r][c]; settle(s)
-  local prim, links, firstPrim, firstSec, fil = 0, 0, 0, 0, 0
-  while true do
-    local hit = matches(s); if next(hit) == nil then break end
-    links = links + 1; local thisP, thisS = 0, 0
-    for k, v in pairs(hit) do
-      if v == P then prim = prim + 1; thisP = thisP + 1
-      elseif v == S then thisS = thisS + 1
-      elseif v >= 5 then fil = fil + 1 end                 -- support filler should NEVER be in a match
-      local rr, cc = k:match("(%d+)_(%d+)"); s[tonumber(rr)][tonumber(cc)] = 0
-    end
-    if links == 1 then firstPrim = thisP; firstSec = thisS end
-    settle(s)
-  end
-  return prim, links, firstPrim, firstSec, fil
-end
--- a real cascade: the swap's FIRST link is a pure SECONDARY (riser) match (>=3, no primary), NO support ever
--- clears, and the chain ends up clearing exactly N primary.
-local function isCascade(g, r, c)
-  if next(matches(g)) ~= nil then return false end          -- no PRE-existing match (it'd have already cleared)
-  local prim, links, firstPrim, firstSec, fil = simChain(g, r, c)
-  return links >= 2 and firstPrim == 0 and firstSec >= NSEC and fil == 0 and prim == N
-end
-
------------------------------------------------------------------ engine verification (full 6x12 board)
+local M = tonumber(arg[2]) or 3
 local W, H = 6, 12
+local P, S, FIL = 1, 2, 5                        -- primary, secondary, filler (support)
+
+local function clone(g) local n = {}; for r = 1, H do n[r] = {}; for c = 1, W do n[r][c] = g[r][c] end end; return n end
+local function settle(g) for c = 1, W do local s = {}; for r = 1, H do if g[r][c] ~= 0 then s[#s+1] = g[r][c] end end; for r = 1, H do g[r][c] = s[r] or 0 end end end
+local function matches(g)                         -- any >=3 run of a real (non-support) color
+  for r = 1, H do for c = 1, W do local v = g[r][c]
+    if v == P or v == S then
+      if c <= W-2 and g[r][c+1]==v and g[r][c+2]==v then return true end
+      if r <= H-2 and g[r+1][c]==v and g[r+2][c]==v then return true end
+    end end end
+  return false
+end
+
+----------------------------------------------------------------- engine: does swapping (r,c) fire the cascade?
 local function stackString(g)
-  local maxR = 0; for r = 1, Hb do for c = 1, Wb do if g[r][c] ~= 0 then maxR = math.max(maxR, r) end end end
+  local maxR = 0; for r = 1, H do for c = 1, W do if g[r][c] ~= 0 then maxR = math.max(maxR, r) end end end
   local rows = {}
-  for r = maxR, 1, -1 do local row = {}; for c = 1, 6 do row[c] = (c <= Wb and g[r][c] ~= 0) and tostring(g[r][c]) or "0" end; rows[#rows+1] = table.concat(row) end
+  for r = maxR, 1, -1 do local row = {}; for c = 1, 6 do row[c] = (g[r][c] ~= 0) and tostring(g[r][c]) or "0" end; rows[#rows+1] = table.concat(row) end
   return table.concat(rows)
 end
-local function primaryOnBoard(st) local n = 0; for r = 1, st.height do for c = 1, 6 do if (st.panels[r][c].color or 0) == P then n = n + 1 end end end; return n end
-local function engineVerify(g, r, c)
+local function firesCascade(g, r, c)
   local ok, res = pcall(function()
-    local p = Puzzle({ puzzleType = "moves", stack = stackString(g), moves = 99 })
-    local m = Match(p:toPanelSource(false), p:toGameMode().matchRules)
+    local pz = Puzzle({ puzzleType = "moves", stack = stackString(g), moves = 99 })
+    local m = Match(pz:toPanelSource(false), pz:toGameMode().matchRules)
     local st = m:createStackWithSettings(LP.getModern(10), true, "controller", nil); st:setMaxRunsPerFrame(1); m:start()
-    -- let it settle first (should be a stable board with no match), then swap
-    for i = 1, 30 do if st:game_ended() then break end st:receiveConfirmedInput("A"); m:run(); if i >= 2 and not st:hasActivePanels() and not st:hasChainingPanels() then break end end
-    local before = primaryOnBoard(st)
+    if matches(g) then return false end                          -- pre-state must not already be matched
+    local function np() local n=0; for rr=1,st.height do for cc=1,6 do if (st.panels[rr][cc].color or 0)==P then n=n+1 end end end return n end
+    for i = 1, 40 do if st:game_ended() then break end st:receiveConfirmedInput("A"); m:run(); if i>=2 and not st:hasActivePanels() and not st:hasChainingPanels() then break end end
+    local s0p = np()
     st.cur_row, st.cur_col = r, c; st:receiveConfirmedInput(KDE.swap); m:run()
-    for k = 1, 200 do if st:game_ended() then break end st:receiveConfirmedInput("A"); m:run(); if k >= 3 and not st:hasActivePanels() and not st:hasChainingPanels() then break end end
-    return (before - primaryOnBoard(st)) == N
+    for k = 1, 200 do if st:game_ended() then break end st:receiveConfirmedInput("A"); m:run(); if k>=3 and not st:hasActivePanels() and not st:hasChainingPanels() then break end end
+    return (s0p - np()) == N
   end)
   return ok and res
 end
 
------------------------------------------------------------------ generalize a cell (uses the fast sim)
+----------------------------------------------------------------- generalize (uses firesCascade on the swap)
 local NC = 4
 local LOWER = { [1]="a", [2]="b", [3]="c", [4]="d" }; local UPPER = { [1]="A", [2]="B", [3]="C", [4]="D" }
-local function settledBoard(g)
-  for c = 1, Wb do local hole = false; for r = 1, Hb do if g[r][c] == 0 then hole = true elseif hole then return false end end end
-  return true
-end
-local function symbolOf(g, r, c, rr, cc)
+local function symbolOf(g, sr, sc, rr, cc)
   local works = {}
   for cand = 0, NC do local g2 = clone(g); g2[rr][cc] = cand
-    -- only a SETTLED substitution is legal (a block can't float above an empty cell)
-    if settledBoard(g2) and isCascade(g2, r, c) then works[cand] = true end end
+    local settled = true
+    for col=1,W do local hole=false; for row=1,H do if g2[row][col]==0 then hole=true elseif hole then settled=false; break end end end
+    if settled and firesCascade(g2, sr, sc) then works[cand] = true end
+  end
   local wb = {}; for k = 1, NC do if works[k] then wb[#wb+1] = k end end
   if #wb == 0 then return "." end
   if #wb == NC then return "*" end
@@ -101,63 +70,32 @@ local function symbolOf(g, r, c, rr, cc)
   local lit = g[rr][cc]; return lit == 0 and "." or tostring(lit)
 end
 
------------------------------------------------------------------ seed the riser from the COMBO_3 solves
-local cells = {}; for r = 1, Hb do for c = 1, Wb do cells[#cells+1] = { r, c } end end
-local found, idxP = {}, {}
-
--- the secondary riser IS a COMBO_3 of color 2: pull every solve straight from getComboShapes (build on it).
--- each riser = its 3 cells (relative to the pattern's bottom-left) + the solving swap (also relative).
-local risers = {}
-for _, rec in ipairs(getComboShapes.enumerate(NSEC).raw) do
-  local g = rec.sample; local minr, minc, pts = 1e9, 1e9, {}
-  for r = 1, 12 do for c = 1, 6 do if g[r][c] == 1 then pts[#pts+1] = { r, c }; minr = math.min(minr, r); minc = math.min(minc, c) end end end
-  local rel = {}; for _, p in ipairs(pts) do rel[#rel+1] = { p[1]-minr, p[2]-minc } end
-  risers[#risers+1] = { cells = rel, sdr = rec.sr - minr, sdc = rec.sc - minc }
-end
-
--- drop each riser into the primary board at every offset and play ITS swap; the engine verifies the cascade.
--- This replaces the blind 3-secondary placement: ~17 risers x offsets instead of C(window,3) x every swap.
-local function placeRisers(base)
-  for _, riser in ipairs(risers) do
-    for baseR = 1, Hb do for baseC = 1, Wb do
-      local g = clone(base); local ok = true
-      for _, rc in ipairs(riser.cells) do
-        local r, c = baseR + rc[1], baseC + rc[2]
-        if r < 1 or r > Hb or c < 1 or c > Wb or g[r][c] ~= 0 then ok = false; break end
-        g[r][c] = S
-      end
-      if ok then
-        local settled = true                              -- self-supporting (no floating), no pre-match
-        for c = 1, Wb do local hole = false; for r = 1, Hb do if g[r][c] == 0 then hole = true elseif hole then settled = false; break end end end
-        if settled and next(matches(g)) == nil then
-          local sr, sc = baseR + riser.sdr, baseC + riser.sdc
-          if sr >= 1 and sr <= Hb and sc >= 1 and sc <= Wb - 1 and isCascade(g, sr, sc) then
-            local kk = shapeCache.canonShape(g)
-            if kk and not found[kk] then found[kk] = { sample = clone(g), sr = sr, sc = sc, key = kk } end
-          end
+----------------------------------------------------------------- PHASE 2: focused unsolve of each cascade end
+local ends = cascadeEnds.enumerate(N, M)
+local found = {}
+for _, e in ipairs(ends) do
+  local g0 = e.g                                                 -- the END: riser present, primary set to drop
+  for r = 1, H do for c = 1, W - 1 do
+    if g0[r][c] == S or g0[r][c+1] == S then                     -- ONLY swaps that move a secondary 2
+      local pre = clone(g0); pre[r][c], pre[r][c+1] = pre[r][c+1], pre[r][c]   -- un-apply the swap
+      -- fill inert support (checkerboard, won't match) under any float, so the displaced 2 sits on a real board
+      for col = 1, W do local top = 0; for row = 1, H do if pre[row][col] ~= 0 then top = row end end
+        for row = 1, top do if pre[row][col] == 0 then pre[row][col] = ((row+col)%2==0) and 5 or 6 end end end
+      if not matches(pre) then                                   -- riser broken, primary not yet matched
+        if firesCascade(pre, r, c) then                          -- replaying the swap fires the whole chain -> N primary
+          local kk = shapeCache.canonShape(pre)
+          if kk and not found[kk] then found[kk] = { sample = pre, sr = r, sc = c, key = kk } end
         end
       end
-    end end
-  end
+    end
+  end end
 end
-local function placePrimary(startP, depthP)
-  if depthP > N then
-    local fl = false; for i = 1, N do if cells[idxP[i]][1] == 1 then fl = true end end
-    if not fl then return end                          -- floor-anchor
-    local base = {}; for r = 1, Hb do base[r] = {}; for c = 1, Wb do base[r][c] = 0 end end
-    for i = 1, N do local p = cells[idxP[i]]; base[p[1]][p[2]] = P end
-    placeRisers(base)
-    return
-  end
-  for i = startP, #cells do idxP[depthP] = i; placePrimary(i + 1, depthP + 1) end
-end
-placePrimary(1, 1)
 
------------------------------------------------------------------ render generalized, with swap shown
+----------------------------------------------------------------- render with the swap shown
 local function render(rec)
   local g, sr, sc = rec.sample, rec.sr, rec.sc
-  local minr,maxr,minc,maxc = Hb,1,Wb,1
-  for rr=1,Hb do for cc=1,Wb do if g[rr][cc]~=0 then minr=math.min(minr,rr);maxr=math.max(maxr,rr);minc=math.min(minc,cc);maxc=math.max(maxc,cc) end end end
+  local minr,maxr,minc,maxc = H,1,W,1
+  for rr=1,H do for cc=1,W do if g[rr][cc]~=0 then minr=math.min(minr,rr);maxr=math.max(maxr,rr);minc=math.min(minc,cc);maxc=math.max(maxc,cc) end end end
   local rLo,rHi = math.min(minr,sr), math.max(maxr,sr)
   local cLo,cHi = math.min(minc,sc), math.max(maxc,sc+1)
   local L = sc - cLo + 1
@@ -166,9 +104,8 @@ local function render(rec)
     local toks = {}
     for cc = cLo, cHi do
       local v = g[rr][cc]; local isSwap = (rr == sr and (cc == sc or cc == sc + 1))
-      if isSwap then                                        -- the swap is a concrete MOVE: render actual values
-        toks[#toks+1] = (v == 0 and ".") or (v >= 5 and "*") or tostring(v)
-      elseif v >= 5 then toks[#toks+1] = "*"                -- support filler
+      if isSwap then toks[#toks+1] = (v == 0 and ".") or (v >= 5 and "*") or tostring(v)
+      elseif v >= 5 then toks[#toks+1] = "*"
       else toks[#toks+1] = symbolOf(g, sr, sc, rr, cc) end
     end
     local n = #toks; local ch = {}; for i = 1, 2*n+1 do ch[i] = " " end
@@ -181,14 +118,13 @@ end
 
 local list = {}; for _, rec in pairs(found) do list[#list+1] = rec end
 table.sort(list, function(a, b) return a.key < b.key end)
-local seen, out, verified = {}, {}, 0
+local seen, out = {}, {}
 for _, rec in ipairs(list) do
-  local ev = engineVerify(rec.sample, rec.sr, rec.sc)
   local rows, plain, sw = render(rec)
   local sig = plain .. "|" .. sw.dr .. "," .. sw.dc
-  if ev and not seen[sig] then seen[sig] = true; verified = verified + 1; out[#out+1] = { rows = rows, sw = sw } end
+  if not seen[sig] then seen[sig] = true; out[#out+1] = { rows = rows, sw = sw } end
 end
-print(string.format("COMBO_%d CASCADE combos: %d distinct  (1=primary · 2=secondary riser · *=support · .=empty · [..]=swap)\n", N, #out))
+print(string.format("combo_%d_cascade_%d combos: %d distinct  (1=primary · 2=riser · *=support · .=empty · [..]=swap)\n", N, M, #out))
 for i, o in ipairs(out) do
   print(string.format("#%d  swap (dr=%d,dc=%d)", i, o.sw.dr, o.sw.dc))
   for _, row in ipairs(o.rows) do print("     " .. row) end

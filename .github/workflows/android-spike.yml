@@ -91,8 +91,10 @@ jobs:
           APK=$(find "$GITHUB_WORKSPACE/la/app/build/outputs/apk" -path '*/debug/*' -name '*.apk' | head -1)
           [ -z "$APK" ] && APK=$(find "$GITHUB_WORKSPACE/la/app/build/outputs/apk" -name '*.apk' | head -1)
           [ -z "$APK" ] && { echo "no apk found"; exit 1; }
-          echo "APK_PATH=$APK" >> "$GITHUB_ENV"
-          echo "resolved APK_PATH=$APK"
+          # Hand off via a FILE — android-emulator-runner does NOT inherit $GITHUB_ENV
+          # vars into its script, so write the path where the emulator step can cat it.
+          echo "$APK" > /tmp/apk_path.txt
+          echo "resolved APK=$APK"
 
       - name: Run on emulator + assert HTTPS_SPIKE OK
         uses: reactivecircus/android-emulator-runner@v2
@@ -107,9 +109,10 @@ jobs:
             # function (the runner's sh treated a helper function as command-not-found
             # -> exit 127). Values piped through tr to a single line.
 
-            # APK_PATH was resolved in the prior 'Locate APK' bash step (env).
-            APK="$APK_PATH"
-            [ -z "$APK" ] && { echo "::error title=NO_APK::APK_PATH env empty (Locate APK step)"; exit 1; }
+            # APK path was resolved in the prior 'Locate APK' bash step and written
+            # to /tmp/apk_path.txt (env vars don't reach this action's script).
+            APK=$(cat /tmp/apk_path.txt 2>/dev/null)
+            [ -z "$APK" ] && { echo "::error title=NO_APK::/tmp/apk_path.txt empty/missing"; exit 1; }
             echo "::warning title=APK_PICKED::$APK"
             echo "::warning title=APK_ABIS::$(unzip -l "$APK" | grep -o 'lib/[^/]*' | sort -u | tr '\n' ' ')"
             echo "::warning title=EMU_ABILIST::$(adb shell getprop ro.product.cpu.abilist | tr -d '\r')"

@@ -59,8 +59,9 @@ function CursorController:nextInput(state, decision)
   local disp = state.displacement or 16
   if self.lockedPos and self._lastDisp and disp > self._lastDisp + 6 then
     self.lockedPos[1] = self.lockedPos[1] + 1
+    if self.lockedSeq then for _, sw in ipairs(self.lockedSeq) do sw[1] = sw[1] + 1 end end -- the whole chip shifts up
     if self.lockedPos[1] > (state.rows or 12) then
-      self.locked, self.lockedPos = nil, nil -- shifted off the top; re-decide
+      self.locked, self.lockedPos, self.lockedSeq = nil, nil, nil -- shifted off the top; re-decide
     else
       self.locked = self.lockedPos[1] .. "," .. self.lockedPos[2]
     end
@@ -76,19 +77,33 @@ function CursorController:nextInput(state, decision)
     return char(32) -- raise is a held action; APM cap doesn't apply
   end
 
-  -- SWAP: acquire a target to commit to (ignoring brain changes mid-execution)
-  local tr, tc = decision.pos[1], decision.pos[2]
-  local key = tr .. "," .. tc
+  -- SWAP: lock onto the chip's FULL swap sequence and complete it, ignoring brain changes until every swap is done.
   if not self.locked then
-    self.locked, self.lockedPos, self.swapped = key, { tr, tc }, false
+    self.lockedSeq = decision.swaps or { { decision.pos[1], decision.pos[2] } }
+    self.seqIdx = 1
+    self.lockedPos = { self.lockedSeq[1][1], self.lockedSeq[1][2] }
+    self.locked = self.lockedPos[1] .. "," .. self.lockedPos[2]
+    self.swapped, self.interSwap = false, 0
     -- reaction delay only when engaging out of idle (noticing a new situation)
     self.reactionTimer = self.idle and jitter(self, self.cfg.reactionFrames) or 0
   end
   self.idle = false
 
   if self.swapped then
-    self.locked = nil -- swap done; release so next frame takes a fresh decision
-    return IDLE
+    self.seqIdx = self.seqIdx + 1
+    if self.lockedSeq and self.seqIdx <= #self.lockedSeq then
+      -- next swap in the chip: re-target it, and let the prior swap LAND first (the verify settles between swaps too)
+      self.lockedPos = { self.lockedSeq[self.seqIdx][1], self.lockedSeq[self.seqIdx][2] }
+      self.locked = self.lockedPos[1] .. "," .. self.lockedPos[2]
+      self.swapped, self.interSwap = false, 6
+    else
+      self.locked, self.lockedSeq = nil, nil -- whole chip done; release for a fresh decision
+      return IDLE
+    end
+  end
+  if (self.interSwap or 0) > 0 then
+    self.interSwap = self.interSwap - 1
+    return IDLE -- waiting for the prior swap in this chip to settle before the next
   end
   if self.reactionTimer > 0 then
     self.reactionTimer = self.reactionTimer - 1

@@ -23,6 +23,20 @@ in the same four steps. This is the reusable plan.
 
 Naming composes: `COMBO_<N>[_<N2>][_CASCADE_<M>][_SWAP_<S>_MOVE_<K>]`.
 
+## Build big clears by COMPOSITION, never brute force
+
+A single-color line longer than the board (7+) can't fit, and brute-forcing N-panel placements explodes
+(C(48,7) ≈ 73M for N=7 — don't). **Build off what we already know:** a clear of size `N` is a two-color **split**
+of `a + b = N` made by composing a known `a`-run with a known `b`-run.
+
+- `getSplitShapes.enumerate(sa, sb)` is parametrized by run sizes → kind `COMBO_<sa>_<sb>`. It places a straight
+  `sa`-run of one color next to a straight `sb`-run of another, undoes the boundary swap, and engine-verifies the swap
+  fires exactly `sa + sb`. Its `produce()` bakes the size pairs we want (e.g. `{3,3}`=6, `{3,4}`=7).
+- Example: **7 = 3 + 4** → `COMBO_3_4` (8 shapes), composed from the 3-runs and 4-runs we enumerate — no brute force.
+- Run the same 4 steps on the split: shapes → 2-swap → cascade → cascade-2-swap, all parametrized by `(sa, sb)`.
+
+So to "do N": pick a decomposition `a + b = N`, add the pair to the split generators' `PAIRS`, done.
+
 ## The gates (what makes a chip valid)
 
 - **No pre-existing match** on the puzzle board.

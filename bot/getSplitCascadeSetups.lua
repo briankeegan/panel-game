@@ -50,21 +50,21 @@ local function realMatch(g)
   return false
 end
 -- true if SOME single swap clears the WHOLE 3+3+3 -> not a forced 2-swap, reject
-local function anySwapWins(g, str)
+local function anySwapWins(g, str, sa, sb)
   for r = 1, H do for c = 1, W - 1 do
     if g[r][c] ~= g[r][c+1] and realMatch(applySwapSettle(g, r, c)) then
       local d = clearedBy(str, { { r, c } })
-      if d[1] == 3 and d[2] == 3 and d[3] == 3 then return true end
+      if d[1] == sa and d[2] == sb and d[3] == 3 then return true end
     end
   end end
   return false
 end
 
 ------------------------------------------------------------------ enumerate: unsolve each split-cascade, gated
-local function enumerate(R)
-  R = R or 2
+local function enumerate(sa, sb, R)
+  sa, sb, R = sa or 3, sb or 3, R or 2
   local out, seen = {}, {}
-  for _, base in ipairs(getSplitCascadeShapes.enumerate()) do
+  for _, base in ipairs(getSplitCascadeShapes.enumerate(sa, sb)) do
     local B0, ar, ac = base.g, base.sr, base.sc
     for br = math.max(1, ar - R), math.min(H, ar + R) do
       for bc = 1, W - 1 do
@@ -74,15 +74,15 @@ local function enumerate(R)
           local _, preMatch = BoardSim.findMatches(g, H)
           if not preMatch then
             local str = gridToStr(g)
-            if not anySwapWins(g, str) then
+            if not anySwapWins(g, str, sa, sb) then
               local fa = clearedBy(str, { { ar, ac } })
               if fa[1] == 0 and fa[2] == 0 and fa[3] == 0 then                       -- fire alone clears nothing
                 local d = clearedBy(str, { { br, bc }, { ar, ac } })
-                if d[1] == 3 and d[2] == 3 and d[3] == 3 and d[4] == 0 then           -- setup+fire clears 3 A + 3 B + 3 C
+                if d[1] == sa and d[2] == sb and d[3] == 3 and d[4] == 0 then         -- setup+fire clears sa A + sb B + 3 C
                   local sig = str .. "|" .. br .. "," .. bc
                   if not seen[sig] then seen[sig] = true
                     out[#out+1] = { g = g, sr = ar, sc = ac, s1 = { br, bc }, moves = moves,
-                                    kind = string.format("COMBO_3_3_CASCADE_3_SWAP_2_MOVE_%d", moves) }
+                                    kind = string.format("COMBO_%d_%d_CASCADE_3_SWAP_2_MOVE_%d", sa, sb, moves) }
                   end
                 end
               end
@@ -126,9 +126,12 @@ local function filmstrip(start, s1, s2)
   print(string.format("  STEP 3 of 3 — swap 2 fire (%d,%d), cascades to 3+3+3:", s2[1], s2[2])); frame(mid, minc, maxc, maxr, { s2[1], s2[2], "swap" })
 end
 
+local PAIRS = { { 3, 3 }, { 3, 4 } }
+
 if arg and arg[0] and arg[0]:match("getSplitCascadeSetups") then
-  local found = enumerate(RAD)
-  print(string.format("COMBO_3_3_CASCADE_3_SWAP_2 (split-cascade needing a setup swap), radius %d: %d variants   [ 1/2=combo · 3=trigger · *=support · [..]=swap · <..>=cursor ]\n", RAD, #found))
+  local sa, sb = tonumber(arg[1]) or 3, tonumber(arg[2]) or 3
+  local found = enumerate(sa, sb, RAD)
+  print(string.format("COMBO_%d_%d_CASCADE_3_SWAP_2 (split-cascade needing a setup swap), radius %d: %d variants   [ 1/2=combo · 3=trigger · *=support · [..]=swap · <..>=cursor ]\n", sa, sb, RAD, #found))
   for i, v in ipairs(found) do
     print(string.format("#%d  %s  |  swap1 (%d,%d), swap2 (%d,%d)", i, v.kind, v.s1[1], v.s1[2], v.sr, v.sc))
     filmstrip(v.g, v.s1, { v.sr, v.sc }); print("")
@@ -136,13 +139,15 @@ if arg and arg[0] and arg[0]:match("getSplitCascadeSetups") then
   local bake = require("bot.chipBake")
   local chips = {}
   for _, v in ipairs(found) do chips[#chips+1] = bake.author(v.g, v.sr, v.sc, v.kind, { v.s1, { v.sr, v.sc } }) end
-  local cnt2 = bake.upsert("^COMBO_3_3_CASCADE_3_SWAP_2", chips)
-  print(string.format("baked %d COMBO_3_3_CASCADE_3_SWAP_2 chips into cache (cache now %d total)", #chips, cnt2))
+  local cnt2 = bake.upsert(string.format("^COMBO_%d_%d_CASCADE_3_SWAP_2", sa, sb), chips)
+  print(string.format("baked %d COMBO_%d_%d_CASCADE_3_SWAP_2 chips into cache (cache now %d total)", #chips, sa, sb, cnt2))
 end
 
 local function produce()
   local out = {}
-  for _, v in ipairs(enumerate(2)) do out[#out+1] = { g = v.g, sr = v.sr, sc = v.sc, kind = v.kind, absSwaps = { v.s1, { v.sr, v.sc } } } end
+  for _, p in ipairs(PAIRS) do
+    for _, v in ipairs(enumerate(p[1], p[2], 2)) do out[#out+1] = { g = v.g, sr = v.sr, sc = v.sc, kind = v.kind, absSwaps = { v.s1, { v.sr, v.sc } } } end
+  end
   return out
 end
 require("bot.chipRegistry").register{ name = "getSplitCascadeSetups", produce = produce }

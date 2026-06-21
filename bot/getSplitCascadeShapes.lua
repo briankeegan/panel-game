@@ -41,7 +41,8 @@ local function bld(str)
   return m, st
 end
 -- swapping (r,c)<->(r,c+1) must clear EXACTLY 3 A + 3 B + 3 C (and nothing else)
-local function firesSplitCascade(g, r, c)
+-- swapping (r,c)<->(r,c+1) must clear EXACTLY sa A + sb B + 3 C (trigger), nothing else
+local function firesSplitCascade(g, r, c, sa, sb)
   local ok, res = pcall(function()
     local m, st = bld(stackString(g))
     local function cnt(col) local n=0 for rr=1,st.height do for cc=1,6 do if (st.panels[rr][cc].color or 0)==col then n=n+1 end end end return n end
@@ -49,27 +50,16 @@ local function firesSplitCascade(g, r, c)
     local a0,b0,c0,o0 = cnt(A),cnt(B),cnt(C),others()
     st.cur_row, st.cur_col = r, c; st:receiveConfirmedInput(KDE.swap); m:run()
     for k = 1, 160 do if st:game_ended() then break end st:receiveConfirmedInput("A"); m:run(); if k >= 2 and not st:hasActivePanels() and not st:hasChainingPanels() then break end end
-    return (a0-cnt(A))==3 and (b0-cnt(B))==3 and (c0-cnt(C))==3 and (o0-others())==0
+    return (a0-cnt(A))==sa and (b0-cnt(B))==sb and (c0-cnt(C))==3 and (o0-others())==0
   end)
   return ok and res
 end
 
--- brute-force EVERY swap on a board; record any that fires the full 3+3+3 split-cascade
-local function recordFires(g, found, kind)
-  if anyRun(g) then return end
-  for r = 1, 8 do for c = 1, W - 1 do
-    if (g[r][c] ~= 0 or g[r][c+1] ~= 0) and g[r][c] ~= g[r][c+1] and firesSplitCascade(g, r, c) then
-      local kk = shapeCache.canonShape(g)
-      if kk and not found[kk] then found[kk] = { g = clone(g), sample = clone(g), sr = r, sc = c, key = kk, kind = kind } end
-    end
-  end end
-end
-
--- every straight 3-run (horizontal or vertical) in a low window — the wave-2 (post-fall) shape of one combo color
-local function straightRuns()
+-- every straight n-run (horizontal or vertical) in a low window — the wave-2 (post-fall) shape of one combo color
+local function straightRuns(n)
   local out = {}
-  for r = 1, 4 do for c = 1, W - 2 do out[#out+1] = { {r,c},{r,c+1},{r,c+2} } end end     -- horizontal
-  for r = 1, 2 do for c = 1, W do out[#out+1] = { {r,c},{r+1,c},{r+2,c} } end end          -- vertical
+  for r = 1, 5 do for c = 1, W - (n-1) do local s={}; for i=0,n-1 do s[#s+1]={r,c+i} end; out[#out+1]=s end end          -- horizontal
+  for r = 1, 5 - (n-1) do for c = 1, W do local s={}; for i=0,n-1 do s[#s+1]={r+i,c} end; out[#out+1]=s end end          -- vertical
   return out
 end
 
@@ -79,11 +69,13 @@ end
 -- the trigger boundary breaks non-uniformly, which is exactly how horizontal/bent completions arise. Place 2 trigger
 -- C's + 1 displaced (an end) so a single swap fires it; the ENGINE confirms the 3+3+3 cascade. Pre-match check throws
 -- out the uniform (still-matched) raises.
-local function enumerate()
+local function enumerate(sa, sb)
+  sa, sb = sa or 3, sb or 3
+  local kind = string.format("COMBO_%d_%d_CASCADE_3", sa, sb)
   local found = {}
-  local RUNS = straightRuns()
-  for _, Arun in ipairs(RUNS) do
-    for _, Brun in ipairs(RUNS) do
+  local RunsA, RunsB = straightRuns(sa), straightRuns(sb)
+  for _, Arun in ipairs(RunsA) do
+    for _, Brun in ipairs(RunsB) do
       local occ = {}; local bad = false
       for _, p in ipairs(Arun) do occ[p[1]*100+p[2]] = A end
       for _, p in ipairs(Brun) do local k=p[1]*100+p[2]; if occ[k] then bad=true break end occ[k]=B end
@@ -113,9 +105,9 @@ local function enumerate()
                   g[trow][missing] = filler(trow, missing); g[trow][dcol] = C
                   support(g)
                   local sc = (disp == "L") and dcol or (tc + 2)          -- the swap that completes the trigger run
-                  if not anyRun(g) and firesSplitCascade(g, trow, sc) then
+                  if not anyRun(g) and firesSplitCascade(g, trow, sc, sa, sb) then
                     local kk = shapeCache.canonShape(g)
-                    if kk and not found[kk] then found[kk] = { g = clone(g), sample = clone(g), sr = trow, sc = sc, key = kk, kind = "COMBO_3_3_CASCADE_3" } end
+                    if kk and not found[kk] then found[kk] = { g = clone(g), sample = clone(g), sr = trow, sc = sc, key = kk, kind = kind } end
                   end
                 end
               end
@@ -150,9 +142,12 @@ local function render(rec)
   return lines
 end
 
+local PAIRS = { { 3, 3 }, { 3, 4 } }
+
 if arg and arg[0] and arg[0]:match("getSplitCascadeShapes") then
-  local list = enumerate()
-  print(string.format("COMBO_3_3_CASCADE_3 (fire 3s -> 1s/2s fall -> 3+3): %d distinct   (1/2=combo · 3=trigger · *=support · [..]=swap)\n", #list))
+  local sa, sb = tonumber(arg[1]) or 3, tonumber(arg[2]) or 3
+  local list = enumerate(sa, sb)
+  print(string.format("COMBO_%d_%d_CASCADE_3 (fire trigger -> A/B fall -> %d+%d): %d distinct   (1/2=combo · 3=trigger · *=support · [..]=swap)\n", sa, sb, sa, sb, #list))
   for i, rec in ipairs(list) do
     print(string.format("#%d  swap (%d,%d)", i, rec.sr, rec.sc))
     for _, row in ipairs(render(rec)) do print(row) end
@@ -161,13 +156,15 @@ if arg and arg[0] and arg[0]:match("getSplitCascadeShapes") then
   local bake = require("bot.chipBake")
   local chips = {}
   for _, v in ipairs(list) do chips[#chips+1] = bake.author(v.g, v.sr, v.sc, v.kind, { { v.sr, v.sc } }) end
-  local cnt = bake.upsert("^COMBO_3_3_CASCADE_3$", chips)
-  print(string.format("baked %d COMBO_3_3_CASCADE_3 chips into cache (cache now %d total)", #chips, cnt))
+  local cnt = bake.upsert(string.format("^COMBO_%d_%d_CASCADE_3$", sa, sb), chips)
+  print(string.format("baked %d COMBO_%d_%d_CASCADE_3 chips into cache (cache now %d total)", #chips, sa, sb, cnt))
 end
 
 local function produce()
   local out = {}
-  for _, v in ipairs(enumerate()) do out[#out+1] = { g = v.g, sr = v.sr, sc = v.sc, kind = v.kind, absSwaps = { { v.sr, v.sc } } } end
+  for _, p in ipairs(PAIRS) do
+    for _, v in ipairs(enumerate(p[1], p[2])) do out[#out+1] = { g = v.g, sr = v.sr, sc = v.sc, kind = v.kind, absSwaps = { { v.sr, v.sc } } } end
+  end
   return out
 end
 require("bot.chipRegistry").register{ name = "getSplitCascadeShapes", produce = produce }

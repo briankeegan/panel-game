@@ -111,6 +111,10 @@ local function runGame(scenario, seed)
   -- firing matches during its simulation -- those get rolled back but the signal already fired). bigCombos/sent are
   -- still signal-based, so treat them as upper bounds for now.
   s.cleared = s.enginePanelsCleared
+  -- HISTORY: save this game as a standard engine replay (re-simmable + watchable) so behavior is never reverse-
+  -- engineered from scratch -- reload it, or re-sim to any frame and ask the brain what it saw on that exact board.
+  os.execute("mkdir -p logs/botreplays 2>/dev/null")
+  require("bot.saveReplay").save(match, string.format("logs/botreplays/%s_seed%d.json", scenario.name, seed))
   return s
 end
 

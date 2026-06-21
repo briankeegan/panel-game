@@ -67,6 +67,10 @@ end
 --   in between      -> OFFENSE (hunt/build combos at leisure)
 local RAISE_BELOW = 4
 local DANGER_ABOVE = 9
+-- DYNAMIC raise: never raise past a height that leaves this many rows of recovery headroom below the top, so a raise
+-- can NEVER top us out. The target also reserves room for pending incoming garbage, and rises on its own as clearing
+-- keeps the stack lower. (Tighten as clearing improves; raise-to-death is a bug, so this stays safe.)
+local RECOVERY_BUFFER = 6
 
 -- chip priorities = EVERY kind authored in bot/chipCache.lua, so this auto-includes new families on a cache update.
 -- Order: READY clears (no 2-swap setup) first, then the 2-swap SETUPS; within each group, bigger base + deeper cascade
@@ -121,12 +125,18 @@ function EnvelopeBrain:decide(state, stack, match)
     if chip then
       self._comboUse = self._comboUse or {}; self._comboUse[chip.kind] = (self._comboUse[chip.kind] or 0) + 1
       move = { type = "SWAP", pos = chip.swaps[1], swaps = chip.swaps }  -- full sequence; the controller completes it
-    elseif st == "RAISE" and not busy and (state.stopTime or 0) == 0 then
-      move = { type = "RAISE" }              -- HARD SAFETY: only raise when genuinely LOW (<=RAISE_BELOW) -> always a big
-                                             -- buffer to the top, so raise can NEVER top us out. Also settled (rise_lock)
-                                             -- and no stop_time to waste. Raise must never kill -- if it can, the gate is wrong.
     else
-      move = { type = "WAIT" }               -- no chip + breaking, or in danger -> wait (the brain keeps searching anyway)
+      -- DYNAMIC safe-raise: climb only up to a target that still leaves RECOVERY_BUFFER rows to the top AND room to
+      -- absorb pending incoming garbage. The target SELF-LIMITS, so a raise can never top us out (raise-to-death is a
+      -- bug); it rises on its own as clearing keeps the stack lower. Settled (rise_lock) + no stop_time to waste.
+      local incomingRows = 0
+      for _, g in ipairs(state.incoming or {}) do incomingRows = incomingRows + (g.h or 0) end
+      local raiseTarget = (state.height or 12) - RECOVERY_BUFFER - incomingRows
+      if not busy and (state.stopTime or 0) == 0 and height < raiseTarget then
+        move = { type = "RAISE" }            -- low enough that raising still leaves a full recovery buffer -> safe
+      else
+        move = { type = "WAIT" }             -- no safe headroom to raise (or breaking) -> wait; the brain keeps searching
+      end
     end
   end
   self._sig, self._move = sig, move

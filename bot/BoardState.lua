@@ -191,14 +191,25 @@ function M.derive(cap)
   local board, width, rows = cap.board, cap.width, cap.rows
   local columnHeights = {}
   for c = 1, width do columnHeights[c] = 0 end
+  -- GARBAGE GEOMETRY (the states hinge on these -- raw isGarbage is per-cell, but nobody derived these before):
+  -- lowestGarbageRow = the row a garbage block will break at first; nonGarbageRows = rows of real playable material
+  -- (RAISE keys on "< 5"); cursorToGarbage = how far the cursor is from that break point (DANGER sub-states).
+  local lowestGarbageRow, nonGarbageRows = nil, 0
   for r = 1, rows do
     local row = board[r]
+    local hasReal, hasGarbage = false, false
     for c = 1, width do
-      if row[c].c ~= 0 then columnHeights[c] = r end -- highest occupied row per column
+      local cell = row[c]
+      if cell.c ~= 0 then columnHeights[c] = r end   -- highest occupied row per column
+      if cell.isGarbage then hasGarbage = true
+      elseif cell.c ~= 0 then hasReal = true end
     end
+    if hasGarbage and not lowestGarbageRow then lowestGarbageRow = r end
+    if hasReal then nonGarbageRows = nonGarbageRows + 1 end
   end
   local maxColHeight = 0
   for c = 1, width do if columnHeights[c] > maxColHeight then maxColHeight = columnHeights[c] end end
+  local cursorToGarbage = lowestGarbageRow and math.abs((cap.cur_row or 0) - lowestGarbageRow) or nil
   local height = cap.height or 12
 
   return {
@@ -209,6 +220,10 @@ function M.derive(cap)
     columnHeights = columnHeights,
     maxColHeight = maxColHeight,
     danger = maxColHeight >= (height - 1),
+    -- garbage geometry (the states hinge on these; nil garbage row = no garbage on board)
+    lowestGarbageRow = lowestGarbageRow,
+    nonGarbageRows = nonGarbageRows,
+    cursorToGarbage = cursorToGarbage,
     incoming = cap.incoming,
     -- INVINCIBILITY (derived from the raw timers; see bot/TIMING_L10.md): three sources of
     -- "can't rise / can't top out", do NOT stack (max-based). The bot must SEE its window.

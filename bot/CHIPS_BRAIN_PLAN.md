@@ -2,7 +2,7 @@
 
 The current bot is **scan-first / reactive**: each frame it scans every swap and fires the single best one.
 This redesign is **state-first / intentional**: the *situation* picks the tactic, and **chips are the vocabulary**.
-The bot should almost always have a playable chip; **scanning is a last-resort fallback, only in DANGER.**
+The bot should almost always have a playable chip.
 
 ## Ground truth (verified 2026-06-19 before writing this)
 - The chip **catalog (STORE) is EMPTY at runtime** — nothing authors into it at startup, so `chips.play` is a
@@ -42,20 +42,9 @@ Today: grid, cursor, height, incoming. ADD: `toppedOut`, `health` + `healthTrend
 - **searchPriorities**: directional order to look **outward FROM THE CURSOR**, e.g. `[LEFT,RIGHT,UP,DOWN]` =
   search left, then right, then up, then down, extending out, same order. `[LEFT,RIGHT,UP]` eases upward only.
 - **maxDistance**: only look for a chip within this radius of the cursor (a far chip costs too many cursor moves to
-  reach). If NO chip is found within maxDistance → useChips returns nil → **then the scan runs** (Brian, 2026-06-19).
-  So the order is: bounded local chip search → fail → construct (scan).
+  reach). If NO chip is found within maxDistance → useChips returns nil.
 - Returns the top-priority **playable** chip (recognized + verified).
 - **State (FALLING, IS_CHAINING) is read from ENGINE signals** (`garbageMatched`, `chain_counter`, fall state).
-
-### SCAN — the fallback construction search (Brian, 2026-06-19; only when NO immediate chip + in DANGER)
-The scan does NOT pick a swap. It **builds a path to a playable chip**, using `useChips` as its leaf test:
-1. Imagine one move (a swap, in its head — `rollbackCopy` clone).
-2. Re-run `useChips` on that hypothetical board.
-3. If a verified chip appears → plan = `[imagined move(s)] + [the chip]`. Done.
-4. Else imagine another move from there and repeat (deepen) until a chip surfaces or a budget is hit.
-**Why this beats the old `deepFit`:** the leaf test is a VERIFIED chip (run-in-its-head), not a chain-*potential*
-heuristic — so it can't chase phantoms (deepFit scored potential and stalled on mirages, the 65%/phantom problem).
-Keep it TARGETED (Brian: e.g. the 3 rows below the garbage break point), and it could run in parallel.
 
 ### Flows
 - **RAISE** → raise (per condition).
@@ -70,7 +59,7 @@ Keep it TARGETED (Brian: e.g. the 3 rows below the garbage break point), and it 
 
 ### The loop
 1. `BoardState.extract`  2. classify RAISE/DANGER/OFFENSE → enter flow  3. `useChips` with that state's priorities
-4. **only if no chip fits (≈impossible w/ good chips) AND in DANGER → scan**  5. plan from chips  6. emit input.
+4. plan from chips  5. emit input.
 (Cursor mechanics unchanged — not the brain.)
 
 ## Build order — each phase GATED by a botBench measurement, flag-gated alongside the current brain (A/B, never regress blind)

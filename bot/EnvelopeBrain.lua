@@ -69,7 +69,7 @@ local RAISE_BELOW = 4
 local DANGER_ABOVE = 9
 -- only RAISE when the stack is genuinely LOW. Raising near the top fills the board faster than the bot can clear it
 -- and tops it out (raising to <DANGER killed it: died f823 vs 1500). Keep the manual raise to refilling after a clear.
-local RAISE_CEILING = 6
+local RAISE_CEILING = 7
 
 -- chip priorities = EVERY kind authored in bot/chipCache.lua, so this auto-includes new families on a cache update.
 -- Order: READY clears (no 2-swap setup) first, then the 2-swap SETUPS; within each group, bigger base + deeper cascade
@@ -124,8 +124,9 @@ function EnvelopeBrain:decide(state, stack, match)
     if chip then
       self._comboUse = self._comboUse or {}; self._comboUse[chip.kind] = (self._comboUse[chip.kind] or 0) + 1
       move = { type = "SWAP", pos = chip.swaps[1], swaps = chip.swaps }  -- full sequence; the controller completes it
-    elseif not busy and height < RAISE_CEILING then
-      move = { type = "RAISE" }              -- no chip + SETTLED + LOW (refill material; never raise toward the ceiling)
+    elseif not busy and height < RAISE_CEILING and (state.stopTime or 0) == 0 then
+      move = { type = "RAISE" }              -- no chip + SETTLED + LOW + no stop_time to waste (raising RESETS it, so
+                                             -- raising right after a clear throws away the invincibility that pauses the rise)
     else
       move = { type = "WAIT" }               -- no chip + breaking, or in danger -> wait (the brain keeps searching anyway)
     end

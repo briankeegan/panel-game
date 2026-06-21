@@ -86,8 +86,12 @@ function CharacterSelectChallenge:loadUserInterface()
       self.ui.cursors[i] = cursor
     end
 
-    local stageCarousel = self:createStageCarousel(player, stageWidth)
-    self.ui.stageSelection:addElement(stageCarousel, player)
+    -- portrait: only the human player's stage (cramming the AI's in too makes the
+    -- card a messed-up double carousel). Landscape keeps both as before.
+    if player.human or not pm then
+      local stageCarousel = self:createStageCarousel(player, stageWidth)
+      self.ui.stageSelection:addElement(stageCarousel, player)
+    end
 
     self.ui.characterIcons[i] = self:createPlayerIcon(player)
   end

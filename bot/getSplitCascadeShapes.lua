@@ -15,6 +15,20 @@ local LP = require("common.data.LevelPresets"); local KDE = require("common.data
 
 local W, H = 6, 12
 local A, B, C = 1, 2, 3                 -- two combo colors + the trigger color
+-- SETTLE_CAP is a SAFETY CEILING, not a tuning knob: the engine loop early-breaks the instant panels settle, so a big
+-- cap costs nothing (a small cascade still exits in ~30 frames). We only need it above the slowest REAL cascade. We
+-- also measure the actual slowest settle (maxSettle) and count any time we hit the ceiling (capHits) so we KNOW the
+-- headroom as clears get bigger (9s, 10s, ...) instead of guessing.
+local SETTLE_CAP = 1000
+local maxSettle, capHits = 0, 0
+local function settle(st, m)           -- run until the engine reports settled; return the frame it settled on
+  for k = 1, SETTLE_CAP do
+    if st:game_ended() then if k > maxSettle then maxSettle = k end; return k end
+    st:receiveConfirmedInput("A"); m:run()
+    if k >= 2 and not st:hasActivePanels() and not st:hasChainingPanels() then if k > maxSettle then maxSettle = k end; return k end
+  end
+  capHits = capHits + 1; if SETTLE_CAP > maxSettle then maxSettle = SETTLE_CAP end; return SETTLE_CAP
+end
 local function filler(r, c) return ((r + c) % 2 == 0) and 5 or 6 end
 
 local function clone(g) local n = {}; for r = 1, H do n[r] = {}; for c = 1, W do n[r][c] = g[r][c] end end; return n end
@@ -49,7 +63,7 @@ local function firesSplitCascade(g, r, c, sa, sb)
     local function others() local n=0 for rr=1,st.height do for cc=1,6 do local v=st.panels[rr][cc].color or 0; if v~=0 and v~=A and v~=B and v~=C then n=n+1 end end end return n end
     local a0,b0,c0,o0 = cnt(A),cnt(B),cnt(C),others()
     st.cur_row, st.cur_col = r, c; st:receiveConfirmedInput(KDE.swap); m:run()
-    for k = 1, 400 do if st:game_ended() then break end st:receiveConfirmedInput("A"); m:run(); if k >= 2 and not st:hasActivePanels() and not st:hasChainingPanels() then break end end  -- 400: a 4+4/3+5 cascade pops in 2 waves and can take ~170 frames; 160 cut the 2nd wave off
+    settle(st, m)            -- run to the REAL settle (records timing); cap is just a runaway guard
     return (a0-cnt(A))==sa and (b0-cnt(B))==sb and (c0-cnt(C))==3 and (o0-others())==0
   end)
   return ok and res
@@ -158,7 +172,11 @@ if arg and arg[0] and arg[0]:match("getSplitCascadeShapes") then
   for _, v in ipairs(list) do chips[#chips+1] = bake.author(v.g, v.sr, v.sc, v.kind, { { v.sr, v.sc } }) end
   local cnt = bake.upsert(string.format("^COMBO_%d_%d_CASCADE_3$", sa, sb), chips)
   print(string.format("baked %d COMBO_%d_%d_CASCADE_3 chips into cache (cache now %d total)", #chips, sa, sb, cnt))
+  print(string.format("[timing] slowest cascade settled at %d frames (ceiling %d, %.0f%% headroom); ceiling hits: %d",
+    maxSettle, SETTLE_CAP, 100 * (1 - maxSettle / SETTLE_CAP), capHits))
 end
+
+Mod.timing = function() return maxSettle, capHits, SETTLE_CAP end
 
 local function produce()
   local out = {}

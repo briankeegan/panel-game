@@ -13,6 +13,11 @@ local LP = require("common.data.LevelPresets"); local KDE = require("common.data
 local H, W = 12, 6
 local A, B, C = 1, 2, 3
 local RAD = tonumber(arg[1]) or 2
+-- SETTLE_CAP is a SAFETY CEILING only — the loop early-breaks the instant the engine settles, so a big cap costs
+-- nothing. maxSettle/capHits record the slowest cascade we actually saw and whether we ever hit the ceiling, so we
+-- know our headroom as clears grow (9s, 10s) instead of guessing a frame count.
+local SETTLE_CAP = 1000
+local maxSettle, capHits = 0, 0
 
 ------------------------------------------------------------------ engine verify: count A/B/C/other cleared
 local function gridToStr(g)
@@ -32,7 +37,10 @@ local function clearedBy(str, swaps)        -- {aCleared, bCleared, cCleared, ot
   local ok, res = pcall(function()
     local m, st = bld(str); local a0,b0,c0,o0 = cnt(st,A),cnt(st,B),cnt(st,C),cntOther(st)
     for _, s in ipairs(swaps) do st.cur_row, st.cur_col = s[1], s[2]; st:receiveConfirmedInput(KDE.swap); m:run()
-      for j = 1, 400 do if st:game_ended() then break end st:receiveConfirmedInput("A"); m:run() if j >= 3 and not st:hasActivePanels() and not st:hasChainingPanels() then break end end end  -- 400: 2-wave 4+4/3+5 cascades take ~170 frames
+      local f = SETTLE_CAP   -- run to the REAL settle; cap is just a runaway guard, early-break stops first
+      for j = 1, SETTLE_CAP do if st:game_ended() then f=j; break end st:receiveConfirmedInput("A"); m:run() if j >= 3 and not st:hasActivePanels() and not st:hasChainingPanels() then f=j; break end end
+      if f > maxSettle then maxSettle = f end; if f >= SETTLE_CAP then capHits = capHits + 1 end
+    end
     return { a0-cnt(st,A), b0-cnt(st,B), c0-cnt(st,C), o0-cntOther(st) }
   end)
   return ok and res or { 0, 0, 0, 0 }
@@ -141,6 +149,8 @@ if arg and arg[0] and arg[0]:match("getSplitCascadeSetups") then
   for _, v in ipairs(found) do chips[#chips+1] = bake.author(v.g, v.sr, v.sc, v.kind, { v.s1, { v.sr, v.sc } }) end
   local cnt2 = bake.upsert(string.format("^COMBO_%d_%d_CASCADE_3_SWAP_2", sa, sb), chips)
   print(string.format("baked %d COMBO_%d_%d_CASCADE_3_SWAP_2 chips into cache (cache now %d total)", #chips, sa, sb, cnt2))
+  print(string.format("[timing] slowest cascade settled at %d frames (ceiling %d, %.0f%% headroom); ceiling hits: %d",
+    maxSettle, SETTLE_CAP, 100 * (1 - maxSettle / SETTLE_CAP), capHits))
 end
 
 local function produce()
@@ -152,4 +162,4 @@ local function produce()
 end
 require("bot.chipRegistry").register{ name = "getSplitCascadeSetups", produce = produce }
 
-return { enumerate = enumerate }
+return { enumerate = enumerate, timing = function() return maxSettle, capHits, SETTLE_CAP end }

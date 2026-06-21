@@ -120,7 +120,7 @@ local function render(rec)
 end
 
 -- the two-color split sizes the registry bakes: 3+3 (=6) and 3+4 (=7)
-local PAIRS = { { 3, 3 }, { 3, 4 } }
+local PAIRS = { { 3, 3 }, { 3, 4 }, { 4, 4 }, { 3, 5 } }
 
 if arg and arg[0] and arg[0]:match("getSplitShapes") then
   local sa, sb = tonumber(arg[1]) or 3, tonumber(arg[2]) or 3

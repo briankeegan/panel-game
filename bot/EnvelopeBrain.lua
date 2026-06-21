@@ -68,16 +68,23 @@ end
 local RAISE_BELOW = 4
 local DANGER_ABOVE = 9
 
--- chip vocabulary in priority order: READY clears first (cascades clear more, so ahead of their plain base), biggest
--- first; then the 2-swap SETUPS (build toward a combo) last. Every kind here is authored in bot/chipCache.lua.
-local CHIP_PRIORITIES = {
-  "COMBO_5_CASCADE_4", "COMBO_5_CASCADE_3", "COMBO_4_CASCADE_3", "COMBO_3_3_CASCADE_3",
-  "COMBO_5", "COMBO_4", "COMBO_3_3", "COMBO_3",
-  "COMBO_5_CASCADE_4_SWAP_2_MOVE_1", "COMBO_5_CASCADE_3_SWAP_2_MOVE_1", "COMBO_4_CASCADE_3_SWAP_2_MOVE_1",
-  "COMBO_5_CASCADE_4_SWAP_2_MOVE_2", "COMBO_5_CASCADE_3_SWAP_2_MOVE_2", "COMBO_4_CASCADE_3_SWAP_2_MOVE_2",
-  "COMBO_5_SWAP_2_MOVE_1", "COMBO_4_SWAP_2_MOVE_1", "COMBO_3_3_SWAP_2_MOVE_1", "COMBO_3_SWAP_2_MOVE_1",
-  "COMBO_5_SWAP_2_MOVE_2", "COMBO_4_SWAP_2_MOVE_2", "COMBO_3_SWAP_2_MOVE_2",
-}
+-- chip priorities = EVERY kind authored in bot/chipCache.lua, so this auto-includes new families on a cache update.
+-- Order: READY clears (no 2-swap setup) first, then the 2-swap SETUPS; within each group, bigger base + deeper cascade
+-- first (they clear more).
+local function buildChipPriorities()
+  local cache = require("bot.chipCache")
+  local seen, kinds = {}, {}
+  for _, c in ipairs(cache) do if not seen[c.kind] then seen[c.kind] = true; kinds[#kinds + 1] = c.kind end end
+  local function rank(k)
+    local setup = k:find("SWAP_2", 1, true) and 1 or 0       -- 2-swap setups sort after ready clears
+    local base = tonumber(k:match("COMBO_(%d)")) or 0        -- base combo size
+    local casc = tonumber(k:match("CASCADE_(%d)")) or 0      -- cascade depth
+    return setup * 1000 - (base * 10 + casc)                 -- ready first; bigger/deeper first
+  end
+  table.sort(kinds, function(a, b) local ra, rb = rank(a), rank(b); if ra ~= rb then return ra < rb end return a < b end)
+  return kinds
+end
+local CHIP_PRIORITIES = buildChipPriorities()
 
 ------------------------------------------------------------------ DECIDE (stateless, re-measured every frame)
 function EnvelopeBrain:decide(state, stack, match)

@@ -128,13 +128,14 @@ function EnvelopeBrain:decide(state, stack, match)
   --   OFFENSE (default)          -> build big: every chip, search all directions.
   local move
   do
-    local st = ((state.toppedOut or height >= DANGER_ABOVE) and "DANGER")  -- near the ceiling: the emergency
-      or ((state.nonGarbageRows or 99) < 5 and "RAISE")                    -- low real material: feed the stack
+    local st = ((state.danger or state.toppedOut) and "DANGER")  -- within 1 row of the top: the emergency, clear NOW
+      or ((state.nonGarbageRows or 99) < 5 and "RAISE")          -- low real material: feed the stack
       or "OFFENSE"
     self._state = st
-    -- DANGER clears NOW (ready single-swap first), easing the cursor UP toward the top; OFFENSE builds big, all dirs.
+    -- DANGER clears NOW (ready single-swap clears first); OFFENSE builds big (cascades/setups first). Same all-direction
+    -- search -- both must find any chip that exists; ease-up belongs to a DANGER sub-state we haven't built yet.
     local priorities = (st == "DANGER") and DANGER_PRIORITIES or OFFENSE_PRIORITIES
-    local search = (st == "DANGER") and { "UP", "LEFT", "RIGHT" } or { "UP", "DOWN", "LEFT", "RIGHT" }
+    local search = { "UP", "DOWN", "LEFT", "RIGHT" }
     local chip = useChips.useChips(grid, rows, cursor, {
       chipPriorities = priorities, searchPriorities = search,
       verify = self:chipVerify(stack, match), touchable = touchable,

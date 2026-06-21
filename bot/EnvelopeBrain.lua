@@ -13,46 +13,36 @@ function EnvelopeBrain.new(_opts)
   return setmetatable({}, EnvelopeBrain)
 end
 
------------------------------------------------------------------- ENGINE VERIFY (the HARD RULE: never play unverified)
--- Rebuild a throwaway Match from the grid and play the route on the REAL engine -- engine truth, NO BoardSim. A flat
--- grid can't reconstruct garbage, so a garbage board returns false (no break chips yet).
+------------------------------------------------------------------ ENGINE VERIFY (garbage-faithful, via match rollback)
+-- Play the candidate swaps on the LIVE board itself: save every stack, play the swaps via match:run (which processes
+-- input + physics + garbage faithfully, unlike a bare stack:run), count this stack's panels_cleared delta (rise-robust),
+-- then rollback EVERY stack to restore (so a 2p opponent isn't desynced). No text rebuild -> faithful on GARBAGE.
 local KDE_swap = nil
-local function gridToStack(grid, rows)
-  local out = {}
-  for r = rows, 1, -1 do for c = 1, BoardSim.WIDTH do
-    local v = grid[r][c] or 0
-    if v == BoardSim.GARBAGE then return nil end
-    out[#out + 1] = tostring(v)
-  end end
-  return table.concat(out)
-end
-local function engineVerifyFull(stack, seq)
-  local ok, result = pcall(function()
-    local Match = require("common.engine.Match"); require("common.engine.checkMatches")
-    local Puzzle = require("common.engine.Puzzle"); local LP = require("common.data.LevelPresets")
-    if not KDE_swap then KDE_swap = require("common.data.KeyDataEncoding").swap end
-    local p = Puzzle({ puzzleType = "moves", stack = stack, moves = 99 })
-    local m = Match(p:toPanelSource(false), p:toGameMode().matchRules)
-    local st = m:createStackWithSettings(LP.getModern(10), true, "controller", nil)
-    st:setMaxRunsPerFrame(1); m:start()
-    local function pan() local n = 0 for r = 1, st.height do for c = 1, 6 do local v = st.panels[r][c].color or 0; if v ~= 0 and v ~= 9 then n = n + 1 end end end return n end
-    for i = 1, 200 do if st:game_ended() then break end st:receiveConfirmedInput("A"); m:run() if i >= 2 and not st:hasActivePanels() and not st:hasChainingPanels() then break end end
-    local pb = pan()
-    for _, mv in ipairs(seq) do
-      st.cur_row, st.cur_col = mv[1], mv[2]; st:receiveConfirmedInput(KDE_swap); m:run()
-      for k = 1, 80 do if st:game_ended() then break end st:receiveConfirmedInput("A"); m:run() if k >= 2 and not st:hasActivePanels() and not st:hasChainingPanels() then break end end
-    end
-    return pan() < pb
-  end)
-  if not ok then return false end
-  return result
-end
-function EnvelopeBrain:chipVerify(grid, rows)
+function EnvelopeBrain:chipVerify(stack, match)
   return function(seq)
-    if not seq or #seq == 0 then return false end
-    local stack = gridToStack(grid, rows)
-    if not stack then return false end
-    return engineVerifyFull(stack, seq) == true
+    if not stack or not match or not seq or #seq == 0 then return false end
+    if not KDE_swap then KDE_swap = require("common.data.KeyDataEncoding").swap end
+    local ok, fired = pcall(function()
+      local clock0 = stack.clock
+      for _, s in ipairs(match.stacks) do s:saveForRollback() end
+      stack.stop_time = math.max(stack.stop_time or 0, 999)  -- FREEZE the auto-rise, or a rising row could fire the match instead of the swap
+      local hit = false
+      local token = {}  -- weak-keyed subscriber held in scope; "matched"/"garbageMatched" fire the INSTANT a clear is detected -- no pop-window guess
+      stack:connectSignal("matched", token, function() hit = true end)
+      stack:connectSignal("garbageMatched", token, function() hit = true end)
+      for _, mv in ipairs(seq) do
+        stack.cur_row, stack.cur_col = mv[1], mv[2]; stack:receiveConfirmedInput(KDE_swap); match:run()
+        for k = 1, 20 do
+          if hit then break end
+          stack:receiveConfirmedInput("A"); match:run()
+          if not stack:hasActivePanels() and not stack:hasChainingPanels() then break end
+        end
+      end
+      stack:disconnectSignal("matched", token); stack:disconnectSignal("garbageMatched", token)
+      for _, s in ipairs(match.stacks) do s:rollbackToFrame(clock0) end
+      return hit
+    end)
+    return ok and fired or false
   end
 end
 
@@ -79,7 +69,7 @@ local RAISE_BELOW = 4
 local DANGER_ABOVE = 9
 
 ------------------------------------------------------------------ DECIDE (stateless, re-measured every frame)
-function EnvelopeBrain:decide(state)
+function EnvelopeBrain:decide(state, stack, match)
   local rows = state.rows
   local grid = BoardSim.colorGrid(state.board, rows)
   local height = state.maxColHeight or BoardSim.maxHeight(grid, rows)
@@ -105,7 +95,7 @@ function EnvelopeBrain:decide(state)
 
     local chip = useChips.useChips(grid, rows, cursor, {                  -- READY chip, cursor-outward
       chipPriorities = { "COMBO_5", "COMBO_4" }, searchPriorities = { "UP", "DOWN", "LEFT", "RIGHT" },
-      verify = self:chipVerify(grid, rows),
+      verify = self:chipVerify(stack, match),
     })
     if chip then
       self._comboUse = self._comboUse or {}; self._comboUse[chip.kind] = (self._comboUse[chip.kind] or 0) + 1

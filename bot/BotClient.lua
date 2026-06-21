@@ -392,7 +392,7 @@ function BotClient:tickMatch()
     local char
     if self.brain then
       local st = self.boardState.extract(stack)
-      local decision = self.brain:decide(st)
+      local decision = self.brain:decide(st, stack, self.match)
       char = self.controller:nextInput(st, decision)
       self.lastState, self.lastDecision = st, decision -- exposed for the game emitter
       -- decide->execute instrumentation (split "brain WAITs/picks bad" from

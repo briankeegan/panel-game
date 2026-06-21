@@ -82,7 +82,7 @@ local function runGame(scenario, seed)
     local g = scenario.garbage(frame)
     if g then stack:applyNetworkGarbage(g, 2) end
     local st = BoardState.extract(stack)
-    local decision = brain:decide(st)
+    local decision = brain:decide(st, stack, match)
     local bs = brain._state  -- log which state the brain picked this frame
     if bs == "RAISE" then s.stateR = s.stateR + 1 elseif bs == "DANGER" then s.stateD = s.stateD + 1 elseif bs == "OFFENSE" then s.stateO = s.stateO + 1 end
     -- DETECTION availability (read the brain's per-frame scan): how often a combo/break/chain was AVAILABLE. The gap

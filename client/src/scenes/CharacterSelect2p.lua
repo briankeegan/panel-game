@@ -233,7 +233,9 @@ function CharacterSelect2p:_createRemoteCard(player, cardW, cardH, canBoot, team
   self.ui.characterIcons[#self.ui.characterIcons + 1] = icon
 
   local name = player.name or "?"
-  if #name > 14 then name = name:sub(1, 13) .. "…" end
+  -- fit the name to the card width (narrow when packed two-per-row)
+  local maxChars = math.max(7, math.floor((cardW - cardH - (canBoot and 110 or 76)) / 9))
+  if #name > maxChars then name = name:sub(1, maxChars - 1) .. "…" end
   card:addChild(ui.Label({x = cardH + 4, y = 10, text = name, translate = false}))
   card:addChild(ui.Label({x = cardH + 4, y = math.floor(cardH / 2) + 4, text = statLine(player), translate = false}))
 
@@ -277,21 +279,54 @@ function CharacterSelect2p:setupPortraitRoster()
     or (mode.minPlayers and mode.maxPlayers and mode.minPlayers < mode.maxPlayers))
   local localIsHost = isOpenRoom and ownerId and localPlayer and localPlayer.publicId == ownerId
 
+  -- cursors for every player (drive the bottom character picker)
+  local remotes = {}
   for i, player in ipairs(self.players) do
     local cursor = self:createCursor(self.ui.grid, player)
     cursor.raise1Callback = function() self.ui.characterGrid:turnPage(-1) end
     cursor.raise2Callback = function() self.ui.characterGrid:turnPage(1) end
     self.ui.cursors[i] = cursor
+    if not player.isLocal then remotes[#remotes + 1] = player end
+  end
 
-    local teamColor = self:teamBorderColorForPlayer(player)
+  local function spacer() self.ui.iconRow:addElement(ui.UiElement({width = cardW, height = cardGap})) end
+
+  -- local player's editable card first (full width)
+  for _, player in ipairs(self.players) do
     if player.isLocal then
-      self.ui.iconRow:addElement((self:_createLocalCard(player, cardW, teamColor)))
-    else
-      local canBoot = localIsHost and player.publicId ~= ownerId
-      self.ui.iconRow:addElement(self:_createRemoteCard(player, cardW, remoteH, canBoot, teamColor))
+      self.ui.iconRow:addElement((self:_createLocalCard(player, cardW, self:teamBorderColorForPlayer(player))))
+      spacer()
+      break
     end
-    -- breathing room between cards
-    self.ui.iconRow:addElement(ui.UiElement({width = cardW, height = cardGap}))
+  end
+
+  local function makeRemote(player, w)
+    local canBoot = localIsHost and player.publicId ~= ownerId
+    return self:_createRemoteCard(player, w, remoteH, canBoot, self:teamBorderColorForPlayer(player))
+  end
+
+  -- 4+ players: pack the other players two per row to keep the roster short so
+  -- the bottom (picker + Ready/Leave) stays on screen. Fewer players: one per row.
+  if #self.players >= 4 then
+    local halfW = math.floor((cardW - cardGap) / 2)
+    for i = 1, #remotes, 2 do
+      local rowEl = ui.UiElement({width = cardW, height = remoteH})
+      local c1 = makeRemote(remotes[i], halfW)
+      c1.x = 0
+      rowEl:addChild(c1)
+      if remotes[i + 1] then
+        local c2 = makeRemote(remotes[i + 1], halfW)
+        c2.x = halfW + cardGap
+        rowEl:addChild(c2)
+      end
+      self.ui.iconRow:addElement(rowEl)
+      spacer()
+    end
+  else
+    for _, player in ipairs(remotes) do
+      self.ui.iconRow:addElement(makeRemote(player, cardW))
+      spacer()
+    end
   end
 end
 

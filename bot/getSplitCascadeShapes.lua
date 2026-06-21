@@ -190,14 +190,16 @@ local function enumerate(sa, sb)
   for _, r in ipairs(getComboShapes.enumerate(sb).raw) do bCfgs[#bCfgs+1] = solvedCells(r) end
   for _, aC in ipairs(aCfgs) do
     for _, bC in ipairs(bCfgs) do
-      for bShiftC = 0, W - 1 do                                      -- slide the B config across
-        local occ, ok = {}, true
-        for _, p in ipairs(aC) do occ[p[1]*100 + p[2]] = A end
-        for _, p in ipairs(bC) do local r, c = p[1], p[2] + bShiftC
-          if c > W or occ[r*100 + c] then ok = false; break end
-          occ[r*100 + c] = B
+      for bShiftR = 0, 6 do                                          -- lift B (rests on filler/other panels above the floor)
+        for bShiftC = 0, W - 1 do                                    -- slide B across
+          local occ, ok = {}, true
+          for _, p in ipairs(aC) do occ[p[1]*100 + p[2]] = A end
+          for _, p in ipairs(bC) do local r, c = p[1] + bShiftR, p[2] + bShiftC
+            if r > H or c > W or occ[r*100 + c] then ok = false; break end
+            occ[r*100 + c] = B
+          end
+          if ok then raiseInject(occ) end
         end
-        if ok then raiseInject(occ) end
       end
     end
   end

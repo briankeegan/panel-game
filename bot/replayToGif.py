@@ -39,6 +39,43 @@ def cc(c, s):
     if s == 6: return tuple(int(x * 0.7) for x in b)     # falling -> dim
     return b
 
+# --- contact sheet (out ends in .png) -- readable stills, no animation needed ---
+if out.lower().endswith(".png"):
+    import math
+    SPS, SHDR, COLS, G = 18, (40 if has_state else 16), 6, 6
+    step = max(1, len(frames) // 30)
+    sel = list(range(0, len(frames), step))
+    bw, bh = W * SPS, H * SPS + SHDR
+    rows = math.ceil(len(sel) / COLS)
+    sheet = Image.new("RGB", (COLS * bw + (COLS + 1) * G, rows * bh + (rows + 1) * G), (0, 0, 0))
+    for idx, fi in enumerate(sel):
+        fr = frames[fi]; img = Image.new("RGB", (bw, bh), (10, 10, 16)); d = ImageDraw.Draw(img)
+        c, s = fr["c"], fr["s"]
+        if has_state:
+            nf = fr.get("info", {})
+            d.text((2, 1), f"f{(start or 0) + fi} h{nf.get('h','?')} cl{fr['pc']}", fill=(205, 205, 205))
+            st = fr.get("state", "?"); d.text((2, 13), st, fill=scol.get(st, (180, 180, 180)))
+            dec = fr.get("dec", "")
+            if dec.startswith("PLAY:"):
+                at = dec.find("@"); dec = "PLAY" + (dec[at:] if at >= 0 else "")
+            d.text((2, 25), dec, fill=(235, 235, 235))
+        else:
+            d.text((2, 2), f"f{(start or 0) + fi} cl{fr['pc']}", fill=(205, 205, 205))
+        for r in range(1, H + 1):
+            for c2 in range(1, W + 1):
+                color = c[r - 1][c2 - 1]
+                if color == 0: continue
+                x = (c2 - 1) * SPS; y = (H - r) * SPS + SHDR
+                d.rectangle([x + 1, y + 1, x + SPS - 1, y + SPS - 1], fill=cc(color, s[r - 1][c2 - 1]))
+        cr, c2 = fr["cur"]
+        if cr and c2 and c2 < W:
+            x = (c2 - 1) * SPS; y = (H - cr) * SPS + SHDR
+            d.rectangle([x, y, x + 2 * SPS - 1, y + SPS - 1], outline=(255, 255, 255), width=1)
+        sheet.paste(img, (G + (idx % COLS) * (bw + G), G + (idx // COLS) * (bh + G)))
+    sheet.save(out)
+    print(f"wrote {out}: contact sheet, {len(sel)} stills, {os.path.getsize(out) // 1024} KB")
+    sys.exit(0)
+
 imgs = []
 for i in range(0, len(frames), step):
     fr = frames[i]

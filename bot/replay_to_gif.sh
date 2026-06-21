@@ -1,7 +1,8 @@
 #!/bin/zsh
-# replay_to_gif.sh — render a watchable colored GIF, one command. Two modes:
-#   zsh bot/replay_to_gif.sh <replay.json> [out.gif] [start] [end] [ms]   # re-sim a saved replay (no brain)
-#   zsh bot/replay_to_gif.sh seed:<N>      [out.gif] [start] [end] [ms]   # RUN the bot live, annotate state+decision
+# replay_to_gif.sh — render a colored view, one command. Source is a replay or seed:N; OUTPUT format is by extension:
+#   out.gif -> animated GIF      out.png -> contact sheet of stills (no animation needed)
+#   zsh bot/replay_to_gif.sh <replay.json> [out.gif|out.png] [start] [end] [ms]   # re-sim a saved replay (no brain)
+#   zsh bot/replay_to_gif.sh seed:<N>      [out.gif|out.png] [start] [end] [ms]   # RUN the bot live, annotate state
 # Give a frame range to ZOOM into a window at full fidelity.
 set -e
 cd "$(dirname "$0")/.."

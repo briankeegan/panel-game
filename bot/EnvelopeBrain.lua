@@ -70,7 +70,7 @@ local DANGER_ABOVE = 9
 -- DYNAMIC raise: never raise past a height that leaves this many rows of recovery headroom below the top, so a raise
 -- can NEVER top us out. The target also reserves room for pending incoming garbage, and rises on its own as clearing
 -- keeps the stack lower. (Tighten as clearing improves; raise-to-death is a bug, so this stays safe.)
-local RECOVERY_BUFFER = 0  -- no margin: raise fills to the very top (DANGER clears before it tops out)
+local RECOVERY_BUFFER = 3  -- raise fills to top-3; the band between there and DANGER (top-1) is OFFENSE's home
 
 -- Per-state chip priorities, built from the cache (auto-includes new families). Order within a set: READY clears first,
 -- then 2-swap SETUPS; bigger base + deeper cascade first (they clear more).

@@ -71,10 +71,13 @@ local DANGER_ABOVE = 9
 -- chip priorities = EVERY kind authored in bot/chipCache.lua, so this auto-includes new families on a cache update.
 -- Order: READY clears (no 2-swap setup) first, then the 2-swap SETUPS; within each group, bigger base + deeper cascade
 -- first (they clear more).
+local EXCLUDE_KINDS = { COMBO_3 = true }  -- skip trivial 3-panel clears: force the bot toward bigger plays
 local function buildChipPriorities()
   local cache = require("bot.chipCache")
   local seen, kinds = {}, {}
-  for _, c in ipairs(cache) do if not seen[c.kind] then seen[c.kind] = true; kinds[#kinds + 1] = c.kind end end
+  for _, c in ipairs(cache) do
+    if not EXCLUDE_KINDS[c.kind] and not seen[c.kind] then seen[c.kind] = true; kinds[#kinds + 1] = c.kind end
+  end
   local function rank(k)
     local setup = k:find("SWAP_2", 1, true) and 1 or 0       -- 2-swap setups sort after ready clears
     local base = tonumber(k:match("COMBO_(%d)")) or 0        -- base combo size

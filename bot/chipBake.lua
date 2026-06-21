@@ -19,6 +19,18 @@ function M.author(g, sr, sc, kind, absSwaps)
     for _, cc in ipairs({ s[2], s[2] + 1 }) do local v = g[s[1]][cc] or 0; local key = s[1]*100+cc
       if not incl[key] then if v == 0 then incl[key] = { s[1], cc, "e" } elseif v <= 4 then incl[key] = { s[1], cc, cls(v) } end end end
   end
+  -- a panel swapped into an empty cell must fall through clear space to land: mark the empty column BELOW each empty
+  -- swap cell as must-be-empty (down to the first support/panel). Without this the fall path / landing reads as don't-care.
+  for _, s in ipairs(absSwaps) do
+    for _, cc in ipairs({ s[2], s[2] + 1 }) do
+      if (g[s[1]][cc] or 0) == 0 then
+        for row = s[1] - 1, 1, -1 do
+          if (g[row][cc] or 0) ~= 0 then break end
+          incl[row*100+cc] = incl[row*100+cc] or { row, cc, "e" }
+        end
+      end
+    end
+  end
   local t = {}; for _, e in pairs(incl) do t[#t+1] = { e[1]-sr, e[2]-sc, e[3] } end
   table.sort(t, function(a, b) if a[1] ~= b[1] then return a[1] < b[1] end return a[2] < b[2] end)
   local swaps = {}; for _, s in ipairs(absSwaps) do swaps[#swaps+1] = { s[1]-sr, s[2]-sc } end

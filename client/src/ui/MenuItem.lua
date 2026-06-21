@@ -98,7 +98,7 @@ function MenuItem.createButtonMenuItemWithLabel(label, onClick, width)
   -- makes the actual menu navigation buttons ~3x of base for easy tapping). Force
   -- a re-render since setText no-ops on unchanged args.
   if system.isPortraitMode() then
-    label.fontSize = math.floor((label.fontSize or GraphicsUtil.fontSize) * 1.5)
+    label.fontSize = math.floor((label.fontSize or GraphicsUtil.fontSize) * 2.25)
     -- force a rebuild at the new size (setText no-ops on unchanged args, and
     -- non-translated labels only rebuild when drawable is nil)
     local t = label.text

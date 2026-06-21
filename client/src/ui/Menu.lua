@@ -98,13 +98,16 @@ function Menu:layout()
     return
   end
 
+  -- portrait: more breathing room between the (big) buttons
+  local vpad = system.isPortraitMode() and 30 or Menu.BUTTON_VERTICAL_PADDING
+
   -- If sizeToFit is enabled, recalculate height from content
   if self.sizeToFit then
     self.height = 0
     for i, menuItem in ipairs(self.menuItems) do
       self.height = self.height + menuItem.height
       if i < #self.menuItems then
-        self.height = self.height + Menu.BUTTON_VERTICAL_PADDING
+        self.height = self.height + vpad
       end
     end
   end
@@ -135,7 +138,7 @@ function Menu:layout()
     end
     currentY = currentY + menuItem.height
     if i < #self.menuItems then
-      currentY = currentY + Menu.BUTTON_VERTICAL_PADDING
+      currentY = currentY + vpad
     end
     if menuFull == false then
       self.lastActiveIndex = i
@@ -144,7 +147,7 @@ function Menu:layout()
     self.width = math.max(self.width, menuItem.width)
     self.totalHeight = self.totalHeight + menuItem.height
     if i < #self.menuItems then
-      self.totalHeight = self.totalHeight + Menu.BUTTON_VERTICAL_PADDING
+      self.totalHeight = self.totalHeight + vpad
     end
   end
 

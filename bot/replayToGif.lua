@@ -67,7 +67,8 @@ for _ = 1, 6000 do
   frames[#frames + 1] = fr
   local k = table.concat(key, ",") .. "|" .. tostring(st.cur_row) .. "," .. tostring(st.cur_col) .. "|" .. (st.panels_cleared or 0) .. "|" .. (state or "")
   if k ~= prevKey then lastChange = #frames; prevKey = k end
-  if #frames - lastChange > idleCut then break end
+  -- bot mode plays to game-over (a slow opening isn't "dead"); only the replay re-sim has a runaway tail to cut.
+  if not seed and #frames - lastChange > idleCut then break end
 end
 
 local f = assert(io.open(outPath, "w")); f:write(djson.encode({ w = 6, h = H, frames = frames })); f:close()

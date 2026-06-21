@@ -19,7 +19,7 @@ if ranged:
     frames = frames[(start or 0):(end if end is not None else len(frames))]
     step = 1                              # explicit window -> full fidelity
 elif has_state:
-    step = 1                              # bot debug view -> every frame (already idle-trimmed at capture)
+    step = max(1, len(frames) // 250)     # bot debug view -> cap ~250 GIF frames over the whole game
 else:
     last, prev = 0, -1                    # auto-trim: stop ~90 frames after the last clear
     for i, f in enumerate(frames):

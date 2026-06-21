@@ -142,7 +142,7 @@ function EnvelopeBrain:decide(state, stack, match)
     })
     if chip then
       self._comboUse = self._comboUse or {}; self._comboUse[chip.kind] = (self._comboUse[chip.kind] or 0) + 1
-      move = { type = "SWAP", pos = chip.swaps[1], swaps = chip.swaps }  -- full sequence; the controller completes it
+      move = { type = "SWAP", pos = chip.swaps[1], swaps = chip.swaps, kind = chip.kind }  -- full sequence; the controller completes it
     else
       -- DYNAMIC safe-raise: climb only up to a target that still leaves RECOVERY_BUFFER rows to the top AND room to
       -- absorb pending incoming garbage. The target SELF-LIMITS, so a raise can never top us out (raise-to-death is a

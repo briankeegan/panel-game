@@ -103,8 +103,12 @@ function EnvelopeBrain:decide(state, stack, match)
   -- decision, recognition returns the identical result -- skip the whole ~670-template pass. ANY board activity bypasses
   -- the cache, so chips forming as the board settles/pops/rises are seen at once. (Unlike the removed sig-commit, which
   -- keyed only on the top color-grid and stayed frozen through the 44-frame flash -- starving the brain.)
+  -- signature includes the TOUCHABLE state, not just colors: a cell mid-action (no-go) blocks chips, so the same colors
+  -- settled vs. settling are DIFFERENT playability and must not share a cache entry (that was suppressing chips).
   local sig = 0
-  for r = 1, rows do for c = 1, BoardSim.WIDTH do sig = (sig * 31 + (grid[r][c] or 0)) % 2147483647 end end
+  for r = 1, rows do for c = 1, BoardSim.WIDTH do
+    sig = (sig * 31 + (grid[r][c] or 0) * 2 + (touchable[r] and touchable[r][c] and 1 or 0)) % 2147483647
+  end end
   local busy = stack and (stack:hasActivePanels() or stack:hasChainingPanels())
   if not busy and sig == self._sig and self._move ~= nil then return self._move end
 
@@ -139,7 +143,10 @@ function EnvelopeBrain:decide(state, stack, match)
       end
     end
   end
-  self._sig, self._move = sig, move
+  -- Only cache a SETTLED decision. The signature is the color grid only -- it can't tell a settling board from the same
+  -- board once it's at rest -- so caching a busy-frame WAIT (where the no-go mask blocked an otherwise-playable chip)
+  -- would hand that stale WAIT back the instant it settles and SUPPRESS the chip. Caching only when not busy fixes it.
+  if not busy then self._sig, self._move = sig, move else self._sig = nil end
   return move
 end
 

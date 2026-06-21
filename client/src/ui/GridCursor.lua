@@ -151,6 +151,10 @@ function GridCursor:setRapidBlinking(rapid)
 end
 
 function GridCursor:drawSelf()
+  -- touch: don't draw the keyboard-cursor frame. It highlights a different cell
+  -- per scene (looks like an inconsistent border on one card) and isn't needed
+  -- when you tap directly. Navigation still works; only the frame is hidden.
+  if require("client.src.system").isPortraitMode() then return end
   if self.target then
     self.drawClock = self.drawClock + 1
     local cursorFrame

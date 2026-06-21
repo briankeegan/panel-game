@@ -8,6 +8,7 @@ local class = require("common.lib.class")
 local input = require("client.src.inputManager")
 local system = require("client.src.system")
 local DebugSettings = require("client.src.debug.DebugSettings")
+local consts = require("common.engine.consts")
 
 local NAVIGATION_BUTTON_WIDTH = 30
 
@@ -59,6 +60,11 @@ function Menu.createCenteredMenu(items, height, options)
   options.vAlign = "center"
   options.menuItems = items
   options.height = height or themes[config.theme].main_menu_max_height
+  -- portrait: use (almost) the whole screen as the viewport so the buttons can be
+  -- big and still fit without scrolling (fitToScreen sizes them to this).
+  if system.isPortraitMode() then
+    options.height = math.floor(consts.CANVAS_HEIGHT * 0.92)
+  end
 
   local menu = Menu(options)
   return menu
@@ -82,7 +88,36 @@ function Menu:setMenuItems(menuItems)
     self:addChild(menuItem)
     self.menuItems[#self.menuItems + 1] = menuItem
   end
+  self:fitToScreen()
   self:setSelectedIndex(1)
+end
+
+-- portrait: shrink the (big) buttons just enough that the whole menu fits on one
+-- screen without scrolling. Only scales DOWN — menus with few items stay full size.
+function Menu:fitToScreen()
+  if not system.isPortraitMode() then return end
+  local n = #self.menuItems
+  if n == 0 then return end
+  local vpad = 30
+  local itemsH = 0
+  for _, it in ipairs(self.menuItems) do itemsH = itemsH + it.height end
+  -- fit the items into the menu's own viewport (set to ~full screen in portrait)
+  local avail = self.height - (n - 1) * vpad
+  if itemsH <= avail then return end
+  local scale = avail / itemsH
+  for _, it in ipairs(self.menuItems) do
+    local btn = it.textButton
+    if btn and btn.label and btn.label.fontSize then
+      btn.label.fontSize = math.max(14, math.floor(btn.label.fontSize * scale))
+      local t = btn.label.text
+      btn.label.text = nil
+      btn.label.drawable = nil
+      btn.label:setText(t, btn.label.replacementTable, btn.label.translate)
+      local _, h = btn.label:getEffectiveDimensions()
+      btn.height = math.floor(h + (btn.HEIGHT_PADDING or 0) * 2)
+    end
+    it.height = math.floor(it.height * scale)
+  end
 end
 
 function Menu:layout()

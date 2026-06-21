@@ -10,16 +10,20 @@
 require("bot.headlessBoot"); do local l = require("common.lib.logger"); l.setLogLevel(l.levels.ERROR) end
 _G.loc = _G.loc or function(s) return tostring(s) end
 local shapeCache = require("bot.shapeCache")
+local getCascadeShapes = require("bot.getCascadeShapes")   -- reuse single-color cascades to compose the bent/5-run cases
 local Match = require("common.engine.Match"); require("common.engine.checkMatches")
 local LP = require("common.data.LevelPresets"); local KDE = require("common.data.KeyDataEncoding"); local Puzzle = require("common.engine.Puzzle")
+local _cascMemo = {}
+local function cascadesOf(n, m) local k = n*100+m; if not _cascMemo[k] then _cascMemo[k] = getCascadeShapes.enumerate(n, m) end return _cascMemo[k] end
 
 local W, H = 6, 12
 local A, B, C = 1, 2, 3                 -- two combo colors + the trigger color
--- SETTLE_CAP is a SAFETY CEILING, not a tuning knob: the engine loop early-breaks the instant panels settle, so a big
--- cap costs nothing (a small cascade still exits in ~30 frames). We only need it above the slowest REAL cascade. We
--- also measure the actual slowest settle (maxSettle) and count any time we hit the ceiling (capHits) so we KNOW the
--- headroom as clears get bigger (9s, 10s, ...) instead of guessing.
-local SETTLE_CAP = 1000
+-- SETTLE_CAP exists ONLY to stop an infinite loop if the engine ever fails to report "settled" (an engine bug). The
+-- loop early-breaks at the real settle, so this never limits a real chip — raising it is free. Set it ABOVE the board's
+-- PHYSICAL MAXIMUM cascade: a 6x12 board has <=72 panels; the deepest possible chain pops every one (~9 frames each)
+-- across its links plus the falls, well under ~2500 frames. 3000 sits above anything the board can produce, so nothing
+-- real ever hits it. maxSettle/capHits report the actual slowest settle and warn if a chip ever does hit the guard.
+local SETTLE_CAP = 3000
 local maxSettle, capHits = 0, 0
 local function settle(st, m)           -- run until the engine reports settled; return the frame it settled on
   for k = 1, SETTLE_CAP do
@@ -87,6 +91,44 @@ local function enumerate(sa, sb)
   sa, sb = sa or 3, sb or 3
   local kind = string.format("COMBO_%d_%d_CASCADE_3", sa, sb)
   local found = {}
+  local function record(g, sr, sc)            -- engine-verify + dedup by shape
+    if not anyRun(g) and firesSplitCascade(g, sr, sc, sa, sb) then
+      local kk = shapeCache.canonShape(g)
+      if kk and not found[kk] then found[kk] = { g = clone(g), sample = clone(g), sr = sr, sc = sc, key = kk, kind = kind } end
+    end
+  end
+  ------------------------------------------------------ PASS 2: compose two single-color cascades on a SHARED trigger
+  -- a-cascade (COMBO_sa_CASCADE_3: primary=color1, riser=color2) + b-cascade (COMBO_sb_CASCADE_3) that have the SAME
+  -- riser+swap. Recolor: a-primary->A, b-primary->B, the shared riser->trigger C. One swap fires the riser; both
+  -- primaries cascade. This reaches the bent / 5-run cases the raise method can't (the 5 falls into a line, doesn't
+  -- have to break a straight run). The ENGINE confirms each. Reuses getCascadeShapes — no re-derivation.
+  do
+    local la, lb = cascadesOf(sa, 3), cascadesOf(sb, 3)
+    for _, Ac in ipairs(la) do
+      local ar, ac = Ac.sr, Ac.sc
+      local aPrim, aRiserSet, nRiser = {}, {}, 0
+      for r = 1, H do for c = 1, W do local v = Ac.g[r][c]
+        if v == 1 then aPrim[#aPrim+1] = { r, c } elseif v == 2 then aRiserSet[r*100+c] = true; nRiser = nRiser + 1 end end end
+      for _, Bc in ipairs(lb) do
+        local dr, dc = ar - Bc.sr, ac - Bc.sc
+        -- B's riser (translated) must land exactly on A's riser -> a genuinely shared trigger
+        local riserOK, cntR = true, 0
+        for r = 1, H do for c = 1, W do if Bc.g[r][c] == 2 then cntR = cntR + 1
+          if not aRiserSet[(r+dr)*100+(c+dc)] then riserOK = false end end end end
+        if riserOK and cntR == nRiser then
+          local g = {}; for r = 1, H do g[r] = {}; for c = 1, W do g[r][c] = 0 end end
+          local ok = true
+          for _, p in ipairs(aPrim) do g[p[1]][p[2]] = A end                 -- a-primary -> color 1
+          for k in pairs(aRiserSet) do g[math.floor(k/100)][k%100] = C end    -- shared riser -> trigger 3
+          for r = 1, H do for c = 1, W do if Bc.g[r][c] == 1 then local nr, nc = r+dr, c+dc
+            if nr < 1 or nr > H or nc < 1 or nc > W or g[nr][nc] ~= 0 then ok = false; break end
+            g[nr][nc] = B end end if not ok then break end end
+          if ok then support(g); record(g, ar, ac) end
+        end
+      end
+    end
+  end
+  ------------------------------------------------------ PASS 1: the raise method (straight runs; 3+3 / 3+4 / 4+4)
   local RunsA, RunsB = straightRuns(sa), straightRuns(sb)
   for _, Arun in ipairs(RunsA) do
     for _, Brun in ipairs(RunsB) do
@@ -119,10 +161,7 @@ local function enumerate(sa, sb)
                   g[trow][missing] = filler(trow, missing); g[trow][dcol] = C
                   support(g)
                   local sc = (disp == "L") and dcol or (tc + 2)          -- the swap that completes the trigger run
-                  if not anyRun(g) and firesSplitCascade(g, trow, sc, sa, sb) then
-                    local kk = shapeCache.canonShape(g)
-                    if kk and not found[kk] then found[kk] = { g = clone(g), sample = clone(g), sr = trow, sc = sc, key = kk, kind = kind } end
-                  end
+                  record(g, trow, sc)
                 end
               end
             end

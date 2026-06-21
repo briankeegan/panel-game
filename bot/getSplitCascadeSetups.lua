@@ -13,10 +13,11 @@ local LP = require("common.data.LevelPresets"); local KDE = require("common.data
 local H, W = 12, 6
 local A, B, C = 1, 2, 3
 local RAD = tonumber(arg[1]) or 2
--- SETTLE_CAP is a SAFETY CEILING only — the loop early-breaks the instant the engine settles, so a big cap costs
--- nothing. maxSettle/capHits record the slowest cascade we actually saw and whether we ever hit the ceiling, so we
--- know our headroom as clears grow (9s, 10s) instead of guessing a frame count.
-local SETTLE_CAP = 1000
+-- SETTLE_CAP exists ONLY as a runaway guard if the engine never reports "settled". The loop early-breaks at the real
+-- settle, so this never limits a real chip. Set ABOVE the board's PHYSICAL MAXIMUM cascade (<=72 panels popping across
+-- the deepest possible 6x12 chain + falls, ~2500 frames). 3000 is past anything the board can produce. maxSettle/capHits
+-- report the actual slowest settle and warn if a chip ever hits the guard.
+local SETTLE_CAP = 3000
 local maxSettle, capHits = 0, 0
 
 ------------------------------------------------------------------ engine verify: count A/B/C/other cleared

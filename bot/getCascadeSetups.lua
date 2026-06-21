@@ -19,6 +19,9 @@ local P, S = 1, 2
 
 local function clone(g) local n = {}; for r = 1, H do n[r] = {}; for c = 1, W do n[r][c] = g[r][c] end end; return n end
 local function settle(g) for c = 1, W do local s = {}; for r = 1, H do if g[r][c] ~= 0 then s[#s+1] = g[r][c] end end; for r = 1, H do g[r][c] = s[r] or 0 end end end
+-- hold a displaced gap open with a blocker (support filler) instead of collapsing the column
+local function support(g) for c = 1, W do local top = 0; for r = 1, H do if g[r][c] ~= 0 then top = r end end
+  for r = 1, top do if g[r][c] == 0 then g[r][c] = ((r+c)%2==0) and 5 or 6 end end end end
 local function matches(g)
   for r = 1, H do for c = 1, W do local v = g[r][c]
     if v ~= 0 then
@@ -140,25 +143,24 @@ local function enumerate(n, m, R)
   local out, seen = {}, {}
   for _, base in ipairs(getCascadeShapes.enumerate(n, m)) do
     local B0, sr, sc = base.g, base.sr, base.sc
+    local function consider(g, br, bc, moves)
+      if matches(g) or anySwapWins(g, n, m) then return end       -- no pre-match + no SINGLE swap fires the whole cascade
+      local d = play(g, { { br, bc }, { sr, sc } })               -- setup then fire
+      if d[1] == n and d[2] == m and d[3] == 0 then               -- clears the WHOLE cascade, no filler
+        local kk = shapeCache.canonShape(g)
+        local sig = (kk or stackString(g)) .. "|" .. br .. "," .. bc
+        if not seen[sig] then seen[sig] = true
+          out[#out+1] = { g = g, sr = sr, sc = sc, s1 = { br, bc }, moves = moves,
+                          kind = string.format("COMBO_%d_CASCADE_%d_SWAP_2_MOVE_%d", n, m, moves) }
+        end
+      end
+    end
     for br = math.max(1, sr - R), math.min(H, sr + R) do
       for bc = 1, W - 1 do
         local moves = math.abs(br - sr) + math.abs(bc - sc)
         if moves >= 1 and moves <= R then
-          local g = clone(B0)
-          g[br][bc], g[br][bc+1] = g[br][bc+1], g[br][bc]; settle(g)
-          if not matches(g) and not anySwapWins(g, n, m) then     -- no pre-match + no single swap wins the cascade
-            if not firesCascade(g, sr, sc, n, m) then             -- fire alone must NOT fire the cascade
-              local d = play(g, { { br, bc }, { sr, sc } })       -- setup then fire
-              if d[1] == n and d[2] == m and d[3] == 0 then       -- fires the WHOLE cascade, no filler
-                local kk = shapeCache.canonShape(g)
-                local sig = (kk or stackString(g)) .. "|" .. br .. "," .. bc
-                if not seen[sig] then seen[sig] = true
-                  out[#out+1] = { g = g, sr = sr, sc = sc, s1 = { br, bc }, moves = moves,
-                                  kind = string.format("COMBO_%d_CASCADE_%d_SWAP_2_MOVE_%d", n, m, moves) }
-                end
-              end
-            end
-          end
+          local gs = clone(B0); gs[br][bc], gs[br][bc+1] = gs[br][bc+1], gs[br][bc]; settle(gs); consider(gs, br, bc, moves)
+          local gh = clone(B0); gh[br][bc], gh[br][bc+1] = gh[br][bc+1], gh[br][bc]; support(gh); consider(gh, br, bc, moves)
         end
       end
     end

@@ -49,6 +49,9 @@ end
 
 ------------------------------------------------------------------ grid helpers + win-gate
 local function settleCols(g) for c = 1, W do local s = {}; for r = 1, H do if g[r][c] ~= 0 then s[#s+1] = g[r][c] end end; for r = 1, H do g[r][c] = s[r] or 0 end end end
+-- hold a displaced gap open with a blocker (support filler) instead of collapsing the column
+local function support(g) for c = 1, W do local top = 0; for r = 1, H do if g[r][c] ~= 0 then top = r end end
+  for r = 1, top do if g[r][c] == 0 then g[r][c] = ((r+c)%2==0) and 5 or 6 end end end end
 local function applySwapSettle(g, r, c) local n = BoardSim.cloneGrid(g, H); n[r][c], n[r][c+1] = n[r][c+1], n[r][c]; settleCols(n); return n end
 local function realMatch(g)
   for r = 1, H do for c = 1, W do local v = g[r][c]
@@ -75,28 +78,26 @@ local function enumerate(sa, sb, R)
   local out, seen = {}, {}
   for _, base in ipairs(getSplitCascadeShapes.enumerate(sa, sb)) do
     local B0, ar, ac = base.g, base.sr, base.sc
+    local function consider(g, br, bc, moves)
+      local _, preMatch = BoardSim.findMatches(g, H)
+      if preMatch then return end
+      local str = gridToStr(g)
+      if anySwapWins(g, str, sa, sb) then return end                          -- no SINGLE swap clears the whole 3+3+3
+      local d = clearedBy(str, { { br, bc }, { ar, ac } })
+      if d[1] == sa and d[2] == sb and d[3] == 3 and d[4] == 0 then            -- setup+fire clears sa A + sb B + 3 C
+        local sig = str .. "|" .. br .. "," .. bc
+        if not seen[sig] then seen[sig] = true
+          out[#out+1] = { g = g, sr = ar, sc = ac, s1 = { br, bc }, moves = moves,
+                          kind = string.format("COMBO_%d_%d_CASCADE_3_SWAP_2_MOVE_%d", sa, sb, moves) }
+        end
+      end
+    end
     for br = math.max(1, ar - R), math.min(H, ar + R) do
       for bc = 1, W - 1 do
         local moves = math.abs(br - ar) + math.abs(bc - ac)
         if moves >= 1 and moves <= R then
-          local g = BoardSim.cloneGrid(B0, H); g[br][bc], g[br][bc+1] = g[br][bc+1], g[br][bc]; settleCols(g)
-          local _, preMatch = BoardSim.findMatches(g, H)
-          if not preMatch then
-            local str = gridToStr(g)
-            if not anySwapWins(g, str, sa, sb) then
-              local fa = clearedBy(str, { { ar, ac } })
-              if fa[1] == 0 and fa[2] == 0 and fa[3] == 0 then                       -- fire alone clears nothing
-                local d = clearedBy(str, { { br, bc }, { ar, ac } })
-                if d[1] == sa and d[2] == sb and d[3] == 3 and d[4] == 0 then         -- setup+fire clears sa A + sb B + 3 C
-                  local sig = str .. "|" .. br .. "," .. bc
-                  if not seen[sig] then seen[sig] = true
-                    out[#out+1] = { g = g, sr = ar, sc = ac, s1 = { br, bc }, moves = moves,
-                                    kind = string.format("COMBO_%d_%d_CASCADE_3_SWAP_2_MOVE_%d", sa, sb, moves) }
-                  end
-                end
-              end
-            end
-          end
+          local gs = BoardSim.cloneGrid(B0, H); gs[br][bc], gs[br][bc+1] = gs[br][bc+1], gs[br][bc]; settleCols(gs); consider(gs, br, bc, moves)
+          local gh = BoardSim.cloneGrid(B0, H); gh[br][bc], gh[br][bc+1] = gh[br][bc+1], gh[br][bc]; support(gh); consider(gh, br, bc, moves)
         end
       end
     end

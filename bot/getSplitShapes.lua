@@ -40,7 +40,7 @@ local function bld(str)
   return m, st
 end
 -- swapping (r,c)<->(r,c+1) must clear EXACTLY 3 of A and 3 of B (and nothing else)
-local function firesSplit(g, r, c)
+local function firesSplit(g, r, c, sa, sb)
   local ok, res = pcall(function()
     local m, st = bld(stackString(g))
     local function cnt(col) local n=0; for rr=1,st.height do for cc=1,6 do if (st.panels[rr][cc].color or 0)==col then n=n+1 end end end return n end
@@ -48,25 +48,27 @@ local function firesSplit(g, r, c)
     local a0, b0, o0 = cnt(A), cnt(B), others()
     st.cur_row, st.cur_col = r, c; st:receiveConfirmedInput(KDE.swap); m:run()
     for k = 1, 120 do if st:game_ended() then break end st:receiveConfirmedInput("A"); m:run(); if k >= 2 and not st:hasActivePanels() and not st:hasChainingPanels() then break end end
-    return (a0 - cnt(A)) == 3 and (b0 - cnt(B)) == 3 and (o0 - others()) == 0
+    return (a0 - cnt(A)) == sa and (b0 - cnt(B)) == sb and (o0 - others()) == 0
   end)
   return ok and res
 end
 
--- every horizontal and vertical 3-run placement within the window, as a list of 3 {r,c} cells
-local function runs()
+-- every horizontal and vertical straight n-run placement within the window, as a list of n {r,c} cells
+local function runs(n)
   local out = {}
-  for r = 1, RWIN do for c = 1, W - 2 do out[#out+1] = { {r,c},{r,c+1},{r,c+2} } end end   -- horizontal
-  for r = 1, RWIN - 2 do for c = 1, W do out[#out+1] = { {r,c},{r+1,c},{r+2,c} } end end     -- vertical
+  for r = 1, RWIN do for c = 1, W - (n-1) do local s={}; for i=0,n-1 do s[#s+1]={r,c+i} end; out[#out+1]=s end end          -- horizontal
+  for r = 1, RWIN - (n-1) do for c = 1, W do local s={}; for i=0,n-1 do s[#s+1]={r+i,c} end; out[#out+1]=s end end          -- vertical
   return out
 end
 
 ----------------------------------------------------------------- enumerate
-local function enumerate()
-  local R = runs()
+local function enumerate(sa, sb)
+  sa, sb = sa or 3, sb or 3
+  local kind = "COMBO_" .. sa .. "_" .. sb
+  local Ra, Rb = runs(sa), runs(sb)
   local found = {}
-  for _, ra in ipairs(R) do for _, rb in ipairs(R) do
-    -- the two 3-runs must not overlap
+  for _, ra in ipairs(Ra) do for _, rb in ipairs(Rb) do
+    -- the two runs must not overlap
     local occ = {}; local bad = false
     for _, p in ipairs(ra) do occ[p[1]*100+p[2]] = A end
     for _, p in ipairs(rb) do local k = p[1]*100+p[2]; if occ[k] then bad = true break end occ[k] = B end
@@ -82,9 +84,9 @@ local function enumerate()
           -- every height. The chip template is swap-relative anyway, so an elevated copy authors to the same chip.
           local lowest = H + 1; for r = 1, H do for c = 1, W do if g[r][c] ~= 0 and g[r][c] < 5 then lowest = math.min(lowest, r) end end end
           local lc = math.min(pa[2], pb[2])                       -- swap anchor (left cell)
-          if lowest == 1 and not anyRun(g) and firesSplit(g, pa[1], lc) then
+          if lowest == 1 and not anyRun(g) and firesSplit(g, pa[1], lc, sa, sb) then
             local kk = shapeCache.canonShape(g)
-            if kk and not found[kk] then found[kk] = { g = g, sample = g, sr = pa[1], sc = lc, key = kk, kind = "COMBO_3_3" } end
+            if kk and not found[kk] then found[kk] = { g = g, sample = g, sr = pa[1], sc = lc, key = kk, kind = kind } end
           end
         end
       end end
@@ -117,25 +119,30 @@ local function render(rec)
   return lines
 end
 
+-- the two-color split sizes the registry bakes: 3+3 (=6) and 3+4 (=7)
+local PAIRS = { { 3, 3 }, { 3, 4 } }
+
 if arg and arg[0] and arg[0]:match("getSplitShapes") then
-  local list = enumerate()
-  print(string.format("COMBO_3_3 (two-color 3+3 single-swap 6-clears): %d distinct   (1/2=colors · *=support · .=empty · [..]=swap)\n", #list))
+  local sa, sb = tonumber(arg[1]) or 3, tonumber(arg[2]) or 3
+  local list = enumerate(sa, sb)
+  print(string.format("COMBO_%d_%d (two-color %d+%d single-swap %d-clears): %d distinct   (1/2=colors · *=support · .=empty · [..]=swap)\n", sa, sb, sa, sb, sa+sb, #list))
   for i, rec in ipairs(list) do
     print(string.format("#%d  swap (%d,%d)", i, rec.sr, rec.sc))
     for _, row in ipairs(render(rec)) do print(row) end
     print("")
   end
-  -- self-bake: running this script adds COMBO_3_3 chips to the cache + catalog.
   local bake = require("bot.chipBake")
   local chips = {}
   for _, v in ipairs(list) do chips[#chips+1] = bake.author(v.g, v.sr, v.sc, v.kind, { { v.sr, v.sc } }) end
-  local cnt = bake.upsert("^COMBO_3_3$", chips)
-  print(string.format("baked %d COMBO_3_3 chips into cache (cache now %d total)", #chips, cnt))
+  local cnt = bake.upsert(string.format("^COMBO_%d_%d$", sa, sb), chips)
+  print(string.format("baked %d COMBO_%d_%d chips into cache (cache now %d total)", #chips, sa, sb, cnt))
 end
 
 local function produce()
   local out = {}
-  for _, v in ipairs(enumerate()) do out[#out+1] = { g = v.g, sr = v.sr, sc = v.sc, kind = v.kind, absSwaps = { { v.sr, v.sc } } } end
+  for _, p in ipairs(PAIRS) do
+    for _, v in ipairs(enumerate(p[1], p[2])) do out[#out+1] = { g = v.g, sr = v.sr, sc = v.sc, kind = v.kind, absSwaps = { { v.sr, v.sc } } } end
+  end
   return out
 end
 require("bot.chipRegistry").register{ name = "getSplitShapes", produce = produce }

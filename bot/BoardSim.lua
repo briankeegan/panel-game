@@ -41,6 +41,24 @@ function BoardSim.colorGrid(board, rows)
   return g
 end
 
+-- NO-GO mask: which cells are SETTLED enough for the bot to build a chip on / swap. A cell is touchable only if its
+-- panel is at rest -- state normal(0) or just-landed landing(4) -- and not garbage. Everything in motion (swapping(1),
+-- popping(2), matched(3), hovering(5), falling(6), dimmed-garbage(7)) is a no-go: don't touch it, don't read it for a
+-- pattern. This lets the bot keep working the settled regions while other parts of the board are still resolving,
+-- instead of pausing the whole brain until the board is 100% still.
+function BoardSim.touchableGrid(board, rows)
+  local g = {}
+  for r = 1, rows do
+    local src, dst = board[r], {}
+    for c = 1, WIDTH do
+      local p = src[c]
+      dst[c] = (p and not p.isGarbage and (p.s == 0 or p.s == 4)) or false
+    end
+    g[r] = dst
+  end
+  return g
+end
+
 -- mark every cell in a 3+ horizontal/vertical run of one play-color
 function BoardSim.findMatches(g, rows)
   local hit, any = {}, false

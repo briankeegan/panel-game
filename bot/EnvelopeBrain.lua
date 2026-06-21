@@ -90,6 +90,7 @@ local CHIP_PRIORITIES = buildChipPriorities()
 function EnvelopeBrain:decide(state, stack, match)
   local rows = state.rows
   local grid = BoardSim.colorGrid(state.board, rows)
+  local touchable = BoardSim.touchableGrid(state.board, rows)  -- NO-GO mask: cells the bot can read/swap (settled only)
 
   -- CACHE: while the board is fully static (nothing active/chaining/flashing) AND the grid is unchanged since the last
   -- decision, recognition returns the identical result -- skip the whole ~670-template pass. ANY board activity bypasses
@@ -103,16 +104,16 @@ function EnvelopeBrain:decide(state, stack, match)
   local height = state.maxColHeight or BoardSim.maxHeight(grid, rows)
   local cursor = state.cursor or { math.min(rows, height + 1), 3 }
 
+  -- NO global WAIT-on-pending-match: instead, search every frame and let the no-go mask keep us off the unsettled cells
+  -- (a clearing match's panels are in matched/popping state -> already excluded, so we can't disrupt or re-swap them).
+  -- STATE by stack height. All states fire the same chips; state only changes the no-play FALLBACK.
   local move
-  if hasPendingMatch(grid, rows) then
-    move = { type = "WAIT" }                 -- a match is clearing -> don't swap into it or undo it
-  else
-    -- STATE by stack height. All states fire the same chips; state only changes the no-play FALLBACK.
+  do
     local st = (height >= DANGER_ABOVE and "DANGER") or (height <= RAISE_BELOW and "RAISE") or "OFFENSE"
     self._state = st
     local chip = useChips.useChips(grid, rows, cursor, {
       chipPriorities = CHIP_PRIORITIES, searchPriorities = { "UP", "DOWN", "LEFT", "RIGHT" },
-      verify = self:chipVerify(stack, match),
+      verify = self:chipVerify(stack, match), touchable = touchable,
     })
     if chip then
       self._comboUse = self._comboUse or {}; self._comboUse[chip.kind] = (self._comboUse[chip.kind] or 0) + 1

@@ -31,16 +31,29 @@ end
 -- sequence fires (caller's real-engine check) before returning. A chip carries `swaps` (a list of anchor-relative
 -- offsets); a single-swap chip is just a 1-element list. Legacy `swap` (one pair) is still accepted. No BoardSim, no
 -- prediction -- fits is a pure pattern-match, verify is engine-truth. nil = none here.
-function chips.recognize(grid, rows, cells, kind, verify)
+function chips.recognize(grid, rows, cells, kind, verify, touchable)
   for _, cell in ipairs(cells) do local R, C = cell[1], cell[2]
     for _, chip in ipairs(STORE) do
       if chip.kind == kind and fits(grid, rows, chip.tmpl, R, C) then
+        local ok = true
+        -- NO-GO zones: every MATCH cell the chip reads must be a settled, touchable panel. Cells the chip doesn't
+        -- reference (the `*` don't-care space) aren't in the template, so they're exempt automatically.
+        if touchable then
+          for _, e in ipairs(chip.tmpl) do
+            local tr, tc = R + e[1], C + e[2]
+            if not (touchable[tr] and touchable[tr][tc]) then ok = false; break end
+          end
+        end
         local offsets = chip.swaps or { chip.swap }       -- back-compat: a single `swap` is a 1-element list
-        local seq, ok = {}, true
-        for _, off in ipairs(offsets) do
-          local sr, sc = R + off[1], C + off[2]
-          if not (sr >= 1 and sr <= rows and sc >= 1 and sc <= 5) then ok = false; break end
-          seq[#seq + 1] = { sr, sc }
+        local seq = {}
+        if ok then
+          for _, off in ipairs(offsets) do
+            local sr, sc = R + off[1], C + off[2]
+            if not (sr >= 1 and sr <= rows and sc >= 1 and sc <= 5) then ok = false; break end
+            -- can't swap an unsettled panel: BOTH swapped cells (sc and sc+1) must be touchable
+            if touchable and not (touchable[sr] and touchable[sr][sc] and touchable[sr][sc + 1]) then ok = false; break end
+            seq[#seq + 1] = { sr, sc }
+          end
         end
         if ok and (not verify or verify(seq, kind)) then
           return { swaps = seq, kind = kind }

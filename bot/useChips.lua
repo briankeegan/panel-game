@@ -52,7 +52,7 @@ function M.useChips(grid, rows, cursor, opts)
   local verify = opts.verify
   local cells = cellOrder(grid, rows, cursor, opts.band, opts.searchPriorities, opts.maxDistance)
   for _, chipName in ipairs(opts.chipPriorities or {}) do
-    local result = chips.recognize(grid, rows, cells, chipName, verify)  -- recognize this kind, in priority order
+    local result = chips.recognize(grid, rows, cells, chipName, verify, opts.touchable)  -- recognize this kind, in priority order
     if result then return result end
   end
   return nil

@@ -194,13 +194,14 @@ function M.derive(cap)
   -- GARBAGE GEOMETRY (the states hinge on these -- raw isGarbage is per-cell, but nobody derived these before):
   -- lowestGarbageRow = the row a garbage block will break at first; nonGarbageRows = rows of real playable material
   -- (RAISE keys on "< 5"); cursorToGarbage = how far the cursor is from that break point (DANGER sub-states).
-  local lowestGarbageRow, nonGarbageRows = nil, 0
+  local lowestGarbageRow, nonGarbageRows, totalHeight = nil, 0, 0
   for r = 1, rows do
     local row = board[r]
     local hasReal, hasGarbage = false, false
     for c = 1, width do
       local cell = row[c]
-      if cell.c ~= 0 then columnHeights[c] = r end   -- highest occupied row per column
+      if cell.c ~= 0 then columnHeights[c] = r end   -- highest occupied row per column (non-garbage)
+      if cell.c ~= 0 or cell.isGarbage then totalHeight = r end  -- highest occupied row INCLUDING garbage
       if cell.isGarbage then hasGarbage = true
       elseif cell.c ~= 0 then hasReal = true end
     end
@@ -224,6 +225,7 @@ function M.derive(cap)
     lowestGarbageRow = lowestGarbageRow,
     nonGarbageRows = nonGarbageRows,
     cursorToGarbage = cursorToGarbage,
+    totalHeight = totalHeight,            -- highest occupied row INCLUDING garbage (the stack to keep below the top)
     incoming = cap.incoming,
     -- INVINCIBILITY (derived from the raw timers; see bot/TIMING_L10.md): three sources of
     -- "can't rise / can't top out", do NOT stack (max-based). The bot must SEE its window.

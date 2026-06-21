@@ -70,7 +70,7 @@ local DANGER_ABOVE = 9
 -- DYNAMIC raise: never raise past a height that leaves this many rows of recovery headroom below the top, so a raise
 -- can NEVER top us out. The target also reserves room for pending incoming garbage, and rises on its own as clearing
 -- keeps the stack lower. (Tighten as clearing improves; raise-to-death is a bug, so this stays safe.)
-local RECOVERY_BUFFER = 6
+local RECOVERY_BUFFER = 0  -- no margin: raise fills to the very top (DANGER clears before it tops out)
 
 -- Per-state chip priorities, built from the cache (auto-includes new families). Order within a set: READY clears first,
 -- then 2-swap SETUPS; bigger base + deeper cascade first (they clear more).
@@ -120,41 +120,33 @@ function EnvelopeBrain:decide(state, stack, match)
   if not busy and sig == self._sig and self._move ~= nil then return self._move end
 
   local height = state.maxColHeight or BoardSim.maxHeight(grid, rows)
+  local totalHeight = state.totalHeight or height  -- stack INCLUDING garbage -- what must stay below the top
   local cursor = state.cursor or { math.min(rows, height + 1), 3 }
 
-  -- STATE drives the tactic (precedence DANGER > RAISE > OFFENSE):
-  --   DANGER (high stack)        -> clear NOW: ready single-swap combos only (no chains/setups), ease the cursor UP.
-  --   RAISE  (low real material) -> feed the stack (the no-chip fallback raises).
-  --   OFFENSE (default)          -> build big: every chip, search all directions.
+  -- RAISE FILLS the stack to the TOP. Garbage counts as part of the stack (totalHeight); NO reserve for incoming
+  -- garbage. DANGER (within 1 of the top, incl garbage) takes over to clear, so the raise itself never tops us out.
+  -- STATE precedence DANGER > RAISE > OFFENSE.
+  local top = state.height or 12
+  local raiseTarget = top - RECOVERY_BUFFER
   local move
   do
-    local st = ((state.danger or state.toppedOut) and "DANGER")  -- within 1 row of the top: the emergency, clear NOW
-      or ((state.nonGarbageRows or 99) < 5 and "RAISE")          -- low real material: feed the stack
+    local st = ((totalHeight >= top - 1 or state.toppedOut) and "DANGER")  -- within 1 of the top (incl garbage): clear NOW
+      or (totalHeight < raiseTarget and "RAISE")                           -- below the top: fill material
       or "OFFENSE"
     self._state = st
-    -- DANGER clears NOW (ready single-swap clears first); OFFENSE builds big (cascades/setups first). Same all-direction
-    -- search -- both must find any chip that exists; ease-up belongs to a DANGER sub-state we haven't built yet.
+    -- DANGER clears NOW (ready single-swap clears first); OFFENSE builds big (cascades/setups first). Same all-direction search.
     local priorities = (st == "DANGER") and DANGER_PRIORITIES or OFFENSE_PRIORITIES
-    local search = { "UP", "DOWN", "LEFT", "RIGHT" }
     local chip = useChips.useChips(grid, rows, cursor, {
-      chipPriorities = priorities, searchPriorities = search,
+      chipPriorities = priorities, searchPriorities = { "UP", "DOWN", "LEFT", "RIGHT" },
       verify = self:chipVerify(stack, match), touchable = touchable,
     })
     if chip then
       self._comboUse = self._comboUse or {}; self._comboUse[chip.kind] = (self._comboUse[chip.kind] or 0) + 1
-      move = { type = "SWAP", pos = chip.swaps[1], swaps = chip.swaps, kind = chip.kind }  -- full sequence; the controller completes it
+      move = { type = "SWAP", pos = chip.swaps[1], swaps = chip.swaps, kind = chip.kind }
+    elseif st == "RAISE" and not busy and (state.stopTime or 0) == 0 then
+      move = { type = "RAISE" }              -- no chip + below the top -> fill material (DANGER clears before we top out)
     else
-      -- DYNAMIC safe-raise: climb only up to a target that still leaves RECOVERY_BUFFER rows to the top AND room to
-      -- absorb pending incoming garbage. The target SELF-LIMITS, so a raise can never top us out (raise-to-death is a
-      -- bug); it rises on its own as clearing keeps the stack lower. Settled (rise_lock) + no stop_time to waste.
-      local incomingRows = 0
-      for _, g in ipairs(state.incoming or {}) do incomingRows = incomingRows + (g.h or 0) end
-      local raiseTarget = (state.height or 12) - RECOVERY_BUFFER - incomingRows
-      if not busy and (state.stopTime or 0) == 0 and height < raiseTarget then
-        move = { type = "RAISE" }            -- low enough that raising still leaves a full recovery buffer -> safe
-      else
-        move = { type = "WAIT" }             -- no safe headroom to raise (or breaking) -> wait; the brain keeps searching
-      end
+      move = { type = "WAIT" }
     end
   end
   -- Only cache a SETTLED decision. The signature is the color grid only -- it can't tell a settling board from the same

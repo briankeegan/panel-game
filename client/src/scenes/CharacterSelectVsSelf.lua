@@ -25,7 +25,9 @@ function CharacterSelectVsSelf:loadUserInterface()
   local pm = system.isPortraitMode()
   local unitSize, gridW, gridH = 100, 9, 6
   if pm then
-    gridW, gridH = 4, 8
+    -- same grid as EndlessMenu (10 rows) so the two screens share identical
+    -- control sizes/positions — VsSelf is just Endless minus the Modern toggle
+    gridW, gridH = 4, 10
     unitSize = math.floor(1240 / gridH)
   end
   self.ui.grid = ui.Grid({unitSize = unitSize, gridWidth = gridW, gridHeight = gridH, unitMargin = 8, hAlign = "center", vAlign = "center"})
@@ -59,7 +61,8 @@ function CharacterSelectVsSelf:loadUserInterface()
   local noRaiseContainer, noRaiseSelector = self:createNoRaiseSelection(player, self.ui.grid.unitSize)
   self.ui.noRaiseSelection:addElement(noRaiseContainer, player)
   if pm then
-    self.ui.grid:createElementAt(1, 4, 4, 1, "noRaiseSelection", self.ui.noRaiseSelection)
+    -- same slot Endless puts No Raise in (its Modern toggle sits to the left)
+    self.ui.grid:createElementAt(3, 4, 2, 1, "noRaiseSelection", self.ui.noRaiseSelection)
   else
     self.ui.grid:createElementAt(5, 2, 1, 1, "noRaiseSelection", self.ui.noRaiseSelection)
   end
@@ -89,7 +92,7 @@ function CharacterSelectVsSelf:loadUserInterface()
 
   self.ui.readyButton = self:createReadyButton()
   if pm then
-    self.ui.grid:createElementAt(1, 8, 2, 1, "readyButton", self.ui.readyButton)
+    self.ui.grid:createElementAt(1, 10, 2, 1, "readyButton", self.ui.readyButton)
   else
     self.ui.grid:createElementAt(9, 2, 1, 1, "readyButton", self.ui.readyButton)
   end
@@ -99,14 +102,14 @@ function CharacterSelectVsSelf:loadUserInterface()
   if pm then characterGridWidth, characterGridHeight = 4, 1 end
   self.ui.characterGrid = self:createCharacterGrid(characterButtons, self.ui.grid, characterGridWidth, characterGridHeight)
   if pm then
-    self.ui.grid:createElementAt(1, 6, characterGridWidth, characterGridHeight, "characterSelection", self.ui.characterGrid, true)
+    self.ui.grid:createElementAt(1, 8, characterGridWidth, characterGridHeight, "characterSelection", self.ui.characterGrid, true)
   else
     self.ui.grid:createElementAt(1, 3, characterGridWidth, characterGridHeight, "characterSelection", self.ui.characterGrid, true)
   end
 
   self.ui.pageIndicator = self:createPageIndicator(self.ui.characterGrid)
   if pm then
-    self.ui.grid:createElementAt(2, 7, 1, 1, "pageIndicator", self.ui.pageIndicator)
+    self.ui.grid:createElementAt(2, 9, 1, 1, "pageIndicator", self.ui.pageIndicator)
   else
     self.ui.grid:createElementAt(5, 6, 1, 1, "pageIndicator", self.ui.pageIndicator)
   end
@@ -117,7 +120,7 @@ function CharacterSelectVsSelf:loadUserInterface()
   self.ui.changeInputButton = self:createChangeInputButton()
   if pm then
     self.ui.changeInputButton:setVisibility(false)
-    self.ui.grid:createElementAt(3, 8, 2, 1, "leaveButton", self.ui.leaveButton)
+    self.ui.grid:createElementAt(3, 10, 2, 1, "leaveButton", self.ui.leaveButton)
   else
     self.ui.grid:createElementAt(8, 6, 1, 1, "changeInputButton", self.ui.changeInputButton)
     self.ui.grid:createElementAt(9, 6, 1, 1, "leaveButton", self.ui.leaveButton)

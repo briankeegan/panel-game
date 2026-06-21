@@ -74,7 +74,10 @@ local RECOVERY_BUFFER = 0  -- no margin: raise fills to the very top (DANGER cle
 
 -- Per-state chip priorities, built from the cache (auto-includes new families). Order within a set: READY clears first,
 -- then 2-swap SETUPS; bigger base + deeper cascade first (they clear more).
-local EXCLUDE_KINDS = { COMBO_3 = true }  -- skip trivial 3-panel clears: force the bot toward bigger plays
+-- Skip ALL trivial 3-clears: plain COMBO_3 AND any COMBO_3 setup/cascade (COMBO_3_SWAP_2_*, COMBO_3_CASCADE_*) --
+-- spending 2 swaps to manufacture a 3-clear is worse than the 3-clear. Keep COMBO_3_3 / COMBO_3_4 / COMBO_3_5 (the
+-- 6/7/8-clears -- a digit, not a letter, follows "COMBO_3_").
+local function isExcluded(kind) return kind == "COMBO_3" or kind:match("^COMBO_3_%a") ~= nil end
 local function rank(k)
   local setup = k:find("SWAP_2", 1, true) and 1 or 0       -- 2-swap setups sort after ready clears
   local base = tonumber(k:match("COMBO_(%d)")) or 0        -- base combo size
@@ -85,7 +88,7 @@ local function buildPriorities(keep)
   local cache = require("bot.chipCache")
   local seen, kinds = {}, {}
   for _, c in ipairs(cache) do
-    if not EXCLUDE_KINDS[c.kind] and not seen[c.kind] and keep(c.kind) then seen[c.kind] = true; kinds[#kinds + 1] = c.kind end
+    if not isExcluded(c.kind) and not seen[c.kind] and keep(c.kind) then seen[c.kind] = true; kinds[#kinds + 1] = c.kind end
   end
   table.sort(kinds, function(a, b) local ra, rb = rank(a), rank(b); if ra ~= rb then return ra < rb end return a < b end)
   return kinds

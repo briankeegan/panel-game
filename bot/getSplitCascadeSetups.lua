@@ -32,7 +32,7 @@ local function clearedBy(str, swaps)        -- {aCleared, bCleared, cCleared, ot
   local ok, res = pcall(function()
     local m, st = bld(str); local a0,b0,c0,o0 = cnt(st,A),cnt(st,B),cnt(st,C),cntOther(st)
     for _, s in ipairs(swaps) do st.cur_row, st.cur_col = s[1], s[2]; st:receiveConfirmedInput(KDE.swap); m:run()
-      for j = 1, 160 do if st:game_ended() then break end st:receiveConfirmedInput("A"); m:run() if j >= 3 and not st:hasActivePanels() and not st:hasChainingPanels() then break end end end
+      for j = 1, 400 do if st:game_ended() then break end st:receiveConfirmedInput("A"); m:run() if j >= 3 and not st:hasActivePanels() and not st:hasChainingPanels() then break end end end  -- 400: 2-wave 4+4/3+5 cascades take ~170 frames
     return { a0-cnt(st,A), b0-cnt(st,B), c0-cnt(st,C), o0-cntOther(st) }
   end)
   return ok and res or { 0, 0, 0, 0 }

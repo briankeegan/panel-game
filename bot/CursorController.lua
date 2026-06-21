@@ -68,13 +68,16 @@ function CursorController:nextInput(state, decision)
   end
   self._lastDisp = disp
 
-  if not decision or decision.type == "WAIT" then
-    self.locked, self.idle = nil, true
-    return IDLE
-  end
-  if decision.type == "RAISE" then
+  if decision and decision.type == "RAISE" then
     self.locked, self.idle = nil, true
     return char(32) -- raise is a held action; APM cap doesn't apply
+  end
+  -- WAIT / no decision: only go idle when we're NOT mid-chip. If we're locked onto a sequence, IGNORE the WAIT and keep
+  -- completing it -- the WAIT just means the board is settling between our own swaps. (Dropping the lock on every WAIT
+  -- was the bug: the brain interleaves WAIT between PLAY frames, so the cursor never finished routing to the swap.)
+  if (not decision or decision.type == "WAIT") and not self.locked then
+    self.idle = true
+    return IDLE
   end
 
   -- SWAP: lock onto the chip's FULL swap sequence and complete it, ignoring brain changes until every swap is done.

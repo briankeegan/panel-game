@@ -43,6 +43,13 @@ local COLORS = {
   white = {1, 1, 1, 1}
 }
 function MultiPlayerSelectionWrapper:drawSelf()
+  -- portrait: draw a dark card behind the control so it matches the multiplayer
+  -- waiting-room cards and reads cleanly over the dimmed game background.
+  if require("client.src.system").isPortraitMode() then
+    GraphicsUtil.setColor(0.07, 0.07, 0.10, 0.9)
+    GraphicsUtil.drawRectangle("fill", self.x, self.y, self.width, self.height)
+    GraphicsUtil.setColor(COLORS.white)
+  end
   if self.hasFocus then
     love.graphics.setLineWidth(6)
     GraphicsUtil.setColor(COLORS.border)

@@ -68,6 +68,17 @@ end
 local RAISE_BELOW = 4
 local DANGER_ABOVE = 9
 
+-- chip vocabulary in priority order: READY clears first (cascades clear more, so ahead of their plain base), biggest
+-- first; then the 2-swap SETUPS (build toward a combo) last. Every kind here is authored in bot/chipCache.lua.
+local CHIP_PRIORITIES = {
+  "COMBO_5_CASCADE_4", "COMBO_5_CASCADE_3", "COMBO_4_CASCADE_3", "COMBO_3_3_CASCADE_3",
+  "COMBO_5", "COMBO_4", "COMBO_3_3", "COMBO_3",
+  "COMBO_5_CASCADE_4_SWAP_2_MOVE_1", "COMBO_5_CASCADE_3_SWAP_2_MOVE_1", "COMBO_4_CASCADE_3_SWAP_2_MOVE_1",
+  "COMBO_5_CASCADE_4_SWAP_2_MOVE_2", "COMBO_5_CASCADE_3_SWAP_2_MOVE_2", "COMBO_4_CASCADE_3_SWAP_2_MOVE_2",
+  "COMBO_5_SWAP_2_MOVE_1", "COMBO_4_SWAP_2_MOVE_1", "COMBO_3_3_SWAP_2_MOVE_1", "COMBO_3_SWAP_2_MOVE_1",
+  "COMBO_5_SWAP_2_MOVE_2", "COMBO_4_SWAP_2_MOVE_2", "COMBO_3_SWAP_2_MOVE_2",
+}
+
 ------------------------------------------------------------------ DECIDE (stateless, re-measured every frame)
 function EnvelopeBrain:decide(state, stack, match)
   local rows = state.rows
@@ -94,7 +105,7 @@ function EnvelopeBrain:decide(state, stack, match)
     self._state = st
 
     local chip = useChips.useChips(grid, rows, cursor, {                  -- READY chip, cursor-outward
-      chipPriorities = { "COMBO_5", "COMBO_4" }, searchPriorities = { "UP", "DOWN", "LEFT", "RIGHT" },
+      chipPriorities = CHIP_PRIORITIES, searchPriorities = { "UP", "DOWN", "LEFT", "RIGHT" },
       verify = self:chipVerify(stack, match),
     })
     if chip then

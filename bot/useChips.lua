@@ -45,36 +45,15 @@ local function cellOrder(grid, rows, cursor, band, searchPriorities, maxDistance
   return cells
 end
 
-----------------------------------------------------------------------
--- sized chips = engine-authored templates RECOGNIZED from the store (no BoardSim prediction)
-----------------------------------------------------------------------
--- COMBO_n: recognize a stored, engine-verified COMBO_n template at a cursor-local cell, then verify it fires.
-local function comboChip(n)
-  return function(grid, rows, cells, verify)
-    return chips.recognize(grid, rows, cells, "COMBO_" .. n, verify)
-  end
-end
-
--- THE REGISTRY — only chips that EXIST (engine-verified templates in the store). Add a size here when its templates
--- are authored into bot/chipCache.lua.
-local CHIPS = {
-  COMBO_5 = comboChip(5),
-  COMBO_4 = comboChip(4),
-  COMBO_3 = comboChip(3),
-}
-M.CHIPS = CHIPS
-
--- useChips(grid, rows, cursor, opts) -> { swaps, kind } | nil. Each call site (state) passes its own chipPriorities.
+-- useChips(grid, rows, cursor, opts) -> { swaps, kind } | nil. chipPriorities is an ordered list of chip KINDS; ANY
+-- kind authored into bot/chipCache.lua is recognizable (no per-kind registry -- recognize slides the store by kind).
 function M.useChips(grid, rows, cursor, opts)
   opts = opts or {}
   local verify = opts.verify
   local cells = cellOrder(grid, rows, cursor, opts.band, opts.searchPriorities, opts.maxDistance)
   for _, chipName in ipairs(opts.chipPriorities or {}) do
-    local find = CHIPS[chipName]
-    if find then
-      local result = find(grid, rows, cells, verify)
-      if result then return result end
-    end
+    local result = chips.recognize(grid, rows, cells, chipName, verify)  -- recognize this kind, in priority order
+    if result then return result end
   end
   return nil
 end

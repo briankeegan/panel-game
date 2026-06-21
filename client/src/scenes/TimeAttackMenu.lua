@@ -27,7 +27,9 @@ function TimeAttackMenu:loadUserInterface()
   local pm = system.isPortraitMode()
   local unitSize, gridW, gridH = 100, 9, 6
   if pm then
-    gridW, gridH = 4, 9
+    -- 10-row grid (same unit size as Endless/VsSelf) so the character carousel is
+    -- the same size on every screen
+    gridW, gridH = 4, 10
     unitSize = math.floor(1240 / gridH)
   end
   self.ui.grid = ui.Grid({unitSize = unitSize, gridWidth = gridW, gridHeight = gridH, unitMargin = 8, hAlign = "center", vAlign = "center"})
@@ -107,7 +109,7 @@ function TimeAttackMenu:loadUserInterface()
 
   self.ui.readyButton = self:createReadyButton()
   if pm then
-    self.ui.grid:createElementAt(1, 9, 2, 1, "readyButton", self.ui.readyButton)
+    self.ui.grid:createElementAt(1, 10, 2, 1, "readyButton", self.ui.readyButton)
   else
     self.ui.grid:createElementAt(9, 2, 1, 1, "readyButton", self.ui.readyButton)
   end
@@ -117,14 +119,14 @@ function TimeAttackMenu:loadUserInterface()
   if pm then characterGridWidth, characterGridHeight = 4, 1 end
   self.ui.characterGrid = self:createCharacterGrid(characterButtons, self.ui.grid, characterGridWidth, characterGridHeight)
   if pm then
-    self.ui.grid:createElementAt(1, 7, characterGridWidth, characterGridHeight, "characterSelection", self.ui.characterGrid, true)
+    self.ui.grid:createElementAt(1, 8, characterGridWidth, characterGridHeight, "characterSelection", self.ui.characterGrid, true)
   else
     self.ui.grid:createElementAt(1, 3, characterGridWidth, characterGridHeight, "characterSelection", self.ui.characterGrid, true)
   end
 
   self.ui.pageIndicator = self:createPageIndicator(self.ui.characterGrid)
   if pm then
-    self.ui.grid:createElementAt(2, 8, 1, 1, "pageIndicator", self.ui.pageIndicator)
+    self.ui.grid:createElementAt(2, 9, 1, 1, "pageIndicator", self.ui.pageIndicator)
   else
     self.ui.grid:createElementAt(5, 6, 1, 1, "pageIndicator", self.ui.pageIndicator)
   end
@@ -140,7 +142,7 @@ function TimeAttackMenu:loadUserInterface()
 
   self.ui.leaveButton = self:createLeaveButton()
   if pm then
-    self.ui.grid:createElementAt(3, 9, 2, 1, "leaveButton", self.ui.leaveButton)
+    self.ui.grid:createElementAt(3, 10, 2, 1, "leaveButton", self.ui.leaveButton)
   else
     self.ui.grid:createElementAt(9, 6, 1, 1, "leaveButton", self.ui.leaveButton)
   end

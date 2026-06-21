@@ -21,7 +21,9 @@ function CharacterSelectChallenge:loadUserInterface()
   local pm = system.isPortraitMode()
   local unitSize, gridW, gridH = 100, 9, 6
   if pm then
-    gridW, gridH = 4, 9
+    -- 10-row grid (same unit size as the other screens) so the character carousel
+    -- is the same size everywhere
+    gridW, gridH = 4, 10
     unitSize = math.floor(1240 / gridH)
   end
   self.ui.grid = ui.Grid({unitSize = unitSize, gridWidth = gridW, gridHeight = gridH, unitMargin = 8, hAlign = "center", vAlign = "center"})
@@ -57,11 +59,11 @@ function CharacterSelectChallenge:loadUserInterface()
 
   if pm then
     self.ui.changeInputButton:setVisibility(false)
-    -- characters on row 7 (like the others place them near the bottom); page + actions below
-    self.ui.grid:createElementAt(1, 7, characterGridWidth, characterGridHeight, "characterSelection", self.ui.characterGrid, true)
-    self.ui.grid:createElementAt(2, 8, 1, 1, "pageIndicator", self.ui.pageIndicator)
-    self.ui.grid:createElementAt(1, 9, 2, 1, "readyButton", self.ui.readyButton)
-    self.ui.grid:createElementAt(3, 9, 2, 1, "leaveButton", self.ui.leaveButton)
+    -- characters on row 8 (same as the other screens); page + actions below
+    self.ui.grid:createElementAt(1, 8, characterGridWidth, characterGridHeight, "characterSelection", self.ui.characterGrid, true)
+    self.ui.grid:createElementAt(2, 9, 1, 1, "pageIndicator", self.ui.pageIndicator)
+    self.ui.grid:createElementAt(1, 10, 2, 1, "readyButton", self.ui.readyButton)
+    self.ui.grid:createElementAt(3, 10, 2, 1, "leaveButton", self.ui.leaveButton)
   else
     self.ui.grid:createElementAt(9, 2, 1, 1, "readyButton", self.ui.readyButton)
     self.ui.grid:createElementAt(1, 3, characterGridWidth, characterGridHeight, "characterSelection", self.ui.characterGrid, true)

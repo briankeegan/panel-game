@@ -843,8 +843,18 @@ end
 
 function CharacterSelect:createPageTurnButtons(pagedUniGrid)
   local x, y = pagedUniGrid:getScreenPos()
-  pagedUniGrid.pageTurnButtons.left.x = x - pagedUniGrid.unitSize
-  pagedUniGrid.pageTurnButtons.right.x = x + pagedUniGrid.width + pagedUniGrid.unitSize / 2
+  if require("client.src.system").isPortraitMode() then
+    -- portrait: the character row is nearly full width, so the default outside-
+    -- the-grid positions fall off-screen. Center the < > buttons in the side
+    -- margins so they're fully visible and pulled in toward the row.
+    local bw = pagedUniGrid.pageTurnButtons.left.width
+    local gridRight = x + pagedUniGrid.width
+    pagedUniGrid.pageTurnButtons.left.x = math.floor((x - bw) / 2)
+    pagedUniGrid.pageTurnButtons.right.x = math.floor(gridRight + (consts.CANVAS_WIDTH - gridRight - bw) / 2)
+  else
+    pagedUniGrid.pageTurnButtons.left.x = x - pagedUniGrid.unitSize
+    pagedUniGrid.pageTurnButtons.right.x = x + pagedUniGrid.width + pagedUniGrid.unitSize / 2
+  end
   pagedUniGrid.pageTurnButtons.left.y = y + pagedUniGrid.height / 2 - pagedUniGrid.unitSize / 4
   pagedUniGrid.pageTurnButtons.right.y = y + pagedUniGrid.height / 2 - pagedUniGrid.unitSize / 4
 

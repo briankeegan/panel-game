@@ -76,7 +76,7 @@ local function runGame(scenario, seed)
   end
 
   local brain = EnvelopeBrain.new({})
-  local ctrl = CursorController.new()
+  local ctrl = CursorController.new({ cursorMoveInterval = 1, reactionFrames = 1 })  -- full speed: measure the HARD bot (human-pacing is a scale-back, later)
   local prevChain, frame = 0, 0
   while frame < MAXFRAMES and not stack:game_ended() do
     local g = scenario.garbage(frame)
@@ -107,6 +107,10 @@ local function runGame(scenario, seed)
   do local u = brain._comboUse or {}; s.c5 = u.COMBO_5 or 0; s.c4 = u.COMBO_4 or 0; s.setup = u.SETUP3 or 0; s.cache = u.CACHE or 0
      s.chipsViaUseChips = 0; for _, n in pairs(u) do s.chipsViaUseChips = s.chipsViaUseChips + n end end  -- all useChips picks
   s.enginePanelsCleared = stack.panels_cleared or 0
+  -- HONEST cleared: the engine's rollback-safe counter, NOT the "matched"-signal sum (which the verify pollutes by
+  -- firing matches during its simulation -- those get rolled back but the signal already fired). bigCombos/sent are
+  -- still signal-based, so treat them as upper bounds for now.
+  s.cleared = s.enginePanelsCleared
   return s
 end
 

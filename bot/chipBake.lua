@@ -6,42 +6,56 @@
 --   M.writeAll(chips)                   -> rewrite BOTH files from a full list (used by buildChipCache)
 local H, W = 12, 6
 local CACHE, CATALOG = "bot/chipCache.lua", "bot/chipCatalog.txt"
+local analyze = require("bot.chipAnalyze")
 local M = {}
 
--- engine-truth author: concrete cells (1..4) + every swap cell, relative to the FIRE anchor (sr,sc), as same/diff
--- color classes; filler (>=5) omitted (don't-care). absSwaps = list of {r,c} swap anchors played in order (LAST = fire).
+-- engine-truth author: concrete colored cells (1..4) as same/diff color classes, plus every NON-color cell the chip
+-- actually constrains — "." must-empty, "@" blocker (solid, not a solving color) — found by chipAnalyze.classify
+-- (recognition-accurate: it keeps only cell values that leave a valid no-pre-match, no-shortcut instance). All relative
+-- to the FIRE anchor (sr,sc). absSwaps = swap anchors played in order (LAST = fire). meta = engine-measured metadata.
 function M.author(g, sr, sc, kind, absSwaps)
   local rl, nn = {}, 0
-  local function cls(col) if col == 0 then return "e" end; if not rl[col] then nn = nn + 1; rl[col] = nn end; return rl[col] end
+  local function cls(col) if not rl[col] then nn = nn + 1; rl[col] = nn end; return rl[col] end
   local incl = {}
   for r = 1, H do for c = 1, W do local v = g[r][c] or 0; if v >= 1 and v <= 4 then incl[r*100+c] = { r, c, cls(v) } end end end
-  for _, s in ipairs(absSwaps) do
-    for _, cc in ipairs({ s[2], s[2] + 1 }) do local v = g[s[1]][cc] or 0; local key = s[1]*100+cc
-      if not incl[key] then if v == 0 then incl[key] = { s[1], cc, "e" } elseif v <= 4 then incl[key] = { s[1], cc, cls(v) } end end end
+  -- every constrained non-color cell ("."/"@"), accurately classified
+  for key, class in pairs(analyze.classify(g, absSwaps)) do
+    if not incl[key] then incl[key] = { math.floor(key/100), key % 100, class } end
   end
-  -- a panel swapped into an empty cell must fall through clear space to land: mark the empty column BELOW each empty
-  -- swap cell as must-be-empty (down to the first support/panel). Without this the fall path / landing reads as don't-care.
-  for _, s in ipairs(absSwaps) do
-    for _, cc in ipairs({ s[2], s[2] + 1 }) do
-      if (g[s[1]][cc] or 0) == 0 then
-        for row = s[1] - 1, 1, -1 do
-          if (g[row][cc] or 0) ~= 0 then break end
-          incl[row*100+cc] = incl[row*100+cc] or { row, cc, "e" }
-        end
-      end
-    end
-  end
+  local meta = analyze.measure(g, absSwaps)
   local t = {}; for _, e in pairs(incl) do t[#t+1] = { e[1]-sr, e[2]-sc, e[3] } end
   table.sort(t, function(a, b) if a[1] ~= b[1] then return a[1] < b[1] end return a[2] < b[2] end)
   local swaps = {}; for _, s in ipairs(absSwaps) do swaps[#swaps+1] = { s[1]-sr, s[2]-sc } end
-  return { tmpl = t, kind = kind, swaps = swaps }
+  return { tmpl = t, kind = kind, swaps = swaps, meta = meta }
 end
 
 local function quote(v) return type(v) == "string" and ('"' .. v .. '"') or tostring(v) end
 local function serTmpl(t) local p = {}; for _, e in ipairs(t) do p[#p+1] = string.format("{%d,%d,%s}", e[1], e[2], quote(e[3])) end; return "{" .. table.concat(p, ",") .. "}" end
 local function serSwaps(s) local p = {}; for _, o in ipairs(s) do p[#p+1] = string.format("{%d,%d}", o[1], o[2]) end; return "{" .. table.concat(p, ",") .. "}" end
+-- serialize the engine-measured metadata as a Lua literal for the cache
+local function serMeta(m)
+  if not m then return "{}" end
+  local cl = {}; for c = 1, 4 do if (m.clears[c] or 0) > 0 then cl[#cl+1] = string.format("[%d]=%d", c, m.clears[c]) end end
+  local gb = {}; for _, b in ipairs(m.garbage) do gb[#gb+1] = string.format("{w=%d,h=%d,k=%q}", b.width, b.height, b.kind) end
+  return string.format("{clears={%s},total=%d,garbage={%s},chain=%d,start=%d,finish=%d,swaps=%d,cursorMoves=%d,cursorEnd={dr=%d,dc=%d,dir=%q},footprint={rows=%d,cols=%d},colors=%d}",
+    table.concat(cl, ","), m.total, table.concat(gb, ","), m.chain, m.start, m.finish, m.swaps, m.cursorMoves,
+    m.cursorEnd.dr, m.cursorEnd.dc, m.cursorEnd.dir, m.footprint.rows, m.footprint.cols, m.colors)
+end
+-- short human tag for the catalog header line
+local function metaTag(m)
+  if not m then return "" end
+  local gw = {}; for _, b in ipairs(m.garbage) do gw[#gw+1] = tostring(b.width) end
+  local g = #gw > 0 and table.concat(gw, ",") or "-"
+  return string.format("   [ clears %d · garbage {%s} · chain %d · cost %dsw+%dmv · settle %d-%df · end %s ]",
+    m.total, g, m.chain, m.swaps, m.cursorMoves, m.start, m.finish, m.cursorEnd.dir)
+end
 
-local function symOf(cl) return (cl == nil) and "*" or (cl == "e" and "." or tostring(cl)) end   -- *=don't-care .=empty digit=color
+local function symOf(cl)   -- *=don't-care · .=must-empty · @=blocker(solid,not-a-solving-color) · digit=color
+  if cl == nil then return "*" end
+  if cl == "e" then return "." end
+  if cl == "@" then return "@" end
+  return tostring(cl)
+end
 -- one frame of a grid (map: r*100+c -> class) over [minr..maxr]x[minc..maxc], bracketing the cells in `swapCell` (a key set).
 local function frameText(grid, minr, maxr, minc, maxc, swapCell)
   local lines = {}
@@ -94,17 +108,18 @@ function M.writeAll(chips)
   end)
   local out, cat, perKind = {}, {}, {}
   for _, c in ipairs(uniq) do
-    out[#out+1] = string.format("  { kind=%q, swaps=%s, tmpl=%s },", c.kind, serSwaps(c.swaps), serTmpl(c.tmpl))
+    out[#out+1] = string.format("  { kind=%q, swaps=%s, tmpl=%s, meta=%s },", c.kind, serSwaps(c.swaps), serTmpl(c.tmpl), serMeta(c.meta))
     perKind[c.kind] = (perKind[c.kind] or 0) + 1
-    cat[#cat+1] = string.format("%s  #%d  swaps=%s\n%s", c.kind, perKind[c.kind], serSwaps(c.swaps), M.render(c))
+    cat[#cat+1] = string.format("%s  #%d  swaps=%s%s\n%s", c.kind, perKind[c.kind], serSwaps(c.swaps), metaTag(c.meta), M.render(c))
   end
   local f = assert(io.open(CACHE, "w"))
   f:write("-- AUTOGENERATED via bot/chipBake.lua — engine-verified chip templates. DO NOT EDIT BY HAND.\n")
-  f:write("-- Each = { kind, swaps={{dr,dc}..}, tmpl={{dr,dc,class}..} }. swaps anchor-relative, played in order. class: int=same/diff color, \"e\"=empty. Filler don't-care.\n")
+  f:write("-- Each = { kind, swaps={{dr,dc}..}, tmpl={{dr,dc,class}..}, meta={...} }. class: int=color, \"e\"=empty, \"@\"=blocker(solid,not-a-solving-color); filler don't-care.\n")
+  f:write("-- meta: clears(per color)+total, garbage(block list the engine sends), chain depth, start/finish frames, swaps+cursorMoves cost, cursorEnd(net dir), footprint, colors.\n")
   f:write("return {\n" .. table.concat(out, "\n") .. "\n}\n")
   f:close()
   local cf = assert(io.open(CATALOG, "w"))
-  cf:write(string.format("AUTOGENERATED via bot/chipBake.lua — a view of bot/chipCache.lua (%d chips).\n[ ]=swap cell · digit=color class · .=must-be-empty · *=don't-care\n\n", #uniq))
+  cf:write(string.format("AUTOGENERATED via bot/chipBake.lua — a view of bot/chipCache.lua (%d chips).\n[ ]=swap · digit=color · .=must-be-empty · @=blocker(solid,not-a-solving-color) · *=don't-care   |  garbage shown as widths\n\n", #uniq))
   cf:write(table.concat(cat, "\n\n") .. "\n")
   cf:close()
   return #uniq

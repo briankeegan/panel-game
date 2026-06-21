@@ -94,6 +94,20 @@ function MenuItem.createButtonMenuItemWithLabel(label, onClick, width)
   label.hAlign = "center"
   label.vAlign = "center"
 
+  -- portrait: bump menu-button text further (the global font is already 2x; this
+  -- makes the actual menu navigation buttons ~3x of base for easy tapping). Force
+  -- a re-render since setText no-ops on unchanged args.
+  if system.isPortraitMode() then
+    label.fontSize = math.floor((label.fontSize or GraphicsUtil.fontSize) * 1.5)
+    -- force a rebuild at the new size (setText no-ops on unchanged args, and
+    -- non-translated labels only rebuild when drawable is nil)
+    local t = label.text
+    label.text = nil
+    label.drawable = nil
+    label:setText(t, label.replacementTable, label.translate)
+    BUTTON_WIDTH = math.max(BUTTON_WIDTH, label.width + 48)
+  end
+
   local textButton = TextButton({
     label = label,
     onClick = onClick,

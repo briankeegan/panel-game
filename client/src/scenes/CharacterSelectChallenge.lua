@@ -34,7 +34,8 @@ function CharacterSelectChallenge:loadUserInterface()
   self.ui.readyButton = self:createReadyButton()
   local characterButtons = self:getCharacterButtons()
   local characterGridWidth, characterGridHeight = self.ui.grid.gridWidth, 3
-  if pm then characterGridWidth, characterGridHeight = 4, 4 end
+  -- same single-row character picker (4 wide, page < > arrows) as the other screens
+  if pm then characterGridWidth, characterGridHeight = 4, 1 end
   self.ui.characterGrid = self:createCharacterGrid(characterButtons, self.ui.grid, characterGridWidth, characterGridHeight)
   self.ui.pageIndicator = self:createPageIndicator(self.ui.characterGrid)
   self.ui.leaveButton = self:createLeaveButton()
@@ -56,7 +57,8 @@ function CharacterSelectChallenge:loadUserInterface()
 
   if pm then
     self.ui.changeInputButton:setVisibility(false)
-    self.ui.grid:createElementAt(1, 4, characterGridWidth, characterGridHeight, "characterSelection", self.ui.characterGrid, true)
+    -- characters on row 7 (like the others place them near the bottom); page + actions below
+    self.ui.grid:createElementAt(1, 7, characterGridWidth, characterGridHeight, "characterSelection", self.ui.characterGrid, true)
     self.ui.grid:createElementAt(2, 8, 1, 1, "pageIndicator", self.ui.pageIndicator)
     self.ui.grid:createElementAt(1, 9, 2, 1, "readyButton", self.ui.readyButton)
     self.ui.grid:createElementAt(3, 9, 2, 1, "leaveButton", self.ui.leaveButton)

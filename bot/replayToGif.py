@@ -28,7 +28,7 @@ else:
     step = 2                              # overview -> every other frame keeps size down
 
 PS = 30
-HDR = 32 if has_state else 16            # taller header for the state/decision line
+HDR = 48 if has_state else 16            # bot mode: 3 info lines; replay: just the counter
 col = {0: (20, 20, 28), 1: (231, 76, 60), 2: (230, 126, 34), 3: (241, 196, 15),
        4: (46, 204, 113), 5: (52, 152, 219), 6: (155, 89, 182), 99: (150, 160, 165)}
 scol = {"DANGER": (231, 76, 60), "OFFENSE": (46, 204, 113), "RAISE": (241, 196, 15)}
@@ -54,10 +54,14 @@ for i in range(0, len(frames), step):
     if cr and c2 and c2 < W:                              # cursor spans (c2, c2+1) at row cr
         x = (c2 - 1) * PS; y = (H - cr) * PS + HDR
         d.rectangle([x + 1, y + 1, x + 2 * PS - 1, y + PS - 1], outline=(255, 255, 255), width=2)
-    d.text((3, 2), f"f{(start or 0) + i}  cleared {fr['pc']}", fill=(210, 210, 210))
-    if has_state:                                         # bot mode: brain state (color-coded) + decision this frame
+    if has_state:                                         # bot mode: 3 info lines
+        nf = fr.get("info", {})
+        d.text((3, 1), f"f{(start or 0)+i} cl{fr['pc']} h{nf.get('h','?')} chn{nf.get('chain','?')} stp{nf.get('stop','?')}", fill=(210, 210, 210))
         stt = fr.get("state", "?"); d.text((3, 17), stt, fill=scol.get(stt, (180, 180, 180)))
         d.text((3 + len(stt) * 6 + 6, 17), fr.get("dec", ""), fill=(235, 235, 235))
+        d.text((3, 33), f"act{nf.get('act','?')} inc{nf.get('inc','?')} ng{nf.get('ng','?')} gRow{nf.get('lgr','-')}", fill=(170, 170, 175))
+    else:
+        d.text((3, 2), f"f{(start or 0) + i}  cleared {fr['pc']}", fill=(210, 210, 210))
     imgs.append(img)
 
 imgs[0].save(out, save_all=True, append_images=imgs[1:], duration=ms, loop=0, optimize=True)

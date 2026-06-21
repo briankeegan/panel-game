@@ -36,13 +36,17 @@ local idleCut = seed and 120 or 150
 local frames, lastChange, prevKey = {}, 0, nil
 for _ = 1, 6000 do
   if st:game_ended() then break end
-  local state, dec
+  local state, dec, info
   if seed then  -- bot drives: decide, act, then capture
-    local s = BoardState.extract(st)
-    local d = brain:decide(s, st, m)
-    local ch = ctrl:nextInput(s, d)
+    local bs = BoardState.extract(st)
+    local d = brain:decide(bs, st, m)
+    local ch = ctrl:nextInput(bs, d)
     state = brain._state or "?"
-    dec = (d.type == "SWAP" and ("PLAY:" .. (d.kind or "?"))) or d.type
+    if d.type == "SWAP" then dec = "PLAY:" .. (d.kind or "?") .. "@" .. d.pos[1] .. "," .. d.pos[2]
+    else dec = d.type end
+    local incRows = 0; for _, g in ipairs(bs.incoming or {}) do incRows = incRows + (g.h or 0) end
+    info = { h = bs.maxColHeight or 0, chain = bs.chainCounter or 0, act = bs.activePanels or 0,
+      stop = bs.stopTime or 0, inc = incRows, ng = bs.nonGarbageRows or 0, lgr = bs.lowestGarbageRow }
     st:receiveConfirmedInput(ch); m:run()
   else          -- replay drives itself
     m:run()
@@ -59,7 +63,7 @@ for _ = 1, 6000 do
     c[r] = cr; s[r] = sr
   end
   local fr = { c = c, s = s, cur = { st.cur_row, st.cur_col }, pc = st.panels_cleared or 0 }
-  if seed then fr.state = state; fr.dec = dec end
+  if seed then fr.state = state; fr.dec = dec; fr.info = info end
   frames[#frames + 1] = fr
   local k = table.concat(key, ",") .. "|" .. tostring(st.cur_row) .. "," .. tostring(st.cur_col) .. "|" .. (st.panels_cleared or 0) .. "|" .. (state or "")
   if k ~= prevKey then lastChange = #frames; prevKey = k end

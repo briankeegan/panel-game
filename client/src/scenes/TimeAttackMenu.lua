@@ -45,7 +45,7 @@ function TimeAttackMenu:loadUserInterface()
   self.ui.panelSelection:addElement(panelCarousel, player)
   self.ui.grid:createElementAt(1, 2, pm and 4 or 2, 1, "panelSelection", self.ui.panelSelection, nil, true)
 
-  local stageCarousel = self:createStageCarousel(player, (pm and self.ui.grid.unitSize or self.ui.grid.unitSize * 2) - self.ui.grid.unitMargin * 2)
+  local stageCarousel = self:createStageCarousel(player, (pm and self.ui.grid.unitSize * 4 or self.ui.grid.unitSize * 2) - self.ui.grid.unitMargin * 2)
   self.ui.stageSelection = ui.MultiPlayerSelectionWrapper({vFill = true, alignment = "left", hAlign = "center", vAlign = "center"})
   self.ui.stageSelection:setTitle("stage")
   self.ui.stageSelection:addElement(stageCarousel, player)

@@ -67,7 +67,9 @@ function EndlessMenu:loadUserInterface()
     self.ui.grid:createElementAt(1, 2, 2, 1, "panelSelection", self.ui.panelSelection, nil, true)
   end
 
-  local stageCarousel = self:createStageCarousel(player, self.ui.grid.unitSize - self.ui.grid.unitMargin * 2)
+  -- portrait: full-width stage so the < > arrows have room (else they squeeze
+  -- into a ~109px box and disappear)
+  local stageCarousel = self:createStageCarousel(player, (pm and self.ui.grid.unitSize * 4 or self.ui.grid.unitSize) - self.ui.grid.unitMargin * 2)
   self.ui.stageSelection = ui.MultiPlayerSelectionWrapper({vFill = true, alignment = "left", hAlign = "center", vAlign = "center"})
   self.ui.stageSelection:setTitle("stage")
   self.ui.stageSelection:addElement(stageCarousel, player)

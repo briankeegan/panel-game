@@ -50,7 +50,7 @@ function CharacterSelectChallenge:loadUserInterface()
   end
 
   panelHeight = self.ui.grid.unitSize - self.ui.grid.unitMargin * 2- self.ui.panelSelection.height
-  stageWidth = (pm and self.ui.grid.unitSize * 2 or self.ui.grid.unitSize * 1.5) - self.ui.grid.unitMargin * 2
+  stageWidth = (pm and self.ui.grid.unitSize * 4 or self.ui.grid.unitSize * 1.5) - self.ui.grid.unitMargin * 2
 
   if pm then
     self.ui.changeInputButton:setVisibility(false)

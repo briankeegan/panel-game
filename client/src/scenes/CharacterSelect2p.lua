@@ -2,6 +2,8 @@ local CharacterSelect = require("client.src.scenes.CharacterSelect")
 local class = require("common.lib.class")
 local ui = require("client.src.ui")
 local system = require("client.src.system")
+local consts = require("common.engine.consts")
+local GraphicsUtil = require("client.src.graphics.graphics_util")
 
 ---@class CharacterSelect2p : CharacterSelect
 local CharacterSelect2p = class(
@@ -17,16 +19,13 @@ function CharacterSelect2p:customLoad(sceneParams)
 end
 
 function CharacterSelect2p:loadUserInterface()
-  -- portrait: a minimal waiting room — player-info row + character grid +
-  -- ready/leave. The panel/stage/level selectors are intentionally NOT shown on
-  -- phones (too cramped, and team play mostly wants quick character + ready).
-  local pm = system.isPortraitMode()
-  local unitSize, gridW, gridH = 100, 9, 6
-  if pm then
-    unitSize, gridW, gridH = 125, 4, 8
+  -- portrait phones get a dedicated minimal waiting room (vertical roster +
+  -- bottom-anchored character picker). Landscape/desktop is unchanged below.
+  if system.isPortraitMode() then
+    return self:loadPortraitUI()
   end
-  -- shift the main grid down in portrait to leave room for the icon row on top
-  self.ui.grid = ui.Grid({unitSize = unitSize, gridWidth = gridW, gridHeight = gridH, unitMargin = 8, hAlign = "center", vAlign = "center", y = pm and 120 or 0})
+
+  self.ui.grid = ui.Grid({unitSize = 100, gridWidth = 9, gridHeight = 6, unitMargin = 8, hAlign = "center", vAlign = "center"})
   self.uiRoot:addChild(self.ui.grid)
 
   self:createIconRow()
@@ -42,7 +41,6 @@ function CharacterSelect2p:loadUserInterface()
 
   local characterButtons = self:getCharacterButtons()
   local characterGridWidth, characterGridHeight = self.ui.grid.gridWidth, 3
-  if pm then characterGridWidth, characterGridHeight = 4, 5 end
   self.ui.characterGrid = self:createCharacterGrid(characterButtons, self.ui.grid, characterGridWidth, characterGridHeight)
 
   self.ui.pageIndicator = self:createPageIndicator(self.ui.characterGrid)
@@ -50,30 +48,21 @@ function CharacterSelect2p:loadUserInterface()
   self.ui.leaveButton = self:createLeaveButton()
   self.ui.changeInputButton = self:createChangeInputButton()
 
-  if pm then
-    -- selectors omitted on purpose; just character grid + page + actions
-    self.ui.grid:createElementAt(1, 1, characterGridWidth, characterGridHeight, "characterSelection", self.ui.characterGrid, true)
-    self.ui.grid:createElementAt(2, 6, 1, 1, "pageIndicator", self.ui.pageIndicator)
-    self.ui.changeInputButton:setVisibility(false)
-    self.ui.grid:createElementAt(1, 8, 2, 1, "readyButton", self.ui.readyButton)
-    self.ui.grid:createElementAt(3, 8, 2, 1, "leaveButton", self.ui.leaveButton)
+  if self.battleRoom.online then
+    self.ui.grid:createElementAt(1, 2, 2, 1, "panelSelection", self.ui.panelSelection, nil, true)
+    self.ui.grid:createElementAt(5, 2, 2, 1, "stageSelection", self.ui.stageSelection, nil, true)
+    self.ui.grid:createElementAt(7, 2, 2, 1, "levelSelection", self.ui.levelSelection, nil, true)
   else
-    if self.battleRoom.online then
-      self.ui.grid:createElementAt(1, 2, 2, 1, "panelSelection", self.ui.panelSelection, nil, true)
-      self.ui.grid:createElementAt(5, 2, 2, 1, "stageSelection", self.ui.stageSelection, nil, true)
-      self.ui.grid:createElementAt(7, 2, 2, 1, "levelSelection", self.ui.levelSelection, nil, true)
-    else
-      self.ui.grid:createElementAt(1, 2, 2, 1, "panelSelection", self.ui.panelSelection, nil, true)
-      self.ui.grid:createElementAt(3, 2, 3, 1, "stageSelection", self.ui.stageSelection, nil, true)
-      self.ui.grid:createElementAt(6, 2, 3, 1, "levelSelection", self.ui.levelSelection, nil, true)
-    end
-
-    self.ui.grid:createElementAt(9, 2, 1, 1, "readyButton", self.ui.readyButton)
-    self.ui.grid:createElementAt(1, 3, characterGridWidth, characterGridHeight, "characterSelection", self.ui.characterGrid, true)
-    self.ui.grid:createElementAt(5, 6, 1, 1, "pageIndicator", self.ui.pageIndicator)
-    self.ui.grid:createElementAt(8, 6, 1, 1, "changeInputButton", self.ui.changeInputButton)
-    self.ui.grid:createElementAt(9, 6, 1, 1, "leaveButton", self.ui.leaveButton)
+    self.ui.grid:createElementAt(1, 2, 2, 1, "panelSelection", self.ui.panelSelection, nil, true)
+    self.ui.grid:createElementAt(3, 2, 3, 1, "stageSelection", self.ui.stageSelection, nil, true)
+    self.ui.grid:createElementAt(6, 2, 3, 1, "levelSelection", self.ui.levelSelection, nil, true)
   end
+
+  self.ui.grid:createElementAt(9, 2, 1, 1, "readyButton", self.ui.readyButton)
+  self.ui.grid:createElementAt(1, 3, characterGridWidth, characterGridHeight, "characterSelection", self.ui.characterGrid, true)
+  self.ui.grid:createElementAt(5, 6, 1, 1, "pageIndicator", self.ui.pageIndicator)
+  self.ui.grid:createElementAt(8, 6, 1, 1, "changeInputButton", self.ui.changeInputButton)
+  self.ui.grid:createElementAt(9, 6, 1, 1, "leaveButton", self.ui.leaveButton)
 
   self:setupRoster()
 
@@ -82,10 +71,238 @@ function CharacterSelect2p:loadUserInterface()
   self.ui.pageTurnButtons = self:createPageTurnButtons(self.ui.characterGrid)
 end
 
+-- Portrait waiting room: a vertical roster of full-width player cards up top,
+-- the character picker + dominant Ready / small Leave anchored to the bottom
+-- (thumb reach). No panel/stage/level selectors. Per design review.
+function CharacterSelect2p:loadPortraitUI()
+  -- dim the busy game background so the roster/cards read clearly
+  local dim = ui.UiElement({x = 0, y = 0, width = consts.CANVAS_WIDTH, height = consts.CANVAS_HEIGHT})
+  dim.drawSelf = function(elem)
+    GraphicsUtil.setColor(0, 0, 0, 0.55)
+    GraphicsUtil.drawRectangle("fill", elem.x, elem.y, elem.width, elem.height)
+    GraphicsUtil.setColor(1, 1, 1, 1)
+  end
+  self.uiRoot:addChild(dim)
+
+  -- character picker = a single row of 4 with < > page arrows (the endless-style
+  -- selector), NOT a multi-row block. createPageTurnButtons adds the arrows.
+  local charRows = 1
+  -- bottom-anchored picker grid: big character cells + page + action row
+  self.ui.grid = ui.Grid({unitSize = 120, gridWidth = 4, gridHeight = charRows + 2, unitMargin = 8, hAlign = "center", vAlign = "bottom"})
+  self.uiRoot:addChild(self.ui.grid)
+
+  -- selectors are referenced by refreshRoster bookkeeping; create but never show
+  self.ui.panelSelection = ui.MultiPlayerSelectionWrapper({hFill = true, alignment = "top", hAlign = "center", vAlign = "top"})
+  self.ui.panelSelection:setTitle("panels")
+  self.ui.stageSelection = ui.MultiPlayerSelectionWrapper({vFill = true, alignment = "left", hAlign = "center", vAlign = "center"})
+  self.ui.stageSelection:setTitle("stage")
+  self.ui.levelSelection = ui.MultiPlayerSelectionWrapper({hFill = true, alignment = "top", hAlign = "center", vAlign = "top"})
+  self.ui.levelSelection:setTitle("level")
+
+  self.ui.readyButton = self:createReadyButton()
+  self.ui.leaveButton = self:createLeaveButton()
+  self.ui.changeInputButton = self:createChangeInputButton()
+  self.ui.changeInputButton:setVisibility(false)
+
+  local characterButtons = self:getCharacterButtons()
+  self.ui.characterGrid = self:createCharacterGrid(characterButtons, self.ui.grid, 4, charRows)
+  self.ui.pageIndicator = self:createPageIndicator(self.ui.characterGrid)
+
+  self.ui.grid:createElementAt(1, 1, 4, charRows, "characterSelection", self.ui.characterGrid, true)
+  self.ui.grid:createElementAt(2, charRows + 1, 1, 1, "pageIndicator", self.ui.pageIndicator)
+  -- Ready dominant (3 wide), Leave small (1 wide)
+  self.ui.grid:createElementAt(1, charRows + 2, 3, 1, "readyButton", self.ui.readyButton)
+  self.ui.grid:createElementAt(4, charRows + 2, 1, 1, "leaveButton", self.ui.leaveButton)
+
+  self:createIconRow()
+  self:setupRoster()
+  self.ui.pageTurnButtons = self:createPageTurnButtons(self.ui.characterGrid)
+end
+
+-- a live ready/wait status label wired to the player's signals
+function CharacterSelect2p:_readyBadge(player, x)
+  local badge = ui.Label({hAlign = "right", vAlign = "center", x = x, text = "", translate = false})
+  badge.refresh = function()
+    if not player.hasLoaded then badge:setText("…", nil, false)
+    elseif player.settings.wantsReady then badge:setText("READY", nil, false)
+    else badge:setText("WAIT", nil, false) end
+  end
+  badge.refresh()
+  badge.onChanged = function() badge.refresh() end
+  player:connectSignal("wantsReadyChanged", badge, badge.onChanged)
+  player:connectSignal("hasLoadedChanged", badge, badge.onChanged)
+  return badge
+end
+
+-- rating · wins line; "unranked" when no data
+local function statLine(player)
+  local parts = {}
+  if player.rating and tostring(player.rating) ~= "" then parts[#parts + 1] = tostring(player.rating) end
+  if player.wins then parts[#parts + 1] = player.wins .. " wins" end
+  return #parts > 0 and table.concat(parts, "  ·  ") or "unranked"
+end
+
+local function spine(elem, color)
+  if color then
+    GraphicsUtil.setColor(color[1], color[2], color[3], color[4] or 1)
+    GraphicsUtil.drawRectangle("fill", elem.x, elem.y, 5, elem.height)
+    GraphicsUtil.setColor(1, 1, 1, 1)
+  end
+end
+
+-- LOCAL player's card == their editable settings panel (design: row 1 is special).
+-- name + ready, then panels / level / stage controls the player can change.
+function CharacterSelect2p:_createLocalCard(player, cardW, teamColor)
+  -- Per design spec: header (name LEFT, stats RIGHT, ready badge RIGHT), then each
+  -- control on its OWN line with a CENTERED label above a CENTERED full-width
+  -- widget (so everything lines up on the card's center axis). Panels & Stage are
+  -- carousels (big, with < > arrows); Level is a slider (no arrows).
+  local headerH, labelH, gap = 60, 26, 14
+  local ctrlW = cardW - 48
+  local ctrlX = math.floor((cardW - ctrlW) / 2)
+  local specs = {
+    {label = "Panels", h = 96, make = function() return self:createPanelCarousel(player, 96) end},
+    {label = "Level",  h = 72, make = function() return self:createLevelSlider(player, 44, 72) end},
+    {label = "Stage",  h = 96, make = function()
+      local sc = self:createStageCarousel(player, ctrlW)
+      -- ensure a passenger is actually shown (setPassengerById(config.stage) is a
+      -- no-op when that stage isn't in the loaded list -> empty carousel)
+      if sc.passengers and sc.passengers[sc.selectedId or 1] then sc:setPassengerByIndex(sc.selectedId or 1) end
+      return sc
+    end},
+  }
+
+  local cardH = headerH + 8 + 16  -- extra bottom pad so Stage doesn't crowd next card
+  for _, s in ipairs(specs) do cardH = cardH + labelH + s.h + gap end
+
+  local card = ui.UiElement({width = cardW, height = cardH})
+  card.drawSelf = function(elem)
+    -- near-opaque so the busy game background doesn't bleed through (contrast)
+    GraphicsUtil.setColor(0.07, 0.07, 0.10, 0.96)
+    GraphicsUtil.drawRectangle("fill", elem.x, elem.y, elem.width, elem.height)
+    GraphicsUtil.setColor(1, 1, 1, 0.05)
+    GraphicsUtil.drawRectangle("fill", elem.x, elem.y, elem.width, elem.height)
+    spine(elem, teamColor or {1, 0.8, 0.1, 0.9})
+  end
+
+  -- header
+  card:addChild(ui.Label({x = 16, y = 12, text = (player.name or "You") .. " (you)", translate = false}))
+  card:addChild(ui.Label({hAlign = "right", x = -16, y = 12, text = statLine(player), translate = false}))
+  local badge = self:_readyBadge(player, -16)
+  badge.vAlign = "top"
+  badge.y = 36
+  card:addChild(badge)
+
+  local y = headerH
+  for _, s in ipairs(specs) do
+    card:addChild(ui.Label({hAlign = "center", y = y, text = s.label, translate = false}))
+    -- Wrap the control in a sized row and let it FILL the row. Do NOT force
+    -- vFill=false / height on the control after construction — StageCarousel is
+    -- built vFill and breaks (renders far below) when that's overridden.
+    local row = ui.UiElement({x = ctrlX, y = y + labelH, width = ctrlW, height = s.h})
+    local control = s.make()
+    -- the panel/stage carousels overlay a "1P" badge (for multi-player landscape);
+    -- pointless here (single local player) — hide it.
+    if control.playerNumberIcon then control.playerNumberIcon:setVisibility(false) end
+    control.hFill = false
+    control.x = 0
+    control.width = ctrlW
+    row:addChild(control)
+    card:addChild(row)
+    y = y + labelH + s.h + gap
+  end
+
+  return card, cardH
+end
+
+-- Collapsed read-only row for everyone else: solid dark card with icon, name,
+-- rating·W/L, ready badge, and (host) a boot button.
+function CharacterSelect2p:_createRemoteCard(player, cardW, cardH, canBoot, teamColor)
+  local card = ui.UiElement({width = cardW, height = cardH})
+  card.drawSelf = function(elem)
+    GraphicsUtil.setColor(0.07, 0.07, 0.10, 0.96)
+    GraphicsUtil.drawRectangle("fill", elem.x, elem.y, elem.width, elem.height)
+    spine(elem, teamColor)
+    GraphicsUtil.setColor(1, 1, 1, 1)
+  end
+
+  local iconBox = ui.UiElement({x = 12, y = 8, width = cardH - 16, height = cardH - 16})
+  local icon = self:createPlayerIcon(player, {hideName = true, hideNumber = true})
+  iconBox:addChild(icon)
+  card:addChild(iconBox)
+  self.ui.characterIcons[#self.ui.characterIcons + 1] = icon
+
+  local name = player.name or "?"
+  if #name > 14 then name = name:sub(1, 13) .. "…" end
+  card:addChild(ui.Label({x = cardH + 4, y = 10, text = name, translate = false}))
+  card:addChild(ui.Label({x = cardH + 4, y = math.floor(cardH / 2) + 4, text = statLine(player), translate = false}))
+
+  local bootReserve = canBoot and cardH or 12
+  card:addChild(self:_readyBadge(player, -(bootReserve + 8)))
+
+  if canBoot then
+    local pubId = player.publicId
+    local bootBtn = ui.TextButton({
+      hAlign = "right", vAlign = "center",
+      width = cardH - 12, height = cardH - 12,
+      label = ui.Label({text = "x", translate = false}),
+      backgroundColor = {0.4, 0.05, 0.05, 0.85},
+      outlineColor = {1, 0.4, 0.4, 1},
+      onClick = function()
+        if GAME.theme and GAME.theme.playCancelSfx then GAME.theme:playCancelSfx() end
+        if GAME.netClient and GAME.netClient.kickPlayer then GAME.netClient:kickPlayer(pubId) end
+      end,
+    })
+    bootBtn.onSelect = bootBtn.onClick
+    card:addChild(bootBtn)
+  end
+
+  return card
+end
+
+-- Portrait roster: local player's editable card first, then a collapsed info row
+-- per other player. Cursors drive the bottom character picker.
+function CharacterSelect2p:setupPortraitRoster()
+  self.ui.characterIcons = {}
+  self.ui.playerInfos = {}
+
+  local cardW = consts.CANVAS_WIDTH - 40
+  local remoteH = 76
+  local cardGap = 12
+
+  local ownerId = self.battleRoom and self.battleRoom.ownerId
+  local localPlayer = GAME and GAME.localPlayer
+  local mode = self.battleRoom and self.battleRoom.mode
+  local isOpenRoom = mode and (mode.openRoom == true
+    or (mode.minPlayers and mode.maxPlayers and mode.minPlayers < mode.maxPlayers))
+  local localIsHost = isOpenRoom and ownerId and localPlayer and localPlayer.publicId == ownerId
+
+  for i, player in ipairs(self.players) do
+    local cursor = self:createCursor(self.ui.grid, player)
+    cursor.raise1Callback = function() self.ui.characterGrid:turnPage(-1) end
+    cursor.raise2Callback = function() self.ui.characterGrid:turnPage(1) end
+    self.ui.cursors[i] = cursor
+
+    local teamColor = self:teamBorderColorForPlayer(player)
+    if player.isLocal then
+      self.ui.iconRow:addElement((self:_createLocalCard(player, cardW, teamColor)))
+    else
+      local canBoot = localIsHost and player.publicId ~= ownerId
+      self.ui.iconRow:addElement(self:_createRemoteCard(player, cardW, remoteH, canBoot, teamColor))
+    end
+    -- breathing room between cards
+    self.ui.iconRow:addElement(ui.UiElement({width = cardW, height = cardGap}))
+  end
+end
+
 -- Creates all per-player UI: panel/stage/level selectors, cursors, top-row
 -- character icons and player info cards. Roster-dependent; called from
 -- loadUserInterface and rebuilt by refreshRoster on drop-in/drop-out.
 function CharacterSelect2p:setupRoster()
+  -- portrait uses a completely separate vertical-roster build
+  if system.isPortraitMode() then
+    return self:setupPortraitRoster()
+  end
   -- Online play has exactly one local player whose selectors are interactive; remote
   -- players' selections come from the server. Size the carousel for one row.
   local rowsToShow
@@ -257,13 +474,17 @@ function CharacterSelect2p:createIconRow()
   if self.ui.iconRow then
     self.ui.iconRow:detach()
   end
+  -- portrait: a VERTICAL stack of full-width player cards pinned to the top.
+  -- setupPortraitRoster fills it; cards grow the screen DOWN instead of shrinking
+  -- a horizontal strip.
+  if system.isPortraitMode() then
+    self.ui.iconRow = ui.StackPanel({alignment = "top", hAlign = "center", vAlign = "top", y = 18, width = consts.CANVAS_WIDTH - 40})
+    self.uiRoot:addChild(self.ui.iconRow)
+    return
+  end
   local cols = math.max(2, #self.players * 2)
-  -- portrait: fit the row to the narrow screen and pin it to the top (the main
-  -- grid is shifted down to make room).
-  local pm = system.isPortraitMode()
-  local widthBudget = pm and 700 or 1200
-  local unitSize = math.min(100, math.floor(widthBudget / cols))
-  self.ui.iconRow = ui.Grid({unitSize = unitSize, gridWidth = cols, gridHeight = 1, unitMargin = 8, hAlign = "center", vAlign = "center", y = pm and -510 or -250})
+  local unitSize = math.min(100, math.floor(1200 / cols))
+  self.ui.iconRow = ui.Grid({unitSize = unitSize, gridWidth = cols, gridHeight = 1, unitMargin = 8, hAlign = "center", vAlign = "center", y = -250})
   self.uiRoot:addChild(self.ui.iconRow)
 end
 

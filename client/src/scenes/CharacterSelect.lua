@@ -332,7 +332,10 @@ end
 
 ---@param player Player
 ---@return UiElement playerIcon
-function CharacterSelect:createPlayerIcon(player)
+function CharacterSelect:createPlayerIcon(player, opts)
+  -- opts.hideName / opts.hideNumber suppress the name-above-icon and the 1P/2P
+  -- corner badge (the portrait roster shows the name in the card already).
+  opts = opts or {}
   local playerIcon = ui.UiElement({hFill = true, vFill = true})
 
   local teamBorderColor = self:teamBorderColorForPlayer(player)
@@ -390,26 +393,30 @@ function CharacterSelect:createPlayerIcon(player)
   end
 
   -- player number icon
-  local playerIndex = tableUtils.indexOf(self.players, player)
-  local playerNumberIcon = ui.ImageContainer({
-    image = getPlayerNumberIcon(playerIndex),
-    hAlign = "left",
-    vAlign = "bottom",
-    x = 2,
-    y = -2,
-    scale = 3
-  })
-  playerIcon:addChild(playerNumberIcon)
+  if not opts.hideNumber then
+    local playerIndex = tableUtils.indexOf(self.players, player)
+    local playerNumberIcon = ui.ImageContainer({
+      image = getPlayerNumberIcon(playerIndex),
+      hAlign = "left",
+      vAlign = "bottom",
+      x = 2,
+      y = -2,
+      scale = 3
+    })
+    playerIcon:addChild(playerNumberIcon)
+  end
 
   -- player name above icon; wins shown via the adjacent info card (every
   -- player gets one in CharacterSelect2p, regardless of player count).
-  local playerName = ui.Label({
-    text = player.name,
-    translate = false,
-    hAlign = "center",
-    vAlign = "top",
-  })
-  playerIcon:addChild(playerName)
+  if not opts.hideName then
+    local playerName = ui.Label({
+      text = player.name,
+      translate = false,
+      hAlign = "center",
+      vAlign = "top",
+    })
+    playerIcon:addChild(playerName)
+  end
 
   -- load icon
   local loadIcon = ui.ImageContainer({

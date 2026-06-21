@@ -412,6 +412,21 @@ local function execCommand(c)
     writeOut("texts[" .. tostring(sceneName()) .. "]: " .. table.concat(sceneTexts(), " | "))
   elseif op == "wait" then st.busy = tonumber(args[1]) or 30
   elseif op == "scene" then writeOut("scene=" .. tostring(sceneName()))
+  elseif op == "mockroom" then
+    -- mockroom <N> [host] : jump to a fake N-player waiting room for layout tests
+    local n = tonumber(args[1]) or 4
+    local host = args[2] == "host"
+    local ok, err = pcall(function() require("client.src.debug.MockScene").waitingRoom(n, {host = host}) end)
+    writeOut("mockroom " .. n .. (host and " host" or "") .. (ok and " ok" or (" ERR: " .. tostring(err))))
+  elseif op == "mockreplay" then
+    -- mockreplay [N] [host] : waiting room built from REAL players in a recorded
+    -- replay (most-populated replay; optional N caps player count)
+    local n = tonumber(args[1])
+    local host = (args[1] == "host") or (args[2] == "host")
+    local ok, err = pcall(function()
+      require("client.src.debug.MockScene").waitingRoomFromReplay({count = n, host = host})
+    end)
+    writeOut("mockreplay" .. (n and (" " .. n) or "") .. (host and " host" or "") .. (ok and " ok" or (" ERR: " .. tostring(err))))
   elseif op == "where" then whereAmI()
   elseif op == "leave" then
     -- back out of the room/match but stay connected in the lobby

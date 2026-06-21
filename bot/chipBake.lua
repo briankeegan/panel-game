@@ -29,23 +29,42 @@ local function quote(v) return type(v) == "string" and ('"' .. v .. '"') or tost
 local function serTmpl(t) local p = {}; for _, e in ipairs(t) do p[#p+1] = string.format("{%d,%d,%s}", e[1], e[2], quote(e[3])) end; return "{" .. table.concat(p, ",") .. "}" end
 local function serSwaps(s) local p = {}; for _, o in ipairs(s) do p[#p+1] = string.format("{%d,%d}", o[1], o[2]) end; return "{" .. table.concat(p, ",") .. "}" end
 
--- render ONE chip from its template: digit = color class · "." = must-be-empty · "*" = don't-care · [ ] = swap cell.
-function M.render(chip)
-  local minr, maxr, minc, maxc = 0, 0, 0, 1
-  for _, e in ipairs(chip.tmpl) do minr=math.min(minr,e[1]); maxr=math.max(maxr,e[1]); minc=math.min(minc,e[2]); maxc=math.max(maxc,e[2]) end
-  local at = {}; for _, e in ipairs(chip.tmpl) do at[e[1]*100+e[2]] = e[3] end
-  local sw = {}; for _, o in ipairs(chip.swaps) do sw[o[1]*100+o[2]] = true; sw[o[1]*100+o[2]+1] = true end
+local function symOf(cl) return (cl == nil) and "*" or (cl == "e" and "." or tostring(cl)) end   -- *=don't-care .=empty digit=color
+-- one frame of a grid (map: r*100+c -> class) over [minr..maxr]x[minc..maxc], bracketing the cells in `swapCell` (a key set).
+local function frameText(grid, minr, maxr, minc, maxc, swapCell)
   local lines = {}
   for r = maxr, minr, -1 do
     local row = {}
     for c = minc, maxc do
-      local cl = at[r*100+c]
-      local ch = (cl == nil) and "*" or (cl == "e" and "." or tostring(cl))
-      row[#row+1] = sw[r*100+c] and ("["..ch.."]") or (" "..ch.." ")
+      local ch = symOf(grid[r*100+c])
+      row[#row+1] = swapCell[r*100+c] and ("["..ch.."]") or (" "..ch.." ")
     end
     lines[#lines+1] = ("    " .. table.concat(row)):gsub("%s+$", "")
   end
   return table.concat(lines, "\n")
+end
+
+-- render a chip: 1 swap -> a single labelled board; 2+ swaps -> ordered STEPS (setup… then fire), applying each swap
+-- before showing the next, so a multi-swap chip reads as the sequence of moves you play.
+function M.render(chip)
+  local minr, maxr, minc, maxc = 0, 0, 0, 1
+  for _, e in ipairs(chip.tmpl) do minr=math.min(minr,e[1]); maxr=math.max(maxr,e[1]); minc=math.min(minc,e[2]); maxc=math.max(maxc,e[2]) end
+  local grid = {}; for _, e in ipairs(chip.tmpl) do grid[e[1]*100+e[2]] = e[3] end
+  if #chip.swaps <= 1 then
+    local o = chip.swaps[1] or { 0, 0 }
+    local swc = { [o[1]*100+o[2]] = true, [o[1]*100+o[2]+1] = true }
+    return frameText(grid, minr, maxr, minc, maxc, swc)
+  end
+  local g = {}; for k, v in pairs(grid) do g[k] = v end
+  local parts = {}
+  for i, o in ipairs(chip.swaps) do
+    local k1, k2 = o[1]*100+o[2], o[1]*100+o[2]+1
+    local label = (i == #chip.swaps) and "fire" or "setup"
+    parts[#parts+1] = string.format("  step %d/%d (%s) — swap (%d,%d):", i, #chip.swaps, label, o[1], o[2])
+    parts[#parts+1] = frameText(g, minr, maxr, minc, maxc, { [k1] = true, [k2] = true })
+    g[k1], g[k2] = g[k2], g[k1]   -- play this swap, then show the next step from the new state
+  end
+  return table.concat(parts, "\n")
 end
 
 -- the key that makes a chip unique (identical template+swaps+kind = same chip), used for de-dup on writeAll.

@@ -25,9 +25,10 @@ function CharacterSelectVsSelf:loadUserInterface()
   local pm = system.isPortraitMode()
   local unitSize, gridW, gridH = 100, 9, 6
   if pm then
-    unitSize, gridW, gridH = 125, 4, 8
+    gridW, gridH = 4, 8
+    unitSize = math.floor(1240 / gridH)
   end
-  self.ui.grid = ui.Grid({unitSize = unitSize, gridWidth = gridW, gridHeight = gridH, unitMargin = 8, hAlign = "center", vAlign = pm and "bottom" or "center"})
+  self.ui.grid = ui.Grid({unitSize = unitSize, gridWidth = gridW, gridHeight = gridH, unitMargin = 8, hAlign = "center", vAlign = "center"})
   self.uiRoot:addChild(self.ui.grid)
 
   self.ui.characterIcons[1] = self:createPlayerIcon(player)
@@ -70,7 +71,7 @@ function CharacterSelectVsSelf:loadUserInterface()
 
   self.ui.levelSelection = ui.MultiPlayerSelectionWrapper({hFill = true, alignment = "top", hAlign = "center", vAlign = "top"})
   self.ui.levelSelection:setTitle("level")
-  local levelSlider = self:createLevelSlider(player, 20, self.ui.grid.unitSize - self.ui.grid.unitMargin * 2 - self.ui.levelSelection.height)
+  local levelSlider = self:createLevelSlider(player, pm and 40 or 20, self.ui.grid.unitSize - self.ui.grid.unitMargin * 2 - self.ui.levelSelection.height)
   local oldOnValueChange = levelSlider.onValueChange
   levelSlider.onValueChange = function(ls)
     oldOnValueChange(ls)

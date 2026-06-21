@@ -21,9 +21,10 @@ function CharacterSelectChallenge:loadUserInterface()
   local pm = system.isPortraitMode()
   local unitSize, gridW, gridH = 100, 9, 6
   if pm then
-    unitSize, gridW, gridH = 125, 4, 9
+    gridW, gridH = 4, 9
+    unitSize = math.floor(1240 / gridH)
   end
-  self.ui.grid = ui.Grid({unitSize = unitSize, gridWidth = gridW, gridHeight = gridH, unitMargin = 8, hAlign = "center", vAlign = pm and "bottom" or "center"})
+  self.ui.grid = ui.Grid({unitSize = unitSize, gridWidth = gridW, gridHeight = gridH, unitMargin = 8, hAlign = "center", vAlign = "center"})
   self.uiRoot:addChild(self.ui.grid)
 
   self.ui.panelSelection = ui.MultiPlayerSelectionWrapper({hFill = true, alignment = "top", hAlign = "center", vAlign = "top"})

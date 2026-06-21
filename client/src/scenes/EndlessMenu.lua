@@ -31,10 +31,12 @@ function EndlessMenu:loadUserInterface()
   -- the character grid shrinks (fewer per page) with page arrows, actions pin to
   -- the bottom. Landscape (else) is exactly as before.
   if pm then
-    unitSize, gridW, gridH = 125, 4, 10
+    -- size the unit so the grid fills the screen height — keeps controls big and
+    -- puts the bottom action row at a consistent y (no "content sits too low" gap)
+    gridW, gridH = 4, 10
+    unitSize = math.floor(1240 / gridH)
   end
-  -- portrait: bottom-anchor so Ready/Leave land at a consistent y across all screens
-  self.ui.grid = ui.Grid({unitSize = unitSize, gridWidth = gridW, gridHeight = gridH, unitMargin = 8, hAlign = "center", vAlign = pm and "bottom" or "center"})
+  self.ui.grid = ui.Grid({unitSize = unitSize, gridWidth = gridW, gridHeight = gridH, unitMargin = 8, hAlign = "center", vAlign = "center"})
   self.uiRoot:addChild(self.ui.grid)
 
   self.ui.characterIcons[1] = self:createPlayerIcon(player)
@@ -130,7 +132,7 @@ function EndlessMenu:loadUserInterface()
 
   self.ui.levelSelection = ui.MultiPlayerSelectionWrapper({hFill = true, alignment = "top", hAlign = "center", vAlign = "top"})
   self.ui.levelSelection:setTitle("level")
-  local levelSlider = self:createLevelSlider(player, 20, self.ui.grid.unitSize - self.ui.grid.unitMargin * 2 - self.ui.levelSelection.height)
+  local levelSlider = self:createLevelSlider(player, pm and 40 or 20, self.ui.grid.unitSize - self.ui.grid.unitMargin * 2 - self.ui.levelSelection.height)
   self.ui.levelSelection:addElement(levelSlider, player)
 
   styleSelector.onValueChange = function(boolSelector, value)

@@ -183,4 +183,16 @@ if arg and arg[0] and arg[0]:match("getCascadeShapes") then
   print(string.format("baked %d COMBO_%d_CASCADE_%d chips into cache (cache now %d total)", #chips, N, M, cnt))
 end
 
+-- registry: the full build bakes these (N primary, M riser) cascade pairs
+local function produce()
+  local out = {}
+  for _, p in ipairs({ { 4, 3 }, { 5, 3 }, { 5, 4 } }) do
+    for _, v in ipairs(enumerate(p[1], p[2])) do
+      out[#out+1] = { g = v.g, sr = v.sr, sc = v.sc, kind = v.kind, absSwaps = { { v.sr, v.sc } } }
+    end
+  end
+  return out
+end
+require("bot.chipRegistry").register{ name = "getCascadeShapes", produce = produce }
+
 return Mod

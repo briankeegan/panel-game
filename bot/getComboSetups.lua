@@ -193,4 +193,16 @@ if arg and arg[0] and arg[0]:match("getComboSetups") then
   print(string.format("baked %d COMBO_%d_SWAP_2 chips into cache (cache now %d total)", #chips, N, n))
 end
 
+-- registry: the full build bakes 2-swap setups for these sizes
+local function produce()
+  local out = {}
+  for _, n in ipairs({ 3, 4, 5 }) do
+    for _, v in ipairs(M.enumerate(n, 2)) do
+      out[#out+1] = { g = v.g, sr = v.sr, sc = v.sc, kind = v.kind, absSwaps = { v.s1, { v.sr, v.sc } } }
+    end
+  end
+  return out
+end
+require("bot.chipRegistry").register{ name = "getComboSetups", produce = produce }
+
 return M

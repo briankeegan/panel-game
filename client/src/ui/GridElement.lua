@@ -26,7 +26,10 @@ local GridElement = class(function(gridElement, options)
 end, UiElement)
 
 function GridElement:drawSelf()
-  if self.drawBorders then
+  -- portrait: skip the grid-cell border. Some scenes pass drawBorders=true and
+  -- others don't, which showed up as an inconsistent white border on some cards;
+  -- the dark setting cards don't need it. One shared fix for every grid screen.
+  if self.drawBorders and not require("client.src.system").isPortraitMode() then
     GraphicsUtil.drawRectangle("line", self.x, self.y, self.width, self.height)
   end
 end

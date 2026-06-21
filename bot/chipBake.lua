@@ -55,7 +55,12 @@ local function chipKey(c) return c.kind .. "|" .. serSwaps(c.swaps) .. "|" .. se
 function M.writeAll(chips)
   local seen, uniq = {}, {}
   for _, c in ipairs(chips) do local k = chipKey(c); if not seen[k] then seen[k] = true; uniq[#uniq+1] = c end end
-  table.sort(uniq, function(a, b) if a.kind ~= b.kind then return a.kind < b.kind end return serTmpl(a.tmpl) < serTmpl(b.tmpl) end)
+  table.sort(uniq, function(a, b)   -- fully ordered (kind, then shape, then swaps) so the written files are deterministic
+    if a.kind ~= b.kind then return a.kind < b.kind end
+    local ta, tb = serTmpl(a.tmpl), serTmpl(b.tmpl)
+    if ta ~= tb then return ta < tb end
+    return serSwaps(a.swaps) < serSwaps(b.swaps)
+  end)
   local out, cat, perKind = {}, {}, {}
   for _, c in ipairs(uniq) do
     out[#out+1] = string.format("  { kind=%q, swaps=%s, tmpl=%s },", c.kind, serSwaps(c.swaps), serTmpl(c.tmpl))

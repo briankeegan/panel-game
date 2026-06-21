@@ -86,37 +86,45 @@ local function buildChipPriorities()
 end
 local CHIP_PRIORITIES = buildChipPriorities()
 
------------------------------------------------------------------- DECIDE (stateless, re-measured every frame)
+------------------------------------------------ DECIDE (re-measured on any board activity; cached while fully static)
 function EnvelopeBrain:decide(state, stack, match)
   local rows = state.rows
   local grid = BoardSim.colorGrid(state.board, rows)
+
+  -- CACHE: while the board is fully static (nothing active/chaining/flashing) AND the grid is unchanged since the last
+  -- decision, recognition returns the identical result -- skip the whole ~670-template pass. ANY board activity bypasses
+  -- the cache, so chips forming as the board settles/pops/rises are seen at once. (Unlike the removed sig-commit, which
+  -- keyed only on the top color-grid and stayed frozen through the 44-frame flash -- starving the brain.)
+  local sig = 0
+  for r = 1, rows do for c = 1, BoardSim.WIDTH do sig = (sig * 31 + (grid[r][c] or 0)) % 2147483647 end end
+  local busy = stack and (stack:hasActivePanels() or stack:hasChainingPanels())
+  if not busy and sig == self._sig and self._move ~= nil then return self._move end
+
   local height = state.maxColHeight or BoardSim.maxHeight(grid, rows)
-  local top = math.min(rows, height + 1)
-  local cursor = state.cursor or { top, 3 }
+  local cursor = state.cursor or { math.min(rows, height + 1), 3 }
 
-  -- a match is clearing -> WAIT: don't swap into it or undo a combo we just made (the engine won't let us re-swap
-  -- matched panels anyway). This is the only anti-oscillation gate we need.
-  if hasPendingMatch(grid, rows) then return { type = "WAIT" } end
-
-  -- STATE by stack height. All states fire the same combo chips; the state only changes the no-play FALLBACK:
-  -- RAISE pushes up for material, OFFENSE/DANGER never raise.
-  local st = (height >= DANGER_ABOVE and "DANGER") or (height <= RAISE_BELOW and "RAISE") or "OFFENSE"
-  self._state = st
-
-  -- re-measure EVERY frame from the live cursor -- NO stale sig-commit. A chip forming while the board settles (panels
-  -- falling/clearing below the top) is found immediately, not skipped because the top color-grid happened to be
-  -- unchanged. The CursorController locks its target mid-travel, so re-deciding here can't thrash the cursor.
-  local chip = useChips.useChips(grid, rows, cursor, {
-    chipPriorities = CHIP_PRIORITIES, searchPriorities = { "UP", "DOWN", "LEFT", "RIGHT" },
-    verify = self:chipVerify(stack, match),
-  })
-  if chip then
-    self._comboUse = self._comboUse or {}; self._comboUse[chip.kind] = (self._comboUse[chip.kind] or 0) + 1
-    return { type = "SWAP", pos = chip.swaps[1], swaps = chip.swaps }  -- pass the FULL sequence; the controller completes it
-  elseif st == "RAISE" then
-    return { type = "RAISE" }              -- no chip + too low -> push stack up for material
+  local move
+  if hasPendingMatch(grid, rows) then
+    move = { type = "WAIT" }                 -- a match is clearing -> don't swap into it or undo it
+  else
+    -- STATE by stack height. All states fire the same chips; state only changes the no-play FALLBACK.
+    local st = (height >= DANGER_ABOVE and "DANGER") or (height <= RAISE_BELOW and "RAISE") or "OFFENSE"
+    self._state = st
+    local chip = useChips.useChips(grid, rows, cursor, {
+      chipPriorities = CHIP_PRIORITIES, searchPriorities = { "UP", "DOWN", "LEFT", "RIGHT" },
+      verify = self:chipVerify(stack, match),
+    })
+    if chip then
+      self._comboUse = self._comboUse or {}; self._comboUse[chip.kind] = (self._comboUse[chip.kind] or 0) + 1
+      move = { type = "SWAP", pos = chip.swaps[1], swaps = chip.swaps }  -- full sequence; the controller completes it
+    elseif st == "RAISE" then
+      move = { type = "RAISE" }              -- no chip + too low -> push stack up for material
+    else
+      move = { type = "WAIT" }               -- no chip -> wait (building is a future SETUP *chip*)
+    end
   end
-  return { type = "WAIT" }                  -- no chip -> wait (building is a future SETUP *chip*)
+  self._sig, self._move = sig, move
+  return move
 end
 
 return EnvelopeBrain

@@ -149,4 +149,18 @@ function MockScene.waitingRoom(count, opts)
   GAME.navigationStack:push(CharacterSelect2p({battleRoom = battleRoom}))
 end
 
+-- Jump straight into the in-game PORTRAIT layout (PortraitGame) by starting a
+-- 1P endless match with a touch player (the routing condition for PortraitGame).
+-- DEBUG/TEST ONLY — for screenshotting the in-game layout locally.
+function MockScene.portraitGame()
+  local gameMode = GameModes.getPreset(GameModes.IDs.ONE_PLAYER_ENDLESS)
+  local EndlessGame = require("client.src.scenes.EndlessGame")
+  local battleRoom = BattleRoom.createLocalFromGameMode(gameMode, EndlessGame)
+  assert(battleRoom, "could not create battleRoom (input config?)")
+  local player = battleRoom.players[1]
+  player:setInputMethod("touch")
+  player.hasLoaded = true
+  battleRoom:startMatch()
+end
+
 return MockScene

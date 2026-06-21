@@ -427,6 +427,10 @@ local function execCommand(c)
       require("client.src.debug.MockScene").waitingRoomFromReplay({count = n, host = host})
     end)
     writeOut("mockreplay" .. (n and (" " .. n) or "") .. (host and " host" or "") .. (ok and " ok" or (" ERR: " .. tostring(err))))
+  elseif op == "mockgame" then
+    -- mockgame : start a 1P endless touch match -> jumps into PortraitGame
+    local ok, err = pcall(function() require("client.src.debug.MockScene").portraitGame() end)
+    writeOut("mockgame" .. (ok and " ok" or (" ERR: " .. tostring(err))))
   elseif op == "where" then whereAmI()
   elseif op == "leave" then
     -- back out of the room/match but stay connected in the lobby

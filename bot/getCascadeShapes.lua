@@ -159,17 +159,28 @@ local function render(rec)
   return rows, table.concat(plain, "/"), { dr = sr - rLo, dc = sc - cLo }
 end
 
-local list = {}; for _, rec in pairs(found) do list[#list+1] = rec end
-table.sort(list, function(a, b) return a.key < b.key end)
-local seen, out = {}, {}
-for _, rec in ipairs(list) do
-  local rows, plain, sw = render(rec)
-  local sig = plain .. "|" .. sw.dr .. "," .. sw.dc
-  if not seen[sig] then seen[sig] = true; out[#out+1] = { rows = rows, sw = sw } end
+local Mod = { enumerate = enumerate }
+
+if arg and arg[0] and arg[0]:match("getCascadeShapes") then
+  local list = enumerate(N, M)
+  local seen, out = {}, {}
+  for _, rec in ipairs(list) do
+    local rows, plain, sw = render(rec)
+    local sig = plain .. "|" .. sw.dr .. "," .. sw.dc
+    if not seen[sig] then seen[sig] = true; out[#out+1] = { rows = rows, sw = sw } end
+  end
+  print(string.format("combo_%d_cascade_%d combos: %d distinct  (1=primary · 2=riser · *=support · .=empty · [..]=swap)\n", N, M, #out))
+  for i, o in ipairs(out) do
+    print(string.format("#%d  swap (dr=%d,dc=%d)", i, o.sw.dr, o.sw.dc))
+    for _, row in ipairs(o.rows) do print("     " .. row) end
+    print("")
+  end
+  -- self-bake: running this script adds COMBO_N_CASCADE_M chips to the cache + catalog.
+  local bake = require("bot.chipBake")
+  local chips = {}
+  for _, v in ipairs(list) do chips[#chips+1] = bake.author(v.g, v.sr, v.sc, v.kind, { { v.sr, v.sc } }) end
+  local cnt = bake.upsert(string.format("^COMBO_%d_CASCADE_%d$", N, M), chips)
+  print(string.format("baked %d COMBO_%d_CASCADE_%d chips into cache (cache now %d total)", #chips, N, M, cnt))
 end
-print(string.format("combo_%d_cascade_%d combos: %d distinct  (1=primary · 2=riser · *=support · .=empty · [..]=swap)\n", N, M, #out))
-for i, o in ipairs(out) do
-  print(string.format("#%d  swap (dr=%d,dc=%d)", i, o.sw.dr, o.sw.dc))
-  for _, row in ipairs(o.rows) do print("     " .. row) end
-  print("")
-end
+
+return Mod

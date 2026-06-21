@@ -163,6 +163,12 @@ if arg and arg[0] and arg[0]:match("getComboShapes%.lua$") then
     for _, row in ipairs(o.rows) do print("     " .. row) end
     print("")
   end
+  -- self-bake: running this script adds COMBO_N chips to the cache + catalog.
+  local bake = require("bot.chipBake")
+  local chips = {}
+  for _, rec in ipairs(res.raw) do chips[#chips+1] = bake.author(rec.sample, rec.sr, rec.sc, "COMBO_" .. N, { { rec.sr, rec.sc } }) end
+  local cnt = bake.upsert("^COMBO_" .. N .. "$", chips)
+  print(string.format("baked %d COMBO_%d chips into cache (cache now %d total)", #chips, N, cnt))
 end
 
 return M

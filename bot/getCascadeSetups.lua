@@ -7,8 +7,7 @@ require("bot.headlessBoot"); do local l = require("common.lib.logger"); l.setLog
 _G.loc = _G.loc or function(s) return tostring(s) end
 local BoardSim = require("bot.BoardSim")
 local shapeCache = require("bot.shapeCache")
-local cascadeEnds = require("bot.getCascadeEnds")
-local getComboShapes = require("bot.getComboShapes")
+local getCascadeShapes = require("bot.getCascadeShapes")   -- cascade bases come straight from its enumerate now
 local Match = require("common.engine.Match"); require("common.engine.checkMatches")
 local LP = require("common.data.LevelPresets"); local KDE = require("common.data.KeyDataEncoding"); local Puzzle = require("common.engine.Puzzle")
 
@@ -49,64 +48,10 @@ local function play(g, swaps)
   end)
   return ok and res or { 0, 0, 0 }
 end
-local function firesCascade(g, r, c)
+local function firesCascade(g, r, c, n, m)
   if matches(g) then return false end
-  local d = play(g, { { r, c } }); return d[1] == N and d[2] == M and d[3] == 0
+  local d = play(g, { { r, c } }); return d[1] == n and d[2] == m and d[3] == 0
 end
-
------------------------------------------------------------------ build cascades (lifted from getCascadeShapes)
-local unsolves = {}
-for _, rec in ipairs(getComboShapes.enumerate(M).raw) do
-  local g = rec.sample; local mr, mc = 1e9, 1e9
-  for r = 1, H do for c = 1, W do if g[r][c] ~= 0 then mr = math.min(mr, r); mc = math.min(mc, c) end end end
-  local sec, fil = {}, {}
-  for r = 1, H do for c = 1, W do local v = g[r][c]
-    if v == 1 then sec[#sec+1] = { r-mr, c-mc } elseif v >= 2 then fil[#fil+1] = { r-mr, c-mc } end
-  end end
-  unsolves[#unsolves+1] = { sec = sec, fil = fil, sdr = rec.sr - mr, sdc = rec.sc - mc }
-end
-local ends = cascadeEnds.enumerate(N, M)
-local found = {}
-for _, e in ipairs(ends) do
-  local g0 = e.g
-  local prim, pr1, pc0, pc1 = {}, 0, 1e9, 0
-  for r = 1, H do for c = 1, W do if g0[r][c] == P then prim[#prim+1] = {r,c}; pr1=math.max(pr1,r); pc0=math.min(pc0,c); pc1=math.max(pc1,c) end end end
-  for _, U in ipairs(unsolves) do
-    for orr = 1, pr1 + 1 do for occ = pc0 - M, pc1 + 1 do
-      local pre = {}; for r = 1, H do pre[r] = {}; for c = 1, W do pre[r][c] = 0 end end
-      for _, p in ipairs(prim) do pre[p[1]][p[2]] = P end
-      local okp = true
-      for _, s in ipairs(U.sec) do local r, c = orr + s[1], occ + s[2]
-        if r < 1 or r > H or c < 1 or c > W or pre[r][c] ~= 0 then okp = false; break end
-        pre[r][c] = S
-      end
-      if okp then
-        for _, f in ipairs(U.fil) do local r, c = orr + f[1], occ + f[2]
-          if r >= 1 and r <= H and c >= 1 and c <= W and pre[r][c] == 0 then pre[r][c] = ((r+c)%2==0) and 5 or 6 end end
-        local maxRelC = 0
-        for _, s in ipairs(U.sec) do maxRelC = math.max(maxRelC, s[2]) end
-        for _, f in ipairs(U.fil) do maxRelC = math.max(maxRelC, f[2]) end
-        for c = occ, occ + maxRelC do if c >= 1 and c <= W then
-          for r = 1, orr - 1 do if pre[r][c] == 0 then pre[r][c] = ((r+c)%2==0) and 5 or 6 end end end end
-        for c = 1, W do local top = 0; for r = 1, H do if pre[r][c] ~= 0 then top = r end end
-          for r = 1, top do if pre[r][c] == 0 then pre[r][c] = ((r+c)%2==0) and 5 or 6 end end end
-        local sr, scc = orr + U.sdr, occ + U.sdc
-        if sr >= 1 and sr <= H and scc >= 1 and scc <= W - 1 and not matches(pre)
-           and (pre[sr][scc] == S or pre[sr][scc+1] == S) then
-          if firesCascade(pre, sr, scc) then
-            local kk = shapeCache.canonShape(pre)
-            if kk and not found[kk] then found[kk] = { sample = pre, sr = sr, sc = scc, key = kk } end
-          end
-        end
-      end
-    end end
-  end
-end
-
-local list = {}; for _, rec in pairs(found) do list[#list+1] = rec end
-table.sort(list, function(a, b) return a.key < b.key end)
-if #list == 0 then print(string.format("no COMBO_%d_CASCADE_%d cascades found", N, M)); os.exit(1) end
-print(string.format("=== built %d COMBO_%d_CASCADE_%d cascades; running swap-unsolve to find ONE that needs a setup swap ===\n", #list, N, M))
 
 ----------------------------------------------------------------- render: 3-step filmstrip (the getComboSetups flavor)
 local function sym(v) if v == 0 then return "." elseif v >= 5 then return "*" else return tostring(v) end end
@@ -122,11 +67,11 @@ local function realMatch(g)
 end
 -- no-shortcut gate: true if SOME single swap fires the WHOLE cascade (wins in one swap) -> not forced 2-swap, reject.
 -- prefilter with realMatch (a winning swap must first make a real match) so the engine only runs when it could matter.
-local function anySwapWins(g)
+local function anySwapWins(g, n, m)
   for r = 1, H do for c = 1, W - 1 do
     if g[r][c] ~= g[r][c+1] and realMatch(applySwapSettle(g, r, c)) then
       local d = play(g, { { r, c } })
-      if d[1] == N and d[2] == M and d[3] == 0 then return true end
+      if d[1] == n and d[2] == m and d[3] == 0 then return true end
     end
   end end
   return false
@@ -188,28 +133,57 @@ local function filmstrip(start, s1, s2)
   frame(mid, minc, maxc, maxr, { s2[1], s2[2], "swap" })
 end
 
------------------------------------------------------------------ the swap-unsolve, on each cascade until ONE works
-for _, base in ipairs(list) do
-  local B0, sr, sc = base.sample, base.sr, base.sc
-  for br = math.max(1, sr - R), math.min(H, sr + R) do
-    for bc = 1, W - 1 do
-      local moves = math.abs(br - sr) + math.abs(bc - sc)
-      if moves >= 1 and moves <= R then
-        local g = clone(B0)
-        g[br][bc], g[br][bc+1] = g[br][bc+1], g[br][bc]; settle(g)
-        if not matches(g) and not anySwapWins(g) then        -- no pre-match + no single swap wins the whole cascade
-          if not firesCascade(g, sr, sc) then                 -- fire alone must NOT fire the cascade
-            local d = play(g, { { br, bc }, { sr, sc } })       -- setup then fire
-            if d[1] == N and d[2] == M and d[3] == 0 then       -- fires the WHOLE cascade, no filler
-              print(string.format("COMBO_%d_CASCADE_%d_SWAP_2_MOVE_%d   [ [..]=swap · <..>=cursor · 1=primary · 2=riser · *=filler ]\n", N, M, moves))
-              filmstrip(g, { br, bc }, { sr, sc })
-              print(string.format("\n  ENGINE VERIFIED: fire-alone clears nothing; [swap 1, swap 2] clears %d primary + %d riser (full cascade), 0 filler.", N, M))
-              os.exit(0)
+----------------------------------------------------------------- enumerate: swap-unsolve EVERY cascade base, gated
+-- returns records { g = puzzle grid, sr,sc = fire swap, s1 = {br,bc} setup swap, moves, kind }
+local function enumerate(n, m, R)
+  R = R or 2
+  local out, seen = {}, {}
+  for _, base in ipairs(getCascadeShapes.enumerate(n, m)) do
+    local B0, sr, sc = base.g, base.sr, base.sc
+    for br = math.max(1, sr - R), math.min(H, sr + R) do
+      for bc = 1, W - 1 do
+        local moves = math.abs(br - sr) + math.abs(bc - sc)
+        if moves >= 1 and moves <= R then
+          local g = clone(B0)
+          g[br][bc], g[br][bc+1] = g[br][bc+1], g[br][bc]; settle(g)
+          if not matches(g) and not anySwapWins(g, n, m) then     -- no pre-match + no single swap wins the cascade
+            if not firesCascade(g, sr, sc, n, m) then             -- fire alone must NOT fire the cascade
+              local d = play(g, { { br, bc }, { sr, sc } })       -- setup then fire
+              if d[1] == n and d[2] == m and d[3] == 0 then       -- fires the WHOLE cascade, no filler
+                local kk = shapeCache.canonShape(g)
+                local sig = (kk or stackString(g)) .. "|" .. br .. "," .. bc
+                if not seen[sig] then seen[sig] = true
+                  out[#out+1] = { g = g, sr = sr, sc = sc, s1 = { br, bc }, moves = moves,
+                                  kind = string.format("COMBO_%d_CASCADE_%d_SWAP_2_MOVE_%d", n, m, moves) }
+                end
+              end
             end
           end
         end
       end
     end
   end
+  return out
 end
-print("no cascade needed a setup swap within radius " .. R .. " (try a larger radius or different N/M)")
+
+if arg and arg[0] and arg[0]:match("getCascadeSetups") then
+  local found = enumerate(N, M, R)
+  if #found == 0 then
+    print("no cascade needed a setup swap within radius " .. R .. " (try a larger radius or different N/M)")
+  else
+    print(string.format("=== %d COMBO_%d_CASCADE_%d_SWAP_2 variants (radius %d)   [ [..]=swap · <..>=cursor · 1=primary · 2=riser · *=filler ] ===\n", #found, N, M, R))
+    for i, v in ipairs(found) do
+      print(string.format("#%d  %s", i, v.kind))
+      filmstrip(v.g, v.s1, { v.sr, v.sc })
+      print("")
+    end
+  end
+  -- self-bake: running this script adds COMBO_N_CASCADE_M_SWAP_2 chips to the cache + catalog.
+  local bake = require("bot.chipBake")
+  local chips = {}
+  for _, v in ipairs(found) do chips[#chips+1] = bake.author(v.g, v.sr, v.sc, v.kind, { v.s1, { v.sr, v.sc } }) end
+  local cnt = bake.upsert(string.format("^COMBO_%d_CASCADE_%d_SWAP_2", N, M), chips)
+  print(string.format("baked %d COMBO_%d_CASCADE_%d_SWAP_2 chips into cache (cache now %d total)", #chips, N, M, cnt))
+end
+
+return { enumerate = enumerate }

@@ -60,8 +60,8 @@ function M.fire(g, absSwaps)
       if k >= 2 and not st:hasActivePanels() and not st:hasChainingPanels() then finishF = k; break end
     end
     st.pushGarbage = orig
-    local clears, total = {}, 0
-    for c = 1, 4 do clears[c] = before[c] - cnt(c); total = total + math.max(0, clears[c]) end
+    local clears, total, remaining = {}, 0, 0
+    for c = 1, 4 do clears[c] = before[c] - cnt(c); total = total + math.max(0, clears[c]); remaining = remaining + cnt(c) end
     -- expand the captured events into garbage blocks via the engine's own COMBO_GARBAGE table
     local garbage = {}
     for _, e in ipairs(events) do
@@ -69,10 +69,10 @@ function M.fire(g, absSwaps)
       for _, w in ipairs(COMBO_GARBAGE[e.comboSize] or {}) do garbage[#garbage+1] = { width = w, height = 1, kind = "combo" } end
       if e.isChain then garbage[#garbage+1] = { width = 6, height = 1, kind = "chain" } end
     end
-    return { clears = clears, total = total, garbage = garbage, chain = chain, start = startF or 0, finish = finishF }
+    return { clears = clears, total = total, garbage = garbage, chain = chain, start = startF or 0, finish = finishF, remaining = remaining }
   end)
   if ok then return res end
-  return { clears = {}, total = 0, garbage = {}, chain = 0, start = 0, finish = 0 }
+  return { clears = {}, total = 0, garbage = {}, chain = 0, start = 0, finish = 0, remaining = 0 }
 end
 
 local function clone(g) local n = {}; for r = 1, H do n[r] = {}; for c = 1, W do n[r][c] = g[r][c] end end; return n end
@@ -176,7 +176,7 @@ function M.measure(g, absSwaps)
   local edr, edc = sN[1]-s1[1], sN[2]-s1[2]
   return {
     clears = f.clears, total = f.total, garbage = f.garbage, chain = f.chain,
-    start = f.start, finish = f.finish,
+    start = f.start, finish = f.finish, leftover = f.remaining,   -- solving-color panels NOT cleared (should be 0)
     swaps = #absSwaps, cursorMoves = travel,
     cursorEnd = { dr = edr, dc = edc, dir = dirTag(edr, edc) },
     footprint = { rows = (maxr >= minr) and (maxr-minr+1) or 0, cols = (maxc >= minc) and (maxc-minc+1) or 0 },

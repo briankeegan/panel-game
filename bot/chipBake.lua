@@ -37,9 +37,9 @@ local function serMeta(m)
   if not m then return "{}" end
   local cl = {}; for c = 1, 4 do if (m.clears[c] or 0) > 0 then cl[#cl+1] = string.format("[%d]=%d", c, m.clears[c]) end end
   local gb = {}; for _, b in ipairs(m.garbage) do gb[#gb+1] = string.format("{w=%d,h=%d,k=%q}", b.width, b.height, b.kind) end
-  return string.format("{clears={%s},total=%d,garbage={%s},chain=%d,start=%d,finish=%d,swaps=%d,cursorMoves=%d,cursorEnd={dr=%d,dc=%d,dir=%q},footprint={rows=%d,cols=%d},colors=%d}",
+  return string.format("{clears={%s},total=%d,garbage={%s},chain=%d,start=%d,finish=%d,swaps=%d,cursorMoves=%d,cursorEnd={dr=%d,dc=%d,dir=%q},footprint={rows=%d,cols=%d},colors=%d,leftover=%d}",
     table.concat(cl, ","), m.total, table.concat(gb, ","), m.chain, m.start, m.finish, m.swaps, m.cursorMoves,
-    m.cursorEnd.dr, m.cursorEnd.dc, m.cursorEnd.dir, m.footprint.rows, m.footprint.cols, m.colors)
+    m.cursorEnd.dr, m.cursorEnd.dc, m.cursorEnd.dir, m.footprint.rows, m.footprint.cols, m.colors, m.leftover or 0)
 end
 -- short human tag for the catalog header line
 local function metaTag(m)
@@ -99,7 +99,11 @@ local function chipKey(c) return c.kind .. "|" .. serSwaps(c.swaps) .. "|" .. se
 -- write BOTH files from a full chip list. Stable order (by kind, then shape) so diffs are clean; de-dups identical chips.
 function M.writeAll(chips)
   local seen, uniq = {}, {}
-  for _, c in ipairs(chips) do local k = chipKey(c); if not seen[k] then seen[k] = true; uniq[#uniq+1] = c end end
+  for _, c in ipairs(chips) do
+    if not (c.meta and (c.meta.leftover or 0) > 0) then              -- drop chips that strand a colored panel (leftover)
+      local k = chipKey(c); if not seen[k] then seen[k] = true; uniq[#uniq+1] = c end
+    end
+  end
   table.sort(uniq, function(a, b)   -- fully ordered (kind, then shape, then swaps) so the written files are deterministic
     if a.kind ~= b.kind then return a.kind < b.kind end
     local ta, tb = serTmpl(a.tmpl), serTmpl(b.tmpl)

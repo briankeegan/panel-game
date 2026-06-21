@@ -330,6 +330,21 @@ function CharacterSelect:initializeFromLocalPlayerSettings(player)
   player:setLevelData(LevelPresets.getModern(player.settings.level))
 end
 
+-- Shared portrait backdrop: a dim overlay so the busy game background doesn't
+-- fight the foreground UI. Add it FIRST (before the grid) so it sits behind all
+-- scene content. No-op in landscape. Used by every portrait character-select
+-- scene so they share one consistent look.
+function CharacterSelect:addPortraitBackdrop()
+  if not require("client.src.system").isPortraitMode() then return end
+  local dim = ui.UiElement({x = 0, y = 0, width = consts.CANVAS_WIDTH, height = consts.CANVAS_HEIGHT})
+  dim.drawSelf = function(elem)
+    GraphicsUtil.setColor(0, 0, 0, 0.55)
+    GraphicsUtil.drawRectangle("fill", elem.x, elem.y, elem.width, elem.height)
+    GraphicsUtil.setColor(1, 1, 1, 1)
+  end
+  self.uiRoot:addChild(dim)
+end
+
 ---@param player Player
 ---@return UiElement playerIcon
 function CharacterSelect:createPlayerIcon(player, opts)

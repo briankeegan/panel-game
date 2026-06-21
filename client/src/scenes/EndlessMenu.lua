@@ -24,6 +24,7 @@ end
 function EndlessMenu:loadUserInterface()
   local player = self.battleRoom.players[1]
 
+  self:addPortraitBackdrop()
   local pm = system.isPortraitMode()
   local unitSize, gridW, gridH = 100, 9, 6
   -- portrait: a tall, narrow grid. Settings stack vertically (one/two per row),
@@ -32,7 +33,8 @@ function EndlessMenu:loadUserInterface()
   if pm then
     unitSize, gridW, gridH = 125, 4, 10
   end
-  self.ui.grid = ui.Grid({unitSize = unitSize, gridWidth = gridW, gridHeight = gridH, unitMargin = 8, hAlign = "center", vAlign = "center"})
+  -- portrait: bottom-anchor so Ready/Leave land at a consistent y across all screens
+  self.ui.grid = ui.Grid({unitSize = unitSize, gridWidth = gridW, gridHeight = gridH, unitMargin = 8, hAlign = "center", vAlign = pm and "bottom" or "center"})
   self.uiRoot:addChild(self.ui.grid)
 
   self.ui.characterIcons[1] = self:createPlayerIcon(player)

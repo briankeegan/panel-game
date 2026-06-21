@@ -75,14 +75,7 @@ end
 -- the character picker + dominant Ready / small Leave anchored to the bottom
 -- (thumb reach). No panel/stage/level selectors. Per design review.
 function CharacterSelect2p:loadPortraitUI()
-  -- dim the busy game background so the roster/cards read clearly
-  local dim = ui.UiElement({x = 0, y = 0, width = consts.CANVAS_WIDTH, height = consts.CANVAS_HEIGHT})
-  dim.drawSelf = function(elem)
-    GraphicsUtil.setColor(0, 0, 0, 0.55)
-    GraphicsUtil.drawRectangle("fill", elem.x, elem.y, elem.width, elem.height)
-    GraphicsUtil.setColor(1, 1, 1, 1)
-  end
-  self.uiRoot:addChild(dim)
+  self:addPortraitBackdrop()
 
   -- character picker = a single row of 4 with < > page arrows (the endless-style
   -- selector), NOT a multi-row block. createPageTurnButtons adds the arrows.
@@ -110,9 +103,9 @@ function CharacterSelect2p:loadPortraitUI()
 
   self.ui.grid:createElementAt(1, 1, 4, charRows, "characterSelection", self.ui.characterGrid, true)
   self.ui.grid:createElementAt(2, charRows + 1, 1, 1, "pageIndicator", self.ui.pageIndicator)
-  -- Ready dominant (3 wide), Leave small (1 wide)
-  self.ui.grid:createElementAt(1, charRows + 2, 3, 1, "readyButton", self.ui.readyButton)
-  self.ui.grid:createElementAt(4, charRows + 2, 1, 1, "leaveButton", self.ui.leaveButton)
+  -- equal Ready/Leave, matching the 1P screens
+  self.ui.grid:createElementAt(1, charRows + 2, 2, 1, "readyButton", self.ui.readyButton)
+  self.ui.grid:createElementAt(3, charRows + 2, 2, 1, "leaveButton", self.ui.leaveButton)
 
   self:createIconRow()
   self:setupRoster()

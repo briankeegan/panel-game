@@ -72,26 +72,33 @@ local DANGER_ABOVE = 9
 -- keeps the stack lower. (Tighten as clearing improves; raise-to-death is a bug, so this stays safe.)
 local RECOVERY_BUFFER = 6
 
--- chip priorities = EVERY kind authored in bot/chipCache.lua, so this auto-includes new families on a cache update.
--- Order: READY clears (no 2-swap setup) first, then the 2-swap SETUPS; within each group, bigger base + deeper cascade
--- first (they clear more).
+-- Per-state chip priorities, built from the cache (auto-includes new families). Order within a set: READY clears first,
+-- then 2-swap SETUPS; bigger base + deeper cascade first (they clear more).
 local EXCLUDE_KINDS = { COMBO_3 = true }  -- skip trivial 3-panel clears: force the bot toward bigger plays
-local function buildChipPriorities()
+local function rank(k)
+  local setup = k:find("SWAP_2", 1, true) and 1 or 0       -- 2-swap setups sort after ready clears
+  local base = tonumber(k:match("COMBO_(%d)")) or 0        -- base combo size
+  local casc = tonumber(k:match("CASCADE_(%d)")) or 0      -- cascade depth
+  return setup * 1000 - (base * 10 + casc)                 -- ready first; bigger/deeper first
+end
+local function buildPriorities(keep)
   local cache = require("bot.chipCache")
   local seen, kinds = {}, {}
   for _, c in ipairs(cache) do
-    if not EXCLUDE_KINDS[c.kind] and not seen[c.kind] then seen[c.kind] = true; kinds[#kinds + 1] = c.kind end
-  end
-  local function rank(k)
-    local setup = k:find("SWAP_2", 1, true) and 1 or 0       -- 2-swap setups sort after ready clears
-    local base = tonumber(k:match("COMBO_(%d)")) or 0        -- base combo size
-    local casc = tonumber(k:match("CASCADE_(%d)")) or 0      -- cascade depth
-    return setup * 1000 - (base * 10 + casc)                 -- ready first; bigger/deeper first
+    if not EXCLUDE_KINDS[c.kind] and not seen[c.kind] and keep(c.kind) then seen[c.kind] = true; kinds[#kinds + 1] = c.kind end
   end
   table.sort(kinds, function(a, b) local ra, rb = rank(a), rank(b); if ra ~= rb then return ra < rb end return a < b end)
   return kinds
 end
-local CHIP_PRIORITIES = buildChipPriorities()
+-- OFFENSE: every chip, built big-first (cascades/setups lead). DANGER: the SAME full set so it never goes empty, but
+-- READY single-swap clears FIRST -- clear now; chains/setups only fall back when no ready clear exists.
+local OFFENSE_PRIORITIES = buildPriorities(function() return true end)
+local DANGER_PRIORITIES = (function()
+  local p = {}; for _, k in ipairs(OFFENSE_PRIORITIES) do p[#p + 1] = k end
+  local function ready(k) return (not k:find("SWAP_2", 1, true) and not k:find("CASCADE", 1, true)) and 0 or 1 end
+  table.sort(p, function(a, b) local ra, rb = ready(a), ready(b); if ra ~= rb then return ra < rb end return rank(a) < rank(b) end)
+  return p
+end)()
 
 ------------------------------------------------ DECIDE (re-measured on any board activity; cached while fully static)
 function EnvelopeBrain:decide(state, stack, match)
@@ -115,15 +122,18 @@ function EnvelopeBrain:decide(state, stack, match)
   local height = state.maxColHeight or BoardSim.maxHeight(grid, rows)
   local cursor = state.cursor or { math.min(rows, height + 1), 3 }
 
-  -- NO global WAIT-on-pending-match: instead, search every frame and let the no-go mask keep us off the unsettled cells
-  -- (a clearing match's panels are in matched/popping state -> already excluded, so we can't disrupt or re-swap them).
-  -- STATE by stack height. All states fire the same chips; state only changes the no-play FALLBACK.
+  -- STATE drives the tactic (precedence DANGER > RAISE > OFFENSE):
+  --   DANGER (high stack)        -> clear NOW: ready single-swap combos only (no chains/setups), ease the cursor UP.
+  --   RAISE  (low real material) -> feed the stack (the no-chip fallback raises).
+  --   OFFENSE (default)          -> build big: every chip, search all directions.
   local move
   do
-    local st = (height >= DANGER_ABOVE and "DANGER") or (height <= RAISE_BELOW and "RAISE") or "OFFENSE"
+    local st = (height >= DANGER_ABOVE and "DANGER")
+      or (height <= RAISE_BELOW and "RAISE")
+      or "OFFENSE"
     self._state = st
     local chip = useChips.useChips(grid, rows, cursor, {
-      chipPriorities = CHIP_PRIORITIES, searchPriorities = { "UP", "DOWN", "LEFT", "RIGHT" },
+      chipPriorities = OFFENSE_PRIORITIES, searchPriorities = { "UP", "DOWN", "LEFT", "RIGHT" },
       verify = self:chipVerify(stack, match), touchable = touchable,
     })
     if chip then

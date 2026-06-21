@@ -11,6 +11,8 @@ require("bot.headlessBoot"); do local l = require("common.lib.logger"); l.setLog
 _G.loc = _G.loc or function(s) return tostring(s) end
 local shapeCache = require("bot.shapeCache")
 local getCascadeShapes = require("bot.getCascadeShapes")   -- reuse single-color cascades to compose the bent/5-run cases
+local getSplitShapes = require("bot.getSplitShapes")       -- reuse the real solved splits (bent included) to inject triggers into
+local getComboShapes = require("bot.getComboShapes")       -- single-color clearing configs (incl. bent/L) for the wave-2
 local Match = require("common.engine.Match"); require("common.engine.checkMatches")
 local LP = require("common.data.LevelPresets"); local KDE = require("common.data.KeyDataEncoding"); local Puzzle = require("common.engine.Puzzle")
 local _cascMemo = {}
@@ -38,6 +40,8 @@ local function filler(r, c) return ((r + c) % 2 == 0) and 5 or 6 end
 local function clone(g) local n = {}; for r = 1, H do n[r] = {}; for c = 1, W do n[r][c] = g[r][c] end end; return n end
 local function support(g) for c = 1, W do local top = 0; for r = 1, H do if g[r][c] ~= 0 then top = r end end
   for r = 1, top do if g[r][c] == 0 then g[r][c] = filler(r, c) end end end end
+local function settleCols(g) for c = 1, W do local s = {}; for r = 1, H do if g[r][c] ~= 0 then s[#s+1] = g[r][c] end end; for r = 1, H do g[r][c] = s[r] or 0 end end end
+local function applySwap(g, r, c) local n = clone(g); n[r][c], n[r][c+1] = n[r][c+1], n[r][c]; settleCols(n); return n end
 local function stackString(g)
   local mr = 0; for r = 1, H do for c = 1, W do if g[r][c] ~= 0 then mr = math.max(mr, r) end end end
   local rows = {}; for r = mr, 1, -1 do local row = {}; for c = 1, 6 do row[c] = (g[r][c] ~= 0) and tostring(g[r][c]) or "0" end; rows[#rows+1] = table.concat(row) end
@@ -128,45 +132,72 @@ local function enumerate(sa, sb)
       end
     end
   end
-  ------------------------------------------------------ PASS 1: the raise method (straight runs; 3+3 / 3+4 / 4+4)
-  local RunsA, RunsB = straightRuns(sa), straightRuns(sb)
-  for _, Arun in ipairs(RunsA) do
-    for _, Brun in ipairs(RunsB) do
-      local occ = {}; local bad = false
-      for _, p in ipairs(Arun) do occ[p[1]*100+p[2]] = A end
-      for _, p in ipairs(Brun) do local k=p[1]*100+p[2]; if occ[k] then bad=true break end occ[k]=B end
-      -- floor-anchor the target so we don't re-enumerate the same shape at every height
-      local low = H+1; for k in pairs(occ) do low = math.min(low, math.floor(k/100)) end
-      if not bad and low == 1 then
-        for trow = 1, 5 do
-          for tc = 1, W - 2 do
-            local tcols = { tc, tc+1, tc+2 }
-            local inSpan = { [tc]=true, [tc+1]=true, [tc+2]=true }
-            -- raise target cells in the trigger columns at/above trow
-            local p = {}; for r = 1, H do p[r] = {}; for c = 1, W do p[r][c] = 0 end end
-            local okp = true
-            for k, col in pairs(occ) do local r, c = math.floor(k/100), k%100
-              local nr = (inSpan[c] and r >= trow) and r + 1 or r
-              if nr > H or p[nr][c] ~= 0 then okp = false; break end
-              p[nr][c] = col
-            end
-            if okp and p[trow][tc] == 0 and p[trow][tc+1] == 0 and p[trow][tc+2] == 0 then
-              -- two trigger C's + one displaced on an end, both end-displacements tried
-              for _, disp in ipairs({ "L", "R" }) do
-                local g = clone(p)
-                local dcol = (disp == "L") and (tc - 1) or (tc + 3)
-                if dcol >= 1 and dcol <= W and g[trow][dcol] == 0 then
-                  local missing = (disp == "L") and tc or (tc + 2)
-                  for _, cc in ipairs(tcols) do if cc ~= missing then g[trow][cc] = C end end
-                  g[trow][missing] = filler(trow, missing); g[trow][dcol] = C
-                  support(g)
-                  local sc = (disp == "L") and dcol or (tc + 2)          -- the swap that completes the trigger run
-                  record(g, trow, sc)
-                end
-              end
+  ------------------------------------------------------ inject a 3-trigger into a solved target `occ` (key->A/B), every
+  -- position: lift the target's cells in the trigger columns, drop in 2 C's + 1 displaced (one swap fires it). record()
+  -- engine-verifies + the no-pre-match / no-leftover / no-shortcut gates. Works for straight OR bent targets.
+  local function raiseInject(occ)
+    local low = H+1; for k in pairs(occ) do low = math.min(low, math.floor(k/100)) end
+    if low ~= 1 then return end                                     -- floor-anchor
+    for trow = 1, 5 do
+      for tc = 1, W - 2 do
+        local inSpan = { [tc]=true, [tc+1]=true, [tc+2]=true }
+        local p = {}; for r = 1, H do p[r] = {}; for c = 1, W do p[r][c] = 0 end end
+        local okp = true
+        for k, col in pairs(occ) do local r, c = math.floor(k/100), k%100
+          local nr = (inSpan[c] and r >= trow) and r + 1 or r
+          if nr > H or p[nr][c] ~= 0 then okp = false; break end
+          p[nr][c] = col
+        end
+        if okp and p[trow][tc] == 0 and p[trow][tc+1] == 0 and p[trow][tc+2] == 0 then
+          for _, disp in ipairs({ "L", "R" }) do
+            local g = clone(p)
+            local dcol = (disp == "L") and (tc - 1) or (tc + 3)
+            if dcol >= 1 and dcol <= W and g[trow][dcol] == 0 then
+              local missing = (disp == "L") and tc or (tc + 2)
+              for _, cc in ipairs({ tc, tc+1, tc+2 }) do if cc ~= missing then g[trow][cc] = C end end
+              g[trow][missing] = filler(trow, missing); g[trow][dcol] = C
+              support(g)
+              record(g, trow, (disp == "L") and dcol or (tc + 2))
             end
           end
         end
+      end
+    end
+  end
+  ------------------------------------------------------ PASS 1: inject into every straight a-run x b-run combination
+  local RunsA, RunsB = straightRuns(sa), straightRuns(sb)
+  for _, Arun in ipairs(RunsA) do
+    for _, Brun in ipairs(RunsB) do
+      local occ, bad = {}, false
+      for _, p in ipairs(Arun) do occ[p[1]*100+p[2]] = A end
+      for _, p in ipairs(Brun) do local k=p[1]*100+p[2]; if occ[k] then bad=true break end occ[k]=B end
+      if not bad then raiseInject(occ) end
+    end
+  end
+  ------------------------------------------------------ PASS 3: compose ANY single-color CLEARING config (incl. bent/L)
+  -- the wave-2 isn't a single-swap split (e.g. two separate L's only form by the fall), so build it from single-color
+  -- clearing shapes: take each getComboShapes(sa) solved arrangement as the A-side and each getComboShapes(sb) solved as
+  -- the B-side, place them together floor-anchored at every horizontal offset, and inject a trigger. Reaches the L+L 5+5.
+  local function solvedCells(rec)
+    local s = applySwap(rec.sample, rec.sr, rec.sc)
+    local cells, minr, minc = {}, H+1, W+1
+    for r = 1, H do for c = 1, W do if s[r][c] == 1 then cells[#cells+1] = { r, c }; minr = math.min(minr, r); minc = math.min(minc, c) end end end
+    local out = {}; for _, p in ipairs(cells) do out[#out+1] = { p[1]-minr+1, p[2]-minc+1 } end   -- normalize to floor/left
+    return out
+  end
+  local aCfgs, bCfgs = {}, {}
+  for _, r in ipairs(getComboShapes.enumerate(sa).raw) do aCfgs[#aCfgs+1] = solvedCells(r) end
+  for _, r in ipairs(getComboShapes.enumerate(sb).raw) do bCfgs[#bCfgs+1] = solvedCells(r) end
+  for _, aC in ipairs(aCfgs) do
+    for _, bC in ipairs(bCfgs) do
+      for bShiftC = 0, W - 1 do                                      -- slide the B config across
+        local occ, ok = {}, true
+        for _, p in ipairs(aC) do occ[p[1]*100 + p[2]] = A end
+        for _, p in ipairs(bC) do local r, c = p[1], p[2] + bShiftC
+          if c > W or occ[r*100 + c] then ok = false; break end
+          occ[r*100 + c] = B
+        end
+        if ok then raiseInject(occ) end
       end
     end
   end

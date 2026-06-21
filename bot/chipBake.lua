@@ -36,7 +36,7 @@ local function serSwaps(s) local p = {}; for _, o in ipairs(s) do p[#p+1] = stri
 local function serMeta(m)
   if not m then return "{}" end
   local cl = {}; for c = 1, 4 do if (m.clears[c] or 0) > 0 then cl[#cl+1] = string.format("[%d]=%d", c, m.clears[c]) end end
-  local gb = {}; for _, b in ipairs(m.garbage) do gb[#gb+1] = string.format("{w=%d,h=%d,k=%q}", b.width, b.height, b.kind) end
+  local gb = {}; for _, b in ipairs(m.garbage) do gb[#gb+1] = string.format("{width=%d,height=%d,kind=%q}", b.width or b.w or 0, b.height or b.h or 0, b.kind or b.k or "combo") end
   return string.format("{clears={%s},total=%d,garbage={%s},chain=%d,start=%d,finish=%d,swaps=%d,cursorMoves=%d,cursorEnd={dr=%d,dc=%d,dir=%q},footprint={rows=%d,cols=%d},colors=%d,leftover=%d}",
     table.concat(cl, ","), m.total, table.concat(gb, ","), m.chain, m.start, m.finish, m.swaps, m.cursorMoves,
     m.cursorEnd.dr, m.cursorEnd.dc, m.cursorEnd.dir, m.footprint.rows, m.footprint.cols, m.colors, m.leftover or 0)

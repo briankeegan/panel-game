@@ -7,10 +7,31 @@ require("bot.headlessBoot"); do local l = require("common.lib.logger"); l.setLog
 _G.loc = _G.loc or function(s) return tostring(s) end
 local shapeCache = require("bot.shapeCache")
 local getComboShapes = require("bot.getComboShapes")   -- reuse EVERY single-color a-shape and b-shape (bent included)
+local getComboCross = require("bot.getComboCross")     -- bent 6/7 crosses (brute force can't reach those sizes)
+local analyze = require("bot.chipAnalyze")             -- authoritative settle/clear measure (old firesSplit cut big pops short)
 local Match = require("common.engine.Match"); require("common.engine.checkMatches")
 local LP = require("common.data.LevelPresets"); local KDE = require("common.data.KeyDataEncoding"); local Puzzle = require("common.engine.Puzzle")
+local W2 = 6
+local function mirrorShape(rec)          -- horizontal mirror: flips the swap's hub to the other side (for symmetric splits)
+  local minc, maxc = W2 + 1, 0
+  for r = 1, 12 do for c = 1, W2 do if rec.sample[r][c] == 1 then minc = math.min(minc, c); maxc = math.max(maxc, c) end end end
+  minc = math.min(minc, rec.sc); maxc = math.max(maxc, rec.sc + 1)
+  local mc = function(c) return minc + maxc - c end
+  local g = {}; for r = 1, 12 do g[r] = {}; for c = 1, W2 do g[r][c] = 0 end end
+  for r = 1, 12 do for c = 1, W2 do if rec.sample[r][c] == 1 then g[r][mc(c)] = 1 end end end
+  return { sample = g, sr = rec.sr, sc = mc(rec.sc + 1), key = (rec.key or "") .. "m" }
+end
 local _shapeMemo = {}
-local function comboShapes(n) if not _shapeMemo[n] then _shapeMemo[n] = getComboShapes.enumerate(n).raw end return _shapeMemo[n] end
+local function comboShapes(n)            -- single-color shapes of size n: brute for <=5, constructive cross for 6/7
+  if not _shapeMemo[n] then
+    local base = (n >= 6 and getComboCross or getComboShapes).enumerate(n).raw
+    if n >= 6 then                       -- crosses keep one hub-orientation; add the mirror so splits can use both sides
+      local aug = {}; for _, r in ipairs(base) do aug[#aug+1] = r; aug[#aug+1] = mirrorShape(r) end; base = aug
+    end
+    _shapeMemo[n] = base
+  end
+  return _shapeMemo[n]
+end
 
 local W, H = 6, 12
 local RWIN = 5                     -- placement window: rows 1..RWIN
@@ -69,12 +90,13 @@ local function enumerate(sa, sb)
   sa, sb = sa or 3, sb or 3
   local kind = "COMBO_" .. sa .. "_" .. sb
   local found = {}
-  local function record(g, sr, sc)            -- floor-anchor + no-pre-match + engine-verify + dedup by shape
+  local function record(g, sr, sc)            -- floor-anchor + no-pre-match + engine-verify (chipAnalyze) + dedup by shape
     local lowest = H + 1; for r = 1, H do for c = 1, W do if g[r][c] == A or g[r][c] == B then lowest = math.min(lowest, r) end end end
-    if lowest == 1 and not anyRun(g) and firesSplit(g, sr, sc, sa, sb) then
-      local kk = shapeCache.canonShape(g)
-      if kk and not found[kk] then found[kk] = { g = g, sample = g, sr = sr, sc = sc, key = kk, kind = kind } end
-    end
+    if lowest ~= 1 or anyRun(g) then return end
+    local f = analyze.fire(g, { { sr, sc } })
+    if (f.clears[A] or 0) ~= sa or (f.clears[B] or 0) ~= sb or f.total ~= (sa + sb) or f.remaining ~= 0 then return end
+    local kk = shapeCache.canonShape(g)
+    if kk and not found[kk] then found[kk] = { g = g, sample = g, sr = sr, sc = sc, key = kk, kind = kind } end
   end
   -- PASS 1 — two straight runs + a boundary swap (the side-by-side cases, directly)
   local Ra, Rb = runs(sa), runs(sb)
@@ -93,26 +115,33 @@ local function enumerate(sa, sb)
       end end
     end
   end end
-  -- PASS 2 — compose every a-shape with every b-shape on a shared swap (catches BENT completions the straight pass can't)
+  -- PASS 2 — compose every a-shape with every b-shape on a SHARED swap, sliding the pair across the board so a side-by-
+  -- side composition (B left of A, etc.) isn't lost just because A was enumerated at the board edge.
   local la, lb = comboShapes(sa), comboShapes(sb)
   for _, Ash in ipairs(la) do
     local ar, ac = Ash.sr, Ash.sc
     local aCells = {}; for r = 1, H do for c = 1, W do if Ash.sample[r][c] == 1 then aCells[#aCells+1] = { r, c } end end end
     for _, Bsh in ipairs(lb) do
-      local dr, dc = ar - Bsh.sr, ac - Bsh.sc
-      local bCells, ok = {}, true
+      local dr, dc = ar - Bsh.sr, ac - Bsh.sc            -- align B's swap onto A's swap (shared), rows must land in-board
+      local bCells, rowOK = {}, true
       for r = 1, H do for c = 1, W do if Bsh.sample[r][c] == 1 then local nr, nc = r+dr, c+dc
-        if nr < 1 or nr > H or nc < 1 or nc > W then ok = false; break end; bCells[#bCells+1] = { nr, nc } end end if not ok then break end end
-      if ok then
-        local function isSwap(r, c) return r == ar and (c == ac or c == ac + 1) end
-        local base = {}; for r = 1, H do base[r] = {}; for c = 1, W do base[r][c] = 0 end end
-        local collide = false
-        for _, p in ipairs(aCells) do if not isSwap(p[1], p[2]) then base[p[1]][p[2]] = A end end
-        for _, p in ipairs(bCells) do if not isSwap(p[1], p[2]) then if base[p[1]][p[2]] ~= 0 then collide = true; break end base[p[1]][p[2]] = B end end
-        if not collide then
-          for _, v1 in ipairs({ 0, 1, 2 }) do for _, v2 in ipairs({ 0, 1, 2 }) do
-            local g = clone(base); g[ar][ac] = v1; g[ar][ac+1] = v2; support(g); record(g, ar, ac)
-          end end
+        if nr < 1 or nr > H then rowOK = false; break end; bCells[#bCells+1] = { nr, nc } end end if not rowOK then break end end
+      if rowOK then
+        local minc, maxc = math.min(ac, ac+1), math.max(ac, ac+1)   -- column extent of the whole pair, incl swap
+        for _, p in ipairs(aCells) do minc = math.min(minc, p[2]); maxc = math.max(maxc, p[2]) end
+        for _, p in ipairs(bCells) do minc = math.min(minc, p[2]); maxc = math.max(maxc, p[2]) end
+        for sh = 1 - minc, W - maxc do                   -- slide horizontally so the pair fits on the board
+          local sac = ac + sh
+          local function isSwap(r, c) return r == ar and (c == sac or c == sac + 1) end
+          local base = {}; for r = 1, H do base[r] = {}; for c = 1, W do base[r][c] = 0 end end
+          local collide = false
+          for _, p in ipairs(aCells) do local c = p[2]+sh; if not isSwap(p[1], c) then base[p[1]][c] = A end end
+          for _, p in ipairs(bCells) do local c = p[2]+sh; if not isSwap(p[1], c) then if base[p[1]][c] ~= 0 then collide = true; break end base[p[1]][c] = B end end
+          if not collide then
+            for _, v1 in ipairs({ 0, 1, 2 }) do for _, v2 in ipairs({ 0, 1, 2 }) do
+              local g = clone(base); g[ar][sac] = v1; g[ar][sac+1] = v2; support(g); record(g, ar, sac)
+            end end
+          end
         end
       end
     end
@@ -144,8 +173,11 @@ local function render(rec)
   return lines
 end
 
--- the two-color split sizes the registry bakes: 3+3 (=6) and 3+4 (=7)
-local PAIRS = { { 3, 3 }, { 3, 4 }, { 4, 4 }, { 3, 5 }, { 4, 5 }, { 5, 5 } }
+-- two-color split sizes the registry bakes: 6 (3+3) through 14 (7+7), composing the single-color shapes pairwise
+local PAIRS = {
+  { 3, 3 }, { 3, 4 }, { 4, 4 }, { 3, 5 }, { 4, 5 }, { 5, 5 },              -- 6..10 (from 3/4/5)
+  { 3, 6 }, { 4, 6 }, { 5, 6 }, { 6, 6 }, { 3, 7 }, { 4, 7 }, { 5, 7 }, { 6, 7 }, { 7, 7 }, -- 9..14 (using bent 6/7)
+}
 
 if arg and arg[0] and arg[0]:match("getSplitShapes") then
   local sa, sb = tonumber(arg[1]) or 3, tonumber(arg[2]) or 3

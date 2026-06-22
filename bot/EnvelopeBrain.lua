@@ -72,52 +72,46 @@ local DANGER_ABOVE = 9
 -- keeps the stack lower. (Tighten as clearing improves; raise-to-death is a bug, so this stays safe.)
 local RECOVERY_BUFFER = 5  -- raise fills only to top-5 (raise less); OFFENSE owns the wider band up to DANGER (top-1)
 
--- Per-state chip priorities, built from the cache (auto-includes new families). Order within a set: READY clears first,
--- then 2-swap SETUPS; bigger / deeper first (they clear more).
--- Drop only the WASTEFUL COMBO_3 setups (COMBO_3_SWAP_2_* / _CASCADE_* -- 2 swaps to manufacture a 3-clear). Plain
--- COMBO_3 (a 1-swap ready 3-clear) stays IN but ranked DEAD LAST -- a last-resort clear when nothing bigger exists.
+-- Chip selection is META-DRIVEN: each state expresses what it wants as a meta FILTER + a RANK, and extractByMeta turns
+-- that into the ordered kind list useChips consumes. No name parsing, so any new family (BREAK_*, SHOGUN_*, ...) joins
+-- automatically and sorts by real value. The only name policies: drop the wasteful COMBO_3 setups, and pin plain
+-- COMBO_3 dead-last (a last-resort clear when nothing bigger exists).
 local function isExcluded(kind) return kind:match("^COMBO_3_%a") ~= nil end
--- Rank by the chip's META, not its name -- so ANY new family (BREAK_*, SHOGUN_*, ...) is ranked by its real value with
--- no name parsing. meta.total = panels cleared, meta.swaps = 1 ready / 2 setup, meta.chain = cascade depth. (Also more
--- correct today: the old name-parse read COMBO_3_3 as size 3, but it clears 6.)
+-- rank a chip by its META (ASC: lower = tried first). total = panels cleared, swaps = 1 ready / 2 setup, chain = depth.
 local function rankKind(kind, meta)
-  if kind == "COMBO_3" then return 1e9 end                       -- plain 3-clear: absolute last resort
-  local setup = (meta and (meta.swaps or 1) > 1) and 1 or 0      -- 2-swap setups sort after ready clears
+  local setup = (meta and (meta.swaps or 1) > 1) and 1 or 0      -- ready clears before 2-swap setups
   local size = (meta and meta.total) or 0                        -- real panels cleared (name-independent)
   local chain = (meta and meta.chain) or 0
-  return setup * 1000 - (size * 10 + chain)                      -- ready first; bigger / deeper first
+  return setup * 1000 - (size * 10 + chain)                      -- bigger / deeper first
 end
-local function buildPriorities(keep)
+-- extractByMeta(filter, rankFn) -> ordered kinds: every cache kind whose meta passes filter(meta, kind), sorted ASC by
+-- rankFn(kind, meta), with plain COMBO_3 force-appended LAST (policy). THE selection primitive -- filter can be static
+-- (OFFENSE/DANGER below) or situational (e.g. "garbage that breaks the incoming") computed per-decision.
+local function extractByMeta(filter, rankFn)
   local cache = require("bot.chipCache")
-  local seen, kinds, metaOf = {}, {}, {}
+  local seen, rows = {}, {}
   for _, c in ipairs(cache) do
-    if not isExcluded(c.kind) and not seen[c.kind] and keep(c.kind) then
-      seen[c.kind] = true; kinds[#kinds + 1] = c.kind; metaOf[c.kind] = c.meta
+    if not isExcluded(c.kind) and not seen[c.kind] and filter(c.meta, c.kind) then
+      seen[c.kind] = true; rows[#rows + 1] = { kind = c.kind, r = rankFn(c.kind, c.meta) }
     end
   end
-  table.sort(kinds, function(a, b)
-    local ra, rb = rankKind(a, metaOf[a]), rankKind(b, metaOf[b])
-    if ra ~= rb then return ra < rb end
-    return a < b
-  end)
+  table.sort(rows, function(a, b) if a.r ~= b.r then return a.r < b.r end return a.kind < b.kind end)
+  local kinds = {}; for _, r in ipairs(rows) do kinds[#kinds + 1] = r.kind end
   return kinds
 end
--- OFFENSE: every chip, built big-first (cascades/setups lead). DANGER: the SAME full set so it never goes empty, but
--- READY single-swap clears FIRST -- clear now; chains/setups only fall back when no ready clear exists.
-local OFFENSE_PRIORITIES = buildPriorities(function() return true end)
-local DANGER_PRIORITIES = (function()
-  local cache = require("bot.chipCache")
-  local metaOf = {}; for _, c in ipairs(cache) do metaOf[c.kind] = metaOf[c.kind] or c.meta end
-  local p = {}; for _, k in ipairs(OFFENSE_PRIORITIES) do p[#p + 1] = k end
-  -- READY = single-swap, no cascade (fires NOW) -- meta-based, so new families sort right too.
-  local function ready(k) local m = metaOf[k]; return (m and (m.swaps or 1) == 1 and (m.chain or 0) == 0) and 0 or 1 end
-  table.sort(p, function(a, b)
-    local ra, rb = ready(a), ready(b)
-    if ra ~= rb then return ra < rb end
-    return rankKind(a, metaOf[a]) < rankKind(b, metaOf[b])
-  end)
-  return p
-end)()
+local ANY = function() return true end
+-- OFFENSE: build biggest; plain COMBO_3 is DEAD LAST here -- prefer building anything bigger over a trivial 3.
+local OFFENSE_PRIORITIES = extractByMeta(ANY, function(kind, meta)
+  if kind == "COMBO_3" then return 1e9 end
+  return rankKind(kind, meta)
+end)
+-- DANGER: the SAME set so it never goes empty, but READY single-swap clears FIRST -- clear NOW; setups/chains fall
+-- back only when no ready clear exists. COMBO_3 needs NO special case here: rankKind puts it last among the ready
+-- clears (smallest) on its own, which is right in the danger zone -- a fast ready 3 beats a slow 2-swap setup.
+local DANGER_PRIORITIES = extractByMeta(ANY, function(kind, meta)
+  local notReady = (meta and (meta.swaps or 1) == 1 and (meta.chain or 0) == 0) and 0 or 1
+  return notReady * 1000000 + rankKind(kind, meta)
+end)
 
 ------------------------------------------------ DECIDE (re-measured on any board activity; cached while fully static)
 function EnvelopeBrain:decide(state, stack, match)

@@ -17,6 +17,8 @@
 local ui = require("client.src.ui")
 local tableUtils = require("common.lib.tableUtils")
 local GameModes = require("common.data.GameModes")
+local system = require("client.src.system")
+local GraphicsUtil = require("client.src.graphics.graphics_util")
 
 local RoomCreateRows = {}
 
@@ -134,8 +136,14 @@ local function buttonGroup(prefs, field, buttons, tooltipFn)
   local descriptions = {}
   for _, b in ipairs(buttons) do descriptions[b.value] = b.description or "" end
 
+  local portrait = system.isPortraitMode()
+  local optFont = portrait and math.floor(GraphicsUtil.fontSize * 1.4) or nil
+  local optHeight = portrait and 64 or nil
   local btns = tableUtils.map(buttons, function(b)
-    return ui.TextButton({label = ui.Label({text = b.label, translate = false})})
+    return ui.TextButton({
+      label = ui.Label({text = b.label, translate = false, fontSize = optFont}),
+      height = optHeight,
+    })
   end)
   local group = ui.ButtonGroup({
     buttons = btns,

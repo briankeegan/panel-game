@@ -34,6 +34,27 @@ MenuItem.GROUP_PADDING = 15
 function MenuItem.createMenuItem(label, item)
   assert(label ~= nil)
 
+  -- portrait: stack the title above its control (full width) instead of side by
+  -- side. Wide option rows (e.g. 5-button composition / player count) no longer
+  -- cram onto one line, and the controls get room to be big + tappable.
+  if item ~= nil and system.isPortraitMode() then
+    local menuItem = MenuItem({x = 0, y = 0})
+    label.hAlign = "center"
+    label.vAlign = "top"
+    label.x = 0
+    label.y = 0
+    local labelH = math.max(30, label.height + MenuItem.PADDING)
+    item.hAlign = "center"
+    item.vAlign = "top"
+    item.x = 0
+    item.y = labelH
+    menuItem.width = math.max(label.width, item.width) + (2 * MenuItem.PADDING)
+    menuItem.height = labelH + item.height + MenuItem.PADDING
+    menuItem:addChild(item)
+    menuItem:addChild(label)
+    return menuItem
+  end
+
   label.vAlign = "center"
   label.x = MenuItem.PADDING
 

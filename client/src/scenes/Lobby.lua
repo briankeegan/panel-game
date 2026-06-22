@@ -27,7 +27,7 @@ local function lobbyLabel(text, translate)
   return ui.Label({
     text = text,
     translate = translate,
-    fontSize = system.isPortraitMode() and math.floor(GraphicsUtil.fontSize * 1.6) or nil
+    fontSize = system.isPortraitMode() and math.floor(GraphicsUtil.fontSize * 1.9) or nil
   })
 end
 
@@ -112,8 +112,8 @@ function Lobby:initLobbyMenu()
   -- "Invite to Purple Team") and 1-2 player room titles fit on one line.
   -- Single-line guarantee matters here: room-card color stripes are indexed by
   -- logical line, so any wrap visually drifts the team tint off its row.
-  -- portrait: wider buttons (~2x) so they're big/tappable on a phone
-  self.lobbyMenuWidth = system.isPortraitMode() and 440 or 220
+  -- portrait: wide buttons so the big (menu-sized) labels don't clip
+  self.lobbyMenuWidth = system.isPortraitMode() and 600 or 220
   self.onePlayerEndlessButton = ui.TextButton({
     label = lobbyLabel("mm_1_endless"),
     width = self.lobbyMenuWidth,

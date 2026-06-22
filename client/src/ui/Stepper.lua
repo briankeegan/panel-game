@@ -6,6 +6,7 @@ local class = require("common.lib.class")
 local util = require("common.lib.util")
 local GraphicsUtil = require("client.src.graphics.graphics_util")
 local DebugSettings = require("client.src.debug.DebugSettings")
+local system = require("client.src.system")
 
 local NAV_BUTTON_WIDTH = 25
 local EMPTY_STEPPER_WIDTH = 160
@@ -24,11 +25,23 @@ local function setLabels(self, labels, values, selectedIndex)
     return
   end
 
+  local navW = self.navButtonWidth or NAV_BUTTON_WIDTH
   for _, label in ipairs(labels) do
+      -- portrait: enlarge the value text so the stepper is tall + easy to read
+      if system.isPortraitMode() and label.fontSize then
+        label.fontSize = math.floor(label.fontSize * 1.5)
+        local t = label.text
+        label.text = nil
+        label.drawable = nil
+        label:setText(t, label.replacementTable, label.translate)
+      end
       label.hAlign = "center"
       label.vAlign = "center"
-      self.width = math.max(label.width + 10 + NAV_BUTTON_WIDTH * 2, self.width)
+      self.width = math.max(label.width + 10 + navW * 2, self.width)
       self.height = math.max(label.height + 4, self.height)
+      if self.navButtonHeight then
+        self.height = math.max(self.height, self.navButtonHeight)
+      end
 
       self:addChild(label)
       label:setVisibility(false)
@@ -36,7 +49,7 @@ local function setLabels(self, labels, values, selectedIndex)
 
   self.labels[self.selectedIndex]:setVisibility(true)
   self.value = self.values[self.selectedIndex]
-  self.rightButton.x = self.width - NAV_BUTTON_WIDTH
+  self.rightButton.x = self.width - navW
   self.rightButton:setVisibility(true);
   self.leftButton:setVisibility(true);
 end
@@ -60,19 +73,28 @@ local Stepper = class(
     self.onChange = options.onChange or function() end
     self.selectedIndex = options.selectedIndex or 1
 
-    local navButtonWidth = 25
+    -- portrait: wider arrows with bigger glyphs so they're easy to tap
+    local portrait = system.isPortraitMode()
+    local navButtonWidth = portrait and 48 or NAV_BUTTON_WIDTH
+    self.navButtonWidth = navButtonWidth
+    local arrowFont = portrait and math.floor(GraphicsUtil.fontSize * 1.4) or nil
+    -- portrait: tall arrows so the stepper matches the button height + big tap target
+    local navButtonHeight = portrait and 80 or nil
+    self.navButtonHeight = navButtonHeight
     self.leftButton = TextButton({
       width = navButtonWidth,
+      height = navButtonHeight,
       vAlign = "center",
-      label = Label({text = "<", translate = false}),
+      label = Label({text = "<", translate = false, fontSize = arrowFont}),
       onClick = function(selfElement, inputSource, holdTime)
         setState(self, self.selectedIndex - 1)
       end
     })
     self.rightButton = TextButton({
       width = navButtonWidth,
+      height = navButtonHeight,
       vAlign = "center",
-      label = Label({text = ">", translate = false}),
+      label = Label({text = ">", translate = false, fontSize = arrowFont}),
       onClick = function(selfElement, inputSource, holdTime)
         setState(self, self.selectedIndex + 1)
       end

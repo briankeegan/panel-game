@@ -15,6 +15,14 @@ for i = 1, #M.SINGLE do for j = i, #M.SINGLE do M.PAIRS[#M.PAIRS+1] = { M.SINGLE
 M.BRUTE, M.CROSS = {}, {}
 for _, n in ipairs(M.SINGLE) do if n <= M.BRUTE_MAX then M.BRUTE[#M.BRUTE+1] = n else M.CROSS[#M.CROSS+1] = n end end
 
+-- max cursor-moves between a setup swap and the fire swap, scaled by clear size. Big combos span more board, so their
+-- setups sit farther from the fire; gain craters past 3 but we go to 5 for completeness on the largest families.
+function M.setupRadius(size)
+  if size >= 9 then return 5 end
+  if size >= 6 then return 3 end
+  return 2
+end
+
 -- single-color shapes of size n, routed by capability. Lazy require avoids load-time cycles.
 function M.comboShapes(n)
   local src = (n > M.BRUTE_MAX) and require("bot.getComboCross") or require("bot.getComboShapes")

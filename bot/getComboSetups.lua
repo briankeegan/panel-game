@@ -197,8 +197,9 @@ end
 -- registry: 2-swap setups for every single-color size in the central config
 local function produce()
   local out = {}
-  for _, n in ipairs(require("bot.chipSizes").SINGLE) do
-    for _, v in ipairs(M.enumerate(n, 2)) do
+  local CS = require("bot.chipSizes")
+  for _, n in ipairs(CS.SINGLE) do
+    for _, v in ipairs(M.enumerate(n, CS.setupRadius(n))) do
       out[#out+1] = { g = v.g, sr = v.sr, sc = v.sc, kind = v.kind, absSwaps = { v.s1, { v.sr, v.sc } } }
     end
   end

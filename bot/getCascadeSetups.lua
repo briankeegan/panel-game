@@ -191,8 +191,9 @@ end
 -- registry: the full build bakes 2-swap cascade setups for these pairs
 local function produce()
   local out = {}
-  for _, p in ipairs(require("bot.chipSizes").CASCADE_SINGLE) do
-    for _, v in ipairs(enumerate(p[1], p[2], 2)) do
+  local CS = require("bot.chipSizes")
+  for _, p in ipairs(CS.CASCADE_SINGLE) do
+    for _, v in ipairs(enumerate(p[1], p[2], CS.setupRadius(p[1] + p[2]))) do  -- N+M footprint spans more than N alone
       out[#out+1] = { g = v.g, sr = v.sr, sc = v.sc, kind = v.kind, absSwaps = { v.s1, { v.sr, v.sc } } }
     end
   end

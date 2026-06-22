@@ -161,6 +161,22 @@ function MockScene.portraitGame()
   player:setInputMethod("touch")
   player.hasLoaded = true
   battleRoom:startMatch()
+
+  -- mock analytics so the portrait stats overlay shows realistic numbers in shots
+  local stack = player.stack
+  if stack then
+    stack.engine.score = 1240
+    stack.engine.speed = 11
+    if stack.analytic then
+      stack.analytic.data.destroyed_panels = 1240
+      stack.analytic.data.reached_chains = {[2] = 4, [3] = 3, [4] = 2, [5] = 1, [6] = 1}
+      stack.analytic.data.used_combos = {[4] = 6, [5] = 4, [6] = 3, [7] = 2, [8] = 1, [9] = 1}
+      -- give APM/GPM something to compute (per-second recompute uses these)
+      stack.analytic.data.swap_count = 5
+      stack.analytic.data.move_count = 3
+      stack.analytic.data.sent_garbage_lines = 1
+    end
+  end
 end
 
 return MockScene

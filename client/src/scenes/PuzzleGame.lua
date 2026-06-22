@@ -145,12 +145,12 @@ function PuzzleGame:customLoad()
   local stack = playerStack
 
   if system.isPortraitMode() then
-    -- big board like the Versus in-game (PortraitGame): enlarge + center, leaving
-    -- room at the top for the objective and at the bottom for the hint button.
+    -- IDENTICAL board position to the regular PortraitGame (centered + bottom-
+    -- anchored) so swiping feels the same; buttons go on the right where raise is.
     stack.gfxScale = 5
     local frameX = (GAME.globalCanvas:getWidth() / 2 - stack:canvasWidth() / 2)
-    local frameY = (GAME.globalCanvas:getHeight() - stack:canvasHeight()) - 130
-    stack:moveToPosition(frameX, math.max(150, frameY))
+    local frameY = (GAME.globalCanvas:getHeight() - stack:canvasHeight())
+    stack:moveToPosition(frameX, frameY)
   else
     stack:moveToCenterPosition()
   end
@@ -256,21 +256,32 @@ function PuzzleGame:customLoad()
         end}
       end
 
-      local bw, bh, gap = 200, 80, 14
-      local total = #buttons * bw + (#buttons - 1) * gap
-      local startX = consts.CANVAS_WIDTH / 2 - total / 2
+      -- stack the buttons vertically on the right (where the raise lives in the
+      -- regular game), so the board position/swipe area is identical. Last button
+      -- (Solve) sits at the bottom for easy reach.
+      local bw, bh, gap = 96, 72, 10
+      local bx = consts.CANVAS_WIDTH - bw - 6
       for i, b in ipairs(buttons) do
         local btn = ui.TextButton({
-          label = ui.Label({text = b.text, translate = false, fontSize = 28}),
-          x = startX + (i - 1) * (bw + gap),
+          label = ui.Label({text = b.text, translate = false, fontSize = 24}),
+          x = bx,
           vAlign = "bottom",
-          y = -8,
+          y = -8 - (#buttons - i) * (bh + gap),
           width = bw,
           height = bh,
           onClick = b.fn
         })
         self.uiRoot:addChild(btn)
       end
+
+      -- reusable stats overlay: swaps used / allowed, on top of the board
+      local PortraitStatsOverlay = require("client.src.ui.PortraitStatsOverlay")
+      self.statsOverlay = PortraitStatsOverlay({
+        stack = self.playerStack,
+        puzzleMode = true,
+        swapsAllowed = currentPuzzle.moves
+      })
+      self.uiRoot:addChild(self.statsOverlay)
     end
   end
 end

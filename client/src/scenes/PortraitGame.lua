@@ -94,16 +94,8 @@ function PortraitGame:customLoad()
   self.uiRoot.width = math.min(consts.CANVAS_WIDTH, consts.CANVAS_HEIGHT)
   self.uiRoot.height = math.max(consts.CANVAS_WIDTH, consts.CANVAS_HEIGHT)
 
-  local communityMessage = ui.Label({
-    text = "join_community",
-    replacements = {"\ndiscord." .. consts.SERVER_LOCATION},
-    translate = true,
-    hAlign = "center",
-    vAlign = "top",
-    y = 10,
-  })
-  self.uiRoot.communityMessage = communityMessage
-  self.uiRoot:addChild(self.uiRoot.communityMessage)
+  -- community/unofficial-build banner removed in-game: not needed here and it just
+  -- collides with the stats at the top.
 
   local timerScale = themes[config.theme].time_Scale
   self.uiRoot.timer = ui.PixelFontLabel({
@@ -117,6 +109,14 @@ function PortraitGame:customLoad()
   self.uiRoot:addChild(self.uiRoot.timer)
 
   self:flipToPortrait()
+
+  -- reusable stats overlay drawn in the margins on top of the board
+  local statsStack = self.match.stacks[1]
+  if statsStack then
+    local PortraitStatsOverlay = require("client.src.ui.PortraitStatsOverlay")
+    self.statsOverlay = PortraitStatsOverlay({stack = statsStack})
+    self.uiRoot:addChild(self.statsOverlay)
+  end
 end
 
 function PortraitGame:drawBar(stack, image, quad, themePositionOffset, height, yOffset, rotate, scale)

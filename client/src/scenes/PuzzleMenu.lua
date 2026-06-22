@@ -15,6 +15,7 @@ local class = require("common.lib.class")
 local tableUtils = require("common.lib.tableUtils")
 local LevelPresets      = require("common.data.LevelPresets")
 local Stack = require("common.engine.Stack")
+local system = require("client.src.system")
 
 -- Scene for the puzzle selection menu
 ---@class PuzzleMenu : Scene
@@ -136,7 +137,8 @@ end
 function PuzzleMenu:load(sceneParams)
   self:updateCurrentPuzzleSet()
 
-  local tickLength = 16
+  -- portrait: match the waiting-room level slider size (createLevelSlider uses 40)
+  local tickLength = system.isPortraitMode() and 40 or 16
   self.levelSlider = ui.LevelSlider({
       tickLength = tickLength,
       value = config.puzzle_level or 5,
@@ -204,6 +206,7 @@ function PuzzleMenu:load(sceneParams)
 
   self.previewStackPanel:addElement(self.puzzleDescriptionLabel)
 
+  local portrait = system.isPortraitMode()
   self.containerStackPanel = ui.StackPanel(
     {
       alignment = "left",
@@ -217,12 +220,25 @@ function PuzzleMenu:load(sceneParams)
 
   self.containerStackPanel:addElement(self.menu)
 
-  local horizontalSpacer = ui.UiElement({width = 20, height = 1})
-  self.containerStackPanel:addElement(horizontalSpacer)
-
-  self.containerStackPanel:addElement(self.previewStackPanel)
+  if not portrait then
+    -- landscape: menu + preview side by side
+    local horizontalSpacer = ui.UiElement({width = 20, height = 1})
+    self.containerStackPanel:addElement(horizontalSpacer)
+    self.containerStackPanel:addElement(self.previewStackPanel)
+  end
 
   self.uiRoot:addChild(self.containerStackPanel)
+
+  if portrait then
+    -- portrait: the centered menu fills the width on its own; put the puzzle
+    -- preview/description at the top so it doesn't squeeze the buttons.
+    self.previewStackPanel.hAlign = "center"
+    self.previewStackPanel.vAlign = "top"
+    self.previewStackPanel.x = 0
+    self.previewStackPanel.y = 90
+    self.uiRoot:addChild(self.previewStackPanel)
+  end
+
   self.uiRoot:addChild(self.puzzleHierarchyDisplay)
 
   self:createInputDeviceOverlay()

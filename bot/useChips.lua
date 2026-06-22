@@ -378,14 +378,14 @@ local function eval(grid, rows)                                   -- higher = be
   local pChain, pTotal = potentialChain(grid, rows, heights)
   return W_PCHAIN_DEPTH * pChain + W_PCHAIN_TOTAL * pTotal + W_ADJ * adjacency(grid, rows) - W_PEAK * peak
 end
-local function legalSwaps(grid, rows, touchable, hiRow)           -- both cells settled/touchable, differ, not empty<->empty
+local function legalSwaps(grid, rows, touchable, hiRow)           -- touchable=nil -> a resolved hypothetical board (all settled)
   local out, hi = {}, math.min(hiRow, rows)
   for r = 1, hi do
-    local tr = touchable[r]
-    if tr then
+    local tr = touchable and touchable[r]
+    if (not touchable) or tr then
       for c = 1, WIDTH - 1 do
         local a, b = grid[r][c], grid[r][c + 1]
-        if tr[c] and tr[c + 1] and a ~= GARBAGE and b ~= GARBAGE and a ~= b and (a ~= 0 or b ~= 0) then out[#out + 1] = { r, c } end
+        if ((not touchable) or (tr[c] and tr[c + 1])) and a ~= GARBAGE and b ~= GARBAGE and a ~= b and (a ~= 0 or b ~= 0) then out[#out + 1] = { r, c } end
       end
     end
   end
@@ -400,7 +400,8 @@ local function scoreSwap(grid, rows, r, c)                        -- eval(result
 end
 -- BEAM SEARCH: keep the best BEAM_W states, expand to depth BEAM_D, commit the FIRST swap of the best leaf. BEAM_D=1 is
 -- pure depth-1 greedy (the validated default). Re-planned every frame; only ever ONE swap committed. Budget-capped.
-local BEAM_W, BEAM_D, NODE_BUDGET = 8, 1, 600
+local BEAM_W, NODE_BUDGET = 8, 600
+local BEAM_D = tonumber(os.getenv("PA_BEAM_D")) or 1   -- 1 = depth-1 greedy (default); env-tunable for beam-depth probes
 function M.planMove(grid, rows, touchable)
   if not touchable then return nil end
   local _, peak = colHeights(grid, rows)
@@ -427,7 +428,7 @@ function M.planMove(grid, rows, touchable)
     for _, node in ipairs(beam) do
       if budget <= 0 then break end
       local _, p2 = colHeights(node.g, rows)
-      for _, sw in ipairs(legalSwaps(node.g, rows, touchable, math.min(rows, p2 + 1))) do
+      for _, sw in ipairs(legalSwaps(node.g, rows, nil, math.min(rows, p2 + 1))) do  -- node.g is resolved -> all settled
         if budget <= 0 then break end
         budget = budget - 1
         local g2, chain, total = BoardSim.simSwap(node.g, rows, sw[1], sw[2])

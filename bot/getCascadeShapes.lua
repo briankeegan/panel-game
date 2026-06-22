@@ -186,7 +186,7 @@ end
 -- registry: the full build bakes these (N primary, M riser) cascade pairs
 local function produce()
   local out = {}
-  for _, p in ipairs({ { 4, 3 }, { 5, 3 }, { 5, 4 } }) do
+  for _, p in ipairs(require("bot.chipSizes").CASCADE_SINGLE) do
     for _, v in ipairs(enumerate(p[1], p[2])) do
       out[#out+1] = { g = v.g, sr = v.sr, sc = v.sc, kind = v.kind, absSwaps = { { v.sr, v.sc } } }
     end

@@ -21,4 +21,9 @@ function M.comboShapes(n)
   return src.enumerate(n).raw
 end
 
+-- single-color cascades as (combo N, trigger M). NOT derived from SINGLE: getCascadeShapes brute-forces the N-primary,
+-- so 6/7 are intractable here (they'd need a constructive builder, the way getComboCross unblocked the 6/7 combos).
+-- Two-color split cascades have no such limit — they go through PAIRS via the inject method in getSplitCascadeShapes.
+M.CASCADE_SINGLE = { { 4, 3 }, { 5, 3 }, { 5, 4 } }
+
 return M

@@ -228,7 +228,7 @@ local function render(rec)
   return lines
 end
 
-local PAIRS = { { 3, 3 }, { 3, 4 }, { 4, 4 }, { 3, 5 }, { 4, 5 }, { 5, 5 } }
+local PAIRS = require("bot.chipSizes").PAIRS
 
 if arg and arg[0] and arg[0]:match("getSplitCascadeShapes") then
   local sa, sb = tonumber(arg[1]) or 3, tonumber(arg[2]) or 3

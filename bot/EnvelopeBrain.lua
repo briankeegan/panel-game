@@ -182,12 +182,13 @@ function EnvelopeBrain:decide(state, stack, match)
       self._comboUse = self._comboUse or {}; self._comboUse[chip.kind] = (self._comboUse[chip.kind] or 0) + 1
       move = { type = "SWAP", pos = chip.swaps[1], swaps = chip.swaps, kind = chip.kind }
       self._substate = "CLEAR"
-    elseif st == "OFFENSE" and not busy then
-      local org = useChips.organizeMove(grid, rows, cursor, touchable)   -- FLATTEN substate: low + clumped stack in dead frames
+    elseif st == "RAISE" and not busy and (state.stopTime or 0) == 0 then
+      move = { type = "RAISE" }              -- low on material -> FILL. Raise is super important; it comes before organizing.
+    elseif (st == "OFFENSE" or st == "DANGER") and not busy then
+      -- have material but no clear -> ORGANIZE/FLATTEN (lower the peak, clump colors) -- including at the top, in DANGER.
+      local org = useChips.organizeMove(grid, rows, cursor, touchable)
       if org then move = { type = "SWAP", pos = org, swaps = { org }, kind = "FLATTEN" }; self._substate = "FLATTEN"
       else move = { type = "WAIT" } end
-    elseif st == "RAISE" and not busy and (state.stopTime or 0) == 0 then
-      move = { type = "RAISE" }              -- no chip + below the top -> fill material (DANGER clears before we top out)
     else
       move = { type = "WAIT" }
     end

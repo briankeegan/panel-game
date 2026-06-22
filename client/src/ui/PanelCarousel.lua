@@ -9,10 +9,12 @@ local PanelCarousel = class(function(carousel, options)
 end, Carousel)
 
 function PanelCarousel:createPassenger(id)
-  -- Scale the panel icons to the carousel height (set at construction) instead of
-  -- a fixed 20px, so a tall mobile carousel shows big panels. Desktop carousels
-  -- are ~30px tall → ~18px icons, matching the old look.
-  local sz = math.max(18, math.floor((self.height or 30) * 0.6))
+  -- portrait: scale the panel icons to the carousel height so a tall mobile
+  -- carousel shows big panels. Desktop keeps the original fixed 20px.
+  local sz = 20
+  if require("client.src.system").isPortraitMode() then
+    sz = math.max(20, math.floor((self.height or 30) * 0.6))
+  end
   local stackPanel = StackPanel({alignment = "left", height = sz, hAlign = "center", vAlign = "center"})
   local panelImages = {}
   -- outlineColor

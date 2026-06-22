@@ -138,7 +138,7 @@ end
 
 ----------------------------------------------------------------- enumerate: swap-unsolve EVERY cascade base, gated
 -- returns records { g = puzzle grid, sr,sc = fire swap, s1 = {br,bc} setup swap, moves, kind }
-local function enumerate(n, m, R)
+local function enumerateRaw(n, m, R)
   R = R or 2
   local out, seen = {}, {}
   for _, base in ipairs(getCascadeShapes.enumerate(n, m)) do
@@ -166,6 +166,10 @@ local function enumerate(n, m, R)
     end
   end
   return out
+end
+-- persistent cache (keyed incl. radius): each (n,m) computes once; a killed regen resumes from here
+local function enumerate(n, m, R)
+  return require("bot.chipStore").memoEnum("getCascadeSetups", n .. "_" .. m .. "_" .. (R or 2), function() return enumerateRaw(n, m, R) end)
 end
 
 if arg and arg[0] and arg[0]:match("getCascadeSetups") then

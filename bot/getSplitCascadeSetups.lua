@@ -73,7 +73,7 @@ local function anySwapWins(g, str, sa, sb)
 end
 
 ------------------------------------------------------------------ enumerate: unsolve each split-cascade, gated
-local function enumerate(sa, sb, R)
+local function enumerateRaw(sa, sb, R)
   sa, sb, R = sa or 3, sb or 3, R or 2
   local out, seen = {}, {}
   for _, base in ipairs(getSplitCascadeShapes.enumerate(sa, sb)) do
@@ -103,6 +103,10 @@ local function enumerate(sa, sb, R)
     end
   end
   return out
+end
+-- persistent cache (keyed incl. radius): each pair computes once; a killed regen resumes from here
+local function enumerate(sa, sb, R)
+  return require("bot.chipStore").memoEnum("getSplitCascadeSetups", (sa or 3) .. "_" .. (sb or 3) .. "_" .. (R or 2), function() return enumerateRaw(sa, sb, R) end)
 end
 
 ------------------------------------------------------------------ render (3-step filmstrip)

@@ -101,6 +101,10 @@ local function enumerateRaw(sa, sb, R)
   end
   return out
 end
+-- persistent cache (keyed incl. radius): each pair computes once; a killed regen resumes from here
+local function enumerate(sa, sb, R)
+  return require("bot.chipStore").memoEnum("getSplitSetups", (sa or 3) .. "_" .. (sb or 3) .. "_" .. (R or 2), function() return enumerateRaw(sa, sb, R) end)
+end
 
 ------------------------------------------------------------------ render (3-step filmstrip)
 local function sym(v) if v == 0 then return "." elseif v >= 5 then return "*" else return tostring(v) end end

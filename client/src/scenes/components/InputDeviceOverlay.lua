@@ -503,6 +503,15 @@ function InputDeviceOverlay:openInputDeviceOverlayIfNeeded()
     return
   end
 
+  -- mobile mode: touch is the only input. Assign every local player to touch and
+  -- never show the device-assignment overlay (no keyboard/controller option).
+  if require("client.src.system").isPortraitMode() then
+    for _, player in ipairs(self.players) do
+      player:setInputMethod("touch")
+    end
+    return
+  end
+
   if not self:allPlayersAssigned() then
     self:restoreSavedDeviceIfPossible()
   end
@@ -524,6 +533,14 @@ function InputDeviceOverlay:drawSelf()
 end
 
 function InputDeviceOverlay:open()
+  -- mobile mode: touch only — never show the device picker, just ensure touch
+  -- (covers the direct "change input" path too)
+  if require("client.src.system").isPortraitMode() then
+    for _, player in ipairs(self.players) do
+      player:setInputMethod("touch")
+    end
+    return
+  end
   self.deviceState = {}
   self.touchTargetSlot = nil
   self.autoCloseTimer = 0

@@ -300,7 +300,7 @@ function OptionsMenu:loadGeneralMenu()
 
   -- Mobile only: portrait toggle (default on). Takes effect on restart.
   if system.isMobileLike() then
-    generalMenuOptions[#generalMenuOptions+1] = ui.MenuItem.createToggleButtonGroupMenuItem("Mobile", nil, false, createToggleButtonGroup("portraitMode"))
+    generalMenuOptions[#generalMenuOptions+1] = ui.MenuItem.createToggleButtonGroupMenuItem("Mobile View", nil, false, createToggleButtonGroup("portraitMode"))
   end
 
   generalMenuOptions[#generalMenuOptions + 1] = ui.MenuItem.createButtonMenuItem("back", nil, nil,

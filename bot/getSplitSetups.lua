@@ -135,7 +135,7 @@ local function filmstrip(start, s1, s2)
   print(string.format("  STEP 3 of 3 — swap 2 fire (%d,%d), clears 3+3:", s2[1], s2[2])); frame(mid, minc, maxc, maxr, { s2[1], s2[2], "swap" })
 end
 
-local PAIRS = { { 3, 3 }, { 3, 4 }, { 4, 4 }, { 3, 5 }, { 4, 5 }, { 5, 5 } }
+local PAIRS = require("bot.chipSizes").PAIRS
 
 if arg and arg[0] and arg[0]:match("getSplitSetups") then
   local sa, sb = tonumber(arg[1]) or 3, tonumber(arg[2]) or 3

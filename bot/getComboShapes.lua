@@ -171,10 +171,10 @@ if arg and arg[0] and arg[0]:match("getComboShapes%.lua$") then
   print(string.format("baked %d COMBO_%d chips into cache (cache now %d total)", #chips, N, cnt))
 end
 
--- registry: the full build bakes these sizes of COMBO_N
+-- registry: bakes the brute-force-reachable single-color sizes (see bot/chipSizes.lua; getComboCross does the rest)
 local function produce()
   local out = {}
-  for _, n in ipairs({ 3, 4, 5 }) do
+  for _, n in ipairs(require("bot.chipSizes").BRUTE) do
     for _, rec in ipairs(M.enumerate(n).raw) do
       out[#out+1] = { g = rec.sample, sr = rec.sr, sc = rec.sc, kind = "COMBO_" .. n, absSwaps = { { rec.sr, rec.sc } } }
     end

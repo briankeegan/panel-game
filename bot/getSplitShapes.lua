@@ -6,8 +6,7 @@
 require("bot.headlessBoot"); do local l = require("common.lib.logger"); l.setLogLevel(l.levels.ERROR) end
 _G.loc = _G.loc or function(s) return tostring(s) end
 local shapeCache = require("bot.shapeCache")
-local getComboShapes = require("bot.getComboShapes")   -- reuse EVERY single-color a-shape and b-shape (bent included)
-local getComboCross = require("bot.getComboCross")     -- bent 6/7 crosses (brute force can't reach those sizes)
+local chipSizes = require("bot.chipSizes")             -- single source of truth for sizes + the combo-shape router
 local analyze = require("bot.chipAnalyze")             -- authoritative settle/clear measure (old firesSplit cut big pops short)
 local Match = require("common.engine.Match"); require("common.engine.checkMatches")
 local LP = require("common.data.LevelPresets"); local KDE = require("common.data.KeyDataEncoding"); local Puzzle = require("common.engine.Puzzle")
@@ -22,10 +21,10 @@ local function mirrorShape(rec)          -- horizontal mirror: flips the swap's 
   return { sample = g, sr = rec.sr, sc = mc(rec.sc + 1), key = (rec.key or "") .. "m" }
 end
 local _shapeMemo = {}
-local function comboShapes(n)            -- single-color shapes of size n: brute for <=5, constructive cross for 6/7
+local function comboShapes(n)            -- single-color shapes of size n (router lives in chipSizes); crosses also mirrored
   if not _shapeMemo[n] then
-    local base = (n >= 6 and getComboCross or getComboShapes).enumerate(n).raw
-    if n >= 6 then                       -- crosses keep one hub-orientation; add the mirror so splits can use both sides
+    local base = chipSizes.comboShapes(n)
+    if n > chipSizes.BRUTE_MAX then      -- crosses keep one hub-orientation; add the mirror so splits can use both sides
       local aug = {}; for _, r in ipairs(base) do aug[#aug+1] = r; aug[#aug+1] = mirrorShape(r) end; base = aug
     end
     _shapeMemo[n] = base
@@ -173,11 +172,7 @@ local function render(rec)
   return lines
 end
 
--- two-color split sizes the registry bakes: 6 (3+3) through 14 (7+7), composing the single-color shapes pairwise
-local PAIRS = {
-  { 3, 3 }, { 3, 4 }, { 4, 4 }, { 3, 5 }, { 4, 5 }, { 5, 5 },              -- 6..10 (from 3/4/5)
-  { 3, 6 }, { 4, 6 }, { 5, 6 }, { 6, 6 }, { 3, 7 }, { 4, 7 }, { 5, 7 }, { 6, 7 }, { 7, 7 }, -- 9..14 (using bent 6/7)
-}
+local PAIRS = chipSizes.PAIRS            -- 6 (3+3) .. 14 (7+7), from the central size config
 
 if arg and arg[0] and arg[0]:match("getSplitShapes") then
   local sa, sb = tonumber(arg[1]) or 3, tonumber(arg[2]) or 3

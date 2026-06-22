@@ -107,10 +107,10 @@ if arg and arg[0] and arg[0]:match("getComboCross%.lua$") then
   print(string.format("\nbaked %d COMBO_%d chips into cache (cache now %d total)", #chips, N, cnt))
 end
 
--- registry: bent single-color combos for the sizes brute force can't reach (6, 7)
+-- registry: bent single-color combos for the sizes brute force can't reach (see bot/chipSizes.lua CROSS)
 local function produce()
   local out = {}
-  for _, n in ipairs({ 6, 7 }) do
+  for _, n in ipairs(require("bot.chipSizes").CROSS) do
     for _, rec in ipairs(M.enumerate(n).raw) do
       out[#out+1] = { g = rec.sample, sr = rec.sr, sc = rec.sc, kind = "COMBO_" .. n, absSwaps = { { rec.sr, rec.sc } } }
     end

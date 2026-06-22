@@ -213,7 +213,7 @@ Server.ROOM_IDLE_TIMEOUT = 30 * 60
 -- whole party leaves; long enough that a network blip / quick app restart
 -- still gets their slot back. Mid-match all-disconnected is handled in
 -- Room.lua immediately (no grace).
-Server.ALL_DISCONNECTED_GRACE = 60
+Server.ALL_DISCONNECTED_GRACE = 10
 
 -- Seconds of "no gameplay progress in this room's active game" before the
 -- stuck-match watchdog flags it via CrashReports. Live gameplay updates
@@ -843,17 +843,55 @@ function Server:_onIncidentDetected(room, reason)
 end
 
 ---@param room Room
+---Fully remove a player from global server state, but only if they hold no
+---live connection. A gameplay drop with a preserved room slot nils the
+---player's connection yet keeps the Player record for reconnect; if the room
+---then closes and no socket ever returned, nothing else fires
+---closeConnection's teardown, so the player ghosts in the lobby roster
+---(publicIdToPlayer) forever. A player still holding any live socket
+---legitimately returns to the lobby and is left alone.
+---@param player ServerPlayer
+---@return boolean reaped
+function Server:reapIfConnectionless(player)
+  ---@diagnostic disable-next-line: invisible
+  if player.gameplayConnection or player.lobbyConnection or player.spectateConnection then
+    return false
+  end
+  self:clearProposals(player)
+  if player.publicPlayerID then
+    self.publicIdToPlayer[player.publicPlayerID] = nil
+  end
+  self.playerToRoom[player] = nil
+  self.spectatorToRoom[player] = nil
+  player.spectatedRoom = nil
+  self.nameToPlayer[player.name] = nil
+  self.nameToConnectionIndex[player.name] = nil
+  logger.info("Reaped connectionless player " .. player.name
+    .. " on room close (no live socket; reconnect never arrived).")
+  pcall(function()
+    if player.publicPlayerID then
+      TraceWriter.endSession(player.publicPlayerID)
+    end
+  end)
+  return true
+end
+
 function Server:closeRoom(room, reason)
-  -- room.players is slot-keyed and may be sparse (e.g. partial team rooms
-  -- with B at slot 3, slot 2 empty). ipairs would stop at the first gap and
-  -- leave a stale playerToRoom entry pointing at the closed room.
+  -- Collect the roster before room:close clears room.players, so we can reap
+  -- connectionless players afterwards. room.players is slot-keyed and may be
+  -- sparse (e.g. partial team rooms with B at slot 3, slot 2 empty). ipairs
+  -- would stop at the first gap and leave a stale playerToRoom entry pointing
+  -- at the closed room.
+  local roster = {}
   for _, player in room:eachPlayer() do
+    roster[#roster + 1] = player
     self.playerToRoom[player] = nil
     ---@diagnostic disable-next-line: invisible
     if player.gameplayConnection then player.gameplayConnection:enableNoDelay(false) end
   end
 
   for _, player in ipairs(room.spectators) do
+    roster[#roster + 1] = player
     self.spectatorToRoom[player] = nil
     -- Do NOT clear player.spectatedRoom here. Room:close uses
     -- `spectator.spectatedRoom == self` to gate the per-spectator leaveRoom
@@ -867,6 +905,15 @@ function Server:closeRoom(room, reason)
   end
 
   room:close(reason)
+
+  -- Reap anyone whose sockets all dropped while their slot was preserved for
+  -- reconnect. With no connection left, nothing else would ever remove them
+  -- from the lobby roster. Runs after room:close so its spectatedRoom gate has
+  -- already fired.
+  for _, player in ipairs(roster) do
+    self:reapIfConnectionless(player)
+  end
+
   self:setLobbyChanged()
 end
 

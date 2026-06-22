@@ -139,10 +139,14 @@ local function buttonGroup(prefs, field, buttons, tooltipFn)
   local portrait = system.isPortraitMode()
   local optFont = portrait and math.floor(GraphicsUtil.fontSize * 1.4) or nil
   local optHeight = portrait and 64 or nil
+  -- min width so single-char options (player count 3-7) aren't tiny untappable
+  -- pills; wide labels (compositions) keep their content width via TextButton's max
+  local optMinWidth = portrait and 72 or nil
   local btns = tableUtils.map(buttons, function(b)
     return ui.TextButton({
       label = ui.Label({text = b.label, translate = false, fontSize = optFont}),
       height = optHeight,
+      width = optMinWidth,
     })
   end)
   local group = ui.ButtonGroup({

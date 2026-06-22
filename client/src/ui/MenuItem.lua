@@ -34,6 +34,22 @@ MenuItem.GROUP_PADDING = 15
 function MenuItem.createMenuItem(label, item)
   assert(label ~= nil)
 
+  -- portrait: enlarge menu-button text uniformly. Catches EVERY button menu item —
+  -- the createButtonMenuItem path AND scenes that build their own TextButton then
+  -- call createMenuItem (e.g. PuzzleMenu). Here 'label' is the TextButton and its
+  -- .label is the inner text label.
+  if item == nil and system.isPortraitMode() and label.label and label.label.fontSize then
+    local bl = label.label
+    bl.fontSize = math.floor(bl.fontSize * 2.25)
+    local t = bl.text
+    bl.text = nil
+    bl.drawable = nil
+    bl:setText(t, bl.replacementTable, bl.translate)
+    local w, h = bl:getEffectiveDimensions()
+    label.width = math.max(label.width, math.floor(w) + 2 * (label.WIDTH_PADDING or 16))
+    label.height = math.max(label.height, math.floor(h) + 2 * (label.HEIGHT_PADDING or 10))
+  end
+
   -- portrait: stack the title above its control (full width) instead of side by
   -- side. Wide option rows (e.g. 5-button composition / player count) no longer
   -- cram onto one line, and the controls get room to be big + tappable.
@@ -114,20 +130,8 @@ function MenuItem.createButtonMenuItemWithLabel(label, onClick, width)
   local BUTTON_WIDTH = width or 140
   label.hAlign = "center"
   label.vAlign = "center"
-
-  -- portrait: bump menu-button text further (the global font is already 2x; this
-  -- makes the actual menu navigation buttons ~3x of base for easy tapping). Force
-  -- a re-render since setText no-ops on unchanged args.
-  if system.isPortraitMode() then
-    label.fontSize = math.floor((label.fontSize or GraphicsUtil.fontSize) * 2.25)
-    -- force a rebuild at the new size (setText no-ops on unchanged args, and
-    -- non-translated labels only rebuild when drawable is nil)
-    local t = label.text
-    label.text = nil
-    label.drawable = nil
-    label:setText(t, label.replacementTable, label.translate)
-    BUTTON_WIDTH = math.max(BUTTON_WIDTH, label.width + 48)
-  end
+  -- the portrait big-button bump lives in createMenuItem now, so it applies to
+  -- every button menu item (including scenes that build their own TextButton).
 
   local textButton = TextButton({
     label = label,

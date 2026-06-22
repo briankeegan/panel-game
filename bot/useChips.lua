@@ -219,9 +219,17 @@ local function targetFit(grid, rows, tmpl, R, C)
   for c, k in pairs(counts) do if k > best then best, col = k, c end end
   return best, n, col
 end
-function M.constructMove(grid, rows, touchable, goal)
+-- count required-empty ('.'/'e') gaps in a template -- fewer gaps = a denser, more robust target (less to keep clear).
+local function gapCount(tmpl)
+  local g = 0
+  for _, e in ipairs(tmpl) do if e[3] == "e" or e[3] == "." then g = g + 1 end end
+  return g
+end
+-- verify is the engine chip-check (brain:chipVerify). When supplied, the FINAL completing swap of a committed big-combo
+-- goal is ALLOWED to clear -- the whole point is to fire the combo. (Without verify, behaviour unchanged: never clear.)
+function M.constructMove(grid, rows, touchable, goal, verify)
   if not touchable then return nil end
-  local bp, bN, bT, bR, bC, bCol = -1, 1                            -- best partial target + its dominant color
+  local bp, bN, bT, bR, bC, bCol, bGap = -1, 1, nil, nil, nil, nil, 99  -- best partial target + its dominant color
   if goal then                                                     -- COMMIT: stick to the current goal while it's still a valid partial -- don't abandon a half-built combo each frame
     local p, n, col = targetFit(grid, rows, goal.tmpl, goal.R, goal.C)
     if p and n and col == goal.col and p > 0 and p < n then bT, bR, bC, bCol = goal.tmpl, goal.R, goal.C, goal.col end
@@ -231,10 +239,15 @@ function M.constructMove(grid, rows, touchable, goal)
       local ts = chips.templatesOf(kind)
       if ts then
         for _, chip in ipairs(ts) do
+          local gap = gapCount(chip.tmpl)
           for r = 1, rows do
             for c = 1, WIDTH do
               local p, n, col = targetFit(grid, rows, chip.tmpl, r, c)
-              if p and n and col and p > 0 and p < n and p / n > bp / bN then bp, bN, bT, bR, bC, bCol = p, n, chip.tmpl, r, c, col end
+              -- prefer most-assembled; tie-break toward FEWER gaps (denser shapes finish more reliably)
+              if p and n and col and p > 0 and p < n
+                  and (p / n > bp / bN or (p / n == bp / bN and gap < bGap)) then
+                bp, bN, bT, bR, bC, bCol, bGap = p, n, chip.tmpl, r, c, col, gap
+              end
             end
           end
         end
@@ -273,6 +286,7 @@ function M.constructMove(grid, rows, touchable, goal)
   end
   local base = distCost()
   local best, bestCost
+  local finish = (#wrong == 1)   -- exactly one cell left: the completing swap is allowed to CLEAR (that line IS the combo)
   for r = 1, rows do
     for c = 1, WIDTH - 1 do
       local a, b = grid[r][c], grid[r][c + 1]
@@ -283,6 +297,26 @@ function M.constructMove(grid, rows, touchable, goal)
         local clears = makesClear(grid, rows, c)
         grid[r][c], grid[r][c + 1] = a, b
         if cost < base and not clears and (not bestCost or cost < bestCost) then best, bestCost = { r, c }, cost end
+      end
+    end
+  end
+  -- LET IT FINISH: goal is ONE cell from done. Find the swap that drops cost to 0 (fills the last cell). It WILL form a
+  -- line (makesClear forbade it above) -- that line IS the big combo. Verify it fires on the real engine; if so RETURN IT
+  -- AS A CLEAR (3rd ret) so the brain plays it. Only the FINAL move of a committed big combo may clear; else never break.
+  if finish and verify then
+    for r = 1, rows do
+      for c = 1, WIDTH - 1 do
+        local a, b = grid[r][c], grid[r][c + 1]
+        if a ~= 0 and b ~= 0 and a ~= b and a ~= BoardSim.GARBAGE and b ~= BoardSim.GARBAGE
+            and touchable[r] and touchable[r][c] and touchable[r][c + 1] then
+          grid[r][c], grid[r][c + 1] = b, a
+          local cost = distCost()
+          grid[r][c], grid[r][c + 1] = a, b
+          if cost == 0 and verify({ { r, c } }) then         -- this swap completes the shape AND the engine fires it
+            M._cFinish = (M._cFinish or 0) + 1
+            return { r, c }, { tmpl = bT, R = bR, C = bC, col = bCol }, true
+          end
+        end
       end
     end
   end

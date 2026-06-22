@@ -185,13 +185,15 @@ function EnvelopeBrain:decide(state, stack, match)
     elseif st == "RAISE" and not busy then
       move = { type = "RAISE" }              -- low on material -> FILL even during stop-time (low board = invincibility is worthless)
     elseif st == "OFFENSE" or st == "DANGER" then
-      -- BUILD toward a big-combo shape; else FLATTEN/pair; else idle.
-      local con, goal = useChips.constructMove(grid, rows, touchable, self._buildGoal)
-      self._buildGoal = goal                          -- COMMIT to one combo across frames until it's built
+      -- BUILD toward a big-combo shape; else FLATTEN/pair; else idle. The constructor may also FINISH a committed combo
+      -- itself (isClear): when the goal is one swap from done, the verified completing swap FIRES the big combo.
+      local con, goal, isClear = useChips.constructMove(grid, rows, touchable, self._buildGoal, verify)
+      if isClear then self._buildGoal = nil else self._buildGoal = goal end  -- combo fired -> drop goal; else keep committing
       local mv = con or useChips.organizeMove(grid, rows, cursor, touchable)
       if mv then
-        move = { type = "SWAP", pos = mv, swaps = { mv }, kind = con and "BUILD" or "FLATTEN" }
-        self._substate = con and "BUILD" or "FLATTEN"
+        move = { type = "SWAP", pos = mv, swaps = { mv }, kind = isClear and "BUILDCLEAR" or (con and "BUILD" or "FLATTEN") }
+        self._substate = isClear and "CLEAR" or (con and "BUILD" or "FLATTEN")
+        if isClear then self._comboUse = self._comboUse or {}; self._comboUse.BUILDCLEAR = (self._comboUse.BUILDCLEAR or 0) + 1 end
       else
         move = { type = "WAIT" }
       end

@@ -66,7 +66,7 @@ local function anySwapWins(g, str, sa, sb)
 end
 
 ------------------------------------------------------------------ enumerate: unsolve each split shape, gated
-local function enumerate(sa, sb, R)
+local function enumerateRaw(sa, sb, R)
   sa, sb, R = sa or 3, sb or 3, R or 2
   local out, seen = {}, {}
   for _, base in ipairs(getSplitShapes.enumerate(sa, sb)) do
@@ -154,7 +154,7 @@ end
 
 local function produce()
   local out = {}
-  local R = require("bot.chipSizes").setupRadius
+  local R = require("bot.chipReach").radius
   for _, p in ipairs(PAIRS) do
     for _, v in ipairs(enumerate(p[1], p[2], R(p[1]+p[2]))) do out[#out+1] = { g = v.g, sr = v.sr, sc = v.sc, kind = v.kind, absSwaps = { v.s1, { v.sr, v.sc } } } end
   end

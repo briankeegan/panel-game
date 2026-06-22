@@ -15,12 +15,7 @@ for i = 1, #M.SINGLE do for j = i, #M.SINGLE do M.PAIRS[#M.PAIRS+1] = { M.SINGLE
 M.BRUTE, M.CROSS = {}, {}
 for _, n in ipairs(M.SINGLE) do if n <= M.BRUTE_MAX then M.BRUTE[#M.BRUTE+1] = n else M.CROSS[#M.CROSS+1] = n end end
 
--- max cursor-moves between a setup swap and the fire swap. Full reach (5) for every multi-panel family so nothing is
--- left on the table; only the tiny single combos (3-5 cells, can't physically span 5 moves) stay at 2.
-function M.setupRadius(size)
-  if size >= 6 then return 5 end
-  return 2
-end
+-- (setup cursor-move radius lives in bot/chipReach.lua, isolated so tuning it doesn't invalidate the shape caches)
 
 -- single-color shapes of size n, routed by capability. Lazy require avoids load-time cycles.
 function M.comboShapes(n)

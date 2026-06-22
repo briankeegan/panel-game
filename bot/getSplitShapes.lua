@@ -85,10 +85,8 @@ local function runs(n)
 end
 
 ----------------------------------------------------------------- enumerate (UNION of two methods, deduped)
-local _memo = {}    -- getSplitSetups re-enumerates the same (sa,sb); cache so the slow 5+6/5+7 pairs compute once
-local function enumerate(sa, sb)
+local function enumerateRaw(sa, sb)
   sa, sb = sa or 3, sb or 3
-  local mk = sa .. "_" .. sb; if _memo[mk] then return _memo[mk] end
   local kind = "COMBO_" .. sa .. "_" .. sb
   local found = {}
   local function record(g, sr, sc)            -- floor-anchor + no-pre-match + engine-verify (chipAnalyze) + dedup by shape
@@ -149,8 +147,11 @@ local function enumerate(sa, sb)
   end
   local list = {}; for _, rec in pairs(found) do list[#list+1] = rec end
   table.sort(list, function(a, b) return a.key < b.key end)
-  _memo[mk] = list
   return list
+end
+-- persistent cache: the slow split enumeration computes once, reused across regens + by getSplitSetups
+local function enumerate(sa, sb)
+  return require("bot.chipStore").memoEnum("getSplitShapes", (sa or 3) .. "_" .. (sb or 3), function() return enumerateRaw(sa, sb) end)
 end
 
 local Mod = { enumerate = enumerate }

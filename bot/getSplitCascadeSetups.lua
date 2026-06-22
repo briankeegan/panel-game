@@ -157,7 +157,7 @@ end
 
 local function produce()
   local out = {}
-  local R = require("bot.chipSizes").setupRadius
+  local R = require("bot.chipReach").radius
   for _, p in ipairs(PAIRS) do
     for _, v in ipairs(enumerate(p[1], p[2], R(p[1]+p[2]))) do out[#out+1] = { g = v.g, sr = v.sr, sc = v.sc, kind = v.kind, absSwaps = { v.s1, { v.sr, v.sc } } } end
   end

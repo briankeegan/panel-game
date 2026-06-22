@@ -161,13 +161,17 @@ end
 
 -- module API: every forced 2-swap across ALL bases for COMBO_n (this is what buildChipCache bakes)
 local M = {}
-function M.enumerate(n, R)
+local function enumerateRaw(n, R)
   R = R or 2
   local out = {}
   for _, rec in ipairs(require("bot.chipSizes").comboShapes(n)) do   -- router: brute <=5, bent cross for 6/7
     for _, v in ipairs(genForBase(rec.sample, rec.sr, rec.sc, n, R)) do out[#out+1] = v end
   end
   return out
+end
+-- persistent cache (keyed incl. radius): each size computes once; a killed regen resumes from here
+function M.enumerate(n, R)
+  return require("bot.chipStore").memoEnum("getComboSetups", n .. "_" .. (R or 2), function() return enumerateRaw(n, R) end)
 end
 
 ------------------------------------------------------------------ CLI (only when run directly): one base, filmstrips
@@ -197,9 +201,9 @@ end
 -- registry: 2-swap setups for every single-color size in the central config
 local function produce()
   local out = {}
-  local CS = require("bot.chipSizes")
-  for _, n in ipairs(CS.SINGLE) do
-    for _, v in ipairs(M.enumerate(n, CS.setupRadius(n))) do
+  local reach = require("bot.chipReach").radius
+  for _, n in ipairs(require("bot.chipSizes").SINGLE) do
+    for _, v in ipairs(M.enumerate(n, reach(n))) do
       out[#out+1] = { g = v.g, sr = v.sr, sc = v.sc, kind = v.kind, absSwaps = { v.s1, { v.sr, v.sc } } }
     end
   end

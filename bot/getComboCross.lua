@@ -26,7 +26,7 @@ local function crossCells(a, b, l, rr)         -- hub-relative offsets of the cr
   return cells
 end
 
-function M.enumerate(N)
+local function enumerateRaw(N)
   local found = {}
   for a = 0, 2 do for b = 0, 2 do for l = 0, 2 do for rr = 0, 2 do
     local v, h = a + b, l + rr
@@ -89,6 +89,10 @@ function M.enumerate(N)
   local list = {}; for _, rec in pairs(found) do list[#list+1] = rec end
   table.sort(list, function(x, y) return x.key < y.key end)
   return { raw = list }
+end
+-- persistent cache: the constructive 6/7 enumeration computes once, reused by every consumer (splits, setups, cascades)
+function M.enumerate(N)
+  return require("bot.chipStore").memoEnum("getComboCross", tostring(N), function() return enumerateRaw(N) end)
 end
 
 ------------------------------------------------------------------ standalone: print + self-bake

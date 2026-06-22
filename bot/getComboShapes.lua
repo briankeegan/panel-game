@@ -51,7 +51,7 @@ local function matchedSet(g)
 end
 
 ------------------------------------------------------------------ enumerate every COMBO_N shape
-function M.enumerate(N)
+local function enumerateRaw(N)
   local function firesExactlyN(g, r, c)
     local ok, res = pcall(function()
       local placed = 0; for rr = 1, H do for cc = 1, W do if g[rr][cc] ~= 0 then placed = placed + 1 end end end
@@ -151,6 +151,10 @@ function M.enumerate(N)
     if not seen[sig] then seen[sig] = true; out[#out+1] = { rows = rows, sw = sw } end
   end
   return { raw = list, out = out }
+end
+-- persistent cache: brute-force enumeration + per-cell generalization computes once, reused everywhere it's required
+function M.enumerate(N)
+  return require("bot.chipStore").memoEnum("getComboShapes", tostring(N), function() return enumerateRaw(N) end)
 end
 
 ------------------------------------------------------------------ standalone

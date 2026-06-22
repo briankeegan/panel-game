@@ -118,6 +118,18 @@ function PuzzleGame:customLoad()
   assert(playerStack, "PuzzleGame requires an associated player stack")
   self.playerStack = playerStack
 
+  -- Solution/hint playback feeds recorded inputs straight to the engine. In touch
+  -- mode the touch controller ALSO feeds live input each frame and corrupts the
+  -- playback (it "tries then fails"). Run playback in controller mode; normal play
+  -- stays touch on mobile.
+  if #self.queuedInputs > 0 then
+    self.player:setInputMethod("controller")
+    playerStack.engine.inputMethod = "controller"
+  elseif system.isPortraitMode() then
+    self.player:setInputMethod("touch")
+    playerStack.engine.inputMethod = "touch"
+  end
+
   -- Restore level if it was temporarily changed for solution playback
   if GAME.battleRoom.sceneParameters.restoreLevelAfterCreation then
     local restoreLevel = GAME.battleRoom.sceneParameters.restoreLevelAfterCreation

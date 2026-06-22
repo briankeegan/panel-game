@@ -89,25 +89,24 @@ end
 -- (OFFENSE/DANGER below) or situational (e.g. "garbage that breaks the incoming") computed per-decision.
 local function extractByMeta(filter, rankFn)
   local cache = require("bot.chipCache")
-  local seen, rows = {}, {}
+  local seen, rows, hasC3 = {}, {}, false
   for _, c in ipairs(cache) do
     if not isExcluded(c.kind) and not seen[c.kind] and filter(c.meta, c.kind) then
-      seen[c.kind] = true; rows[#rows + 1] = { kind = c.kind, r = rankFn(c.kind, c.meta) }
+      seen[c.kind] = true
+      if c.kind == "COMBO_3" then hasC3 = true                  -- policy: plain 3-clear is the LAST RESORT in EVERY state
+      else rows[#rows + 1] = { kind = c.kind, r = rankFn(c.kind, c.meta) } end
     end
   end
   table.sort(rows, function(a, b) if a.r ~= b.r then return a.r < b.r end return a.kind < b.kind end)
   local kinds = {}; for _, r in ipairs(rows) do kinds[#kinds + 1] = r.kind end
+  if hasC3 then kinds[#kinds + 1] = "COMBO_3" end               -- appended dead-last, after everything, in all states
   return kinds
 end
 local ANY = function() return true end
--- OFFENSE: build biggest; plain COMBO_3 is DEAD LAST here -- prefer building anything bigger over a trivial 3.
-local OFFENSE_PRIORITIES = extractByMeta(ANY, function(kind, meta)
-  if kind == "COMBO_3" then return 1e9 end
-  return rankKind(kind, meta)
-end)
--- DANGER: the SAME set so it never goes empty, but READY single-swap clears FIRST -- clear NOW; setups/chains fall
--- back only when no ready clear exists. COMBO_3 needs NO special case here: rankKind puts it last among the ready
--- clears (smallest) on its own, which is right in the danger zone -- a fast ready 3 beats a slow 2-swap setup.
+-- OFFENSE: build biggest (ready-first, then size/depth). DANGER: the SAME set so it never goes empty, but READY
+-- single-swap clears FIRST -- clear NOW; setups/chains fall back only when no ready clear exists. COMBO_3 is pinned
+-- dead-last in BOTH by extractByMeta.
+local OFFENSE_PRIORITIES = extractByMeta(ANY, rankKind)
 local DANGER_PRIORITIES = extractByMeta(ANY, function(kind, meta)
   local notReady = (meta and (meta.swaps or 1) == 1 and (meta.chain or 0) == 0) and 0 or 1
   return notReady * 1000000 + rankKind(kind, meta)

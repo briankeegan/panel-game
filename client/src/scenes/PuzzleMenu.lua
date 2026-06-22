@@ -16,6 +16,7 @@ local tableUtils = require("common.lib.tableUtils")
 local LevelPresets      = require("common.data.LevelPresets")
 local Stack = require("common.engine.Stack")
 local system = require("client.src.system")
+local ModLoader = require("client.src.mods.ModLoader")
 
 -- Scene for the puzzle selection menu
 ---@class PuzzleMenu : Scene
@@ -229,15 +230,9 @@ function PuzzleMenu:load(sceneParams)
 
   self.uiRoot:addChild(self.containerStackPanel)
 
-  if portrait then
-    -- portrait: the centered menu fills the width on its own; put the puzzle
-    -- preview/description at the top so it doesn't squeeze the buttons.
-    self.previewStackPanel.hAlign = "center"
-    self.previewStackPanel.vAlign = "top"
-    self.previewStackPanel.x = 0
-    self.previewStackPanel.y = 90
-    self.uiRoot:addChild(self.previewStackPanel)
-  end
+  -- portrait: no board preview on the menu — it reads like a playable board
+  -- appearing before you start. The board only shows once you click into the
+  -- puzzle (PuzzleGame). Landscape keeps the side-by-side preview above.
 
   self.uiRoot:addChild(self.puzzleHierarchyDisplay)
 
@@ -433,6 +428,8 @@ function PuzzleMenu:previewFunctionForPuzzleSet(puzzleSet, puzzleSetIndices, ind
 end
 
 function PuzzleMenu:createEditPuzzleButton(puzzleSet, index)
+  -- portrait has no menu preview to anchor the edit button to; skip it there
+  if system.isPortraitMode() then return end
   self:removeEditButton()
   
   -- Create clickable image button for edit
@@ -727,6 +724,16 @@ end
 
 
 function PuzzleMenu:updateSelf(dt)
+  -- Puzzles skip character-select, so the character+stage mods load on a silent
+  -- 1-asset/frame background drain that takes ~1-3s; clicking a puzzle before it
+  -- finishes stalls the start. While browsing the menu, drain the queue several
+  -- assets per frame so it's warm in a fraction of a second. Puzzle-menu only.
+  if self.battleRoom and not self.battleRoom.allAssetsLoaded then
+    for _ = 1, 12 do
+      if not ModLoader.update() then break end
+    end
+  end
+
   self.inputDeviceOverlay:openInputDeviceOverlayIfNeeded()
 
   if self.inputDeviceOverlay:isActive() then

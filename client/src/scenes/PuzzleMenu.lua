@@ -242,6 +242,14 @@ function PuzzleMenu:load(sceneParams)
   self.uiRoot:addChild(self.puzzleHierarchyDisplay)
 
   self:createInputDeviceOverlay()
+
+  -- Preload the character/stage mods now, while the user is browsing puzzles, so
+  -- clicking a puzzle starts instantly instead of stalling ~1-3s on a silent mod
+  -- load (puzzles skip character-select, where other modes hide this cost).
+  -- updateLoadingState resolves + kicks off the load itself; no refresh needed.
+  if self.battleRoom then
+    self.battleRoom:updateLoadingState()
+  end
 end
 
 function PuzzleMenu:createInputDeviceOverlay()

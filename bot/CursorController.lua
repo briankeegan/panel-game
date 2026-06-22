@@ -68,6 +68,15 @@ function CursorController:nextInput(state, decision)
   end
   self._lastDisp = disp
 
+  -- STALL GUARD: if locked but the cursor can't close distance to the target on a frame it's free to move (the rising
+  -- board overran the chip mid-route), release the lock so the brain re-decides instead of dead-locking on a dead chip.
+  if self.locked and self.lockedPos and self.reactionTimer == 0 and (self.interSwap or 0) == 0 and self.moveCooldown == 0 then
+    local d = math.abs(state.cursor[1] - self.lockedPos[1]) + math.abs(state.cursor[2] - self.lockedPos[2])
+    if d > 0 and self._lastDist and d >= self._lastDist then self._noProg = (self._noProg or 0) + 1 else self._noProg = 0 end
+    self._lastDist = d
+    if (self._noProg or 0) > 4 then self.locked, self.lockedSeq, self._noProg = nil, nil, 0; self.idle = true; return IDLE end
+  end
+
   if decision and decision.type == "RAISE" then
     self.locked, self.idle = nil, true
     return char(32) -- raise is a held action; APM cap doesn't apply

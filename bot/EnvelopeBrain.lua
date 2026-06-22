@@ -176,6 +176,14 @@ function EnvelopeBrain:decide(state, stack, match)
     -- OFFENSE HOLDS small clears and BUILDS instead -- only fire when it's BIG (or a chain). DANGER/RAISE fire/fill as
     -- before (DANGER will spend anything to survive). The organizer makes a non-clearing grouping swap to assemble a
     -- bigger play -- continuous + cheap, no catalog.
+    -- don't loop on a chip that never fires: if the same KIND has been the call a while with no clear, drop it so the bot
+    -- does something else. Key on KIND -- the rising board shifts the position, which defeats a position key. Mitigation
+    -- only; the real cause is chips going stale between decision and execution on a rising board (the planner fixes it).
+    if chip then
+      if chip.kind == self._loopKind and (state.panels_cleared or 0) == self._loopCl then self._loopN = (self._loopN or 0) + 1 else self._loopN = 0 end
+      self._loopKind, self._loopCl = chip.kind, (state.panels_cleared or 0)
+      if (self._loopN or 0) > 25 then chip = nil end
+    end
     local fire = chip ~= nil   -- fire whatever clears -- survive first; organize only fills genuinely dead frames
     self._substate = nil
     if fire then

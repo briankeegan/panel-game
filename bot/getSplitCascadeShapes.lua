@@ -186,8 +186,8 @@ local function enumerate(sa, sb)
     return out
   end
   local aCfgs, bCfgs = {}, {}
-  for _, r in ipairs(getComboShapes.enumerate(sa).raw) do aCfgs[#aCfgs+1] = solvedCells(r) end
-  for _, r in ipairs(getComboShapes.enumerate(sb).raw) do bCfgs[#bCfgs+1] = solvedCells(r) end
+  for _, r in ipairs(require("bot.chipSizes").comboShapes(sa)) do aCfgs[#aCfgs+1] = solvedCells(r) end
+  for _, r in ipairs(require("bot.chipSizes").comboShapes(sb)) do bCfgs[#bCfgs+1] = solvedCells(r) end
   for _, aC in ipairs(aCfgs) do
     for _, bC in ipairs(bCfgs) do
       for bShiftR = 0, 6 do                                          -- lift B (rests on filler/other panels above the floor)

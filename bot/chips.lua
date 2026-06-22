@@ -31,7 +31,21 @@ end
 -- sequence fires (caller's real-engine check) before returning. A chip carries `swaps` (a list of anchor-relative
 -- offsets); a single-swap chip is just a 1-element list. Legacy `swap` (one pair) is still accepted. No BoardSim, no
 -- prediction -- fits is a pure pattern-match, verify is engine-truth. nil = none here.
-function chips.recognize(grid, rows, cells, kind, verify, touchable)
+-- cheap pre-filter for BREAK candidates: any template cell orthogonally adjacent to a garbage cell on the board.
+-- Narrows before the costly verify; the verify's garbageMatched signal is the actual confirmation.
+local function nearGarbage(grid, rows, t, R, C)
+  for _, e in ipairs(t) do
+    local r, c = R + e[1], C + e[2]
+    for _, d in ipairs({ { 0, 0 }, { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
+      local rr, cc = r + d[1], c + d[2]
+      if rr >= 1 and rr <= rows and cc >= 1 and cc <= 6 and grid[rr] and grid[rr][cc] == BoardSim.GARBAGE then return true end
+    end
+  end
+  return false
+end
+
+-- requireBreak: only accept a match that actually breaks garbage (cheap nearGarbage pre-filter, then garbageMatched).
+function chips.recognize(grid, rows, cells, kind, verify, touchable, requireBreak)
   for _, cell in ipairs(cells) do local R, C = cell[1], cell[2]
     for _, chip in ipairs(STORE) do
       if chip.kind == kind and fits(grid, rows, chip.tmpl, R, C) then
@@ -55,9 +69,19 @@ function chips.recognize(grid, rows, cells, kind, verify, touchable)
             seq[#seq + 1] = { sr, sc }
           end
         end
-        if ok and (not verify or verify(seq, kind)) then
-          chips._lastMatch = { R = R, C = C, tmpl = chip.tmpl, swaps = seq, kind = kind }  -- debug/viz: where it landed
-          return { swaps = seq, kind = kind }
+        if ok then
+          local near = (not requireBreak) or nearGarbage(grid, rows, chip.tmpl, R, C)
+          if requireBreak then chips._dbgFits = (chips._dbgFits or 0) + 1; if near then chips._dbgNear = (chips._dbgNear or 0) + 1 end end
+          if near then
+            local fired, broke = true, false
+            if verify then fired, broke = verify(seq, kind) end
+            if requireBreak and fired then chips._dbgFired = (chips._dbgFired or 0) + 1 end
+            if requireBreak and broke then chips._dbgBroke = (chips._dbgBroke or 0) + 1 end
+            if fired and (not requireBreak or broke) then
+              chips._lastMatch = { R = R, C = C, tmpl = chip.tmpl, swaps = seq, kind = kind }  -- debug/viz: where it landed
+              return { swaps = seq, kind = kind, brokeGarbage = broke or false }
+            end
+          end
         end
       end
     end

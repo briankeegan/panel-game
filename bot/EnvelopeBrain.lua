@@ -22,27 +22,28 @@ function EnvelopeBrain:chipVerify(stack, match)
   return function(seq)
     if not stack or not match or not seq or #seq == 0 then return false end
     if not KDE_swap then KDE_swap = require("common.data.KeyDataEncoding").swap end
-    local ok, fired = pcall(function()
+    local ok, fired, broke = pcall(function()
       local clock0 = stack.clock
       for _, s in ipairs(match.stacks) do s:saveForRollback() end
       stack.stop_time = math.max(stack.stop_time or 0, 999)  -- FREEZE the auto-rise, or a rising row could fire the match instead of the swap
-      local hit = false
-      local token = {}  -- weak-keyed subscriber held in scope; "matched"/"garbageMatched" fire the INSTANT a clear is detected -- no pop-window guess
+      local hit, gbroke = false, false
+      local token = {}  -- weak-keyed subscriber held in scope; signals fire the INSTANT a clear is detected -- no pop-window guess
       stack:connectSignal("matched", token, function() hit = true end)
-      stack:connectSignal("garbageMatched", token, function() hit = true end)
+      stack:connectSignal("garbageMatched", token, function() hit = true; gbroke = true end)  -- garbage broke -> this chip is a BREAK
       for _, mv in ipairs(seq) do
         stack.cur_row, stack.cur_col = mv[1], mv[2]; stack:receiveConfirmedInput(KDE_swap); match:run()
         for k = 1, 20 do
-          if hit then break end
+          if hit then break end                          -- garbageMatched fires in the SAME checkMatches as matched, so gbroke is already set
           stack:receiveConfirmedInput("A"); match:run()
           if not stack:hasActivePanels() and not stack:hasChainingPanels() then break end
         end
       end
       stack:disconnectSignal("matched", token); stack:disconnectSignal("garbageMatched", token)
       for _, s in ipairs(match.stacks) do s:rollbackToFrame(clock0) end
-      return hit
+      return hit, gbroke
     end)
-    return ok and fired or false
+    if not ok then return false end
+    return fired, broke   -- fired = it clears; broke = it broke garbage
   end
 end
 
@@ -148,9 +149,18 @@ function EnvelopeBrain:decide(state, stack, match)
     self._state = st
     -- DANGER clears NOW (ready single-swap clears first); OFFENSE builds big (cascades/setups first). Same all-direction search.
     local priorities = (st == "DANGER") and DANGER_PRIORITIES or OFFENSE_PRIORITIES
-    local chip = useChips.useChips(grid, rows, cursor, {
-      chipPriorities = priorities, searchPriorities = { "UP", "DOWN", "LEFT", "RIGHT" },
-      verify = self:chipVerify(stack, match), touchable = touchable,
+    local verify = self:chipVerify(stack, match)
+    local search = { "UP", "DOWN", "LEFT", "RIGHT" }
+    local chip
+    -- DANGER + garbage on board -> PRIORITIZE a BREAK: any existing combo that clears next to garbage breaks it and
+    -- opens stop-time (the way out of the danger zone). Fall back to any clear if no break is playable.
+    if state.lowestGarbageRow then  -- TEST: any state with garbage (was DANGER-only) -- breaking early beats drowning
+      chip = useChips.useChips(grid, rows, cursor, {
+        chipPriorities = priorities, searchPriorities = search, verify = verify, touchable = touchable, requireBreak = true,
+      })
+    end
+    chip = chip or useChips.useChips(grid, rows, cursor, {
+      chipPriorities = priorities, searchPriorities = search, verify = verify, touchable = touchable,
     })
     if chip then
       self._comboUse = self._comboUse or {}; self._comboUse[chip.kind] = (self._comboUse[chip.kind] or 0) + 1

@@ -78,7 +78,11 @@ function PuzzleMenu:startGame(puzzleSet, puzzleSetIterator)
   assert(puzzleSetIterator)
 
   local player = self.battleRoom.players[1]
-  assert(player.inputConfiguration, "Player must have an input configuration assigned before starting puzzle game")
+  -- touch players have no device inputConfiguration (they use inputMethod "touch"),
+  -- so requiring a config blocked puzzle start on phones. Accept touch, matching
+  -- BattleRoom's own readiness check.
+  assert(player.inputConfiguration or player.settings.inputMethod == "touch",
+    "Player must have an input configuration (or touch) assigned before starting puzzle game")
 
   GAME.localPlayer:setLevel(config.puzzle_level)
   GAME.localPlayer:setLevelData(LevelPresets.getModern(config.puzzle_level))

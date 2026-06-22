@@ -324,4 +324,123 @@ function M.constructMove(grid, rows, touchable, goal, verify)
   return best, (best and { tmpl = bT, R = bR, C = bC, col = bCol })
 end
 
+------------------------------------------------------------------ SEARCH-BASED MOVE PLANNER
+-- A general planner that does NOT use chip templates. It leans on BoardSim's pure simulator (cloneGrid + resolve =
+-- swap -> gravity -> clear -> cascade, counting chain depth & panels) and a cheap eval over the resulting board. The
+-- eval's key term is POTENTIAL CHAIN: for every column, drop a hypothetical test panel of each of the 6 colors on top,
+-- resolve, keep the largest cascade it would trigger -- rewarding a board ONE move from a big chain, so depth-1 greedy
+-- (and a tiny beam) ASSEMBLE combos/chains with no hand-coded shapes. Chips still fire FIRST (decide's CLEAR step).
+local GARBAGE = BoardSim.GARBAGE
+local function isPlay(v) return v and v >= 1 and v <= 6 end
+local function colHeights(grid, rows)                               -- highest occupied row per column + overall peak
+  local h, peak = {}, 0
+  for c = 1, WIDTH do
+    local hc = 0
+    for r = rows, 1, -1 do if grid[r] and grid[r][c] ~= 0 then hc = r; break end end
+    h[c] = hc; if hc > peak then peak = hc end
+  end
+  return h, peak
+end
+local function adjacency(grid, rows)                               -- same-color orthogonal neighbour count (grouping)
+  local s = 0
+  for r = 1, rows do
+    local row = grid[r]; if row then
+      for c = 1, WIDTH do
+        local v = row[c]
+        if isPlay(v) then
+          if c < WIDTH and row[c + 1] == v then s = s + 1 end
+          if r < rows and grid[r + 1] and grid[r + 1][c] == v then s = s + 1 end
+        end
+      end
+    end
+  end
+  return s
+end
+-- POTENTIAL CHAIN: drop a test panel of each color atop each column, resolve a CLONE, keep the best cascade it triggers.
+local function potentialChain(grid, rows, heights)
+  local bestChain, bestTotal = 0, 0
+  for c = 1, WIDTH do
+    local landRow = heights[c] + 1
+    if landRow <= rows then
+      for color = 1, 6 do
+        local g = BoardSim.cloneGrid(grid, rows)
+        g[landRow][c] = color
+        local chain, total = BoardSim.resolve(g, rows)
+        if total > 0 and (chain > bestChain or (chain == bestChain and total > bestTotal)) then bestChain, bestTotal = chain, total end
+      end
+    end
+  end
+  return bestChain, bestTotal
+end
+local W_PCHAIN_DEPTH, W_PCHAIN_TOTAL, W_ADJ, W_PEAK = 220, 14, 6, 9
+local function eval(grid, rows)                                   -- higher = better board
+  local heights, peak = colHeights(grid, rows)
+  local pChain, pTotal = potentialChain(grid, rows, heights)
+  return W_PCHAIN_DEPTH * pChain + W_PCHAIN_TOTAL * pTotal + W_ADJ * adjacency(grid, rows) - W_PEAK * peak
+end
+local function legalSwaps(grid, rows, touchable, hiRow)           -- both cells settled/touchable, differ, not empty<->empty
+  local out, hi = {}, math.min(hiRow, rows)
+  for r = 1, hi do
+    local tr = touchable[r]
+    if tr then
+      for c = 1, WIDTH - 1 do
+        local a, b = grid[r][c], grid[r][c + 1]
+        if tr[c] and tr[c + 1] and a ~= GARBAGE and b ~= GARBAGE and a ~= b and (a ~= 0 or b ~= 0) then out[#out + 1] = { r, c } end
+      end
+    end
+  end
+  return out
+end
+local W_IMMEDIATE_TOTAL, W_IMMEDIATE_CHAIN, W_IMMEDIATE_FIRST = 30, 400, 20
+local function scoreSwap(grid, rows, r, c)                        -- eval(result) + a fat bonus for firing a clear NOW
+  local g, chain, total, firstClear = BoardSim.simSwap(grid, rows, r, c)
+  local s = eval(g, rows)
+  if total > 0 then s = s + W_IMMEDIATE_TOTAL * total + W_IMMEDIATE_CHAIN * chain + W_IMMEDIATE_FIRST * (firstClear or 0) end
+  return s, g, total, chain
+end
+-- BEAM SEARCH: keep the best BEAM_W states, expand to depth BEAM_D, commit the FIRST swap of the best leaf. BEAM_D=1 is
+-- pure depth-1 greedy (the validated default). Re-planned every frame; only ever ONE swap committed. Budget-capped.
+local BEAM_W, BEAM_D, NODE_BUDGET = 8, 1, 600
+function M.planMove(grid, rows, touchable)
+  if not touchable then return nil end
+  local _, peak = colHeights(grid, rows)
+  local hiRow = math.min(rows, peak + 1)                          -- only swap within/just above the occupied band
+  local budget = NODE_BUDGET
+  local beam = {}
+  for _, sw in ipairs(legalSwaps(grid, rows, touchable, hiRow)) do
+    if budget <= 0 then break end
+    budget = budget - 1
+    local s, g, total, chain = scoreSwap(grid, rows, sw[1], sw[2])
+    local reward = (total > 0) and (W_IMMEDIATE_TOTAL * total + W_IMMEDIATE_CHAIN * chain) or 0
+    beam[#beam + 1] = { g = g, score = s, reward = reward, first = sw }
+  end
+  if #beam == 0 then return nil end
+  local function trim(states)
+    table.sort(states, function(a, b) return a.score > b.score end)
+    while #states > BEAM_W do states[#states] = nil end
+  end
+  trim(beam)
+  local best = beam[1]
+  for _ = 2, BEAM_D do
+    if budget <= 0 then break end
+    local nxt = {}
+    for _, node in ipairs(beam) do
+      if budget <= 0 then break end
+      local _, p2 = colHeights(node.g, rows)
+      for _, sw in ipairs(legalSwaps(node.g, rows, touchable, math.min(rows, p2 + 1))) do
+        if budget <= 0 then break end
+        budget = budget - 1
+        local g2, chain, total = BoardSim.simSwap(node.g, rows, sw[1], sw[2])
+        local reward = node.reward + ((total > 0) and (W_IMMEDIATE_TOTAL * total + W_IMMEDIATE_CHAIN * chain) or 0)
+        local leaf = { g = g2, score = eval(g2, rows) + reward, reward = reward, first = node.first }
+        nxt[#nxt + 1] = leaf
+        if leaf.score > best.score then best = leaf end
+      end
+    end
+    if #nxt == 0 then break end
+    trim(nxt); beam = nxt
+  end
+  return best.first
+end
+
 return M

@@ -185,15 +185,13 @@ function EnvelopeBrain:decide(state, stack, match)
     elseif st == "RAISE" and not busy then
       move = { type = "RAISE" }              -- low on material -> FILL even during stop-time (low board = invincibility is worthless)
     elseif st == "OFFENSE" or st == "DANGER" then
-      -- BUILD toward a big-combo shape; else FLATTEN/pair; else idle. The constructor may also FINISH a committed combo
-      -- itself (isClear): when the goal is one swap from done, the verified completing swap FIRES the big combo.
-      local con, goal, isClear = useChips.constructMove(grid, rows, touchable, self._buildGoal, verify)
-      if isClear then self._buildGoal = nil else self._buildGoal = goal end  -- combo fired -> drop goal; else keep committing
-      local mv = con or useChips.organizeMove(grid, rows, cursor, touchable)
+      -- SEARCH-BASED PLAN: no template build/flatten. The planner runs a beam over BoardSim and commits the single best
+      -- swap (first swap of the best leaf), guided by potential-chain lookahead -- assembling combos/chains with no
+      -- hand-coded shapes. Chips already fired FIRST (CLEAR step above); here we only ever play ONE swap and re-plan.
+      local mv = useChips.planMove(grid, rows, touchable)
       if mv then
-        move = { type = "SWAP", pos = mv, swaps = { mv }, kind = isClear and "BUILDCLEAR" or (con and "BUILD" or "FLATTEN") }
-        self._substate = isClear and "CLEAR" or (con and "BUILD" or "FLATTEN")
-        if isClear then self._comboUse = self._comboUse or {}; self._comboUse.BUILDCLEAR = (self._comboUse.BUILDCLEAR or 0) + 1 end
+        move = { type = "SWAP", pos = mv, swaps = { mv }, kind = "PLAN" }
+        self._substate = "PLAN"
       else
         move = { type = "WAIT" }
       end

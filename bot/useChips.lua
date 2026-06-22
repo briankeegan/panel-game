@@ -130,8 +130,9 @@ local function clusterScore(grid, rows)
       for c = 1, WIDTH do
         local v = row[c]
         if v and v ~= 0 and v ~= BoardSim.GARBAGE then
-          if c < WIDTH and row[c + 1] == v then s = s + 1 end
-          if r < rows and grid[r + 1] and grid[r + 1][c] == v then s = s + 1 end
+          if c < WIDTH and row[c + 1] == v then s = s + 3 end                    -- horizontal pair (toward a row clear) -- weighted UP
+          if c > 1 and c < WIDTH and row[c - 1] == v and row[c + 1] == v then s = s + 6 end  -- 3-in-a-row potential: big bonus
+          if r < rows and grid[r + 1] and grid[r + 1][c] == v then s = s + 1 end  -- vertical pair (weaker -- blobs don't clear)
         end
       end
     end

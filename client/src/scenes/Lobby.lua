@@ -21,6 +21,16 @@ local function clampSubmenuX(preferredX, menuWidth)
   return math.max(8, math.min(preferredX, consts.CANVAS_WIDTH - menuWidth - 8))
 end
 
+-- portrait: bigger lobby-button text so the lobby buttons match the main menu.
+-- Desktop/landscape uses the default font.
+local function lobbyLabel(text, translate)
+  return ui.Label({
+    text = text,
+    translate = translate,
+    fontSize = system.isPortraitMode() and math.floor(GraphicsUtil.fontSize * 1.6) or nil
+  })
+end
+
 -- expects a serverIp and serverPort as a param (unless already set in GAME.connected_server_ip & GAME.connected_server_port respectively)
 ---@class LobbyScene : Scene
 ---@field lobbyMenu ScrollMenu
@@ -105,21 +115,21 @@ function Lobby:initLobbyMenu()
   -- portrait: wider buttons (~2x) so they're big/tappable on a phone
   self.lobbyMenuWidth = system.isPortraitMode() and 440 or 220
   self.onePlayerEndlessButton = ui.TextButton({
-    label = ui.Label({text = "mm_1_endless"}),
+    label = lobbyLabel("mm_1_endless"),
     width = self.lobbyMenuWidth,
     onClick = function()
       GAME.netClient:requestRoom(GameModes.getPreset(GameModes.IDs.ONE_PLAYER_ENDLESS))
     end
   })
   self.onePlayerTimeAttackButton = ui.TextButton({
-    label = ui.Label({text = "mm_1_time"}),
+    label = lobbyLabel("mm_1_time"),
     width = self.lobbyMenuWidth,
     onClick = function()
       GAME.netClient:requestRoom(GameModes.getPreset(GameModes.IDs.ONE_PLAYER_TIME_ATTACK))
     end
   })
   self.onePlayerVsButton = ui.TextButton({
-    label = ui.Label({text = "mm_1_vs"}),
+    label = lobbyLabel("mm_1_vs"),
     width = self.lobbyMenuWidth,
     onClick = function()
       if GAME.localPlayer.settings.style ~= GameModes.Styles.MODERN then
@@ -716,7 +726,7 @@ function Lobby:initLobbyMenu()
   local RoomCreateTeamMenu = require("client.src.scenes.RoomCreateTeamMenu")
   local RoomCreateFfaMenu = require("client.src.scenes.RoomCreateFfaMenu")
 
-  self.teamCreateButtonLabel = ui.Label({text = "Create Team Game", translate = false})
+  self.teamCreateButtonLabel = lobbyLabel("Create Team Game", false)
   self.teamCreateButton = ui.TextButton({
     label = self.teamCreateButtonLabel,
     width = self.lobbyMenuWidth,
@@ -731,7 +741,7 @@ function Lobby:initLobbyMenu()
   })
 
   self.ffaCreateButton = ui.TextButton({
-    label = ui.Label({text = "Create FFA", translate = false}),
+    label = lobbyLabel("Create FFA", false),
     width = self.lobbyMenuWidth,
     onClick = function(button)
       if self:isLocalPlayerInRoom() then
@@ -742,7 +752,7 @@ function Lobby:initLobbyMenu()
       GAME.navigationStack:push(RoomCreateFfaMenu({}))
     end
   })
-  self.leaderboardToggleLabel = ui.Label({text = "lb_show_board"})
+  self.leaderboardToggleLabel = lobbyLabel("lb_show_board")
   self.showLeaderboardButton = ui.TextButton({
     label = self.leaderboardToggleLabel,
     width = self.lobbyMenuWidth,
@@ -755,7 +765,7 @@ function Lobby:initLobbyMenu()
     end
   })
   self.backButton = ui.TextButton({
-    label = ui.Label({text = "lb_back"}),
+    label = lobbyLabel("lb_back"),
     width = self.lobbyMenuWidth,
     onClick = exitMenu
   })
@@ -1241,7 +1251,7 @@ function Lobby:createPlayerButtons(personalizedLobbyData)
       end
 
       local button = ui.TextButton({
-        label = ui.Label({text = playerName, translate = false}),
+        label = lobbyLabel(playerName, false),
         width = self.lobbyMenuWidth,
         onClick =
           function(button)

@@ -16,8 +16,8 @@ local function fits(grid, rows, t, R, C)
   for _, e in ipairs(t) do
     local rr, cc = R + e[1], C + e[2]
     local col = (rr >= 1 and rr <= rows and cc >= 1 and cc <= 6 and grid[rr] and (grid[rr][cc] or 0)) or -1
-    if e[3] == "g" then if col ~= BoardSim.GARBAGE then return false end
-    elseif e[3] == "e" then if col ~= 0 then return false end
+    if e[3] == "g" or e[3] == "@" then if col ~= BoardSim.GARBAGE then return false end  -- garbage (catalog also encodes it as "@")
+    elseif e[3] == "e" or e[3] == "." then  -- gap cell: NOT part of the solving shape -- ignore it; verify confirms the fall
     else
       if col <= 0 or col == BoardSim.GARBAGE then return false end
       if seen[e[3]] == nil then for _, v in pairs(seen) do if v == col then return false end end seen[e[3]] = col

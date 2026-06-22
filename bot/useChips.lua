@@ -391,17 +391,36 @@ local function legalSwaps(grid, rows, touchable, hiRow)           -- touchable=n
   end
   return out
 end
+-- USE THE CHIPS in the lookahead: does a candidate board set up a recognized, VERIFIED combo (a swap from a big clear)?
+-- Scored by the combo's size, so the search builds toward the catalog's known-good plays -- not just generic cascades.
+local CHIP_KINDS = { "COMBO_4", "COMBO_5", "COMBO_3_3", "COMBO_4_4" }
+local CHIP_VALUE = { COMBO_4 = 4, COMBO_5 = 5, COMBO_3_3 = 6, COMBO_4_4 = 8 }
+local W_CHIP = 40
+local function chipSetupBonus(grid, rows, sr, sc)
+  local cells = {}                                               -- windowed near the swap (a created chip forms there)
+  for r = (sr - 2 > 1 and sr - 2 or 1), (sr + 2 < rows and sr + 2 or rows) do
+    for c = (sc - 2 > 1 and sc - 2 or 1), (sc + 2 < WIDTH and sc + 2 or WIDTH) do cells[#cells + 1] = { r, c } end
+  end
+  local best = 0
+  for _, kind in ipairs(CHIP_KINDS) do
+    if chips.recognize(grid, rows, cells, kind, nil, nil) then
+      local v = CHIP_VALUE[kind]; if v > best then best = v end
+    end
+  end
+  return best
+end
 local W_IMMEDIATE_TOTAL, W_IMMEDIATE_CHAIN, W_IMMEDIATE_FIRST = 30, 400, 20
-local function scoreSwap(grid, rows, r, c)                        -- eval(result) + a fat bonus for firing a clear NOW
+local function scoreSwap(grid, rows, r, c)                        -- eval + chip-setup bonus + a fat bonus for a clear NOW
   local g, chain, total, firstClear = BoardSim.simSwap(grid, rows, r, c)
-  local s = eval(g, rows)
+  local s = eval(g, rows) + W_CHIP * chipSetupBonus(g, rows, r, c)
   if total > 0 then s = s + W_IMMEDIATE_TOTAL * total + W_IMMEDIATE_CHAIN * chain + W_IMMEDIATE_FIRST * (firstClear or 0) end
   return s, g, total, chain
 end
 -- BEAM SEARCH: keep the best BEAM_W states, expand to depth BEAM_D, commit the FIRST swap of the best leaf. BEAM_D=1 is
 -- pure depth-1 greedy (the validated default). Re-planned every frame; only ever ONE swap committed. Budget-capped.
-local BEAM_W, NODE_BUDGET = 8, 600
-local BEAM_D = tonumber(os.getenv("PA_BEAM_D")) or 1   -- 1 = depth-1 greedy (default); env-tunable for beam-depth probes
+local BEAM_W = 8
+local BEAM_D = tonumber(os.getenv("PA_BEAM_D")) or 3        -- look N moves ahead; scalable knob (env PA_BEAM_D)
+local NODE_BUDGET = 400 * BEAM_D                            -- sim budget scales with depth so deeper levels aren't starved
 function M.planMove(grid, rows, touchable, cursor)
   if not touchable then return nil end
   local cr = (cursor and cursor[1]) or 1
@@ -437,7 +456,7 @@ function M.planMove(grid, rows, touchable, cursor)
         budget = budget - 1
         local g2, chain, total = BoardSim.simSwap(node.g, rows, sw[1], sw[2])
         local reward = node.reward + ((total > 0) and (W_IMMEDIATE_TOTAL * total + W_IMMEDIATE_CHAIN * chain) or 0)
-        local leaf = { g = g2, score = eval(g2, rows) + reward, reward = reward, first = node.first, dist = node.dist }
+        local leaf = { g = g2, score = eval(g2, rows) + W_CHIP * chipSetupBonus(g2, rows, sw[1], sw[2]) + reward, reward = reward, first = node.first, dist = node.dist }
         nxt[#nxt + 1] = leaf
         if leaf.score > best.score or (leaf.score == best.score and leaf.dist < best.dist) then best = leaf end
       end

@@ -130,9 +130,8 @@ local function clusterScore(grid, rows)
       for c = 1, WIDTH do
         local v = row[c]
         if v and v ~= 0 and v ~= BoardSim.GARBAGE then
-          if c < WIDTH and row[c + 1] == v then s = s + 3 end                    -- horizontal pair (toward a row clear) -- weighted UP
-          if c > 1 and c < WIDTH and row[c - 1] == v and row[c + 1] == v then s = s + 6 end  -- 3-in-a-row potential: big bonus
-          if r < rows and grid[r + 1] and grid[r + 1][c] == v then s = s + 1 end  -- vertical pair (weaker -- blobs don't clear)
+          if c < WIDTH and row[c + 1] == v then s = s + 1 end                    -- horizontal 2 (build pairs, both orientations equally)
+          if r < rows and grid[r + 1] and grid[r + 1][c] == v then s = s + 1 end  -- vertical 2
         end
       end
     end
@@ -149,6 +148,26 @@ local function dropCol(grid, rows, c)  -- gravity: compact a column's panels dow
       write = write + 1
     end
   end
+end
+local function runLen(grid, rows, r, c, dr, dc)
+  local v = grid[r] and grid[r][c]; if not v or v == 0 or v == BoardSim.GARBAGE then return 0 end
+  local n, rr, cc = 1, r + dr, c + dc
+  while rr >= 1 and rr <= rows and cc >= 1 and cc <= WIDTH and grid[rr] and grid[rr][cc] == v do n = n + 1; rr = rr + dr; cc = cc + dc end
+  rr, cc = r - dr, c - dc
+  while rr >= 1 and rr <= rows and cc >= 1 and cc <= WIDTH and grid[rr] and grid[rr][cc] == v do n = n + 1; rr = rr - dr; cc = cc - dc end
+  return n
+end
+-- would a 3+ run now exist through the moved columns? NEVER organize into a break -- clearing is the chips' job.
+local function makesClear(grid, rows, c)
+  for rr = 1, rows do
+    for cc = c, c + 1 do
+      local v = grid[rr] and grid[rr][cc]
+      if v and v ~= 0 and v ~= BoardSim.GARBAGE and (runLen(grid, rows, rr, cc, 0, 1) >= 3 or runLen(grid, rows, rr, cc, 1, 0) >= 3) then
+        return true
+      end
+    end
+  end
+  return false
 end
 -- the swap that best improves flatness+clumping, or nil. Two move types: panel<->empty (slide+fall = flatten) and
 -- panel<->panel of different colors (shuffle = clump).
@@ -169,9 +188,9 @@ function M.organizeMove(grid, rows, cursor, touchable)
         for rr = 1, rows do s1[rr] = grid[rr][c]; s2[rr] = grid[rr][c + 1] end
         grid[r][c], grid[r][c + 1] = b, a
         if flatten then dropCol(grid, rows, c); dropCol(grid, rows, c + 1) end                   -- only the slide drops
-        local sc = score(grid, rows)
+        local sc = (not makesClear(grid, rows, c)) and score(grid, rows) or nil                  -- disqualify any move that clears
         for rr = 1, rows do grid[rr][c] = s1[rr]; grid[rr][c + 1] = s2[rr] end                    -- restore
-        if sc > base and (not bestScore or sc > bestScore) then best, bestScore = { r, c }, sc end
+        if sc and sc > base and (not bestScore or sc > bestScore) then best, bestScore = { r, c }, sc end
       end
     end
   end

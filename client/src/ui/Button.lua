@@ -19,6 +19,10 @@ local Button = class(
   function(self, options)
     self.backgroundColor = options.backgroundColor or {1.0, 0.08, 0.58, 0.8}
     self.outlineColor = options.outlineColor or {1.0, 0.08, 0.58, 1.0}
+    -- optional per-button overrides for the selected look (used by ButtonGroup to
+    -- make the chosen toggle obviously pink + yellow border). nil = use theme.
+    self.selectedBackgroundColor = options.selectedBackgroundColor
+    self.selectedBorderColor = options.selectedBorderColor
     self.currentlyPressed = false
     self.selected = false
 
@@ -65,7 +69,7 @@ end
 
 function Button:drawBackground()
   local bgColor = (self.selected or self.currentlyPressed)
-    and GAME.theme.colors.menuSelectedBackgroundColor
+    and (self.selectedBackgroundColor or GAME.theme.colors.menuSelectedBackgroundColor)
     or  GAME.theme.colors.menuDefaultBackgroundColor
   GraphicsUtil.drawRectangle("fill", self.x, self.y, self.width, self.height,
     bgColor[1], bgColor[2], bgColor[3], bgColor[4],
@@ -75,7 +79,7 @@ end
 
 function Button:drawOutline()
   local borderColor = self.selected
-    and GAME.theme.colors.menuSelectedBorderColor
+    and (self.selectedBorderColor or GAME.theme.colors.menuSelectedBorderColor)
     or  GAME.theme.colors.menuDefaultBorderColor
   for w = 0, self.BORDER_WIDTH - 1 do
     GraphicsUtil.drawRectangle("line", self.x + w, self.y + w, self.width - 2*w, self.height - 2*w,

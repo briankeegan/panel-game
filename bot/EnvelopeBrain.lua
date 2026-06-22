@@ -185,11 +185,15 @@ function EnvelopeBrain:decide(state, stack, match)
     elseif st == "RAISE" and not busy then
       move = { type = "RAISE" }              -- low on material -> FILL even during stop-time (low board = invincibility is worthless)
     elseif st == "OFFENSE" or st == "DANGER" then
-      -- have material but no clear -> ORGANIZE/FLATTEN even while the board settles: the touchable mask already skips
-      -- every breaking/falling cell, so we just work the SETTLED ones instead of idling through the pop.
+      -- have material but no clear -> ORGANIZE/FLATTEN, even while the board settles (touchable skips breaking cells).
       local org = useChips.organizeMove(grid, rows, cursor, touchable)
-      if org then move = { type = "SWAP", pos = org, swaps = { org }, kind = "FLATTEN" }; self._substate = "FLATTEN"
-      else move = { type = "WAIT" } end
+      if org then
+        move = { type = "SWAP", pos = org, swaps = { org }, kind = "FLATTEN" }; self._substate = "FLATTEN"
+      elseif not busy and st ~= "DANGER" then
+        move = { type = "RAISE" }              -- organizer dry + room to spare -> FILL more material; never just idle
+      else
+        move = { type = "WAIT" }               -- only here: busy settling, or topped out with nothing to organize
+      end
     else
       move = { type = "WAIT" }
     end

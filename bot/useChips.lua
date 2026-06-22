@@ -219,38 +219,75 @@ local function targetFit(grid, rows, tmpl, R, C)
   for c, k in pairs(counts) do if k > best then best, col = k, c end end
   return best, n, col
 end
-function M.constructMove(grid, rows, touchable)
+function M.constructMove(grid, rows, touchable, goal)
   if not touchable then return nil end
-  local bp, bN, bT, bR, bC = -1, 1                                  -- best partial target so far
-  for _, kind in ipairs(TARGET_KINDS) do
-    local ts = chips.templatesOf(kind)
-    if ts then
-      for _, chip in ipairs(ts) do
-        for r = 1, rows do
-          for c = 1, WIDTH do
-            local p, n, col = targetFit(grid, rows, chip.tmpl, r, c)
-            if p and n and col and p > 0 and p < n and p / n > bp / bN then bp, bN, bT, bR, bC = p, n, chip.tmpl, r, c end
+  local bp, bN, bT, bR, bC, bCol = -1, 1                            -- best partial target + its dominant color
+  if goal then                                                     -- COMMIT: stick to the current goal while it's still a valid partial -- don't abandon a half-built combo each frame
+    local p, n, col = targetFit(grid, rows, goal.tmpl, goal.R, goal.C)
+    if p and n and col == goal.col and p > 0 and p < n then bT, bR, bC, bCol = goal.tmpl, goal.R, goal.C, goal.col end
+  end
+  if not bT then
+    for _, kind in ipairs(TARGET_KINDS) do
+      local ts = chips.templatesOf(kind)
+      if ts then
+        for _, chip in ipairs(ts) do
+          for r = 1, rows do
+            for c = 1, WIDTH do
+              local p, n, col = targetFit(grid, rows, chip.tmpl, r, c)
+              if p and n and col and p > 0 and p < n and p / n > bp / bN then bp, bN, bT, bR, bC, bCol = p, n, chip.tmpl, r, c, col end
+            end
           end
         end
       end
     end
   end
   if not bT then return nil end
-  local best, bestP                                                 -- swap that advances THIS target's fit most, w/o clearing
+  M._cTarget = (M._cTarget or 0) + 1                                 -- diag: a partial target existed
+  local wrong = {}                                                  -- class cells of the target still missing bCol
+  for _, e in ipairs(bT) do
+    if type(e[3]) == "number" then
+      local rr, cc = bR + e[1], bC + e[2]
+      if ((grid[rr] and grid[rr][cc]) or 0) ~= bCol then wrong[#wrong + 1] = { rr, cc } end
+    end
+  end
+  if #wrong == 0 then return nil end
+  -- TRANSPORT: walk bCol toward the target. cost = sum over wrong cells of distance to the nearest bCol panel; the swap
+  -- that lowers it most moves a needed color one step closer (a direct fill drops a term to 0). Never clear.
+  local function distCost()
+    local s = 0
+    for _, w in ipairs(wrong) do
+      local nd = 99
+      for r = 1, rows do
+        local row = grid[r]
+        if row then for c = 1, WIDTH do
+          if row[c] == bCol then
+            local dr = r > w[1] and r - w[1] or w[1] - r
+            local dc = c > w[2] and c - w[2] or w[2] - c
+            if dr + dc < nd then nd = dr + dc end
+          end
+        end end
+      end
+      s = s + nd
+    end
+    return s
+  end
+  local base = distCost()
+  local best, bestCost
   for r = 1, rows do
     for c = 1, WIDTH - 1 do
       local a, b = grid[r][c], grid[r][c + 1]
       if a ~= 0 and b ~= 0 and a ~= b and a ~= BoardSim.GARBAGE and b ~= BoardSim.GARBAGE
           and touchable[r] and touchable[r][c] and touchable[r][c + 1] then
         grid[r][c], grid[r][c + 1] = b, a
-        local p = targetFit(grid, rows, bT, bR, bC)
+        local cost = distCost()
         local clears = makesClear(grid, rows, c)
         grid[r][c], grid[r][c + 1] = a, b
-        if p and p > bp and not clears and (not bestP or p > bestP) then best, bestP = { r, c }, p end
+        if cost < base and not clears and (not bestCost or cost < bestCost) then best, bestCost = { r, c }, cost end
       end
     end
   end
-  return best
+  if best then M._cSwap = (M._cSwap or 0) + 1 end
+  return best, (best and { tmpl = bT, R = bR, C = bC, col = bCol })
 end
 
 return M

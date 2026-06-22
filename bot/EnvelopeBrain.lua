@@ -185,12 +185,13 @@ function EnvelopeBrain:decide(state, stack, match)
     elseif st == "RAISE" and not busy then
       move = { type = "RAISE" }              -- low on material -> FILL even during stop-time (low board = invincibility is worthless)
     elseif st == "OFFENSE" or st == "DANGER" then
-      -- have material but no clear -> ORGANIZE/FLATTEN, even while the board settles (touchable skips breaking cells).
-      -- (constructMove exists but is unwired: the big-combo shapes need empty gaps a dense board lacks, so it barely
-      -- fires. Real construction has to MAKE the gap first -- multi-step planning, deferred.) Pair-organize for now.
-      local org = useChips.organizeMove(grid, rows, cursor, touchable)
-      if org then
-        move = { type = "SWAP", pos = org, swaps = { org }, kind = "FLATTEN" }; self._substate = "FLATTEN"
+      -- BUILD toward a big-combo shape; else FLATTEN/pair; else idle.
+      local con, goal = useChips.constructMove(grid, rows, touchable, self._buildGoal)
+      self._buildGoal = goal                          -- COMMIT to one combo across frames until it's built
+      local mv = con or useChips.organizeMove(grid, rows, cursor, touchable)
+      if mv then
+        move = { type = "SWAP", pos = mv, swaps = { mv }, kind = con and "BUILD" or "FLATTEN" }
+        self._substate = con and "BUILD" or "FLATTEN"
       else
         move = { type = "WAIT" }
       end

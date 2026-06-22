@@ -27,7 +27,7 @@ local function lobbyLabel(text, translate)
   return ui.Label({
     text = text,
     translate = translate,
-    fontSize = system.isPortraitMode() and math.floor(GraphicsUtil.fontSize * 1.9) or nil
+    fontSize = system.isPortraitMode() and math.floor(GraphicsUtil.fontSize * 2.25) or nil
   })
 end
 
@@ -112,25 +112,30 @@ function Lobby:initLobbyMenu()
   -- "Invite to Purple Team") and 1-2 player room titles fit on one line.
   -- Single-line guarantee matters here: room-card color stripes are indexed by
   -- logical line, so any wrap visually drifts the team tint off its row.
-  -- portrait: wide buttons so the big (menu-sized) labels don't clip
+  -- room rows keep a fixed width (the team tint + wrapped text need it)
   self.lobbyMenuWidth = system.isPortraitMode() and 600 or 220
+  -- portrait: simple buttons (players, game options) are content-width like the
+  -- main menu — each hugs its label instead of a uniform full-width bar.
+  -- (can't use `and nil or` — it can't yield nil; set explicitly)
+  self.simpleButtonWidth = self.lobbyMenuWidth
+  if system.isPortraitMode() then self.simpleButtonWidth = nil end
   self.onePlayerEndlessButton = ui.TextButton({
     label = lobbyLabel("mm_1_endless"),
-    width = self.lobbyMenuWidth,
+    width = self.simpleButtonWidth,
     onClick = function()
       GAME.netClient:requestRoom(GameModes.getPreset(GameModes.IDs.ONE_PLAYER_ENDLESS))
     end
   })
   self.onePlayerTimeAttackButton = ui.TextButton({
     label = lobbyLabel("mm_1_time"),
-    width = self.lobbyMenuWidth,
+    width = self.simpleButtonWidth,
     onClick = function()
       GAME.netClient:requestRoom(GameModes.getPreset(GameModes.IDs.ONE_PLAYER_TIME_ATTACK))
     end
   })
   self.onePlayerVsButton = ui.TextButton({
     label = lobbyLabel("mm_1_vs"),
-    width = self.lobbyMenuWidth,
+    width = self.simpleButtonWidth,
     onClick = function()
       if GAME.localPlayer.settings.style ~= GameModes.Styles.MODERN then
         GAME.localPlayer:setStyle(GameModes.Styles.MODERN)
@@ -729,7 +734,7 @@ function Lobby:initLobbyMenu()
   self.teamCreateButtonLabel = lobbyLabel("Create Team Game", false)
   self.teamCreateButton = ui.TextButton({
     label = self.teamCreateButtonLabel,
-    width = self.lobbyMenuWidth,
+    width = self.simpleButtonWidth,
     onClick = function(button)
       if self:isLocalPlayerInRoom() then
         GAME.netClient:leaveRoom()
@@ -742,7 +747,7 @@ function Lobby:initLobbyMenu()
 
   self.ffaCreateButton = ui.TextButton({
     label = lobbyLabel("Create FFA", false),
-    width = self.lobbyMenuWidth,
+    width = self.simpleButtonWidth,
     onClick = function(button)
       if self:isLocalPlayerInRoom() then
         GAME.netClient:leaveRoom()
@@ -755,7 +760,7 @@ function Lobby:initLobbyMenu()
   self.leaderboardToggleLabel = lobbyLabel("lb_show_board")
   self.showLeaderboardButton = ui.TextButton({
     label = self.leaderboardToggleLabel,
-    width = self.lobbyMenuWidth,
+    width = self.simpleButtonWidth,
     onClick = function()
       if self.leaderboard.hasFocus then
         self.leaderboard:yieldFocus()
@@ -766,7 +771,7 @@ function Lobby:initLobbyMenu()
   })
   self.backButton = ui.TextButton({
     label = lobbyLabel("lb_back"),
-    width = self.lobbyMenuWidth,
+    width = self.simpleButtonWidth,
     onClick = exitMenu
   })
 
@@ -801,7 +806,7 @@ function Lobby:initLobbyMenu()
   -- portrait: taller, wider menu window so the bigger buttons fit (and scroll)
   -- instead of getting clipped off the bottom.
   local lmH = system.isPortraitMode() and 1040 or 540
-  local lmW = system.isPortraitMode() and 500 or 300
+  local lmW = system.isPortraitMode() and 700 or 300
   self.lobbyMenu = ui.ScrollMenu({height = lmH, width = lmW, hAlign = "center", vAlign = "center"})
   self.lobbyMenu.x = self.lobbyMenuXoffsetMap[false]
 
@@ -1252,7 +1257,7 @@ function Lobby:createPlayerButtons(personalizedLobbyData)
 
       local button = ui.TextButton({
         label = lobbyLabel(playerName, false),
-        width = self.lobbyMenuWidth,
+        width = self.simpleButtonWidth,
         onClick =
           function(button)
             self:openPlayerSubMenu(publicId, button)

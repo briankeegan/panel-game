@@ -47,6 +47,12 @@ local function setLabels(self, labels, values, selectedIndex)
       label:setVisibility(false)
   end
 
+  -- portrait: stretch to a usable width (match the sliders) so short values like
+  -- "Custom" don't make a cramped narrow stepper, and the row title has room
+  if system.isPortraitMode() then
+    self.width = math.max(self.width, 460)
+  end
+
   self.labels[self.selectedIndex]:setVisibility(true)
   self.value = self.values[self.selectedIndex]
   self.rightButton.x = self.width - navW

@@ -21,9 +21,12 @@ function M.comboShapes(n)
   return src.enumerate(n).raw
 end
 
--- single-color cascades as (combo N, trigger M). NOT derived from SINGLE: getCascadeShapes brute-forces the N-primary,
--- so 6/7 are intractable here (they'd need a constructive builder, the way getComboCross unblocked the 6/7 combos).
--- Two-color split cascades have no such limit — they go through PAIRS via the inject method in getSplitCascadeShapes.
-M.CASCADE_SINGLE = { { 4, 3 }, { 5, 3 }, { 5, 4 } }
+-- single-color cascades as (combo N, trigger M). N up to 7 now that comboEnds enumerates constructively (was brute
+-- C(N*N,N), hung at 6/7). Trigger M capped at 5: the riser's unsolves still come from brute getComboShapes(M), so a
+-- 6+ riser would hang. Two-color split cascades go through PAIRS via the inject method (no such limit).
+M.CASCADE_SINGLE = {
+  { 4, 3 }, { 5, 3 }, { 5, 4 },
+  { 6, 3 }, { 6, 4 }, { 6, 5 }, { 7, 3 }, { 7, 4 }, { 7, 5 },
+}
 
 return M

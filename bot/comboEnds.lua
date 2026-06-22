@@ -33,23 +33,33 @@ end
 
 function M.enumerate(N)
   local S = N                       -- box S x S (an I-N needs N in one dimension)
-  local cells = {}; for r = 1, S do for c = 1, S do cells[#cells+1] = { r, c } end end
-  local found, list, idx = {}, {}, {}
-  local function recurse(start, depth)
-    if depth > N then
-      local set, picks = {}, {}
-      for i = 1, N do local p = cells[idx[i]]; set[p[1].."_"..p[2]] = true; picks[#picks+1] = p end
-      for _, p in ipairs(picks) do if not inRun(set, p[1], p[2]) then return end end
-      if not connected(picks, set) then return end
+  -- Grow only CONNECTED cell-sets (every clearing shape is connected), with state-dedup so each set is visited once.
+  -- This replaces the old C(N*N, N) brute force (1.9M at N=6, 85M at N=7) with a few thousand real candidates.
+  local function setKey(set) local ks = {}; for k in pairs(set) do ks[#ks+1] = k end; table.sort(ks); return table.concat(ks, ";") end
+  local found, list, seen = {}, {}, {}
+  local function visit(set, picks)
+    local sk = setKey(set)
+    if seen[sk] then return end; seen[sk] = true
+    if #picks == N then
+      for _, p in ipairs(picks) do if not inRun(set, p[1], p[2]) then return end end   -- every cell in an H/V run >=3
       local g = {}; for r = 1, S do g[r] = {}; for c = 1, S do g[r][c] = 0 end end
       for _, p in ipairs(picks) do g[p[1]][p[2]] = 1 end
       local key = shapeCache.canonShape(g)
       if key and not found[key] then found[key] = true; list[#list+1] = { g = g, key = key, S = S } end
       return
     end
-    for i = start, #cells do idx[depth] = i; recurse(i+1, depth+1) end
+    local adj = {}
+    for _, p in ipairs(picks) do for _, d in ipairs({ {0,1},{0,-1},{1,0},{-1,0} }) do
+      local rr, cc = p[1]+d[1], p[2]+d[2]
+      if rr >= 1 and rr <= S and cc >= 1 and cc <= S then local k = rr.."_"..cc; if not set[k] then adj[k] = { rr, cc } end end
+    end end
+    for k, cell in pairs(adj) do
+      set[k] = true; picks[#picks+1] = cell
+      visit(set, picks)
+      picks[#picks] = nil; set[k] = nil
+    end
   end
-  recurse(1, 1)
+  for r = 1, S do for c = 1, S do visit({ [r.."_"..c] = true }, { { r, c } }) end end
   table.sort(list, function(a, b) return a.key < b.key end)
   return list
 end

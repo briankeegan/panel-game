@@ -188,12 +188,17 @@ function EnvelopeBrain:decide(state, stack, match)
       -- SEARCH-BASED PLAN: no template build/flatten. The planner runs a beam over BoardSim and commits the single best
       -- swap (first swap of the best leaf), guided by potential-chain lookahead -- assembling combos/chains with no
       -- hand-coded shapes. Chips already fired FIRST (CLEAR step above); here we only ever play ONE swap and re-plan.
-      local mv = useChips.planMove(grid, rows, touchable)
+      -- planMove returns nil when no swap improves the board (no junk @1,1). Then the stuck-ladder: room -> RAISE for
+      -- fresh material (new colors = new setups); too high -> organize DOWN; never a pointless corner swap.
+      local mv = useChips.planMove(grid, rows, touchable, cursor)
       if mv then
-        move = { type = "SWAP", pos = mv, swaps = { mv }, kind = "PLAN" }
-        self._substate = "PLAN"
+        move = { type = "SWAP", pos = mv, swaps = { mv }, kind = "PLAN" }; self._substate = "PLAN"
+      elseif st ~= "DANGER" and not busy then
+        move = { type = "RAISE" }; self._substate = "RAISE"          -- nothing to build + room -> pull in fresh blocks
       else
-        move = { type = "WAIT" }
+        local org = useChips.organizeMove(grid, rows, cursor, touchable)  -- too high -> flatten/even the stack down
+        if org then move = { type = "SWAP", pos = org, swaps = { org }, kind = "FLATTEN" }; self._substate = "FLATTEN"
+        else move = { type = "WAIT" } end
       end
     else
       move = { type = "WAIT" }

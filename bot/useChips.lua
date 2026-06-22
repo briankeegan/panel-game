@@ -402,8 +402,10 @@ end
 -- pure depth-1 greedy (the validated default). Re-planned every frame; only ever ONE swap committed. Budget-capped.
 local BEAM_W, NODE_BUDGET = 8, 600
 local BEAM_D = tonumber(os.getenv("PA_BEAM_D")) or 1   -- 1 = depth-1 greedy (default); env-tunable for beam-depth probes
-function M.planMove(grid, rows, touchable)
+function M.planMove(grid, rows, touchable, cursor)
   if not touchable then return nil end
+  local cr = (cursor and cursor[1]) or 1
+  local cc = (cursor and cursor[2]) or 3
   local _, peak = colHeights(grid, rows)
   local hiRow = math.min(rows, peak + 1)                          -- only swap within/just above the occupied band
   local budget = NODE_BUDGET
@@ -413,11 +415,13 @@ function M.planMove(grid, rows, touchable)
     budget = budget - 1
     local s, g, total, chain = scoreSwap(grid, rows, sw[1], sw[2])
     local reward = (total > 0) and (W_IMMEDIATE_TOTAL * total + W_IMMEDIATE_CHAIN * chain) or 0
-    beam[#beam + 1] = { g = g, score = s, reward = reward, first = sw }
+    local dist = (sw[1] > cr and sw[1] - cr or cr - sw[1]) + (sw[2] > cc and sw[2] - cc or cc - sw[2])  -- from the cursor
+    beam[#beam + 1] = { g = g, score = s, reward = reward, first = sw, dist = dist }
   end
   if #beam == 0 then return nil end
   local function trim(states)
-    table.sort(states, function(a, b) return a.score > b.score end)
+    -- ties break toward the swap NEAREST the cursor (radiate out from where it already is), never the bottom-left corner
+    table.sort(states, function(a, b) if a.score ~= b.score then return a.score > b.score end return a.dist < b.dist end)
     while #states > BEAM_W do states[#states] = nil end
   end
   trim(beam)
@@ -433,14 +437,18 @@ function M.planMove(grid, rows, touchable)
         budget = budget - 1
         local g2, chain, total = BoardSim.simSwap(node.g, rows, sw[1], sw[2])
         local reward = node.reward + ((total > 0) and (W_IMMEDIATE_TOTAL * total + W_IMMEDIATE_CHAIN * chain) or 0)
-        local leaf = { g = g2, score = eval(g2, rows) + reward, reward = reward, first = node.first }
+        local leaf = { g = g2, score = eval(g2, rows) + reward, reward = reward, first = node.first, dist = node.dist }
         nxt[#nxt + 1] = leaf
-        if leaf.score > best.score then best = leaf end
+        if leaf.score > best.score or (leaf.score == best.score and leaf.dist < best.dist) then best = leaf end
       end
     end
     if #nxt == 0 then break end
     trim(nxt); beam = nxt
   end
+  -- NOTHING-USEFUL GUARD: if the best swap doesn't actually improve on the current board, it's junk (the @1,1 default --
+  -- first legal swap winning a tie when nothing helps). Return nil so the brain raises for fresh material / organizes
+  -- down instead of doing a pointless corner swap.
+  if best.score <= eval(grid, rows) then return nil end
   return best.first
 end
 

@@ -244,16 +244,21 @@ if arg and arg[0] and arg[0]:match("getShogunShapes%.lua$") then
   local res = M.enumerate(SIZES)
   print(string.format("SHOGUN shapes: %d verified  (1=run color drop · 2/3=break gadget · G=garbage · .=gap it lands in · *=don't-care/support · [..]=break swap)\n", #res.out))
   for i, s in ipairs(res.out) do
-    local mir = s.mirrorGap and ("  (mirror: gap@col" .. s.mirrorGap .. ")") or ""
-    print(string.format("#%d  horizontal run-%d  gap@col%d   break swap (%d,%d)   (chain %d)%s", i, s.L, s.gap, s.breakSwap[1], s.breakSwap[2], s.chain, mir))
-    print(render(s)); print("")
+    local label
+    if s.orient == "V" then
+      label = string.format("#%d  vertical 2-stack (color-release)   break swap (%d,%d)   (chain %d)", i, s.breakSwap[1], s.breakSwap[2], s.chain)
+    else
+      local mir = s.mirrorGap and ("  (mirror: gap@col" .. s.mirrorGap .. ")") or ""
+      label = string.format("#%d  horizontal run-%d  gap@col%d   break swap (%d,%d)   (chain %d)%s", i, s.L, s.gap, s.breakSwap[1], s.breakSwap[2], s.chain, mir)
+    end
+    print(label); print(render(s)); print("")
   end
   -- summary
-  local byL = {}
-  for _, s in ipairs(res.out) do byL[s.L] = (byL[s.L] or 0) + 1 end
+  local byL, nV = {}, 0
+  for _, s in ipairs(res.out) do if s.orient == "V" then nV = nV + 1 else byL[s.L] = (byL[s.L] or 0) + 1 end end
   print("---- summary ----")
   for _, L in ipairs(SIZES) do print(string.format("  horizontal-%d : %d verified", L, byL[L] or 0)) end
-  print(string.format("  vertical     : %d verified  (geometrically infeasible — see notes)", 0))
+  print(string.format("  vertical     : %d verified  (color-release: freed panel tops the stack)", nV))
   print("")
   if #res.skipped > 0 then
     print("---- skipped ----")

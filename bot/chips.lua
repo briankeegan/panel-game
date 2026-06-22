@@ -56,6 +56,7 @@ function chips.recognize(grid, rows, cells, kind, verify, touchable)
           end
         end
         if ok and (not verify or verify(seq, kind)) then
+          chips._lastMatch = { R = R, C = C, tmpl = chip.tmpl, swaps = seq, kind = kind }  -- debug/viz: where it landed
           return { swaps = seq, kind = kind }
         end
       end

@@ -197,4 +197,60 @@ function M.organizeMove(grid, rows, cursor, touchable)
   return best
 end
 
+-- CONSTRUCTOR: aim at the BIG-combo SHAPES the catalog already knows. Find the single-class big shape that's closest to
+-- assembled on the board, then make the swap that brings its missing color one step closer -- never completing it (the
+-- chip fires that). This is deliberate assembly of a specific large combo, not generic pairs.
+local TARGET_KINDS = { "COMBO_4", "COMBO_5", "COMBO_6", "COMBO_7" }
+-- partial fit of a single-class template at (R,C): (progress, totalCells, dominantColor). -1 if the shape can't sit here.
+local function targetFit(grid, rows, tmpl, R, C)
+  local counts, n = {}, 0
+  for _, e in ipairs(tmpl) do
+    local rr, cc = R + e[1], C + e[2]; local cls = e[3]
+    if rr < 1 or rr > rows or cc < 1 or cc > WIDTH then return -1 end
+    local v = (grid[rr] and grid[rr][cc]) or 0
+    if cls == "e" or cls == "." then
+      if v ~= 0 then return -1 end                                  -- a required-empty gap is filled -> shape can't form here
+    elseif type(cls) == "number" then
+      n = n + 1; if v ~= 0 and v ~= BoardSim.GARBAGE then counts[v] = (counts[v] or 0) + 1 end
+    end
+  end
+  if n == 0 then return -1 end
+  local best, col = 0, nil
+  for c, k in pairs(counts) do if k > best then best, col = k, c end end
+  return best, n, col
+end
+function M.constructMove(grid, rows, touchable)
+  if not touchable then return nil end
+  local bp, bN, bT, bR, bC = -1, 1                                  -- best partial target so far
+  for _, kind in ipairs(TARGET_KINDS) do
+    local ts = chips.templatesOf(kind)
+    if ts then
+      for _, chip in ipairs(ts) do
+        for r = 1, rows do
+          for c = 1, WIDTH do
+            local p, n, col = targetFit(grid, rows, chip.tmpl, r, c)
+            if p and n and col and p > 0 and p < n and p / n > bp / bN then bp, bN, bT, bR, bC = p, n, chip.tmpl, r, c end
+          end
+        end
+      end
+    end
+  end
+  if not bT then return nil end
+  local best, bestP                                                 -- swap that advances THIS target's fit most, w/o clearing
+  for r = 1, rows do
+    for c = 1, WIDTH - 1 do
+      local a, b = grid[r][c], grid[r][c + 1]
+      if a ~= 0 and b ~= 0 and a ~= b and a ~= BoardSim.GARBAGE and b ~= BoardSim.GARBAGE
+          and touchable[r] and touchable[r][c] and touchable[r][c + 1] then
+        grid[r][c], grid[r][c + 1] = b, a
+        local p = targetFit(grid, rows, bT, bR, bC)
+        local clears = makesClear(grid, rows, c)
+        grid[r][c], grid[r][c + 1] = a, b
+        if p and p > bp and not clears and (not bestP or p > bestP) then best, bestP = { r, c }, p end
+      end
+    end
+  end
+  return best
+end
+
 return M

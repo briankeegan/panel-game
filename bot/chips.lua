@@ -116,6 +116,7 @@ function chips.loadCache()
   end
   return n
 end
+function chips.templatesOf(kind) return STORE_BY_KIND[kind] end
 chips.loadCache()
 
 return chips

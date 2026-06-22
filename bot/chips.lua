@@ -7,6 +7,7 @@ local BoardSim = require("bot.BoardSim")
 
 local chips = {}
 local STORE = {}            -- list of { tmpl = {{dr,dc,class}..}, kind, swaps = {{dr,dc}..} } (swaps anchor-relative)
+local STORE_BY_KIND = {}    -- kind -> {chips of that kind} -- recognize iterates ONLY this, not the whole store (~90x)
 
 -- ---- recognition: slide a minimal template; only its cells must satisfy the same/diff color-classes ----
 -- class: an integer N = "same color across cells sharing N, different from other N"; "e" = empty(0); "g" = GARBAGE.
@@ -46,9 +47,10 @@ end
 
 -- requireBreak: only accept a match that actually breaks garbage (cheap nearGarbage pre-filter, then garbageMatched).
 function chips.recognize(grid, rows, cells, kind, verify, touchable, requireBreak)
+  local list = STORE_BY_KIND[kind]; if not list then return nil end   -- O(1) kind lookup; iterate only its templates
   for _, cell in ipairs(cells) do local R, C = cell[1], cell[2]
-    for _, chip in ipairs(STORE) do
-      if chip.kind == kind and fits(grid, rows, chip.tmpl, R, C) then
+    for _, chip in ipairs(list) do
+      if fits(grid, rows, chip.tmpl, R, C) then
         local ok = true
         -- NO-GO zones: every MATCH cell the chip reads must be a settled, touchable panel. Cells the chip doesn't
         -- reference (the `*` don't-care space) aren't in the template, so they're exempt automatically.
@@ -106,6 +108,7 @@ function chips.loadCache()
   local function add(c)
     local k = chipKey(c); if seen[k] then return end; seen[k] = true
     STORE[#STORE + 1] = c; n = n + 1
+    local bk = STORE_BY_KIND[c.kind]; if not bk then bk = {}; STORE_BY_KIND[c.kind] = bk end; bk[#bk + 1] = c
   end
   for _, c in ipairs(data) do
     local chip = { tmpl = c.tmpl, kind = c.kind, swaps = c.swaps or { c.swap or { 0, 0 } } }

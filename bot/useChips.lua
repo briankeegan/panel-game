@@ -107,4 +107,74 @@ function M.setupSearch(grid, rows, cursor, opts)
   return { swaps = best.seq, kind = "SETUP+" .. best.kind, setup = true }
 end
 
+-- ORGANIZER: two goals at once -- keep the stack LOW + FLAT, and CLUMP same colors together. One score: flatness (low
+-- peak + even columns) plus color grouping (same-color neighbours). The organize move is the swap that improves that
+-- combined score most -- whether by sliding a panel into a shorter column (flatten) or shuffling colors together (clump).
+local CLUSTER_W = 2  -- how much a color-grouping gain is worth vs flattening (tunable)
+local function flatness(grid, rows)
+  local h = {}; for c = 1, WIDTH do h[c] = 0 end
+  for r = rows, 1, -1 do
+    local row = grid[r]
+    if row then for c = 1, WIDTH do if h[c] == 0 and row[c] and row[c] ~= 0 then h[c] = r end end end
+  end
+  local mx, sum = 0, 0
+  for c = 1, WIDTH do if h[c] > mx then mx = h[c] end; sum = sum + h[c] end
+  local mean, var = sum / WIDTH, 0
+  for c = 1, WIDTH do local d = h[c] - mean; var = var + d * d end
+  return -(mx * 4 + var)
+end
+local function clusterScore(grid, rows)
+  local s = 0
+  for r = 1, rows do
+    local row = grid[r]; if row then
+      for c = 1, WIDTH do
+        local v = row[c]
+        if v and v ~= 0 and v ~= BoardSim.GARBAGE then
+          if c < WIDTH and row[c + 1] == v then s = s + 1 end
+          if r < rows and grid[r + 1] and grid[r + 1][c] == v then s = s + 1 end
+        end
+      end
+    end
+  end
+  return s
+end
+local function score(grid, rows) return flatness(grid, rows) + CLUSTER_W * clusterScore(grid, rows) end
+local function dropCol(grid, rows, c)  -- gravity: compact a column's panels down to the floor
+  local write = 1
+  for r = 1, rows do
+    local v = grid[r] and grid[r][c]
+    if v and v ~= 0 then
+      if write ~= r then grid[write][c] = v; grid[r][c] = 0 end
+      write = write + 1
+    end
+  end
+end
+-- the swap that best improves flatness+clumping, or nil. Two move types: panel<->empty (slide+fall = flatten) and
+-- panel<->panel of different colors (shuffle = clump).
+function M.organizeMove(grid, rows, cursor, touchable)
+  if not touchable then return nil end
+  local base = score(grid, rows)
+  local best, bestScore
+  for r = 1, rows do
+    for c = 1, WIDTH - 1 do
+      local a, b = grid[r][c], grid[r][c + 1]
+      local pa = a ~= 0 and a ~= BoardSim.GARBAGE
+      local pb = b ~= 0 and b ~= BoardSim.GARBAGE
+      local tr = touchable[r]
+      local flatten = (pa and b == 0 and tr and tr[c]) or (pb and a == 0 and tr and tr[c + 1])  -- one panel, one empty
+      local clump = pa and pb and a ~= b and tr and tr[c] and tr[c + 1]                          -- two diff-color panels
+      if flatten or clump then
+        local s1, s2 = {}, {}
+        for rr = 1, rows do s1[rr] = grid[rr][c]; s2[rr] = grid[rr][c + 1] end
+        grid[r][c], grid[r][c + 1] = b, a
+        if flatten then dropCol(grid, rows, c); dropCol(grid, rows, c + 1) end                   -- only the slide drops
+        local sc = score(grid, rows)
+        for rr = 1, rows do grid[rr][c] = s1[rr]; grid[rr][c + 1] = s2[rr] end                    -- restore
+        if sc > base and (not bestScore or sc > bestScore) then best, bestScore = { r, c }, sc end
+      end
+    end
+  end
+  return best
+end
+
 return M

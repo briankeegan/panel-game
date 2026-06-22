@@ -112,6 +112,10 @@ local DANGER_PRIORITIES = extractByMeta(ANY, function(kind, meta)
   local notReady = (meta and (meta.swaps or 1) == 1 and (meta.chain or 0) == 0) and 0 or 1
   return notReady * 1000000 + rankKind(kind, meta)
 end)
+-- in OFFENSE we HOLD small clears and organize toward bigger ones; only FIRE a clear this big (or any chain).
+local META = (function() local cache = require("bot.chipCache"); local m = {}; for _, c in ipairs(cache) do m[c.kind] = m[c.kind] or c.meta end; return m end)()
+local OFFENSE_FIRE_MIN = 6
+local function chipIsBig(kind) local m = META[kind]; return m ~= nil and ((m.total or 0) >= OFFENSE_FIRE_MIN or (m.chain or 0) >= 1) end
 
 ------------------------------------------------ DECIDE (re-measured on any board activity; cached while fully static)
 function EnvelopeBrain:decide(state, stack, match)
@@ -164,14 +168,21 @@ function EnvelopeBrain:decide(state, stack, match)
     })
     -- NEW STEP: nothing directly playable -> DEPTH-1 SETUP SEARCH. Construct a play that's one productive swap away
     -- (imagine the swap, re-recognize, verify only the winner). Only on a settled board (the imagined grid is faithful).
-    if not chip and not busy then
+    if false and not chip and not busy then  -- DISABLED: brute-force setupSearch is too slow; goal-directed rewrite next
       chip = useChips.setupSearch(grid, rows, cursor, {
         chipPriorities = priorities, verify = verify, touchable = touchable,
       })
     end
-    if chip then
+    -- OFFENSE HOLDS small clears and BUILDS instead -- only fire when it's BIG (or a chain). DANGER/RAISE fire/fill as
+    -- before (DANGER will spend anything to survive). The organizer makes a non-clearing grouping swap to assemble a
+    -- bigger play -- continuous + cheap, no catalog.
+    local fire = chip ~= nil   -- fire whatever clears -- survive first; organize only fills genuinely dead frames
+    if fire then
       self._comboUse = self._comboUse or {}; self._comboUse[chip.kind] = (self._comboUse[chip.kind] or 0) + 1
       move = { type = "SWAP", pos = chip.swaps[1], swaps = chip.swaps, kind = chip.kind }
+    elseif st == "OFFENSE" and not busy then
+      local org = useChips.organizeMove(grid, rows, cursor, touchable)   -- build toward a bigger play; hold the small clear
+      move = org and { type = "SWAP", pos = org, swaps = { org }, kind = "ORGANIZE" } or { type = "WAIT" }
     elseif st == "RAISE" and not busy and (state.stopTime or 0) == 0 then
       move = { type = "RAISE" }              -- no chip + below the top -> fill material (DANGER clears before we top out)
     else

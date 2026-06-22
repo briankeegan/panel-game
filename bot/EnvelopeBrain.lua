@@ -25,12 +25,19 @@ function EnvelopeBrain:chipVerify(stack, match)
     local ok, fired, broke = pcall(function()
       local clock0 = stack.clock
       for _, s in ipairs(match.stacks) do s:saveForRollback() end
-      stack.stop_time = math.max(stack.stop_time or 0, 999)  -- FREEZE the auto-rise, or a rising row could fire the match instead of the swap
-      local hit, gbroke = false, false
-      local token = {}  -- weak-keyed subscriber held in scope; signals fire the INSTANT a clear is detected -- no pop-window guess
-      stack:connectSignal("matched", token, function() hit = true end)
-      stack:connectSignal("garbageMatched", token, function() hit = true; gbroke = true end)  -- garbage broke -> this chip is a BREAK
+      local hit, gbroke, routing = false, false, false
+      local token = {}  -- weak-keyed subscriber held in scope; clears DURING the cursor's travel are the rise, not the swap -> ignored
+      stack:connectSignal("matched", token, function() if not routing then hit = true end end)
+      stack:connectSignal("garbageMatched", token, function() if not routing then hit = true; gbroke = true end end)
+      local cr, cc = stack.cur_row or 1, stack.cur_col or 1
       for _, mv in ipairs(seq) do
+        -- ROUTE the way the CONTROLLER does, not teleport: advance the board with the rise LIVE for the cursor's travel
+        -- time. A chip that goes stale while the cursor crosses to a far swap must NOT verify -- the teleport-vs-route bug.
+        routing = true; stack.stop_time = 0
+        local travel = math.min((math.abs(mv[1] - cr) + math.abs(mv[2] - cc)) * 2 + 6, 30)
+        for _ = 1, travel do stack:receiveConfirmedInput("A"); match:run() end
+        routing = false; stack.stop_time = math.max(stack.stop_time or 0, 999)  -- freeze the swap itself so its clear is attributed to the swap, not a rising row
+        cr, cc = mv[1], mv[2]
         stack.cur_row, stack.cur_col = mv[1], mv[2]; stack:receiveConfirmedInput(KDE_swap); match:run()
         for k = 1, 20 do
           if hit then break end                          -- garbageMatched fires in the SAME checkMatches as matched, so gbroke is already set
@@ -176,10 +183,6 @@ function EnvelopeBrain:decide(state, stack, match)
     -- OFFENSE HOLDS small clears and BUILDS instead -- only fire when it's BIG (or a chain). DANGER/RAISE fire/fill as
     -- before (DANGER will spend anything to survive). The organizer makes a non-clearing grouping swap to assemble a
     -- bigger play -- continuous + cheap, no catalog.
-    -- FIRE ONCE: the fast-path fires SINGLE-swap chips only. A multi-swap chip can't finish its sequence before the board
-    -- moves (rise/settle) makes the later swaps stale -- it loops forever and never fires (the new cache is full of these,
-    -- and the recognizer now matches them all). Multi-step setups are the SEARCH's job: commit one swap, re-plan.
-    if chip and chip.swaps and #chip.swaps > 1 then chip = nil end
     local fire = chip ~= nil   -- fire whatever clears -- survive first; organize only fills genuinely dead frames
     self._substate = nil
     if fire then

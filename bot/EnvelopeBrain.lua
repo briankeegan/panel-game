@@ -70,15 +70,16 @@ local DANGER_ABOVE = 9
 -- DYNAMIC raise: never raise past a height that leaves this many rows of recovery headroom below the top, so a raise
 -- can NEVER top us out. The target also reserves room for pending incoming garbage, and rises on its own as clearing
 -- keeps the stack lower. (Tighten as clearing improves; raise-to-death is a bug, so this stays safe.)
-local RECOVERY_BUFFER = 3  -- raise fills to top-3; the band between there and DANGER (top-1) is OFFENSE's home
+local RECOVERY_BUFFER = 5  -- raise fills only to top-5 (raise less); OFFENSE owns the wider band up to DANGER (top-1)
 
 -- Per-state chip priorities, built from the cache (auto-includes new families). Order within a set: READY clears first,
 -- then 2-swap SETUPS; bigger base + deeper cascade first (they clear more).
--- Skip ALL trivial 3-clears: plain COMBO_3 AND any COMBO_3 setup/cascade (COMBO_3_SWAP_2_*, COMBO_3_CASCADE_*) --
--- spending 2 swaps to manufacture a 3-clear is worse than the 3-clear. Keep COMBO_3_3 / COMBO_3_4 / COMBO_3_5 (the
--- 6/7/8-clears -- a digit, not a letter, follows "COMBO_3_").
-local function isExcluded(kind) return kind == "COMBO_3" or kind:match("^COMBO_3_%a") ~= nil end
+-- Drop only the WASTEFUL COMBO_3 setups (COMBO_3_SWAP_2_* / _CASCADE_* -- 2 swaps to manufacture a 3-clear). Plain
+-- COMBO_3 (a 1-swap ready 3-clear) stays IN but ranked DEAD LAST -- a last-resort clear when nothing bigger exists.
+-- Keep COMBO_3_3 / COMBO_3_4 / COMBO_3_5 etc. (the 6/7/8-clears -- a digit, not a letter, follows "COMBO_3_").
+local function isExcluded(kind) return kind:match("^COMBO_3_%a") ~= nil end
 local function rank(k)
+  if k == "COMBO_3" then return 1e9 end                    -- plain 3-clear: ABSOLUTE last resort (only if nothing bigger)
   local setup = k:find("SWAP_2", 1, true) and 1 or 0       -- 2-swap setups sort after ready clears
   local base = tonumber(k:match("COMBO_(%d)")) or 0        -- base combo size
   local casc = tonumber(k:match("CASCADE_(%d)")) or 0      -- cascade depth

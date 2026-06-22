@@ -270,9 +270,19 @@ function love.quit()
   pcall(love.filesystem.write, "debug.log", tostring(logger.messageBuffer))
 
   if GAME.updater then
-    while GAME.updater.state ~= GAME_UPDATER_STATES.idle do
+    -- Bound the drain: the updater finishes on background network threads, and a
+    -- stalled mobile connection can leave it non-idle forever, hanging Quit. Cap
+    -- the wait; an in-flight download just defers to next launch (re-fetched).
+    local deadline = love.timer.getTime() + 2
+    while GAME.updater.state ~= GAME_UPDATER_STATES.idle and love.timer.getTime() < deadline do
       GAME.updater:update()
     end
+  end
+
+  -- Android: love.event.quit() only finishes the activity; the process can linger
+  -- so a relaunch resumes stale state. Force a real exit after cleanup above.
+  if love.system.getOS() == "Android" then
+    os.exit(0)
   end
 end
 

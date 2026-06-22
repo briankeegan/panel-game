@@ -34,6 +34,9 @@ local function setLabels(self, labels, values, selectedIndex)
         label.text = nil
         label.drawable = nil
         label:setText(t, label.replacementTable, label.translate)
+        -- some callers give labels a fixed width (e.g. 70) that's narrower than the
+        -- enlarged text; sync width to the rendered text so centering is correct
+        if label.drawable then label.width = label.drawable:getWidth() end
       end
       label.hAlign = "center"
       label.vAlign = "center"

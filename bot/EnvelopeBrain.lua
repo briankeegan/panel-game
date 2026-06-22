@@ -77,13 +77,13 @@ local RECOVERY_BUFFER = 5  -- raise fills only to top-5 (raise less); OFFENSE ow
 -- that into the ordered kind list useChips consumes. No name parsing, so any new family (BREAK_*, SHOGUN_*, ...) joins
 -- automatically and sorts by real value. The only name policies: drop the wasteful COMBO_3 setups, and pin plain
 -- COMBO_3 dead-last (a last-resort clear when nothing bigger exists).
-local function isExcluded(kind) return kind:match("^COMBO_3_%a") ~= nil end
+local function isExcluded(kind) return kind == "COMBO_3" or kind:match("^COMBO_3_%a") ~= nil end  -- COMBO_3 removed entirely
 -- rank a chip by its META (ASC: lower = tried first). total = panels cleared, swaps = 1 ready / 2 setup, chain = depth.
 local function rankKind(kind, meta)
-  local setup = (meta and (meta.swaps or 1) > 1) and 1 or 0      -- ready clears before 2-swap setups
+  local setup = (meta and (meta.swaps or 1) > 1) and 1 or 0
   local size = (meta and meta.total) or 0                        -- real panels cleared (name-independent)
   local chain = (meta and meta.chain) or 0
-  return setup * 1000 - (size * 10 + chain)                      -- bigger / deeper first
+  return -(size * 100 + chain * 50) + setup                      -- BIGGER (incl multi-step setups) first; ready only breaks ties
 end
 -- extractByMeta(filter, rankFn) -> ordered kinds: every cache kind whose meta passes filter(meta, kind), sorted ASC by
 -- rankFn(kind, meta), with plain COMBO_3 force-appended LAST (policy). THE selection primitive -- filter can be static
@@ -184,8 +184,9 @@ function EnvelopeBrain:decide(state, stack, match)
       self._substate = "CLEAR"
     elseif st == "RAISE" and not busy and (state.stopTime or 0) == 0 then
       move = { type = "RAISE" }              -- low on material -> FILL. Raise is super important; it comes before organizing.
-    elseif (st == "OFFENSE" or st == "DANGER") and not busy then
-      -- have material but no clear -> ORGANIZE/FLATTEN (lower the peak, clump colors) -- including at the top, in DANGER.
+    elseif st == "OFFENSE" or st == "DANGER" then
+      -- have material but no clear -> ORGANIZE/FLATTEN even while the board settles: the touchable mask already skips
+      -- every breaking/falling cell, so we just work the SETTLED ones instead of idling through the pop.
       local org = useChips.organizeMove(grid, rows, cursor, touchable)
       if org then move = { type = "SWAP", pos = org, swaps = { org }, kind = "FLATTEN" }; self._substate = "FLATTEN"
       else move = { type = "WAIT" } end

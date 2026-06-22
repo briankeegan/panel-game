@@ -73,34 +73,49 @@ local DANGER_ABOVE = 9
 local RECOVERY_BUFFER = 5  -- raise fills only to top-5 (raise less); OFFENSE owns the wider band up to DANGER (top-1)
 
 -- Per-state chip priorities, built from the cache (auto-includes new families). Order within a set: READY clears first,
--- then 2-swap SETUPS; bigger base + deeper cascade first (they clear more).
+-- then 2-swap SETUPS; bigger / deeper first (they clear more).
 -- Drop only the WASTEFUL COMBO_3 setups (COMBO_3_SWAP_2_* / _CASCADE_* -- 2 swaps to manufacture a 3-clear). Plain
 -- COMBO_3 (a 1-swap ready 3-clear) stays IN but ranked DEAD LAST -- a last-resort clear when nothing bigger exists.
--- Keep COMBO_3_3 / COMBO_3_4 / COMBO_3_5 etc. (the 6/7/8-clears -- a digit, not a letter, follows "COMBO_3_").
 local function isExcluded(kind) return kind:match("^COMBO_3_%a") ~= nil end
-local function rank(k)
-  if k == "COMBO_3" then return 1e9 end                    -- plain 3-clear: ABSOLUTE last resort (only if nothing bigger)
-  local setup = k:find("SWAP_2", 1, true) and 1 or 0       -- 2-swap setups sort after ready clears
-  local base = tonumber(k:match("COMBO_(%d)")) or 0        -- base combo size
-  local casc = tonumber(k:match("CASCADE_(%d)")) or 0      -- cascade depth
-  return setup * 1000 - (base * 10 + casc)                 -- ready first; bigger/deeper first
+-- Rank by the chip's META, not its name -- so ANY new family (BREAK_*, SHOGUN_*, ...) is ranked by its real value with
+-- no name parsing. meta.total = panels cleared, meta.swaps = 1 ready / 2 setup, meta.chain = cascade depth. (Also more
+-- correct today: the old name-parse read COMBO_3_3 as size 3, but it clears 6.)
+local function rankKind(kind, meta)
+  if kind == "COMBO_3" then return 1e9 end                       -- plain 3-clear: absolute last resort
+  local setup = (meta and (meta.swaps or 1) > 1) and 1 or 0      -- 2-swap setups sort after ready clears
+  local size = (meta and meta.total) or 0                        -- real panels cleared (name-independent)
+  local chain = (meta and meta.chain) or 0
+  return setup * 1000 - (size * 10 + chain)                      -- ready first; bigger / deeper first
 end
 local function buildPriorities(keep)
   local cache = require("bot.chipCache")
-  local seen, kinds = {}, {}
+  local seen, kinds, metaOf = {}, {}, {}
   for _, c in ipairs(cache) do
-    if not isExcluded(c.kind) and not seen[c.kind] and keep(c.kind) then seen[c.kind] = true; kinds[#kinds + 1] = c.kind end
+    if not isExcluded(c.kind) and not seen[c.kind] and keep(c.kind) then
+      seen[c.kind] = true; kinds[#kinds + 1] = c.kind; metaOf[c.kind] = c.meta
+    end
   end
-  table.sort(kinds, function(a, b) local ra, rb = rank(a), rank(b); if ra ~= rb then return ra < rb end return a < b end)
+  table.sort(kinds, function(a, b)
+    local ra, rb = rankKind(a, metaOf[a]), rankKind(b, metaOf[b])
+    if ra ~= rb then return ra < rb end
+    return a < b
+  end)
   return kinds
 end
 -- OFFENSE: every chip, built big-first (cascades/setups lead). DANGER: the SAME full set so it never goes empty, but
 -- READY single-swap clears FIRST -- clear now; chains/setups only fall back when no ready clear exists.
 local OFFENSE_PRIORITIES = buildPriorities(function() return true end)
 local DANGER_PRIORITIES = (function()
+  local cache = require("bot.chipCache")
+  local metaOf = {}; for _, c in ipairs(cache) do metaOf[c.kind] = metaOf[c.kind] or c.meta end
   local p = {}; for _, k in ipairs(OFFENSE_PRIORITIES) do p[#p + 1] = k end
-  local function ready(k) return (not k:find("SWAP_2", 1, true) and not k:find("CASCADE", 1, true)) and 0 or 1 end
-  table.sort(p, function(a, b) local ra, rb = ready(a), ready(b); if ra ~= rb then return ra < rb end return rank(a) < rank(b) end)
+  -- READY = single-swap, no cascade (fires NOW) -- meta-based, so new families sort right too.
+  local function ready(k) local m = metaOf[k]; return (m and (m.swaps or 1) == 1 and (m.chain or 0) == 0) and 0 or 1 end
+  table.sort(p, function(a, b)
+    local ra, rb = ready(a), ready(b)
+    if ra ~= rb then return ra < rb end
+    return rankKind(a, metaOf[a]) < rankKind(b, metaOf[b])
+  end)
   return p
 end)()
 

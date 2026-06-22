@@ -62,8 +62,8 @@ function CharacterSelectChallenge:loadUserInterface()
     -- characters on row 8 (same as the other screens); page + actions below
     self.ui.grid:createElementAt(1, 8, characterGridWidth, characterGridHeight, "characterSelection", self.ui.characterGrid, true)
     self.ui.grid:createElementAt(2, 9, 1, 1, "pageIndicator", self.ui.pageIndicator)
-    self.ui.grid:createElementAt(1, 10, 2, 1, "readyButton", self.ui.readyButton)
-    self.ui.grid:createElementAt(3, 10, 2, 1, "leaveButton", self.ui.leaveButton)
+    self.ui.grid:createElementAt(3, 10, 2, 1, "readyButton", self.ui.readyButton)
+    self.ui.grid:createElementAt(1, 10, 2, 1, "leaveButton", self.ui.leaveButton)
   else
     self.ui.grid:createElementAt(9, 2, 1, 1, "readyButton", self.ui.readyButton)
     self.ui.grid:createElementAt(1, 3, characterGridWidth, characterGridHeight, "characterSelection", self.ui.characterGrid, true)

@@ -104,8 +104,8 @@ function CharacterSelect2p:loadPortraitUI()
   self.ui.grid:createElementAt(1, 1, 4, charRows, "characterSelection", self.ui.characterGrid, true)
   self.ui.grid:createElementAt(2, charRows + 1, 1, 1, "pageIndicator", self.ui.pageIndicator)
   -- equal Ready/Leave, matching the 1P screens
-  self.ui.grid:createElementAt(1, charRows + 2, 2, 1, "readyButton", self.ui.readyButton)
-  self.ui.grid:createElementAt(3, charRows + 2, 2, 1, "leaveButton", self.ui.leaveButton)
+  self.ui.grid:createElementAt(3, charRows + 2, 2, 1, "readyButton", self.ui.readyButton)
+  self.ui.grid:createElementAt(1, charRows + 2, 2, 1, "leaveButton", self.ui.leaveButton)
 
   self:createIconRow()
   self:setupRoster()

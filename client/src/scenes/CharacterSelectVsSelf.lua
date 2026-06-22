@@ -92,7 +92,7 @@ function CharacterSelectVsSelf:loadUserInterface()
 
   self.ui.readyButton = self:createReadyButton()
   if pm then
-    self.ui.grid:createElementAt(1, 10, 2, 1, "readyButton", self.ui.readyButton)
+    self.ui.grid:createElementAt(3, 10, 2, 1, "readyButton", self.ui.readyButton)
   else
     self.ui.grid:createElementAt(9, 2, 1, 1, "readyButton", self.ui.readyButton)
   end
@@ -120,7 +120,7 @@ function CharacterSelectVsSelf:loadUserInterface()
   self.ui.changeInputButton = self:createChangeInputButton()
   if pm then
     self.ui.changeInputButton:setVisibility(false)
-    self.ui.grid:createElementAt(3, 10, 2, 1, "leaveButton", self.ui.leaveButton)
+    self.ui.grid:createElementAt(1, 10, 2, 1, "leaveButton", self.ui.leaveButton)
   else
     self.ui.grid:createElementAt(8, 6, 1, 1, "changeInputButton", self.ui.changeInputButton)
     self.ui.grid:createElementAt(9, 6, 1, 1, "leaveButton", self.ui.leaveButton)

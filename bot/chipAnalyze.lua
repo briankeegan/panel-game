@@ -114,8 +114,16 @@ function M.validInstance(g, absSwaps, target)
 end
 -- classify every NON-color cell in the footprint: "." must-empty · "@" blocker(solid,not-solving) · (nil = don't-care).
 -- For each cell try empty / a filler / each present solving color and keep only what leaves a valid instance.
-function M.classify(g, absSwaps)
-  local target = M.fire(g, absSwaps).clears
+-- opt (all optional, for cheap SETUP authoring off a base): target=known clears (skip the fire); baseGrid+baseCls let
+-- cells whose column-neighborhood is byte-identical to the base inherit the base's class instead of being re-tested.
+function M.classify(g, absSwaps, opt)
+  opt = opt or {}
+  local target = opt.target or M.fire(g, absSwaps).clears
+  local changedCol
+  if opt.baseGrid then
+    changedCol = {}
+    for c = 1, W do for r = 1, H do if (g[r][c] or 0) ~= (opt.baseGrid[r][c] or 0) then changedCol[c] = true; break end end end
+  end
   local minr, maxr, minc, maxc, colors = H+1, 0, W+1, 0, {}
   for r = 1, H do for c = 1, W do local v = g[r][c]; if v and v >= 1 and v <= 4 then
     minr=math.min(minr,r); maxr=math.max(maxr,r); minc=math.min(minc,c); maxc=math.max(maxc,c); colors[v]=true end end end
@@ -124,7 +132,10 @@ function M.classify(g, absSwaps)
   for r = math.max(1,minr), math.min(H,maxr) do
     for c = math.max(1,minc), math.min(W,maxc) do
       local v = g[r][c] or 0
-      if not (v >= 1 and v <= 4) then                          -- color cells are handled by the author's color classes
+      if (v >= 1 and v <= 4) then                              -- color cells are handled by the author's color classes
+      elseif changedCol and not (changedCol[c-2] or changedCol[c-1] or changedCol[c] or changedCol[c+1] or changedCol[c+2]) then
+        local cl = opt.baseCls[r*100+c]; if cl then out[r*100+c] = cl end   -- structure unchanged here -> inherit base
+      else
         local okEmpty  = M.validInstance(setCell(g, r, c, 0), absSwaps, target)
         local okFiller = M.validInstance(setCell(g, r, c, filler(r, c)), absSwaps, target)
         local okColor  = false; for col in pairs(colors) do if M.validInstance(setCell(g, r, c, col), absSwaps, target) then okColor = true; break end end
@@ -177,6 +188,25 @@ function M.measure(g, absSwaps)
   return {
     clears = f.clears, total = f.total, garbage = f.garbage, chain = f.chain,
     start = f.start, finish = f.finish, leftover = f.remaining,   -- solving-color panels NOT cleared (should be 0)
+    swaps = #absSwaps, cursorMoves = travel,
+    cursorEnd = { dr = edr, dc = edc, dir = dirTag(edr, edc) },
+    footprint = { rows = (maxr >= minr) and (maxr-minr+1) or 0, cols = (maxc >= minc) and (maxc-minc+1) or 0 },
+    colors = nColors,
+  }
+end
+
+-- a SETUP fires the SAME combo as its base, so inherit what it DOES (clears/garbage/chain/timing) with NO engine call;
+-- only the cost (extra swap + cursor travel) and geometry differ, and those are cheap to recompute from the grid+swaps.
+function M.measureFromBase(g, absSwaps, baseMeta)
+  local minr, maxr, minc, maxc, cols = H+1, 0, W+1, 0, {}
+  for r = 1, H do for c = 1, W do local v = g[r][c]; if v and v >= 1 and v <= 4 then
+    minr=math.min(minr,r); maxr=math.max(maxr,r); minc=math.min(minc,c); maxc=math.max(maxc,c); cols[v]=true end end end
+  local nColors = 0; for _ in pairs(cols) do nColors = nColors + 1 end
+  local travel = 0; for i = 2, #absSwaps do travel = travel + math.abs(absSwaps[i][1]-absSwaps[i-1][1]) + math.abs(absSwaps[i][2]-absSwaps[i-1][2]) end
+  local s1, sN = absSwaps[1], absSwaps[#absSwaps]; local edr, edc = sN[1]-s1[1], sN[2]-s1[2]
+  return {
+    clears = baseMeta.clears, total = baseMeta.total, garbage = baseMeta.garbage, chain = baseMeta.chain,
+    start = baseMeta.start, finish = baseMeta.finish, leftover = baseMeta.leftover,
     swaps = #absSwaps, cursorMoves = travel,
     cursorEnd = { dr = edr, dc = edc, dir = dirTag(edr, edc) },
     footprint = { rows = (maxr >= minr) and (maxr-minr+1) or 0, cols = (maxc >= minc) and (maxc-minc+1) or 0 },

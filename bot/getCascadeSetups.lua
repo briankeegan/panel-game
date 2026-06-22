@@ -150,7 +150,7 @@ local function enumerateRaw(n, m, R)
         local kk = shapeCache.canonShape(g)
         local sig = (kk or stackString(g)) .. "|" .. br .. "," .. bc
         if not seen[sig] then seen[sig] = true
-          out[#out+1] = { g = g, sr = sr, sc = sc, s1 = { br, bc }, moves = moves,
+          out[#out+1] = { g = g, sr = sr, sc = sc, s1 = { br, bc }, moves = moves, baseG = B0,
                           kind = string.format("COMBO_%d_CASCADE_%d_SWAP_2_MOVE_%d", n, m, moves) }
         end
       end

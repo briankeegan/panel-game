@@ -177,12 +177,15 @@ function EnvelopeBrain:decide(state, stack, match)
     -- before (DANGER will spend anything to survive). The organizer makes a non-clearing grouping swap to assemble a
     -- bigger play -- continuous + cheap, no catalog.
     local fire = chip ~= nil   -- fire whatever clears -- survive first; organize only fills genuinely dead frames
+    self._substate = nil
     if fire then
       self._comboUse = self._comboUse or {}; self._comboUse[chip.kind] = (self._comboUse[chip.kind] or 0) + 1
       move = { type = "SWAP", pos = chip.swaps[1], swaps = chip.swaps, kind = chip.kind }
+      self._substate = "CLEAR"
     elseif st == "OFFENSE" and not busy then
-      local org = useChips.organizeMove(grid, rows, cursor, touchable)   -- build toward a bigger play; hold the small clear
-      move = org and { type = "SWAP", pos = org, swaps = { org }, kind = "ORGANIZE" } or { type = "WAIT" }
+      local org = useChips.organizeMove(grid, rows, cursor, touchable)   -- FLATTEN substate: low + clumped stack in dead frames
+      if org then move = { type = "SWAP", pos = org, swaps = { org }, kind = "FLATTEN" }; self._substate = "FLATTEN"
+      else move = { type = "WAIT" } end
     elseif st == "RAISE" and not busy and (state.stopTime or 0) == 0 then
       move = { type = "RAISE" }              -- no chip + below the top -> fill material (DANGER clears before we top out)
     else

@@ -121,7 +121,7 @@ local function flatness(grid, rows)
   for c = 1, WIDTH do if h[c] > mx then mx = h[c] end; sum = sum + h[c] end
   local mean, var = sum / WIDTH, 0
   for c = 1, WIDTH do local d = h[c] - mean; var = var + d * d end
-  return -(mx * 4 + var)
+  return -(mx * 8 + var)   -- peak weighted heavily -> the organizer goes after the TALLEST column first
 end
 local function clusterScore(grid, rows)
   local s = 0

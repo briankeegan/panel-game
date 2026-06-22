@@ -141,7 +141,7 @@ local function genForBase(B0, ar, ac, n, R)
     if clearedBy(str, { { br, bc }, { ar, ac } }) == n then         -- (c) setup+fire clears exactly n
       local sig = str .. "|" .. br .. "," .. bc
       if not seen[sig] then seen[sig] = true
-        found[#found+1] = { g = g, sr = ar, sc = ac, s1 = { br, bc }, moves = moves,
+        found[#found+1] = { g = g, sr = ar, sc = ac, s1 = { br, bc }, moves = moves, baseG = B0,
                             kind = string.format("COMBO_%d_SWAP_2_MOVE_%d", n, moves) }
       end
     end

@@ -29,6 +29,26 @@ function M.author(g, sr, sc, kind, absSwaps)
   return { tmpl = t, kind = kind, swaps = swaps, meta = meta }
 end
 
+-- author a SETUP off its already-authored base combo: inherit the base's metadata (same combo fires) with NO engine,
+-- and let classify reuse the base's cell constraints wherever the displacement didn't change the structure. baseGrid is
+-- the base's grid B0 (the setup is B0 + one displacement); base & setup share the fire anchor (sr,sc).
+function M.authorFromBase(g, sr, sc, kind, absSwaps, baseChip, baseGrid)
+  local rl, nn = {}, 0
+  local function cls(col) if not rl[col] then nn = nn + 1; rl[col] = nn end; return rl[col] end
+  local incl = {}
+  for r = 1, H do for c = 1, W do local v = g[r][c] or 0; if v >= 1 and v <= 4 then incl[r*100+c] = { r, c, cls(v) } end end end
+  local baseCls = {}                                            -- base ./@ as ABSOLUTE keys (shared anchor -> same frame)
+  for _, e in ipairs(baseChip.tmpl) do if e[3] == "." or e[3] == "@" then baseCls[(e[1]+sr)*100 + (e[2]+sc)] = e[3] end end
+  for key, class in pairs(analyze.classify(g, absSwaps, { target = baseChip.meta.clears, baseGrid = baseGrid, baseCls = baseCls })) do
+    if not incl[key] then incl[key] = { math.floor(key/100), key % 100, class } end
+  end
+  local meta = analyze.measureFromBase(g, absSwaps, baseChip.meta)
+  local t = {}; for _, e in pairs(incl) do t[#t+1] = { e[1]-sr, e[2]-sc, e[3] } end
+  table.sort(t, function(a, b) if a[1] ~= b[1] then return a[1] < b[1] end return a[2] < b[2] end)
+  local swaps = {}; for _, s in ipairs(absSwaps) do swaps[#swaps+1] = { s[1]-sr, s[2]-sc } end
+  return { tmpl = t, kind = kind, swaps = swaps, meta = meta }
+end
+
 local function quote(v) return type(v) == "string" and ('"' .. v .. '"') or tostring(v) end
 local function serTmpl(t) local p = {}; for _, e in ipairs(t) do p[#p+1] = string.format("{%d,%d,%s}", e[1], e[2], quote(e[3])) end; return "{" .. table.concat(p, ",") .. "}" end
 local function serSwaps(s) local p = {}; for _, o in ipairs(s) do p[#p+1] = string.format("{%d,%d}", o[1], o[2]) end; return "{" .. table.concat(p, ",") .. "}" end

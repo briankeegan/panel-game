@@ -87,7 +87,7 @@ local function enumerateRaw(sa, sb, R)
       if d[1] == sa and d[2] == sb and d[3] == 3 and d[4] == 0 then            -- setup+fire clears sa A + sb B + 3 C
         local sig = str .. "|" .. br .. "," .. bc
         if not seen[sig] then seen[sig] = true
-          out[#out+1] = { g = g, sr = ar, sc = ac, s1 = { br, bc }, moves = moves,
+          out[#out+1] = { g = g, sr = ar, sc = ac, s1 = { br, bc }, moves = moves, baseG = B0,
                           kind = string.format("COMBO_%d_%d_CASCADE_3_SWAP_2_MOVE_%d", sa, sb, moves) }
         end
       end

@@ -182,8 +182,8 @@ function EnvelopeBrain:decide(state, stack, match)
       self._comboUse = self._comboUse or {}; self._comboUse[chip.kind] = (self._comboUse[chip.kind] or 0) + 1
       move = { type = "SWAP", pos = chip.swaps[1], swaps = chip.swaps, kind = chip.kind }
       self._substate = "CLEAR"
-    elseif st == "RAISE" and not busy and (state.stopTime or 0) == 0 then
-      move = { type = "RAISE" }              -- low on material -> FILL. Raise is super important; it comes before organizing.
+    elseif st == "RAISE" and not busy then
+      move = { type = "RAISE" }              -- low on material -> FILL even during stop-time (low board = invincibility is worthless)
     elseif st == "OFFENSE" or st == "DANGER" then
       -- have material but no clear -> ORGANIZE/FLATTEN even while the board settles: the touchable mask already skips
       -- every breaking/falling cell, so we just work the SETTLED ones instead of idling through the pop.

@@ -69,18 +69,12 @@ function chips.recognize(grid, rows, cells, kind, verify, touchable, requireBrea
             seq[#seq + 1] = { sr, sc }
           end
         end
-        if ok then
-          local near = (not requireBreak) or nearGarbage(grid, rows, chip.tmpl, R, C)
-          if requireBreak then chips._dbgFits = (chips._dbgFits or 0) + 1; if near then chips._dbgNear = (chips._dbgNear or 0) + 1 end end
-          if near then
-            local fired, broke = true, false
-            if verify then fired, broke = verify(seq, kind) end
-            if requireBreak and fired then chips._dbgFired = (chips._dbgFired or 0) + 1 end
-            if requireBreak and broke then chips._dbgBroke = (chips._dbgBroke or 0) + 1 end
-            if fired and (not requireBreak or broke) then
-              chips._lastMatch = { R = R, C = C, tmpl = chip.tmpl, swaps = seq, kind = kind }  -- debug/viz: where it landed
-              return { swaps = seq, kind = kind, brokeGarbage = broke or false }
-            end
+        if ok and (not requireBreak or nearGarbage(grid, rows, chip.tmpl, R, C)) then
+          local fired, broke = true, false
+          if verify then fired, broke = verify(seq, kind) end
+          if fired and (not requireBreak or broke) then     -- requireBreak: only accept a match the engine confirms broke garbage
+            chips._lastMatch = { R = R, C = C, tmpl = chip.tmpl, swaps = seq, kind = kind }  -- debug/viz: where it landed
+            return { swaps = seq, kind = kind, brokeGarbage = broke or false }
           end
         end
       end

@@ -154,7 +154,7 @@ function EnvelopeBrain:decide(state, stack, match)
     local chip
     -- DANGER + garbage on board -> PRIORITIZE a BREAK: any existing combo that clears next to garbage breaks it and
     -- opens stop-time (the way out of the danger zone). Fall back to any clear if no break is playable.
-    if state.lowestGarbageRow then  -- TEST: any state with garbage (was DANGER-only) -- breaking early beats drowning
+    if st == "DANGER" and state.lowestGarbageRow then
       chip = useChips.useChips(grid, rows, cursor, {
         chipPriorities = priorities, searchPriorities = search, verify = verify, touchable = touchable, requireBreak = true,
       })

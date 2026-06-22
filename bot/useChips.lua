@@ -58,4 +58,53 @@ function M.useChips(grid, rows, cursor, opts)
   return nil
 end
 
+local WIDTH = BoardSim.WIDTH
+local function sameColorNeighbor(grid, rows, r, c)
+  local v = grid[r][c]; if not v or v == 0 or v == BoardSim.GARBAGE then return false end
+  for _, d in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
+    local rr, cc = r + d[1], c + d[2]
+    if rr >= 1 and rr <= rows and cc >= 1 and cc <= WIDTH and grid[rr] and grid[rr][cc] == v then return true end
+  end
+  return false
+end
+
+-- DEPTH-1 SETUP SEARCH: when nothing is directly playable, try each PRODUCTIVE horizontal swap (one that forms a new
+-- same-color adjacency), IMAGINE it on a grid copy, and re-RECOGNIZE chips near it -- pattern only, NO verify. Keep the
+-- best (highest-priority) hit, then VERIFY only that one 2-step sequence on the real board. Returns {swaps={setup, chip
+-- swaps...}, kind} or nil. Swaps two settled panels => no gravity, so the imagined grid is faithful; the verify is the
+-- single engine sim and the final truth. This CONSTRUCTS plays the recognizer alone can't see.
+function M.setupSearch(grid, rows, cursor, opts)
+  opts = opts or {}
+  local touchable = opts.touchable; if not touchable then return nil end
+  local priorities = opts.chipPriorities or {}
+  local best  -- { seq, kind, rank }
+  for r = 1, rows do
+    for c = 1, WIDTH - 1 do
+      local a, b = grid[r][c], grid[r][c + 1]
+      if a ~= 0 and b ~= 0 and a ~= b and a ~= BoardSim.GARBAGE and b ~= BoardSim.GARBAGE
+          and touchable[r] and touchable[r][c] and touchable[r][c + 1] then
+        grid[r][c], grid[r][c + 1] = b, a                                  -- imagine the swap
+        if sameColorNeighbor(grid, rows, r, c) or sameColorNeighbor(grid, rows, r, c + 1) then
+          local cells = {}                                                 -- anchors near the swap (templates are small)
+          for rr = math.max(1, r - 3), math.min(rows, r + 3) do
+            for cc = math.max(1, c - 3), math.min(WIDTH, c + 4) do cells[#cells + 1] = { rr, cc } end
+          end
+          for i, kind in ipairs(priorities) do
+            if best and i >= best.rank then break end                      -- can't beat the current best
+            local res = chips.recognize(grid, rows, cells, kind, nil, touchable)  -- nil verify -> pattern only
+            if res then
+              local seq = { { r, c } }; for _, sw in ipairs(res.swaps) do seq[#seq + 1] = sw end
+              best = { seq = seq, kind = kind, rank = i }; break
+            end
+          end
+        end
+        grid[r][c], grid[r][c + 1] = a, b                                  -- un-imagine
+      end
+    end
+  end
+  if not best then return nil end
+  if opts.verify and not opts.verify(best.seq, best.kind) then return nil end  -- the only engine sim: confirm it fires
+  return { swaps = best.seq, kind = "SETUP+" .. best.kind, setup = true }
+end
+
 return M

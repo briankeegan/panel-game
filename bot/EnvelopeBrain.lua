@@ -162,6 +162,13 @@ function EnvelopeBrain:decide(state, stack, match)
     chip = chip or useChips.useChips(grid, rows, cursor, {
       chipPriorities = priorities, searchPriorities = search, verify = verify, touchable = touchable,
     })
+    -- NEW STEP: nothing directly playable -> DEPTH-1 SETUP SEARCH. Construct a play that's one productive swap away
+    -- (imagine the swap, re-recognize, verify only the winner). Only on a settled board (the imagined grid is faithful).
+    if not chip and not busy then
+      chip = useChips.setupSearch(grid, rows, cursor, {
+        chipPriorities = priorities, verify = verify, touchable = touchable,
+      })
+    end
     if chip then
       self._comboUse = self._comboUse or {}; self._comboUse[chip.kind] = (self._comboUse[chip.kind] or 0) + 1
       move = { type = "SWAP", pos = chip.swaps[1], swaps = chip.swaps, kind = chip.kind }

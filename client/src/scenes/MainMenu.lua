@@ -113,20 +113,25 @@ function MainMenu:createMainMenu()
     end)
   end
 
-  local restItems = {
-    ui.MenuItem.createButtonMenuItem("mm_configure", nil, nil, function()
+  local restItems = {}
+
+  -- Configure input is keyboard/controller setup — meaningless on touch; hide in
+  -- portrait. Desktop/landscape keeps it.
+  if not system.isPortraitMode() then
+    restItems[#restItems + 1] = ui.MenuItem.createButtonMenuItem("mm_configure", nil, nil, function()
       switchToScene(InputConfigMenu())
-    end),
-    ui.MenuItem.createButtonMenuItem("mm_set_name", nil, nil, function()
-      switchToScene(SetNameMenu())
-    end),
-    ui.MenuItem.createButtonMenuItem("mm_options", nil, nil, function()
-      switchToScene(OptionsMenu())
-    end),
-    ui.MenuItem.createButtonMenuItem("mm_replay_browser", nil, nil, function()
-      switchToScene(ReplayBrowser())
-    end),
-  }
+    end)
+  end
+
+  restItems[#restItems + 1] = ui.MenuItem.createButtonMenuItem("mm_set_name", nil, nil, function()
+    switchToScene(SetNameMenu())
+  end)
+  restItems[#restItems + 1] = ui.MenuItem.createButtonMenuItem("mm_options", nil, nil, function()
+    switchToScene(OptionsMenu())
+  end)
+  restItems[#restItems + 1] = ui.MenuItem.createButtonMenuItem("mm_replay_browser", nil, nil, function()
+    switchToScene(ReplayBrowser())
+  end)
 
   -- Fullscreen is meaningless in portrait (the game fills the phone) — hide it
   -- there. Desktop/landscape keeps it in its usual spot.

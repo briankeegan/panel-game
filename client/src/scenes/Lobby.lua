@@ -807,7 +807,9 @@ function Lobby:initLobbyMenu()
   -- instead of getting clipped off the bottom.
   local lmH = system.isPortraitMode() and 1040 or 540
   local lmW = system.isPortraitMode() and 700 or 300
-  self.lobbyMenu = ui.ScrollMenu({height = lmH, width = lmW, hAlign = "center", vAlign = "center"})
+  -- portrait: match the main menu's button spacing (Menu uses vpad 30)
+  local lmGap = system.isPortraitMode() and 30 or 8
+  self.lobbyMenu = ui.ScrollMenu({height = lmH, width = lmW, hAlign = "center", vAlign = "center", childGap = lmGap})
   self.lobbyMenu.x = self.lobbyMenuXoffsetMap[false]
 
   self.uiRoot:addChild(self.lobbyMenu)

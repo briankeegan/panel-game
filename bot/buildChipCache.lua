@@ -20,6 +20,7 @@ for _, gen in ipairs(registry.all()) do
   else
     io.stderr:write(string.format("%-22s SKIPPED (%s)\n", gen.name, tostring(recs)))
   end
+  recs = nil; collectgarbage("collect")        -- free each generator's enumeration intermediates (cascades are heavy)
 end
 
 local total = bake.writeAll(chips)

@@ -78,7 +78,9 @@ end
 -- transplant each riser solve's secondary arrangement onto each cascade end's primary at every placement, then keep
 -- the ones the engine confirms fire the whole chain (secondary clears, then exactly N primary).
 -- enumerate every COMBO_n_CASCADE_m: returns { g=pre grid, sr,sc=fire swap, kind, key } (one swap fires the chain).
+local _memo = {}    -- getCascadeSetups re-enumerates the same (n,m); cache so the slow M=5 pairs compute once
 local function enumerate(n, m)
+  local mk = n .. "_" .. m; if _memo[mk] then return _memo[mk] end
   local unsolves = {}
   for _, rec in ipairs(getComboShapes.enumerate(m).raw) do
     local g = rec.sample; local mr, mc = 1e9, 1e9
@@ -131,6 +133,7 @@ local function enumerate(n, m)
   end
   local list = {}; for _, rec in pairs(found) do list[#list+1] = rec end
   table.sort(list, function(a, b) return a.key < b.key end)
+  _memo[mk] = list
   return list
 end
 

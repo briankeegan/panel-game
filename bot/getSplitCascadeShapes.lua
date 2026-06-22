@@ -91,8 +91,10 @@ end
 -- the trigger boundary breaks non-uniformly, which is exactly how horizontal/bent completions arise. Place 2 trigger
 -- C's + 1 displaced (an end) so a single swap fires it; the ENGINE confirms the 3+3+3 cascade. Pre-match check throws
 -- out the uniform (still-matched) raises.
+local _memo = {}    -- getSplitCascadeSetups re-enumerates the same (sa,sb); cache so the inject pass runs once per pair
 local function enumerate(sa, sb)
   sa, sb = sa or 3, sb or 3
+  local mk = sa .. "_" .. sb; if _memo[mk] then return _memo[mk] end
   local kind = string.format("COMBO_%d_%d_CASCADE_3", sa, sb)
   local found = {}
   local function record(g, sr, sc)            -- engine-verify + dedup by shape
@@ -205,6 +207,7 @@ local function enumerate(sa, sb)
   end
   local list = {}; for _, rec in pairs(found) do list[#list+1] = rec end
   table.sort(list, function(a, b) return a.key < b.key end)
+  _memo[mk] = list
   return list
 end
 

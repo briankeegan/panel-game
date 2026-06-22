@@ -11,6 +11,8 @@ local PuzzleHelpDisplay = require("client.src.ui.PuzzleHelpDisplay")
 local PuzzleSetIterator = require("client.src.PuzzleSetIterator")
 local PuzzleSet = require("client.src.PuzzleSet")
 local MultibarElement = require("client.src.ui.MultibarElement")
+local system = require("client.src.system")
+local ui = require("client.src.ui")
 
 -- Scene for a puzzle mode instance of the game
 ---@class PuzzleGame : GameBase
@@ -61,7 +63,7 @@ local PuzzleGame = class(
       width = 0,
       height = 0,
       x = 0,
-      y = 18,
+      y = system.isPortraitMode() and 6 or 18,
       hAlign = "center",
       vAlign = "top"
     })
@@ -130,8 +132,17 @@ function PuzzleGame:customLoad()
   
   local stack = playerStack
 
-  stack:moveToCenterPosition()
-  
+  if system.isPortraitMode() then
+    -- big board like the Versus in-game (PortraitGame): enlarge + center, leaving
+    -- room at the top for the objective and at the bottom for the hint button.
+    stack.gfxScale = 5
+    local frameX = (GAME.globalCanvas:getWidth() / 2 - stack:canvasWidth() / 2)
+    local frameY = (GAME.globalCanvas:getHeight() - stack:canvasHeight()) - 130
+    stack:moveToPosition(frameX, math.max(150, frameY))
+  else
+    stack:moveToCenterPosition()
+  end
+
   local framePos = themes[config.theme].healthbar_frame_Pos
   local frameScale = themes[config.theme].healthbar_frame_Scale * (stack.gfxScale / 3)
   
@@ -180,20 +191,23 @@ function PuzzleGame:customLoad()
     local stack = activeStack
     local stackWidth = stack.baseWidth + stack.panelOriginXOffset
     local stackRightEdge = stack.frameOriginX * stack.gfxScale + (stackWidth * stack.gfxScale)
-    
+    local portrait = system.isPortraitMode()
+
+    -- portrait: board fills the screen, so the side-by-side displays move up top
+    -- (objective) and down low (help); landscape keeps the original right-of-board.
     self.puzzleGoalDisplay = PuzzleGoalDisplay({
-      x = stackRightEdge + 2,
-      y = 358,
+      x = portrait and 12 or (stackRightEdge + 2),
+      y = portrait and 50 or 358,
       width = 0,
       height = 0,
       puzzle = currentPuzzle,
       stack = stack.engine
     })
     self.uiRoot:addChild(self.puzzleGoalDisplay)
-    
+
     self.puzzleHelpDisplay = PuzzleHelpDisplay({
-      x = stackRightEdge + 2,
-      y = 490,
+      x = portrait and 12 or (stackRightEdge + 2),
+      y = portrait and (consts.CANVAS_HEIGHT - 210) or 490,
       width = 0,
       height = 0,
       puzzle = currentPuzzle,
@@ -201,9 +215,50 @@ function PuzzleGame:customLoad()
     })
     self.uiRoot:addChild(self.puzzleHelpDisplay)
 
+    -- portrait: the Hint/Solve buttons replace the "Press Taunt Down" help text, so
+    -- hide the display's visuals (the buttons still drive its logic).
+    if portrait then
+      self.puzzleHelpDisplay:setVisibility(false)
+    end
+
     -- If solution is playing (non-move puzzle with hint used), show the hint state
     if self.hintUsed and currentPuzzle.puzzleType ~= "moves" then
       self.puzzleHelpDisplay:transitionToState("hint_shown")
+    end
+
+    -- portrait: bottom button row (touch can't press Taunt Down). Reset is always
+    -- available; Hint/Solve appear when the puzzle has a solution (move puzzles get
+    -- both, others just Solve).
+    if portrait then
+      local buttons = {}
+      buttons[#buttons + 1] = {text = "Reset", fn = function() self:resetPuzzle() end}
+      if self.puzzleHelpDisplay:hasSolution() then
+        if self.puzzleHelpDisplay.hintHelper:isMovePuzzle() then
+          buttons[#buttons + 1] = {text = "Hint", fn = function()
+            self.puzzleHelpDisplay:onTauntUp()
+            self.puzzleHelpDisplay:onTauntDown()
+          end}
+        end
+        buttons[#buttons + 1] = {text = "Solve", fn = function()
+          self.puzzleHelpDisplay:playSolution()
+        end}
+      end
+
+      local bw, bh, gap = 200, 80, 14
+      local total = #buttons * bw + (#buttons - 1) * gap
+      local startX = consts.CANVAS_WIDTH / 2 - total / 2
+      for i, b in ipairs(buttons) do
+        local btn = ui.TextButton({
+          label = ui.Label({text = b.text, translate = false, fontSize = 28}),
+          x = startX + (i - 1) * (bw + gap),
+          vAlign = "bottom",
+          y = -8,
+          width = bw,
+          height = bh,
+          onClick = b.fn
+        })
+        self.uiRoot:addChild(btn)
+      end
     end
   end
 end

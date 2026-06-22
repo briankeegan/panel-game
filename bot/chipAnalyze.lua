@@ -14,9 +14,24 @@ local COMBO_GARBAGE = { {}, {}, {}, {3}, {4}, {5}, {6}, {3,4}, {4,4}, {5,5}, {5,
                         [20] = {6,6,6,6,6,6}, [27] = {6,6,6,6,6,6,6,6} }
 for i = 1, 72 do COMBO_GARBAGE[i] = COMBO_GARBAGE[i] or COMBO_GARBAGE[i-1] end
 
-local function stackString(g)
+-- gb (optional) = {row, lo, hi, buffer} — a 1-row garbage block spliced at gb.row spanning gb.lo..gb.hi (bracket chars,
+-- one per column). Lets garbage-based chips (shoguns) build a faithful board; nil for every ordinary swap-combo.
+local function stackString(g, gb)
   local mr = 0; for r = 1, H do for c = 1, W do if g[r][c] ~= 0 then mr = math.max(mr, r) end end end
-  local rows = {}; for r = mr, 1, -1 do local row = {}; for c = 1, 6 do row[c] = (g[r][c] ~= 0) and tostring(g[r][c]) or "0" end; rows[#rows+1] = table.concat(row) end
+  if gb then mr = math.max(mr, gb.row) end
+  local rows = {}
+  for r = mr, 1, -1 do
+    if gb and r == gb.row then
+      local row, c = {}, 1
+      while c <= W do
+        if c == gb.lo then row[#row+1] = "[" .. string.rep("=", gb.hi - gb.lo - 1) .. "]"; c = gb.hi + 1
+        else row[#row+1] = (g[r][c] ~= 0) and tostring(g[r][c]) or "0"; c = c + 1 end
+      end
+      rows[#rows+1] = table.concat(row)
+    else
+      local row = {}; for c = 1, 6 do row[c] = (g[r][c] ~= 0) and tostring(g[r][c]) or "0" end; rows[#rows+1] = table.concat(row)
+    end
+  end
   return table.concat(rows)
 end
 
@@ -24,9 +39,9 @@ end
 --   clears = {[color]=count} cleared (colors 1..4), total
 --   garbage = list of {width,height,kind="combo"|"metal"|"chain"} blocks the engine actually queued
 --   chain = max chain length reached; start = frame of first pop after the LAST swap; finish = frame it fully settled
-function M.fire(g, absSwaps)
+function M.fire(g, absSwaps, gb)
   local ok, res = pcall(function()
-    local pz = Puzzle({ puzzleType = "moves", stack = stackString(g), moves = 99 })
+    local pz = Puzzle({ puzzleType = "moves", stack = stackString(g, gb), moves = 99, garbagePanelBuffer = gb and gb.buffer })
     local m = Match(pz:toPanelSource(false), pz:toGameMode().matchRules)
     local st = m:createStackWithSettings(LP.getModern(10), true, "controller", nil); st:setMaxRunsPerFrame(1); m:start()
     local function cnt(col) local n=0; for r=1,st.height do for c=1,6 do if (st.panels[r][c].color or 0)==col then n=n+1 end end end return n end
@@ -49,7 +64,13 @@ function M.fire(g, absSwaps)
         for k = 1, SETTLE do if st:game_ended() then break end st:receiveConfirmedInput("A"); m:run(); if k>=2 and not st:hasActivePanels() and not st:hasChainingPanels() then break end end
       end
     end
-    -- time the cascade from the final swap: first pop = first panel-count drop; finish = settled
+    -- shogun-style chips have no triggering swap: the "fire" is the garbage already breaking. Force it directly.
+    if gb and gb.forceBreak then
+      local fc = st.levelData.frameConstants; local gp = {}
+      for r = 1, st.height do for c = 1, W do if st.panels[r][c].isGarbage then gp[#gp+1] = st.panels[r][c] end end end
+      if #gp > 0 then st:matchGarbagePanels(gp, fc.FLASH + fc.FACE + fc.POP * #gp, false, #gp) end
+    end
+    -- time the cascade from the final swap (or forced break): first pop = first panel-count drop; finish = settled
     local pAfterFire = panels()
     local startF, finishF, chain, frame = nil, SETTLE, 0, 0
     for k = 1, SETTLE do
@@ -91,7 +112,7 @@ local function preMatch(g)
   return false
 end
 -- does SOME single horizontal swap clear exactly `target`? (the 1-swap-shortcut test for multi-swap chips)
-local function anySingleSwapClears(g, target)
+local function anySingleSwapClears(g, target, gb)
   for r = 1, H do for c = 1, W - 1 do
     if g[r][c] ~= g[r][c+1] then
       local s = clone(g); s[r][c], s[r][c+1] = s[r][c+1], s[r][c]; settleCols(s)
@@ -99,17 +120,17 @@ local function anySingleSwapClears(g, target)
       for rr = 1, H do for cc = 1, W do local v = s[rr][cc]; if v >= 1 and v <= 4 then
         if cc <= W-2 and s[rr][cc+1]==v and s[rr][cc+2]==v then hit = true end
         if rr <= H-2 and s[rr+1][cc]==v and s[rr+2][cc]==v then hit = true end end end end
-      if hit and sameClears(M.fire(g, { { r, c } }).clears, target) then return true end
+      if hit and sameClears(M.fire(g, { { r, c } }, gb).clears, target) then return true end
     end
   end end
   return false
 end
 -- is `g` still a valid instance of this chip: no pre-match, the swaps clear exactly `target`, and (for 2+ swaps) no
 -- single swap clears the whole target. Accurate; pre-match prefilter makes the common rejections free.
-function M.validInstance(g, absSwaps, target)
+function M.validInstance(g, absSwaps, target, gb)
   if preMatch(g) then return false end
-  if not sameClears(M.fire(g, absSwaps).clears, target) then return false end
-  if #absSwaps >= 2 and anySingleSwapClears(g, target) then return false end
+  if not sameClears(M.fire(g, absSwaps, gb).clears, target) then return false end
+  if #absSwaps >= 2 and anySingleSwapClears(g, target, gb) then return false end
   return true
 end
 -- classify every NON-color cell in the footprint: "." must-empty · "@" blocker(solid,not-solving) · (nil = don't-care).
@@ -118,7 +139,8 @@ end
 -- cells whose column-neighborhood is byte-identical to the base inherit the base's class instead of being re-tested.
 function M.classify(g, absSwaps, opt)
   opt = opt or {}
-  local target = opt.target or M.fire(g, absSwaps).clears
+  local gb = opt.gb
+  local target = opt.target or M.fire(g, absSwaps, gb).clears
   local changedCol
   if opt.baseGrid then
     changedCol = {}
@@ -128,6 +150,7 @@ function M.classify(g, absSwaps, opt)
   for r = 1, H do for c = 1, W do local v = g[r][c]; if v and v >= 1 and v <= 4 then
     minr=math.min(minr,r); maxr=math.max(maxr,r); minc=math.min(minc,c); maxc=math.max(maxc,c); colors[v]=true end end end
   for _, s in ipairs(absSwaps) do minr=math.min(minr,s[1]); maxr=math.max(maxr,s[1]); minc=math.min(minc,s[2]); maxc=math.max(maxc,s[2]+1) end
+  if gb then minr = 1; maxr = math.max(maxr, gb.row) end          -- garbage chips: the fall space BELOW the run + the garbage row matter
   local out = {}
   for r = math.max(1,minr), math.min(H,maxr) do
     for c = math.max(1,minc), math.min(W,maxc) do
@@ -136,9 +159,9 @@ function M.classify(g, absSwaps, opt)
       elseif changedCol and not (changedCol[c-2] or changedCol[c-1] or changedCol[c] or changedCol[c+1] or changedCol[c+2]) then
         local cl = opt.baseCls[r*100+c]; if cl then out[r*100+c] = cl end   -- structure unchanged here -> inherit base
       else
-        local okEmpty  = M.validInstance(setCell(g, r, c, 0), absSwaps, target)
-        local okFiller = M.validInstance(setCell(g, r, c, filler(r, c)), absSwaps, target)
-        local okColor  = false; for col in pairs(colors) do if M.validInstance(setCell(g, r, c, col), absSwaps, target) then okColor = true; break end end
+        local okEmpty  = M.validInstance(setCell(g, r, c, 0), absSwaps, target, gb)
+        local okFiller = M.validInstance(setCell(g, r, c, filler(r, c)), absSwaps, target, gb)
+        local okColor  = false; for col in pairs(colors) do if M.validInstance(setCell(g, r, c, col), absSwaps, target, gb) then okColor = true; break end end
         if okEmpty and okFiller and okColor then               -- truly anything -> don't-care
         elseif not okColor and not okEmpty and okFiller then out[r*100+c] = "@"   -- must be solid, not a solving color
         elseif okEmpty and not okFiller and not okColor then out[r*100+c] = "."   -- must be empty
@@ -176,15 +199,16 @@ function M.blockers(g, absSwaps, baseClears)
 end
 
 -- measure(g, absSwaps): the full per-chip metadata, engine-measured + derived.
-function M.measure(g, absSwaps)
-  local f = M.fire(g, absSwaps)
+function M.measure(g, absSwaps, gb)
+  local f = M.fire(g, absSwaps, gb)
   local minr, maxr, minc, maxc, cols = H+1, 0, W+1, 0, {}
   for r = 1, H do for c = 1, W do local v = g[r][c]; if v and v >= 1 and v <= 4 then
     minr=math.min(minr,r); maxr=math.max(maxr,r); minc=math.min(minc,c); maxc=math.max(maxc,c); cols[v]=true end end end
   local nColors = 0; for _ in pairs(cols) do nColors = nColors + 1 end
   local travel = 0; for i = 2, #absSwaps do travel = travel + math.abs(absSwaps[i][1]-absSwaps[i-1][1]) + math.abs(absSwaps[i][2]-absSwaps[i-1][2]) end
   local s1, sN = absSwaps[1], absSwaps[#absSwaps]
-  local edr, edc = sN[1]-s1[1], sN[2]-s1[2]
+  local edr, edc = 0, 0                                          -- swap-less chips (shoguns): the fall is the action
+  if s1 then edr, edc = sN[1]-s1[1], sN[2]-s1[2] end
   return {
     clears = f.clears, total = f.total, garbage = f.garbage, chain = f.chain,
     start = f.start, finish = f.finish, leftover = f.remaining,   -- solving-color panels NOT cleared (should be 0)

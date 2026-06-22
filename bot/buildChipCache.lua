@@ -22,7 +22,7 @@ for _, gen in ipairs(registry.all()) do
     local ok, recs = pcall(gen.produce)
     if ok and type(recs) == "table" then
       local out = {}
-      for _, r in ipairs(recs) do out[#out+1] = bake.author(r.g, r.sr, r.sc, r.kind, r.absSwaps) end
+      for _, r in ipairs(recs) do out[#out+1] = bake.author(r.g, r.sr, r.sc, r.kind, r.absSwaps, r.garbage) end
       authored.save(gen.name, out)            -- cache the finished chips so this never re-authors until the code changes
       for _, c in ipairs(out) do chips[#chips+1] = c end
       io.stderr:write(string.format("%-22s %d (built)\n", gen.name, #chips - n0))

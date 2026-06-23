@@ -22,6 +22,11 @@ local IDLE = char(0)
 -- in fast bursts (fit_targets: act ~20-25%). A scalar = no jitter; full speed = 1.
 local DEFAULT_CURSOR_SPEED = { cursorMoveInterval = { 4, 9 }, reactionFrames = { 10, 16 } }
 
+-- After a swap fires it needs ~7 frames to resolve into its clear; re-engaging (esp. re-swapping the same cell) before
+-- then stops the clear from ever registering -- the mid-game stall. Drain idle until the board settles, capped so a
+-- busy/garbage board can't deadlock it.
+local SWAP_SETTLE_CAP = 8
+
 -- deterministic jitter: pick a value in the range (scalar passes through). Seeded per controller -> reproducible.
 local function jitter(self, v)
   if type(v) ~= "table" then return v end
@@ -51,6 +56,19 @@ end
 
 function CursorController:nextInput(state, decision)
   if self.moveCooldown > 0 then self.moveCooldown = self.moveCooldown - 1 end
+
+  -- SWAP-SETTLE DRAIN: a just-fired swap needs ~7 frames to resolve into its clear. Re-engaging before then (re-swapping
+  -- the same cell, or moving on) stops the clear from ever registering -- the mid-game stall. Idle until the board
+  -- settles, capped so a busy/garbage board can't deadlock it.
+  if self.draining then
+    if (self.swapSettle or 0) < SWAP_SETTLE_CAP then
+      self.swapSettle = (self.swapSettle or 0) + 1
+      return IDLE
+    end
+    self.swapSettle, self.draining = 0, false
+    self.locked, self.lockedSeq, self.lockedPos = nil, nil, nil
+    self.idle = true
+  end
 
   -- FOLLOW THE RISE: when a row commits the whole stack shifts UP one row, so a
   -- target we're locked onto moves up too. displacement runs 16->0 then resets to
@@ -111,7 +129,7 @@ function CursorController:nextInput(state, decision)
                              -- gives the prior swap time to land; a whole-board settle-wait stalled forever under garbage
                              -- (the board is never fully idle) and only a few panels ever move anyway.
     else
-      self.locked, self.lockedSeq = nil, nil -- whole chip done; release for a fresh decision
+      self.swapped, self.draining = false, true -- whole chip done; DRAIN (top of next call) so the swap RESOLVES before re-engaging
       return IDLE
     end
   end

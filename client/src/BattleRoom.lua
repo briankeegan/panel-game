@@ -589,8 +589,11 @@ function BattleRoom:refreshReadyStates()
   for _, player in ipairs(self.players) do
     if player.isLocal then
       -- every local human player has an input configuration assigned; touch substitutes for an inputConfiguration
+      -- Offline games force-load their assets at match start (GameBase:loadAssets),
+      -- so they don't need to wait on the async preload gate -- waiting on it made
+      -- "Start" sit dead for seconds. Online still gates to stay in sync with peers.
       local ready = minimumCondition
-        and self.allAssetsLoaded and player.settings.wantsReady
+        and (self.allAssetsLoaded or not self.online) and player.settings.wantsReady
         and (not player.human or (player.inputConfiguration or player.settings.inputMethod == "touch"))
       player:setReady(ready)
     else
@@ -1009,6 +1012,14 @@ function BattleRoom:update(dt)
   if self.state == BattleRoom.states.Setup then
     -- the setup phase of the room
     self:updateLoadingState()
+    -- Fast-drain the mod-load queue while in setup so game starts feel instant
+    -- instead of the 1-asset/frame background drip that made "Start" sit dead for
+    -- 1-3s. Only in Setup -- never hitches an in-progress match.
+    if not self.allAssetsLoaded then
+      for _ = 1, 24 do
+        if not ModLoader.update() then break end
+      end
+    end
     self:refreshReadyStates()
     if self:allReady() then
       -- if online we have to wait for the server message

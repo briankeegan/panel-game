@@ -124,26 +124,23 @@ function PuzzleGame:customLoad()
   -- mode the touch controller ALSO feeds live input each frame and corrupts the
   -- playback (it "tries then fails"). Run playback in controller mode; normal play
   -- stays touch on mobile.
-  if system.isPortraitMode() then
-    -- Always touch on mobile, INCLUDING solution/hint playback. The engine runs the
-    -- fed key-encoded inputs regardless of inputMethod (1-char key inputs still move
-    -- the cursor in touch mode -- that's why hint works); controller mode instead
-    -- stalls the local stack because the touch player has no inputConfiguration.
+  if #self.queuedInputs > 0 then
+    -- Solution/hint playback: receive-only so the fed inputs are the SOLE driver.
+    -- is_local=false stops the stack from generating its own local input each frame
+    -- (the double-feed that fought the playback and jammed the board); the engine
+    -- just runs the confirmed inputs fed by feedQueuedInput.
+    playerStack.engine.is_local = false
+  elseif system.isPortraitMode() then
     self.player:setInputMethod("touch")
     playerStack.engine.inputMethod = "touch"
     playerStack.inputMethod = "touch"
-    -- The touch controller + detector (which actually generate swaps) are only built
-    -- in the PlayerStack constructor, and only when inputMethod is already "touch"
-    -- then. A stack built as controller otherwise renders the cursor but never swaps,
-    -- so build them here if missing.
+    -- Touch controller + detector (which generate swaps) are only built in the
+    -- PlayerStack constructor when inputMethod is already "touch"; build them here
+    -- if a stack came up as controller, else the cursor shows but never swaps.
     if not playerStack.touchInputDetector then
       playerStack.touchInputController = TouchInputController(playerStack.engine)
       playerStack.touchInputDetector = TouchInputDetector(playerStack)
     end
-  elseif #self.queuedInputs > 0 then
-    -- desktop playback decodes the recorded inputs as controller
-    self.player:setInputMethod("controller")
-    playerStack.engine.inputMethod = "controller"
   end
 
   -- Restore level if it was temporarily changed for solution playback

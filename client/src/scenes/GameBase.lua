@@ -281,7 +281,7 @@ function GameBase:loadAssets(match)
   if not match.stageId then match.stageId = StageLoader.fullyResolveStageSelection(match.stageId) end
   local s = stages[match.stageId]
   if s and not s.fullyLoaded then needsLoad = true end
-  if needsLoad and GAME.presentLoadingString then GAME:presentLoadingString(loc("ld_characters")) end
+  if needsLoad and GAME.presentLoadingString then GAME:presentLoadingString(loc("ld_loading")) end
 
   for i, stack in ipairs(match.stacks) do
     logger.debug("Force loading character " .. stack.character.id .. " as part of GameBase:load")

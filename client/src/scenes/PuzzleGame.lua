@@ -136,6 +136,7 @@ function PuzzleGame:customLoad()
     -- auto-repeat (turns a held key into an extra move). Either makes the swap miss.
     playerStack.send_controls = false
     playerStack.engine.cur_wait_time = 99999
+    self.isSolvePlayback = true
   elseif system.isPortraitMode() then
     self.player:setInputMethod("touch")
     playerStack.engine.inputMethod = "touch"
@@ -461,10 +462,12 @@ function PuzzleGame:customGameOverSetup()
     self:savePuzzleRecordResult(not self.hintUsed)
     self:recordPuzzleSolution()
 
-    -- If hint/solution was used, stay on the same puzzle; otherwise advance to next
-    local puzzleIndices = PuzzleGame.setupNextPuzzle(GAME.battleRoom, self.puzzleSetIterator, self.puzzleSet, not self.hintUsed)
-    if puzzleIndices then
-    else
+    -- Always advance to the next puzzle on a win so "Start" walks the whole set
+    -- through to the end (then exits). Using Hint/Solve still counts as completing it
+    -- for progression; savePuzzleRecordResult(not hintUsed) above keeps the "beaten
+    -- unaided" record honest. Reset is there if you want to replay one by hand.
+    local puzzleIndices = PuzzleGame.setupNextPuzzle(GAME.battleRoom, self.puzzleSetIterator, self.puzzleSet, true)
+    if not puzzleIndices then
       self.puzzleSetIterator = nil
     end
   else -- puzzle failed or manually reset
@@ -514,10 +517,11 @@ function PuzzleGame:feedQueuedInput()
   if self.inputQueueIndex <= #self.queuedInputs then
     stack:receiveConfirmedInput(self.queuedInputs[self.inputQueueIndex])
     self.inputQueueIndex = self.inputQueueIndex + 1
-  elseif self.match and not self.match.ended then
-    -- After the recorded inputs run out, keep the engine advancing with idle frames
-    -- so the final swap + clear actually resolve. With send_controls disabled during
-    -- playback there's no idle poll to drive it, so the match would otherwise freeze.
+  elseif self.isSolvePlayback and self.match and not self.match.ended then
+    -- Solve playback only: after the recorded inputs run out, keep the engine advancing
+    -- with idle frames so the final swap + clear resolve (send_controls is disabled here,
+    -- so nothing else drives it). NOT for move-puzzle Hint -- that keeps its live poll and
+    -- hands control straight back to the player, so it must not be fed idle forever.
     stack:receiveConfirmedInput(KeyDataEncoding.idle)
   end
 end

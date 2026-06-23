@@ -412,9 +412,10 @@ end
 local W_IMMEDIATE_TOTAL, W_IMMEDIATE_CHAIN, W_IMMEDIATE_FIRST = 30, 400, 20
 local function scoreSwap(grid, rows, r, c)                        -- eval + chip-setup bonus + a fat bonus for a clear NOW
   local g, chain, total, firstClear = BoardSim.simSwap(grid, rows, r, c)
-  local s = eval(g, rows) + W_CHIP * chipSetupBonus(g, rows, r, c)
+  local bonus = chipSetupBonus(g, rows, r, c)
+  local s = eval(g, rows) + W_CHIP * bonus
   if total > 0 then s = s + W_IMMEDIATE_TOTAL * total + W_IMMEDIATE_CHAIN * chain + W_IMMEDIATE_FIRST * (firstClear or 0) end
-  return s, g, total, chain
+  return s, g, total, chain, bonus
 end
 -- BEAM SEARCH: keep the best BEAM_W states, expand to depth BEAM_D, commit the FIRST swap of the best leaf. BEAM_D=1 is
 -- pure depth-1 greedy (the validated default). Re-planned every frame; only ever ONE swap committed. Budget-capped.
@@ -432,10 +433,10 @@ function M.planMove(grid, rows, touchable, cursor)
   for _, sw in ipairs(legalSwaps(grid, rows, touchable, hiRow)) do
     if budget <= 0 then break end
     budget = budget - 1
-    local s, g, total, chain = scoreSwap(grid, rows, sw[1], sw[2])
+    local s, g, total, chain, bonus = scoreSwap(grid, rows, sw[1], sw[2])
     local reward = (total > 0) and (W_IMMEDIATE_TOTAL * total + W_IMMEDIATE_CHAIN * chain) or 0
     local dist = (sw[1] > cr and sw[1] - cr or cr - sw[1]) + (sw[2] > cc and sw[2] - cc or cc - sw[2])  -- from the cursor
-    beam[#beam + 1] = { g = g, score = s, reward = reward, first = sw, dist = dist }
+    beam[#beam + 1] = { g = g, score = s, reward = reward, setup = bonus, first = sw, dist = dist }
   end
   if #beam == 0 then return nil end
   local function trim(states)
@@ -455,8 +456,9 @@ function M.planMove(grid, rows, touchable, cursor)
         if budget <= 0 then break end
         budget = budget - 1
         local g2, chain, total = BoardSim.simSwap(node.g, rows, sw[1], sw[2])
+        local lbonus = chipSetupBonus(g2, rows, sw[1], sw[2])
         local reward = node.reward + ((total > 0) and (W_IMMEDIATE_TOTAL * total + W_IMMEDIATE_CHAIN * chain) or 0)
-        local leaf = { g = g2, score = eval(g2, rows) + W_CHIP * chipSetupBonus(g2, rows, sw[1], sw[2]) + reward, reward = reward, first = node.first, dist = node.dist }
+        local leaf = { g = g2, score = eval(g2, rows) + W_CHIP * lbonus + reward, reward = reward, setup = math.max(node.setup or 0, lbonus), first = node.first, dist = node.dist }
         nxt[#nxt + 1] = leaf
         if leaf.score > best.score or (leaf.score == best.score and leaf.dist < best.dist) then best = leaf end
       end
@@ -464,10 +466,11 @@ function M.planMove(grid, rows, touchable, cursor)
     if #nxt == 0 then break end
     trim(nxt); beam = nxt
   end
-  -- NOTHING-USEFUL GUARD: if the best swap doesn't actually improve on the current board, it's junk (the @1,1 default --
-  -- first legal swap winning a tie when nothing helps). Return nil so the brain raises for fresh material / organizes
-  -- down instead of doing a pointless corner swap.
-  if best.score <= eval(grid, rows) then return nil end
+  -- NOTHING-USEFUL GUARD: commit the plan's first swap if the plan DOES something along its PATH -- clears (reward),
+  -- sets up a recognized chip (setup), or improves the board. Only bail (-> raise/organize, never a junk @1,1 corner
+  -- swap) when the best plan does NONE of those. Gating on the path -- not the mid-build leaf's eval -- is what lets
+  -- depth commit a build whose payoff is a move or two out (the deep search was strangled by the old leaf-only guard).
+  if best.reward == 0 and (best.setup or 0) == 0 and best.score <= eval(grid, rows) then return nil end
   return best.first
 end
 

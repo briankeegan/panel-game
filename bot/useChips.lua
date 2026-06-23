@@ -422,7 +422,7 @@ end
 local BEAM_W = 8
 local BEAM_D = tonumber(os.getenv("PA_BEAM_D")) or 1        -- depth-1 greedy, re-planned EVERY frame: deeper plans go stale on the rising board (d2 cleared 51 vs d1 154, 20x slower). knob stays for experiments (env PA_BEAM_D)
 local NODE_BUDGET = 400 * BEAM_D                            -- sim budget scales with depth so deeper levels aren't starved
-function M.planMove(grid, rows, touchable, cursor)
+function M.planMove(grid, rows, touchable, cursor, force)
   if not touchable then return nil end
   local cr = (cursor and cursor[1]) or 1
   local cc = (cursor and cursor[2]) or 3
@@ -470,7 +470,7 @@ function M.planMove(grid, rows, touchable, cursor)
   -- sets up a recognized chip (setup), or improves the board. Only bail (-> raise/organize, never a junk @1,1 corner
   -- swap) when the best plan does NONE of those. Gating on the path -- not the mid-build leaf's eval -- is what lets
   -- depth commit a build whose payoff is a move or two out (the deep search was strangled by the old leaf-only guard).
-  if best.reward == 0 and (best.setup or 0) == 0 and best.score <= eval(grid, rows) then return nil end
+  if not force and best.reward == 0 and (best.setup or 0) == 0 and best.score <= eval(grid, rows) then return nil end  -- force (DANGER): any move beats standing still and dying
   return best.first
 end
 

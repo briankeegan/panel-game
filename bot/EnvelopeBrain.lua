@@ -193,7 +193,7 @@ function EnvelopeBrain:decide(state, stack, match)
       -- hand-coded shapes. Chips already fired FIRST (CLEAR step above); here we only ever play ONE swap and re-plan.
       -- planMove returns nil when no swap improves the board (no junk @1,1). Then the stuck-ladder: room -> RAISE for
       -- fresh material (new colors = new setups); too high -> organize DOWN; never a pointless corner swap.
-      local mv = useChips.planMove(grid, rows, touchable, cursor)
+      local mv = useChips.planMove(grid, rows, touchable, cursor, st == "DANGER")  -- DANGER: never bail to WAIT, dig with the best move
       if mv then
         move = { type = "SWAP", pos = mv, swaps = { mv }, kind = "PLAN" }; self._substate = "PLAN"
       elseif st ~= "DANGER" and not busy then

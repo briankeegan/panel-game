@@ -445,6 +445,11 @@ function M.planMove(grid, rows, touchable, cursor, force)
     while #states > BEAM_W do states[#states] = nil end
   end
   trim(beam)
+  if os.getenv("PA_PLANDBG") and peak >= 9 then
+    local s = {}
+    for i = 1, math.min(4, #beam) do local b = beam[i]; s[#s + 1] = string.format("(%d,%d)[s%d r%d set%d d%d]", b.first[1], b.first[2], b.score, b.reward, b.setup or 0, b.dist) end
+    io.stderr:write("PLAN top: " .. table.concat(s, " ") .. "\n")
+  end
   local best = beam[1]
   for _ = 2, BEAM_D do
     if budget <= 0 then break end

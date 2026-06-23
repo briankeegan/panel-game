@@ -46,5 +46,18 @@ while not stack:game_ended() and frame < 200000 do
   match:run()
   frame = frame + 1
 end
-print(string.format("seed=%d  survived %d frames (%.1fs)  cleared=%s  garbage-faced=%s  [%s]",
-  seed, frame, frame / 60, tostring(stack.panels_cleared or 0), tostring(sawGarbage), modeArg))
+-- death-board column profile (tower / evenness analysis) + save the real replay for faithful re-sim
+local hs = {}
+for c = 1, 6 do
+  hs[c] = 0
+  for r = #stack.panels, 1, -1 do
+    local p = stack.panels[r] and stack.panels[r][c]
+    if p and ((p.color or 0) ~= 0 or p.isGarbage) then hs[c] = r; break end
+  end
+end
+local mx, mn = 0, 99
+for c = 1, 6 do if hs[c] > mx then mx = hs[c] end; if hs[c] < mn then mn = hs[c] end end
+local name = attackFile and attackFile:match("([^/]+)%.json$") or "endless"
+pcall(function() require("bot.saveReplay").save(match, string.format("logs/botreplays/bench_%s_seed%d.json", name, seed)) end)
+print(string.format("seed=%d  survived %d frames (%.1fs)  cleared=%s  garbage=%s  cols=[%s] spread=%d  [%s]",
+  seed, frame, frame / 60, tostring(stack.panels_cleared or 0), tostring(sawGarbage), table.concat(hs, ","), mx - mn, modeArg))

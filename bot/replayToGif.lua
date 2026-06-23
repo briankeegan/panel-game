@@ -34,18 +34,10 @@ end
 local H = math.min(12, #st.panels)
 local idleCut = seed and 120 or 150
 local frames, lastChange, prevKey = {}, 0, nil
--- optional garbage scenario for bot mode (PA_GARBAGE_SCENARIO=factor|large-garbage|combo-storm), injected like botBench
-local function gblk(w, h, ch) return { width = w, height = h, isMetal = false, isChain = ch, frameEarned = 0, rowEarned = 1, colEarned = 1 } end
-local GSCEN = ({
-  factor = function(f) local e = math.max(180, 600 - math.floor(f / 6)); return (f > 0 and f % e == 0) and { gblk(6, 2, true) } or nil end,
-  ["large-garbage"] = function(f) return (f > 0 and f % 600 == 0) and { gblk(6, 4, true) } or nil end,
-  ["combo-storm"] = function(f) return (f > 0 and f % 120 == 0) and { gblk(3, 1, false) } or nil end,
-})[os.getenv("PA_GARBAGE_SCENARIO") or ""]
-for frame = 0, 17999 do
+for frame = 0, 5999 do
   if st:game_ended() then break end
   local state, dec, info
   if seed then  -- bot drives: decide, act, then capture
-    if GSCEN then local g = GSCEN(frame); if g then st:applyNetworkGarbage(g, 2) end end
     local bs = BoardState.extract(st)
     local d = brain:decide(bs, st, m)
     local ch = ctrl:nextInput(bs, d)

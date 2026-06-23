@@ -385,6 +385,27 @@ local function sceneTexts()
   return acc
 end
 
+-- Find the first visible clickable element (Button/TextButton) whose label text
+-- matches, walking the scene's uiRoot. Lets the harness click standalone buttons
+-- (Solve/Hint/Start) that aren't ui.Menu items.
+local function findClickable(node, label, depth)
+  if not node or depth > 12 or node.isVisible == false then return nil end
+  if node.onClick then
+    local texts = {}
+    collectTexts(node, texts, 0)
+    for _, t in ipairs(texts) do
+      if t:lower() == label:lower() then return node end
+    end
+  end
+  if node.children then
+    for _, ch in ipairs(node.children) do
+      local f = findClickable(ch, label, depth + 1)
+      if f then return f end
+    end
+  end
+  return nil
+end
+
 -- First on-screen string containing needle (case-insensitive), or nil.
 local function screenHasText(needle)
   needle = needle:lower()
@@ -412,6 +433,15 @@ local function execCommand(c)
     writeOut("texts[" .. tostring(sceneName()) .. "]: " .. table.concat(sceneTexts(), " | "))
   elseif op == "wait" then st.busy = tonumber(args[1]) or 30
   elseif op == "scene" then writeOut("scene=" .. tostring(sceneName()))
+  elseif op == "click" then
+    local s = scene()
+    local btn = s and s.uiRoot and findClickable(s.uiRoot, rest, 0)
+    if btn then
+      local ok, err = pcall(function() btn:onClick() end)
+      writeOut("click: '" .. rest .. "' " .. (ok and "fired" or ("ERR: " .. tostring(err))))
+    else
+      writeOut("click: '" .. rest .. "' not found in " .. tostring(sceneName()))
+    end
   elseif op == "mockroom" then
     -- mockroom <N> [host] : jump to a fake N-player waiting room for layout tests
     local n = tonumber(args[1]) or 4

@@ -125,11 +125,12 @@ function PuzzleGame:customLoad()
   -- playback (it "tries then fails"). Run playback in controller mode; normal play
   -- stays touch on mobile.
   if #self.queuedInputs > 0 then
-    -- Solution/hint playback: receive-only so the fed inputs are the SOLE driver.
-    -- is_local=false stops the stack from generating its own local input each frame
-    -- (the double-feed that fought the playback and jammed the board); the engine
-    -- just runs the confirmed inputs fed by feedQueuedInput.
-    playerStack.engine.is_local = false
+    -- Solution/hint playback: decode the recorded inputs as controller, and DISABLE
+    -- the local input poll (send_controls) so the fed inputs are the sole driver.
+    -- Otherwise the touch poll double-feeds, corrupts the playback, kills the match,
+    -- and bounces to the menu. Stack stays is_local so it runs at 1 input/frame.
+    playerStack.engine.inputMethod = "controller"
+    playerStack.send_controls = false
   elseif system.isPortraitMode() then
     self.player:setInputMethod("touch")
     playerStack.engine.inputMethod = "touch"

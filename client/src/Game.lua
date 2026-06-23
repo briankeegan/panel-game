@@ -656,7 +656,7 @@ function Game:transform_coordinates(x, y)
 end
 
 
-function Game:drawLoadingString(loadingString) 
+function Game:drawLoadingString(loadingString)
   local textMaxWidth = 300
   local textHeight = 40
   local x = 0
@@ -664,6 +664,19 @@ function Game:drawLoadingString(loadingString)
   local backgroundPadding = 10
   GraphicsUtil.drawRectangle("fill", consts.CANVAS_WIDTH / 2 - (textMaxWidth / 2) , y - backgroundPadding, textMaxWidth, textHeight, 0, 0, 0, 0.5)
   GraphicsUtil.printf(loadingString, x, y, consts.CANVAS_WIDTH, "center", nil, nil, 10)
+end
+
+-- Draw a loading string to the screen and present it immediately, so it's visible
+-- DURING a following blocking operation (e.g. force-loading mods at match start)
+-- instead of showing a frozen frame. Mirrors the normal canvas->screen draw path.
+function Game:presentLoadingString(loadingString)
+  love.graphics.setCanvas({self.globalCanvas, stencil = true})
+  love.graphics.clear()
+  self:drawLoadingString(loadingString)
+  love.graphics.setCanvas()
+  love.graphics.draw(self.globalCanvas, self.canvasX, self.canvasY, 0, self.canvasXScale, self.canvasYScale,
+    self.globalCanvas:getWidth() / 2, self.globalCanvas:getHeight() / 2)
+  love.graphics.present()
 end
 
 function Game:setLanguage(lang_code)

@@ -271,6 +271,18 @@ end
 -- the stage are ready — no asset streams in during play.
 function GameBase:loadAssets(match)
   local preloadStartMs = math.floor(love.timer.getTime() * 1000)
+
+  -- If anything below still needs a (blocking) force-load, paint a loading screen
+  -- first so the wait shows feedback instead of a frozen frame.
+  local needsLoad = false
+  for _, stack in ipairs(match.stacks) do
+    if stack.character and not stack.character.fullyLoaded then needsLoad = true end
+  end
+  if not match.stageId then match.stageId = StageLoader.fullyResolveStageSelection(match.stageId) end
+  local s = stages[match.stageId]
+  if s and not s.fullyLoaded then needsLoad = true end
+  if needsLoad and GAME.presentLoadingString then GAME:presentLoadingString(loc("ld_characters")) end
+
   for i, stack in ipairs(match.stacks) do
     logger.debug("Force loading character " .. stack.character.id .. " as part of GameBase:load")
     ModController:loadModFor(stack.character, stack, true)

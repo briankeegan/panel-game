@@ -442,6 +442,44 @@ local function execCommand(c)
     else
       writeOut("click: '" .. rest .. "' not found in " .. tostring(sceneName()))
     end
+  elseif op == "puzzlestate" then
+    local s = scene()
+    local br = GAME.battleRoom
+    local match = br and br.match
+    local parts = {}
+    parts[#parts + 1] = "text=" .. tostring(s and s.text)
+    parts[#parts + 1] = "matchEnded=" .. tostring(match and match.ended)
+    if match and match.stacks and match.stacks[1] then
+      local e = match.stacks[1].engine
+      parts[#parts + 1] = "game_over_clock=" .. tostring(e and e.game_over_clock)
+      parts[#parts + 1] = "clock=" .. tostring(e and e.clock)
+      -- count non-empty color panels left on the board
+      local n = 0
+      if e and e.panels then
+        for _, row in ipairs(e.panels) do
+          for _, p in ipairs(row) do
+            if p and p.color and p.color ~= 0 and p.color ~= 9 then n = n + 1 end
+          end
+        end
+      end
+      parts[#parts + 1] = "colorPanels=" .. n
+      parts[#parts + 1] = "cur=" .. tostring(e and e.cur_row) .. "," .. tostring(e and e.cur_col)
+      parts[#parts + 1] = "inputMethod=" .. tostring(e and e.inputMethod)
+    end
+    local pz = s and s.getCurrentPuzzle and s:getCurrentPuzzle()
+    if pz and pz.cursorStartLeft then
+      parts[#parts + 1] = "cursorStart=" .. tostring(pz.cursorStartLeft.row) .. "," .. tostring(pz.cursorStartLeft.column)
+    else
+      parts[#parts + 1] = "cursorStart=nil"
+    end
+    local hh = s and s.puzzleHelpDisplay and s.puzzleHelpDisplay.hintHelper
+    if hh and hh.solutionSwapPositions then
+      local sw = {}
+      for _, p in ipairs(hh.solutionSwapPositions) do sw[#sw + 1] = tostring(p.row) .. "," .. tostring(p.column) end
+      parts[#parts + 1] = "solveSwaps=" .. table.concat(sw, ";")
+      parts[#parts + 1] = "solveLen=" .. tostring(hh.solutionInputs and #hh.solutionInputs)
+    end
+    writeOut("puzzlestate: " .. table.concat(parts, " "))
   elseif op == "mockroom" then
     -- mockroom <N> [host] : jump to a fake N-player waiting room for layout tests
     local n = tonumber(args[1]) or 4

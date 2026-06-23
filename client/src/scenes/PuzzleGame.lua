@@ -131,6 +131,11 @@ function PuzzleGame:customLoad()
     -- desktop cadence the recorded solution was authored against. Keep that poll;
     -- only a TOUCH-built stack's poll corrupts playback (it feeds live touch input).
     playerStack.engine.inputMethod = "controller"
+    -- Clean, edge-detected replay so the cursor lands exactly where the solution
+    -- intends: no poll (poll idles split a held key into two presses) and no DAS
+    -- auto-repeat (turns a held key into an extra move). Either makes the swap miss.
+    playerStack.send_controls = false
+    playerStack.engine.cur_wait_time = 99999
   elseif system.isPortraitMode() then
     self.player:setInputMethod("touch")
     playerStack.engine.inputMethod = "touch"
@@ -502,14 +507,18 @@ function PuzzleGame:trackSwapInput()
 end
 
 function PuzzleGame:feedQueuedInput()
-  if #self.queuedInputs > 0 and self.inputQueueIndex <= #self.queuedInputs then
-    local playerStack = self.playerStack
-    if playerStack then
-      local stack = playerStack.engine
-      local input = self.queuedInputs[self.inputQueueIndex]
-      stack:receiveConfirmedInput(input)
-      self.inputQueueIndex = self.inputQueueIndex + 1
-    end
+  if #self.queuedInputs == 0 then return end
+  local playerStack = self.playerStack
+  if not playerStack then return end
+  local stack = playerStack.engine
+  if self.inputQueueIndex <= #self.queuedInputs then
+    stack:receiveConfirmedInput(self.queuedInputs[self.inputQueueIndex])
+    self.inputQueueIndex = self.inputQueueIndex + 1
+  elseif self.match and not self.match.ended then
+    -- After the recorded inputs run out, keep the engine advancing with idle frames
+    -- so the final swap + clear actually resolve. With send_controls disabled during
+    -- playback there's no idle poll to drive it, so the match would otherwise freeze.
+    stack:receiveConfirmedInput(KeyDataEncoding.idle)
   end
 end
 

@@ -107,15 +107,18 @@ function CursorController:nextInput(state, decision)
       -- next swap in the chip: re-target it, and let the prior swap LAND first (the verify settles between swaps too)
       self.lockedPos = { self.lockedSeq[self.seqIdx][1], self.lockedSeq[self.seqIdx][2] }
       self.locked = self.lockedPos[1] .. "," .. self.lockedPos[2]
-      self.swapped, self.interSwap = false, 6
+      self.swapped, self.waitSettle = false, true
     else
       self.locked, self.lockedSeq = nil, nil -- whole chip done; release for a fresh decision
       return IDLE
     end
   end
-  if (self.interSwap or 0) > 0 then
-    self.interSwap = self.interSwap - 1
-    return IDLE -- waiting for the prior swap in this chip to settle before the next
+  -- ADAPTIVE settle between a chip's swaps: wait until the prior swap has actually settled (no active/chaining panels),
+  -- exactly like the verify does -- then fire the next swap IMMEDIATELY. A fixed delay let the live board drift between
+  -- swaps so the combo fell apart; settle-then-fire keeps the pair as tight as the verify, so the valid chip clears.
+  if self.waitSettle then
+    if (state.activePanels or 0) > 0 or (state.chainCounter or 0) > 0 then return IDLE end
+    self.waitSettle = false
   end
   if self.reactionTimer > 0 then
     self.reactionTimer = self.reactionTimer - 1

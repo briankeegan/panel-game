@@ -25,19 +25,15 @@ function EnvelopeBrain:chipVerify(stack, match)
     local ok, fired, broke = pcall(function()
       local clock0 = stack.clock
       for _, s in ipairs(match.stacks) do s:saveForRollback() end
-      local hit, gbroke, routing = false, false, false
-      local token = {}  -- weak-keyed subscriber held in scope; clears DURING the cursor's travel are the rise, not the swap -> ignored
-      stack:connectSignal("matched", token, function() if not routing then hit = true end end)
-      stack:connectSignal("garbageMatched", token, function() if not routing then hit = true; gbroke = true end end)
-      local cr, cc = stack.cur_row or 1, stack.cur_col or 1
+      stack.stop_time = math.max(stack.stop_time or 0, 999)  -- freeze the rise so a rising row can't fire the match instead of the swap
+      local hit, gbroke = false, false
+      local token = {}  -- weak-keyed subscriber held in scope; signals fire the INSTANT a clear is detected
+      stack:connectSignal("matched", token, function() hit = true end)
+      stack:connectSignal("garbageMatched", token, function() hit = true; gbroke = true end)  -- garbage broke -> this chip is a BREAK
       for _, mv in ipairs(seq) do
-        -- ROUTE the way the CONTROLLER does, not teleport: advance the board with the rise LIVE for the cursor's travel
-        -- time. A chip that goes stale while the cursor crosses to a far swap must NOT verify -- the teleport-vs-route bug.
-        routing = true; stack.stop_time = 0
-        local travel = math.min((math.abs(mv[1] - cr) + math.abs(mv[2] - cc)) * 2 + 6, 30)
-        for _ = 1, travel do stack:receiveConfirmedInput("A"); match:run() end
-        routing = false; stack.stop_time = math.max(stack.stop_time or 0, 999)  -- freeze the swap itself so its clear is attributed to the swap, not a rising row
-        cr, cc = mv[1], mv[2]
+        -- teleport+swap, settling between swaps. The controller's ADAPTIVE settle (wait for the prior swap to land, then
+        -- fire the next) reproduces this tightly on the live board, so a chip that verifies here actually fires when
+        -- executed -- the routing model over-rejected multi-swap chips that DO execute (proven: +70 panels with them on).
         stack.cur_row, stack.cur_col = mv[1], mv[2]; stack:receiveConfirmedInput(KDE_swap); match:run()
         for k = 1, 20 do
           if hit then break end                          -- garbageMatched fires in the SAME checkMatches as matched, so gbroke is already set

@@ -13,6 +13,8 @@ local PuzzleSet = require("client.src.PuzzleSet")
 local MultibarElement = require("client.src.ui.MultibarElement")
 local system = require("client.src.system")
 local ui = require("client.src.ui")
+local TouchInputController = require("client.src.TouchInputController")
+local TouchInputDetector = require("client.src.TouchInputDetector")
 
 -- Scene for a puzzle mode instance of the game
 ---@class PuzzleGame : GameBase
@@ -125,9 +127,20 @@ function PuzzleGame:customLoad()
   if #self.queuedInputs > 0 then
     self.player:setInputMethod("controller")
     playerStack.engine.inputMethod = "controller"
+    playerStack.inputMethod = "controller"
   elseif system.isPortraitMode() then
     self.player:setInputMethod("touch")
     playerStack.engine.inputMethod = "touch"
+    playerStack.inputMethod = "touch"
+    -- The touch controller + detector (which actually generate swaps) are only
+    -- built in the PlayerStack constructor, and only when inputMethod is already
+    -- "touch" then. A puzzle stack built as controller (e.g. coming out of a
+    -- solve/hint playback) otherwise renders the cursor but never swaps. Build
+    -- them here if missing so touch play works on every (re)load.
+    if not playerStack.touchInputDetector then
+      playerStack.touchInputController = TouchInputController(playerStack.engine)
+      playerStack.touchInputDetector = TouchInputDetector(playerStack)
+    end
   end
 
   -- Restore level if it was temporarily changed for solution playback

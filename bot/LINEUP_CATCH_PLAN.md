@@ -111,6 +111,42 @@ A breaking block is a one-time opportunity — grab it — but **never at the co
 
 ---
 
+## Implemented (the chip/recognition half — built + engine-verified, ready for the brain to call)
+
+Two modules cover the mechanics/recognition half; the brain wires them into the state machine. Both are
+engine-verified against the mechanics above.
+
+**`bot/garbageReveal.lua`** — the fair reader (= break detector + column reader):
+- `openColumns(stack)` → `{ [col] = color }` for columns whose breaking garbage has **POPPED** (fair gate
+  `timer ≤ pop_time`); sealed / not-yet-popped columns are **absent**. *Verified: leaks nothing while sealed, then
+  reveals c6→c1 right-to-left ~7f apart.*
+- `breakingRow(stack)` → row the freed panels fall from (nil if nothing is breaking).
+- `dropETA(stack)` → frames until the bottom row drops (the catch budget), read live from the block's timers.
+
+**`bot/catchPrimitive.lua`** — the topOff (catch recognition):
+- `findTopOff(grid, col, color)` → `nil` | `{already=true}` | `{swap={r,c}}` — can column `col` present 2 of `color`
+  on top with **≤1 swap** so the freed panel completes a vertical-3. *Verified: recognition correct (already/swap/nil)
+  and the engine confirms the vertical-3 fires in each case.*
+
+| component (from the table above) | status |
+|---|---|
+| break detector / column reader | ✅ `garbageReveal.openColumns` · `breakingRow` |
+| `topOff` | ✅ `catchPrimitive.findTopOff` |
+| scheduler (right→left, budget) | ⬜ **brain** |
+| organize (coverage prep) | ⬜ **brain** (+ the search organize gap) |
+| state wiring (CATCH in the spine) | ⬜ **brain** |
+
+**Brain glue (the loop), roughly:**
+```
+each frame, if garbageReveal.breakingRow(stack):
+  budget = garbageReveal.dropETA(stack)
+  for col,color in garbageReveal.openColumns(stack), iterate RIGHT->LEFT:
+    t = catchPrimitive.findTopOff(grid, col, color)
+    if t and (t.already or budget allows t.swap): route cursor + apply t.swap
+```
+
+---
+
 ## Open questions for the brain side
 
 1. **Fair-to-read gate:** confirm "I know this column" = its **pop frame** (`timer ≤ pop_time`), not the data-assign
@@ -127,5 +163,5 @@ A breaking block is a one-time opportunity — grab it — but **never at the co
 - Reveal/pop mechanics: `common/engine/checkMatches.lua` (`matchGarbagePanels`, `sortByPopOrder`, `convertGarbagePanels`,
   `COMBO_GARBAGE`); `pop_time`/`pop_index` in `common/engine/Panel.lua`.
 - Brain architecture (state-first RAISE/DANGER/OFFENSE + useChips): `bot/EnvelopeBrain.lua`, `bot/CHIPS_BRAIN_PLAN.md`.
-- The vertical top-off prototype (now the CATCH primitive): see the color-release path removed from `bot/getShogunShapes.lua`.
+- The CATCH primitive (vertical top-off): `bot/catchPrimitive.lua`. The fair reveal reader: `bot/garbageReveal.lua`.
 - Organize gap: the search doesn't group colors toward a setup (a known, separate issue this mode depends on).

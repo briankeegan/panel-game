@@ -41,7 +41,7 @@ local GSCEN = ({
   ["large-garbage"] = function(f) return (f > 0 and f % 600 == 0) and { gblk(6, 4, true) } or nil end,
   ["combo-storm"] = function(f) return (f > 0 and f % 120 == 0) and { gblk(3, 1, false) } or nil end,
 })[os.getenv("PA_GARBAGE_SCENARIO") or ""]
-for frame = 0, 17999 do
+for frame = 0, 5999 do
   if st:game_ended() then break end
   local state, dec, info
   if seed then  -- bot drives: decide, act, then capture

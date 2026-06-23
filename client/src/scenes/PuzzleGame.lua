@@ -125,9 +125,12 @@ function PuzzleGame:customLoad()
   -- playback (it "tries then fails"). Run playback in controller mode; normal play
   -- stays touch on mobile.
   if #self.queuedInputs > 0 then
+    -- Solution/hint playback: engine decodes the recorded inputs as controller,
+    -- but leave the PlayerStack's local-input path as touch. The puzzle player has
+    -- no inputConfiguration, so switching that path to controller/keyboard breaks
+    -- the fed playback (the working path per the original solve fix).
     self.player:setInputMethod("controller")
     playerStack.engine.inputMethod = "controller"
-    playerStack.inputMethod = "controller"
   elseif system.isPortraitMode() then
     self.player:setInputMethod("touch")
     playerStack.engine.inputMethod = "touch"

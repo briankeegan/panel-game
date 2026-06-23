@@ -107,18 +107,13 @@ function CursorController:nextInput(state, decision)
       -- next swap in the chip: re-target it, and let the prior swap LAND first (the verify settles between swaps too)
       self.lockedPos = { self.lockedSeq[self.seqIdx][1], self.lockedSeq[self.seqIdx][2] }
       self.locked = self.lockedPos[1] .. "," .. self.lockedPos[2]
-      self.swapped, self.waitSettle = false, true
+      self.swapped = false   -- NO inter-swap wait: route straight to the next swap. The cursor's TRAVEL to it already
+                             -- gives the prior swap time to land; a whole-board settle-wait stalled forever under garbage
+                             -- (the board is never fully idle) and only a few panels ever move anyway.
     else
       self.locked, self.lockedSeq = nil, nil -- whole chip done; release for a fresh decision
       return IDLE
     end
-  end
-  -- ADAPTIVE settle between a chip's swaps: wait until the prior swap has actually settled (no active/chaining panels),
-  -- exactly like the verify does -- then fire the next swap IMMEDIATELY. A fixed delay let the live board drift between
-  -- swaps so the combo fell apart; settle-then-fire keeps the pair as tight as the verify, so the valid chip clears.
-  if self.waitSettle then
-    if (state.activePanels or 0) > 0 or (state.chainCounter or 0) > 0 then return IDLE end
-    self.waitSettle = false
   end
   if self.reactionTimer > 0 then
     self.reactionTimer = self.reactionTimer - 1
@@ -135,7 +130,21 @@ function CursorController:nextInput(state, decision)
   elseif cr > ltr then bits = 4    -- Down
   elseif cc < ltc then bits = 1    -- Right
   elseif cc > ltc then bits = 2    -- Left
-  else bits = 16; self.swapped = true end -- aligned: swap once
+  else
+    -- aligned -- but only swap SETTLED panels. A cell mid-move (swapping/popping/falling/hovering) is OFF-LIMITS:
+    -- swapping into motion no-ops or mis-fires. Settled = state normal(0) or landing(4), the brain's touchable mask.
+    -- If the target's in motion wait for just THESE cells (not the whole board, which never idles under garbage); if it
+    -- never settles, drop the chip and re-decide.
+    local b = state.board
+    local function settled(r, c) local p = b and b[r] and b[r][c]; return p and (p.s == 0 or p.s == 4) end
+    if not (settled(ltr, ltc) and settled(ltr, ltc + 1)) then
+      self._offLimits = (self._offLimits or 0) + 1
+      if self._offLimits > 12 then self.locked, self.lockedSeq, self._offLimits = nil, nil, 0; self.idle = true end
+      return IDLE
+    end
+    self._offLimits = 0
+    bits = 16; self.swapped = true -- aligned + settled: swap once
+  end
   self.moveCooldown = jitter(self, self.cfg.cursorMoveInterval)
   return char(bits)
 end

@@ -125,12 +125,12 @@ function PuzzleGame:customLoad()
   -- playback (it "tries then fails"). Run playback in controller mode; normal play
   -- stays touch on mobile.
   if #self.queuedInputs > 0 then
-    -- Solution/hint playback: decode the recorded inputs as controller, and DISABLE
-    -- the local input poll (send_controls) so the fed inputs are the sole driver.
-    -- Otherwise the touch poll double-feeds, corrupts the playback, kills the match,
-    -- and bounces to the menu. Stack stays is_local so it runs at 1 input/frame.
+    -- Solution/hint playback. The stack is built as a real CONTROLLER stack
+    -- (playPuzzleSolution assigns a config before the reset), so its send_controls
+    -- poll reads the empty config => one idle input per frame -- exactly the legacy
+    -- desktop cadence the recorded solution was authored against. Keep that poll;
+    -- only a TOUCH-built stack's poll corrupts playback (it feeds live touch input).
     playerStack.engine.inputMethod = "controller"
-    playerStack.send_controls = false
   elseif system.isPortraitMode() then
     self.player:setInputMethod("touch")
     playerStack.engine.inputMethod = "touch"
@@ -623,10 +623,18 @@ function PuzzleGame:playPuzzleSolution(solutionInputs)
   local currentPuzzle = self:getCurrentPuzzle()
   local isMovePuzzle = currentPuzzle and currentPuzzle.puzzleType == "moves"
 
-  -- Reset to a fresh initial board, then the new scene replays the solution. The
-  -- solution is absolute (assumes the starting board), so it MUST run from a reset
-  -- board, not the current/mid-game one. customLoad keeps the playback in touch
-  -- mode on mobile (controller mode stalls -- touch player has no input config).
+  -- Build the playback stack as a real CONTROLLER stack, like legacy desktop: the
+  -- recorded solution drives a 2-cell controller cursor with a per-frame idle poll,
+  -- not the touch single-cell cursor. Assign a controller config before the reset so
+  -- the rebuilt stack comes up in controller mode; normal play flips back to touch in
+  -- customLoad. Without this the swap lands off and the puzzle never clears.
+  if GAME.input and GAME.input.inputConfigurations and GAME.input.inputConfigurations[1] then
+    GAME.localPlayer:setInputMethod("controller")
+    GAME.localPlayer:restrictInputs(GAME.input.inputConfigurations[1])
+  end
+
+  -- Reset to a fresh initial board, then the new scene replays the solution from the
+  -- start (the solution is absolute, so it must run from a reset board).
   GAME.battleRoom.sceneParameters.queuedSolutionInputs = procat(solutionInputs)
   GAME.battleRoom.sceneParameters.hintWasUsed = true
 

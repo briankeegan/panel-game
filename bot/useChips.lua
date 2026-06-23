@@ -419,7 +419,7 @@ end
 -- BEAM SEARCH: keep the best BEAM_W states, expand to depth BEAM_D, commit the FIRST swap of the best leaf. BEAM_D=1 is
 -- pure depth-1 greedy (the validated default). Re-planned every frame; only ever ONE swap committed. Budget-capped.
 local BEAM_W = 8
-local BEAM_D = tonumber(os.getenv("PA_BEAM_D")) or 3        -- look N moves ahead; scalable knob (env PA_BEAM_D)
+local BEAM_D = tonumber(os.getenv("PA_BEAM_D")) or 1        -- depth-1 greedy, re-planned EVERY frame: deeper plans go stale on the rising board (d2 cleared 51 vs d1 154, 20x slower). knob stays for experiments (env PA_BEAM_D)
 local NODE_BUDGET = 400 * BEAM_D                            -- sim budget scales with depth so deeper levels aren't starved
 function M.planMove(grid, rows, touchable, cursor)
   if not touchable then return nil end

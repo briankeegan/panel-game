@@ -102,6 +102,30 @@ A breaking block is a one-time opportunity — grab it — but **never at the co
 
 ---
 
+## Relationship to shoguns (the *other* garbage technique)
+
+Both fire when your garbage breaks, but they are **different mechanisms and complementary — not either/or.** They can
+both fire on the *same* break, on different columns.
+
+| | SHOGUN | CATCH / lineup |
+|---|---|---|
+| what completes the run | YOUR pre-placed **faller** drops into a gap | the garbage's **freed colored panel** tops your pair |
+| depends on the release color? | **NO** — color-independent (debris is grey and drops clear; your own faller finishes the run) | **YES** — you must match the color that opens |
+| timing | **static** — pre-arranged, recognized, fires automatically on the break | **reactive** — read the right→left reveal, route in the window |
+| form | catalog chip (`SHOGUN_H3/H4/H5`, in `chipCache`) | a mode + the `topOff` primitive |
+
+So on one break a **shogun column fires automatically** (your faller, grey debris dropping clear beneath it) while the
+**catch loop tops off other columns** with the freed colors. They **stack**.
+
+**Brain guidance:**
+- **Shoguns = the reliable, set-up-ahead play** (color-independent, already recognized in the catalog). Let them fire.
+- **Catch = the opportunistic add-on** (reactive, depends on what opens). Run the catch loop on the columns a shogun
+  isn't already handling.
+- They **share the same trigger** (your garbage breaking), so CATCH mode should let any pre-recognized shoguns fire
+  **and** run the reveal-catch loop — **additive**, never competing. Don't let one suppress the other.
+
+---
+
 ## Scope guidance for the first pass
 
 - **Target tall blocks + the right side** — that's ~all the value and the easiest mechanically.

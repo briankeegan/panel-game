@@ -622,23 +622,12 @@ function PuzzleGame:playPuzzleSolution(solutionInputs)
     return false
   end
 
-  local currentPuzzle = self:getCurrentPuzzle()
-  local isMovePuzzle = currentPuzzle and currentPuzzle.puzzleType == "moves"
-
-  -- Store solution inputs for the new scene to pick up
-  GAME.battleRoom.sceneParameters.queuedSolutionInputs = procat(solutionInputs)
-  GAME.battleRoom.sceneParameters.hintWasUsed = true
-
-  -- For non-move puzzles, temporarily set to level 10 for faster panels
-  -- Store the original level to restore after match is created
-  if not isMovePuzzle then
-    GAME.battleRoom.sceneParameters.restoreLevelAfterCreation = config.puzzle_level
-    GAME.localPlayer:setLevel(10)
-    GAME.localPlayer:setLevelData(LevelPresets.getModern(10))
-  end
-
-  -- Reset puzzle (creates new scene via resetPuzzle)
-  self:resetPuzzle()
+  -- Feed the solution on the CURRENT stack via queueInputs -- exactly what the hint
+  -- path (executePuzzleHint) does, and that works on touch. The old approach reloaded
+  -- the scene into controller mode, which broke on mobile: the touch player has no
+  -- inputConfiguration, so the controller/keyboard local-input path can't feed.
+  self.hintUsed = true
+  self:queueInputs(procat(solutionInputs))
 
   return true
 end

@@ -130,21 +130,7 @@ function CursorController:nextInput(state, decision)
   elseif cr > ltr then bits = 4    -- Down
   elseif cc < ltc then bits = 1    -- Right
   elseif cc > ltc then bits = 2    -- Left
-  else
-    -- aligned -- but only swap SETTLED panels. A cell mid-move (swapping/popping/falling/hovering) is OFF-LIMITS:
-    -- swapping into motion no-ops or mis-fires. Settled = state normal(0) or landing(4), the brain's touchable mask.
-    -- If the target's in motion wait for just THESE cells (not the whole board, which never idles under garbage); if it
-    -- never settles, drop the chip and re-decide.
-    local b = state.board
-    local function settled(r, c) local p = b and b[r] and b[r][c]; return p and (p.s == 0 or p.s == 4) end
-    if not (settled(ltr, ltc) and settled(ltr, ltc + 1)) then
-      self._offLimits = (self._offLimits or 0) + 1
-      if self._offLimits > 12 then self.locked, self.lockedSeq, self._offLimits = nil, nil, 0; self.idle = true end
-      return IDLE
-    end
-    self._offLimits = 0
-    bits = 16; self.swapped = true -- aligned + settled: swap once
-  end
+  else bits = 16; self.swapped = true end -- aligned: swap once (the engine's canSwap already refuses a moving cell)
   self.moveCooldown = jitter(self, self.cfg.cursorMoveInterval)
   return char(bits)
 end

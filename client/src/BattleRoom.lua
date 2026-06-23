@@ -923,6 +923,14 @@ function BattleRoom:startLoadingNewAssets()
       ModController:loadStageIdFor(player, player.settings.stageId)
       logger.debug("Loading character " .. tostring(player.settings.characterId) .. " for player " .. tostring(player.name))
       ModController:loadCharacterIdFor(player, player.settings.characterId)
+      if self.pinModsToRoom then
+        -- Keep this char+stage resident on the room itself so every match in the
+        -- session starts instantly (matches drop their own claims on deinit, which
+        -- otherwise evicts the mod in the teardown gap). Freed in shutdown() when the
+        -- room ends -- i.e. when you exit puzzles -- so memory isn't held afterwards.
+        ModController:loadStageIdFor(self, player.settings.stageId)
+        ModController:loadCharacterIdFor(self, player.settings.characterId)
+      end
     end
   end
 end
@@ -1049,6 +1057,9 @@ function BattleRoom:shutdown()
     -- accumulate across rooms.
     ModController:releaseModsFor(player)
   end
+  -- Drop the room's own pinned mods (puzzle rooms keep char/stage warm across
+  -- matches); this is the "free the memory after you exit puzzles" half.
+  ModController:releaseModsFor(self)
   if self.match then
     self.match:deinit()
     self.match = nil

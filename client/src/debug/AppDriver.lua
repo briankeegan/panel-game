@@ -450,6 +450,8 @@ local function execCommand(c)
     parts[#parts + 1] = "text=" .. tostring(s and s.text)
     parts[#parts + 1] = "matchEnded=" .. tostring(match and match.ended)
     if match and match.stacks and match.stacks[1] then
+      local st = match.stacks[1]
+      parts[#parts + 1] = "charLoaded=" .. tostring(st.character and st.character.fullyLoaded)
       local e = match.stacks[1].engine
       parts[#parts + 1] = "game_over_clock=" .. tostring(e and e.game_over_clock)
       parts[#parts + 1] = "clock=" .. tostring(e and e.clock)

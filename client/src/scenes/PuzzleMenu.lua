@@ -243,6 +243,9 @@ function PuzzleMenu:load(sceneParams)
   -- load (puzzles skip character-select, where other modes hide this cost).
   -- updateLoadingState resolves + kicks off the load itself; no refresh needed.
   if self.battleRoom then
+    -- Pin the puzzle char+stage to the room so they stay warm across every puzzle
+    -- in the session (instant Starts); BattleRoom:shutdown frees them on exit.
+    self.battleRoom.pinModsToRoom = true
     self.battleRoom:updateLoadingState()
   end
 end

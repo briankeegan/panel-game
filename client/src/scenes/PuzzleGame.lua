@@ -124,26 +124,26 @@ function PuzzleGame:customLoad()
   -- mode the touch controller ALSO feeds live input each frame and corrupts the
   -- playback (it "tries then fails"). Run playback in controller mode; normal play
   -- stays touch on mobile.
-  if #self.queuedInputs > 0 then
-    -- Solution/hint playback: engine decodes the recorded inputs as controller,
-    -- but leave the PlayerStack's local-input path as touch. The puzzle player has
-    -- no inputConfiguration, so switching that path to controller/keyboard breaks
-    -- the fed playback (the working path per the original solve fix).
-    self.player:setInputMethod("controller")
-    playerStack.engine.inputMethod = "controller"
-  elseif system.isPortraitMode() then
+  if system.isPortraitMode() then
+    -- Always touch on mobile, INCLUDING solution/hint playback. The engine runs the
+    -- fed key-encoded inputs regardless of inputMethod (1-char key inputs still move
+    -- the cursor in touch mode -- that's why hint works); controller mode instead
+    -- stalls the local stack because the touch player has no inputConfiguration.
     self.player:setInputMethod("touch")
     playerStack.engine.inputMethod = "touch"
     playerStack.inputMethod = "touch"
-    -- The touch controller + detector (which actually generate swaps) are only
-    -- built in the PlayerStack constructor, and only when inputMethod is already
-    -- "touch" then. A puzzle stack built as controller (e.g. coming out of a
-    -- solve/hint playback) otherwise renders the cursor but never swaps. Build
-    -- them here if missing so touch play works on every (re)load.
+    -- The touch controller + detector (which actually generate swaps) are only built
+    -- in the PlayerStack constructor, and only when inputMethod is already "touch"
+    -- then. A stack built as controller otherwise renders the cursor but never swaps,
+    -- so build them here if missing.
     if not playerStack.touchInputDetector then
       playerStack.touchInputController = TouchInputController(playerStack.engine)
       playerStack.touchInputDetector = TouchInputDetector(playerStack)
     end
+  elseif #self.queuedInputs > 0 then
+    -- desktop playback decodes the recorded inputs as controller
+    self.player:setInputMethod("controller")
+    playerStack.engine.inputMethod = "controller"
   end
 
   -- Restore level if it was temporarily changed for solution playback
@@ -622,12 +622,24 @@ function PuzzleGame:playPuzzleSolution(solutionInputs)
     return false
   end
 
-  -- Feed the solution on the CURRENT stack via queueInputs -- exactly what the hint
-  -- path (executePuzzleHint) does, and that works on touch. The old approach reloaded
-  -- the scene into controller mode, which broke on mobile: the touch player has no
-  -- inputConfiguration, so the controller/keyboard local-input path can't feed.
-  self.hintUsed = true
-  self:queueInputs(procat(solutionInputs))
+  local currentPuzzle = self:getCurrentPuzzle()
+  local isMovePuzzle = currentPuzzle and currentPuzzle.puzzleType == "moves"
+
+  -- Reset to a fresh initial board, then the new scene replays the solution. The
+  -- solution is absolute (assumes the starting board), so it MUST run from a reset
+  -- board, not the current/mid-game one. customLoad keeps the playback in touch
+  -- mode on mobile (controller mode stalls -- touch player has no input config).
+  GAME.battleRoom.sceneParameters.queuedSolutionInputs = procat(solutionInputs)
+  GAME.battleRoom.sceneParameters.hintWasUsed = true
+
+  -- For non-move puzzles, temporarily bump to level 10 for faster panels
+  if not isMovePuzzle then
+    GAME.battleRoom.sceneParameters.restoreLevelAfterCreation = config.puzzle_level
+    GAME.localPlayer:setLevel(10)
+    GAME.localPlayer:setLevelData(LevelPresets.getModern(10))
+  end
+
+  self:resetPuzzle()
 
   return true
 end

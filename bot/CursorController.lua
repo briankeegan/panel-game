@@ -150,10 +150,15 @@ function CursorController:nextInput(state, decision)
   local needRow, needCol = cr ~= ltr, cc ~= ltc
   if not needRow and not needCol then
     bits = 16; self.swapped = true            -- aligned: swap once (engine's canSwap already refuses a moving cell)
+  elseif needRow and needCol then
+    self._diag = not self._diag               -- TWO axes: alternate -> every input is a fresh direction change (moves every frame)
+    bits = self._diag and ((cr < ltr) and 8 or 4) or ((cc < ltc) and 1 or 2)
   else
-    if needRow and needCol then self._diag = not self._diag end
-    if needRow and (not needCol or self._diag) then bits = (cr < ltr) and 8 or 4
-    else bits = (cc < ltc) and 1 or 2 end
+    -- ONE axis (straight): no second direction to alternate with, and a HELD key freezes (DAS skips the move-gate). So
+    -- TAP -- one idle release between presses makes each press a fresh edge (cur_timer=0) that lands. Reliable, half-rate.
+    self._tap = not self._tap
+    if not self._tap then return IDLE end
+    bits = needRow and ((cr < ltr) and 8 or 4) or ((cc < ltc) and 1 or 2)
   end
   self.moveCooldown = jitter(self, self.cfg.cursorMoveInterval)
   return char(bits)

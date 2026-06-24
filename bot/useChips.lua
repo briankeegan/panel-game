@@ -375,10 +375,19 @@ end
 -- W_PEAK 9->60: punish the tallest column hard. Swept {9,25,60,120,250}: 60 is the peak (deaths were uneven towers; a
 -- flatter board has more room to set up chips, so it both survives longer AND clears more). Above 60 flatness starves building.
 local W_PCHAIN_DEPTH, W_PCHAIN_TOTAL, W_ADJ, W_PEAK = 220, 14, 6, 60
+-- W_VAR 0->5: penalize column-height VARIANCE so ALL columns stay even, not just the single tallest. The peak penalty
+-- alone still let one column tower while others sat low. Swept {0,5,15,30}/10 seeds: 5 is best (median 1883f->2942f).
+local W_VAR = 5
 local function eval(grid, rows)                                   -- higher = better board
   local heights, peak = colHeights(grid, rows)
   local pChain, pTotal = potentialChain(grid, rows, heights)
-  return W_PCHAIN_DEPTH * pChain + W_PCHAIN_TOTAL * pTotal + W_ADJ * adjacency(grid, rows) - W_PEAK * peak
+  local var = 0
+  if W_VAR ~= 0 then
+    local sum = 0; for c = 1, WIDTH do sum = sum + heights[c] end
+    local mean = sum / WIDTH
+    for c = 1, WIDTH do local d = heights[c] - mean; var = var + d * d end
+  end
+  return W_PCHAIN_DEPTH * pChain + W_PCHAIN_TOTAL * pTotal + W_ADJ * adjacency(grid, rows) - W_PEAK * peak - W_VAR * var
 end
 local function legalSwaps(grid, rows, touchable, hiRow)           -- touchable=nil -> a resolved hypothetical board (all settled)
   local out, hi = {}, math.min(hiRow, rows)

@@ -142,17 +142,22 @@ function CursorController:nextInput(state, decision)
   end
 
   local cr, cc = state.cursor[1], state.cursor[2]
+  local cell = cr .. "," .. cc
+  if self._swappedCell and self._swappedCell ~= cell then self._swappedCell = nil end -- cursor moved off -> swaps allowed again
   local ltr, ltc = self.lockedPos[1], self.lockedPos[2]
-  -- ROUTE DIAGONALLY: when both axes need to move, ALTERNATE row/column so consecutive inputs are DIFFERENT directions.
-  -- Each direction change is a fresh press (cur_timer=0) so the engine moves every frame. Holding ONE direction wedges
-  -- the DAS timer (cur_timer steps by 2, skipping the move-gate at 0/cur_wait_time) and freezes the cursor mid-route.
-  -- CLEAN HOLD (mirror a real player's send_controls): emit ONE direction toward the target every frame and HOLD it.
-  -- A held key keeps cur_timer on the EVEN track so it lands on the DAS threshold (cur_wait_time) and rapid-fires; any
-  -- stutter (tap/diagonal/cooldown-idle) knocks cur_timer ODD -> it skips the gate -> the cursor freezes. Row, then col.
+  -- CLEAN HOLD: emit ONE direction toward the target every frame (row, then col) so the engine's DAS timer stays on the
+  -- even track and rapid-fires instead of wedging. When aligned, swap ONCE.
   local bits
   if cr ~= ltr then bits = (cr < ltr) and 8 or 4
   elseif cc ~= ltc then bits = (cc < ltc) and 1 or 2
-  else bits = 16; self.swapped = true end     -- aligned: swap once (engine's canSwap already refuses a moving cell)
+  elseif self._swappedCell == cell then
+    -- SWAP ONCE: already fired this exact cell and the cursor hasn't moved off it, so the swap was refused (countdown /
+    -- canSwap=false) or didn't clear. Don't grind it forever -- abandon so the brain can pick a different move.
+    self.locked, self.lockedSeq, self.lockedPos = nil, nil, nil; self.idle = true
+    return IDLE
+  else
+    bits = 16; self.swapped = true; self._swappedCell = cell   -- aligned: swap once, and remember we fired here
+  end
   return char(bits)
 end
 

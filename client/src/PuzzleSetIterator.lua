@@ -51,6 +51,9 @@ end
 ---@return PuzzleSetIterator
 function PuzzleSetIterator.makePuzzleSetIterator(puzzleSet, puzzleSetIndices, startIndex)
   local iterator = PuzzleSetIterator()
+  -- Start button passes no index (walk the whole set); picking a single puzzle
+  -- passes that puzzle's index. Lets a Start run advance through every puzzle.
+  iterator.isFullSetRun = (startIndex == nil)
   startIndex = startIndex or 1
   
   -- Navigate to the target puzzle set using the indices

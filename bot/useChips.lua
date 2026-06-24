@@ -372,7 +372,9 @@ local function potentialChain(grid, rows, heights)
   end
   return bestChain, bestTotal
 end
-local W_PCHAIN_DEPTH, W_PCHAIN_TOTAL, W_ADJ, W_PEAK = 220, 14, 6, 9
+-- W_PEAK 9->60: punish the tallest column hard. Swept {9,25,60,120,250}: 60 is the peak (deaths were uneven towers; a
+-- flatter board has more room to set up chips, so it both survives longer AND clears more). Above 60 flatness starves building.
+local W_PCHAIN_DEPTH, W_PCHAIN_TOTAL, W_ADJ, W_PEAK = 220, 14, 6, 60
 local function eval(grid, rows)                                   -- higher = better board
   local heights, peak = colHeights(grid, rows)
   local pChain, pTotal = potentialChain(grid, rows, heights)

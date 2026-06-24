@@ -107,15 +107,24 @@ function CursorController:nextInput(state, decision)
     return IDLE
   end
 
-  -- SWAP: lock onto the chip's FULL swap sequence and complete it, ignoring brain changes until every swap is done.
-  if not self.locked then
+  -- SWAP: lock onto the decision's FULL swap sequence and complete it, ignoring brain flicker until done -- EXCEPT a real
+  -- CLEAR chip PREEMPTS an in-progress ORGANIZE move (PLAN/FLATTEN). Chips are the priority once found; a clear always
+  -- beats shuffling. Without this the brain would find a chip mid-organize and the lock would ignore it (found-but-never-
+  -- played -> the danger death-spiral). A chip never preempts another chip (finish the clear you committed to).
+  local lk = self.lockedKind
+  local lockedIsOrganize = (lk == nil or lk == "PLAN" or lk == "FLATTEN")
+  local dk = decision.kind
+  local newIsClear = not (dk == nil or dk == "PLAN" or dk == "FLATTEN")
+  local preempt = self.locked and lockedIsOrganize and newIsClear
+  if not self.locked or preempt then
     self.lockedSeq = decision.swaps or { { decision.pos[1], decision.pos[2] } }
     self.seqIdx = 1
     self.lockedPos = { self.lockedSeq[1][1], self.lockedSeq[1][2] }
     self.locked = self.lockedPos[1] .. "," .. self.lockedPos[2]
-    self.swapped, self.interSwap = false, 0
-    -- reaction delay only when engaging out of idle (noticing a new situation)
-    self.reactionTimer = self.idle and jitter(self, self.cfg.reactionFrames) or 0
+    self.lockedKind = decision.kind
+    self.swapped, self.interSwap, self._swappedCell = false, 0, nil
+    -- reaction delay only when engaging out of idle; a preempt is already engaged, so act immediately (no extra delay)
+    self.reactionTimer = (self.idle and not preempt) and jitter(self, self.cfg.reactionFrames) or 0
   end
   self.idle = false
 

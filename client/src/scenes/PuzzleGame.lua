@@ -50,9 +50,11 @@ local PuzzleGame = class(
     if sceneParams.queuedSolutionInputs then
       self.queuedInputs = sceneParams.queuedSolutionInputs
       self.hintUsed = sceneParams.hintWasUsed or false
+      self.solveUsed = sceneParams.solveWasUsed or false
       -- Clear from battleRoom parameters so it doesn't persist
       GAME.battleRoom.sceneParameters.queuedSolutionInputs = nil
       GAME.battleRoom.sceneParameters.hintWasUsed = nil
+      GAME.battleRoom.sceneParameters.solveWasUsed = nil
     end
 
     local indices = deepcpy(self.puzzleSetIterator:currentPuzzle())
@@ -462,10 +464,10 @@ function PuzzleGame:customGameOverSetup()
     self:savePuzzleRecordResult(not self.hintUsed)
     self:recordPuzzleSolution()
 
-    -- Start (whole-set run) walks every puzzle to the end regardless. A single
-    -- picked puzzle keeps legacy behavior: advance on a clean clear, stay if you
-    -- used Hint/Solve so you can do it yourself.
-    local advance = (self.puzzleSetIterator and self.puzzleSetIterator.isFullSetRun) or (not self.hintUsed)
+    -- Beta rule: a clean clear advances, a Hint stays put so you can do it yourself.
+    -- Solve completes the puzzle, so it advances too (solveUsed) -- it just doesn't
+    -- count as beaten (savePuzzleRecordResult above uses hintUsed, which Solve sets).
+    local advance = (not self.hintUsed) or self.solveUsed
     local puzzleIndices = PuzzleGame.setupNextPuzzle(GAME.battleRoom, self.puzzleSetIterator, self.puzzleSet, advance)
     if puzzleIndices then
     else
@@ -651,6 +653,8 @@ function PuzzleGame:playPuzzleSolution(solutionInputs)
   -- start (the solution is absolute, so it must run from a reset board).
   GAME.battleRoom.sceneParameters.queuedSolutionInputs = procat(solutionInputs)
   GAME.battleRoom.sceneParameters.hintWasUsed = true
+  -- Solve completes the puzzle: advance past it (but hintWasUsed keeps it un-beaten).
+  GAME.battleRoom.sceneParameters.solveWasUsed = true
 
   -- For non-move puzzles, temporarily bump to level 10 for faster panels
   if not isMovePuzzle then

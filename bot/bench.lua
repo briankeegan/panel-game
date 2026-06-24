@@ -43,7 +43,12 @@ while not stack:game_ended() and frame < 200000 do
   local d = brain:decide(st, stack, match)
   local ch = ctrl:nextInput(st, d)
   stack:receiveConfirmedInput(ch)
-  match:run()
+  -- DRAIN: run the engine until it has consumed up to the latest press. A single match:run per frame let the input
+  -- buffer build a ~60-frame backlog (input_state lagged confirmedInput[clock+1] far behind the latest append), so the
+  -- bot's fire-and-forget inputs were applied ~60 frames STALE -- after a swap the engine kept replaying old DOWNs and
+  -- the cursor jammed, capping survival at ~16-86s. Catching up each frame (like the real client's netcode) keeps
+  -- input_state == the latest press. Same fix, fire-and-forget intact: seed3 16s->5:00, clears 24->550.
+  repeat match:run() until stack:game_ended() or stack.clock >= #stack.confirmedInput
   frame = frame + 1
 end
 -- death-board column profile (tower / evenness analysis) + save the real replay for faithful re-sim

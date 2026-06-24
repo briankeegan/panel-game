@@ -143,12 +143,18 @@ function CursorController:nextInput(state, decision)
 
   local cr, cc = state.cursor[1], state.cursor[2]
   local ltr, ltc = self.lockedPos[1], self.lockedPos[2]
+  -- ROUTE DIAGONALLY: when both axes need to move, ALTERNATE row/column so consecutive inputs are DIFFERENT directions.
+  -- Each direction change is a fresh press (cur_timer=0) so the engine moves every frame. Holding ONE direction wedges
+  -- the DAS timer (cur_timer steps by 2, skipping the move-gate at 0/cur_wait_time) and freezes the cursor mid-route.
   local bits
-  if cr < ltr then bits = 8        -- Up
-  elseif cr > ltr then bits = 4    -- Down
-  elseif cc < ltc then bits = 1    -- Right
-  elseif cc > ltc then bits = 2    -- Left
-  else bits = 16; self.swapped = true end -- aligned: swap once (the engine's canSwap already refuses a moving cell)
+  local needRow, needCol = cr ~= ltr, cc ~= ltc
+  if not needRow and not needCol then
+    bits = 16; self.swapped = true            -- aligned: swap once (engine's canSwap already refuses a moving cell)
+  else
+    if needRow and needCol then self._diag = not self._diag end
+    if needRow and (not needCol or self._diag) then bits = (cr < ltr) and 8 or 4
+    else bits = (cc < ltc) and 1 or 2 end
+  end
   self.moveCooldown = jitter(self, self.cfg.cursorMoveInterval)
   return char(bits)
 end

@@ -74,7 +74,10 @@ local DANGER_ABOVE = 9
 -- DYNAMIC raise: never raise past a height that leaves this many rows of recovery headroom below the top, so a raise
 -- can NEVER top us out. The target also reserves room for pending incoming garbage, and rises on its own as clearing
 -- keeps the stack lower. (Tighten as clearing improves; raise-to-death is a bug, so this stays safe.)
-local RECOVERY_BUFFER = 5  -- raise fills only to top-5 (raise less); OFFENSE owns the wider band up to DANGER (top-1)
+-- RECOVERY_BUFFER 5->11: in endless the stack already rises passively, so manual raising just tops the bot out faster.
+-- raiseTarget = top-11 = 1, so it only raises to avoid an EMPTY board. A/B over 10 seeds: avg survived 27s->38s, median
+-- 1295f->1883f, cleared 36->52 -- better on every percentile incl. the worst case.
+local RECOVERY_BUFFER = 11
 
 -- Chip selection is META-DRIVEN: each state expresses what it wants as a meta FILTER + a RANK, and extractByMeta turns
 -- that into the ordered kind list useChips consumes. No name parsing, so any new family (BREAK_*, SHOGUN_*, ...) joins

@@ -37,7 +37,7 @@ local brain = EnvelopeBrain.new({})
 local ctrl = CursorController.new({ cursorMoveInterval = 1, reactionFrames = 1 })
 local frame = 0
 local sawGarbage = false
-while not stack:game_ended() and frame < 200000 do
+while not stack:game_ended() and frame < 18000 do  -- 18000f = 5:00 cap (was 200000/55min; the bot now survives long enough that the old cap ran the bench effectively forever)
   local st = BoardState.extract(stack)
   if st.lowestGarbageRow then sawGarbage = true end
   local d = brain:decide(st, stack, match)

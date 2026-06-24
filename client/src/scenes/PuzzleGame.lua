@@ -462,12 +462,10 @@ function PuzzleGame:customGameOverSetup()
     self:savePuzzleRecordResult(not self.hintUsed)
     self:recordPuzzleSolution()
 
-    -- Always advance to the next puzzle on a win so "Start" walks the whole set
-    -- through to the end (then exits). Using Hint/Solve still counts as completing it
-    -- for progression; savePuzzleRecordResult(not hintUsed) above keeps the "beaten
-    -- unaided" record honest. Reset is there if you want to replay one by hand.
-    local puzzleIndices = PuzzleGame.setupNextPuzzle(GAME.battleRoom, self.puzzleSetIterator, self.puzzleSet, true)
-    if not puzzleIndices then
+    -- If hint/solution was used, stay on the same puzzle; otherwise advance to next
+    local puzzleIndices = PuzzleGame.setupNextPuzzle(GAME.battleRoom, self.puzzleSetIterator, self.puzzleSet, not self.hintUsed)
+    if puzzleIndices then
+    else
       self.puzzleSetIterator = nil
     end
   else -- puzzle failed or manually reset

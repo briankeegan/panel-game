@@ -149,6 +149,14 @@ function CursorController:nextInput(state, decision)
   elseif cc < ltc then bits = 1    -- Right
   elseif cc > ltc then bits = 2    -- Left
   else bits = 16; self.swapped = true end -- aligned: swap once (the engine's canSwap already refuses a moving cell)
+  -- FREEZE-BREAKER: a held direction can wedge against the engine's DAS timer (cur_timer steps by 2, skipping the
+  -- move-gate at 0/cur_wait_time) and the cursor sits stuck mid-route. If we asked to move but it hasn't budged for 2
+  -- frames, release one idle so the next press is a fresh edge (cur_timer=0) and the move lands.
+  if bits ~= 16 then
+    if self._moveCur and cr == self._moveCur[1] and cc == self._moveCur[2] then self._frozenN = (self._frozenN or 0) + 1 else self._frozenN = 0 end
+    self._moveCur = { cr, cc }
+    if (self._frozenN or 0) >= 2 then self._frozenN = 0; return IDLE end
+  end
   self.moveCooldown = jitter(self, self.cfg.cursorMoveInterval)
   return char(bits)
 end

@@ -22,7 +22,7 @@ local attackFile = (modeArg ~= "endless") and modeArg or nil
 local mode = GameModes.getPreset(attackFile and GameModes.IDs.ONE_PLAYER_TRAINING or GameModes.IDs.ONE_PLAYER_VS_SELF)
 local levelData = LevelPresets.getModern(10)   -- normal level-10 game, untouched
 local match = Match(GeneratorSource(seed, true), mode.matchRules)
-local stack = match:createStackWithSettings(levelData, false, "controller")
+local stack = match:createStackWithSettings(levelData, true, "controller")  -- LOCAL (matches the live game): a local stack ignores maxRunsPerFrame and catches up to the input buffer every frame. As non-local it obeyed the cap and lagged ~60 frames behind chipVerify's buffer churn -- the whole "bot dies in 16-86s" artifact.
 stack:setMaxRunsPerFrame(1)
 if attackFile then
   local sim = match:createSimulatedStackWithSettings(save.readAttackFile(attackFile))
@@ -43,12 +43,7 @@ while not stack:game_ended() and frame < (tonumber(os.getenv("PA_CAP")) or 20000
   local d = brain:decide(st, stack, match)
   local ch = ctrl:nextInput(st, d)
   stack:receiveConfirmedInput(ch)
-  -- DRAIN: run the engine until it has consumed up to the latest press. A single match:run per frame let the input
-  -- buffer build a ~60-frame backlog (input_state lagged confirmedInput[clock+1] far behind the latest append), so the
-  -- bot's fire-and-forget inputs were applied ~60 frames STALE -- after a swap the engine kept replaying old DOWNs and
-  -- the cursor jammed, capping survival at ~16-86s. Catching up each frame (like the real client's netcode) keeps
-  -- input_state == the latest press. Same fix, fire-and-forget intact: seed3 16s->5:00, clears 24->550.
-  repeat match:run() until stack:game_ended() or stack.clock >= #stack.confirmedInput
+  match:run()  -- local stack catches up to the latest press inside match:run (Match:run loops shouldRun while input is buffered) -- no manual drain needed
   frame = frame + 1
 end
 -- death-board column profile (tower / evenness analysis) + save the real replay for faithful re-sim

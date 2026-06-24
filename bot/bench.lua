@@ -24,6 +24,7 @@ local levelData = LevelPresets.getModern(10)   -- normal level-10 game, untouche
 local match = Match(GeneratorSource(seed, true), mode.matchRules)
 local stack = match:createStackWithSettings(levelData, false, "controller")
 stack:setMaxRunsPerFrame(1)
+stack.cur_wait_time = tonumber(os.getenv("PA_DAS")) or stack.cur_wait_time
 if attackFile then
   local sim = match:createSimulatedStackWithSettings(save.readAttackFile(attackFile))
   sim:setMaxRunsPerFrame(1)

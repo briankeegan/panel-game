@@ -92,7 +92,7 @@ function CursorController:nextInput(state, decision)
     local d = math.abs(state.cursor[1] - self.lockedPos[1]) + math.abs(state.cursor[2] - self.lockedPos[2])
     if d > 0 and self._lastDist and d >= self._lastDist then self._noProg = (self._noProg or 0) + 1 else self._noProg = 0 end
     self._lastDist = d
-    if (self._noProg or 0) > 4 then self.locked, self.lockedSeq, self._noProg = nil, nil, 0; self.idle = true; return IDLE end
+    if (self._noProg or 0) > 100000 then self.locked, self.lockedSeq, self._noProg = nil, nil, 0; self.idle = true; return IDLE end  -- effectively NEVER abandon: route to the target until reached (the follow-rise handles a target that scrolls off)
   end
 
   if decision and decision.type == "RAISE" then
@@ -146,21 +146,13 @@ function CursorController:nextInput(state, decision)
   -- ROUTE DIAGONALLY: when both axes need to move, ALTERNATE row/column so consecutive inputs are DIFFERENT directions.
   -- Each direction change is a fresh press (cur_timer=0) so the engine moves every frame. Holding ONE direction wedges
   -- the DAS timer (cur_timer steps by 2, skipping the move-gate at 0/cur_wait_time) and freezes the cursor mid-route.
+  -- CLEAN HOLD (mirror a real player's send_controls): emit ONE direction toward the target every frame and HOLD it.
+  -- A held key keeps cur_timer on the EVEN track so it lands on the DAS threshold (cur_wait_time) and rapid-fires; any
+  -- stutter (tap/diagonal/cooldown-idle) knocks cur_timer ODD -> it skips the gate -> the cursor freezes. Row, then col.
   local bits
-  local needRow, needCol = cr ~= ltr, cc ~= ltc
-  if not needRow and not needCol then
-    bits = 16; self.swapped = true            -- aligned: swap once (engine's canSwap already refuses a moving cell)
-  elseif needRow and needCol then
-    self._diag = not self._diag               -- TWO axes: alternate -> every input is a fresh direction change (moves every frame)
-    bits = self._diag and ((cr < ltr) and 8 or 4) or ((cc < ltc) and 1 or 2)
-  else
-    -- ONE axis (straight): no second direction to alternate with, and a HELD key freezes (DAS skips the move-gate). So
-    -- TAP -- one idle release between presses makes each press a fresh edge (cur_timer=0) that lands. Reliable, half-rate.
-    self._tap = not self._tap
-    if not self._tap then return IDLE end
-    bits = needRow and ((cr < ltr) and 8 or 4) or ((cc < ltc) and 1 or 2)
-  end
-  self.moveCooldown = jitter(self, self.cfg.cursorMoveInterval)
+  if cr ~= ltr then bits = (cr < ltr) and 8 or 4
+  elseif cc ~= ltc then bits = (cc < ltc) and 1 or 2
+  else bits = 16; self.swapped = true end     -- aligned: swap once (engine's canSwap already refuses a moving cell)
   return char(bits)
 end
 

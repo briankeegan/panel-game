@@ -5,6 +5,8 @@
 --   decide(state) -> { type="SWAP", pos={r,c} } | { type="WAIT" }
 local BoardSim = require("bot.BoardSim")
 local useChips = require("bot.useChips")
+local garbageReveal = require("bot.garbageReveal")     -- fair reveal reader (breakingRow / openColumns) for CATCH
+local catchPrimitive = require("bot.catchPrimitive")    -- findCatch: the biggest lined-up chip the freed color completes
 
 local EnvelopeBrain = {}
 EnvelopeBrain.__index = EnvelopeBrain
@@ -124,6 +126,22 @@ local OFFENSE_FIRE_MIN = 6
 local function chipIsBig(kind) local m = META[kind]; return m ~= nil and ((m.total or 0) >= OFFENSE_FIRE_MIN or (m.chain or 0) >= 1) end
 
 ------------------------------------------------ DECIDE (re-measured on any board activity; cached while fully static)
+-- CATCH (Brian's lineup): my garbage is breaking -> top off the revealing colors into chains. Loop opened columns
+-- RIGHT->LEFT (most lead first); return the first catch that needs a SWAP to set up (catalog combo/chain preferred,
+-- topOff as the floor). Ready 'already' catches need no move -- they fire when the freed row drops. {swaps,kind} | nil.
+function EnvelopeBrain:tryCatch(grid, rows, stack, priorities, verify)
+  local open = garbageReveal.openColumns(stack)
+  for c = BoardSim.WIDTH, 1, -1 do
+    local color = open[c]
+    if color then
+      local cat = catchPrimitive.findCatch(grid, rows, c, color, { priorities = priorities, verify = verify })
+      if cat and cat.kind ~= "TOPOFF" then return { swaps = cat.swaps, kind = "CATCH_" .. cat.kind } end       -- catalog combo/chain
+      if cat and cat.kind == "TOPOFF" and cat.swap then return { swaps = { cat.swap }, kind = "CATCH_TOPOFF" } end -- 1-swap floor
+    end
+  end
+  return nil
+end
+
 function EnvelopeBrain:decide(state, stack, match)
   local rows = state.rows
   local grid = BoardSim.colorGrid(state.board, rows)
@@ -161,10 +179,13 @@ function EnvelopeBrain:decide(state, stack, match)
     local priorities = (st == "DANGER") and DANGER_PRIORITIES or OFFENSE_PRIORITIES
     local verify = self:chipVerify(stack, match)
     local search = { "UP", "DOWN", "LEFT", "RIGHT" }
-    local chip
+    -- CATCH first in DANGER when my garbage is BREAKING (Brian's lineup): set up topOffs/combos for the revealing colors.
+    local chip = (st == "DANGER" and stack and garbageReveal.breakingRow(stack))
+      and self:tryCatch(grid, rows, stack, priorities, verify) or nil
+    if chip then self._substate = "CATCH" end
     -- DANGER + garbage on board -> PRIORITIZE a BREAK: any existing combo that clears next to garbage breaks it and
     -- opens stop-time (the way out of the danger zone). Fall back to any clear if no break is playable.
-    if st == "DANGER" and state.lowestGarbageRow then
+    if st == "DANGER" and state.lowestGarbageRow and not chip then
       chip = useChips.useChips(grid, rows, cursor, {
         chipPriorities = priorities, searchPriorities = search, verify = verify, touchable = touchable, requireBreak = true,
       })
@@ -202,9 +223,10 @@ function EnvelopeBrain:decide(state, stack, match)
       elseif st ~= "DANGER" and not busy then
         move = { type = "RAISE" }; self._substate = "RAISE"          -- nothing to build + room -> pull in fresh blocks
       else
-        local org = useChips.organizeMove(grid, rows, cursor, touchable)  -- too high -> flatten/even the stack down
-        if org then move = { type = "SWAP", pos = org, swaps = { org }, kind = "FLATTEN" }; self._substate = "FLATTEN"
-        else move = { type = "WAIT" } end
+        -- FLATTEN/organizeMove DISABLED: it flails -- scattered clump swaps, the peak never actually drops (verified). Do
+        -- NOT re-enable until rewritten to directly target the tallest column's top and shove it toward empty space, with
+        -- the peak-drop verified. Until then, WAIT here rather than flail.
+        move = { type = "WAIT" }
       end
     else
       move = { type = "WAIT" }

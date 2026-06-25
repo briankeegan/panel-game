@@ -200,6 +200,8 @@ local function runSeed(seed, injectGarbage)
     -- SAME decide->execute->run path as BotClient:tickMatch (lines 399-428).
     local st = BoardState.extract(stack)
     local decision = controller:isBusy() and WAIT_DEC or brain:decide(st, stack, match)  -- faithful: pass stack+match (chipVerify) + gate like BotClient:tickMatch
+    if decision and decision.kind and decision.kind:find("CATCH") then diag.catchMoves = (diag.catchMoves or 0) + 1
+      if os.getenv("PA_CATCH_DBG") then print(string.format("  f%-6d CATCH MOVE: %-16s cleared=%d garbageBroken=%d", frame, decision.kind, stack.panels_cleared or 0, garbageBroken)) end end
     local char = controller:nextInput(st, decision)
     if char == KeyDataEncoding.swap then diag.swaps = diag.swaps + 1 end
     diag.decisions = diag.decisions + 1
@@ -217,6 +219,8 @@ local function runSeed(seed, injectGarbage)
 
   local survivalFrames = (stack.game_over_clock and stack.game_over_clock > 0)
     and stack.game_over_clock or frame
+  if os.getenv("PA_CATCH_DBG") then print(string.format("  === seed %d CATCH SUMMARY: catchMoves=%d garbageBroken=%d chainsFired=%d survival=%df (%.0fs) ===",
+    seed, diag.catchMoves or 0, garbageBroken, diag.chainsFired, survivalFrames, survivalFrames / 60)) end
   return survivalFrames, garbageBroken, diag, stack
 end
 

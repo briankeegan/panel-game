@@ -170,4 +170,11 @@ function CursorController:nextInput(state, decision)
   return char(bits)
 end
 
+-- The controller is mid-move whenever it holds a locked target or is draining a just-fired swap. While this is true the
+-- brain's per-frame decision is IGNORED (the lock completes through it), so the caller can skip the expensive chipVerify
+-- and only re-decide when this clears -> ~10x fewer verifies for the same play. Lets the bot run near real-time.
+function CursorController:isBusy()
+  return (self.locked ~= nil) or (self.draining == true)
+end
+
 return CursorController

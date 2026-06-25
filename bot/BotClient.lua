@@ -379,6 +379,7 @@ end
 
 -- Advance exactly one engine frame: feed+send our input, run, ship D on death,
 -- and finalize on our death or the opponent's. Non-blocking; call per ~60Hz tick.
+local WAIT_DECISION = { type = "WAIT" }  -- shared no-op passed while the controller is mid-move (no per-frame alloc)
 function BotClient:tickMatch()
   if not self.match or self.matchEnded then return end
   if socket.gettime() * 1000 < self.scheduledStartMs then return end -- hold for the aligned start instant
@@ -392,7 +393,10 @@ function BotClient:tickMatch()
     local char
     if self.brain then
       local st = self.boardState.extract(stack)
-      local decision = self.brain:decide(st, stack, self.match)
+      -- Only run the expensive per-move verify when the controller needs a NEW move; while it's mid-move (locked /
+      -- draining) the lock completes through a WAIT, so re-deciding is wasted. ~10x fewer verifies -> the bot runs
+      -- well above real-time instead of ~0.33x (it could not keep up at 60fps deciding every frame).
+      local decision = self.controller:isBusy() and WAIT_DECISION or self.brain:decide(st, stack, self.match)
       char = self.controller:nextInput(st, decision)
       self.lastState, self.lastDecision = st, decision -- exposed for the game emitter
       -- decide->execute instrumentation (split "brain WAITs/picks bad" from

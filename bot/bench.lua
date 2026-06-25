@@ -19,7 +19,7 @@ local seed = tonumber(arg[2]) or 1
 local attackFile = (modeArg ~= "endless") and modeArg or nil
 
 -- real-mode match setup, copied from common/tests/engine/GarbageQueueTestingUtils (the proven headless path)
-local mode = GameModes.getPreset(attackFile and GameModes.IDs.ONE_PLAYER_TRAINING or GameModes.IDs.ONE_PLAYER_VS_SELF)
+local mode = GameModes.getPreset(attackFile and GameModes.IDs.ONE_PLAYER_TRAINING or GameModes.IDs.ONE_PLAYER_ENDLESS)  -- REAL endless (StackInteractions.NONE = no garbage), not VS_SELF which self-garbages the bot
 local levelData = LevelPresets.getModern(10)   -- normal level-10 game, untouched
 local match = Match(GeneratorSource(seed, true), mode.matchRules)
 local stack = match:createStackWithSettings(levelData, true, "controller")  -- LOCAL (matches the live game): a local stack ignores maxRunsPerFrame and catches up to the input buffer every frame. As non-local it obeyed the cap and lagged ~60 frames behind chipVerify's buffer churn -- the whole "bot dies in 16-86s" artifact.
@@ -28,19 +28,18 @@ if attackFile then
   local sim = match:createSimulatedStackWithSettings(save.readAttackFile(attackFile))
   sim:setMaxRunsPerFrame(1)
   match:addTarget(sim, stack)
-else
-  match:addTarget(stack, stack)
-end
+end  -- endless: NO addTarget. addTarget(stack,stack) made the bot attack ITSELF -> self-garbage piled up and topped it out ~42s; real endless has no garbage (just the rising board).
 match:start()
 
 local brain = EnvelopeBrain.new({})
 local ctrl = CursorController.new({ cursorMoveInterval = 1, reactionFrames = 1 })
+local WAIT_D = { type = "WAIT" }
 local frame = 0
 local sawGarbage = false
 while not stack:game_ended() and frame < (tonumber(os.getenv("PA_CAP")) or 200000) do  -- no real cap: run until the bot dies. PA_CAP only to bound wall-clock for quick multi-seed sweeps.
   local st = BoardState.extract(stack)
   if st.lowestGarbageRow then sawGarbage = true end
-  local d = brain:decide(st, stack, match)
+  local d = ctrl:isBusy() and WAIT_D or brain:decide(st, stack, match)  -- only verify when the controller needs a NEW move (~10x fewer verifies -> near real-time)
   local ch = ctrl:nextInput(st, d)
   stack:receiveConfirmedInput(ch)
   match:run()  -- local stack catches up to the latest press inside match:run (Match:run loops shouldRun while input is buffered) -- no manual drain needed

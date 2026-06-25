@@ -137,6 +137,8 @@ function EnvelopeBrain:tryCatch(grid, rows, stack, priorities, verify)
       local cat = catchPrimitive.findCatch(grid, rows, c, color, { priorities = priorities, verify = verify })
       if cat and cat.kind ~= "TOPOFF" then return { swaps = cat.swaps, kind = "CATCH_" .. cat.kind } end       -- catalog combo/chain
       if cat and cat.kind == "TOPOFF" and cat.swap then return { swaps = { cat.swap }, kind = "CATCH_TOPOFF" } end -- 1-swap floor
+      local route = catchPrimitive.catchRoute(grid, rows, c, color)  -- reactive: scramble a matching panel toward this column's top
+      if route then return { swaps = { route }, kind = "CATCH_ROUTE" } end
     end
   end
   return nil

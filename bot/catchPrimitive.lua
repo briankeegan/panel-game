@@ -64,4 +64,30 @@ function M.findCatch(grid, rows, col, color, opts)
   return nil
 end
 
+-- catchRoute(grid, rows, col, color) -> {r,c} swap | nil. REACTIVE (Brian): once the column opens showing `color`, scramble
+-- to route a matching panel toward this column's top TWO cells so the freed panel completes a vertical-3. One step per call
+-- (multi-frame within the drop budget); pulls `color` in from up to 2 columns away. nil if no matching panel is reachable.
+function M.catchRoute(grid, rows, col, color)
+  local H = rows or 12
+  local t = topRow(grid, col, H)
+  if t < 2 then return nil end                                   -- need TWO cells under the drop for a vertical-3
+  local function has(r) return (grid[r][col] or 0) == color end
+  local function bringInto(r)                                    -- a swap that puts `color` at (r,col), or nil
+    if col < 6 and (grid[r][col + 1] or 0) == color then return { r, col } end
+    if col > 1 and (grid[r][col - 1] or 0) == color then return { r, col - 1 } end
+    return nil
+  end
+  -- GATHER: for each top cell still needing `color`, find the nearest `color` panel AT THAT ROW anywhere across, and STEP
+  -- it one column toward `col` (multi-frame; the drop budget is ~250-350f, plenty). Builds the pair over several swaps.
+  for _, r in ipairs({ t, t - 1 }) do
+    if not has(r) then
+      for d = 1, 5 do
+        if col + d <= 6 and (grid[r][col + d] or 0) == color then return { r, col + d - 1 } end   -- step the right-side panel left
+        if col - d >= 1 and (grid[r][col - d] or 0) == color then return { r, col - d } end       -- step the left-side panel right
+      end
+    end
+  end
+  return nil
+end
+
 return M

@@ -4,9 +4,12 @@
 -- per opened column, right-to-left, within the drop budget. See bot/LINEUP_CATCH_PLAN.md.
 local M = {}
 
--- highest filled row in a column (0 = empty column)
+-- highest COLORED (non-garbage) row in a column (0 = none). The catch sits UNDER the breaking garbage: the freed panel
+-- lands at topRow+1 (the garbage's bottom row, converting) on top of these colored cells. Counting garbage here would
+-- aim the catch at the garbage block instead of your colored pairs -- the freed panel lands under it, not on it.
+local GARBAGE = require("bot.BoardSim").GARBAGE
 local function topRow(grid, col, H)
-  for r = H, 1, -1 do if (grid[r][col] or 0) ~= 0 then return r end end
+  for r = H, 1, -1 do local v = grid[r][col] or 0; if v ~= 0 and v ~= GARBAGE then return r end end
   return 0
 end
 
@@ -30,6 +33,34 @@ function M.findTopOff(grid, col, color, W, H)
   end
   if a == color and b ~= color then local s = slideIn(t-1); if s then return { swap = s } end end
   if b == color and a ~= color then local s = slideIn(t);   if s then return { swap = s } end end
+  return nil
+end
+
+-- findCatch(grid, rows, col, color, opts) -> nil | {kind, swaps} | {kind="TOPOFF", already=, swap=}
+--   THE catch (Brian's correction): the freed garbage panel drops onto the column top; place it there virtually and
+--   recognize the BIGGEST lined-up CATALOG chip it completes (chips are color-relative, so the live color maps in). Only
+--   credit X-ENABLED plays (recognized WITH the drop, not without). topOff (bare vertical-3) is just the floor/fallback.
+--   opts: priorities (chip kind list, biggest first), verify (engine confirm), maxDistance (cells from the drop).
+local _useChips
+function M.findCatch(grid, rows, col, color, opts)
+  opts = opts or {}
+  _useChips = _useChips or require("bot.useChips")
+  local H = rows or 12
+  local t = topRow(grid, col, H)
+  local dropRow = t + 1
+  if dropRow > H then return nil end                                   -- column full -> nothing drops in
+  grid[dropRow] = grid[dropRow] or {}
+  local saved = grid[dropRow][col] or 0
+  if opts.priorities then
+    local ro = { chipPriorities = opts.priorities, verify = opts.verify, maxDistance = opts.maxDistance or 3 }
+    local before = _useChips.useChips(grid, H, { dropRow, col }, ro)  -- baseline: best chip WITHOUT the freed panel
+    grid[dropRow][col] = color
+    local after = _useChips.useChips(grid, H, { dropRow, col }, ro)   -- best chip WITH it
+    grid[dropRow][col] = saved
+    if after and not before then return { kind = after.kind, swaps = after.swaps } end  -- X completes a catalog play -> the catch
+  end
+  local to = M.findTopOff(grid, col, color, 6, H)                      -- floor: bare vertical-3
+  if to then return { kind = "TOPOFF", already = to.already, swap = to.swap } end
   return nil
 end
 

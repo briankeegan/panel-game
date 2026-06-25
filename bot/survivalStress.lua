@@ -85,6 +85,7 @@ require("common.engine.checkMatches") -- registers match/garbage logic on Stack
 local BoardState = require("bot.BoardState")
 local CursorController = require("bot.CursorController")
 local tableUtils = require("common.lib.tableUtils")
+local WAIT_DEC = { type = "WAIT" }  -- shared no-op passed while the controller is mid-move (skip the expensive verify)
 
 -- CLI args
 local garbageEveryFrames = tonumber(arg[1]) or 600    -- 10s @ 60fps (human-rate w/ 6x4 block = 144 area/min); 0 disables
@@ -136,6 +137,25 @@ local function syntheticReplay(seed)
   return r
 end
 
+-- Bit-0 CATCH observer (env PA_CATCH_DBG): watch garbageReveal + catchPrimitive on the REAL breaking garbage block.
+-- Logs each time the open-column set changes during a break -> validates the right->left reveal (fairness) + findTopOff.
+local _gr, _cp, _bs, _lastKey
+local function catchObserve(stack, frame)
+  _gr = _gr or require("bot.garbageReveal"); _cp = _cp or require("bot.catchPrimitive"); _bs = _bs or require("bot.BoardSim")
+  local br = _gr.breakingRow(stack)
+  if not br then if _lastKey then print(string.format("  f%-6d break ENDED", frame)); _lastKey = nil end return end
+  local open = _gr.openColumns(stack)
+  local parts = {}; for c = 6, 1, -1 do if open[c] then parts[#parts + 1] = "c" .. c .. "=" .. open[c] end end
+  local key = table.concat(parts, " ")
+  if key == _lastKey then return end
+  _lastKey = key
+  local st = BoardState.extract(stack); local grid = _bs.colorGrid(st.board, st.rows)
+  local tops = {}
+  for c = 6, 1, -1 do if open[c] then local t = _cp.findTopOff(grid, c, open[c], 6, st.rows)
+    tops[#tops + 1] = "c" .. c .. ":" .. (t and (t.already and "ALREADY" or ("swap@" .. t.swap[1] .. "," .. t.swap[2])) or "-") end end
+  print(string.format("  f%-6d breakRow=%d eta=%s | open(R->L) %s | topOff %s", frame, br, tostring(_gr.dropETA(stack)), key, table.concat(tops, " ")))
+end
+
 -- Run one offline survival game on `seed`. Returns survivalFrames, garbageBroken,
 -- diag (a few sanity counters proving the bot is actually playing).
 local function runSeed(seed, injectGarbage)
@@ -179,12 +199,13 @@ local function runSeed(seed, injectGarbage)
 
     -- SAME decide->execute->run path as BotClient:tickMatch (lines 399-428).
     local st = BoardState.extract(stack)
-    local decision = brain:decide(st)
+    local decision = controller:isBusy() and WAIT_DEC or brain:decide(st, stack, match)  -- faithful: pass stack+match (chipVerify) + gate like BotClient:tickMatch
     local char = controller:nextInput(st, decision)
     if char == KeyDataEncoding.swap then diag.swaps = diag.swaps + 1 end
     diag.decisions = diag.decisions + 1
     stack:receiveConfirmedInput(char)
     match:run()
+    if os.getenv("PA_CATCH_DBG") then catchObserve(stack, frame) end  -- Bit-0: observe the reader on real breaking garbage
     -- OFFENSE metric (B's fire-rate ask): track peak chain + count chain IGNITIONS (chain_counter
     -- crossing into >=2 = a real chain, not a combo). survival-time alone hid the never-fire failure.
     local cc = stack.chain_counter or 0

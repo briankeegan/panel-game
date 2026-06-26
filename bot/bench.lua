@@ -36,6 +36,7 @@ local ctrl = CursorController.new({ cursorMoveInterval = 1, reactionFrames = 1 }
 local WAIT_D = { type = "WAIT" }
 local frame = 0
 local sawGarbage = false
+local peakChain, chainsFired, inChain = 0, 0, false
 while not stack:game_ended() and frame < (tonumber(os.getenv("PA_CAP")) or 200000) do  -- no real cap: run until the bot dies. PA_CAP only to bound wall-clock for quick multi-seed sweeps.
   local st = BoardState.extract(stack)
   if st.lowestGarbageRow then sawGarbage = true end
@@ -43,6 +44,9 @@ while not stack:game_ended() and frame < (tonumber(os.getenv("PA_CAP")) or 20000
   local ch = ctrl:nextInput(st, d)
   stack:receiveConfirmedInput(ch)
   match:run()  -- local stack catches up to the latest press inside match:run (Match:run loops shouldRun while input is buffered) -- no manual drain needed
+  local cc = stack.chain_counter or 0
+  if cc > peakChain then peakChain = cc end
+  if cc > 1 and not inChain then chainsFired = chainsFired + 1; inChain = true elseif cc <= 1 then inChain = false end
   frame = frame + 1
 end
 -- death-board column profile (tower / evenness analysis) + save the real replay for faithful re-sim
@@ -58,5 +62,5 @@ local mx, mn = 0, 99
 for c = 1, 6 do if hs[c] > mx then mx = hs[c] end; if hs[c] < mn then mn = hs[c] end end
 local name = attackFile and attackFile:match("([^/]+)%.json$") or "endless"
 pcall(function() require("bot.saveReplay").save(match, string.format("logs/botreplays/bench_%s_seed%d.json", name, seed)) end)
-print(string.format("seed=%d  survived %d frames (%.1fs)  cleared=%s  garbage=%s  cols=[%s] spread=%d  [%s]",
-  seed, frame, frame / 60, tostring(stack.panels_cleared or 0), tostring(sawGarbage), table.concat(hs, ","), mx - mn, modeArg))
+print(string.format("seed=%d  survived %d frames (%.1fs)  cleared=%s  chains=%d peakChain=%d  garbage=%s  cols=[%s] spread=%d  [%s]",
+  seed, frame, frame / 60, tostring(stack.panels_cleared or 0), chainsFired, peakChain, tostring(sawGarbage), table.concat(hs, ","), mx - mn, modeArg))

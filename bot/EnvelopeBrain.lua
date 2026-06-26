@@ -7,6 +7,7 @@ local BoardSim = require("bot.BoardSim")
 local useChips = require("bot.useChips")
 local garbageReveal = require("bot.garbageReveal")     -- fair reveal reader (breakingRow / openColumns) for CATCH
 local catchPrimitive = require("bot.catchPrimitive")    -- findCatch: the biggest lined-up chip the freed color completes
+local chainSim = require("bot.chainSim")                -- bestChain: the deepest single-swap chain on the live board (depth matches engine); the height drop IS the danger escape
 
 local EnvelopeBrain = {}
 EnvelopeBrain.__index = EnvelopeBrain
@@ -220,6 +221,10 @@ function EnvelopeBrain:decide(state, stack, match)
       self._substate = kind; move = { type = "SWAP", pos = rc, swaps = { rc }, kind = kind }
     end
     local function wait() self._substate = "WAIT"; move = { type = "WAIT" } end
+    -- the deepest chain a single swap fires on the LIVE board (exact facts, depth matches engine). Memoized per decision.
+    -- Its height drop is the escape; in DANGER we fire the deepest available, in OFFENSE only a worthwhile (deep) one.
+    local _cb
+    local function chainBest() if _cb == nil then _cb = chainSim.bestChain(chainSim.gridFromStack(stack)) or false end return _cb end
     -- last resort when nothing direct is playable: build toward a break/clear (NOT a competing path -- only runs after the
     -- situation's real options all returned nil). keepMaterial holds in OFFENSE-with-garbage (build to break), clears in DANGER.
     local function planFallback()
@@ -256,17 +261,27 @@ function EnvelopeBrain:decide(state, stack, match)
     else
       -- C. NO garbage: the height state decides.
       if st == "DANGER" then
-        local cl = clearChip(false, true)                                -- near the top: clear ANYTHING (incl 3s) to drop height
-        if cl then fireChip(cl, "CLEAR") else planFallback() end
+        local cb = chainBest()
+        if cb and cb.depth >= 2 then fireSwap({ cb.r, cb.c }, "CHAIN")   -- fire the DEEPEST chain: its height drop is the escape (deeper than a flat combo)
+        else local cl = clearChip(false, true)                           -- no chain set up -> clear ANYTHING (incl 3s) to drop height
+          if cl then fireChip(cl, "CLEAR") else planFallback() end
+        end
       elseif st == "RAISE" and not busy then
         self._substate = "RAISE"; move = { type = "RAISE" }              -- low material: fill the stack
-      else                                                               -- OFFENSE
-        local cl = clearChip(false, false)                               -- HOLD small 3-clears (build material); fire only big combos
-        if cl then fireChip(cl, "CLEAR")
-        else local mv = useChips.planMove(grid, rows, touchable, cursor, false, true)  -- keepMaterial=TRUE in OFFENSE: build toward big combos, hold material; don't drain it with small clears
-          if mv then fireSwap(mv, "PLAN")
-          elseif not busy and safeToRaise then self._substate = "RAISE"; move = { type = "RAISE" }
-          else wait() end
+      else                                                               -- OFFENSE: build toward a deep CHAIN, then fire it
+        local cb = chainBest()
+        if cb and cb.depth >= 6 then fireSwap({ cb.r, cb.c }, "CHAIN")   -- a deep chain is set up -> FIRE it
+        else
+          local org = chainSim.organizeSwap(grid)                        -- else PACK the board toward a deeper chain (1-move lookahead on chain potential)
+          if org then fireSwap({ org.r, org.c }, "ORGANIZE")
+          else local cl = clearChip(false, false)                        -- nothing to build toward -> fire a big combo, else hold/raise
+            if cl then fireChip(cl, "CLEAR")
+            else local mv = useChips.planMove(grid, rows, touchable, cursor, false, true)
+              if mv then fireSwap(mv, "PLAN")
+              elseif not busy and safeToRaise then self._substate = "RAISE"; move = { type = "RAISE" }
+              else wait() end
+            end
+          end
         end
       end
     end

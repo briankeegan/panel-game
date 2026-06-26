@@ -106,6 +106,27 @@ function M.bestChain(grid)
   return M.chainInfo(grid, r, c)
 end
 
+-- M.organizeSwap(grid) -> {r,c,depth} | nil : the adjacent swap that, applied WITHOUT firing an immediate match, most
+-- RAISES the board's deepest-chain potential (1-move lookahead). The brain's ORGANIZE: pack toward a deep chain to fire
+-- later. Returns nil if no swap improves potential. Cost ~ (#swaps)^2 cascades -- profile before using per-frame.
+function M.organizeSwap(grid)
+  local cur = M.hasMatch(grid) and 0 or M.deepestSwap(grid)
+  local best, br, bc = cur, 0, 0
+  for r = 1, H do for c = 1, W-1 do
+    local a, b = grid[r][c] or 0, grid[r][c+1] or 0
+    if a ~= 0 and a ~= 9 and b ~= 0 and b ~= 9 and a ~= b then
+      local g = clone(grid)
+      g[r][c], g[r][c+1] = g[r][c+1], g[r][c]; settle(g)
+      if not M.hasMatch(g) then                       -- a SETUP, not an immediate fire
+        local d = M.deepestSwap(g)
+        if d > best then best, br, bc = d, r, c end
+      end
+    end
+  end end
+  if br == 0 then return nil end
+  return { r = br, c = bc, depth = best }
+end
+
 -- pack a no-pre-match full board out of stacked color-pairs (alternating so no vertical 3)
 local function packBoard(NC)
   local g = {}; for r = 1, H do g[r] = {}; for c = 1, W do g[r][c] = 0 end end

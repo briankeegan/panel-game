@@ -79,7 +79,11 @@ local DANGER_ABOVE = 9
 -- RECOVERY_BUFFER 5->11: in endless the stack already rises passively, so manual raising just tops the bot out faster.
 -- raiseTarget = top-11 = 1, so it only raises to avoid an EMPTY board. A/B over 10 seeds: avg survived 27s->38s, median
 -- 1295f->1883f, cleared 36->52 -- better on every percentile incl. the worst case.
-local RECOVERY_BUFFER = 11
+-- RECOVERY_BUFFER 11->6 (garbage/team build): a SHORTER buffer = TALLER held stack, so incoming garbage lands ON full
+-- material with a reachable edge instead of floating high on a short lopsided stack (proven: single block 0 breaks -> 5/8
+-- on the fast test; RB=5 tops out, RB=6 is the sweet spot). NOTE: trades off endless survival (RB=11 was tuned for the
+-- passive-rise endless mode where manual raising tops out faster) -- revisit a mode-aware buffer once breaking is solid.
+local RECOVERY_BUFFER = tonumber(os.getenv("PA_RB")) or 6
 
 -- Chip selection is META-DRIVEN: each state expresses what it wants as a meta FILTER + a RANK, and extractByMeta turns
 -- that into the ordered kind list useChips consumes. No name parsing, so any new family (BREAK_*, SHOGUN_*, ...) joins
@@ -129,7 +133,7 @@ local function chipIsBig(kind) local m = META[kind]; return m ~= nil and ((m.tot
 -- CATCH (Brian's lineup): my garbage is breaking -> top off the revealing colors into chains. Loop opened columns
 -- RIGHT->LEFT (most lead first); return the first catch that needs a SWAP to set up (catalog combo/chain preferred,
 -- topOff as the floor). Ready 'already' catches need no move -- they fire when the freed row drops. {swaps,kind} | nil.
-function EnvelopeBrain:tryCatch(grid, rows, stack, priorities, verify)
+function EnvelopeBrain:tryCatch(grid, rows, stack, priorities, verify, touchable)
   local open = garbageReveal.openColumns(stack)
   for c = BoardSim.WIDTH, 1, -1 do
     local color = open[c]
@@ -137,7 +141,7 @@ function EnvelopeBrain:tryCatch(grid, rows, stack, priorities, verify)
       local cat = catchPrimitive.findCatch(grid, rows, c, color, { priorities = priorities, verify = verify })
       if cat and cat.kind ~= "TOPOFF" then return { swaps = cat.swaps, kind = "CATCH_" .. cat.kind } end       -- catalog combo/chain
       if cat and cat.kind == "TOPOFF" and cat.swap then return { swaps = { cat.swap }, kind = "CATCH_TOPOFF" } end -- 1-swap floor
-      local route = catchPrimitive.catchRoute(grid, rows, c, color)  -- reactive: scramble a matching panel toward this column's top
+      local route = (not os.getenv("PA_NOROUTE")) and catchPrimitive.catchRoute(grid, rows, c, color, touchable) or nil  -- multi-swap stack; PA_NOROUTE isolates whether ONLY this disruptive path hurts vs the 1-swap topoff
       if route then return { swaps = { route }, kind = "CATCH_ROUTE" } end
     end
   end
@@ -171,67 +175,83 @@ function EnvelopeBrain:decide(state, stack, match)
   -- STATE precedence DANGER > RAISE > OFFENSE.
   local top = state.height or 12
   local raiseTarget = top - RECOVERY_BUFFER
+  -- Raise/build a base BEFORE a block lands; the MOMENT garbage is ON the board, STOP raising (Brian: the trigger is
+  -- garbage LANDED, not incoming -- you keep playing while it's still in transit, and lock down once it's actually here).
+  local safeToRaise = not state.lowestGarbageRow
   local move
   do
     local st = ((totalHeight >= top - 1 or state.toppedOut) and "DANGER")  -- within 1 of the top (incl garbage): clear NOW
-      or (totalHeight < raiseTarget and "RAISE")                           -- below the top: fill material
+      or (totalHeight < raiseTarget and safeToRaise and "RAISE")           -- below the top + safe headroom: fill material
       or "OFFENSE"
     self._state = st
     -- DANGER clears NOW (ready single-swap clears first); OFFENSE builds big (cascades/setups first). Same all-direction search.
     local priorities = (st == "DANGER") and DANGER_PRIORITIES or OFFENSE_PRIORITIES
     local verify = self:chipVerify(stack, match)
     local search = { "UP", "DOWN", "LEFT", "RIGHT" }
-    -- CATCH first in DANGER when my garbage is BREAKING (Brian's lineup): set up topOffs/combos for the revealing colors.
-    local chip = (st == "DANGER" and stack and garbageReveal.breakingRow(stack))
-      and self:tryCatch(grid, rows, stack, priorities, verify) or nil
-    if chip then self._substate = "CATCH" end
-    -- DANGER + garbage on board -> PRIORITIZE a BREAK: any existing combo that clears next to garbage breaks it and
-    -- opens stop-time (the way out of the danger zone). Fall back to any clear if no break is playable.
-    if st == "DANGER" and state.lowestGarbageRow and not chip then
-      chip = useChips.useChips(grid, rows, cursor, {
-        chipPriorities = priorities, searchPriorities = search, verify = verify, touchable = touchable, requireBreak = true,
-      })
+    -- ===================== DECISION TREE (Brian: one decision per situation -- no competing, nothing unreachable) =====
+    -- A) my garbage is BREAKING -> CATCH the revealing colors. We have time, and a catch clear re-breaks the block on its
+    --    own, so NEVER force another break here. B) sealed garbage on the board -> COMMIT to clearing the block: break it,
+    --    or flatten ONLY to ENABLE the break -- no raise/plan distractions. C) no garbage -> the height state decides.
+    -- breaking and lowestGarbageRow are mutually exclusive situations, so exactly ONE branch runs each frame.
+    local breaking = stack and garbageReveal.breakingRow(stack)
+    local function clearChip(req)
+      local o = { chipPriorities = priorities, searchPriorities = search, verify = verify, touchable = touchable }
+      if req then o.requireBreak = true end
+      return useChips.useChips(grid, rows, cursor, o)
     end
-    chip = chip or useChips.useChips(grid, rows, cursor, {
-      chipPriorities = priorities, searchPriorities = search, verify = verify, touchable = touchable,
-    })
-    -- NEW STEP: nothing directly playable -> DEPTH-1 SETUP SEARCH. Construct a play that's one productive swap away
-    -- (imagine the swap, re-recognize, verify only the winner). Only on a settled board (the imagined grid is faithful).
-    if false and not chip and not busy then  -- DISABLED: brute-force setupSearch is too slow; goal-directed rewrite next
-      chip = useChips.setupSearch(grid, rows, cursor, {
-        chipPriorities = priorities, verify = verify, touchable = touchable,
-      })
-    end
-    -- OFFENSE HOLDS small clears and BUILDS instead -- only fire when it's BIG (or a chain). DANGER/RAISE fire/fill as
-    -- before (DANGER will spend anything to survive). The organizer makes a non-clearing grouping swap to assemble a
-    -- bigger play -- continuous + cheap, no catalog.
-    local fire = chip ~= nil   -- fire whatever clears -- survive first; organize only fills genuinely dead frames
-    self._substate = nil
-    if fire then
+    local function fireChip(chip, sub)   -- a recognized catalog chip -> SWAP (keep its kind for the executor), tally use
       self._comboUse = self._comboUse or {}; self._comboUse[chip.kind] = (self._comboUse[chip.kind] or 0) + 1
-      move = { type = "SWAP", pos = chip.swaps[1], swaps = chip.swaps, kind = chip.kind }
-      self._substate = "CLEAR"
-    elseif st == "RAISE" and not busy then
-      move = { type = "RAISE" }              -- low on material -> FILL even during stop-time (low board = invincibility is worthless)
-    elseif st == "OFFENSE" or st == "DANGER" then
-      -- SEARCH-BASED PLAN: no template build/flatten. The planner runs a beam over BoardSim and commits the single best
-      -- swap (first swap of the best leaf), guided by potential-chain lookahead -- assembling combos/chains with no
-      -- hand-coded shapes. Chips already fired FIRST (CLEAR step above); here we only ever play ONE swap and re-plan.
-      -- planMove returns nil when no swap improves the board (no junk @1,1). Then the stuck-ladder: room -> RAISE for
-      -- fresh material (new colors = new setups); too high -> organize DOWN; never a pointless corner swap.
-      local mv = useChips.planMove(grid, rows, touchable, cursor, st == "DANGER")  -- DANGER: never bail to WAIT, dig with the best move
-      if mv then
-        move = { type = "SWAP", pos = mv, swaps = { mv }, kind = "PLAN" }; self._substate = "PLAN"
-      elseif st ~= "DANGER" and not busy then
-        move = { type = "RAISE" }; self._substate = "RAISE"          -- nothing to build + room -> pull in fresh blocks
-      else
-        -- FLATTEN/organizeMove DISABLED: it flails -- scattered clump swaps, the peak never actually drops (verified). Do
-        -- NOT re-enable until rewritten to directly target the tallest column's top and shove it toward empty space, with
-        -- the peak-drop verified. Until then, WAIT here rather than flail.
-        move = { type = "WAIT" }
+      self._substate = sub; move = { type = "SWAP", pos = chip.swaps[1], swaps = chip.swaps, kind = chip.kind }
+    end
+    local function fireSwap(rc, kind)    -- a raw routing / organize swap {r,c}
+      self._substate = kind; move = { type = "SWAP", pos = rc, swaps = { rc }, kind = kind }
+    end
+    local function wait() self._substate = "WAIT"; move = { type = "WAIT" } end
+    -- last resort when nothing direct is playable: build toward a break/clear (NOT a competing path -- only runs after the
+    -- situation's real options all returned nil). keepMaterial holds in OFFENSE-with-garbage (build to break), clears in DANGER.
+    local function planFallback()
+      local mv = useChips.planMove(grid, rows, touchable, cursor, st == "DANGER", false)  -- keepMaterial=false: under a flood, CLEAR/drop height rather than hold (the catch+break already supply the breaking)
+      if mv then fireSwap(mv, "PLAN") else wait() end
+    end
+    self._substate = nil
+    if breaking then
+      -- A. BREAKING: my garbage is popping -> don't break again. The CATCH (lining up freed panels) is OUT: on the real
+      -- engine it nets NEGATIVE -- it disrupts the board and halves total breaks (off=31.3s/broke78 vs on=25.6s/broke42,
+      -- topoff-only=24.2s). Back to the table for a non-disruptive catch. For now: clear what's there, else flatten so the
+      -- NEXT break lands flat, else build toward a clear.
+      local cl = clearChip(false)
+      if cl then fireChip(cl, "CLEAR")
+      else local fl = catchPrimitive.flattenMove(grid, rows, touchable)
+        if fl then fireSwap(fl, "FLATTEN") else planFallback() end
+      end
+    elseif state.lowestGarbageRow then
+      -- B. SEALED garbage: commit to removing the block -- break it, or flatten ONLY to enable the break.
+      local bc = clearChip(true)                                          -- a ready clear that pops the block (break + clear in one)
+      if bc then fireChip(bc, "CLEAR")
+      else local br = catchPrimitive.breakRoute(grid, rows, touchable)    -- route to complete the vertical-3 next to it
+        if br then fireSwap(br, "BREAK_ROUTE")
+        else local fl = catchPrimitive.flattenMove(grid, rows, touchable) -- break unreachable -> flatten to ENABLE it
+          if fl then fireSwap(fl, "FLATTEN")
+          else local cl = clearChip(false)                               -- otherwise drop height while we set up
+            if cl then fireChip(cl, "CLEAR") else planFallback() end
+          end
+        end
       end
     else
-      move = { type = "WAIT" }
+      -- C. NO garbage: the height state decides.
+      local cl = clearChip(false)
+      if st == "DANGER" then
+        if cl then fireChip(cl, "CLEAR") else planFallback() end         -- near the top: clear NOW, else build a clear
+      elseif st == "RAISE" and not busy then
+        self._substate = "RAISE"; move = { type = "RAISE" }              -- low material: fill the stack
+      else                                                               -- OFFENSE
+        if cl then fireChip(cl, "CLEAR")
+        else local mv = useChips.planMove(grid, rows, touchable, cursor, false, false)
+          if mv then fireSwap(mv, "PLAN")
+          elseif not busy and safeToRaise then self._substate = "RAISE"; move = { type = "RAISE" }
+          else wait() end
+        end
+      end
     end
   end
   -- Only cache a SETTLED decision. The signature is the color grid only -- it can't tell a settling board from the same

@@ -139,7 +139,7 @@ end
 
 -- Bit-0 CATCH observer (env PA_CATCH_DBG): watch garbageReveal + catchPrimitive on the REAL breaking garbage block.
 -- Logs each time the open-column set changes during a break -> validates the right->left reveal (fairness) + findTopOff.
-local _gr, _cp, _bs, _lastKey
+local _gr, _cp, _bs, _lastKey, _dumps
 local function catchObserve(stack, frame)
   _gr = _gr or require("bot.garbageReveal"); _cp = _cp or require("bot.catchPrimitive"); _bs = _bs or require("bot.BoardSim")
   local br = _gr.breakingRow(stack)
@@ -154,11 +154,28 @@ local function catchObserve(stack, frame)
   for c = 6, 1, -1 do if open[c] then local t = _cp.findTopOff(grid, c, open[c], 6, st.rows)
     tops[#tops + 1] = "c" .. c .. ":" .. (t and (t.already and "ALREADY" or ("swap@" .. t.swap[1] .. "," .. t.swap[2])) or "-") end end
   print(string.format("  f%-6d breakRow=%d eta=%s | open(R->L) %s | topOff %s", frame, br, tostring(_gr.dropETA(stack)), key, table.concat(tops, " ")))
+  if #parts == 6 then  -- FULL reveal: dump the board so I can SEE the twos + the freed row, the way a human reads it
+    _dumps = (_dumps or 0) + 1
+    if _dumps <= 3 then
+      print("    --- board at full reveal (G=garbage, .=empty; each freed color falls straight down onto its column) ---")
+      for r = math.min(st.rows, br + 1), 1, -1 do
+        local row = {}; for c = 1, 6 do local v = grid[r][c] or 0; row[c] = (v == _bs.GARBAGE and "G") or (v == 0 and ".") or tostring(v) end
+        print("      r" .. r .. "  " .. table.concat(row, " "))
+      end
+      local twos = {}
+      for c = 1, 6 do
+        local t = 0; for r = st.rows, 1, -1 do local v = grid[r][c] or 0; if v ~= 0 and v ~= _bs.GARBAGE then t = r; break end end
+        if t >= 2 and grid[t][c] == grid[t - 1][c] then twos[#twos + 1] = "c" .. c .. "=[" .. grid[t][c] .. "]" end
+      end
+      print("      TWOS on board: " .. (#twos > 0 and table.concat(twos, " ") or "NONE") .. "   |   freed colors(R->L): " .. key)
+    end
+  end
 end
 
 -- Run one offline survival game on `seed`. Returns survivalFrames, garbageBroken,
 -- diag (a few sanity counters proving the bot is actually playing).
 local function runSeed(seed, injectGarbage)
+  _G._brkN = 0; _G._brkLast = -999   -- reset the PA_BRK board-dump counter per seed so each seed dumps its own boards
   -- CONSTRUCTION PARITY: identical call the live bot makes (BotClient.lua:348).
   local match = Match.createFromReplay(syntheticReplay(seed))
   local stack = match.stacks[1]
@@ -175,7 +192,10 @@ local function runSeed(seed, injectGarbage)
   stack:connectSignal("garbageMatched", sub, function(_, count) garbageBroken = garbageBroken + count end)
 
   local brain = require("bot.EnvelopeBrain").new({}) -- THE bot
-  local controller = CursorController.new()
+  local _rf, _cmi = tonumber(os.getenv("PA_RF")), tonumber(os.getenv("PA_CMI"))  -- MIDDLE speed test: faster than throttled but enough pacing for swaps to resolve (full speed/reaction0 thrashed the routing)
+  local controller = CursorController.new(
+    (_rf or _cmi) and { cursorMoveInterval = _cmi or 2, reactionFrames = _rf or 5 }
+    or (os.getenv("PA_FULLSPEED") and { cursorMoveInterval = 1, reactionFrames = 0 } or nil))  -- DEFAULT nil = throttled (33.8s)
 
   local KeyDataEncoding = require("common.data.KeyDataEncoding")
   local diag = { swaps = 0, decisions = 0, garbageInjected = 0, peakChain = 0, chainsFired = 0 }
@@ -199,7 +219,36 @@ local function runSeed(seed, injectGarbage)
 
     -- SAME decide->execute->run path as BotClient:tickMatch (lines 399-428).
     local st = BoardState.extract(stack)
+    if os.getenv("PA_BRK") and st.lowestGarbageRow and (_G._brkN or 0) < 1 and not (stack:hasActivePanels() or stack:hasChainingPanels()) and (frame - (_G._brkLast or -999)) > 100 then
+      _G._brkN = (_G._brkN or 0) + 1; _G._brkLast = frame
+      local bs = require("bot.BoardSim")
+      local grid = bs.colorGrid(st.board, st.rows)
+      print("  === BOARD @f" .. frame .. "  lowGarbRow=" .. tostring(st.lowestGarbageRow) .. "  cursor=(" .. tostring(st.cursor and st.cursor[1]) .. "," .. tostring(st.cursor and st.cursor[2]) .. ") ===")
+      for r = math.min(st.rows, 12), 1, -1 do local row = {} for c = 1, 6 do local v = grid[r][c] or 0; row[c] = (v == bs.GARBAGE and "G") or (v == 0 and ".") or tostring(v) end print("    r" .. r .. "  " .. table.concat(row, " ")) end
+    end
     local decision = controller:isBusy() and WAIT_DEC or brain:decide(st, stack, match)  -- faithful: pass stack+match (chipVerify) + gate like BotClient:tickMatch
+    if not controller:isBusy() then local s = brain._substate or "WAIT"; diag.sub = diag.sub or {}; diag.sub[s] = (diag.sub[s] or 0) + 1 end  -- PA_BEHAV: what is the bot DOING?
+    if os.getenv("PA_TRACE") and require("bot.garbageReveal").breakingRow(stack) then  -- frame-by-frame in the REVEAL window: is the catch firing? how far does the cursor travel?
+      local gr = require("bot.garbageReveal"); local eta = gr.dropETA(stack) or 999
+      if eta < 110 and (_G._trN or 0) < 80 then
+        _G._trN = (_G._trN or 0) + 1
+        local cur = st.cursor or { 0, 0 }; local tgt = (decision and decision.pos) or { 0, 0 }
+        local oc = gr.openColumns(stack); local ocs = {}; for c, col in pairs(oc) do ocs[#ocs + 1] = c .. "=" .. col end
+        if not controller:isBusy() then
+          print(string.format("  f%-5d cur=(%d,%d) %-11s tgt=(%d,%d) cleared=%-3d eta=%-3d open[%s]",
+            frame, cur[1] or 0, cur[2] or 0, tostring(brain._substate), tgt[1] or 0, tgt[2] or 0, stack.panels_cleared or 0, eta, table.concat(ocs, " ")))
+        end
+      end
+    end
+    if os.getenv("PA_SEQ") and st.lowestGarbageRow then  -- SEQUENCE trace: log each break/catch transition on the garbage (break once -> catch while breaking -> re-break)
+      local breaking = require("bot.garbageReveal").breakingRow(stack)
+      local key = tostring(breaking) .. "|" .. tostring(brain._substate)
+      if key ~= _G._seqLast and (_G._seqN or 0) < 40 then
+        _G._seqN = (_G._seqN or 0) + 1; _G._seqLast = key
+        local ng = 0; for rr = 1, stack.height do for cc = 1, 6 do if stack.panels[rr][cc] and stack.panels[rr][cc].isGarbage then ng = ng + 1 end end end
+        print(string.format("  f%-5d %-9s garbage=%-2d -> %-12s broken=%d", frame, breaking and "BREAKING" or "sealed", ng, tostring(brain._substate), garbageBroken))
+      end
+    end
     if decision and decision.kind and decision.kind:find("CATCH") then diag.catchMoves = (diag.catchMoves or 0) + 1
       if os.getenv("PA_CATCH_DBG") then print(string.format("  f%-6d CATCH MOVE: %-16s cleared=%d garbageBroken=%d", frame, decision.kind, stack.panels_cleared or 0, garbageBroken)) end end
     local char = controller:nextInput(st, decision)
@@ -208,6 +257,14 @@ local function runSeed(seed, injectGarbage)
     stack:receiveConfirmedInput(char)
     match:run()
     if os.getenv("PA_CATCH_DBG") then catchObserve(stack, frame) end  -- Bit-0: observe the reader on real breaking garbage
+    if os.getenv("PA_GARB_DBG") and frame % 600 == 0 then  -- is garbage landing? is the bot breaking it? what state?
+      local ng, mh = 0, 0
+      for rr = 1, (stack.height or 12) do for cc = 1, 6 do local p = stack.panels[rr] and stack.panels[rr][cc]
+        if p and p.isGarbage then ng = ng + 1 end
+        if p and ((p.color or 0) ~= 0 or p.isGarbage) and rr > mh then mh = rr end end end
+      print(string.format("  f%-6d injected=%d garbage_on_board=%d tallest=%d state=%s sub=%s broken=%d lowGarbRow=%s",
+        frame, diag.garbageInjected, ng, mh, tostring(brain._state), tostring(brain._substate), garbageBroken, tostring(st.lowestGarbageRow)))
+    end
     -- OFFENSE metric (B's fire-rate ask): track peak chain + count chain IGNITIONS (chain_counter
     -- crossing into >=2 = a real chain, not a combo). survival-time alone hid the never-fire failure.
     local cc = stack.chain_counter or 0
@@ -221,6 +278,26 @@ local function runSeed(seed, injectGarbage)
     and stack.game_over_clock or frame
   if os.getenv("PA_CATCH_DBG") then print(string.format("  === seed %d CATCH SUMMARY: catchMoves=%d garbageBroken=%d chainsFired=%d survival=%df (%.0fs) ===",
     seed, diag.catchMoves or 0, garbageBroken, diag.chainsFired, survivalFrames, survivalFrames / 60)) end
+  if os.getenv("PA_CHIPS") then  -- ARE THE CHIPS WORKING? which NAMED chips actually fired (vs all-PLAN generic planner)
+    local d = require("bot.chips")._dbg or {}
+    print(string.format("  seed %d  RECOGNIZE: recCalls=%d fitsCalls=%d -> fits=%d (matched) notTouch=%d verRej=%d accept=%d (fired)", seed, d.recCalls or 0, d.fitsCalls or 0, d.fits or 0, d.notTouch or 0, d.verRej or 0, d.accept or 0))
+    local cu = {}; for k, v in pairs(brain._comboUse or {}) do cu[#cu + 1] = k .. "x" .. v end
+    table.sort(cu)
+    print(string.format("  seed %d  CHIPS fired: %s  | garbageBroken=%d catchMoves=%d", seed,
+      #cu > 0 and table.concat(cu, " ") or "NONE -- named chips never fire, it's all PLAN", garbageBroken, diag.catchMoves or 0))
+  end
+  if os.getenv("PA_DEATH") then  -- the DEATH BOARD (G=garbage, .=empty) -- look at exactly how it topped out
+    print(string.format("  === seed %d DEATH @%df (%.1fs)  garbageBroken=%d  injected=%d ===", seed, survivalFrames, survivalFrames / 60, garbageBroken, diag.garbageInjected))
+    for r = math.min(stack.height or 12, 12), 1, -1 do
+      local row = {}; for c = 1, 6 do local p = stack.panels[r] and stack.panels[r][c]; row[c] = (p and p.isGarbage and "G") or (p and tostring(p.color or 0)) or "." end
+      print("    r" .. r .. "  " .. table.concat(row, " "))
+    end
+  end
+  if os.getenv("PA_BEHAV") then
+    local parts = {}; for k, v in pairs(diag.sub or {}) do parts[#parts + 1] = k .. "=" .. v end; table.sort(parts)
+    print(string.format("  seed %d BEHAV: survived %df  ownPanelsCleared=%d  garbageBroken=%d | substates: %s",
+      seed, survivalFrames, stack.panels_cleared or 0, garbageBroken, table.concat(parts, " ")))
+  end
   return survivalFrames, garbageBroken, diag, stack
 end
 

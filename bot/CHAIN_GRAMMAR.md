@@ -9,12 +9,15 @@ the language; `bot/getChainShapes.lua` bakes the verified instances.
 - `A` `B` `C` = **any distinct colors** (a chip cares which cells share a color, not the actual color)
 - `.` = empty / don't-care
 - `[XY]` = the swap (swap these two cells)
-- A chain needs **only 2 colors** — see the alternation rule.
+- These pure-3 staircase chains need **only 2 colors** — see the alternation rule. (Deeper, full-board chains are a
+  different animal — they use 5–6 colors and reach 15–19; that's `bot/CHAIN_SOLVER.md`, not this grammar.)
 
 ## The building block: FEED
 
-Every link is the same atom: **a 3 clears → the gap it leaves drops panels → they land as the next 3.** A clear "feeds"
-the clear above it. The only difference between primitives is the *orientation* of each 3:
+Every link works the same way: **a 3 clears → the gap it leaves drops panels → they land as the next 3.** A clear "feeds"
+the clear above it. STEP and TOWER below are two of the forms — but **don't read this as "2 atoms."** Counting by what
+clears (row/tower) × what forms × where it lands, the minimum is **6 distinct feed atoms** (RR, RT×2, TR×2, TT), and that
+is *still* only the pure-3 corner — allow combos (4+ clears) and forks and the family is much larger. Two shown here:
 
 ```
 STEP  (row feeds a row)        TOWER / CONVERT  (tower feeds a row)
@@ -27,8 +30,8 @@ into a B-row, one over         A stands as a column, clears, B drops into a B-ro
 
 ## Rule 1 — two colors, alternating
 
-By the time link `k+2` fires, link `k`'s color is already gone, so it is **free to reuse**. Every chain is just
-**`A B A B A B…`** up the stack. You never need more than 2 colors (a fork/side-feed may borrow a 3rd).
+By the time link `k+2` fires, link `k`'s color is already gone, so it is **free to reuse**. So a pure-3 staircase chain is
+just **`A B A B A B…`** up the stack — 2 colors suffice for *this construction* (deep/combo chains use more; see above).
 
 ## Rule 2 — feed up
 
@@ -41,11 +44,12 @@ A chain is a **walk through this graph**. `R` = a row clears, `T` = a tower clea
 
 | feeds → | **Row** | **Tower** |
 |---|---|---|
-| **Row clears** | ✓ STEP | ✓ rise (rarer) |
-| **Tower clears** | ✓ CONVERT | ✗ forbidden |
+| **Row clears** | ✓ STEP | ✓ rise |
+| **Tower clears** | ✓ CONVERT | ✓ stack (rare) |
 
-**Only `T→T` is illegal** — two towers back-to-back pre-match before the first can fire. Every other join is legal, so
-towers and rows are one connected system: `R→R→R` (staircase), `T→R` (convert), `T→R→T→R` (woven), etc.
+**All four joins are real.** (An earlier draft of this doc called `T→T` forbidden — that was wrong; the wider search
+later found a tower feeding a tower.) Towers and rows are one connected system: `R→R→R` (staircase), `T→R` (convert),
+`T→R→T→R` (woven), `T→T` (rare but valid).
 
 ## Rule 4 — the staircase, and the fold
 
@@ -62,4 +66,4 @@ that is how `CHAIN_5` and `CHAIN_6` are built. ~2 rows per link → a pure chain
 | `CHAIN_TOWER` | the CONVERT atom (`T→R`) | 2 |
 
 To go further: extract the remaining primitives (earthquake, from-tower) the same way, and add fork/merge (one clear
-feeding two branches — a 3rd color). See [[chain_primitives]].
+feeding two branches — a 3rd color). The live deep-chain solver is `bot/chainSim.lua` / `bot/CHAIN_SOLVER.md`.

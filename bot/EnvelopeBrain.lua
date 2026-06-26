@@ -89,7 +89,7 @@ local RECOVERY_BUFFER = tonumber(os.getenv("PA_RB")) or 6
 -- that into the ordered kind list useChips consumes. No name parsing, so any new family (BREAK_*, SHOGUN_*, ...) joins
 -- automatically and sorts by real value. The only name policies: drop the wasteful COMBO_3 setups, and pin plain
 -- COMBO_3 dead-last (a last-resort clear when nothing bigger exists).
-local function isExcluded(kind) return kind == "COMBO_3" or kind:match("^COMBO_3_%a") ~= nil end  -- COMBO_3 removed (general 3-clears drain breaking material -> broke 0). TODO: re-add COMBO_3 as a BREAK only (Brian: combo-3 *garbage breaks* should be present).
+local function isExcluded(kind) return kind == "COMBO_3" or kind:match("^COMBO_3_%a") ~= nil end  -- COMBO_3 NOT allowed (even under pressure -- there's always a better solve: a combo/chain/lineup, not a cheap 3-clear).
 -- rank a chip by its META (ASC: lower = tried first). total = panels cleared, swaps = 1 ready / 2 setup, chain = depth.
 local function rankKind(kind, meta)
   local setup = (meta and (meta.swaps or 1) > 1) and 1 or 0
@@ -124,6 +124,11 @@ local DANGER_PRIORITIES = extractByMeta(ANY, function(kind, meta)
   local notReady = (meta and (meta.swaps or 1) == 1 and (meta.chain or 0) == 0) and 0 or 1
   return notReady * 1000000 + rankKind(kind, meta)
 end)
+-- CATCH priorities: the catch CREDITS a freed-panel-completed 3+ (incl COMBO_3) as a CHAIN -- the panel falls from the
+-- breaking garbage onto a lined-up pair (Brian: "3+ is great, horizontal too"). So unlike OFFENSE/DANGER (which forbid the
+-- cheap STANDALONE 3-clear), the catch list KEEPS COMBO_3 -- appended last so a bigger combo/chain still wins when the drop
+-- enables one. useChips recognizes both orientations, so this gives HORIZONTAL and VERTICAL 3+ catches.
+local CATCH_PRIORITIES = {}; for _, k in ipairs(OFFENSE_PRIORITIES) do CATCH_PRIORITIES[#CATCH_PRIORITIES+1] = k end; CATCH_PRIORITIES[#CATCH_PRIORITIES+1] = "COMBO_3"
 -- in OFFENSE we HOLD small clears and organize toward bigger ones; only FIRE a clear this big (or any chain).
 local META = (function() local cache = require("bot.chipCache"); local m = {}; for _, c in ipairs(cache) do m[c.kind] = m[c.kind] or c.meta end; return m end)()
 local OFFENSE_FIRE_MIN = 6
@@ -138,7 +143,7 @@ function EnvelopeBrain:tryCatch(grid, rows, stack, priorities, verify, touchable
   for c = BoardSim.WIDTH, 1, -1 do
     local color = open[c]
     if color then
-      local cat = catchPrimitive.findCatch(grid, rows, c, color, { priorities = priorities, verify = verify })
+      local cat = catchPrimitive.findCatch(grid, rows, c, color, { priorities = CATCH_PRIORITIES, verify = verify })  -- CATCH_PRIORITIES keeps COMBO_3 -> credits a freed-drop 3+ (H or V) as a chain
       if cat and cat.kind ~= "TOPOFF" then return { swaps = cat.swaps, kind = "CATCH_" .. cat.kind } end       -- catalog combo/chain
       if cat and cat.kind == "TOPOFF" and cat.swap then return { swaps = { cat.swap }, kind = "CATCH_TOPOFF" } end -- 1-swap floor
       local route = (not os.getenv("PA_NOROUTE")) and catchPrimitive.catchRoute(grid, rows, c, color, touchable) or nil  -- multi-swap stack; PA_NOROUTE isolates whether ONLY this disruptive path hurts vs the 1-swap topoff
@@ -187,7 +192,7 @@ function EnvelopeBrain:decide(state, stack, match)
   local move
   do
     local st = ((totalHeight >= top - 1 or state.toppedOut) and "DANGER")  -- within 1 of the top (incl garbage): clear NOW
-      or (avgH < raiseTarget and safeToRaise and "RAISE")                  -- average fill below target + safe headroom: build material
+      or (avgH < raiseTarget and totalHeight < top - 5 and safeToRaise and "RAISE")  -- build material on AVERAGE fill, but CAP the tallest (top-5): leave headroom so a landing garbage block still has empty room to build a break in -- raising the board solid means breakRoute can't fire and the bot deadlocks (broke freezes, tops out)
       or "OFFENSE"
     self._state = st
     -- DANGER clears NOW (ready single-swap clears first); OFFENSE builds big (cascades/setups first). Same all-direction search.
@@ -200,10 +205,12 @@ function EnvelopeBrain:decide(state, stack, match)
     --    or flatten ONLY to ENABLE the break -- no raise/plan distractions. C) no garbage -> the height state decides.
     -- breaking and lowestGarbageRow are mutually exclusive situations, so exactly ONE branch runs each frame.
     local breaking = stack and garbageReveal.breakingRow(stack)
-    local function clearChip(req)
+    local function clearChip(req, allowC3)
       local o = { chipPriorities = priorities, searchPriorities = search, verify = verify, touchable = touchable }
       if req then o.requireBreak = true end
-      return useChips.useChips(grid, rows, cursor, o)
+      local chip = useChips.useChips(grid, rows, cursor, o)
+      if chip and chip.kind == "COMBO_3" and not allowC3 then return nil end  -- plain 3-clear: only under pressure (clear freed rows / drop height); held in OFFENSE so it doesn't drain the material we raised
+      return chip
     end
     local function fireChip(chip, sub)   -- a recognized catalog chip -> SWAP (keep its kind for the executor), tally use
       self._comboUse = self._comboUse or {}; self._comboUse[chip.kind] = (self._comboUse[chip.kind] or 0) + 1
@@ -225,34 +232,38 @@ function EnvelopeBrain:decide(state, stack, match)
       -- engine it nets NEGATIVE -- it disrupts the board and halves total breaks (off=31.3s/broke78 vs on=25.6s/broke42,
       -- topoff-only=24.2s). Back to the table for a non-disruptive catch. For now: clear what's there, else flatten so the
       -- NEXT break lands flat, else build toward a clear.
-      local cl = clearChip(false)
-      if cl then fireChip(cl, "CLEAR")
-      else local fl = catchPrimitive.flattenMove(grid, rows, touchable)
-        if fl then fireSwap(fl, "FLATTEN") else planFallback() end
+      local catch = self:tryCatch(grid, rows, stack, priorities, verify, touchable)  -- LINE UP the freed panels into the biggest combo/chain they complete (the better solve, not a 3-clear)
+      if catch then self._substate = "CATCH"; move = { type = "SWAP", pos = catch.swaps[1], swaps = catch.swaps, kind = catch.kind }
+      else local cl = clearChip(false)
+        if cl then fireChip(cl, "CLEAR")
+        else local fl = catchPrimitive.flattenMove(grid, rows, touchable)
+          if fl then fireSwap(fl, "FLATTEN") else planFallback() end
+        end
       end
     elseif state.lowestGarbageRow then
       -- B. SEALED garbage: commit to removing the block -- break it, or flatten ONLY to enable the break.
-      local bc = clearChip(true)                                          -- a ready clear that pops the block (break + clear in one)
+      local bc = clearChip(true, true)                                    -- a ready clear that pops the block (incl a COMBO_3 break+clear)
       if bc then fireChip(bc, "CLEAR")
       else local br = catchPrimitive.breakRoute(grid, rows, touchable)    -- route to complete the vertical-3 next to it
         if br then fireSwap(br, "BREAK_ROUTE")
         else local fl = catchPrimitive.flattenMove(grid, rows, touchable) -- break unreachable -> flatten to ENABLE it
           if fl then fireSwap(fl, "FLATTEN")
-          else local cl = clearChip(false)                               -- otherwise drop height while we set up
+          else local cl = clearChip(false, true)                         -- otherwise clear (incl 3s) to drop height while we set up
             if cl then fireChip(cl, "CLEAR") else planFallback() end
           end
         end
       end
     else
       -- C. NO garbage: the height state decides.
-      local cl = clearChip(false)
       if st == "DANGER" then
-        if cl then fireChip(cl, "CLEAR") else planFallback() end         -- near the top: clear NOW, else build a clear
+        local cl = clearChip(false, true)                                -- near the top: clear ANYTHING (incl 3s) to drop height
+        if cl then fireChip(cl, "CLEAR") else planFallback() end
       elseif st == "RAISE" and not busy then
         self._substate = "RAISE"; move = { type = "RAISE" }              -- low material: fill the stack
       else                                                               -- OFFENSE
+        local cl = clearChip(false, false)                               -- HOLD small 3-clears (build material); fire only big combos
         if cl then fireChip(cl, "CLEAR")
-        else local mv = useChips.planMove(grid, rows, touchable, cursor, false, true)  -- keepMaterial=TRUE in OFFENSE: build toward big combos, do NOT fire small 3-clears -- those drain the material we just raised and flip us straight back to RAISE (the OFFENSE<->RAISE dither). Fire only big (clearChip above) or break.
+        else local mv = useChips.planMove(grid, rows, touchable, cursor, false, true)  -- keepMaterial=TRUE in OFFENSE: build toward big combos, hold material; don't drain it with small clears
           if mv then fireSwap(mv, "PLAN")
           elseif not busy and safeToRaise then self._substate = "RAISE"; move = { type = "RAISE" }
           else wait() end

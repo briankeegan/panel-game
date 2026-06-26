@@ -25,7 +25,7 @@ local DEFAULT_CURSOR_SPEED = { cursorMoveInterval = { 4, 9 }, reactionFrames = {
 -- After a swap fires it needs ~7 frames to resolve into its clear; re-engaging (esp. re-swapping the same cell) before
 -- then stops the clear from ever registering -- the mid-game stall. Drain idle until the board settles, capped so a
 -- busy/garbage board can't deadlock it.
-local SWAP_SETTLE_CAP = 8
+local SWAP_SETTLE_CAP = tonumber(os.getenv("PA_DRAIN")) or 8   -- frames idled after a swap so its clear registers; the move-rate knob (PA_DRAIN to test faster re-engage)
 
 -- deterministic jitter: pick a value in the range (scalar passes through). Seeded per controller -> reproducible.
 local function jitter(self, v)

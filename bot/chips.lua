@@ -49,9 +49,11 @@ end
 -- requireBreak: only accept a match that actually breaks garbage (cheap nearGarbage pre-filter, then garbageMatched).
 function chips.recognize(grid, rows, cells, kind, verify, touchable, requireBreak)
   local list = STORE_BY_KIND[kind]; if not list then return nil end   -- O(1) kind lookup; iterate only its templates
+  chips._dbg = chips._dbg or {}; chips._dbg.recCalls = (chips._dbg.recCalls or 0) + 1; chips._dbg.fitsCalls = (chips._dbg.fitsCalls or 0) + #cells * #list  -- DBG
   for _, cell in ipairs(cells) do local R, C = cell[1], cell[2]
     for _, chip in ipairs(list) do
       if fits(grid, rows, chip.tmpl, R, C) then
+        chips._dbg = chips._dbg or {}; chips._dbg.fits = (chips._dbg.fits or 0) + 1  -- DBG: a template matched the shape
         local ok = true
         -- NO-GO zones: every MATCH cell the chip reads must be a settled, touchable panel. Cells the chip doesn't
         -- reference (the `*` don't-care space) aren't in the template, so they're exempt automatically.
@@ -72,10 +74,13 @@ function chips.recognize(grid, rows, cells, kind, verify, touchable, requireBrea
             seq[#seq + 1] = { sr, sc }
           end
         end
+        if not ok then chips._dbg.notTouch = (chips._dbg.notTouch or 0) + 1 end  -- DBG: match/swap cells not settled
         if ok and (not requireBreak or nearGarbage(grid, rows, chip.tmpl, R, C)) then
           local fired, broke = true, false
           if verify then fired, broke = verify(seq, kind) end
+          if verify and not fired then chips._dbg.verRej = (chips._dbg.verRej or 0) + 1 end  -- DBG: engine verify said NO clear
           if fired and (not requireBreak or broke) then     -- requireBreak: only accept a match the engine confirms broke garbage
+            chips._dbg.accept = (chips._dbg.accept or 0) + 1  -- DBG: fired
             chips._lastMatch = { R = R, C = C, tmpl = chip.tmpl, swaps = seq, kind = kind }  -- debug/viz: where it landed
             return { swaps = seq, kind = kind, brokeGarbage = broke or false }
           end

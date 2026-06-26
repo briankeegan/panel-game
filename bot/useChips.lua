@@ -375,9 +375,10 @@ end
 -- W_PEAK 9->60: punish the tallest column hard. Swept {9,25,60,120,250}: 60 is the peak (deaths were uneven towers; a
 -- flatter board has more room to set up chips, so it both survives longer AND clears more). Above 60 flatness starves building.
 local W_PCHAIN_DEPTH, W_PCHAIN_TOTAL, W_ADJ, W_PEAK = 220, 14, 6, 60
+W_ADJ = tonumber(os.getenv("PA_ADJ")) or W_ADJ   -- PA_ADJ: boost organization (group colors into pairs) so freed garbage panels land on matches (the catch SETUP)
 -- W_VAR 0->5: penalize column-height VARIANCE so ALL columns stay even, not just the single tallest. The peak penalty
 -- alone still let one column tower while others sat low. Swept {0,5,15,30}/10 seeds: 5 is best (median 1883f->2942f).
-local W_VAR = 5
+local W_VAR = tonumber(os.getenv("PA_VAR")) or 5
 local function eval(grid, rows)                                   -- higher = better board
   local heights, peak = colHeights(grid, rows)
   local pChain, pTotal = potentialChain(grid, rows, heights)
@@ -421,11 +422,11 @@ local function chipSetupBonus(grid, rows, sr, sc)
   return best
 end
 local W_IMMEDIATE_TOTAL, W_IMMEDIATE_CHAIN, W_IMMEDIATE_FIRST = 30, 400, 20
-local function scoreSwap(grid, rows, r, c)                        -- eval + chip-setup bonus + a fat bonus for a clear NOW
+local function scoreSwap(grid, rows, r, c, immScale)             -- eval + chip-setup bonus + a (scalable) bonus for a clear NOW
   local g, chain, total, firstClear = BoardSim.simSwap(grid, rows, r, c)
   local bonus = chipSetupBonus(g, rows, r, c)
   local s = eval(g, rows) + W_CHIP * bonus
-  if total > 0 then s = s + W_IMMEDIATE_TOTAL * total + W_IMMEDIATE_CHAIN * chain + W_IMMEDIATE_FIRST * (firstClear or 0) end
+  if total > 0 then s = s + (immScale or 1) * (W_IMMEDIATE_TOTAL * total + W_IMMEDIATE_CHAIN * chain + W_IMMEDIATE_FIRST * (firstClear or 0)) end
   return s, g, total, chain, bonus
 end
 -- BEAM SEARCH: keep the best BEAM_W states, expand to depth BEAM_D, commit the FIRST swap of the best leaf. BEAM_D=1 is
@@ -433,8 +434,9 @@ end
 local BEAM_W = 8
 local BEAM_D = tonumber(os.getenv("PA_BEAM_D")) or 1        -- depth-1 greedy, re-planned EVERY frame: deeper plans go stale on the rising board (d2 cleared 51 vs d1 154, 20x slower). knob stays for experiments (env PA_BEAM_D)
 local NODE_BUDGET = 400 * BEAM_D                            -- sim budget scales with depth so deeper levels aren't starved
-function M.planMove(grid, rows, touchable, cursor, force)
+function M.planMove(grid, rows, touchable, cursor, force, keepMaterial)
   if not touchable then return nil end
+  local immScale = keepMaterial and 0.15 or 1   -- garbage imminent/present: devalue immediate clears so the planner HOLDS material (don't strip the stack down -> it stays tall enough for the block to land breakable) instead of clearing it low
   local cr = (cursor and cursor[1]) or 1
   local cc = (cursor and cursor[2]) or 3
   local _, peak = colHeights(grid, rows)
@@ -444,7 +446,7 @@ function M.planMove(grid, rows, touchable, cursor, force)
   for _, sw in ipairs(legalSwaps(grid, rows, touchable, hiRow)) do
     if budget <= 0 then break end
     budget = budget - 1
-    local s, g, total, chain, bonus = scoreSwap(grid, rows, sw[1], sw[2])
+    local s, g, total, chain, bonus = scoreSwap(grid, rows, sw[1], sw[2], immScale)
     local reward = (total > 0) and (W_IMMEDIATE_TOTAL * total + W_IMMEDIATE_CHAIN * chain) or 0
     local dist = (sw[1] > cr and sw[1] - cr or cr - sw[1]) + (sw[2] > cc and sw[2] - cc or cc - sw[2])  -- from the cursor
     beam[#beam + 1] = { g = g, score = s, reward = reward, setup = bonus, first = sw, dist = dist }

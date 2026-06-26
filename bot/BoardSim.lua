@@ -201,6 +201,7 @@ end
 function BoardSim.resolve(g, rows)
   local reveal = g.reveal
   local chain, total, firstClear, garbageCleared = 0, 0, 0, 0
+  BoardSim.applyGravity(g, rows)   -- SETTLE FIRST: a swap can empty a cell so the real match only forms after the panel above falls. The engine settles then matches; matching the un-fallen grid MISSED real clears (verified bot/tests/boardSimVerify.lua swap 2,3). No-op when already settled.
   while true do
     local hit, any = BoardSim.findMatches(g, rows)
     if not any then break end
@@ -246,6 +247,11 @@ function BoardSim.resolve(g, rows)
     total = total + n
     if chain == 1 then firstClear = n end
     BoardSim.applyGravity(g, rows)
+    -- DEEP-CHAIN PHANTOM: the engine settles cascades wave-by-wave with hover, so deep links (3+) that BoardSim's instant
+    -- full-settle aligns often DON'T fire in the engine (verified bot/tests/boardSimVerify.lua). PA_MAXLINK caps cascade
+    -- depth to measure/limit the over-prediction; default uncapped.
+    local maxlink = tonumber(os.getenv("PA_MAXLINK"))
+    if maxlink and chain >= maxlink then break end
   end
   return chain, total, firstClear, garbageCleared
 end

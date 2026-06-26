@@ -257,6 +257,14 @@ local function runSeed(seed, injectGarbage)
     stack:receiveConfirmedInput(char)
     match:run()
     if os.getenv("PA_CATCH_DBG") then catchObserve(stack, frame) end  -- Bit-0: observe the reader on real breaking garbage
+    if os.getenv("PA_PROG") and frame % 120 == 0 then  -- TRAJECTORY: cleared vs garbage over time -- where does it fall behind?
+      local ng, mh = 0, 0
+      for rr = 1, (stack.height or 12) do for cc = 1, 6 do local p = stack.panels[rr] and stack.panels[rr][cc]
+        if p and p.isGarbage then ng = ng + 1 end
+        if p and ((p.color or 0) ~= 0 or p.isGarbage) and rr > mh then mh = rr end end end
+      local hs = {}; for c = 1, 6 do hs[c] = 0; for r = (stack.height or 12), 1, -1 do local p = stack.panels[r][c]; if p and ((p.color or 0) ~= 0 or p.isGarbage) then hs[c] = r; break end end end
+      print(string.format("  f%-5d (%4.1fs) cleared=%-3d broke=%-3d garbOnBoard=%-2d heights=[%s] state=%s sub=%s", frame, frame / 60, stack.panels_cleared or 0, garbageBroken, ng, table.concat(hs, ","), tostring(brain._state), tostring(brain._substate)))
+    end
     if os.getenv("PA_GARB_DBG") and frame % 600 == 0 then  -- is garbage landing? is the bot breaking it? what state?
       local ng, mh = 0, 0
       for rr = 1, (stack.height or 12) do for cc = 1, 6 do local p = stack.panels[rr] and stack.panels[rr][cc]

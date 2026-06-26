@@ -89,7 +89,7 @@ local RECOVERY_BUFFER = tonumber(os.getenv("PA_RB")) or 6
 -- that into the ordered kind list useChips consumes. No name parsing, so any new family (BREAK_*, SHOGUN_*, ...) joins
 -- automatically and sorts by real value. The only name policies: drop the wasteful COMBO_3 setups, and pin plain
 -- COMBO_3 dead-last (a last-resort clear when nothing bigger exists).
-local function isExcluded(kind) return kind == "COMBO_3" or kind:match("^COMBO_3_%a") ~= nil end  -- COMBO_3 removed entirely
+local function isExcluded(kind) return kind == "COMBO_3" or kind:match("^COMBO_3_%a") ~= nil end  -- COMBO_3 removed (general 3-clears drain breaking material -> broke 0). TODO: re-add COMBO_3 as a BREAK only (Brian: combo-3 *garbage breaks* should be present).
 -- rank a chip by its META (ASC: lower = tried first). total = panels cleared, swaps = 1 ready / 2 setup, chain = depth.
 local function rankKind(kind, meta)
   local setup = (meta and (meta.swaps or 1) > 1) and 1 or 0
@@ -178,10 +178,16 @@ function EnvelopeBrain:decide(state, stack, match)
   -- Raise/build a base BEFORE a block lands; the MOMENT garbage is ON the board, STOP raising (Brian: the trigger is
   -- garbage LANDED, not incoming -- you keep playing while it's still in transit, and lock down once it's actually here).
   local safeToRaise = not state.lowestGarbageRow
+  -- RAISE on the AVERAGE column fill, not the tallest: gating on the tallest let a single height-6 column keep the bot in
+  -- OFFENSE forever while the rest of the board sat empty -> it never raised, never built material, couldn't break (Brian:
+  -- "the first thing it should do is raise; otherwise it has no material"). Average fill builds material everywhere first.
+  local sumH = 0
+  for c = 1, BoardSim.WIDTH do local h = 0; for r = rows, 1, -1 do if (grid[r][c] or 0) ~= 0 then h = r; break end end; sumH = sumH + h end
+  local avgH = sumH / BoardSim.WIDTH
   local move
   do
     local st = ((totalHeight >= top - 1 or state.toppedOut) and "DANGER")  -- within 1 of the top (incl garbage): clear NOW
-      or (totalHeight < raiseTarget and safeToRaise and "RAISE")           -- below the top + safe headroom: fill material
+      or (avgH < raiseTarget and safeToRaise and "RAISE")                  -- average fill below target + safe headroom: build material
       or "OFFENSE"
     self._state = st
     -- DANGER clears NOW (ready single-swap clears first); OFFENSE builds big (cascades/setups first). Same all-direction search.
@@ -246,7 +252,7 @@ function EnvelopeBrain:decide(state, stack, match)
         self._substate = "RAISE"; move = { type = "RAISE" }              -- low material: fill the stack
       else                                                               -- OFFENSE
         if cl then fireChip(cl, "CLEAR")
-        else local mv = useChips.planMove(grid, rows, touchable, cursor, false, false)
+        else local mv = useChips.planMove(grid, rows, touchable, cursor, false, true)  -- keepMaterial=TRUE in OFFENSE: build toward big combos, do NOT fire small 3-clears -- those drain the material we just raised and flip us straight back to RAISE (the OFFENSE<->RAISE dither). Fire only big (clearChip above) or break.
           if mv then fireSwap(mv, "PLAN")
           elseif not busy and safeToRaise then self._substate = "RAISE"; move = { type = "RAISE" }
           else wait() end

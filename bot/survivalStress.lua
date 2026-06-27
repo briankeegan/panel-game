@@ -256,6 +256,9 @@ local function runSeed(seed, injectGarbage)
     if os.getenv("PA_CATCH2") and brain._substate == "CATCH" then  -- per-frame: does the catch reach its target + actually move/clear, or stall like flatten did?
       print(string.format("  f%-5d CATCH %-14s tgt=(%s,%s) cur=(%s,%s) cleared=%d broke=%d", frame, tostring(decision and decision.kind), tostring(decision and decision.pos and decision.pos[1]), tostring(decision and decision.pos and decision.pos[2]), tostring(st.cursor and st.cursor[1]), tostring(st.cursor and st.cursor[2]), stack.panels_cleared or 0, garbageBroken))
     end
+    if os.getenv("PA_BREAK") and brain._substate == "BREAK_ROUTE" then  -- per-frame: is breakRoute committing to ONE target, or re-picking each frame (thrash)?
+      print(string.format("  f%-5d BREAK_ROUTE tgt=(%s,%s) cur=(%s,%s) broke=%d", frame, tostring(decision and decision.pos and decision.pos[1]), tostring(decision and decision.pos and decision.pos[2]), tostring(st.cursor and st.cursor[1]), tostring(st.cursor and st.cursor[2]), garbageBroken))
+    end
     if decision and decision.kind and decision.kind:find("CATCH") then diag.catchMoves = (diag.catchMoves or 0) + 1
       if os.getenv("PA_CATCH_DBG") then print(string.format("  f%-6d CATCH MOVE: %-16s cleared=%d garbageBroken=%d", frame, decision.kind, stack.panels_cleared or 0, garbageBroken)) end end
     local char = controller:nextInput(st, decision)

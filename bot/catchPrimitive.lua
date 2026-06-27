@@ -133,6 +133,23 @@ function M.breakRoute(grid, rows, touchable, anyTop)
       end
     end
   end
+  -- HORIZONTAL break (Brian: "horizontal too"): a same-color PAIR sitting in the top row directly under the block + a 3rd
+  -- of that color routed in from OUTSIDE the pair completes a horizontal-3 that pops the block -- usually fewer moves than
+  -- assembling a vertical column, because a top-row pair under the block is common.
+  for col = 1, W - 1 do
+    local t = topRow(grid, col, H)
+    if t >= 1 and grid[t + 1] then
+      local X = grid[t][col] or 0
+      if X ~= 0 and (grid[t + 1][col] or 0) == GARBAGE and (grid[t][col + 1] or 0) == X and (grid[t + 1][col + 1] or 0) == GARBAGE then
+        for c = col - 2, 1, -1 do  -- complete LEFT: route the nearest left-side X rightward toward col-1 (one step/frame)
+          if (grid[t][c] or 0) == X and touchOK(touchable, t, c) then return { t, c } end
+        end
+        for c = col + 3, W do      -- complete RIGHT: route the nearest right-side X leftward toward col+2
+          if (grid[t][c] or 0) == X and touchOK(touchable, t, c - 1) then return { t, c - 1 } end
+        end
+      end
+    end
+  end
   return nil
 end
 

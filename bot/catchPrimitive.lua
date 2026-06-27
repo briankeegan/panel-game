@@ -152,6 +152,16 @@ function M.breakRoute(grid, rows, touchable, anyTop)
       end
     end
   end
+  if os.getenv("PA_BREAKDIAG") and not anyTop then    -- why no routable break this frame? per column: top-row, top-color, G=garbage above, the two rows under the top
+    local parts = {}
+    for col = 1, W do
+      local t = topRow(grid, col, H)
+      local abv = (grid[t + 1] and grid[t + 1][col]) or 0
+      parts[#parts + 1] = string.format("c%d[t%d %s%s u%s,%s]", col, t, tostring((grid[t] and grid[t][col]) or 0),
+        (abv == GARBAGE) and "G" or "-", tostring((grid[t - 1] and grid[t - 1][col]) or 0), tostring((grid[t - 2] and grid[t - 2][col]) or 0))
+    end
+    print("breakNIL " .. table.concat(parts, " "))
+  end
   return nil
 end
 

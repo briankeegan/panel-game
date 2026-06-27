@@ -290,11 +290,14 @@ function EnvelopeBrain:decide(state, stack, match)
           elseif cb and cb.depth >= 2 then fireSwap({ cb.r, cb.c }, "CHAIN")  -- organize PLATEAUED -> FIRE the chain we built (don't abandon it to combos -- that was 45% wasted), then rebuild
           else local cl = clearChip(false, not self._endless)            -- ENDLESS: hold 3-clears (build a chain). GARBAGE: FIRE them -- clears the passive rise, keeps us low.
             if cl then fireChip(cl, "CLEAR")
-            else local mv = useChips.planMove(grid, rows, touchable, cursor, false, true)
-              if mv then fireSwap(mv, "PLAN")
-              elseif not busy and safeToRaise then self._substate = "RAISE"; move = { type = "RAISE" }
-              else local bp = catchPrimitive.buildPair(grid, rows, touchable)  -- idle last-resort lock pre-lay (secondary). buildPair AHEAD of clearing rides the rise up -- it preempts the clear-building -- even WITH the room fix. Keep it last.
-                if bp then fireSwap(bp, "BUILDPAIR") else wait() end
+            else local fl = (not self._endless) and catchPrimitive.flattenMove(grid, rows, touchable) or nil  -- GARBAGE: LEVEL during the lull (only fires on a step>=2) so the block lands FLAT across all columns -> 6 break points, not the lopsided 1-column landing that stalls the break ~6s.
+              if fl then fireSwap(fl, "FLATTEN")
+              else local mv = useChips.planMove(grid, rows, touchable, cursor, false, true)
+                if mv then fireSwap(mv, "PLAN")
+                elseif not busy and safeToRaise then self._substate = "RAISE"; move = { type = "RAISE" }
+                else local bp = catchPrimitive.buildPair(grid, rows, touchable)  -- idle last-resort lock pre-lay (secondary). buildPair AHEAD of clearing rides the rise up. Keep it last.
+                  if bp then fireSwap(bp, "BUILDPAIR") else wait() end
+                end
               end
             end
           end

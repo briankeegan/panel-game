@@ -288,12 +288,12 @@ function EnvelopeBrain:decide(state, stack, match)
           local org = self._endless and chainSim.organizeSwap(grid) or nil  -- PACK toward a deeper chain (1-move greedy). ENDLESS only: in garbage the organize rides the board up but garbage interrupts (10s waves) before a chain is ready to fire -> topout. Garbage needs a different shape.
           if org then fireSwap({ org.r, org.c }, "ORGANIZE")
           elseif cb and cb.depth >= 2 then fireSwap({ cb.r, cb.c }, "CHAIN")  -- organize PLATEAUED -> FIRE the chain we built (don't abandon it to combos -- that was 45% wasted), then rebuild
-          else local cl = clearChip(false, not self._endless)            -- ENDLESS: hold 3-clears (build a chain). GARBAGE: FIRE them -- holding rides the passive rise to 8, leaving no room to break when the block lands.
+          else local cl = clearChip(false, not self._endless)            -- ENDLESS: hold 3-clears (build a chain). GARBAGE: FIRE them -- clears the passive rise, keeps us low.
             if cl then fireChip(cl, "CLEAR")
             else local mv = useChips.planMove(grid, rows, touchable, cursor, false, true)
               if mv then fireSwap(mv, "PLAN")
               elseif not busy and safeToRaise then self._substate = "RAISE"; move = { type = "RAISE" }
-              else local bp = catchPrimitive.buildPair(grid, rows, touchable)  -- idle last-resort: pre-lay a generic lock (secondary path). Moving this AHEAD of clearing rode the passive rise up into a topout -- keep it last.
+              else local bp = catchPrimitive.buildPair(grid, rows, touchable)  -- idle last-resort lock pre-lay (secondary). buildPair AHEAD of clearing rides the rise up -- it preempts the clear-building -- even WITH the room fix. Keep it last.
                 if bp then fireSwap(bp, "BUILDPAIR") else wait() end
               end
             end

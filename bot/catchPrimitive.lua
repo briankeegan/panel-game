@@ -142,19 +142,26 @@ end
 -- cell beside it (a shorter neighbor) -> gravity drops it -> the surface evens out. One step/frame; re-found each frame.
 function M.flattenMove(grid, rows, touchable)
   local W, H = 6, rows or 12
-  local tops, maxT, maxC, minT = {}, 0, 0, 999
-  for c = 1, W do
-    local t = topRow(grid, c, H)            -- highest COLORED row (skips garbage)
-    tops[c] = t
-    if t > maxT then maxT, maxC = t, c end
-    if t < minT then minT = t end
+  local tops = {}
+  for c = 1, W do tops[c] = topRow(grid, c, H) end                -- highest COLORED row per column (skips garbage)
+  -- BOARD-WIDE leveling: find the adjacent pair with the biggest height STEP and slide the taller column's top panel down
+  -- into the shorter one (it falls -> the step shrinks). Repeated, material propagates tall->short across the WHOLE board.
+  -- (The old version only moved the single tallest column's adjacent neighbors, so it got stuck on plateaus = "local only".)
+  local bestDiff, bestC = 0, 0
+  for c = 1, W - 1 do
+    local d = tops[c] - tops[c + 1]; if d < 0 then d = -d end
+    if d > bestDiff then bestDiff, bestC = d, c end
   end
-  if maxC == 0 or (maxT - minT) < 3 then return nil end          -- flat enough already
-  for _, c in ipairs({ maxC - 1, maxC + 1 }) do                  -- a shorter neighbor with an empty cell at the tall top row
-    if c >= 1 and c <= W and tops[c] < maxT and (grid[maxT] and (grid[maxT][c] or 0) == 0)
-      and (not touchable or (touchable[maxT] and touchable[maxT][maxC])) then  -- only the PANEL cell must be settled
-      return { maxT, math.min(maxC, c) }                         -- swap the tall panel into the empty neighbor -> it falls
-    end
+  if bestDiff < 2 then return nil end                            -- every adjacent step < 2 -> flat enough
+  local tall = (tops[bestC] >= tops[bestC + 1]) and bestC or (bestC + 1)
+  local short = (tall == bestC) and (bestC + 1) or bestC
+  -- Swap ONE ROW ABOVE the SHORT column. That is the highest row the cursor can reach for this pair (it's capped around
+  -- min(the two heights)+1). The old code aimed at the TALL column's TOP row -- unreachable over a much-shorter neighbor,
+  -- so the cursor got stuck and the board froze. At short_top+1 the short col is open and the tall col has a panel to slide.
+  local sr = tops[short] + 1
+  if sr <= H and grid[sr] and (grid[sr][short] or 0) == 0 and (grid[sr][tall] or 0) ~= 0
+    and (not touchable or (touchable[sr] and touchable[sr][tall])) then  -- the tall panel we slide must be settled
+    return { sr, bestC }                                         -- slide a tall panel into the short col's open top -> levels, and it's REACHABLE
   end
   return nil
 end

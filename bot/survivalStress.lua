@@ -249,6 +249,10 @@ local function runSeed(seed, injectGarbage)
         print(string.format("  f%-5d %-9s garbage=%-2d -> %-12s broken=%d", frame, breaking and "BREAKING" or "sealed", ng, tostring(brain._substate), garbageBroken))
       end
     end
+    if os.getenv("PA_FLAT") and brain._substate == "FLATTEN" then  -- per-frame: watch the colored spread shrink as flatten executes
+      local ch = {}; local cmx, cmn = 0, 99; for c = 1, 6 do ch[c] = 0; for r = (stack.height or 12), 1, -1 do local p = stack.panels[r][c]; if p and (p.color or 0) ~= 0 and not p.isGarbage then ch[c] = r; break end end; if ch[c] > cmx then cmx = ch[c] end; if ch[c] < cmn then cmn = ch[c] end end
+      print(string.format("  f%-5d FLATTEN colored=[%s] cSpread=%d  tgt=(%s,%s) cur=(%s,%s)", frame, table.concat(ch, ","), cmx - cmn, tostring(decision and decision.pos and decision.pos[1]), tostring(decision and decision.pos and decision.pos[2]), tostring(st.cursor and st.cursor[1]), tostring(st.cursor and st.cursor[2])))
+    end
     if decision and decision.kind and decision.kind:find("CATCH") then diag.catchMoves = (diag.catchMoves or 0) + 1
       if os.getenv("PA_CATCH_DBG") then print(string.format("  f%-6d CATCH MOVE: %-16s cleared=%d garbageBroken=%d", frame, decision.kind, stack.panels_cleared or 0, garbageBroken)) end end
     local char = controller:nextInput(st, decision)
@@ -262,8 +266,8 @@ local function runSeed(seed, injectGarbage)
       for rr = 1, (stack.height or 12) do for cc = 1, 6 do local p = stack.panels[rr] and stack.panels[rr][cc]
         if p and p.isGarbage then ng = ng + 1 end
         if p and ((p.color or 0) ~= 0 or p.isGarbage) and rr > mh then mh = rr end end end
-      local hs = {}; for c = 1, 6 do hs[c] = 0; for r = (stack.height or 12), 1, -1 do local p = stack.panels[r][c]; if p and ((p.color or 0) ~= 0 or p.isGarbage) then hs[c] = r; break end end end
-      print(string.format("  f%-5d (%4.1fs) cleared=%-3d broke=%-3d garbOnBoard=%-2d heights=[%s] state=%s sub=%s", frame, frame / 60, stack.panels_cleared or 0, garbageBroken, ng, table.concat(hs, ","), tostring(brain._state), tostring(brain._substate)))
+      local ch = {}; local cmx, cmn = 0, 99; for c = 1, 6 do ch[c] = 0; for r = (stack.height or 12), 1, -1 do local p = stack.panels[r][c]; if p and (p.color or 0) ~= 0 and not p.isGarbage then ch[c] = r; break end end; if ch[c] > cmx then cmx = ch[c] end; if ch[c] < cmn then cmn = ch[c] end end
+      print(string.format("  f%-5d (%4.1fs) cleared=%-3d broke=%-3d garbOnBoard=%-2d colored=[%s] cSpread=%d state=%s sub=%s", frame, frame / 60, stack.panels_cleared or 0, garbageBroken, ng, table.concat(ch, ","), cmx - cmn, tostring(brain._state), tostring(brain._substate)))
     end
     if os.getenv("PA_GARB_DBG") and frame % 600 == 0 then  -- is garbage landing? is the bot breaking it? what state?
       local ng, mh = 0, 0

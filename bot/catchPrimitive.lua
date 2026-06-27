@@ -109,6 +109,15 @@ end
 -- it. Same-row routing only (the panel is already on the right row -- no lift), which is the case that keeps coming up.
 function M.breakRoute(grid, rows, touchable, anyTop)
   local W, H = 6, rows or 12
+  if os.getenv("PA_GRID") and not anyTop then    -- dump the top of the board (G = garbage cell) so we can see what breakRoute is staring at
+    local s = {}
+    for r = math.min(H, 11), 1, -1 do
+      local row = {}
+      for c = 1, W do local v = (grid[r] and grid[r][c]) or 0; row[c] = (v == GARBAGE) and "G" or tostring(v) end
+      s[#s + 1] = "r" .. r .. ":" .. table.concat(row)
+    end
+    print("GRID " .. table.concat(s, " "))
+  end
   -- eligible columns: a colored top cell with room for a vertical-3 (t,t-1,t-2). Normally require GARBAGE directly above
   -- (so the clear pops the block); with anyTop, fire on ANY column top -> completing the three just CLEARS and drops height
   -- (clearRoute: used when the bot would otherwise idle under garbage, to lift clear throughput). Prefer the LOWEST top.
@@ -124,16 +133,24 @@ function M.breakRoute(grid, rows, touchable, anyTop)
   table.sort(elig, function(a, b) if a.ready ~= b.ready then return a.ready > b.ready end return a.t < b.t end)  -- finish the CHEAPEST break first (most same-color ready), then lowest -- don't stall grinding a hard column
   for _, e in ipairs(elig) do
     local col, t, X = e.col, e.t, grid[e.t][e.col]
-    -- build a vertical-3 ending at t (adjacent to the block -> clearing it pops the block): fill t-1 then t-2 with X,
-    -- routing the nearest X on each row across toward col. ONE step/frame; the brain re-finds + steps until it completes.
+    -- build a vertical-3 ending at t (adjacent to the block -> clearing it pops the block): fill t-1 then t-2 with X.
+    -- ONLY commit if the whole column is FINISHABLE: every missing row must already hold an X somewhere in it, because
+    -- the sole way to fill (r,col) is sliding an X that is already IN row r. A missing row with no X is a dead end --
+    -- routing toward it just oscillates one panel forever (the spin that topped the bot out). Skip dead-end columns;
+    -- if none finish, return nil so the brain falls through to clearing (drop height + churn until a break lines up).
+    local firstMove, finishable = nil, true
     for _, r in ipairs({ t - 1, t - 2 }) do
       if (grid[r][col] or 0) ~= X then
+        local move = nil
         for d = 1, W do
-          if col + d <= W and (grid[r][col + d] or 0) == X and touchOK(touchable, r, col + d - 1) then return { r, col + d - 1 } end
-          if col - d >= 1 and (grid[r][col - d] or 0) == X and touchOK(touchable, r, col - d) then return { r, col - d } end
+          if col + d <= W and (grid[r][col + d] or 0) == X and touchOK(touchable, r, col + d - 1) then move = { r, col + d - 1 }; break end
+          if col - d >= 1 and (grid[r][col - d] or 0) == X and touchOK(touchable, r, col - d) then move = { r, col - d }; break end
         end
+        if not move then finishable = false; break end
+        firstMove = firstMove or move
       end
     end
+    if finishable and firstMove then return firstMove end
   end
   -- HORIZONTAL break (Brian: "horizontal too"): a same-color PAIR sitting in the top row directly under the block + a 3rd
   -- of that color routed in from OUTSIDE the pair completes a horizontal-3 that pops the block -- usually fewer moves than

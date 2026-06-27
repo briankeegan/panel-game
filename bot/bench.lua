@@ -31,7 +31,7 @@ if attackFile then
 end  -- endless: NO addTarget. addTarget(stack,stack) made the bot attack ITSELF -> self-garbage piled up and topped it out ~42s; real endless has no garbage (just the rising board).
 match:start()
 
-local brain = EnvelopeBrain.new({})
+local brain = EnvelopeBrain.new({ endless = true })  -- endless: enable the chain organize/fire (ride up + fire a deep chain). Garbage harnesses leave it OFF (default) so they keep break/clear headroom.
 local ctrl = CursorController.new({ cursorMoveInterval = 1, reactionFrames = 1 })
 local WAIT_D = { type = "WAIT" }
 local frame = 0

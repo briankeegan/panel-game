@@ -13,7 +13,9 @@ local EnvelopeBrain = {}
 EnvelopeBrain.__index = EnvelopeBrain
 
 function EnvelopeBrain.new(_opts)
-  return setmetatable({}, EnvelopeBrain)
+  -- _endless gates the chain ORGANIZE/fire: ride-the-board-up-then-fire-a-deep-chain is an ENDLESS strategy; in garbage
+  -- it's suicide (the packed board leaves no headroom for a landing block -> instant topout). Default OFF = garbage-safe.
+  return setmetatable({ _endless = _opts and _opts.endless or false }, EnvelopeBrain)
 end
 
 ------------------------------------------------------------------ ENGINE VERIFY (garbage-faithful, via match rollback)
@@ -224,7 +226,7 @@ function EnvelopeBrain:decide(state, stack, match)
     -- the deepest chain a single swap fires on the LIVE board (exact facts, depth matches engine). Memoized per decision.
     -- Its height drop is the escape; in DANGER we fire the deepest available, in OFFENSE only a worthwhile (deep) one.
     local _cb
-    local function chainBest() if _cb == nil then _cb = chainSim.bestChain(chainSim.gridFromStack(stack)) or false end return _cb end
+    local function chainBest() if not self._endless then return false end if _cb == nil then _cb = chainSim.bestChain(chainSim.gridFromStack(stack)) or false end return _cb end
     -- last resort when nothing direct is playable: build toward a break/clear (NOT a competing path -- only runs after the
     -- situation's real options all returned nil). keepMaterial holds in OFFENSE-with-garbage (build to break), clears in DANGER.
     local function planFallback()
@@ -272,7 +274,7 @@ function EnvelopeBrain:decide(state, stack, match)
         local cb = chainBest()
         if cb and cb.depth >= 6 then fireSwap({ cb.r, cb.c }, "CHAIN")   -- a deep chain is set up -> FIRE it
         else
-          local org = chainSim.organizeSwap(grid)                        -- else PACK the board toward a deeper chain (1-move lookahead on chain potential)
+          local org = self._endless and chainSim.organizeSwap(grid) or nil  -- else PACK toward a deeper chain (1-move lookahead) -- ENDLESS only; in garbage this rides the board up into a topout
           if org then fireSwap({ org.r, org.c }, "ORGANIZE")
           else local cl = clearChip(false, false)                        -- nothing to build toward -> fire a big combo, else hold/raise
             if cl then fireChip(cl, "CLEAR")

@@ -37,6 +37,7 @@ local WAIT_D = { type = "WAIT" }
 local frame = 0
 local sawGarbage = false
 local peakChain, chainsFired, inChain = 0, 0, false
+local subCount = {}   -- where do the frames GO between chains? organize / clear / wait / raise
 while not stack:game_ended() and frame < (tonumber(os.getenv("PA_CAP")) or 200000) do  -- no real cap: run until the bot dies. PA_CAP only to bound wall-clock for quick multi-seed sweeps.
   local st = BoardState.extract(stack)
   if st.lowestGarbageRow then sawGarbage = true end
@@ -47,6 +48,7 @@ while not stack:game_ended() and frame < (tonumber(os.getenv("PA_CAP")) or 20000
   local cc = stack.chain_counter or 0
   if cc > peakChain then peakChain = cc end
   if cc > 1 and not inChain then chainsFired = chainsFired + 1; inChain = true elseif cc <= 1 then inChain = false end
+  local sub = brain._substate or "idle"; subCount[sub] = (subCount[sub] or 0) + 1
   frame = frame + 1
 end
 -- death-board column profile (tower / evenness analysis) + save the real replay for faithful re-sim
@@ -64,3 +66,7 @@ local name = attackFile and attackFile:match("([^/]+)%.json$") or "endless"
 pcall(function() require("bot.saveReplay").save(match, string.format("logs/botreplays/bench_%s_seed%d.json", name, seed)) end)
 print(string.format("seed=%d  survived %d frames (%.1fs)  cleared=%s  chains=%d peakChain=%d (peakPotential=%d)  garbage=%s  cols=[%s] spread=%d  [%s]",
   seed, frame, frame / 60, tostring(stack.panels_cleared or 0), chainsFired, peakChain, brain._peakBestChain or 0, tostring(sawGarbage), table.concat(hs, ","), mx - mn, modeArg))
+do local arr = {}; for k, v in pairs(subCount) do arr[#arr+1] = { k, v } end
+  table.sort(arr, function(a,b) return a[2] > b[2] end)
+  local parts = {}; for _, kv in ipairs(arr) do parts[#parts+1] = string.format("%s=%d(%.0f%%)", kv[1], kv[2], 100*kv[2]/frame) end
+  print("  WHERE THE TIME GOES: " .. table.concat(parts, "  ")) end

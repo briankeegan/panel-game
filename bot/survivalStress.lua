@@ -253,6 +253,9 @@ local function runSeed(seed, injectGarbage)
       local ch = {}; local cmx, cmn = 0, 99; for c = 1, 6 do ch[c] = 0; for r = (stack.height or 12), 1, -1 do local p = stack.panels[r][c]; if p and (p.color or 0) ~= 0 and not p.isGarbage then ch[c] = r; break end end; if ch[c] > cmx then cmx = ch[c] end; if ch[c] < cmn then cmn = ch[c] end end
       print(string.format("  f%-5d FLATTEN colored=[%s] cSpread=%d  tgt=(%s,%s) cur=(%s,%s)", frame, table.concat(ch, ","), cmx - cmn, tostring(decision and decision.pos and decision.pos[1]), tostring(decision and decision.pos and decision.pos[2]), tostring(st.cursor and st.cursor[1]), tostring(st.cursor and st.cursor[2])))
     end
+    if os.getenv("PA_CATCH2") and brain._substate == "CATCH" then  -- per-frame: does the catch reach its target + actually move/clear, or stall like flatten did?
+      print(string.format("  f%-5d CATCH %-14s tgt=(%s,%s) cur=(%s,%s) cleared=%d broke=%d", frame, tostring(decision and decision.kind), tostring(decision and decision.pos and decision.pos[1]), tostring(decision and decision.pos and decision.pos[2]), tostring(st.cursor and st.cursor[1]), tostring(st.cursor and st.cursor[2]), stack.panels_cleared or 0, garbageBroken))
+    end
     if decision and decision.kind and decision.kind:find("CATCH") then diag.catchMoves = (diag.catchMoves or 0) + 1
       if os.getenv("PA_CATCH_DBG") then print(string.format("  f%-6d CATCH MOVE: %-16s cleared=%d garbageBroken=%d", frame, decision.kind, stack.panels_cleared or 0, garbageBroken)) end end
     local char = controller:nextInput(st, decision)

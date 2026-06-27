@@ -227,6 +227,7 @@ function EnvelopeBrain:decide(state, stack, match)
     -- Its height drop is the escape; in DANGER we fire the deepest available, in OFFENSE only a worthwhile (deep) one.
     local _cb
     local function chainBest()
+      if not self._endless then return false end  -- chains (firing the colored stack) are an ENDLESS thing. In GARBAGE the bot must BREAK/CATCH the block -- firing a chain steals those frames and breaking dies (broke -> 0).
       if _cb == nil then _cb = chainSim.bestChain(chainSim.gridFromStack(stack)) or false
         if _cb and _cb.depth and _cb.depth > (self._peakBestChain or 0) then self._peakBestChain = _cb.depth end  -- diag: deepest potential the organize ever reaches (vs what we fire)
       end
@@ -284,14 +285,17 @@ function EnvelopeBrain:decide(state, stack, match)
         local cb = chainBest()
         if cb and cb.depth >= 6 then fireSwap({ cb.r, cb.c }, "CHAIN")   -- a deep chain is set up -> FIRE it
         else
-          local org = self._endless and chainSim.organizeSwap(grid) or nil  -- PACK toward a deeper chain (1-move greedy; 2-move lookahead probed WORSE: 5 vs 7). ENDLESS only (rides up in garbage)
+          local org = self._endless and chainSim.organizeSwap(grid) or nil  -- PACK toward a deeper chain (1-move greedy). ENDLESS only: in garbage the organize rides the board up but garbage interrupts (10s waves) before a chain is ready to fire -> topout. Garbage needs a different shape.
           if org then fireSwap({ org.r, org.c }, "ORGANIZE")
+          elseif cb and cb.depth >= 2 then fireSwap({ cb.r, cb.c }, "CHAIN")  -- organize PLATEAUED -> FIRE the chain we built (don't abandon it to combos -- that was 45% wasted), then rebuild
           else local cl = clearChip(false, false)                        -- nothing to build toward -> fire a big combo, else hold/raise
             if cl then fireChip(cl, "CLEAR")
             else local mv = useChips.planMove(grid, rows, touchable, cursor, false, true)
               if mv then fireSwap(mv, "PLAN")
               elseif not busy and safeToRaise then self._substate = "RAISE"; move = { type = "RAISE" }
-              else wait() end
+              else local bp = catchPrimitive.buildPair(grid, rows, touchable)  -- IDLE, no garbage: pre-lay a catch LOCK (a top pair) so freed panels land on it when a block later drops + breaks -- the setup done BEFORE the drop, not reactively
+                if bp then fireSwap(bp, "BUILDPAIR") else wait() end
+              end
             end
           end
         end

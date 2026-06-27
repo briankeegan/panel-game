@@ -226,7 +226,12 @@ function EnvelopeBrain:decide(state, stack, match)
     -- the deepest chain a single swap fires on the LIVE board (exact facts, depth matches engine). Memoized per decision.
     -- Its height drop is the escape; in DANGER we fire the deepest available, in OFFENSE only a worthwhile (deep) one.
     local _cb
-    local function chainBest() if not self._endless then return false end if _cb == nil then _cb = chainSim.bestChain(chainSim.gridFromStack(stack)) or false end return _cb end
+    local function chainBest()
+      if _cb == nil then _cb = chainSim.bestChain(chainSim.gridFromStack(stack)) or false
+        if _cb and _cb.depth and _cb.depth > (self._peakBestChain or 0) then self._peakBestChain = _cb.depth end  -- diag: deepest potential the organize ever reaches (vs what we fire)
+      end
+      return _cb
+    end
     -- last resort when nothing direct is playable: build toward a break/clear (NOT a competing path -- only runs after the
     -- situation's real options all returned nil). keepMaterial holds in OFFENSE-with-garbage (build to break), clears in DANGER.
     local function planFallback()
@@ -234,7 +239,12 @@ function EnvelopeBrain:decide(state, stack, match)
       if mv then fireSwap(mv, "PLAN") else wait() end
     end
     self._substate = nil
-    if breaking then
+    -- GARBAGE LINEUP: while a block is breaking or sealed, if the freed/standing panels already set up a real CASCADE,
+    -- FIRE it. In garbage we can't ride the board up to organize a deeper chain (no headroom), so we take the cascade the
+    -- breaks handed us. depth>=3 = a genuine multi-link chain, strictly better than a topoff-3.
+    local gcb = (breaking or state.lowestGarbageRow) and chainBest()
+    if gcb and gcb.depth >= 3 then fireSwap({ gcb.r, gcb.c }, "CHAIN")
+    elseif breaking then
       -- A. BREAKING: my garbage is popping -> don't break again. The CATCH (lining up freed panels) is OUT: on the real
       -- engine it nets NEGATIVE -- it disrupts the board and halves total breaks (off=31.3s/broke78 vs on=25.6s/broke42,
       -- topoff-only=24.2s). Back to the table for a non-disruptive catch. For now: clear what's there, else flatten so the
@@ -274,7 +284,7 @@ function EnvelopeBrain:decide(state, stack, match)
         local cb = chainBest()
         if cb and cb.depth >= 6 then fireSwap({ cb.r, cb.c }, "CHAIN")   -- a deep chain is set up -> FIRE it
         else
-          local org = self._endless and chainSim.organizeSwap(grid) or nil  -- else PACK toward a deeper chain (1-move lookahead) -- ENDLESS only; in garbage this rides the board up into a topout
+          local org = self._endless and chainSim.organizeSwap(grid) or nil  -- PACK toward a deeper chain (1-move greedy; 2-move lookahead probed WORSE: 5 vs 7). ENDLESS only (rides up in garbage)
           if org then fireSwap({ org.r, org.c }, "ORGANIZE")
           else local cl = clearChip(false, false)                        -- nothing to build toward -> fire a big combo, else hold/raise
             if cl then fireChip(cl, "CLEAR")

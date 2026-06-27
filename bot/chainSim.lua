@@ -203,7 +203,10 @@ end
 
 -- pull a grid out of a live engine stack (the brain's board), for bestChain/simChain planning
 function M.gridFromStack(stack)
-  local g = {}; for r = 1, H do g[r] = {}; for c = 1, W do g[r][c] = (stack.panels[r] and stack.panels[r][c] and stack.panels[r][c].color) or 0 end end
+  local g = {}; for r = 1, H do g[r] = {}; for c = 1, W do
+    local p = stack.panels[r] and stack.panels[r][c]
+    g[r][c] = (p and p.isGarbage and 9) or (p and p.color) or 0   -- unbroken garbage -> 9 wall (a blocker), so bestChain doesn't read it as empty or as a swappable color
+  end end
   return g
 end
 

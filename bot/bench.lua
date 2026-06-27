@@ -62,5 +62,5 @@ local mx, mn = 0, 99
 for c = 1, 6 do if hs[c] > mx then mx = hs[c] end; if hs[c] < mn then mn = hs[c] end end
 local name = attackFile and attackFile:match("([^/]+)%.json$") or "endless"
 pcall(function() require("bot.saveReplay").save(match, string.format("logs/botreplays/bench_%s_seed%d.json", name, seed)) end)
-print(string.format("seed=%d  survived %d frames (%.1fs)  cleared=%s  chains=%d peakChain=%d  garbage=%s  cols=[%s] spread=%d  [%s]",
-  seed, frame, frame / 60, tostring(stack.panels_cleared or 0), chainsFired, peakChain, tostring(sawGarbage), table.concat(hs, ","), mx - mn, modeArg))
+print(string.format("seed=%d  survived %d frames (%.1fs)  cleared=%s  chains=%d peakChain=%d (peakPotential=%d)  garbage=%s  cols=[%s] spread=%d  [%s]",
+  seed, frame, frame / 60, tostring(stack.panels_cleared or 0), chainsFired, peakChain, brain._peakBestChain or 0, tostring(sawGarbage), table.concat(hs, ","), mx - mn, modeArg))

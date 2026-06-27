@@ -116,10 +116,12 @@ function M.breakRoute(grid, rows, touchable, anyTop)
   for col = 1, W do
     local t = topRow(grid, col, H)
     if t >= 3 and (grid[t][col] or 0) ~= 0 and (anyTop or (grid[t + 1] and (grid[t + 1][col] or 0) == GARBAGE)) then
-      elig[#elig + 1] = { col = col, t = t }
+      local X = grid[t][col]
+      local ready = 1 + ((grid[t - 1] and grid[t - 1][col] == X) and 1 or 0) + ((grid[t - 2] and grid[t - 2][col] == X) and 1 or 0)
+      elig[#elig + 1] = { col = col, t = t, ready = ready }   -- how many of the vertical-3 are already this color (closer = fewer routes)
     end
   end
-  table.sort(elig, function(a, b) return a.t < b.t end)   -- lowest touching point first (break bottom-up)
+  table.sort(elig, function(a, b) if a.ready ~= b.ready then return a.ready > b.ready end return a.t < b.t end)  -- finish the CHEAPEST break first (most same-color ready), then lowest -- don't stall grinding a hard column
   for _, e in ipairs(elig) do
     local col, t, X = e.col, e.t, grid[e.t][e.col]
     -- build a vertical-3 ending at t (adjacent to the block -> clearing it pops the block): fill t-1 then t-2 with X,

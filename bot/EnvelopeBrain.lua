@@ -250,7 +250,11 @@ function EnvelopeBrain:decide(state, stack, match)
       -- engine it nets NEGATIVE -- it disrupts the board and halves total breaks (off=31.3s/broke78 vs on=25.6s/broke42,
       -- topoff-only=24.2s). Back to the table for a non-disruptive catch. For now: clear what's there, else flatten so the
       -- NEXT break lands flat, else build toward a clear.
-      local catch = self:tryCatch(grid, rows, stack, priorities, verify, touchable)  -- LINE UP the freed panels into the biggest combo/chain they complete (the better solve, not a 3-clear)
+      -- CATCH: line up the freed panels into the biggest combo/chain they complete. It's SITUATIONAL -- it disrupts an
+      -- in-progress cascade on some seeds (1002/1005 tank) but chains freed panels into big breaks on others (1004 broke
+      -- 84). Net it's POSITIVE on the current engine: median 35.4 vs 32.0 and floor 26.4 vs 24.4 WITH it on. Keep it.
+      -- A GATED catch (fire only when it won't stall an active cascade) would capture both sides -- that's the rework.
+      local catch = self:tryCatch(grid, rows, stack, priorities, verify, touchable)
       if catch then self._substate = "CATCH"; move = { type = "SWAP", pos = catch.swaps[1], swaps = catch.swaps, kind = catch.kind }
       else local cl = clearChip(false)
         if cl then fireChip(cl, "CLEAR")

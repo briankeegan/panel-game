@@ -223,6 +223,37 @@ function M.flattenMove(grid, rows, touchable)
   return nil
 end
 
+-- stageTrigger(grid, rows, touchable) -> {r,c} swap | nil. COCK THE BREAK before a block lands: a top PAIR (X at t,t-1)
+-- plus a third X parked at (t-2, c+-1) is exactly the shape breakRoute completes in ONE slide once garbage seals the
+-- column -- the guaranteed first break, instead of hoping the landing aligns. This routes the nearest X along row t-2
+-- one column toward the pair, stopping ADJACENT (never into (t-2,c) itself: that fires the 3 early, wasting the trigger).
+-- Returns nil when some column is already cocked (nothing to stage) or no pair/third-X exists.
+function M.stageTrigger(grid, rows, touchable)
+  local W, H = 6, rows or 12
+  for c = 1, W do
+    local t = topRow(grid, c, H)
+    if t >= 3 then
+      local X = grid[t][c] or 0
+      if X ~= 0 and X ~= GARBAGE and (grid[t-1][c] or 0) == X then
+        -- a pair at the top of column c. cocked already?
+        if (c > 1 and (grid[t-2][c-1] or 0) == X) or (c < W and (grid[t-2][c+1] or 0) == X) then return nil end
+        -- route the nearest X in row t-2 one step toward c, stopping at the adjacent cell
+        for d = 2, W - 1 do
+          for _, dir in ipairs({ -1, 1 }) do
+            local cc = c + dir * d
+            if cc >= 1 and cc <= W and (grid[t-2][cc] or 0) == X then
+              -- step it one column toward c: swap (t-2, min(cc, cc-dir))
+              local sc = (dir == 1) and (cc - 1) or cc
+              if (grid[t-2][sc] or 0) ~= (grid[t-2][sc+1] or 0) and touchOK(touchable, t-2, sc) then return { t-2, sc } end
+            end
+          end
+        end
+      end
+    end
+  end
+  return nil
+end
+
 -- buildPair(grid, rows, touchable) -> {r,c} swap | nil. SETUP (Brian: setup is enough, no chain-building): lay a vertical
 -- PAIR at a column top with one swap, so a freed garbage panel dropping onto that column completes a vertical-3 and clears
 -- (the catch). HOLDS (never makes it a triple itself). Used in IDLE frames so it doesn't compete with breaking/offense.

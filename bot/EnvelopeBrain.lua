@@ -305,10 +305,13 @@ function EnvelopeBrain:decide(state, stack, match)
       if cl then fireChip(cl, "CLEAR")
       else local fl = catchPrimitive.flattenMove(grid, rows, touchable)
         if fl then fireSwap(fl, "FLATTEN")
-        else local bp = catchPrimitive.buildPair(grid, rows, touchable)
-          if bp then fireSwap(bp, "BRACE_PAIR")
-          else local mv = useChips.planMove(grid, rows, touchable, cursor, true, false)
-            if mv then fireSwap(mv, "PLAN") else wait() end
+        else local tg = catchPrimitive.stageTrigger(grid, rows, touchable)  -- cock a 1-slide break next to an existing pair (the guaranteed first break)
+          if tg then fireSwap(tg, "BRACE_TRIGGER")
+          else local bp = catchPrimitive.buildPair(grid, rows, touchable)
+            if bp then fireSwap(bp, "BRACE_PAIR")
+            else local mv = useChips.planMove(grid, rows, touchable, cursor, true, false)
+              if mv then fireSwap(mv, "PLAN") else wait() end
+            end
           end
         end
       end

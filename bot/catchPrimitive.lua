@@ -227,16 +227,24 @@ end
 -- plus a third X parked at (t-2, c+-1) is exactly the shape breakRoute completes in ONE slide once garbage seals the
 -- column -- the guaranteed first break, instead of hoping the landing aligns. This routes the nearest X along row t-2
 -- one column toward the pair, stopping ADJACENT (never into (t-2,c) itself: that fires the 3 early, wasting the trigger).
--- Returns nil when some column is already cocked (nothing to stage) or no pair/third-X exists.
+-- Returns nil when TRIGGER_TARGET columns are already cocked (nothing to stage) or no pair/third-X exists.
+-- 3 measured best on the 10-seed 6x12 sweep: 1 -> 23.5s median, 2 -> 22.8, 3 -> 25.1 (mean 26.2 -> 29.5). Redundant
+-- cocked columns mean the breaks AFTER the first are also one slide away.
+M.TRIGGER_TARGET = tonumber(os.getenv("PA_TRIGGERS")) or 3
 function M.stageTrigger(grid, rows, touchable)
   local W, H = 6, rows or 12
+  local cocked = 0
   for c = 1, W do
     local t = topRow(grid, c, H)
     if t >= 3 then
       local X = grid[t][c] or 0
       if X ~= 0 and X ~= GARBAGE and (grid[t-1][c] or 0) == X then
         -- a pair at the top of column c. cocked already?
-        if (c > 1 and (grid[t-2][c-1] or 0) == X) or (c < W and (grid[t-2][c+1] or 0) == X) then return nil end
+        if (c > 1 and (grid[t-2][c-1] or 0) == X) or (c < W and (grid[t-2][c+1] or 0) == X) then
+          cocked = cocked + 1
+          if cocked >= M.TRIGGER_TARGET then return nil end
+          goto nextcol
+        end
         -- route the nearest X in row t-2 one step toward c, stopping at the adjacent cell
         for d = 2, W - 1 do
           for _, dir in ipairs({ -1, 1 }) do
@@ -250,6 +258,7 @@ function M.stageTrigger(grid, rows, touchable)
         end
       end
     end
+    ::nextcol::
   end
   return nil
 end

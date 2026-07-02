@@ -101,6 +101,32 @@ function M.catchRoute(grid, rows, col, color, touchable)
 end
 
 
+-- rowBreak(grid, W, H, touchable) -> {r,c} swap | nil. BREAK THE ROW (Brian): a horizontal-3 clears three cells ACROSS a
+-- row, so every column drops by one and the board stays FLAT -- unlike a vertical-3, which pops one column deep, lopsides
+-- the board, and strands the rest of the block. Find a garbage-touching row, a color with >=3 cells in it, and slide the
+-- tightest triple together toward the middle (which touches the block, so the match pops it). One step/frame.
+local function rowBreak(grid, W, H, touchable)
+  for r = H - 1, 1, -1 do
+    local byColor = {}
+    for c = 1, W do
+      local v = grid[r][c] or 0
+      if v ~= 0 and v ~= GARBAGE and grid[r + 1] and (grid[r + 1][c] or 0) == GARBAGE then  -- colored + garbage directly above = breakable
+        byColor[v] = byColor[v] or {}; byColor[v][#byColor[v] + 1] = c
+      end
+    end
+    for _, cols in pairs(byColor) do
+      if #cols >= 3 then
+        local bi, bspan = 1, 99
+        for i = 1, #cols - 2 do local s = cols[i + 2] - cols[i]; if s < bspan then bspan, bi = s, i end end
+        local a, b, cc = cols[bi], cols[bi + 1], cols[bi + 2]   -- tightest triple; b (middle) stays, ends slide toward it
+        if b > a + 1 and (grid[r][a + 1] or 0) ~= (grid[r][a] or 0) and touchOK(touchable, r, a) then return { r, a } end
+        if cc > b + 1 and (grid[r][cc - 1] or 0) ~= (grid[r][cc] or 0) and touchOK(touchable, r, cc - 1) then return { r, cc - 1 } end
+      end
+    end
+  end
+  return nil
+end
+
 -- breakRoute(grid, rows, touchable) -> {r,c} swap | nil. AIMED multi-swap BREAK (Brian's r2c3->right insight): the bot
 -- only ever recognized a ONE-swap break, missing breaks that are a few slides away. Common case: a column already has a
 -- same-color PAIR at its top touching the garbage, and a matching 3rd panel sits on the row just BELOW the pair, a few
@@ -118,6 +144,7 @@ function M.breakRoute(grid, rows, touchable, anyTop)
     end
     print("GRID " .. table.concat(s, " "))
   end
+  if not anyTop then local rb = rowBreak(grid, W, H, touchable); if rb then return rb end end  -- PREFER the flat row break over a lopsiding vertical (rare: needs 3 of one color in the touching row)
   -- eligible columns: a colored top cell with room for a vertical-3 (t,t-1,t-2). Normally require GARBAGE directly above
   -- (so the clear pops the block); with anyTop, fire on ANY column top -> completing the three just CLEARS and drops height
   -- (clearRoute: used when the bot would otherwise idle under garbage, to lift clear throughput). Prefer the LOWEST top.
@@ -152,23 +179,7 @@ function M.breakRoute(grid, rows, touchable, anyTop)
     end
     if finishable and firstMove then return firstMove end
   end
-  -- HORIZONTAL break (Brian: "horizontal too"): a same-color PAIR sitting in the top row directly under the block + a 3rd
-  -- of that color routed in from OUTSIDE the pair completes a horizontal-3 that pops the block -- usually fewer moves than
-  -- assembling a vertical column, because a top-row pair under the block is common.
-  for col = 1, W - 1 do
-    local t = topRow(grid, col, H)
-    if t >= 1 and grid[t + 1] then
-      local X = grid[t][col] or 0
-      if X ~= 0 and (grid[t + 1][col] or 0) == GARBAGE and (grid[t][col + 1] or 0) == X and (grid[t + 1][col + 1] or 0) == GARBAGE then
-        for c = col - 2, 1, -1 do  -- complete LEFT: route the nearest left-side X rightward toward col-1 (one step/frame)
-          if (grid[t][c] or 0) == X and touchOK(touchable, t, c) then return { t, c } end
-        end
-        for c = col + 3, W do      -- complete RIGHT: route the nearest right-side X leftward toward col+2
-          if (grid[t][c] or 0) == X and touchOK(touchable, t, c - 1) then return { t, c - 1 } end
-        end
-      end
-    end
-  end
+  -- (the old restrictive same-height-pair horizontal break is superseded by rowBreak above.)
   if os.getenv("PA_BREAKDIAG") and not anyTop then    -- why no routable break this frame? per column: top-row, top-color, G=garbage above, the two rows under the top
     local parts = {}
     for col = 1, W do

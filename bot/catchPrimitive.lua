@@ -192,37 +192,48 @@ function M.breakRoute(grid, rows, touchable, anyTop)
   -- eligible columns: a colored top cell with room for a vertical-3 (t,t-1,t-2). Normally require GARBAGE directly above
   -- (so the clear pops the block); with anyTop, fire on ANY column top -> completing the three just CLEARS and drops height
   -- (clearRoute: used when the bot would otherwise idle under garbage, to lift clear throughput). Prefer the LOWEST top.
+  -- DISTANCE-AWARE column choice (2026-07, single-seed trace on seed 1005): the old sort ranked columns by `ready`
+  -- (how many of the 3 cells already match) alone, with no regard for HOW FAR a still-missing row's fix has to slide
+  -- from. Traced exact failure: after one break, the bot committed to a column needing only 1 more row (ready=2) --
+  -- but that row's only same-color source was 5 columns away. It spent 125 frames (2s) walking the slide one column
+  -- at a time (targets col1->col2->col3->col4, never reaching col6) while garbage buried the board and killed it,
+  -- with a CLOSER (if less "ready") column never considered. Now every eligible+finishable column's TOTAL slide
+  -- distance is computed up front and the lowest-cost one wins -- ready is just one input to that cost, not the sort key.
   local elig = {}
   for col = 1, W do
     local t = topRow(grid, col, H)
     if t >= 3 and (grid[t][col] or 0) ~= 0 and (anyTop or (grid[t + 1] and (grid[t + 1][col] or 0) == GARBAGE)) then
       local X = grid[t][col]
       local ready = 1 + ((grid[t - 1] and grid[t - 1][col] == X) and 1 or 0) + ((grid[t - 2] and grid[t - 2][col] == X) and 1 or 0)
-      elig[#elig + 1] = { col = col, t = t, ready = ready }   -- how many of the vertical-3 are already this color (closer = fewer routes)
-    end
-  end
-  table.sort(elig, function(a, b) if a.ready ~= b.ready then return a.ready > b.ready end return a.t < b.t end)  -- finish the CHEAPEST break first (most same-color ready), then lowest -- don't stall grinding a hard column
-  for _, e in ipairs(elig) do
-    local col, t, X = e.col, e.t, grid[e.t][e.col]
-    -- build a vertical-3 ending at t (adjacent to the block -> clearing it pops the block): fill t-1 then t-2 with X.
-    -- ONLY commit if the whole column is FINISHABLE: every missing row must already hold an X somewhere in it, because
-    -- the sole way to fill (r,col) is sliding an X that is already IN row r. A missing row with no X is a dead end --
-    -- routing toward it just oscillates one panel forever (the spin that topped the bot out). Skip dead-end columns;
-    -- if none finish, return nil so the brain falls through to clearing (drop height + churn until a break lines up).
-    local firstMove, finishable = nil, true
-    for _, r in ipairs({ t - 1, t - 2 }) do
-      if (grid[r][col] or 0) ~= X then
-        local move = nil
-        for d = 1, W do
-          if col + d <= W and (grid[r][col + d] or 0) == X and touchOK(touchable, r, col + d - 1) then move = { r, col + d - 1 }; break end
-          if col - d >= 1 and (grid[r][col - d] or 0) == X and touchOK(touchable, r, col - d) then move = { r, col - d }; break end
+      -- ONLY commit if the whole column is FINISHABLE: every missing row must already hold an X somewhere in it,
+      -- because the sole way to fill (r,col) is sliding an X that is already IN row r. A missing row with no X is a
+      -- dead end -- routing toward it just oscillates one panel forever (the spin that topped the bot out). Skip
+      -- dead-end columns; if none finish, elig stays empty and we return nil (falls through to clearing).
+      local firstMove, finishable, cost = nil, true, 0
+      for _, r in ipairs({ t - 1, t - 2 }) do
+        if (grid[r][col] or 0) ~= X then
+          local move, dist = nil, nil
+          for d = 1, W do
+            if col + d <= W and (grid[r][col + d] or 0) == X and touchOK(touchable, r, col + d - 1) then move, dist = { r, col + d - 1 }, d; break end
+            if col - d >= 1 and (grid[r][col - d] or 0) == X and touchOK(touchable, r, col - d) then move, dist = { r, col - d }, d; break end
+          end
+          if not move then finishable = false; break end
+          cost = cost + dist
+          firstMove = firstMove or move
         end
-        if not move then finishable = false; break end
-        firstMove = firstMove or move
+      end
+      if finishable then
+        elig[#elig + 1] = { col = col, t = t, ready = ready, cost = cost, firstMove = firstMove }
       end
     end
-    if finishable and firstMove then return firstMove end
   end
+  table.sort(elig, function(a, b) if a.cost ~= b.cost then return a.cost < b.cost end return a.t < b.t end)  -- finish the column with the FEWEST total slide-steps first, not just the one with the most cells already right
+  if os.getenv("PA_ROUTEDIAG") and not anyTop then
+    local parts = {}
+    for _, e in ipairs(elig) do parts[#parts+1] = string.format("col%d(t%d,ready%d,cost%d)", e.col, e.t, e.ready, e.cost) end
+    print("  ROUTEDIAG elig=[" .. table.concat(parts, " ") .. "]")
+  end
+  if elig[1] then return elig[1].firstMove end
   -- (the old restrictive same-height-pair horizontal break is superseded by rowBreak above.)
   if os.getenv("PA_BREAKDIAG") and not anyTop then    -- why no routable break this frame? per column: top-row, top-color, G=garbage above, the two rows under the top
     local parts = {}

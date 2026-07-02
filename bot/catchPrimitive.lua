@@ -263,6 +263,51 @@ function M.stageTrigger(grid, rows, touchable)
   return nil
 end
 
+-- stageContact(grid, rows, touchable) -> {r,c} swap | nil. CONTACT-AWARE trigger staging: a landing block rests on the
+-- TALLEST column(s), its bottom row at maxT+1 -- so only a vertical-3 topping at maxT can touch it. A cocked trigger in
+-- any shorter column is decoration (measured: seed 1005 had one, zero breaks; seed 1006's flat board + contact trigger
+-- broke instantly). This stages the trigger IN the contact columns: with a pair at (maxT,maxT-1), park the third X at
+-- (maxT-2, c+-1); with no pair, slide the top color into (maxT-1, c) to make one. One step per call.
+function M.stageContact(grid, rows, touchable)
+  local W, H = 6, rows or 12
+  local maxT = 0
+  for c = 1, W do local t = topRow(grid, c, H); if t > maxT then maxT = t end end
+  if maxT < 3 then return nil end                                   -- a contact trio needs rows maxT..maxT-2
+  for c = 1, W do
+    if topRow(grid, c, H) == maxT then
+      local X = grid[maxT][c] or 0
+      if X ~= 0 and X ~= GARBAGE then
+        if (grid[maxT-1][c] or 0) == X then
+          -- pair at the contact top. cocked already?
+          if (c > 1 and (grid[maxT-2][c-1] or 0) == X) or (c < W and (grid[maxT-2][c+1] or 0) == X) then return nil end
+          -- route the nearest X in row maxT-2 one step toward c, stopping adjacent (into (maxT-2,c) fires the 3 early)
+          for d = 2, W - 1 do
+            for _, dir in ipairs({ -1, 1 }) do
+              local cc = c + dir * d
+              if cc >= 1 and cc <= W and (grid[maxT-2][cc] or 0) == X then
+                local sc = (dir == 1) and (cc - 1) or cc
+                if (grid[maxT-2][sc] or 0) ~= (grid[maxT-2][sc+1] or 0) and touchOK(touchable, maxT-2, sc) then return { maxT-2, sc } end
+              end
+            end
+          end
+        else
+          -- no pair yet: bring X into (maxT-1, c) -- route the nearest X along row maxT-1 (the swap INTO the column is fine here)
+          for d = 1, W - 1 do
+            for _, dir in ipairs({ -1, 1 }) do
+              local cc = c + dir * d
+              if cc >= 1 and cc <= W and (grid[maxT-1][cc] or 0) == X then
+                local sc = (dir == 1) and (cc - 1) or cc
+                if (grid[maxT-1][sc] or 0) ~= (grid[maxT-1][sc+1] or 0) and touchOK(touchable, maxT-1, sc) then return { maxT-1, sc } end
+              end
+            end
+          end
+        end
+      end
+    end
+  end
+  return nil
+end
+
 -- buildPair(grid, rows, touchable) -> {r,c} swap | nil. SETUP (Brian: setup is enough, no chain-building): lay a vertical
 -- PAIR at a column top with one swap, so a freed garbage panel dropping onto that column completes a vertical-3 and clears
 -- (the catch). HOLDS (never makes it a triple itself). Used in IDLE frames so it doesn't compete with breaking/offense.

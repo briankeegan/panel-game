@@ -260,6 +260,70 @@ function EnvelopeBrain:decide(state, stack, match)
       if mv then fireSwap(mv, "PLAN") else wait() end
     end
     self._substate = nil
+    if self._bigGarbageGame then
+      -- ================= DIG-ONLY MODE (Brian 2026-07-02): only the large-garbage solve mechanics =================
+      -- BREAK -> CATCH -> SETUP -> POSTURE, nothing else: no chain organize, no offense planning, no raise-to-build.
+      -- Gated deliberately minimal while each mechanic is proven out (PA_MECH counters). Two mechanics the generic
+      -- tree lacked: (1) when the block hangs on ONE tall column (jagged landing) no staged 3 can touch it -- CLEAR
+      -- anything so the support drops and the block descends onto the braced flat surface; (2) the lull must HOLD a
+      -- flat 3-4 high surface (clearing only against the rise), not strip the board bare (seed 1002/1003: braced to
+      -- height ~2, zero possible breaks, 0 broken).
+      if breaking then
+        local catch = self:tryCatch(grid, rows, stack, priorities, verify, touchable)
+        if catch then self._substate = "CATCH"; move = { type = "SWAP", pos = catch.swaps[1], swaps = catch.swaps, kind = catch.kind }
+        else local cl = clearChip(false, true)
+          if cl then fireChip(cl, "CLEAR")
+          else local fl = catchPrimitive.flattenMove(grid, rows, touchable)
+            if fl then fireSwap(fl, "FLATTEN") else wait() end
+          end
+        end
+      elseif state.lowestGarbageRow then
+        local bc = clearChip(true, true)                                   -- a ready clear that pops the block
+        if bc then fireChip(bc, "CLEAR")
+        else local br = catchPrimitive.breakRoute(grid, rows, touchable)   -- finish a contact-column vertical-3
+          if br then fireSwap(br, "BREAK_ROUTE")
+          else local cl = clearChip(false, true)                           -- activity + SUPPORT CLEARING: the block falls as its supports go
+            if cl then fireChip(cl, "CLEAR")
+            else local tg = catchPrimitive.stageContact(grid, rows, touchable) or catchPrimitive.stageTrigger(grid, rows, touchable)  -- RE-COCK the contact column between breaks (cocked seeds got exactly ONE break then stalled)
+              if tg then fireSwap(tg, "DIG_TRIGGER")
+              else local mv = useChips.planMove(grid, rows, touchable, cursor, true, false)  -- ASSEMBLE a clear via setup swaps (no ready clear + no finishable break = the only path to dropping the block's supports)
+                if mv then fireSwap(mv, "PLAN")
+                else local fl = catchPrimitive.flattenMove(grid, rows, touchable)
+                  if fl then fireSwap(fl, "FLATTEN") else wait() end
+                end
+              end
+            end
+          end
+        end
+      else
+        -- LULL POSTURE: hold a FLAT, 3-4 high, trigger-cocked surface. Clear only to fight the rise (maxH>=5); below
+        -- that HOLD material -- the staged 3s must be able to reach the landing block's bottom row.
+        -- CONTACT FIRST: at L10 the lull clear rate can only match the rise (~one 3-clear per rise row), never beat it
+        -- -- boards hover at height 4-7 no matter what, so "get short, then posture" means posture NEVER runs (measured:
+        -- seed 1001's whole lull was PLAN, zero staging decisions, 0 breaks). The break mechanic doesn't need a short
+        -- board -- it needs a cocked trigger in the CONTACT column at whatever height the board is. Stage that first,
+        -- every time it degrades; fight the rise with the remaining frames.
+        local ct = catchPrimitive.stageContact(grid, rows, touchable)
+        if ct then fireSwap(ct, "BRACE_CONTACT")
+        else local cl = (height >= 5 and avgH >= 3) and clearChip(false, true) or nil  -- avgH floor: keep enough material for a contact trio (a stripped board can't break anything -- seed 1001 got mined to avgH 1.3, 0 breaks)
+          if cl then fireChip(cl, "CLEAR")
+          else local mv = (height >= 5 and avgH >= 3) and useChips.planMove(grid, rows, touchable, cursor, true, false) or nil
+            if mv then fireSwap(mv, "PLAN")
+            else local fl = catchPrimitive.flattenMove(grid, rows, touchable)
+              if fl then fireSwap(fl, "FLATTEN")
+              else local tg = catchPrimitive.stageTrigger(grid, rows, touchable)
+                if tg then fireSwap(tg, "BRACE_TRIGGER")
+                else local bp = catchPrimitive.buildPair(grid, rows, touchable)
+                  if bp then fireSwap(bp, "BRACE_PAIR")
+                  elseif avgH < 2.5 and not busy then self._substate = "RAISE"; move = { type = "RAISE" }  -- material floor: an empty board can't break anything
+                  else wait() end
+                end
+              end
+            end
+          end
+        end
+      end
+    else
     -- GARBAGE LINEUP: while a block is breaking or sealed, if the freed/standing panels already set up a real CASCADE,
     -- FIRE it. In garbage we can't ride the board up to organize a deeper chain (no headroom), so we take the cascade the
     -- breaks handed us. depth>=3 = a genuine multi-link chain, strictly better than a topoff-3.
@@ -359,6 +423,7 @@ function EnvelopeBrain:decide(state, stack, match)
         end
       end
     end
+    end -- dig-only / generic tree split
     -- HEARTBEAT: the L10 death condition is ONE still frame while garbage is at the ceiling with stop_time 0
     -- (maxHealth=1). If the whole tree came up WAIT with garbage on the board, make a harmless DISTINCT swap instead:
     -- two different-colored settled panels in the same row -- a pure permutation (no gravity, no structure change).

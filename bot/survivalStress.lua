@@ -194,8 +194,22 @@ local function runSeed(seed, injectGarbage)
   -- "garbageMatched"(count, onScreenCount) the instant garbage converts to normal
   -- panels on a clear (checkMatches.lua:718) — the real engine dig signal.
   local garbageBroken = 0
+  -- PA_MECH: per-MECHANIC outcome counters (Brian: verify each mechanic works before tuning anything).
+  --   reveals        = break/reveal windows that opened
+  --   breakEvents    = garbage matches (each = one row converted)
+  --   catchDone      = reveals in which a CHAIN fired (chain_counter>=2) during the window or <=90f after -- i.e. the
+  --                    freed panel LANDED ON a lined-up pair and re-matched: the "land on top" mechanic actually working
+  --   rebreakLat[]   = frames from a reseal to the next garbage match (how fast the next break comes)
+  local mech = os.getenv("PA_MECH") and { reveals = 0, breakEvents = 0, catchDone = 0, rebreakLat = {}, resealAt = nil,
+    windowChain = false, lastBreakEnd = -9999 } or nil
   local sub = {} -- subscriber token held in scope so the weak-keyed sub survives
-  stack:connectSignal("garbageMatched", sub, function(_, count) garbageBroken = garbageBroken + count end)
+  stack:connectSignal("garbageMatched", sub, function(_, count)
+    garbageBroken = garbageBroken + count
+    if mech then
+      mech.breakEvents = mech.breakEvents + 1
+      if mech.resealAt then mech.rebreakLat[#mech.rebreakLat + 1] = (mech.frameNow or 0) - mech.resealAt; mech.resealAt = nil end
+    end
+  end)
 
   local brain = require("bot.EnvelopeBrain").new({ bigGarbage = garbH >= 3 }) -- THE bot; announce a tall-block mode up front (like the training preset's visible queue)
   local _rf, _cmi = tonumber(os.getenv("PA_RF")), tonumber(os.getenv("PA_CMI"))  -- MIDDLE speed test: faster than throttled but enough pacing for swaps to resolve (full speed/reaction0 thrashed the routing)
@@ -225,6 +239,35 @@ local function runSeed(seed, injectGarbage)
           frameEarned = stack.stopWatch, rowEarned = 1, colEarned = 1 },
       }, 2)
       diag.garbageInjected = diag.garbageInjected + 1
+      if mech then
+        -- LANDING POSTURE snapshot: is the SETUP mechanic delivering short+flat+cocked at the moment pressure arrives?
+        local tops, pairs, cocked = {}, 0, 0
+        for c = 1, 6 do
+          local t = 0
+          for r = (stack.height or 12), 1, -1 do local p = stack.panels[r] and stack.panels[r][c]
+            if p and (p.color or 0) ~= 0 and not p.isGarbage then t = r; break end end
+          tops[c] = t
+        end
+        for c = 1, 6 do
+          local t = tops[c]
+          if t >= 2 then
+            local a = stack.panels[t][c].color or 0
+            local b = stack.panels[t-1] and stack.panels[t-1][c] and (stack.panels[t-1][c].color or 0) or 0
+            if a ~= 0 and a == b then
+              pairs = pairs + 1
+              if t >= 3 then
+                local lc = (c > 1) and stack.panels[t-2][c-1] and (stack.panels[t-2][c-1].color or 0) or 0
+                local rc = (c < 6) and stack.panels[t-2][c+1] and (stack.panels[t-2][c+1].color or 0) or 0
+                if lc == a or rc == a then cocked = cocked + 1 end
+              end
+            end
+          end
+        end
+        local mx, mn, sum = 0, 99, 0
+        for c = 1, 6 do sum = sum + tops[c]; if tops[c] > mx then mx = tops[c] end; if tops[c] < mn then mn = tops[c] end end
+        print(string.format("  seed %d POSTURE@inject#%d f%d: tops=[%s] maxH=%d avgH=%.1f spread=%d pairs=%d cocked=%d",
+          seed, diag.garbageInjected, frame, table.concat(tops, ","), mx, sum / 6, mx - mn, pairs, cocked))
+      end
     end
 
     -- SAME decide->execute->run path as BotClient:tickMatch (lines 399-428).
@@ -309,8 +352,26 @@ local function runSeed(seed, injectGarbage)
     local cc = stack.chain_counter or 0
     if cc > diag.peakChain then diag.peakChain = cc end
     if cc >= 2 and prevChain < 2 then diag.chainsFired = diag.chainsFired + 1 end
+    if mech then
+      mech.frameNow = frame
+      local br = require("bot.garbageReveal").breakingRow(stack)
+      if br and not mech.prevBreaking then mech.reveals = mech.reveals + 1; mech.windowChain = false end
+      if not br and mech.prevBreaking then mech.resealAt = frame; mech.lastBreakEnd = frame end
+      if cc >= 2 and prevChain < 2 and not mech.windowChain
+        and (br or (frame - mech.lastBreakEnd) <= 90) then
+        mech.catchDone = mech.catchDone + 1; mech.windowChain = true
+      end
+      mech.prevBreaking = br
+    end
     prevChain = cc
     frame = frame + 1
+  end
+  if mech then
+    table.sort(mech.rebreakLat)
+    local lat = #mech.rebreakLat > 0 and mech.rebreakLat[math.ceil(#mech.rebreakLat / 2)] or -1
+    print(string.format("  seed %d MECH: reveals=%d breakEvents=%d catchDone=%d (%.0f%% of reveals) rebreakLat median=%df n=%d",
+      seed, mech.reveals, mech.breakEvents, mech.catchDone,
+      mech.reveals > 0 and (100 * mech.catchDone / mech.reveals) or 0, lat, #mech.rebreakLat))
   end
 
   local survivalFrames = (stack.game_over_clock and stack.game_over_clock > 0)

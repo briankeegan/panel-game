@@ -305,6 +305,17 @@ function EnvelopeBrain:decide(state, stack, match)
       if cl then fireChip(cl, "CLEAR")
       else local fl = catchPrimitive.flattenMove(grid, rows, touchable)
         if fl then fireSwap(fl, "FLATTEN")
+        elseif avgH >= 5 then
+          -- TALL lull (no garbage yet, rise climbing): chase a clear BEFORE posture -- the plan-first order is what got
+          -- the injection-off baseline to the 300s cap; unconditional it cost the landings, so it only runs when tall.
+          local mv = useChips.planMove(grid, rows, touchable, cursor, true, false)
+          if mv then fireSwap(mv, "PLAN")
+          else local tg = catchPrimitive.stageTrigger(grid, rows, touchable)
+            if tg then fireSwap(tg, "BRACE_TRIGGER")
+            else local bp = catchPrimitive.buildPair(grid, rows, touchable)
+              if bp then fireSwap(bp, "BRACE_PAIR") else wait() end
+            end
+          end
         else local tg = catchPrimitive.stageTrigger(grid, rows, touchable)  -- cock a 1-slide break next to an existing pair (the guaranteed first break)
           if tg then fireSwap(tg, "BRACE_TRIGGER")
           else local bp = catchPrimitive.buildPair(grid, rows, touchable)

@@ -428,7 +428,7 @@ print(string.format(
 local survivals, broken = {}, {}
 local totalSwaps, totalGarbInj, totalChains, totalFrames = 0, 0, 0, 0
 for i = 1, seeds do
-  local seed = 1000 + i -- deterministic, reproducible seed set
+  local seed = (tonumber(os.getenv("PA_SEED_BASE")) or 1000) + i -- deterministic, reproducible seed set; PA_SEED_BASE picks a window (single-seed debugging: PA_SEED_BASE=1002 seeds=1 -> seed 1003)
   local sf, gb, diag = runSeed(seed, true)
   survivals[#survivals + 1] = sf
   broken[#broken + 1] = gb

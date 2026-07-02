@@ -197,7 +197,7 @@ local function runSeed(seed, injectGarbage)
   local sub = {} -- subscriber token held in scope so the weak-keyed sub survives
   stack:connectSignal("garbageMatched", sub, function(_, count) garbageBroken = garbageBroken + count end)
 
-  local brain = require("bot.EnvelopeBrain").new({}) -- THE bot
+  local brain = require("bot.EnvelopeBrain").new({ bigGarbage = garbH >= 3 }) -- THE bot; announce a tall-block mode up front (like the training preset's visible queue)
   local _rf, _cmi = tonumber(os.getenv("PA_RF")), tonumber(os.getenv("PA_CMI"))  -- MIDDLE speed test: faster than throttled but enough pacing for swaps to resolve (full speed/reaction0 thrashed the routing)
   local controller = CursorController.new(
     (_rf or _cmi) and { cursorMoveInterval = _cmi or 2, reactionFrames = _rf or 5 }

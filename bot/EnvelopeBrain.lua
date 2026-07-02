@@ -15,7 +15,13 @@ EnvelopeBrain.__index = EnvelopeBrain
 function EnvelopeBrain.new(_opts)
   -- _endless gates the chain ORGANIZE/fire: ride-the-board-up-then-fire-a-deep-chain is an ENDLESS strategy; in garbage
   -- it's suicide (the packed board leaves no headroom for a landing block -> instant topout). Default OFF = garbage-safe.
-  return setmetatable({ _endless = _opts and _opts.endless or false }, EnvelopeBrain)
+  -- _bigGarbageGame: tall blocks (h>=3) are coming (known mode, e.g. the large_garbage training preset). Also flips on
+  -- automatically the first time one shows up in the incoming queue -- but a surprise first block gives only ~1s of
+  -- telegraph, so a mode that KNOWS should announce it up front and the bot postures short/flat from frame 0.
+  return setmetatable({
+    _endless = _opts and _opts.endless or false,
+    _bigGarbageGame = (_opts and _opts.bigGarbage) or false,
+  }, EnvelopeBrain)
 end
 
 ------------------------------------------------------------------ ENGINE VERIFY (garbage-faithful, via match rollback)
@@ -183,9 +189,19 @@ function EnvelopeBrain:decide(state, stack, match)
   -- STATE precedence DANGER > RAISE > OFFENSE.
   local top = state.height or 12
   local raiseTarget = top - RECOVERY_BUFFER
+  -- TALL-BLOCK awareness: a block h>=3 must be shaved almost entirely (it always reaches the ceiling), so every row we
+  -- raise underneath it is pure extra digging. Once one is seen (incoming or landed) this is a BIG-GARBAGE game: never
+  -- raise again, hold the short/flat/staged posture between volleys (the queue is often empty between periodic volleys,
+  -- so the flag is sticky, not per-frame).
+  local pendingBig = 0
+  for _, g in ipairs(state.incoming or {}) do
+    if (g.h or 0) > pendingBig then pendingBig = g.h end
+  end
+  if pendingBig >= 3 then self._bigGarbageGame = true end
   -- Raise/build a base BEFORE a block lands; the MOMENT garbage is ON the board, STOP raising (Brian: the trigger is
   -- garbage LANDED, not incoming -- you keep playing while it's still in transit, and lock down once it's actually here).
-  local safeToRaise = not state.lowestGarbageRow
+  -- Exception: in a big-garbage game raising is never safe (see above).
+  local safeToRaise = not state.lowestGarbageRow and not self._bigGarbageGame
   -- RAISE on the AVERAGE column fill, not the tallest: gating on the tallest let a single height-6 column keep the bot in
   -- OFFENSE forever while the rest of the board sat empty -> it never raised, never built material, couldn't break (Brian:
   -- "the first thing it should do is raise; otherwise it has no material"). Average fill builds material everywhere first.
@@ -259,14 +275,34 @@ function EnvelopeBrain:decide(state, stack, match)
       end
     elseif state.lowestGarbageRow then
       -- B. SEALED garbage: commit to removing the block -- break it, or flatten ONLY to enable the break.
+      -- ORDER (L10 physics): while garbage is at the ceiling the drain pauses ONLY during activity (rise_lock: popping/
+      -- falling/swapping) or banked stop time -- and stop time comes ONLY from 4+ combos and chains, never plain 3s.
+      -- So any CLEAR beats FLATTEN here: a clear keeps the board active and may bank stop; a flatten swap followed by a
+      -- still board is a death frame. Flatten is the last resort before plan, not the first fallback.
       local bc = clearChip(true, true)                                    -- a ready clear that pops the block (incl a COMBO_3 break+clear)
       if bc then fireChip(bc, "CLEAR")
       else local br = catchPrimitive.breakRoute(grid, rows, touchable)    -- route to complete the vertical-3 next to it
         if br then fireSwap(br, "BREAK_ROUTE")
-        else local fl = catchPrimitive.flattenMove(grid, rows, touchable) -- break unreachable -> flatten to ENABLE it
-          if fl then fireSwap(fl, "FLATTEN")
-          else local cl = clearChip(false, true)                         -- otherwise clear (incl 3s) to drop height while we set up
-            if cl then fireChip(cl, "CLEAR") else planFallback() end
+        else local cl = clearChip(false, true)                            -- any clear: activity + height drop while we set up the break
+          if cl then fireChip(cl, "CLEAR")
+          else local fl = catchPrimitive.flattenMove(grid, rows, touchable) -- break unreachable -> flatten to ENABLE it
+            if fl then fireSwap(fl, "FLATTEN") else planFallback() end
+          end
+        end
+      end
+    elseif self._bigGarbageGame then
+      -- B2. BRACE (big-garbage game, board currently clean): a tall block is inbound or will be. Get SHORT (every ready
+      -- clear incl 3s drops height = margin), get FLAT (a level surface gives the block 6 contact columns instead of 1 --
+      -- the jagged-landing death), keep a vertical pair staged at the surface (one swap completes a 3 touching the block
+      -- the moment it lands). No raising, no chain organizing -- everything is posture for the next landing.
+      local cl = clearChip(false, true)
+      if cl then fireChip(cl, "CLEAR")
+      else local fl = catchPrimitive.flattenMove(grid, rows, touchable)
+        if fl then fireSwap(fl, "FLATTEN")
+        else local bp = catchPrimitive.buildPair(grid, rows, touchable)
+          if bp then fireSwap(bp, "BRACE_PAIR")
+          else local mv = useChips.planMove(grid, rows, touchable, cursor, true, false)
+            if mv then fireSwap(mv, "PLAN") else wait() end
           end
         end
       end

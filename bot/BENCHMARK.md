@@ -27,6 +27,19 @@ real frame), NOT a "ceiling < X" bound. Primary cell = survival-time @ 144/min (
 ("max area/min survived") is kept only as a secondary diagnostic and only when it resolves to a number.
 
 ## Changelog (newest first)
+- **2026-07-02** — **FROZEN SURVIVAL 15.4 s → 25.4 s median (+65%)** (p10 21.8, mean 30.8; protocol `600 3600 10`) and a NEW
+  tracked axis: **large-garbage practice (6×12 every 900f, `900 18000 10 "" hard 6 12`, PA_FULLSPEED): median 23.5 s**
+  (from 20.4 s at the session start; garbage-broken median 36→72, zero-break seeds 4→3). Changes (each 10-seed measured,
+  losers reverted): (1) **BRACE posture** — sticky big-garbage flag; no raising, stay short/flat, staged pairs;
+  (2) BRACE yields to DANGER near the ceiling (self-topout fix: injection-off 97 s → 197 s, one variant hit the 300 s cap);
+  (3) sealed-dig ordering: any CLEAR before FLATTEN (L10 physics: maxHealth=1 — the drain pauses only during activity/stop,
+  and stop time comes ONLY from 4+ combos/chains, never 3s); (4) **stageTrigger** — pre-cock a 1-slide break next to a top
+  pair, the shape breakRoute finishes; first break stops being landing luck; (5) GARBAGE-LINEUP cascade-fire un-deadcoded
+  for big-garbage digs. KEY ENGINE FACTS for whoever digs next: garbage ≥ ceiling drains health ONLY on still frames
+  (rise_lock covers popping/falling/swap-in-flight); L10 maxHealth=1 → ONE uncovered still frame is death; a 12-row block
+  always reaches the ceiling; observed dig floor ~180-270f per garbage row (serial) — 5-min survival vs 900f volleys needs
+  the sustained CHAIN dig (row per link + danger stop-time per link), which is the open frontier. CI: the smoke-test
+  workflow's `large-garbage` mode runs this offline on a runner (no server contact).
 - **2026-06-17** — **SURVIVAL = 11.6 s median (p10 11.3 / mean 12.2)** | SHA `da4684b7` (chips wired, BoardSim verify) |
   frozen protocol v1 `luajit bot/survivalStress.lua 600 3600 10`, seeds 1001-1010 | log `bot/survival_run_3a2f360c.log`.
   **FIRST frozen-protocol number — this is the comparable baseline from here on.** Not apples-to-apples with the

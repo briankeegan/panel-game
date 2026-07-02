@@ -27,6 +27,19 @@ real frame), NOT a "ceiling < X" bound. Primary cell = survival-time @ 144/min (
 ("max area/min survived") is kept only as a secondary diagnostic and only when it resolves to a number.
 
 ## Changelog (newest first)
+- **2026-07-02 (mechanics pass, Brian's redirect)** — verify mechanics before tuning; PA_MECH counters added (reveals /
+  break events / catch-per-reveal / re-break latency + landing-posture snapshot). **MECHANICS SCORECARD** (6×12@900f):
+  **SETUP** partially works — contact-aware staging (stageContact: the trigger must be in the TALLEST column, the only
+  one the block rests on) raised cocked-at-landing 1/10 → ~5/10; when cocked-at-contact, the first break follows.
+  **BREAK** works when posture is right, and the dig then SUSTAINS (digging seeds: 43-65 s, 3 blocks, 200-540 broken;
+  re-break median 11-35f). **CATCH ("land on top") is the broken mechanic** — 20-40% of reveals convert to a chain; the
+  reveal trace shows the catch executor OSCILLATING (same two cells swapped back and forth for a whole window).
+  **THE ENTANGLEMENT (key finding):** at maxHealth=1 the drain pauses during ANY activity, so the thrash/oscillation is
+  itself the survival coverage — 8/8 mechanically-correct fixes (anti-reversal, route lock, goal-committed staging,
+  availability-driven color choice, churn, heartbeat gating, drain cuts) measured WORSE because reducing chaos reduces
+  coverage before the better mechanics pay off. Best committed state: **mean 33.7 s / median 23.8 s** (from 16.6 s at
+  the redirect start with mechanics accidentally dead). Next: the catch executor must get good enough to REPLACE chaos
+  coverage with real chain stop-time — halfway fixes lose to the chaos baseline every time.
 - **2026-07-02 (later)** — session close: **large-garbage median 28.7 s** (multi-trigger staging TRIGGER_TARGET=3: 23.5→25.1;
   height-conditional BRACE order: 25.1→28.7; injection-off 197→230 s). Frozen 6×4 ends at **24.3 s median** (peak 26.1 with
   T3 before the height-conditional order; still +58% over the 15.4 baseline). Negative results kept as knobs for re-sweeps:

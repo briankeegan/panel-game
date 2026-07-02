@@ -20,8 +20,10 @@
 --               bot exactly like BotClient:tickMatch, inject garbage via the REAL
 --               online receive path (stack:applyNetworkGarbage), report a distribution.
 --
--- CLI: luajit bot/survivalStress.lua [garbageEveryFrames] [maxFrames] [seeds] [profile] [difficulty]
+-- CLI: luajit bot/survivalStress.lua [garbageEveryFrames] [maxFrames] [seeds] [profile] [difficulty] [garbW] [garbH]
 --      luajit bot/survivalStress.lua --capture   (one-time fixture grab)
+--   garbW/garbH: injected block shape (default 6x4 = human-rate protocol). 6 12 =
+--   the client's "large_garbage" training preset (one full-board block per volley).
 
 io.stdout:setvbuf("no") -- live progress when redirected to a file (bisection lines as they happen, not at exit)
 require("bot.headlessBoot") -- LÖVE stub + bit-exact RNG + globals + `json` (must be first)
@@ -93,6 +95,10 @@ local maxFrames          = tonumber(arg[2]) or 10800  -- 3 min cap
 local seeds              = tonumber(arg[3]) or 25
 local profilePath        = (arg[4] and arg[4] ~= "") and arg[4] or nil
 local difficulty         = arg[5] or "hard"
+-- Injected block shape. Default 6x4 = the frozen human-rate protocol (unchanged).
+-- 6x12 mirrors the client's "large_garbage" training preset (TrainingMenu.lua:59).
+local garbW              = tonumber(arg[6]) or 6
+local garbH              = tonumber(arg[7]) or 4
 
 -- Load the captured fixture once. Without it we cannot be online-faithful, so refuse
 -- to fall back to a hand-rolled match (that's the deleted-test failure mode).
@@ -210,8 +216,12 @@ local function runSeed(seed, injectGarbage)
     if injectGarbage and garbageEveryFrames > 0 and frame > 0 and frame % garbageEveryFrames == 0 then
       -- HUMAN-RATE pressure (data's bench_targets.json): a 6x4 chain-block every 10s = 144 area/min,
       -- = median real-player offense. The old 6x1-every-5s (72/min) was too gentle (a turtle survived).
+      -- isChain follows engine semantics: height>1 garbage is chain garbage; a
+      -- 6x1 is a combo block. (The training attack engine marks even 6x12 as
+      -- chain=false, but it needs illegalStuffIsAllowed on its queue for that;
+      -- the online receive path we use here gets the legal equivalent.)
       stack:applyNetworkGarbage({
-        { width = 6, height = 4, isMetal = false, isChain = true,
+        { width = garbW, height = garbH, isMetal = false, isChain = garbH > 1,
           frameEarned = stack.stopWatch, rowEarned = 1, colEarned = 1 },
       }, 2)
       diag.garbageInjected = diag.garbageInjected + 1
@@ -400,9 +410,9 @@ end
 -- run the distribution
 ----------------------------------------------------------------------
 print(string.format(
-  "SURVIVAL-STRESS (createFromReplay, online-faithful): fixture=%s slot=%d profile=%s difficulty=%s garbage=6x1-every-%df maxFrames=%d seeds=%d",
+  "SURVIVAL-STRESS (createFromReplay, online-faithful): fixture=%s slot=%d profile=%s difficulty=%s garbage=%dx%d-every-%df maxFrames=%d seeds=%d",
   FIXTURE, FIX.localPlayerNumber, tostring(profilePath or "(plain)"), difficulty,
-  garbageEveryFrames, maxFrames, seeds))
+  garbW, garbH, garbageEveryFrames, maxFrames, seeds))
 
 local survivals, broken = {}, {}
 local totalSwaps, totalGarbInj, totalChains, totalFrames = 0, 0, 0, 0

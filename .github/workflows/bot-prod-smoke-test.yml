@@ -14,8 +14,16 @@ name: Bot Prod Smoke Test (LIVE SERVER)
 on:
   workflow_dispatch:
     inputs:
+      mode:
+        description: 'What to run'
+        required: false
+        default: 'prod-vs'
+        type: choice
+        options:
+          - prod-vs          # bot-vs-bot matches on the live server
+          - large-garbage    # offline survival vs the "large_garbage" training preset (6x12 blocks); no server contact
       matches:
-        description: 'Number of bot-vs-bot matches to play (~2.5 min worst-case each; keep total under ~50min / job timeout)'
+        description: 'prod-vs: number of matches (~2.5 min worst-case each). large-garbage: number of seeds.'
         required: false
         default: '3'
       ip:
@@ -51,6 +59,7 @@ jobs:
           luarocks install --local luautf8 --lua-version 5.1
 
       - name: Run bot-vs-bot smoke test against the live server
+        if: inputs.mode == 'prod-vs'
         id: smoke
         run: |
           eval "$(luarocks path --local --lua-version 5.1)"
@@ -60,11 +69,25 @@ jobs:
             2>&1 | tee bot-prod-smoke.log
         continue-on-error: true
 
+      # "large_garbage" training preset (TrainingMenu.lua): 6-wide x 12-tall blocks.
+      # Offline harness (committed matchStart fixture, real engine) -- runs entirely
+      # on the runner, does NOT contact the server. One block per volley interval
+      # (900f = the preset's delayBeforeRepeat); 3600f cap = 60s survival target.
+      - name: Run large-garbage practice survival (offline, real engine)
+        if: inputs.mode == 'large-garbage'
+        id: largegarbage
+        run: |
+          eval "$(luarocks path --local --lua-version 5.1)"
+          set -o pipefail
+          luajit bot/survivalStress.lua 900 3600 "${{ inputs.matches }}" "" "${{ inputs.difficulty }}" 6 12 \
+            2>&1 | tee bot-prod-smoke.log
+        continue-on-error: true
+
       - name: Summary
         if: always()
         run: |
           {
-            echo "## Bot Prod Smoke Test — ${{ inputs.ip }}:${{ inputs.port }}"
+            echo "## Bot Smoke Test (${{ inputs.mode }}) — ${{ inputs.ip }}:${{ inputs.port }}"
             echo ""
             echo '```'
             tail -n 40 bot-prod-smoke.log || echo "(no log produced)"
@@ -79,5 +102,5 @@ jobs:
           path: bot-prod-smoke.log
 
       - name: Fail if the smoke test failed
-        if: steps.smoke.outcome == 'failure'
+        if: steps.smoke.outcome == 'failure' || steps.largegarbage.outcome == 'failure'
         run: exit 1

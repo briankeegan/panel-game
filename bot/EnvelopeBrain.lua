@@ -242,8 +242,12 @@ function EnvelopeBrain:decide(state, stack, match)
     -- the deepest chain a single swap fires on the LIVE board (exact facts, depth matches engine). Memoized per decision.
     -- Its height drop is the escape; in DANGER we fire the deepest available, in OFFENSE only a worthwhile (deep) one.
     local _cb
-    local function chainBest()
-      if not self._endless then return false end  -- chains (firing the colored stack) are an ENDLESS thing. In GARBAGE the bot must BREAK/CATCH the block -- firing a chain steals those frames and breaking dies (broke -> 0).
+    local function chainBest(force)
+      -- chains (firing the colored stack) are an ENDLESS thing. In GARBAGE the bot must BREAK/CATCH the block -- firing
+      -- a chain steals those frames and breaking dies (broke -> 0). `force` (big-garbage dig, block ON the board) is the
+      -- exception: there a chain converts one garbage row PER LINK and banks danger stop-time per link -- the only shave
+      -- mechanism fast enough for a 6x12. (Without force the GARBAGE LINEUP gcb path below was dead code.)
+      if not self._endless and not force then return false end
       if _cb == nil then _cb = chainSim.bestChain(chainSim.gridFromStack(stack)) or false
         if _cb and _cb.depth and _cb.depth > (self._peakBestChain or 0) then self._peakBestChain = _cb.depth end  -- diag: deepest potential the organize ever reaches (vs what we fire)
       end
@@ -259,7 +263,7 @@ function EnvelopeBrain:decide(state, stack, match)
     -- GARBAGE LINEUP: while a block is breaking or sealed, if the freed/standing panels already set up a real CASCADE,
     -- FIRE it. In garbage we can't ride the board up to organize a deeper chain (no headroom), so we take the cascade the
     -- breaks handed us. depth>=3 = a genuine multi-link chain, strictly better than a topoff-3.
-    local gcb = (breaking or state.lowestGarbageRow) and chainBest()
+    local gcb = (breaking or state.lowestGarbageRow) and chainBest(self._bigGarbageGame)
     if gcb and gcb.depth >= 3 then fireSwap({ gcb.r, gcb.c }, "CHAIN")
     elseif breaking then
       -- A. BREAKING: my garbage is popping. Do NOT break/swap into the active cascade -- it steals panels the engine would

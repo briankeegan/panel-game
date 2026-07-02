@@ -158,11 +158,15 @@ local function rowBreak(grid, W, H, touchable)
         byColor[v] = byColor[v] or {}; byColor[v][#byColor[v] + 1] = c
       end
     end
-    for _, cols in pairs(byColor) do
+    for color, cols in pairs(byColor) do
       if #cols >= 3 then
         local bi, bspan = 1, 99
         for i = 1, #cols - 2 do local s = cols[i + 2] - cols[i]; if s < bspan then bspan, bi = s, i end end
         local a, b, cc = cols[bi], cols[bi + 1], cols[bi + 2]   -- tightest triple; b (middle) stays, ends slide toward it
+        if os.getenv("PA_ROWBREAKDIAG") then
+          print(string.format("  ROWBREAKDIAG r=%d color=%d cols=[%s] triple=(%d,%d,%d)",
+            r, color, table.concat(cols, ","), a, b, cc))
+        end
         if b > a + 1 and (grid[r][a + 1] or 0) ~= (grid[r][a] or 0) and touchOK(touchable, r, a) then return { r, a } end
         if cc > b + 1 and (grid[r][cc - 1] or 0) ~= (grid[r][cc] or 0) and touchOK(touchable, r, cc - 1) then return { r, cc - 1 } end
       end
@@ -213,11 +217,25 @@ function M.breakRoute(grid, rows, touchable, anyTop)
       for _, r in ipairs({ t - 1, t - 2 }) do
         if (grid[r][col] or 0) ~= X then
           local move, dist = nil, nil
+          local sawXNoTouch = false
           for d = 1, W do
-            if col + d <= W and (grid[r][col + d] or 0) == X and touchOK(touchable, r, col + d - 1) then move, dist = { r, col + d - 1 }, d; break end
-            if col - d >= 1 and (grid[r][col - d] or 0) == X and touchOK(touchable, r, col - d) then move, dist = { r, col - d }, d; break end
+            if col + d <= W and (grid[r][col + d] or 0) == X then
+              if touchOK(touchable, r, col + d - 1) then move, dist = { r, col + d - 1 }, d; break else sawXNoTouch = true end
+            end
+            if col - d >= 1 and (grid[r][col - d] or 0) == X then
+              if touchOK(touchable, r, col - d) then move, dist = { r, col - d }, d; break else sawXNoTouch = true end
+            end
           end
-          if not move then finishable = false; break end
+          if not move then
+            -- PA_ELIGWHY (2026-07, root-causing why a column drops out of elig mid-slide, seed 1005): distinguishes a
+            -- genuine dead end (no X anywhere in the row) from a column that's really finishable but its one candidate
+            -- X is mid-animation (falling/swapping, touchOK false) THIS frame -- the latter is transient and harmless:
+            -- the column reappears in elig, cost unchanged or lower, once the panel settles next frame.
+            if os.getenv("PA_ELIGWHY") and not anyTop then
+              print(string.format("  ELIGWHY col=%d X=%d row=%d %s", col, X, r, sawXNoTouch and "X-found-but-TOUCH-BLOCKED" or "no-X-in-row"))
+            end
+            finishable = false; break
+          end
           cost = cost + dist
           firstMove = firstMove or move
         end
@@ -374,9 +392,22 @@ local function topPairCount(grid, W, H)
     if t >= 2 and (grid[t][c] or 0) ~= 0 and grid[t][c] == grid[t - 1][c] then n = n + 1 end end
   return n
 end
+-- true if column nc's OWN top pair is already complete AND includes row r -- taking r's panel would break it. Without
+-- this guard, two adjacent columns sharing the same top color can ping-pong the SAME swap forever: col c completes its
+-- pair by pulling a panel from neighbor c+1, which un-pairs c+1's now-gapped top -- but if c+1's top color is the SAME,
+-- the very next call sees c+1 as needing exactly the panel it just donated and swaps it right back, undoing c's pair.
+-- Root-caused 2026-07 on seed 1001 via PA_BUILDPAIRDIAG: cols 5/6 (both top color 3) alternated swap=(1,5) forever,
+-- topPairCount stuck oscillating at 2 instead of climbing to PAIR_TARGET=3. Never cannibalize an intact pair to
+-- (maybe) build another -- that's a wash at best, an infinite thrash at worst.
+local function ownsIntactPair(grid, H, nc, r)
+  local tn = topRow(grid, nc, H)
+  return tn >= 2 and (grid[tn][nc] or 0) ~= 0 and grid[tn][nc] == grid[tn - 1][nc] and (r == tn or r == tn - 1)
+end
 function M.buildPair(grid, rows, touchable)
   local W, H = 6, rows or 12
-  if topPairCount(grid, W, H) >= M.PAIR_TARGET then return nil end
+  local tpc = topPairCount(grid, W, H)
+  if os.getenv("PA_BUILDPAIRDIAG") then print(string.format("  BUILDPAIRDIAG topPairCount=%d target=%d", tpc, M.PAIR_TARGET)) end
+  if tpc >= M.PAIR_TARGET then return nil end
   for c = 1, W do
     local t = topRow(grid, c, H)
     if t >= 2 and grid[t][c] ~= grid[t - 1][c] then
@@ -384,12 +415,28 @@ function M.buildPair(grid, rows, touchable)
       local below = (t - 2 >= 1) and (grid[t - 2][c] or 0) or -1   -- avoid making a TRIPLE (would clear, not hold a pair)
       if a ~= 0 and b ~= 0 then
         if below ~= a then                                          -- slide a's color into (t-1,c) -> pair = a
-          if c > 1 and (grid[t - 1][c - 1] or 0) == a and (touchable == nil or (touchable[t - 1] and touchable[t - 1][c - 1] and touchable[t - 1][c])) then return { t - 1, c - 1 } end
-          if c < W and (grid[t - 1][c + 1] or 0) == a and (touchable == nil or (touchable[t - 1] and touchable[t - 1][c] and touchable[t - 1][c + 1])) then return { t - 1, c } end
+          if c > 1 and (grid[t - 1][c - 1] or 0) == a and not ownsIntactPair(grid, H, c - 1, t - 1)
+            and (touchable == nil or (touchable[t - 1] and touchable[t - 1][c - 1] and touchable[t - 1][c])) then
+            if os.getenv("PA_BUILDPAIRDIAG") then print(string.format("  BUILDPAIRDIAG col=%d t=%d a=%d b=%d swap=(%d,%d) [a-side, from left]", c, t, a, b, t-1, c-1)) end
+            return { t - 1, c - 1 }
+          end
+          if c < W and (grid[t - 1][c + 1] or 0) == a and not ownsIntactPair(grid, H, c + 1, t - 1)
+            and (touchable == nil or (touchable[t - 1] and touchable[t - 1][c] and touchable[t - 1][c + 1])) then
+            if os.getenv("PA_BUILDPAIRDIAG") then print(string.format("  BUILDPAIRDIAG col=%d t=%d a=%d b=%d swap=(%d,%d) [a-side, from right]", c, t, a, b, t-1, c)) end
+            return { t - 1, c }
+          end
         end
         if below ~= b then                                          -- slide b's color into (t,c) -> pair = b
-          if c > 1 and (grid[t][c - 1] or 0) == b and (touchable == nil or (touchable[t] and touchable[t][c - 1] and touchable[t][c])) then return { t, c - 1 } end
-          if c < W and (grid[t][c + 1] or 0) == b and (touchable == nil or (touchable[t] and touchable[t][c] and touchable[t][c + 1])) then return { t, c } end
+          if c > 1 and (grid[t][c - 1] or 0) == b and not ownsIntactPair(grid, H, c - 1, t)
+            and (touchable == nil or (touchable[t] and touchable[t][c - 1] and touchable[t][c])) then
+            if os.getenv("PA_BUILDPAIRDIAG") then print(string.format("  BUILDPAIRDIAG col=%d t=%d a=%d b=%d swap=(%d,%d) [b-side, from left]", c, t, a, b, t, c-1)) end
+            return { t, c - 1 }
+          end
+          if c < W and (grid[t][c + 1] or 0) == b and not ownsIntactPair(grid, H, c + 1, t)
+            and (touchable == nil or (touchable[t] and touchable[t][c] and touchable[t][c + 1])) then
+            if os.getenv("PA_BUILDPAIRDIAG") then print(string.format("  BUILDPAIRDIAG col=%d t=%d a=%d b=%d swap=(%d,%d) [b-side, from right]", c, t, a, b, t, c)) end
+            return { t, c }
+          end
         end
       end
     end

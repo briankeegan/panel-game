@@ -209,7 +209,7 @@ function M.flattenMove(grid, rows, touchable)
     local d = tops[c] - tops[c + 1]; if d < 0 then d = -d end
     if d > bestDiff then bestDiff, bestC = d, c end
   end
-  if bestDiff < 2 then return nil end                            -- every adjacent step < 2 -> flat enough
+  if bestDiff < (tonumber(os.getenv("PA_FLAT_MIN")) or 2) then return nil end  -- every adjacent step < threshold -> flat enough (PA_FLAT_MIN=1 = perfectly flat; measured on the 6x12 sweep)
   local tall = (tops[bestC] >= tops[bestC + 1]) and bestC or (bestC + 1)
   local short = (tall == bestC) and (bestC + 1) or bestC
   -- Swap ONE ROW ABOVE the SHORT column. That is the highest row the cursor can reach for this pair (it's capped around

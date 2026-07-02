@@ -1,0 +1,83 @@
+name: Bot Prod Smoke Test (LIVE SERVER)
+
+# Manual-only. Connects to the REAL self-hosted production server (default
+# 104.156.250.136:49569) with two throwaway bot accounts that create a PRIVATE
+# room and challenge only each other -- never the public lobby queue, never
+# ranked (BotClient never sets wantsRanked) -- so no real player can ever be
+# matched with them and the leaderboard is never touched. Runs at real 60Hz
+# pace (no PA_FAST), same load profile as one human playing one bot.
+#
+# This is a connectivity/regression smoke test (does the bot still log in,
+# join a room, and finish a match against the deployed server?), not a
+# benchmark -- see bot/BENCHMARK.md for the seed-averaged ceiling numbers,
+# which are measured locally.
+on:
+  workflow_dispatch:
+    inputs:
+      matches:
+        description: 'Number of bot-vs-bot matches to play (~2.5 min worst-case each; keep total under ~50min / job timeout)'
+        required: false
+        default: '3'
+      ip:
+        description: 'Server IP'
+        required: false
+        default: '104.156.250.136'
+      port:
+        description: 'Server port'
+        required: false
+        default: '49569'
+      difficulty:
+        description: 'Bot difficulty/level (1-10ish)'
+        required: false
+        default: 'hard'
+
+jobs:
+  bot-vs-bot:
+    name: Bot vs bot on live server
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install luajit + luarocks
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y luajit luarocks liblua5.1-0-dev build-essential unzip libreadline-dev
+
+      - name: Install lua rocks (luasocket, luafilesystem, luautf8)
+        run: |
+          luarocks install --local luasocket --lua-version 5.1
+          luarocks install --local luafilesystem --lua-version 5.1
+          luarocks install --local luautf8 --lua-version 5.1
+
+      - name: Run bot-vs-bot smoke test against the live server
+        id: smoke
+        run: |
+          eval "$(luarocks path --local --lua-version 5.1)"
+          set -o pipefail
+          luajit bot/winRateTest.lua "" "" \
+            "${{ inputs.matches }}" "${{ inputs.ip }}" "${{ inputs.port }}" "${{ inputs.difficulty }}" \
+            2>&1 | tee bot-prod-smoke.log
+        continue-on-error: true
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Bot Prod Smoke Test — ${{ inputs.ip }}:${{ inputs.port }}"
+            echo ""
+            echo '```'
+            tail -n 40 bot-prod-smoke.log || echo "(no log produced)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bot-prod-smoke-log
+          path: bot-prod-smoke.log
+
+      - name: Fail if the smoke test failed
+        if: steps.smoke.outcome == 'failure'
+        run: exit 1

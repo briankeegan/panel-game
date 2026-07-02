@@ -17,13 +17,16 @@ local function topRow(grid, col, H)
   for r = H, 1, -1 do local v = grid[r][col] or 0; if v ~= 0 and v ~= GARBAGE then return r end end
   return 0
 end
+M.topRow = topRow  -- exposed so callers (e.g. EnvelopeBrain:tryCatch) can locate a READY column's exact 2 cells to protect them from OTHER columns' swaps
 
--- findTopOff(grid, col, color [,W,H]) -> nil | {already=true} | {swap={r,c}}
+-- findTopOff(grid, col, color [,W,H,touchable]) -> nil | {already=true} | {swap={r,c}}
 --   The freed panel lands ON TOP of the column, so a vertical-3 needs the top TWO existing cells to be `color`.
 --     already   : top two already `color` -> the catch fires with no move (this is the pre-organized / cheap case).
 --     swap{r,c} : one horizontal swap (cells c,c+1 on row r) makes the top two `color` -> a one-move catch.
 --     nil       : would need >1 move -> skip it (esp. the tight left columns; that's the organize phase's job).
-function M.findTopOff(grid, col, color, W, H)
+--   touchable (optional): NO-GO mask for the swap cells -- without it a slide-in swap could be proposed through a
+--   cell mid-action or reserved by another column's already-completed pair (see tryCatch's reserved-cell guard).
+function M.findTopOff(grid, col, color, W, H, touchable)
   W, H = W or 6, H or 12
   local t = topRow(grid, col, H)
   if t < 2 then return nil end                                  -- need 2 panels under the drop to make a 3
@@ -32,8 +35,8 @@ function M.findTopOff(grid, col, color, W, H)
   -- one swap only: the wrong cell must be fixable by sliding a `color` panel in from an adjacent column; the other top
   -- cell must already be `color`.
   local function slideIn(r)                                     -- a swap anchor that brings `color` into (r,col)
-    if col > 1 and (grid[r][col-1] or 0) == color then return { r, col-1 } end   -- swap (col-1,col)
-    if col < W and (grid[r][col+1] or 0) == color then return { r, col   } end   -- swap (col,col+1)
+    if col > 1 and (grid[r][col-1] or 0) == color and touchOK(touchable, r, col-1) then return { r, col-1 } end   -- swap (col-1,col)
+    if col < W and (grid[r][col+1] or 0) == color and touchOK(touchable, r, col) then return { r, col   } end   -- swap (col,col+1)
     return nil
   end
   if a == color and b ~= color then local s = slideIn(t-1); if s then return { swap = s } end end
@@ -56,15 +59,27 @@ function M.findCatch(grid, rows, col, color, opts)
   if dropRow > H then return nil end                                   -- column full -> nothing drops in
   grid[dropRow] = grid[dropRow] or {}
   local saved = grid[dropRow][col] or 0
+  -- CATALOG SCAN (2026-07, single-seed root-cause trace on seed 1010): this calls opts.verify (EnvelopeBrain:chipVerify),
+  -- which plays real swaps on the live engine then rolls back. That rollback was leaving phantom test input permanently
+  -- in Stack.confirmedInput (rollback never restores that field) which got replayed as real gameplay input later --
+  -- that was the actual bug, not the catalog scan itself. Fixed at the source in chipVerify (rewindToFrame + explicit
+  -- confirmedInput truncation); this scan is a correct, working building block and stays on unconditionally. Was
+  -- previously gated behind PA_CATALOG=1 as a stopgap while the rollback bug was being isolated -- see EnvelopeBrain
+  -- .lua:chipVerify for the full root-cause writeup. Seed 1010 with the real fix: 24.2s/72 broken -> 81.9s/510 broken,
+  -- WITH this scan enabled (matches/exceeds the 81.3s/510 seen when the scan was disabled as a workaround).
   if opts.priorities then
-    local ro = { chipPriorities = opts.priorities, verify = opts.verify, maxDistance = opts.maxDistance or 3 }
+    local ro = { chipPriorities = opts.priorities, verify = opts.verify, maxDistance = opts.maxDistance or 3, touchable = opts.touchable }
     local before = _useChips.useChips(grid, H, { dropRow, col }, ro)  -- baseline: best chip WITHOUT the freed panel
     grid[dropRow][col] = color
     local after = _useChips.useChips(grid, H, { dropRow, col }, ro)   -- best chip WITH it
     grid[dropRow][col] = saved
+    if os.getenv("PA_CATALOGDBG2") then
+      print(string.format("  CATALOGDBG2 col=%d color=%d saved=%s dropRow=%d before=%s after=%s",
+        col, color, tostring(saved), dropRow, before and before.kind or "nil", after and after.kind or "nil"))
+    end
     if after and not before then return { kind = after.kind, swaps = after.swaps } end  -- X completes a catalog play -> the catch
   end
-  local to = M.findTopOff(grid, col, color, 6, H)                      -- floor: bare vertical-3
+  local to = M.findTopOff(grid, col, color, 6, H, opts.touchable)      -- floor: bare vertical-3
   if to then return { kind = "TOPOFF", already = to.already, swap = to.swap } end
   return nil
 end
@@ -100,6 +115,35 @@ function M.catchRoute(grid, rows, col, color, touchable)
   return nil
 end
 
+-- catchSlide(grid, rows, col, color, touchable) -> {r,c} swap | nil. HORIZONTAL-SLIDE catch (fixes catchRoute's dead
+-- end, diagnosed 2026-07 on seed 1010): catchRoute needs a TALLER neighbor to donate a panel via gravity, but donating
+-- ONE panel makes the target column the new tallest -- so it can never deliver the SECOND panel a pair needs; verified
+-- architecturally impossible on that seed's board (0/4 catch attempts converted despite 5 reveals). BRACE also
+-- deliberately flattens the board for break contact, which is exactly the shape catchRoute can't route on (no height
+-- differential to donate from) -- the two mechanics were fighting each other.
+-- This targets the SAME two cells findTopOff checks (t, t-1 -- "the top two existing cells below the drop") and fixes
+-- whichever one is wrong via a same-row horizontal slide of `color` in from a nearby column, searching outward. No
+-- height requirement. Only ever touches a cell that doesn't yet match, so repeated calls converge monotonically
+-- (never undoes its own prior progress) instead of oscillating.
+function M.catchSlide(grid, rows, col, color, touchable)
+  local W, H = 6, rows or 12
+  local t = topRow(grid, col, H)
+  if t < 1 then return nil end
+  for _, r in ipairs(t >= 2 and { t, t - 1 } or { t }) do
+    if (grid[r][col] or 0) ~= color then
+      for d = 1, W - 1 do
+        for _, dir in ipairs({ -1, 1 }) do
+          local cc = col + dir * d
+          if cc >= 1 and cc <= W and (grid[r][cc] or 0) == color then
+            local sc = (dir == 1) and (cc - 1) or cc
+            if (grid[r][sc] or 0) ~= (grid[r][sc + 1] or 0) and touchOK(touchable, r, sc) then return { r, sc } end
+          end
+        end
+      end
+    end
+  end
+  return nil
+end
 
 -- rowBreak(grid, W, H, touchable) -> {r,c} swap | nil. BREAK THE ROW (Brian): a horizontal-3 clears three cells ACROSS a
 -- row, so every column drops by one and the board stays FLAT -- unlike a vertical-3, which pops one column deep, lopsides

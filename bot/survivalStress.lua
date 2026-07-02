@@ -280,6 +280,11 @@ local function runSeed(seed, injectGarbage)
       for r = math.min(st.rows, 12), 1, -1 do local row = {} for c = 1, 6 do local v = grid[r][c] or 0; row[c] = (v == bs.GARBAGE and "G") or (v == 0 and ".") or tostring(v) end print("    r" .. r .. "  " .. table.concat(row, " ")) end
     end
     local decision = controller:isBusy() and WAIT_DEC or brain:decide(st, stack, match)  -- faithful: pass stack+match (chipVerify) + gate like BotClient:tickMatch
+    if os.getenv("PA_DECDUMP") and not controller:isBusy() then
+      print(string.format("DECDUMP f%d clock=%s type=%s kind=%s pos=%s", frame, tostring(stack.clock),
+        tostring(decision and decision.type), tostring(decision and decision.kind),
+        decision and decision.pos and string.format("(%d,%d)", decision.pos[1], decision.pos[2]) or "nil"))
+    end
     if not controller:isBusy() then local s = brain._substate or "WAIT"; diag.sub = diag.sub or {}; diag.sub[s] = (diag.sub[s] or 0) + 1 end  -- PA_BEHAV: what is the bot DOING?
     if os.getenv("PA_TRACE") and require("bot.garbageReveal").breakingRow(stack) then  -- frame-by-frame in the REVEAL window: is the catch firing? how far does the cursor travel?
       local gr = require("bot.garbageReveal"); local eta = gr.dropETA(stack) or 999
@@ -501,6 +506,7 @@ for i = 1, seeds do
     seed, sf, sf / 60, gb, diag.swaps, diag.garbageInjected)
     .. string.format("  chains-fired %d (%.1f/min) peakChain %d",
        diag.chainsFired, diag.chainsFired / math.max(sf / 3600, 0.01), diag.peakChain))
+  if os.getenv("PA_VERIFYDIAG") then print("  verify() calls so far: " .. tostring(_G._verifyCallCount or 0)) end
 end
 
 table.sort(survivals); table.sort(broken)

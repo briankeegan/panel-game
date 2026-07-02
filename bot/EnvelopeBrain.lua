@@ -33,9 +33,43 @@ function EnvelopeBrain:chipVerify(stack, match)
   return function(seq)
     if not stack or not match or not seq or #seq == 0 then return false end
     if not KDE_swap then KDE_swap = require("common.data.KeyDataEncoding").swap end
+    local function dumpBoard()
+      local rows = {}
+      for r = math.min(stack.height or 12, 6), 1, -1 do
+        local row = {}
+        for c = 1, 6 do
+          local p = stack.panels[r] and stack.panels[r][c]
+          row[c] = p and string.format("%s/%s/%s/%s/%s", tostring(p.color or 0), tostring(p.isGarbage), tostring(p.state), tostring(p.timer), tostring(p.pop_time)) or "."
+        end
+        rows[#rows+1] = table.concat(row, " ")
+      end
+      return table.concat(rows, "|") .. " clock=" .. tostring(stack.clock) .. " stopWatch=" .. tostring(stack.stopWatch)
+        .. " stop_time=" .. tostring(stack.stop_time) .. " pre_stop=" .. tostring(stack.pre_stop_time)
+        .. " rise_timer=" .. tostring(stack.rise_timer) .. " displacement=" .. tostring(stack.displacement)
+        .. " rise_lock=" .. tostring(stack.rise_lock) .. " manual_raise=" .. tostring(stack.manual_raise)
+    end
+    if os.getenv("PA_VERIFYDIAG") then _G._verifyCallCount = (_G._verifyCallCount or 0) + 1 end
+    local before = os.getenv("PA_VERIFYDIAG") and dumpBoard() or nil
     local ok, fired, broke = pcall(function()
       local clock0 = stack.clock
-      for _, s in ipairs(match.stacks) do s:saveForRollback() end
+      -- ROOT-CAUSE FIX (2026-07, single-seed trace on seed 1010), take 2: the FIRST fix attempt (truncate
+      -- confirmedInput back to its pre-test length after Stack:rollbackToFrame) crashed with "bad argument #1 to
+      -- 'unpack' (table expected, got nil)" in Stack:controls. Root cause of THAT crash: Stack:rollbackToFrame sets
+      -- lastRollbackFrame = the PRE-rollback clock (see its own comment: "match will try to fast forward this stack
+      -- to that frame") -- i.e. it's the "rewind then RESIMULATE forward with corrected input" primitive used for real
+      -- netcode rollback, not a "test then fully undo" primitive. With lastRollbackFrame > clock afterwards,
+      -- Stack:behindRollback() is true, so Stack:shouldRun ignores the confirmedInput buffer entirely and forces
+      -- Match:run to keep calling stack:run() until stack.clock catches up to Match.clock (which our test's own
+      -- match:run() calls had already ratcheted forward, since Match.clock only ever increases) -- consuming
+      -- confirmedInput indices we had just truncated away. The engine ships the exact primitive we actually want:
+      -- Stack:rewindToFrame (and Match:rewindToFrame, which also resets Match.clock itself, undoing the ratchet)
+      -- sets lastRollbackFrame = the TARGET clock, so behindRollback() is immediately false and nothing tries to
+      -- fast-forward. Combined with truncating confirmedInput back to its pre-test length (still necessary --
+      -- rewind/rollback restore panels/scalars but never touch confirmedInput, which is our own addition via
+      -- receiveConfirmedInput below), the stack is left in a state byte-identical to "this verify() call never
+      -- happened", confirmed via PA_INPUTDIAG/PA_ROLLBACKDIAG/PA_VERIFYDIAG's board dumps.
+      local inputLen0 = {}
+      for _, s in ipairs(match.stacks) do s:saveForRollback(); inputLen0[s] = #s.confirmedInput end
       stack.stop_time = math.max(stack.stop_time or 0, 999)  -- freeze the rise so a rising row can't fire the match instead of the swap
       local hit, gbroke = false, false
       local token = {}  -- weak-keyed subscriber held in scope; signals fire the INSTANT a clear is detected
@@ -53,10 +87,33 @@ function EnvelopeBrain:chipVerify(stack, match)
         end
       end
       stack:disconnectSignal("matched", token); stack:disconnectSignal("garbageMatched", token)
-      for _, s in ipairs(match.stacks) do s:rollbackToFrame(clock0) end
+      local clockBeforeRewind = match.clock
+      match:rewindToFrame(clock0)   -- rewinds EVERY stack + Match.clock itself; sets lastRollbackFrame=clock0 so nothing fast-forwards back
+      if os.getenv("PA_ROLLBACKDIAG") and stack.clock ~= clock0 then
+        print(string.format("  ROLLBACKDIAG: rewindToFrame(%d) FAILED -- stack clock now %s, match clock was %s now %s",
+          clock0, tostring(stack.clock), tostring(clockBeforeRewind), tostring(match.clock)))
+      end
+      for _, s in ipairs(match.stacks) do
+        if os.getenv("PA_INPUTDIAG") then
+          print(string.format("  INPUTDIAG clock0=%d #confirmedInput_before_trunc=%d inputLen0=%d stack.clock_after_rewind=%s",
+            clock0, #s.confirmedInput, inputLen0[s] or -1, tostring(s.clock)))
+        end
+        for i = #s.confirmedInput, (inputLen0[s] or 0) + 1, -1 do s.confirmedInput[i] = nil end  -- erase the phantom test input this call appended
+      end
       return hit, gbroke
     end)
-    if not ok then return false end
+    if not ok then
+      if os.getenv("PA_VERIFYDIAG") then print("  VERIFYDIAG: chipVerify pcall FAILED: " .. tostring(fired)) end  -- pcall puts the error message in the 2nd return slot on failure
+      return false
+    end
+    if before then
+      local after = dumpBoard()
+      if after ~= before then
+        print("  VERIFYDIAG: board CHANGED across a single verify() call")
+        print("    before: " .. before)
+        print("    after:  " .. after)
+      end
+    end
     return fired, broke   -- fired = it clears; broke = it broke garbage
   end
 end
@@ -147,16 +204,108 @@ local function chipIsBig(kind) local m = META[kind]; return m ~= nil and ((m.tot
 -- CATCH (Brian's lineup): my garbage is breaking -> top off the revealing colors into chains. Loop opened columns
 -- RIGHT->LEFT (most lead first); return the first catch that needs a SWAP to set up (catalog combo/chain preferred,
 -- topOff as the floor). Ready 'already' catches need no move -- they fire when the freed row drops. {swaps,kind} | nil.
+-- CROSS-COLUMN GUARD (2026-07, single-seed trace on seed 1010): when 2+ columns are open in the SAME reveal, tryCatch
+-- serves only ONE per frame (highest column number first) -- so a lower column can sit "ALREADY-READY" (holding, per
+-- the fix above) for many frames while a higher column's catchSlide/catchRoute keeps searching. Those searches scan
+-- the WHOLE row for the target color, with no awareness of any OTHER column's finished pair -- traced exact cells:
+-- col5 held a(row2)=4/b(row1)=4 ready for 2 frames, then col6's own catch action swapped row1 cols 3-4, which
+-- happened to change row1-col5 from 4 to 3, silently breaking col5's pair (it had to redo the TOPOFF swap one frame
+-- later). Fix: before resolving the served column, cheaply check EVERY OTHER open column for ready (findTopOff is
+-- pure/cheap, no verify) and mark its 2 cells reserved; the served column's catalog/slide/route search then treats
+-- those cells as not-touchable, so it can never pick a swap through a finished pair.
+local function reservedCellsFrom(grid, rows, open, skipCol)
+  local reserved = nil
+  for cc = 1, BoardSim.WIDTH do
+    if cc ~= skipCol and open[cc] then
+      local t = catchPrimitive.topRow(grid, cc, rows)
+      if t >= 2 then
+        local ready = catchPrimitive.findTopOff(grid, cc, open[cc], 6, rows)
+        if ready and ready.already then
+          reserved = reserved or {}
+          reserved[t] = reserved[t] or {}; reserved[t][cc] = true
+          reserved[t-1] = reserved[t-1] or {}; reserved[t-1][cc] = true
+        end
+      end
+    end
+  end
+  return reserved
+end
+local function guardTouchable(touchable, reserved)
+  if not reserved then return touchable end
+  return setmetatable({}, { __index = function(_, r)
+    if not reserved[r] then return touchable and touchable[r] end
+    local baseRow = touchable and touchable[r]
+    return setmetatable({}, { __index = function(_, c)
+      if reserved[r][c] then return false end
+      return baseRow and baseRow[c]
+    end })
+  end })
+end
+
 function EnvelopeBrain:tryCatch(grid, rows, stack, priorities, verify, touchable)
   local open = garbageReveal.openColumns(stack)
   for c = BoardSim.WIDTH, 1, -1 do
     local color = open[c]
     if color then
-      local cat = catchPrimitive.findCatch(grid, rows, c, color, { priorities = CATCH_PRIORITIES, verify = verify })  -- CATCH_PRIORITIES keeps COMBO_3 -> credits a freed-drop 3+ (H or V) as a chain
-      if cat and cat.kind ~= "TOPOFF" then return { swaps = cat.swaps, kind = "CATCH_" .. cat.kind } end       -- catalog combo/chain
-      if cat and cat.kind == "TOPOFF" and cat.swap then return { swaps = { cat.swap }, kind = "CATCH_TOPOFF" } end -- 1-swap floor
-      local route = (not os.getenv("PA_NOROUTE")) and catchPrimitive.catchRoute(grid, rows, c, color, touchable) or nil  -- multi-swap stack; PA_NOROUTE isolates whether ONLY this disruptive path hurts vs the 1-swap topoff
-      if route then return { swaps = { route }, kind = "CATCH_ROUTE" } end
+      local reserved = reservedCellsFrom(grid, rows, open, c)
+      local guarded = guardTouchable(touchable, reserved)
+      if os.getenv("PA_GUARDDIAG") and reserved then
+        local cells = {}
+        for r, row in pairs(reserved) do for cc in pairs(row) do cells[#cells+1] = string.format("(%d,%d)", r, cc) end end
+        print(string.format("  GUARDDIAG serving col=%d reserved=%s", c, table.concat(cells, " ")))
+      end
+      if os.getenv("PA_CATCHDIAG") then
+        local t0 = 0; for r = rows, 1, -1 do local v = grid[r][c] or 0; if v ~= 0 and v ~= BoardSim.GARBAGE then t0 = r; break end end
+        print(string.format("  CATCHDIAG col=%d color=%d topRow=%d a(row%d)=%s b(row%d)=%s clock=%s disp=%s stop=%s active=%s chaining=%s nap=%s",
+          c, color, t0, t0, tostring(grid[t0] and grid[t0][c]), t0-1, tostring(grid[t0-1] and grid[t0-1][c]),
+          tostring(stack and stack.clock), tostring(stack and stack.displacement), tostring(stack and stack.stop_time),
+          tostring(stack and stack:hasActivePanels()), tostring(stack and stack:hasChainingPanels()), tostring(stack and stack.n_active_panels)))
+        if os.getenv("PA_CATCHFULL") then
+          for r = math.min(rows, 5), 1, -1 do
+            local row = {}
+            for cc = 1, 6 do local v = grid[r][cc] or 0; row[cc] = (v == BoardSim.GARBAGE) and "G" or tostring(v) end
+            print("    r" .. r .. "  " .. table.concat(row, " "))
+          end
+        end
+      end
+      local dbgBefore = os.getenv("PA_CATALOGDBG") and (function() local d = require("bot.chips")._dbg; return d and { fits = d.fits or 0, notTouch = d.notTouch or 0, verRej = d.verRej or 0, accept = d.accept or 0 } or { fits = 0, notTouch = 0, verRej = 0, accept = 0 } end)() or nil
+      local cat = catchPrimitive.findCatch(grid, rows, c, color, { priorities = CATCH_PRIORITIES, verify = verify, touchable = guarded })  -- CATCH_PRIORITIES keeps COMBO_3 -> credits a freed-drop 3+ (H or V) as a chain
+      if dbgBefore then
+        local d = require("bot.chips")._dbg or {}
+        local df, dnt, dvr, dac = (d.fits or 0) - dbgBefore.fits, (d.notTouch or 0) - dbgBefore.notTouch, (d.verRej or 0) - dbgBefore.verRej, (d.accept or 0) - dbgBefore.accept
+        if df > 0 or dac > 0 then
+          print(string.format("  CATALOGDBG col=%d color=%d delta: fits=%d notTouch=%d verRej=%d accept=%d", c, color, df, dnt, dvr, dac))
+        end
+      end
+      if cat and cat.kind ~= "TOPOFF" then
+        if os.getenv("PA_CATCHDIAG") then print(string.format("  CATCHDIAG col=%d color=%d CATALOG kind=%s", c, color, cat.kind)) end
+        return { swaps = cat.swaps, kind = "CATCH_" .. cat.kind }
+      end       -- catalog combo/chain
+      if cat and cat.kind == "TOPOFF" and cat.swap then
+        if os.getenv("PA_CATCHDIAG") then print(string.format("  CATCHDIAG col=%d color=%d TOPOFF swap=(%d,%d)", c, color, cat.swap[1], cat.swap[2])) end
+        return { swaps = { cat.swap }, kind = "CATCH_TOPOFF" }
+      end -- 1-swap floor
+      if cat and cat.kind == "TOPOFF" and cat.already then
+        -- BUG FIX (2026-07, single-seed trace on seed 1010): "already ready" was silently DROPPED here -- neither
+        -- branch above matches {kind=TOPOFF, already=true} (no .swap field) -- so tryCatch reported "nothing found"
+        -- for a column that was FULLY SET UP, and decide()'s caller fell through to clearChip/flatten, which can
+        -- disturb the very pair just finished (traced: 4 slides built a matching pair at col5, it broke again 1
+        -- decision later once nothing signaled "hold, don't touch this column"). ready=true holds without disturbing it.
+        if os.getenv("PA_CATCHDIAG") then print(string.format("  CATCHDIAG col=%d color=%d ALREADY-READY (holding)", c, color)) end
+        return { ready = true, col = c }
+      end
+      if not os.getenv("PA_NOSLIDE") then
+        local slide = catchPrimitive.catchSlide(grid, rows, c, color, guarded)  -- horizontal-slide: no height requirement, monotonic convergence
+        if slide then
+          if os.getenv("PA_CATCHDIAG") then print(string.format("  CATCHDIAG col=%d color=%d SLIDE swap=(%d,%d)", c, color, slide[1], slide[2])) end
+          return { swaps = { slide }, kind = "CATCH_SLIDE" }
+        end
+      end
+      local route = (not os.getenv("PA_NOROUTE")) and catchPrimitive.catchRoute(grid, rows, c, color, guarded) or nil  -- multi-swap stack; PA_NOROUTE isolates whether ONLY this disruptive path hurts vs the 1-swap topoff
+      if route then
+        if os.getenv("PA_CATCHDIAG") then print(string.format("  CATCHDIAG col=%d color=%d ROUTE swap=(%d,%d)", c, color, route[1], route[2])) end
+        return { swaps = { route }, kind = "CATCH_ROUTE" }
+      end
     end
   end
   return nil
@@ -270,7 +419,10 @@ function EnvelopeBrain:decide(state, stack, match)
       -- height ~2, zero possible breaks, 0 broken).
       if breaking then
         local catch = self:tryCatch(grid, rows, stack, priorities, verify, touchable)
-        if catch then self._substate = "CATCH"; move = { type = "SWAP", pos = catch.swaps[1], swaps = catch.swaps, kind = catch.kind }
+        if catch and catch.ready then
+          self._substate = "CATCH_READY"; move = { type = "WAIT" }  -- a column is fully set up -- HOLD. Falling through to clear/flatten here was the bug: it could disturb the pair before the drop lands.
+        elseif catch then
+          self._substate = "CATCH"; move = { type = "SWAP", pos = catch.swaps[1], swaps = catch.swaps, kind = catch.kind }
         else local cl = clearChip(false, true)
           if cl then fireChip(cl, "CLEAR")
           else local fl = catchPrimitive.flattenMove(grid, rows, touchable)
@@ -334,7 +486,10 @@ function EnvelopeBrain:decide(state, stack, match)
       -- have cascaded for free (breaking mid-pop measured WORSE: median 35.4->26.9). Let it run; the catch lines up freed
       -- panels (situational, net-positive), else clear, else flatten so the NEXT settled break lands flat.
       local catch = self:tryCatch(grid, rows, stack, priorities, verify, touchable)
-      if catch then self._substate = "CATCH"; move = { type = "SWAP", pos = catch.swaps[1], swaps = catch.swaps, kind = catch.kind }
+      if catch and catch.ready then
+        self._substate = "CATCH_READY"; move = { type = "WAIT" }  -- a column is fully set up -- HOLD, don't disturb it (see the dig-only branch for the traced bug this fixes)
+      elseif catch then
+        self._substate = "CATCH"; move = { type = "SWAP", pos = catch.swaps[1], swaps = catch.swaps, kind = catch.kind }
       else local cl = clearChip(false)
         if cl then fireChip(cl, "CLEAR")
         else local fl = catchPrimitive.flattenMove(grid, rows, touchable)

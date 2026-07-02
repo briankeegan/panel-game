@@ -27,6 +27,12 @@ real frame), NOT a "ceiling < X" bound. Primary cell = survival-time @ 144/min (
 ("max area/min survived") is kept only as a secondary diagnostic and only when it resolves to a number.
 
 ## Changelog (newest first)
+- **2026-07-02 (later)** — session close: **large-garbage median 28.7 s** (multi-trigger staging TRIGGER_TARGET=3: 23.5→25.1;
+  height-conditional BRACE order: 25.1→28.7; injection-off 197→230 s). Frozen 6×4 ends at **24.3 s median** (peak 26.1 with
+  T3 before the height-conditional order; still +58% over the 15.4 baseline). Negative results kept as knobs for re-sweeps:
+  PA_PAIRS>3 worse, PA_FLAT_MIN=1 worse, PA_DRAIN≠8 catastrophic, catch-route column lock worse (the per-frame re-pick
+  "thrash" is load-bearing legal wiggle). 5-min target NOT reached — the wall is the serial dig rate (~180-270f/row vs a
+  12-row block per 900f); the open frontier is the sustained CHAIN dig executor (row per link + danger stop per link).
 - **2026-07-02** — **FROZEN SURVIVAL 15.4 s → 25.4 s median (+65%)** (p10 21.8, mean 30.8; protocol `600 3600 10`) and a NEW
   tracked axis: **large-garbage practice (6×12 every 900f, `900 18000 10 "" hard 6 12`, PA_FULLSPEED): median 23.5 s**
   (from 20.4 s at the session start; garbage-broken median 36→72, zero-break seeds 4→3). Changes (each 10-seed measured,

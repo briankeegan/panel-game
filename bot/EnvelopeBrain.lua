@@ -290,11 +290,13 @@ function EnvelopeBrain:decide(state, stack, match)
           end
         end
       end
-    elseif self._bigGarbageGame then
+    elseif self._bigGarbageGame and st ~= "DANGER" then
       -- B2. BRACE (big-garbage game, board currently clean): a tall block is inbound or will be. Get SHORT (every ready
       -- clear incl 3s drops height = margin), get FLAT (a level surface gives the block 6 contact columns instead of 1 --
       -- the jagged-landing death), keep a vertical pair staged at the surface (one swap completes a 3 touching the block
       -- the moment it lands). No raising, no chain organizing -- everything is posture for the next landing.
+      -- st == "DANGER" falls through to C: the passive rise still climbs during BRACE (measured: a buildPair toggle rode
+      -- the rise into a self-topout at 97s) -- near the ceiling, clearing outranks posture.
       local cl = clearChip(false, true)
       if cl then fireChip(cl, "CLEAR")
       else local fl = catchPrimitive.flattenMove(grid, rows, touchable)
@@ -336,6 +338,30 @@ function EnvelopeBrain:decide(state, stack, match)
               end
             end
           end
+        end
+      end
+    end
+    -- HEARTBEAT: the L10 death condition is ONE still frame while garbage is at the ceiling with stop_time 0
+    -- (maxHealth=1). If the whole tree came up WAIT with garbage on the board, make a harmless DISTINCT swap instead:
+    -- two different-colored settled panels in the same row -- a pure permutation (no gravity, no structure change).
+    -- Distinct swaps are legal play (WigglePay only punishes repeating the exact same reversal to stall); every swap in
+    -- flight keeps rise_lock up. The rotating anchor makes consecutive heartbeats hit different cells, never a reversal.
+    if move and move.type == "WAIT" and (breaking or state.lowestGarbageRow) then
+      local W = BoardSim.WIDTH
+      local total = rows * (W - 1)
+      local start = self._hbIdx or 0
+      for k = 0, total - 1 do
+        local idx = (start + k) % total
+        local r = math.floor(idx / (W - 1)) + 1
+        local c = (idx % (W - 1)) + 1
+        local a = (grid[r] and grid[r][c]) or 0
+        local b = (grid[r] and grid[r][c + 1]) or 0
+        if a ~= 0 and b ~= 0 and a ~= b and a ~= BoardSim.GARBAGE and b ~= BoardSim.GARBAGE
+          and touchable[r] and touchable[r][c] and touchable[r][c + 1] then
+          self._hbIdx = idx + 1
+          self._substate = "HEARTBEAT"
+          move = { type = "SWAP", pos = { r, c }, swaps = { { r, c } }, kind = "HEARTBEAT" }
+          break
         end
       end
     end

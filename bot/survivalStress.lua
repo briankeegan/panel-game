@@ -276,6 +276,17 @@ local function runSeed(seed, injectGarbage)
     diag.decisions = diag.decisions + 1
     stack:receiveConfirmedInput(char)
     match:run()
+    if os.getenv("PA_DTRACE") then  -- ring buffer of the last 150 frames; dumped at death to see the exact drain frame
+      _G._dring = _G._dring or {}
+      local ring = _G._dring
+      ring[#ring + 1] = string.format("f%-5d stop=%-3d shake=%-3d pre=%-3d act=%-2d swapQ=%s hp=%d topped=%s sub=%-11s cur=(%d,%d) tgt=(%s,%s) in=%s",
+        frame, stack.stop_time or 0, stack.shake_time or 0, stack.pre_stop_time or 0, stack.n_active_panels or 0,
+        tostring(stack:swapQueued()), stack.health or -1, tostring(stack:isToppedOut()),
+        tostring(brain._substate), stack.cur_row or 0, stack.cur_col or 0,
+        tostring(decision and decision.pos and decision.pos[1]), tostring(decision and decision.pos and decision.pos[2]), char)
+      if #ring > 150 then table.remove(ring, 1) end
+      if stack:game_ended() then print("=== DEATH TRACE (last 150 frames) ==="); for _, l in ipairs(ring) do print(l) end; _G._dring = nil end
+    end
     if os.getenv("PA_CATCH_DBG") then catchObserve(stack, frame) end  -- Bit-0: observe the reader on real breaking garbage
     if os.getenv("PA_PROG") and frame % 120 == 0 then  -- TRAJECTORY: cleared vs garbage over time -- where does it fall behind?
       local ng, mh = 0, 0

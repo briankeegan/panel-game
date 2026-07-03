@@ -415,8 +415,8 @@ function EnvelopeBrain:decide(state, stack, match)
     --    or flatten ONLY to ENABLE the break -- no raise/plan distractions. C) no garbage -> the height state decides.
     -- breaking and lowestGarbageRow are mutually exclusive situations, so exactly ONE branch runs each frame.
     local breaking = stack and garbageReveal.breakingRow(stack)
-    local function clearChip(req, allowC3, mask, prios)
-      local o = { chipPriorities = prios or priorities, searchPriorities = search, verify = verify, touchable = mask or touchable }
+    local function clearChip(req, allowC3, mask, prios, exactFallback)
+      local o = { chipPriorities = prios or priorities, searchPriorities = search, verify = verify, touchable = mask or touchable, exactFallback = exactFallback }
       if req then o.requireBreak = true end
       local chip = useChips.useChips(grid, rows, cursor, o)
       if chip and chip.kind == "COMBO_3" and not allowC3 then return nil end  -- plain 3-clear: only under pressure (clear freed rows / drop height); held in OFFENSE so it doesn't drain the material we raised
@@ -522,7 +522,9 @@ function EnvelopeBrain:decide(state, stack, match)
         -- flight). When no pops are active and the banked stop is thinner than one cursor trip, the next swap
         -- must ITSELF pop: take any immediate clear over the otherwise-preferred multi-swap setups.
         if (not busy) and (stack.stop_time or 0) <= 45 and (stack.shake_time or 0) == 0 then
-          local pop = clearChip(true, true, nil, POPNOW_PRIORITIES) or clearChip(false, true, nil, POPNOW_PRIORITIES)
+          -- exactFallback=true: at stop 0 ANY pop beats a still frame, including the pull-into-empty 1-swap clears
+          -- the catalog can't see (bot/useChips.lua exactOneSwap -- opt-in, engine-exact via simSwap).
+          local pop = clearChip(true, true, nil, POPNOW_PRIORITIES, true) or clearChip(false, true, nil, POPNOW_PRIORITIES, true)
           if pop then fireChip(pop, "CLEAR") end
         end
         if move then -- POP-NOW fired above

@@ -123,13 +123,21 @@ void. A quiescence-based re-measure of a 3-seed run showed ~17/18 MATCHED.
      final authority when present — the filter just stops burning live verify calls
      (swap + rewind each) on dead chips.
    - **After both fixes: 100% precision in BOTH modes; VERIFY coverage 58% → 68%**
-     (23→27 of 40 boards; per-kind all 100%). The remaining 13/40 no-chip boards are
-     the genuine template-family gap: brute force shows none are dead — the misses are
+     (23→27 of 40 boards; per-kind all 100%). The remaining no-chip boards are the
+     genuine template-family gap: brute force shows none are dead — the misses are
      **pull-into-empty drop clears** (swap a panel into an adjacent empty cell so its
-     column compacts into a 3-match, e.g. board 11) and 2-swap setups of the same
-     shape. Fix candidates, deliberately deferred (each shifts live behavior and needs
-     its own sweep): (a) author the drop-clear template family, (b) exact 1-swap
-     fallback scan when the catalog returns nothing.
+     column compacts into a 3-match, e.g. board 11) and 2-swap setups of the same shape.
+   - **Exact 1-swap fallback (added 2026-07-03, opt-in)**: `useChips` can now scan the
+     cursor-ordered cells with `simSwap` when the catalog's COMBO_3 slot comes up empty —
+     recognizer CEILING is **85% coverage / 100% precision in both modes** (the last 6
+     boards need 2-swap setups). Scope lesson, paired 10-seed sweep: enabled globally it
+     fired on exactly ONE live path (findCatch's catalog scan, seed 1003) and came out
+     2.2s WORSE there — the catch window is timing-sensitive, so a newly-visible bare 3
+     is not automatically a good catch. Now `opts.exactFallback`: ON for POP-NOW (any
+     pop beats a still frame at stop 0) and the corpus test; OFF elsewhere. Sweep with
+     this scoping: per-seed byte-identical to baseline. Catch-path enablement is a
+     recorded tuning-phase candidate; the drop-clear template family (a) remains open
+     for the multi-swap shapes.
 7. ~~**POP-NOW guard**~~ — DONE (2026-07-03): `bot/tests/popNowVerify.lua` constructs the
    exact state (sealed block, bare stop clock, breakRoute = non-popping routing step,
    plain 3-clear available) and **caught the real reason it never fired**: extractByMeta's

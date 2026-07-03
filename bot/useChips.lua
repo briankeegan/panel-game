@@ -66,6 +66,42 @@ local function cellOrder(grid, rows, cursor, band, searchPriorities, maxDistance
   return cells
 end
 
+-- EXACT 1-SWAP FALLBACK (2026-07-03, closes the drop-clear template gap found via bot/useChipsTest.lua +
+-- brute-force classification): the catalog has no "pull-into-empty" shapes (swap a panel into an adjacent empty
+-- cell so its column compacts into a 3-match), so boards whose ONLY play is that shape returned nothing -- 13/40
+-- of the puzzle corpus, none of them dead. Instead of authoring templates for every such shape, scan the same
+-- cursor-ordered cells with BoardSim.simSwap (0/941 vs the engine): any single swap whose OWN simulation clears
+-- >=3 (or breaks garbage, under requireBreak) is a play, by construction. Runs ONLY in the plain-COMBO_3 slot of
+-- the priority list AND only for callers that opt in via opts.exactFallback: a paired 10-seed sweep showed the
+-- one live path where it fired unrequested (findCatch's catalog scan, seed 1003) came out 2.2s WORSE -- the catch
+-- window is timing-sensitive and a bare 3 it couldn't see before isn't automatically a good catch. Current
+-- opt-ins: POP-NOW (any immediate pop beats a still frame at stop 0 -- watertight) and the corpus test (which
+-- measures the recognizer's ceiling). Catch-path inclusion is a recorded tuning-phase candidate, not a default.
+-- `kind` stays COMBO_3 -- it names the priority bucket, not the (possibly bigger) actual clear.
+local function exactOneSwap(grid, rows, cells, verify, touchable, requireBreak)
+  for _, cell in ipairs(cells) do
+    local r, c = cell[1], cell[2]
+    if c >= 1 and c <= 5 and grid[r] then
+      local a, b = grid[r][c] or 0, grid[r][c + 1] or 0
+      if a ~= b and a ~= BoardSim.GARBAGE and b ~= BoardSim.GARBAGE and (a ~= 0 or b ~= 0)
+        and (not touchable or (touchable[r] and touchable[r][c] and touchable[r][c + 1])) then
+        local _, _, total, _, gb = BoardSim.simSwap(grid, rows, r, c)
+        if (requireBreak and (gb or 0) > 0) or (not requireBreak and (total or 0) >= 3) then
+          local fired, broke = true, (gb or 0) > 0
+          if verify then fired, broke = verify({ { r, c } }, "COMBO_3") end
+          if fired and (not requireBreak or broke) then
+            if os.getenv("PA_FALLBACKDIAG") then
+              print(string.format("  FALLBACKDIAG 1-swap (%d,%d) total=%d gb=%d requireBreak=%s verify=%s", r, c, total or 0, gb or 0, tostring(requireBreak or false), tostring(verify ~= nil)))
+            end
+            return { swaps = { { r, c } }, kind = "COMBO_3", brokeGarbage = broke or false }
+          end
+        end
+      end
+    end
+  end
+  return nil
+end
+
 -- useChips(grid, rows, cursor, opts) -> { swaps, kind } | nil. chipPriorities is an ordered list of chip KINDS; ANY
 -- kind authored into bot/chipCache.lua is recognizable (no per-kind registry -- recognize slides the store by kind).
 function M.useChips(grid, rows, cursor, opts)
@@ -74,6 +110,9 @@ function M.useChips(grid, rows, cursor, opts)
   local cells = cellOrder(grid, rows, cursor, opts.band, opts.searchPriorities, opts.maxDistance)
   for _, chipName in ipairs(opts.chipPriorities or {}) do
     local result = chips.recognize(grid, rows, cells, chipName, verify, opts.touchable, opts.requireBreak)  -- recognize this kind, in priority order
+    if not result and chipName == "COMBO_3" and opts.exactFallback then
+      result = exactOneSwap(grid, rows, cells, verify, opts.touchable, opts.requireBreak)
+    end
     if result then return result end
   end
   return nil

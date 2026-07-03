@@ -63,7 +63,9 @@ for _, mode in ipairs({ "NO-VERIFY", "VERIFY" }) do
     local _, st = bld(e.p.stack); local g, rows = gridOf(st)
     local cursor = { st.cur_row or BoardSim.maxHeight(g, rows), st.cur_col or 3 }
     local verify = (mode == "VERIFY") and function(swaps, kind) return fired(e.p.stack, swaps, kind) end or nil
-    local chip = useChips(g, rows, cursor, { chipPriorities = PRIOS, searchPriorities = SEARCH, verify = verify })
+    -- exactFallback on: this test measures the recognizer's CEILING (what is playable-by-construction), so the
+    -- engine-exact 1-swap scan counts toward coverage; live call sites opt in per-path (see useChips.lua).
+    local chip = useChips(g, rows, cursor, { chipPriorities = PRIOS, searchPriorities = SEARCH, verify = verify, exactFallback = true })
     if chip then cov = cov + 1
       byKind[chip.kind] = byKind[chip.kind] or { c = 0, f = 0 }; byKind[chip.kind].c = byKind[chip.kind].c + 1
       if fired(e.p.stack, chip.swaps, chip.kind) then fire = fire + 1; byKind[chip.kind].f = byKind[chip.kind].f + 1 end

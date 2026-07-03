@@ -20,8 +20,10 @@
 --               bot exactly like BotClient:tickMatch, inject garbage via the REAL
 --               online receive path (stack:applyNetworkGarbage), report a distribution.
 --
--- CLI: luajit bot/survivalStress.lua [garbageEveryFrames] [maxFrames] [seeds] [profile] [difficulty]
+-- CLI: luajit bot/survivalStress.lua [garbageEveryFrames] [maxFrames] [seeds] [profile] [difficulty] [garbW] [garbH]
 --      luajit bot/survivalStress.lua --capture   (one-time fixture grab)
+--   garbW/garbH: injected block shape (default 6x4 = human-rate protocol). 6 12 =
+--   the client's "large_garbage" training preset (one full-board block per volley).
 
 io.stdout:setvbuf("no") -- live progress when redirected to a file (bisection lines as they happen, not at exit)
 require("bot.headlessBoot") -- LÖVE stub + bit-exact RNG + globals + `json` (must be first)
@@ -93,6 +95,10 @@ local maxFrames          = tonumber(arg[2]) or 10800  -- 3 min cap
 local seeds              = tonumber(arg[3]) or 25
 local profilePath        = (arg[4] and arg[4] ~= "") and arg[4] or nil
 local difficulty         = arg[5] or "hard"
+-- Injected block shape. Default 6x4 = the frozen human-rate protocol (unchanged).
+-- 6x12 mirrors the client's "large_garbage" training preset (TrainingMenu.lua:59).
+local garbW              = tonumber(arg[6]) or 6
+local garbH              = tonumber(arg[7]) or 4
 
 -- Load the captured fixture once. Without it we cannot be online-faithful, so refuse
 -- to fall back to a hand-rolled match (that's the deleted-test failure mode).
@@ -188,10 +194,24 @@ local function runSeed(seed, injectGarbage)
   -- "garbageMatched"(count, onScreenCount) the instant garbage converts to normal
   -- panels on a clear (checkMatches.lua:718) — the real engine dig signal.
   local garbageBroken = 0
+  -- PA_MECH: per-MECHANIC outcome counters (Brian: verify each mechanic works before tuning anything).
+  --   reveals        = break/reveal windows that opened
+  --   breakEvents    = garbage matches (each = one row converted)
+  --   catchDone      = reveals in which a CHAIN fired (chain_counter>=2) during the window or <=90f after -- i.e. the
+  --                    freed panel LANDED ON a lined-up pair and re-matched: the "land on top" mechanic actually working
+  --   rebreakLat[]   = frames from a reseal to the next garbage match (how fast the next break comes)
+  local mech = os.getenv("PA_MECH") and { reveals = 0, breakEvents = 0, catchDone = 0, rebreakLat = {}, resealAt = nil,
+    windowChain = false, lastBreakEnd = -9999 } or nil
   local sub = {} -- subscriber token held in scope so the weak-keyed sub survives
-  stack:connectSignal("garbageMatched", sub, function(_, count) garbageBroken = garbageBroken + count end)
+  stack:connectSignal("garbageMatched", sub, function(_, count)
+    garbageBroken = garbageBroken + count
+    if mech then
+      mech.breakEvents = mech.breakEvents + 1
+      if mech.resealAt then mech.rebreakLat[#mech.rebreakLat + 1] = (mech.frameNow or 0) - mech.resealAt; mech.resealAt = nil end
+    end
+  end)
 
-  local brain = require("bot.EnvelopeBrain").new({}) -- THE bot
+  local brain = require("bot.EnvelopeBrain").new({ bigGarbage = garbH >= 3 }) -- THE bot; announce a tall-block mode up front (like the training preset's visible queue)
   local _rf, _cmi = tonumber(os.getenv("PA_RF")), tonumber(os.getenv("PA_CMI"))  -- MIDDLE speed test: faster than throttled but enough pacing for swaps to resolve (full speed/reaction0 thrashed the routing)
   local controller = CursorController.new(
     (_rf or _cmi) and { cursorMoveInterval = _cmi or 2, reactionFrames = _rf or 5 }
@@ -210,11 +230,44 @@ local function runSeed(seed, injectGarbage)
     if injectGarbage and garbageEveryFrames > 0 and frame > 0 and frame % garbageEveryFrames == 0 then
       -- HUMAN-RATE pressure (data's bench_targets.json): a 6x4 chain-block every 10s = 144 area/min,
       -- = median real-player offense. The old 6x1-every-5s (72/min) was too gentle (a turtle survived).
+      -- isChain follows engine semantics: height>1 garbage is chain garbage; a
+      -- 6x1 is a combo block. (The training attack engine marks even 6x12 as
+      -- chain=false, but it needs illegalStuffIsAllowed on its queue for that;
+      -- the online receive path we use here gets the legal equivalent.)
       stack:applyNetworkGarbage({
-        { width = 6, height = 4, isMetal = false, isChain = true,
+        { width = garbW, height = garbH, isMetal = false, isChain = garbH > 1,
           frameEarned = stack.stopWatch, rowEarned = 1, colEarned = 1 },
       }, 2)
       diag.garbageInjected = diag.garbageInjected + 1
+      if mech then
+        -- LANDING POSTURE snapshot: is the SETUP mechanic delivering short+flat+cocked at the moment pressure arrives?
+        local tops, pairs, cocked = {}, 0, 0
+        for c = 1, 6 do
+          local t = 0
+          for r = (stack.height or 12), 1, -1 do local p = stack.panels[r] and stack.panels[r][c]
+            if p and (p.color or 0) ~= 0 and not p.isGarbage then t = r; break end end
+          tops[c] = t
+        end
+        for c = 1, 6 do
+          local t = tops[c]
+          if t >= 2 then
+            local a = stack.panels[t][c].color or 0
+            local b = stack.panels[t-1] and stack.panels[t-1][c] and (stack.panels[t-1][c].color or 0) or 0
+            if a ~= 0 and a == b then
+              pairs = pairs + 1
+              if t >= 3 then
+                local lc = (c > 1) and stack.panels[t-2][c-1] and (stack.panels[t-2][c-1].color or 0) or 0
+                local rc = (c < 6) and stack.panels[t-2][c+1] and (stack.panels[t-2][c+1].color or 0) or 0
+                if lc == a or rc == a then cocked = cocked + 1 end
+              end
+            end
+          end
+        end
+        local mx, mn, sum = 0, 99, 0
+        for c = 1, 6 do sum = sum + tops[c]; if tops[c] > mx then mx = tops[c] end; if tops[c] < mn then mn = tops[c] end end
+        print(string.format("  seed %d POSTURE@inject#%d f%d: tops=[%s] maxH=%d avgH=%.1f spread=%d pairs=%d cocked=%d",
+          seed, diag.garbageInjected, frame, table.concat(tops, ","), mx, sum / 6, mx - mn, pairs, cocked))
+      end
     end
 
     -- SAME decide->execute->run path as BotClient:tickMatch (lines 399-428).
@@ -227,6 +280,11 @@ local function runSeed(seed, injectGarbage)
       for r = math.min(st.rows, 12), 1, -1 do local row = {} for c = 1, 6 do local v = grid[r][c] or 0; row[c] = (v == bs.GARBAGE and "G") or (v == 0 and ".") or tostring(v) end print("    r" .. r .. "  " .. table.concat(row, " ")) end
     end
     local decision = controller:isBusy() and WAIT_DEC or brain:decide(st, stack, match)  -- faithful: pass stack+match (chipVerify) + gate like BotClient:tickMatch
+    if os.getenv("PA_DECDUMP") and not controller:isBusy() then
+      print(string.format("DECDUMP f%d clock=%s type=%s kind=%s pos=%s", frame, tostring(stack.clock),
+        tostring(decision and decision.type), tostring(decision and decision.kind),
+        decision and decision.pos and string.format("(%d,%d)", decision.pos[1], decision.pos[2]) or "nil"))
+    end
     if not controller:isBusy() then local s = brain._substate or "WAIT"; diag.sub = diag.sub or {}; diag.sub[s] = (diag.sub[s] or 0) + 1 end  -- PA_BEHAV: what is the bot DOING?
     if os.getenv("PA_TRACE") and require("bot.garbageReveal").breakingRow(stack) then  -- frame-by-frame in the REVEAL window: is the catch firing? how far does the cursor travel?
       local gr = require("bot.garbageReveal"); local eta = gr.dropETA(stack) or 999
@@ -266,6 +324,17 @@ local function runSeed(seed, injectGarbage)
     diag.decisions = diag.decisions + 1
     stack:receiveConfirmedInput(char)
     match:run()
+    if os.getenv("PA_DTRACE") then  -- ring buffer of the last 150 frames; dumped at death to see the exact drain frame
+      _G._dring = _G._dring or {}
+      local ring = _G._dring
+      ring[#ring + 1] = string.format("f%-5d stop=%-3d shake=%-3d pre=%-3d act=%-2d swapQ=%s hp=%d topped=%s sub=%-11s cur=(%d,%d) tgt=(%s,%s) in=%s",
+        frame, stack.stop_time or 0, stack.shake_time or 0, stack.pre_stop_time or 0, stack.n_active_panels or 0,
+        tostring(stack:swapQueued()), stack.health or -1, tostring(stack:isToppedOut()),
+        tostring(brain._substate), stack.cur_row or 0, stack.cur_col or 0,
+        tostring(decision and decision.pos and decision.pos[1]), tostring(decision and decision.pos and decision.pos[2]), char)
+      if #ring > 150 then table.remove(ring, 1) end
+      if stack:game_ended() then print("=== DEATH TRACE (last 150 frames) ==="); for _, l in ipairs(ring) do print(l) end; _G._dring = nil end
+    end
     if os.getenv("PA_CATCH_DBG") then catchObserve(stack, frame) end  -- Bit-0: observe the reader on real breaking garbage
     if os.getenv("PA_PROG") and frame % 120 == 0 then  -- TRAJECTORY: cleared vs garbage over time -- where does it fall behind?
       local ng, mh = 0, 0
@@ -288,8 +357,26 @@ local function runSeed(seed, injectGarbage)
     local cc = stack.chain_counter or 0
     if cc > diag.peakChain then diag.peakChain = cc end
     if cc >= 2 and prevChain < 2 then diag.chainsFired = diag.chainsFired + 1 end
+    if mech then
+      mech.frameNow = frame
+      local br = require("bot.garbageReveal").breakingRow(stack)
+      if br and not mech.prevBreaking then mech.reveals = mech.reveals + 1; mech.windowChain = false end
+      if not br and mech.prevBreaking then mech.resealAt = frame; mech.lastBreakEnd = frame end
+      if cc >= 2 and prevChain < 2 and not mech.windowChain
+        and (br or (frame - mech.lastBreakEnd) <= 90) then
+        mech.catchDone = mech.catchDone + 1; mech.windowChain = true
+      end
+      mech.prevBreaking = br
+    end
     prevChain = cc
     frame = frame + 1
+  end
+  if mech then
+    table.sort(mech.rebreakLat)
+    local lat = #mech.rebreakLat > 0 and mech.rebreakLat[math.ceil(#mech.rebreakLat / 2)] or -1
+    print(string.format("  seed %d MECH: reveals=%d breakEvents=%d catchDone=%d (%.0f%% of reveals) rebreakLat median=%df n=%d",
+      seed, mech.reveals, mech.breakEvents, mech.catchDone,
+      mech.reveals > 0 and (100 * mech.catchDone / mech.reveals) or 0, lat, #mech.rebreakLat))
   end
 
   local survivalFrames = (stack.game_over_clock and stack.game_over_clock > 0)
@@ -400,14 +487,14 @@ end
 -- run the distribution
 ----------------------------------------------------------------------
 print(string.format(
-  "SURVIVAL-STRESS (createFromReplay, online-faithful): fixture=%s slot=%d profile=%s difficulty=%s garbage=6x1-every-%df maxFrames=%d seeds=%d",
+  "SURVIVAL-STRESS (createFromReplay, online-faithful): fixture=%s slot=%d profile=%s difficulty=%s garbage=%dx%d-every-%df maxFrames=%d seeds=%d",
   FIXTURE, FIX.localPlayerNumber, tostring(profilePath or "(plain)"), difficulty,
-  garbageEveryFrames, maxFrames, seeds))
+  garbW, garbH, garbageEveryFrames, maxFrames, seeds))
 
 local survivals, broken = {}, {}
 local totalSwaps, totalGarbInj, totalChains, totalFrames = 0, 0, 0, 0
 for i = 1, seeds do
-  local seed = 1000 + i -- deterministic, reproducible seed set
+  local seed = (tonumber(os.getenv("PA_SEED_BASE")) or 1000) + i -- deterministic, reproducible seed set; PA_SEED_BASE picks a window (single-seed debugging: PA_SEED_BASE=1002 seeds=1 -> seed 1003)
   local sf, gb, diag = runSeed(seed, true)
   survivals[#survivals + 1] = sf
   broken[#broken + 1] = gb
@@ -419,6 +506,7 @@ for i = 1, seeds do
     seed, sf, sf / 60, gb, diag.swaps, diag.garbageInjected)
     .. string.format("  chains-fired %d (%.1f/min) peakChain %d",
        diag.chainsFired, diag.chainsFired / math.max(sf / 3600, 0.01), diag.peakChain))
+  if os.getenv("PA_VERIFYDIAG") then print("  verify() calls so far: " .. tostring(_G._verifyCallCount or 0)) end
 end
 
 table.sort(survivals); table.sort(broken)

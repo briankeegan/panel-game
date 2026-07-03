@@ -69,7 +69,11 @@ end
 local function playOne(gameIdx)
   resetForNextGame(host); resetForNextGame(join)
 
-  host:createRoom(GameModes.getPreset(GameModes.IDs.TWO_PLAYER_VS), true)
+  -- openRoom=false: unlisted in the lobby room list. `join` still gets in via a
+  -- direct roomNumber join (handleJoinRoom never gates that on openRoom) -- this
+  -- only stops a real lobby-browsing player from spotting/joining our test room,
+  -- which matters now that this script also targets the live prod server.
+  host:createRoom(GameModes.getPreset(GameModes.IDs.TWO_PLAYER_VS), false)
   pumpUntil(function() return host.roomNumber end, 8, "create_room")
   join:joinRoom(host.roomNumber)
   pumpUntil(function() return nPlayers(host) >= 2 end, 8, "join")

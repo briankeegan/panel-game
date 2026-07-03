@@ -422,8 +422,17 @@ local function chipSetupBonus(grid, rows, sr, sc)
   return best
 end
 local W_IMMEDIATE_TOTAL, W_IMMEDIATE_CHAIN, W_IMMEDIATE_FIRST = 30, 400, 20
+-- TRUSTED_CHAIN_CAP (2026-07, root-caused via PA_PLANVERIFY ground-truth on live seeds, not a synthetic test):
+-- chain>=2 predictions from BoardSim.simSwap were WRONG 13/13 times observed under large-garbage pressure -- several
+-- predicted a 9-10 panel clear (chain=3) that the real engine cleared ZERO of. Root cause is the documented DEEP-CHAIN
+-- PHANTOM in BoardSim.resolve: the real engine settles cascades wave-by-wave with a hover delay between links, but the
+-- simulator instantly full-settles, so links past the first can align in the sim in ways that never actually fire.
+-- The FIRST link is reliable (no wave-timing gap exists for it -- it's the direct, immediate result of the swap
+-- itself); only cascaded links beyond that are unreliable. Cap resolve depth to 1 for scoring so planMove can't be
+-- talked into a phantom deep chain by its own simulator. PA_MAXLINK (if set) still overrides for diagnostics/sweeps.
+local TRUSTED_CHAIN_CAP = tonumber(os.getenv("PA_TRUSTLINK")) or 1
 local function scoreSwap(grid, rows, r, c, immScale)             -- eval + chip-setup bonus + a (scalable) bonus for a clear NOW
-  local g, chain, total, firstClear = BoardSim.simSwap(grid, rows, r, c)
+  local g, chain, total, firstClear = BoardSim.simSwap(grid, rows, r, c, TRUSTED_CHAIN_CAP)
   local bonus = chipSetupBonus(g, rows, r, c)
   local s = eval(g, rows) + W_CHIP * bonus
   if total > 0 then s = s + (immScale or 1) * (W_IMMEDIATE_TOTAL * total + W_IMMEDIATE_CHAIN * chain + W_IMMEDIATE_FIRST * (firstClear or 0)) end
@@ -449,7 +458,7 @@ function M.planMove(grid, rows, touchable, cursor, force, keepMaterial)
     local s, g, total, chain, bonus = scoreSwap(grid, rows, sw[1], sw[2], immScale)
     local reward = (total > 0) and (W_IMMEDIATE_TOTAL * total + W_IMMEDIATE_CHAIN * chain) or 0
     local dist = (sw[1] > cr and sw[1] - cr or cr - sw[1]) + (sw[2] > cc and sw[2] - cc or cc - sw[2])  -- from the cursor
-    beam[#beam + 1] = { g = g, score = s, reward = reward, setup = bonus, first = sw, dist = dist }
+    beam[#beam + 1] = { g = g, score = s, reward = reward, setup = bonus, first = sw, dist = dist, total = total, chain = chain }
   end
   if #beam == 0 then return nil end
   local function trim(states)
@@ -468,7 +477,7 @@ function M.planMove(grid, rows, touchable, cursor, force, keepMaterial)
       for _, sw in ipairs(legalSwaps(node.g, rows, nil, math.min(rows, p2 + 1))) do  -- node.g is resolved -> all settled
         if budget <= 0 then break end
         budget = budget - 1
-        local g2, chain, total = BoardSim.simSwap(node.g, rows, sw[1], sw[2])
+        local g2, chain, total = BoardSim.simSwap(node.g, rows, sw[1], sw[2], TRUSTED_CHAIN_CAP)
         local lbonus = chipSetupBonus(g2, rows, sw[1], sw[2])
         local reward = node.reward + ((total > 0) and (W_IMMEDIATE_TOTAL * total + W_IMMEDIATE_CHAIN * chain) or 0)
         local leaf = { g = g2, score = eval(g2, rows) + W_CHIP * lbonus + reward, reward = reward, setup = math.max(node.setup or 0, lbonus), first = node.first, dist = node.dist }
@@ -483,8 +492,24 @@ function M.planMove(grid, rows, touchable, cursor, force, keepMaterial)
   -- sets up a recognized chip (setup), or improves the board. Only bail (-> raise/organize, never a junk @1,1 corner
   -- swap) when the best plan does NONE of those. Gating on the path -- not the mid-build leaf's eval -- is what lets
   -- depth commit a build whose payoff is a move or two out (the deep search was strangled by the old leaf-only guard).
-  if not force and best.reward == 0 and (best.setup or 0) == 0 and best.score <= eval(grid, rows) then return nil end  -- force (DANGER): any move beats standing still and dying
-  return best.first
+  local baseline = eval(grid, rows)
+  local reject = not force and best.reward == 0 and (best.setup or 0) == 0 and best.score <= baseline
+  if os.getenv("PA_PLANDIAG") then
+    print(string.format("  PLANDIAG cands=%d best=(%d,%d) score=%.1f baseline=%.1f reward=%d setup=%d force=%s -> %s",
+      #beam, best.first[1], best.first[2], best.score, baseline, best.reward, best.setup or 0, tostring(force), reject and "REJECT(nil)" or "COMMIT"))
+    if os.getenv("PA_PLANGRID") and not reject and best.reward > 0 then
+      local rows2 = rows
+      local rowStr = {}
+      for r = math.min(rows2, 12), 1, -1 do
+        local rc = {}
+        for c = 1, 6 do local v = grid[r] and grid[r][c] or 0; rc[c] = (v == GARBAGE) and "G" or tostring(v) end
+        rowStr[#rowStr + 1] = "r" .. r .. ":" .. table.concat(rc)
+      end
+      print("  PLANGRID swap=(" .. best.first[1] .. "," .. best.first[2] .. ") rows=" .. rows2 .. " " .. table.concat(rowStr, " "))
+    end
+  end
+  if reject then return nil end  -- force (DANGER): any move beats standing still and dying
+  return best.first, best.total, best.chain  -- extra returns (backward compatible) for PA_PLANVERIFY ground-truth tracking in EnvelopeBrain
 end
 
 return M

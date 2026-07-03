@@ -381,6 +381,7 @@ function BoardSim.digPlan(grid, rows, maxDepth)
   local function progress(g)
     local s = 0
     for r = math.max(1, lg - 2), math.min(rows, lg - 1) do
+      local byColor = {}
       for c = 1, WIDTH do
         local v = g[r][c]
         if isPlay(v) then
@@ -388,6 +389,18 @@ function BoardSim.digPlan(grid, rows, maxDepth)
           if r > 1 and g[r - 1][c] == v then s = s + 1 end              -- vertical pair
           -- a play cell directly under garbage is one step from a touching match
           for rr = r + 1, rows do if isGarbage(g[rr][c]) then s = s + 1; break elseif g[rr][c] ~= 0 then break end end
+          local t = byColor[v]; if t then t[#t + 1] = c else byColor[v] = { c } end
+        end
+      end
+      -- tightest-triple span: 3+ cells of one color in a contact row are a dig in progress, and every slide that
+      -- tightens the triple must STRICTLY raise progress -- the pair term alone can't see it, so the beam pruned
+      -- exactly the gather moves a spread dig needs (bot/tests/digPlanVerify.lua CASE 3: fives at c1/c4/c6, a
+      -- constructed 3-slide dig with no shortcut; digPlan returned nil before this term).
+      for _, cols in pairs(byColor) do
+        if #cols >= 3 then
+          local best = 99
+          for i = 1, #cols - 2 do local sp = cols[i + 2] - cols[i]; if sp < best then best = sp end end
+          s = s + (WIDTH - best) * 2
         end
       end
     end

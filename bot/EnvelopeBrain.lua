@@ -373,8 +373,8 @@ function EnvelopeBrain:decide(state, stack, match)
     --    or flatten ONLY to ENABLE the break -- no raise/plan distractions. C) no garbage -> the height state decides.
     -- breaking and lowestGarbageRow are mutually exclusive situations, so exactly ONE branch runs each frame.
     local breaking = stack and garbageReveal.breakingRow(stack)
-    local function clearChip(req, allowC3)
-      local o = { chipPriorities = priorities, searchPriorities = search, verify = verify, touchable = touchable }
+    local function clearChip(req, allowC3, mask)
+      local o = { chipPriorities = priorities, searchPriorities = search, verify = verify, touchable = mask or touchable }
       if req then o.requireBreak = true end
       local chip = useChips.useChips(grid, rows, cursor, o)
       if chip and chip.kind == "COMBO_3" and not allowC3 then return nil end  -- plain 3-clear: only under pressure (clear freed rows / drop height); held in OFFENSE so it doesn't drain the material we raised
@@ -485,14 +485,40 @@ function EnvelopeBrain:decide(state, stack, match)
         -- seed 1001's whole lull was PLAN, zero staging decisions, 0 breaks). The break mechanic doesn't need a short
         -- board -- it needs a cocked trigger in the CONTACT column at whatever height the board is. Stage that first,
         -- every time it degrades; fight the rise with the remaining frames.
+        -- SHIELD the staged material from our own clears (LULL ONLY -- shielding the sealed/breaking dig clears was
+        -- measured 2s WORSE on the 10-seed median: the digger needs those cells). Any intact top PAIR (and its
+        -- cocked trigger cell) is off-limits to clear/plan/flatten here; staging mechanics see the plain mask.
+        -- Measured: without this, staging was rebuilt and re-mined by PLAN/CLEAR all lull long and 9/10 seeds
+        -- arrived at the first landing with cocked=0 (median 12.2s); with it, 6/10 arrive cocked (median 18.4s).
+        local shielded = {}
+        for r = 1, rows do
+          local src, dst = touchable[r], {}
+          for c = 1, 6 do dst[c] = (src and src[c]) or false end
+          shielded[r] = dst
+        end
+        for c = 1, 6 do
+          local t = 0
+          for r = rows, 1, -1 do local v = grid[r][c] or 0; if v ~= 0 and v ~= BoardSim.GARBAGE then t = r; break end end
+          if t >= 2 then
+            local X = grid[t][c] or 0
+            if X ~= 0 and X ~= BoardSim.GARBAGE and (grid[t-1][c] or 0) == X then
+              shielded[t][c] = false; shielded[t-1][c] = false
+              if t >= 3 then
+                for _, nb in ipairs({ c - 1, c + 1 }) do
+                  if nb >= 1 and nb <= 6 and (grid[t-2][nb] or 0) == X then shielded[t-2][nb] = false; break end
+                end
+              end
+            end
+          end
+        end
         local ct = catchPrimitive.stageContact(grid, rows, touchable)
         if ct then fireSwap(ct, "BRACE_CONTACT")
-        else local cl = (height >= 5 and avgH >= 3) and clearChip(false, true) or nil  -- avgH floor: keep enough material for a contact trio (a stripped board can't break anything -- seed 1001 got mined to avgH 1.3, 0 breaks)
+        else local cl = (height >= 5 and avgH >= 3) and clearChip(false, true, shielded) or nil  -- avgH floor: keep enough material for a contact trio (a stripped board can't break anything -- seed 1001 got mined to avgH 1.3, 0 breaks)
           if cl then fireChip(cl, "CLEAR")
           else local mv, total, chain
-            if height >= 5 and avgH >= 3 then mv, total, chain = useChips.planMove(grid, rows, touchable, cursor, true, false) end
+            if height >= 5 and avgH >= 3 then mv, total, chain = useChips.planMove(grid, rows, shielded, cursor, true, false) end
             if mv then firePlan(mv, total, chain)
-            else local fl = catchPrimitive.flattenMove(grid, rows, touchable)
+            else local fl = catchPrimitive.flattenMove(grid, rows, shielded)
               if fl then fireSwap(fl, "FLATTEN")
               else local tg = catchPrimitive.stageTrigger(grid, rows, touchable)
                 if tg then fireSwap(tg, "BRACE_TRIGGER")

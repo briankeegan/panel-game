@@ -8,6 +8,7 @@ local M = {}
 -- lands at topRow+1 (the garbage's bottom row, converting) on top of these colored cells. Counting garbage here would
 -- aim the catch at the garbage block instead of your colored pairs -- the freed panel lands under it, not on it.
 local GARBAGE = require("bot.BoardSim").GARBAGE
+local RESOLVING = require("bot.BoardSim").RESOLVING
 -- touchability for a swap at (r,c) (swaps cells c and c+1); nil touchable = treat all as swappable
 local function touchOK(touchable, r, c)
   if not touchable then return true end
@@ -213,16 +214,34 @@ function M.breakRoute(grid, rows, touchable, anyTop)
       -- because the sole way to fill (r,col) is sliding an X that is already IN row r. A missing row with no X is a
       -- dead end -- routing toward it just oscillates one panel forever (the spin that topped the bot out). Skip
       -- dead-end columns; if none finish, elig stays empty and we return nil (falls through to clearing).
+      -- SLIDE PATH must be SUPPORTED: a slid panel crosses every column between donor and target at row r; an
+      -- empty cell with nothing (or only a mid-pop RESOLVING cell) underneath swallows it -- it falls out of the
+      -- row and the route can never complete. Measured on seed 1001's death: a pre-landing clear left a 3-deep
+      -- mid-pop hole in column 3, and breakRoute fed donor after donor into it (cost sawtoothing 5->3->4) for the
+      -- entire post-landing window instead of falling through to a workable clear.
+      local function slidePathOK(r, fromC, toC)
+        local step = (toC > fromC) and 1 or -1
+        local x = fromC + step
+        while x ~= toC do
+          local cell = grid[r][x] or 0
+          if cell == 0 or cell == RESOLVING then          -- panel must LAND here mid-route: needs support below
+            local below = (r > 1) and (grid[r-1][x] or 0) or 1
+            if below == 0 or below == RESOLVING then return false end
+          end
+          x = x + step
+        end
+        return true
+      end
       local firstMove, finishable, cost = nil, true, 0
       for _, r in ipairs({ t - 1, t - 2 }) do
         if (grid[r][col] or 0) ~= X then
           local move, dist = nil, nil
           local sawXNoTouch = false
           for d = 1, W do
-            if col + d <= W and (grid[r][col + d] or 0) == X then
+            if col + d <= W and (grid[r][col + d] or 0) == X and slidePathOK(r, col + d, col) then
               if touchOK(touchable, r, col + d - 1) then move, dist = { r, col + d - 1 }, d; break else sawXNoTouch = true end
             end
-            if col - d >= 1 and (grid[r][col - d] or 0) == X then
+            if col - d >= 1 and (grid[r][col - d] or 0) == X and slidePathOK(r, col - d, col) then
               if touchOK(touchable, r, col - d) then move, dist = { r, col - d }, d; break else sawXNoTouch = true end
             end
           end
@@ -365,6 +384,32 @@ end
 -- any shorter column is decoration (measured: seed 1005 had one, zero breaks; seed 1006's flat board + contact trigger
 -- broke instantly). This stages the trigger IN the contact columns: with a pair at (maxT,maxT-1), park the third X at
 -- (maxT-2, c+-1); with no pair, slide the top color into (maxT-1, c) to make one. One step per call.
+-- A swap at (r, sc) displaces the cells (r,sc) and (r,sc+1). While contact-staging, never displace a cell that
+-- currently COMPLETES another tied-max column's stage: its pair cell (row maxT-1, same column, color == that
+-- column's top) or its cocked-trigger cell (row maxT-2, adjacent to a paired tied column, color == that column's
+-- top). Stealing one relocates progress sideways at best; with two ADJACENT tied columns sharing a top color it
+-- ping-pongs forever -- measured on seeds 1005/1008: 8 consecutive re-fires of the SAME swap cell, burning ~200
+-- frames (a third of the pre-injection lull), a big reason 9/10 seeds arrived at the first landing with cocked=0.
+-- Same failure class as buildPair's ownsIntactPair bug, guarded the same way.
+local function contactStageProtected(grid, W, H, maxT, r, col)
+  if col < 1 or col > W then return false end
+  if r == maxT - 1 then
+    local X = grid[maxT][col] or 0
+    return X ~= 0 and X ~= GARBAGE and topRow(grid, col, H) == maxT and (grid[maxT-1][col] or 0) == X
+  elseif r == maxT - 2 then
+    local v = grid[r][col] or 0
+    if v == 0 or v == GARBAGE then return false end
+    for _, nb in ipairs({ col - 1, col + 1 }) do
+      if nb >= 1 and nb <= W and topRow(grid, nb, H) == maxT then
+        local X = grid[maxT][nb] or 0
+        if X == v and X ~= GARBAGE and (grid[maxT-1][nb] or 0) == X then return true end
+      end
+    end
+    return false
+  end
+  return false
+end
+
 function M.stageContact(grid, rows, touchable)
   local W, H = 6, rows or 12
   local maxT = 0
@@ -396,19 +441,24 @@ function M.stageContact(grid, rows, touchable)
                 local cc = c + dir * d
                 if cc >= 1 and cc <= W and (grid[maxT-2][cc] or 0) == X then
                   local sc = (dir == 1) and (cc - 1) or cc
-                  if (grid[maxT-2][sc] or 0) ~= (grid[maxT-2][sc+1] or 0) and touchOK(touchable, maxT-2, sc) then return { maxT-2, sc } end
+                  if (grid[maxT-2][sc] or 0) ~= (grid[maxT-2][sc+1] or 0) and touchOK(touchable, maxT-2, sc)
+                    and not contactStageProtected(grid, W, H, maxT, maxT-2, sc)
+                    and not contactStageProtected(grid, W, H, maxT, maxT-2, sc+1) then return { maxT-2, sc } end
                 end
               end
             end
           end
         else
-          -- no pair yet: bring X into (maxT-1, c) -- route the nearest X along row maxT-1 (the swap INTO the column is fine here)
+          -- no pair yet: bring X into (maxT-1, c) -- route the nearest X along row maxT-1 (the swap INTO the column is
+          -- fine here: c has no pair, so the protection check can never refer to c itself)
           for d = 1, W - 1 do
             for _, dir in ipairs({ -1, 1 }) do
               local cc = c + dir * d
               if cc >= 1 and cc <= W and (grid[maxT-1][cc] or 0) == X then
                 local sc = (dir == 1) and (cc - 1) or cc
-                if (grid[maxT-1][sc] or 0) ~= (grid[maxT-1][sc+1] or 0) and touchOK(touchable, maxT-1, sc) then return { maxT-1, sc } end
+                if (grid[maxT-1][sc] or 0) ~= (grid[maxT-1][sc+1] or 0) and touchOK(touchable, maxT-1, sc)
+                  and not contactStageProtected(grid, W, H, maxT, maxT-1, sc)
+                  and not contactStageProtected(grid, W, H, maxT, maxT-1, sc+1) then return { maxT-1, sc } end
               end
             end
           end

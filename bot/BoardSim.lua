@@ -17,6 +17,12 @@ BoardSim.WIDTH = WIDTH
 local GARBAGE = 99
 BoardSim.GARBAGE = GARBAGE
 
+-- ALREADY-RESOLVING sentinel (see colorGrid below): a cell that's matched(3)/popping(2)/popped(9) in the real
+-- engine right now. Distinct from GARBAGE(99) and from empty(0) -- it is neither matchable material nor passable
+-- air, it's a physically-occupied cell that just hasn't visually finished disappearing yet.
+local RESOLVING = 98
+BoardSim.RESOLVING = RESOLVING
+
 -- MATCHABLE play colors only (1-6). Color 9 (and 7/8) are non-matchable puzzle BLOCKERS:
 -- swappable (see candidate filters) but they never form a match — so isPlay excludes them.
 local function isPlay(c) return c >= 1 and c <= 6 end
@@ -25,34 +31,47 @@ BoardSim.isPlay = isPlay
 local function isGarbage(c) return c == GARBAGE end
 BoardSim.isGarbage = isGarbage
 
--- FALLS UNDER GRAVITY: any occupied, non-garbage cell -- NOT the same set as isPlay. isPlay(1-6) is deliberately
--- narrower for MATCH-FINDING (colors 7/8/9 are real, swappable, real-gameplay panels -- confirmed 2026-07 via a live
--- seed, not just puzzles -- that never form a match). Gravity has no such exception: every real panel falls,
--- regardless of whether its color is matchable. applyGravity used isPlay for this and got it wrong: a color-8 cell
--- was neither moved (isPlay(8)==false, so the loop's write-pointer skipped it) nor protected -- a play panel falling
--- past it in the SAME pass silently overwrote it, since the write-pointer logic assumes every row it doesn't
--- explicitly move is already empty. Root-caused via PA_FIRECHECK/PA_PLANSTATE + a real-engine reproduction (Puzzle/
--- Match/Stack) of the exact board+swap: BoardSim.simSwap predicted a match that BoardSim's OWN corrupted
+-- FALLS UNDER GRAVITY: any occupied, non-garbage, non-resolving cell -- NOT the same set as isPlay. isPlay(1-6) is
+-- deliberately narrower for MATCH-FINDING (colors 7/8/9 are real, swappable, real-gameplay panels -- confirmed
+-- 2026-07 via a live seed, not just puzzles -- that never form a match). Gravity has no such exception: every real
+-- panel falls, regardless of whether its color is matchable. applyGravity used isPlay for this and got it wrong: a
+-- color-8 cell was neither moved (isPlay(8)==false, so the loop's write-pointer skipped it) nor protected -- a play
+-- panel falling past it in the SAME pass silently overwrote it, since the write-pointer logic assumes every row it
+-- doesn't explicitly move is already empty. Root-caused via PA_FIRECHECK/PA_PLANSTATE + a real-engine reproduction
+-- (Puzzle/Match/Stack) of the exact board+swap: BoardSim.simSwap predicted a match that BoardSim's OWN corrupted
 -- post-gravity grid didn't actually contain once compared cell-by-cell against the real engine's settle.
-local function fallsUnderGravity(c) return c ~= 0 and c ~= GARBAGE end
+-- RESOLVING cells never fall either (they're stationary until they finish popping) -- see the compaction loop below,
+-- which additionally treats RESOLVING as a fixed obstacle that other material can't fall past.
+local function fallsUnderGravity(c) return c ~= 0 and c ~= GARBAGE and c ~= RESOLVING end
 
 -- color-only grid copy from a BoardState board. Carries a parallel `reveal` map
 -- (g.reveal[r][c] = real color a garbage cell will turn into when its block's
 -- bottom row breaks, captured by BoardState.extract from the engine's garbage
 -- buffer; nil if unknown). Stored under a string key so numeric row iteration is
 -- unaffected.
--- ALREADY-RESOLVING panels (state matched(3), popping(2), popped(9) -- see PanelStateCodes) report as EMPTY(0), not
--- their stale color. Root-caused 2026-07 via PA_PLANSTATE on a real seed: a panel mid-clear from an EARLIER match
--- still carries its old color in board[r][c].c for several frames while it visually pops, so without this a run like
--- three color-1 cells that are ALREADY matched/popping/popped still reads as three ordinary, at-rest color-1 panels.
--- BoardSim.resolve's findMatches then "discovers" that stale run as a FRESH match on EVERY simSwap call this frame,
--- crediting whatever swap is being scored with a clear it didn't cause and isn't related to -- inflating
--- planMove/useChips predictions (confirmed: a candidate swap predicted total=3 while the engine only ever cleared 2,
--- because 3 of the "3" were a pre-existing pop already in flight, unrelated to the swap). These panels ARE really
--- there for gravity purposes for a few more frames in the real engine, but since this whole simulator already treats
--- every resolve as an instant full-settle (see the DEEP-CHAIN PHANTOM note in BoardSim.resolve), treating them as
--- already-gone is consistent with that same approximation and is a strict improvement over counting them as fresh,
--- rematchable material forever.
+-- ALREADY-RESOLVING panels (state matched(3), popping(2), popped(9) -- see PanelStateCodes) report as the RESOLVING
+-- sentinel, NOT their stale color and NOT empty(0). Root-caused 2026-07 via PA_PLANSTATE on a real seed: a panel
+-- mid-clear from an EARLIER match still carries its old color in board[r][c].c for several frames while it visually
+-- pops, so without this a run like three color-1 cells that are ALREADY matched/popping/popped still reads as three
+-- ordinary, at-rest color-1 panels. BoardSim.resolve's findMatches then "discovers" that stale run as a FRESH match
+-- on EVERY simSwap call this frame, crediting whatever swap is being scored with a clear it didn't cause and isn't
+-- related to -- inflating planMove/useChips predictions (confirmed: a candidate swap predicted total=3 while the
+-- engine only ever cleared 2, because 3 of the "3" were a pre-existing pop already in flight, unrelated to the swap).
+-- FIXED (2026-07, second finding on a live seed): reporting these as empty(0) fixed the stale-rematch bug above but
+-- created a NEW one -- 0 means "passable air" to applyGravity, so a real board with a resolving hole mid-column (its
+-- neighbors above/below still occupied) got INSTANTLY compacted through that hole in one gravity pass, merging two
+-- play-color runs that in the real engine are NOT adjacent and won't become adjacent for many more frames (a
+-- matched/popping panel keeps its nonzero color, and hence keeps blocking gravity -- Panel.lua's normalState.update
+-- only starts a panel falling when the panel below reads color==0 -- until it actually finishes popping, which is
+-- staggered per-panel by combo_index, not instant). Confirmed directly: a live board with row3 cols2-4 mid-pop
+-- (state 3/2/2) predicted total=7 for a candidate swap (a col-2 vertical-4 plus a col-3 vertical-3 that the instant
+-- collapse joined together); re-running BoardSim.applyGravity/findMatches on the SAME board with NO swap at all
+-- still found a match purely from the resolving hole -- proving the phantom match wasn't caused by any swap, it's
+-- inherent to treating a resolving cell as passable. The RESOLVING sentinel is excluded from fallsUnderGravity (like
+-- GARBAGE) so it never moves, and the fast-path compaction loop below treats it as a fixed obstacle -- neither the
+-- match-finding fix nor the "don't corrupt a real cell via fallthrough" fix from the color-7/8/9 bug is lost, since
+-- isPlay already excludes RESOLVING from matching (same as it excludes GARBAGE), only findMatches' NEIGHBOR view of
+-- it changes (obstacle, not air).
 local RESOLVING_STATE = { [2] = true, [3] = true, [9] = true }  -- popping, matched, popped
 function BoardSim.colorGrid(board, rows)
   local g, reveal = {}, {}
@@ -60,7 +79,7 @@ function BoardSim.colorGrid(board, rows)
     local src, dst, rev = board[r], {}, {}
     for c = 1, WIDTH do
       local p = src[c]
-      dst[c] = (p.isGarbage and GARBAGE) or (RESOLVING_STATE[p.s] and 0) or p.c
+      dst[c] = (p.isGarbage and GARBAGE) or (RESOLVING_STATE[p.s] and RESOLVING) or p.c
       rev[c] = p.reveal
     end
     g[r] = dst; reveal[r] = rev
@@ -180,7 +199,13 @@ function BoardSim.applyGravity(g, rows)
     for c = 1, WIDTH do
       local write = 1
       for r = 1, rows do
-        if fallsUnderGravity(g[r][c]) then
+        local v = g[r][c]
+        if v == RESOLVING then
+          -- fixed obstacle: still physically there (mid-pop), doesn't move itself, and nothing above may compact
+          -- past it into the rows it still occupies (see the colorGrid comment on why treating this as passable air
+          -- was wrong).
+          write = r + 1
+        elseif fallsUnderGravity(v) then
           if write ~= r then
             g[write][c] = g[r][c]; g[r][c] = 0
             if reveal then reveal[write][c] = reveal[r][c]; reveal[r][c] = nil end

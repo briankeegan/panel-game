@@ -73,10 +73,11 @@ interrupted.
 
 ## Current git state
 
-- Branch: `claude/bot-building-hpom4o`, pushed through commit `bd51b0fa` (stageTrigger/stageContact
-  fixes + flattenMove verification + a catchVerify.lua test-harness fix). This session's *new*
-  changes (two foundational `BoardSim.lua` fixes plus the `planMove` verification that found them —
-  see items 11/12 below) are uncommitted as of writing this — commit them right after this doc lands.
+- Branch: `claude/bot-building-hpom4o`. Items 1-14 (through the `applyGravity` color-7/8/9 fix and the
+  deep-chain-cap fix) are committed (see git log: `b462d959`, `d9db36cb`, `05fce30b`, `9da8515b`,
+  `bd51b0fa`, `0165c224`, `6340e1a5`, `8b78761a`). Item 15 (the `RESOLVING`-sentinel gravity fix in
+  `bot/BoardSim.lua`, and this doc update) is this session's new work — commit it right after this doc
+  lands.
 
 ## What's been verified correct so far (with evidence)
 
@@ -386,27 +387,113 @@ interrupted.
       `BoardSim`'s simulation diverges) rather than assumed away.
     - `bot/tests/catchVerify.lua`: 8/8 OK. `DETERMINISM: PASS` (10-seed sweep, both runs).
 
+15. **`BoardSim.colorGrid`'s resolving->empty(0) mapping (item 12b) created a SECOND, distinct phantom-match bug —
+    FOUND, ROOT-CAUSED, FIXED, verified with a direct before/after BoardSim repro (no swap needed to trigger it).**
+    - Picked up the "Immediate next step" from the previous handoff: repeat item 14's method
+      (`PA_PLANVERIFY`/`PA_PLANVERIFY2`/`PA_PLANSTATE`/`PA_FIRECHECK`) on a fresh 10-seed `600 3600 10` sweep to find
+      the next `DID-NOT-MATERIALIZE` case with `FIRECHECK` still confirming the prediction at fire time (ruling out
+      staleness). Of 5 `DID-NOT-MATERIALIZE` cases in the sweep, 2 were the already-explained pre-game countdown
+      (item 11b, `in_countdown=true`), leaving 2 fire-confirmed real candidates: `swap=(1,1)` predicted `total=7`,
+      engine actually cleared `4`.
+    - `PA_PLANSTATE` at the moment of that commit showed row 3, columns 2-4 in state `3,3,3` (matched — mid-clear
+      from an EARLIER, unrelated match), everything else `state=0` (normal). Reconstructed the exact grid+states in
+      isolation (`BoardSim.colorGrid`/`applyGravity`/`findMatches` directly, no engine needed for this first check)
+      and found: **even with NO swap applied at all**, just running the current board's own `colorGrid`+`applyGravity`
+      +`findMatches` on it produces a match — proving the phantom isn't caused by whichever swap is being scored, it's
+      inherent to the board state itself once the simulator "settles" it.
+    - Root cause: item 12b's fix (matched/popping/popped panels report as color **0**, not their stale color) was the
+      right call for MATCH-FINDING (a stale run shouldn't rematch), but reusing plain `0` also means "passable air" to
+      `applyGravity` — which instantly collapses a column through it. In the real engine a matched/popping/popped
+      panel keeps a **nonzero** color until the instant it's actually removed (`Panel.lua`'s `poppedState.changeState`
+      is what finally zeroes it, and pop timing is staggered per-panel by `combo_index`, not simultaneous), and
+      `normalState.update` only lets a panel above start falling once the panel below reads `color==0` — so nothing
+      above a resolving cell can move down past it until it's genuinely gone, often many frames later. `BoardSim`
+      treating the hole as already-vacated let two unrelated, non-adjacent same-color runs (a column-2 vertical
+      four of color 1 and a column-3 vertical three of color 5, both real, both pre-existing, separated by the
+      resolving hole at row 3) get pulled together into one contiguous run and "discovered" as a single giant match —
+      crediting a swap 2 rows away with a clear count (`7`) neither the swap nor either individual run actually
+      produces within the verification window.
+    - Fixed: added a new sentinel `BoardSim.RESOLVING` (98, distinct from `GARBAGE`=99 and from empty=0).
+      `colorGrid` now reports matched/popping/popped cells as `RESOLVING`, not `0`. `fallsUnderGravity` excludes it
+      (same as `GARBAGE`) so it never moves itself, and the fast-path (no-true-garbage) compaction loop in
+      `applyGravity` now treats a `RESOLVING` cell as a fixed obstacle — `write` jumps to `r+1` when one is hit, so
+      material below compacts up to just underneath it and material above cannot compact down past it, matching the
+      real engine's "nothing falls through an unresolved cell" rule. The garbage-aware slow path already worked
+      correctly for free once `RESOLVING ~= 0` (its `g[r-1][c] == 0` fall-in check now correctly refuses a resolving
+      neighbor). `isPlay` already excludes anything outside 1-6, so match-finding treats `RESOLVING` as a
+      non-matchable obstacle exactly like `GARBAGE` — item 12b's original stale-rematch fix is fully preserved, only
+      the "is this passable to gravity" question changed.
+    - Re-ran the exact reproduction after the fix: the same board with NO swap no longer finds any match
+      (`any match with NO swap at all: false`, was `true` before), and `simSwap(1,1)` on the same board now predicts
+      `chain=0/total=0` instead of the phantom `chain=1/total=7`.
+    - Checked every other reader of `colorGrid`'s numeric contract (`grep` across `catchPrimitive.lua`/`useChips.lua`)
+      for `==0`/`~=0` checks that might now behave differently: several (`topRow`, `flattenMove`'s height cost,
+      `planMove`'s shape-fit scan) treat "not empty and not garbage" as occupied material for HEIGHT/structural
+      purposes — a `RESOLVING` cell now correctly counts as occupied there too (it physically is, for a few more
+      frames), a strict accuracy improvement, not a regression. Every actual swap-candidate site that also requires
+      `a~=0 and b~=0` (the only places that could act on a `RESOLVING` cell) additionally gates on
+      `touchable[r][c]`/`touchable[r][c+1]` from `BoardSim.touchableGrid`, which already independently rejects a
+      `RESOLVING`-state cell (state 2/3/9 fails the `s==0 or s==4` test) — so no illegal swap through a resolving
+      cell was ever reachable, before or after this fix.
+    - No regressions: `bot/tests/catchVerify.lua` still 8/8 OK. `bot/tests/boardSimVerify.lua` still 11/941 (1.2%)
+      mismatches, byte-identical to before (expected — that test only uses gap-free, match-free, fully-settled
+      boards, so it never exercises a resolving-hole state; its residual is the separate, already-documented
+      deep-chain phantom). Re-ran the 10-seed `600 3600 10` sweep: `DETERMINISM: PASS`, `CONSTRUCTION PARITY: PASS`,
+      `planMove` hit rate 24/29 (82.8%) vs the pre-fix same-sweep baseline 22/27 (81.5%) — a small improvement on
+      this particular sweep window, expected to matter more on runs where a resolving hole and a nearby candidate
+      swap coincide more often (this bug needs BOTH a mid-pop cell AND unrelated material stacked through its
+      column to manifest, so its frequency is board-state-dependent, not constant).
+    - **Honest remaining picture**: of the 5 `DID-NOT-MATERIALIZE` cases in the post-fix sweep, 2 are still the
+      known pre-game-countdown case (item 11b) and the other 2 (`swap=(2,2)` predicted `3`/actual `2`, `swap=(3,4)`
+      predicted `3`/actual `2`) are `FIRECHECK`-confirmed at fire time yet reproduce as a full `3` on an isolated
+      real-engine repro (`Puzzle`/`Match`/`Stack`, same pattern as before) — i.e. the **same three-way mismatch
+      class item 14 already flagged and explicitly left open** (captured-live-run actual disagrees with both
+      BoardSim's prediction AND a faithful isolated reproduction of the same board+swap). This fix did not close
+      that item; it closed a different, now-confirmed-separate bug. The item-14 open question (whether the
+      mismatch is a real remaining `BoardSim` bug or a `PA_PLANVERIFY` capture/correlation bug) still stands and
+      should be picked up next, exactly as item 14 already prescribed.
+
 ## Not yet verified at all
 
 Every substate in `catchPrimitive.lua` (`breakRoute`, `rowBreak`, `buildPair`, `stageTrigger`,
 `stageContact`, `flattenMove`) and `useChips.planMove` has had the single-seed, real-engine-
-ground-truth treatment the owner mandated (items 5-14 above). **This is NOT the same as "planMove's
-predictions are fully correct"** — item 14 ends with a real, open, unsolved gap: `planMove`'s hit
-rate is 76.1%, and most of the remaining misses are evidenced (via `PA_FIRECHECK`) to be a real bug,
-not staleness. Whoever picks this up next should treat that as active, unfinished work, not a
-footnote. The deep-chain phantom (item 13's original framing) is fixed, not just documented, as of
-today — the open item now is the still-unexplained ~24% `planMove` miss rate from item 14.
+ground-truth treatment the owner mandated (items 5-15 above). **This is NOT the same as "planMove's
+predictions are fully correct"** — item 15 ends with a real, open, unsolved gap, narrower than before
+but not closed: on the latest 10-seed sweep, 2 of 5 `DID-NOT-MATERIALIZE` cases are `FIRECHECK`-
+confirmed at fire time AND reproduce as the FULL predicted total on an isolated real-engine repro —
+a three-way mismatch (live-run actual vs `BoardSim` prediction vs isolated repro, with the isolated
+repro agreeing with `BoardSim` and disagreeing with the live run) that item 14 first flagged and this
+session's item 15 re-confirmed still exists after fixing the resolving-hole gravity bug. Whoever
+picks this up next should treat that as active, unfinished work, not a footnote. Both the deep-chain
+phantom (item 13) and the resolving-hole gravity phantom (item 15) are fixed, not just documented —
+the open item now is specifically this three-way-mismatch class, which is a NARROWER, harder-to-attribute
+problem than a straightforward `BoardSim` misprediction.
 
 ## Immediate next step for whoever picks this up
 
-Do NOT treat this as "done, move to tuning." `planMove`'s hit rate is 76.1%, and item 14's
-`PA_FIRECHECK` evidence shows most of the remaining misses are a real, unfound bug, not staleness.
-Next step: repeat item 14's method — capture a clean, correctly-correlated `PA_PLANGRID`/
-`PA_PLANSTATE`/`PA_FIRECHECK` snapshot for a `DID-NOT-MATERIALIZE` case, reproduce it on the real
-engine (`Puzzle`/`Match`/`Stack`), and trace exactly where `BoardSim`'s simulation diverges — the
-same process that already found 4 distinct bugs today. Only once `PA_FIRECHECK` stops finding
-fire-time-confirmed-but-failed cases (or the remaining ones are conclusively staleness, not assumed)
-should work move to task #3 (10-seed generalization sweep) and task #4 (freeze the 6x4 protocol).
+Do NOT treat this as "done, move to tuning." The open item is no longer a generic `BoardSim`
+misprediction — item 15 showed the isolated real-engine reproduction (`Puzzle`/`Match`/`Stack`) AGREES
+with `BoardSim`'s prediction and disagrees with the LIVE captured run's `panels_cleared` delta. That
+points at one of two places, and next steps should aim to distinguish them rather than re-run the same
+repro pattern again (it already gave a clean answer for `swap=(2,2)`/`swap=(3,4)`, it just didn't point
+at `BoardSim`):
+  1. **`PA_PLANVERIFY`'s own capture/correlation mechanism** (`bot/EnvelopeBrain.lua`'s `firePlan`/the
+     `stack.clock - pv.frame >= 90` check) — e.g. the swap firing later than expected relative to the
+     stashed `before` count, an intervening SECOND swap/event changing `panels_cleared` for an unrelated
+     reason before the 90-frame check fires, or the fixed 90-frame window being too short for a delayed
+     combo to fully finish popping (`Stack:onPop`/`panels_cleared` increments per-panel, staggered by
+     `combo_index * frameTimes.POP`) on THIS particular live run's timing (garbage injection, chain
+     state, etc. differ from the clean isolated repro).
+  2. A genuine remaining `BoardSim` gap that only manifests with LIVE-run-specific state the isolated
+     `Puzzle`-based repro can't reproduce (chaining flags, metal panels, the 2-player `createFromReplay`
+     match rules vs the repro's simpler `moves`-puzzle rules, or a board feature not captured by
+     `PA_PLANGRID`/`PA_PLANSTATE`'s dumps, e.g. `chaining`/`matchAnyway`/`propagatesChaining` flags).
+  Cheapest next diagnostic: add a `PA_PLANVERIFY`-adjacent counter that also logs `stack.chain_counter`
+  and whether any OTHER swap/clear touched the board between commit and the 90-frame check, to rule in
+  or out explanation (1) before chasing (2) again.
+  Only once this three-way-mismatch class is resolved (explained AND fixed, or conclusively pinned on
+  the diagnostic rather than `BoardSim`) should work move to task #3 (10-seed generalization sweep) and
+  task #4 (freeze the 6x4 protocol).
 
 ## Task tracker state (as of this handoff)
 
@@ -423,13 +510,14 @@ should work move to task #3 (10-seed generalization sweep) and task #4 (freeze t
 
 ## Files touched this session
 
-- `bot/catchPrimitive.lua`, `bot/EnvelopeBrain.lua`, `bot/survivalStress.lua` — see `b462d959`,
-  `d9db36cb`, `05fce30b`, `9da8515b`, `bd51b0fa` (all committed; see git log for detail).
-- `bot/BoardSim.lua` — `touchableGrid` hovering-above-swap fix, `colorGrid` stale-resolving-panel
-  fix (item 12). Uncommitted at time of writing.
-- `bot/CursorController.lua` — `PA_CURSORDIAG`. Uncommitted.
-- `bot/EnvelopeBrain.lua` — `PA_PLANVERIFY`/`PA_PLANVERIFY2`/`PA_PLANSTATE`, `firePlan` wiring for
-  all `planMove` call sites. Uncommitted.
-- `bot/useChips.lua` — `PA_PLANDIAG`/`PA_PLANGRID`, `planMove` now also returns `total`/`chain` for
-  verification. Uncommitted.
-- `docs/bot-verification-handoff.md` — this file.
+- `bot/catchPrimitive.lua`, `bot/EnvelopeBrain.lua`, `bot/survivalStress.lua`, `bot/BoardSim.lua`,
+  `bot/CursorController.lua`, `bot/useChips.lua` — see `b462d959`, `d9db36cb`, `05fce30b`,
+  `9da8515b`, `bd51b0fa`, `0165c224`, `6340e1a5`, `8b78761a` (all committed prior to this session;
+  see git log for detail — `touchableGrid`/`colorGrid` fixes, `PA_CURSORDIAG`, `PA_PLANVERIFY`/
+  `PA_PLANVERIFY2`/`PA_PLANSTATE`/`PA_PLANDIAG`/`PA_PLANGRID`/`PA_FIRECHECK`, the deep-chain cap,
+  and the `applyGravity` color-7/8/9 fix).
+- `bot/BoardSim.lua` — **this session's new work**: `RESOLVING` sentinel (item 15) — `colorGrid` now
+  maps matched/popping/popped cells to `RESOLVING` instead of `0`; `fallsUnderGravity` excludes it;
+  the fast-path gravity compaction loop treats it as a fixed obstacle. Committed this session.
+- `docs/bot-verification-handoff.md` — this file, updated this session with item 15 and the
+  current honest state of the remaining open item.

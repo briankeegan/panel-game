@@ -324,16 +324,32 @@ function EnvelopeBrain:tryCatch(grid, rows, stack, priorities, verify, touchable
 end
 
 -- LULL SHIELD (pure; extracted 2026-07-03 so bot/tests/lullShieldVerify.lua can prove it in isolation): copy
--- `touchable` with every intact top PAIR (X at t,t-1) and that pair's one cocked-trigger cell (t-2, c+-1, first
--- match wins) masked NO-GO. Used by the LULL branch only -- clear/plan/flatten must not mine the staged break
--- material (measured: without it 9/10 seeds hit the first landing with cocked=0); staging mechanics keep the
--- plain mask. Shielding the sealed/breaking dig clears was measured 2s WORSE, so this never runs there.
+-- `touchable` with every intact top PAIR (X at t,t-1), that pair's one cocked-trigger cell (t-2, c+-1, first
+-- match wins), AND the pair column's SUPPORT cells (rows 1..t-2 of the same column) masked NO-GO. Used by the
+-- LULL branch only -- clear/plan/flatten must not mine the staged break material (measured: without it 9/10
+-- seeds hit the first landing with cocked=0); staging mechanics keep the plain mask. Shielding the
+-- sealed/breaking dig clears was measured 2s WORSE, so this never runs there.
+-- SUPPORT-CELL SHIELD (2026-07-03, KNOB -- default OFF, PA_LULLSUPPORT=1 or the module flag to enable): the
+-- cell-level shield leaves a hole -- lull PLANs legally clear panels UNDER a staged pair, riding the whole stage
+-- down by gravity (proven live in lullShieldVerify PIECE 2). Seed 1001's first-landing death is the endpoint:
+-- the lull delivered column heights 5,5,2,3,4,5 and an exhaustive whole-board search proves NO <=3-swap break
+-- existed at landing. Masking the CONTACT column's support (rows 1..t-2 where t == board maxT) fixes exactly
+-- that -- measured on dev seeds 1001-1010: zero-reveal seeds 4 -> 0, p10 11.5s -> 16.9s, mean 22.2 -> 25.7,
+-- broken median 72 -> 141. BUT the holdout window 2001-2010 REGRESSED (mean 24.4 -> 18.4; seeds 2006/2008 with
+-- healthy baseline lulls went to zero reveals), and every-pair scoping was worse still (holdout mean 16.9). Net
+-- 20-seed mean is negative, so the default stays OFF until the 2006-regression is root-caused -- the mechanism
+-- is proven, the interaction isn't understood. Flip LULL_SUPPORT_SHIELD (or PA_LULLSUPPORT=1) to A/B it.
+EnvelopeBrain.LULL_SUPPORT_SHIELD = os.getenv("PA_LULLSUPPORT") == "1"
 function EnvelopeBrain.lullShield(grid, rows, touchable)
   local shielded = {}
   for r = 1, rows do
     local src, dst = touchable[r], {}
     for c = 1, 6 do dst[c] = (src and src[c]) or false end
     shielded[r] = dst
+  end
+  local maxT = 0
+  for c = 1, 6 do
+    for r = rows, 1, -1 do local v = grid[r][c] or 0; if v ~= 0 and v ~= BoardSim.GARBAGE then if r > maxT then maxT = r end break end end
   end
   for c = 1, 6 do
     local t = 0
@@ -342,6 +358,9 @@ function EnvelopeBrain.lullShield(grid, rows, touchable)
       local X = grid[t][c] or 0
       if X ~= 0 and X ~= BoardSim.GARBAGE and (grid[t-1][c] or 0) == X then
         shielded[t][c] = false; shielded[t-1][c] = false
+        if t == maxT and EnvelopeBrain.LULL_SUPPORT_SHIELD then    -- contact column: clearing under it sinks the stage the block lands on
+          for r = 1, t - 2 do shielded[r][c] = false end
+        end
         if t >= 3 then
           for _, nb in ipairs({ c - 1, c + 1 }) do
             if nb >= 1 and nb <= 6 and (grid[t-2][nb] or 0) == X then shielded[t-2][nb] = false; break end

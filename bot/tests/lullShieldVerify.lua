@@ -15,6 +15,10 @@ local EnvelopeBrain = require("bot.EnvelopeBrain")
 local fails = {}
 local function check(ok, label) if not ok then fails[#fails + 1] = label end; return ok end
 
+-- this suite verifies the support-shield MECHANISM (mask exactness + stage-holds-height), so enable the knob;
+-- the live default is OFF pending the holdout-regression root cause (see lullShield's comment in EnvelopeBrain).
+EnvelopeBrain.LULL_SUPPORT_SHIELD = true
+
 local function buildStack(boardStr)
   local pz = Puzzle({ puzzleType = "moves", stack = boardStr, moves = 99 })
   local m = Match(pz:toPanelSource(false), pz:toGameMode().matchRules)
@@ -54,7 +58,9 @@ printBoard(st1, "=== board A (col2 cocked: pair r5/r4, trigger r3c3) ===")
 local g1, bs1 = gridOf(st1)
 local touchable = BoardSim.touchableGrid(bs1.board, bs1.rows)
 local shield = EnvelopeBrain.lullShield(g1, bs1.rows, touchable)
-local staged = { ["5,2"] = true, ["4,2"] = true, ["3,3"] = true }
+-- pair (r5/r4), its trigger (r3c3), and the pair column's SUPPORT (r3/r2/r1 of c2 -- added 2026-07-03 after
+-- PIECE 2 caught lull PLANs mining under the pair and sinking the stage)
+local staged = { ["5,2"] = true, ["4,2"] = true, ["3,3"] = true, ["3,2"] = true, ["2,2"] = true, ["1,2"] = true }
 local exact = true
 for r = 1, bs1.rows do for c = 1, 6 do
   local want = (touchable[r] and touchable[r][c] or false) and not staged[r .. "," .. c]
@@ -86,7 +92,7 @@ for step = 1, 6 do
   local sub = tostring(brain._substate)
   if mv and mv.type == "SWAP" and mv.pos then
     fired = fired + 1
-    for _, cell in ipairs({ { 5, 2 }, { 4, 2 }, { 3, 3 } }) do
+    for _, cell in ipairs({ { 5, 2 }, { 4, 2 }, { 3, 3 }, { 3, 2 }, { 2, 2 }, { 1, 2 } }) do
       if mv.pos[1] == cell[1] and (mv.pos[2] == cell[2] or mv.pos[2] + 1 == cell[2]) then
         okDisp = false; print(string.format("  step %d: %s swap (%d,%d) DISPLACES staged cell (%d,%d)", step, sub, mv.pos[1], mv.pos[2], cell[1], cell[2]))
       end
@@ -101,10 +107,14 @@ for step = 1, 6 do
     break
   end
 end
-printBoard(st1, "=== after " .. fired .. " lull moves (pair unit intact=" .. tostring(pairUnit(st1)) .. ") ===")
+-- with the support cells shielded (2026-07-03) the stage should hold its ORIGINAL height, not just survive as a
+-- unit -- this is the assertion that failed as pair-slid-down before the support extension.
+local stageAtHeight = (st1.panels[5][2].color or 0) == 5 and (st1.panels[4][2].color or 0) == 5
+printBoard(st1, "=== after " .. fired .. " lull moves (pair unit=" .. tostring(pairUnit(st1)) .. ", at original height=" .. tostring(stageAtHeight) .. ") ===")
 check(okDisp, "lull moves avoid staged cells")
 check(okPair and pairUnit(st1), "pair survives as a unit")
-print("  RESULT: lull shield " .. ((okDisp and okPair) and "WORKS (cell contract held over live play; under-mining hole documented above)" or "BROKEN"))
+check(stageAtHeight, "stage holds its original height (support shielded)")
+print("  RESULT: lull shield " .. ((okDisp and okPair and stageAtHeight) and "WORKS (stage held at height through live lull play)" or "BROKEN"))
 
 -- ============ PIECE 3: contact-first -- staging preempts clearing, converges, pair intact ============
 print("\n########## PIECE 3: lull stages the contact column FIRST (BRACE_CONTACT) ##########")

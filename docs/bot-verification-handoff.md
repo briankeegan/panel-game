@@ -165,6 +165,49 @@ void. A quiescence-based re-measure of a 3-seed run showed ~17/18 MATCHED.
 `bot/tests/GarbageApplyTest.lua` (network G-message routing) use mocked inputs on purpose —
 they test data plumbing, make no claim about engine physics, and are kept.
 
+## Tuning-phase opening analysis (2026-07-03, post-verification)
+
+PA_MECH baseline at HEAD, dev seeds 1001-1010 + holdout 2001-2010 (20 seeds):
+
+- **9/20 seeds die with reveals=0 — the first block is NEVER broken** (dev: 1001/1004/1005/1006; holdout: 2001/2003/2004/2009/2010). These are all
+  first-landing deaths (garbInjected=1). Catch-completion tuning cannot touch them; the
+  first-break problem strictly dominates.
+- On seeds that do break: catch completion 50-100% (dev), 0-75% (holdout); re-break
+  latency is 4-7f when the catch completes vs 91-185f when it doesn't — confirming
+  "catch completion rate is the game" for the seeds that get past landing one.
+- **Seed-1001 anatomy (hard proof)**: at death the block sat on column heights
+  5,5,2,3,4,5 (c3/c4 mined hollow during the lull). digPlan correctly returned nil at
+  every depth 1-6, and an EXHAUSTIVE whole-board search (all rows, not just digPlan's
+  window) proves **no ≤3-swap break existed at all**. The post-landing mechanics are
+  innocent; the lull delivered an unbreakable board.
+- Causal chain: lull PLAN under-mining (the shield hole documented in item #8) →
+  hollow/jagged landing board → no break exists → death ~90f after landing.
+- **Primary metric for the next interventions: zero-reveal seed count (now 9/20).**
+  Candidates, in leverage order: (1) extend the lull shield to the staged pair's column
+  SUPPORT cells; (2) a per-COLUMN material floor in the lull (avgH gates let two columns
+  go hollow while the average looks fine); (3) catch-path exactFallback (recorded
+  earlier). Each gated by paired dev+holdout sweeps.
+
+**Candidate (1) MEASURED (2026-07-03) — mechanism proven, landed as a default-OFF knob
+(`PA_LULLSUPPORT=1` / `EnvelopeBrain.LULL_SUPPORT_SHIELD`):**
+
+| variant | dev zero-reveal | dev median/mean | dev broken | holdout zero-reveal | holdout median/mean |
+|---|---|---|---|---|---|
+| baseline | 4/10 | 22.0 / 22.2 | 72 | 5/10 | 20.5 / 24.4 |
+| support shield, every pair | 1/10 | 21.9 / 22.3 | 138 | 5/10 (set changed) | 18.0 / 16.9 |
+| support shield, contact col only | **0/10** | **25.6 / 25.7** (p10 16.9!) | **141** | 5/10 (set changed) | 15.2 / 18.4 |
+
+The contact-column variant eliminates dev first-landing deaths entirely and doubles
+garbage broken — the seed-1001 causal chain is confirmed end to end. But BOTH variants
+regress the holdout window: seeds 2006/2008, whose baseline lulls were healthy (2006:
+4 reveals, 75% catch), collapse to zero reveals when the support mask is on. Net
+20-seed mean is negative, so the default stays OFF. **Open question for the next
+session: root-cause seed 2006 with PA_LULLSUPPORT=1 vs 0** — what does the mask block
+that ruins a lull that was working? (Hypotheses: the shielded contact column starves
+the only viable clear line on those boards; or RAISE loops displace the stage.) The
+isolation suite (`lullShieldVerify`) runs with the knob ON and proves the mechanism:
+the stage holds its built height through live lull play.
+
 ## Where survival stands and why it still dies
 
 10-seed 6x12 protocol (`PA_SEED_BASE=1000, 600 3600 10 "" hard 6 12`): median ~22s,

@@ -460,6 +460,17 @@ function EnvelopeBrain:decide(state, stack, match)
           end
         end
       elseif state.lowestGarbageRow then
+        -- POP NOW when the clock is bare: with garbage over the top, health drains EVERY still frame once
+        -- stop_time hits 0 (Stack:advancePassiveRaise) -- a multi-swap dig plan mid-assembly is death if nothing
+        -- is popping (measured seed 1005: died ~50f after landing, 3 DIG_PLAN setup swaps deep, zero pops in
+        -- flight). When no pops are active and the banked stop is thinner than one cursor trip, the next swap
+        -- must ITSELF pop: take any immediate clear over the otherwise-preferred multi-swap setups.
+        if (not busy) and (stack.stop_time or 0) <= 45 and (stack.shake_time or 0) == 0 then
+          local pop = clearChip(true, true) or clearChip(false, true)
+          if pop then fireChip(pop, "CLEAR") end
+        end
+        if move then -- POP-NOW fired above
+        else
         local bc = clearChip(true, true)                                   -- a ready clear that pops the block
         if bc then fireChip(bc, "CLEAR")
         else local br = catchPrimitive.breakRoute(grid, rows, touchable)   -- finish a contact-column vertical-3
@@ -487,6 +498,7 @@ function EnvelopeBrain:decide(state, stack, match)
             end
           end
         end
+        end -- POP-NOW wrapper
       else
         -- LULL POSTURE: hold a FLAT, 3-4 high, trigger-cocked surface. Clear only to fight the rise (maxH>=5); below
         -- that HOLD material -- the staged 3s must be able to reach the landing block's bottom row.

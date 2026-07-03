@@ -226,7 +226,7 @@ end
 -- captured them (g.reveal), else empty — we don't fabricate colors, so a dig still
 -- frees space + lowers the stack but only chains through reveals whose colors we
 -- know. garbageCleared counts converted cells (the dig reward).
-function BoardSim.resolve(g, rows)
+function BoardSim.resolve(g, rows, maxLinkCap)
   local reveal = g.reveal
   local chain, total, firstClear, garbageCleared = 0, 0, 0, 0
   BoardSim.applyGravity(g, rows)   -- SETTLE FIRST: a swap can empty a cell so the real match only forms after the panel above falls. The engine settles then matches; matching the un-fallen grid MISSED real clears (verified bot/tests/boardSimVerify.lua swap 2,3). No-op when already settled.
@@ -277,8 +277,11 @@ function BoardSim.resolve(g, rows)
     BoardSim.applyGravity(g, rows)
     -- DEEP-CHAIN PHANTOM: the engine settles cascades wave-by-wave with hover, so deep links (3+) that BoardSim's instant
     -- full-settle aligns often DON'T fire in the engine (verified bot/tests/boardSimVerify.lua). PA_MAXLINK caps cascade
-    -- depth to measure/limit the over-prediction; default uncapped.
-    local maxlink = tonumber(os.getenv("PA_MAXLINK"))
+    -- depth to measure/limit the over-prediction; default uncapped for direct callers. `maxLinkCap` is the same knob as
+    -- an explicit parameter (2026-07: confirmed via PA_PLANVERIFY ground-truth on live seeds that chain>=2 predictions
+    -- from useChips.scoreSwap are wrong ~100% of the time under large-garbage pressure, several predicting a 9-10
+    -- panel clear that the real engine clears zero of -- see useChips.lua's scoreSwap for where this is capped).
+    local maxlink = tonumber(os.getenv("PA_MAXLINK")) or maxLinkCap
     if maxlink and chain >= maxlink then break end
   end
   return chain, total, firstClear, garbageCleared
@@ -601,7 +604,7 @@ end
 
 -- copy `grid`, apply swap (r,c)<->(r,c+1), resolve
 -- -> newGrid, chain, total, firstClear, garbageCleared
-function BoardSim.simSwap(grid, rows, r, c)
+function BoardSim.simSwap(grid, rows, r, c, maxLinkCap)
   -- a swap off the board (row past the top / col out of range) is a NO-OP, not a crash. The build planner
   -- (deepFit/EnvelopeBrain) can emit r > rows on a full/near-full board; guard so the bot doesn't die on it.
   if not grid or not r or not c or r < 1 or r > rows or c < 1 or c >= WIDTH or not grid[r] then
@@ -609,7 +612,7 @@ function BoardSim.simSwap(grid, rows, r, c)
   end
   local g = BoardSim.cloneGrid(grid, rows)
   g[r][c], g[r][c + 1] = g[r][c + 1], g[r][c]
-  local chain, total, firstClear, garbageCleared = BoardSim.resolve(g, rows)
+  local chain, total, firstClear, garbageCleared = BoardSim.resolve(g, rows, maxLinkCap)
   return g, chain, total, firstClear, garbageCleared
 end
 

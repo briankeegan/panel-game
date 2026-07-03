@@ -422,8 +422,17 @@ local function chipSetupBonus(grid, rows, sr, sc)
   return best
 end
 local W_IMMEDIATE_TOTAL, W_IMMEDIATE_CHAIN, W_IMMEDIATE_FIRST = 30, 400, 20
+-- TRUSTED_CHAIN_CAP (2026-07, root-caused via PA_PLANVERIFY ground-truth on live seeds, not a synthetic test):
+-- chain>=2 predictions from BoardSim.simSwap were WRONG 13/13 times observed under large-garbage pressure -- several
+-- predicted a 9-10 panel clear (chain=3) that the real engine cleared ZERO of. Root cause is the documented DEEP-CHAIN
+-- PHANTOM in BoardSim.resolve: the real engine settles cascades wave-by-wave with a hover delay between links, but the
+-- simulator instantly full-settles, so links past the first can align in the sim in ways that never actually fire.
+-- The FIRST link is reliable (no wave-timing gap exists for it -- it's the direct, immediate result of the swap
+-- itself); only cascaded links beyond that are unreliable. Cap resolve depth to 1 for scoring so planMove can't be
+-- talked into a phantom deep chain by its own simulator. PA_MAXLINK (if set) still overrides for diagnostics/sweeps.
+local TRUSTED_CHAIN_CAP = tonumber(os.getenv("PA_TRUSTLINK")) or 1
 local function scoreSwap(grid, rows, r, c, immScale)             -- eval + chip-setup bonus + a (scalable) bonus for a clear NOW
-  local g, chain, total, firstClear = BoardSim.simSwap(grid, rows, r, c)
+  local g, chain, total, firstClear = BoardSim.simSwap(grid, rows, r, c, TRUSTED_CHAIN_CAP)
   local bonus = chipSetupBonus(g, rows, r, c)
   local s = eval(g, rows) + W_CHIP * bonus
   if total > 0 then s = s + (immScale or 1) * (W_IMMEDIATE_TOTAL * total + W_IMMEDIATE_CHAIN * chain + W_IMMEDIATE_FIRST * (firstClear or 0)) end
@@ -468,7 +477,7 @@ function M.planMove(grid, rows, touchable, cursor, force, keepMaterial)
       for _, sw in ipairs(legalSwaps(node.g, rows, nil, math.min(rows, p2 + 1))) do  -- node.g is resolved -> all settled
         if budget <= 0 then break end
         budget = budget - 1
-        local g2, chain, total = BoardSim.simSwap(node.g, rows, sw[1], sw[2])
+        local g2, chain, total = BoardSim.simSwap(node.g, rows, sw[1], sw[2], TRUSTED_CHAIN_CAP)
         local lbonus = chipSetupBonus(g2, rows, sw[1], sw[2])
         local reward = node.reward + ((total > 0) and (W_IMMEDIATE_TOTAL * total + W_IMMEDIATE_CHAIN * chain) or 0)
         local leaf = { g = g2, score = eval(g2, rows) + W_CHIP * lbonus + reward, reward = reward, setup = math.max(node.setup or 0, lbonus), first = node.first, dist = node.dist }

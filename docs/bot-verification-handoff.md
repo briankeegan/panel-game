@@ -303,14 +303,38 @@ interrupted.
       sometimes for the worse on a given seed even when the fix is strictly more correct; the point of
       the per-seed median, not single-seed numbers, is to average that out). `bot/tests/catchVerify.lua`
       still reports 8/8 OK. `DETERMINISM: PASS` on the parity check.
-    - **Known remaining limitation, not new, not fixed today**: deeper `chain>=2` predictions still
-      sometimes over-predict (e.g. `swap=(5,3) predictedTotal=9 predictedChain=3 actual=0` was still
-      seen after both fixes) — this is the ALREADY-DOCUMENTED "DEEP-CHAIN PHANTOM" in
-      `BoardSim.resolve`'s own comment (the engine settles cascades wave-by-wave with hover delay
-      between links; the simulator's instant full-settle can align links that never actually fire).
-      `PA_MAXLINK` already exists as a mitigation knob. Out of scope for today — a real, still-open
-      item for a future pass, now with a much clearer live-engine reproduction path
-      (`PA_PLANVERIFY`) than existed before this session.
+13. **Deep-chain phantom (`chain>=2` predictions) — FOUND SYSTEMATIC, FIXED, NOT JUST DOCUMENTED.**
+    Checking whether "every mechanic works for sure" before moving on, re-measured `chain>=2`
+    predictions with real ground truth rather than accepting the earlier "known limitation" framing:
+    **every single `chain>=2` prediction observed (13/13, across seed 1006 alone and the 10-seed
+    sweep) was wrong** — several predicted a 9-10 panel clear (`chain=3`) that the real engine cleared
+    ZERO of. This is not an edge case, it's a total failure mode for any candidate swap the simulator
+    thinks fires a 2+-link cascade, and since `W_IMMEDIATE_CHAIN=400` weights chain depth heavily,
+    `planMove` would have been strongly drawn toward these phantom swaps over real options.
+    - Root cause matches the pre-existing DEEP-CHAIN PHANTOM comment in `BoardSim.resolve`: the real
+      engine settles cascades wave-by-wave with a hover delay between links; the simulator's instant
+      full-settle can align links 2+ in ways that never fire for real. The FIRST link doesn't have
+      this problem (it's the direct, immediate result of the swap, no wave-timing gap).
+    - Fixed: threaded an explicit `maxLinkCap` parameter through `BoardSim.resolve`/`simSwap` (the
+      existing `PA_MAXLINK` env var still overrides, for diagnostics), and set
+      `TRUSTED_CHAIN_CAP=1` in `useChips.lua`'s `scoreSwap` so `planMove` never scores or rewards a
+      cascade past the first link. Re-verified on the same real engine, same seeds: **0 of 84
+      `chain>=2` predictions remain** (all correctly capped to `chain=1`) across the 10-seed sweep;
+      `chain=1` predictions kept the same reliability as before this fix (still imperfect — see below
+      — but that ceiling was already there, this fix didn't move it).
+    - **Honest residual, not swept under the rug**: `chain=1` predictions from `planMove` still
+      `DID-NOT-MATERIALIZE` in 28 of 84 sampled decisions (67% hit rate) on the 10-seed sweep. Not
+      individually root-caused one-by-one — the ones inspected are a mix of the already-explained
+      countdown artifact (item 11b, once per run) and generic snapshot staleness (the board can shift
+      in the ~90-130 frames between a decision and its execution, same latency window every substate
+      in this brain operates under). This is a bounded, non-systematic noise floor, structurally
+      different from the 13/13-always-wrong deep-chain bug that's now fixed — but it is NOT 100%, and
+      anyone continuing this work should not read "planMove verified" as "planMove's predictions are
+      always right." A late-game cluster of 6 consecutive total misses was also observed in the
+      injection-OFF parity baseline (seed 2024, frames ~2960-3570, a long, cluttered, no-garbage
+      endgame state) — flagged here, NOT investigated further this session; worth a dedicated look if
+      `planMove` behavior in long/cluttered boards becomes relevant.
+    - `bot/tests/catchVerify.lua`: 8/8 OK. `DETERMINISM: PASS`.
 
 ## Not yet verified at all
 

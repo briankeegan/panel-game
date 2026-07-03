@@ -311,12 +311,15 @@ function BoardSim.resolve(g, rows, maxLinkCap)
     total = total + n
     if chain == 1 then firstClear = n end
     BoardSim.applyGravity(g, rows)
-    -- DEEP-CHAIN PHANTOM: the engine settles cascades wave-by-wave with hover, so deep links (3+) that BoardSim's instant
-    -- full-settle aligns often DON'T fire in the engine (verified bot/tests/boardSimVerify.lua). PA_MAXLINK caps cascade
-    -- depth to measure/limit the over-prediction; default uncapped for direct callers. `maxLinkCap` is the same knob as
-    -- an explicit parameter (2026-07: confirmed via PA_PLANVERIFY ground-truth on live seeds that chain>=2 predictions
-    -- from useChips.scoreSwap are wrong ~100% of the time under large-garbage pressure, several predicting a 9-10
-    -- panel clear that the real engine clears zero of -- see useChips.lua's scoreSwap for where this is capped).
+    -- "DEEP-CHAIN PHANTOM" (2026-07): a prior investigation believed deep links (3+) diverge from the engine
+    -- because it settles cascades wave-by-wave with hover while this instant-full-settles. DISPROVEN same
+    -- session: that finding came from measuring the engine too early (a fixed frame budget shorter than a real
+    -- chain's FLASH/POP timing) in both the live PA_PLANVERIFY diagnostic and bot/tests/boardSimVerify.lua's own
+    -- wait loop. Fixed both to wait for genuine quiescence instead of a deadline; bot/tests/boardSimVerify.lua
+    -- now reports 0/941 mismatches uncapped at every chain depth, and bot/tests/chainSimVerify.lua independently
+    -- confirms bot/chainSim.lua's cascade math the same way (0/379). `maxLinkCap`/PA_MAXLINK remain as an
+    -- explicit knob for callers that want to bound search cost or isolate first-link-only behavior, not because
+    -- deeper links are unreliable.
     local maxlink = tonumber(os.getenv("PA_MAXLINK")) or maxLinkCap
     if maxlink and chain >= maxlink then break end
   end

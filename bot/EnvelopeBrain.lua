@@ -410,13 +410,27 @@ function EnvelopeBrain:decide(state, stack, match)
         end
       end
     end
-    if os.getenv("PA_PLANVERIFY") and self._planVerify and (stack.clock or 0) - self._planVerify.frame >= 90 then
+    -- FIXED (2026-07): a flat 90-frame-since-COMMIT window (before travel+reaction+fire even happen, let alone a
+    -- multi-link chain's per-link FLASH/POP stagger) was too short to let a real chain fully resolve, so this
+    -- reported "DID-NOT-MATERIALIZE" for predictions that just hadn't finished yet -- root-caused via
+    -- bot/tests/boardSimVerify.lua and bot/tests/chainSimVerify.lua's own "phantom" residual, which turned out to
+    -- be the SAME bug in the standalone test's wait loop (both fixed same session). Now waits for genuine
+    -- quiescence (20 consecutive frames with no active/chaining panels AND panels_cleared unchanged), capped at
+    -- 400 frames so a swap that never fires at all still reports eventually.
+    if os.getenv("PA_PLANVERIFY") and self._planVerify then
       local pv = self._planVerify
-      local actual = (stack.panels_cleared or 0) - pv.before
-      print(string.format("  PLANVERIFY swap=(%d,%d) predictedTotal=%d predictedChain=%d actualClearedByF%d=%d framesWaited=%d %s",
-        pv.r, pv.c, pv.total, pv.chain, stack.clock or 0, actual, (stack.clock or 0) - pv.frame,
-        (actual >= pv.total) and "MATCHED" or "DID-NOT-MATERIALIZE"))
-      self._planVerify = nil
+      local nowCleared = stack.panels_cleared or 0
+      local busyNow = stack:hasActivePanels() or stack:hasChainingPanels()
+      if busyNow or nowCleared ~= (pv.lastCleared or pv.before) then pv.lastActive = (stack.clock or 0) - pv.frame end
+      pv.lastCleared = nowCleared
+      local waited = (stack.clock or 0) - pv.frame
+      if waited - (pv.lastActive or 0) >= 20 or waited >= 400 then
+        local actual = nowCleared - pv.before
+        print(string.format("  PLANVERIFY swap=(%d,%d) predictedTotal=%d predictedChain=%d actualClearedByF%d=%d framesWaited=%d %s",
+          pv.r, pv.c, pv.total, pv.chain, stack.clock or 0, actual, waited,
+          (actual >= pv.total) and "MATCHED" or "DID-NOT-MATERIALIZE"))
+        self._planVerify = nil
+      end
     end
     -- the deepest chain a single swap fires on the LIVE board (exact facts, depth matches engine). Memoized per decision.
     -- Its height drop is the escape; in DANGER we fire the deepest available, in OFFENSE only a worthwhile (deep) one.

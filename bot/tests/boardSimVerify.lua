@@ -43,7 +43,24 @@ local function engineClears(boardStr, r, c)
   local m, st = newStack(boardStr)
   local before = colored(st)
   st.cur_row, st.cur_col = r, c; st:receiveConfirmedInput(KDE.swap); m:run()
-  for k = 1, 200 do if st:game_ended() then break end st:receiveConfirmedInput("A"); m:run(); if k >= 3 and not st:hasActivePanels() and not st:hasChainingPanels() then break end end
+  -- FIXED (2026-07, found while investigating why this test's own "phantom" residual never went to zero): a
+  -- 200-frame cap with only 3 quiet frames to confirm rest was NOT ENOUGH TIME for a real 3+-link chain to finish
+  -- resolving -- FLASH=28 alone plus per-panel POP stagger by combo_index means a deep chain's LATER links are
+  -- still popping/falling well past frame 200. Confirmed directly: board#2 swap(3,1) measured "engine=8" at the
+  -- 200-frame cutoff while hasActivePanels()/hasChainingPanels() were STILL TRUE (i.e. it hit the timeout, not a
+  -- quiet board) -- letting it run to genuine quiescence (same pattern as bot/chainSim.lua's engineChain: wait for
+  -- 20 CONSECUTIVE quiet frames, not just 3, generous 3000-frame ceiling) measured 11, exactly matching
+  -- BoardSim's prediction. Every one of this test's previously-reported "phantom" mismatches was measured
+  -- mid-cascade, not after the real engine actually finished -- a test bug, not a BoardSim.simSwap bug.
+  local lastActive, prev = 0, colored(st)
+  for k = 1, 3000 do
+    if st:game_ended() then lastActive = k; break end
+    st:receiveConfirmedInput("A"); m:run()
+    local now = colored(st)
+    if st:hasActivePanels() or st:hasChainingPanels() or now ~= prev then lastActive = k end
+    prev = now
+    if k > lastActive + 20 then break end
+  end
   return before - colored(st)
 end
 

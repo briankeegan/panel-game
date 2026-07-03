@@ -42,6 +42,12 @@ override knobs only). Any doc/comment still citing the phantom as real is stale 
 authoritative statement is in `bot/useChips.lua` above `TRUSTED_CHAIN_CAP` and in
 `bot/BoardSim.lua`'s `resolve()`.
 
+**Third strike (2026-07-03):** `useChipsTest.fired()`'s flat 80-frame settle was the same
+bug class — 5 frames short of a slow multi-clear's first panel removal — and produced
+the "41% recognition false positives / 58% VERIFY coverage" numbers. Fixed to
+quiescence; see item #6. Treat ANY fixed frame budget around the engine as guilty until
+proven quiescent.
+
 **Consequence for the handoff:** every old "planMove hit rate 76%" / "still-unexplained
 miss" number in prior versions of this doc was produced by the buggy 90-frame window and is
 void. A quiescence-based re-measure of a 3-seed run showed ~17/18 MATCHED.
@@ -57,7 +63,7 @@ void. A quiescence-based re-measure of a 3-seed run showed ~17/18 MATCHED.
 | `chainSim.engineChain` (the real-engine repro helper itself) | fixed + exercised by chainSimVerify | had a board-loading bug: fixed-12-row padded puzzle strings scramble PuzzleSource's row mapping; must trim to occupied height |
 | catch primitives: `catchRoute`, `findTopOff`, `buildPair`, `flattenMove`, `breakRoute`, `garbageReveal`, `findCatch`, `dropETA` | `bot/tests/catchVerify.lua` | 8/8 OK |
 | `CursorController` (decision→input→engine execution) | `bot/tests/executorVerify.lua` | OK (clear fires, plain swap exchanges) |
-| `useChips` (catalog chip recognition) | `bot/useChipsTest.lua` (FIXED this session — crashed on default invocation, missing `DEFAULT_PRIORITIES` export) | VERIFY mode 100% precision by construction; **coverage only 58%** (23/40 puzzle boards yield nothing playable) — root-caused 2026-07-03, see item #6 below |
+| `useChips` (catalog chip recognition) | `bot/useChipsTest.lua` (harness settle fixed to quiescence 2026-07-03; simSwap pre-filter added to `chips.recognize`) | **100% precision in BOTH modes; VERIFY coverage 68%** (was 58% — the old number mixed in a harness frame-budget artifact); remaining gap root-caused, see item #6 below |
 | `catchPrimitive.stageContact` / `stageTrigger` / `catchSlide` | `bot/tests/stageVerify.lua` (NEW 2026-07-03) | 8/8: convergence, tied-scan, donor guard, TRIGGER_TARGET cap, slide-stage + real fire, both completability gates; mutation-checked |
 | `BoardSim.digPlan` | `bot/tests/digPlanVerify.lua` (NEW 2026-07-03) | 4/4 known-depth boards break on the engine; caught + fixed a beam-pruning bug (spread digs) |
 | POP-NOW guard (`EnvelopeBrain` sealed branch) | `bot/tests/popNowVerify.lua` (NEW 2026-07-03) | fires CLEAR at stop_time=0, dormant at 90, clear pops on engine; caught + fixed the dead COMBO_3-append |
@@ -96,22 +102,34 @@ void. A quiescence-based re-measure of a 3-seed run showed ~17/18 MATCHED.
    (abandon PLAN swaps that predict 0 at fire) was considered and deliberately NOT added:
    a transient mid-cascade 0 could abandon a swap that would still clear; needs its own
    isolated study first.
-6. ~~**`useChips` coverage gap`**~~ — UNDERSTOOD (2026-07-03). The 42% decomposes into two
-   distinct causes, neither of which is the search band or touchable gating:
-   - **8/40 (20%): recognition finds nothing, but NONE of those boards is dead** — brute
-     force shows 2 have a 1-swap clear and 6 have a 2-swap clear. All the misses are the
-     same missing template family: **pull-into-empty drop clears** (swap a panel into an
-     adjacent empty cell so its column compacts into a 3-match — e.g. board 11: pulling
-     the 1 out of c3r1 drops the 4 into a 4-4-4 row). The catalog has no such shape.
-   - **9/40 (22%): recognition returns a chip but engine-verify rejects every candidate**
-     (NO-VERIFY precision is only 59%). Root-caused examples (boards 21/29/30): the
-     recognizer proposes swaps whose own `BoardSim.simSwap` predicts total=0 — templates
-     assume a panel stays where it's swapped, but it falls through an empty column. A
-     cheap exact post-filter (simSwap on the proposed sequence, engine-proven 0/941)
-     would kill these false positives without a full engine verify.
-   - Fix candidates (deliberately NOT slipped in; each shifts live behavior and needs its
-     own sweep): (a) author the drop-clear template family, (b) simSwap post-filter in
-     `chips.recognize`, (c) exact 1-swap fallback scan when the catalog returns nothing.
+6. ~~**`useChips` coverage gap`**~~ — UNDERSTOOD and PARTLY FIXED (2026-07-03). The
+   original "42% / 59%-precision" picture decomposed into THREE causes, none of which is
+   the search band or touchable gating:
+   - **Measurement artifact (fixed)**: `useChipsTest.fired()` used a flat 80-frame
+     settle — 5 frames short of a real COMBO_3_3's first panel-clear (measured k=85 on
+     puzzle board 3; 6 matched panels flash+stagger). Every slow multi-clear chip read
+     as "didn't fire", inflating false-positive counts AND silently rejecting REAL chips
+     in VERIFY mode. Fixed to quiescence (rule 4 — struck a THIRD time; see Corrected
+     record). The live `EnvelopeBrain:chipVerify` does NOT have this bug class for
+     single swaps (it exits on the `matched` signal, same-frame as detection); its
+     20-frame between-swap settle for multi-swap chips is a theoretical under-wait,
+     noted as a watch item, no demonstrated failure.
+   - **Real recognition false positives (fixed)**: templates that swap a panel into an
+     empty column and assume it stays put while it falls to the floor (boards 21/29/30:
+     the recognizer's own `BoardSim.simSwap` predicts total=0 for its proposed swap).
+     Fixed with an exact pre-filter in `chips.recognize`: simulate the whole swap
+     sequence with BoardSim (0/941 vs engine, settling between swaps like the executor)
+     and drop candidates whose own sim says nothing clears. Engine verify remains the
+     final authority when present — the filter just stops burning live verify calls
+     (swap + rewind each) on dead chips.
+   - **After both fixes: 100% precision in BOTH modes; VERIFY coverage 58% → 68%**
+     (23→27 of 40 boards; per-kind all 100%). The remaining 13/40 no-chip boards are
+     the genuine template-family gap: brute force shows none are dead — the misses are
+     **pull-into-empty drop clears** (swap a panel into an adjacent empty cell so its
+     column compacts into a 3-match, e.g. board 11) and 2-swap setups of the same
+     shape. Fix candidates, deliberately deferred (each shifts live behavior and needs
+     its own sweep): (a) author the drop-clear template family, (b) exact 1-swap
+     fallback scan when the catalog returns nothing.
 7. ~~**POP-NOW guard**~~ — DONE (2026-07-03): `bot/tests/popNowVerify.lua` constructs the
    exact state (sealed block, bare stop clock, breakRoute = non-popping routing step,
    plain 3-clear available) and **caught the real reason it never fired**: extractByMeta's

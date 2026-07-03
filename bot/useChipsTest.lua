@@ -26,13 +26,26 @@ local function pan(st) local n = 0 for r = 1, st.height do for c = 1, 6 do local
 
 -- play moves on a fresh engine; did it FIRE? (cleared panels OR broke garbage). pcall-safe: a plan with an invalid
 -- swap (off-board recall) counts as NOT fired instead of crashing.
+-- QUIESCENCE, not a frame cap (2026-07-03, handoff rule 4 struck AGAIN): the old flat 80-frame settle was 5 frames
+-- short of a real COMBO_3_3's first panel-clear (6 matched panels flash+stagger; first color removal measured at
+-- k=85 on puzzle board 3) -- so every slow multi-clear chip was reported "didn't fire", which read as 41%
+-- recognition false-positives in NO-VERIFY mode and silently REJECTED real chips in VERIFY mode (deflating
+-- coverage). Wait for 20 consecutive quiet frames (no active/chaining panels, panel count stable), 400-frame cap.
 local function fired(stack, moves, kind)
   local ok, res = pcall(function()
     local m, st = bld(stack); local broke = false; local sub = {}
     st:connectSignal("garbageMatched", sub, function() broke = true end)
     local b = pan(st)
     for _, mv in ipairs(moves) do st.cur_row, st.cur_col = mv[1], mv[2]; st:receiveConfirmedInput(KDE.swap); m:run()
-      for k = 1, 80 do if st:game_ended() then break end st:receiveConfirmedInput("A"); m:run() if k >= 2 and not st:hasActivePanels() and not st:hasChainingPanels() then break end end end
+      local quiet, last = 0, -1
+      for k = 1, 400 do
+        if st:game_ended() then break end
+        st:receiveConfirmedInput("A"); m:run()
+        local n = pan(st)
+        if not st:hasActivePanels() and not st:hasChainingPanels() and n == last then quiet = quiet + 1 else quiet = 0 end
+        last = n
+        if quiet >= 20 then break end
+      end end
     return (pan(st) < b) or broke
   end)
   return ok and res

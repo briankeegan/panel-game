@@ -15,9 +15,9 @@ local EnvelopeBrain = require("bot.EnvelopeBrain")
 local fails = {}
 local function check(ok, label) if not ok then fails[#fails + 1] = label end; return ok end
 
--- this suite verifies the support-shield MECHANISM (mask exactness + stage-holds-height), so enable the knob;
--- the live default is OFF pending the holdout-regression root cause (see lullShield's comment in EnvelopeBrain).
-EnvelopeBrain.LULL_SUPPORT_SHIELD = true
+-- this suite verifies the support-shield MECHANISM (mask exactness + stage-holds-height), so enable mode 1
+-- (always lock); the live default is OFF pending the holdout-regression redesign (see lullShield's comment).
+EnvelopeBrain.LULL_SUPPORT_SHIELD = 1
 
 local function buildStack(boardStr)
   local pz = Puzzle({ puzzleType = "moves", stack = boardStr, moves = 99 })

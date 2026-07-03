@@ -215,12 +215,19 @@ relief valve). A **v2 spread release** (column fully released once maxT ≥ seco
 Even with the release, 2006 arrives at injection with spread=3 and avgH=5.0 — the
 masked lull clears less overall, so the board rides HIGHER and lands jagged anyway.
 Conclusion: hard NO-GO masking of the stage conflicts with the flat-low posture on
-tall-lull seeds. The default stays OFF (baseline byte-identical, verified). Redesign
-directions for the next attempt, in order: (a) make PLAN/CLEAR scoring PREFER
-non-stage cells (soft cost) instead of hard masks; (b) apply the support mask only
-while a block is actually in transit (pendingBig gate) so the early lull keeps full
-clear throughput; (c) the untried per-column material floor (candidate 2), which
-attacks the hollow-columns half of the problem without touching stage protection.
+tall-lull seeds. The default stays OFF (baseline byte-identical, verified).
+
+**Mode 2 (transit-only lock, PA_LULLSUPPORT=2) also MEASURED (2026-07-03): a no-op.**
+Locking the stage only while a block is announced (pendingBig ≥ 3, the ~120-frame
+transit+telegraph window) produced sweeps byte-identical to baseline on dev, holdout
+AND seed 2006 — the stage-sinking mining happens EARLIER in the lull, before the
+announcement, so a transit gate locks the barn after the horse. The cheap-variant
+space is now exhausted; what remains is real design work:
+(a) soft cost in PLAN/CLEAR scoring for stage/support cells instead of hard masks —
+    keeps clear throughput while steering mining elsewhere; the most promising.
+(c) per-column material floor (candidate 2) — attacks the hollow-columns half
+    (seed-1001 class) without touching stage protection at all.
+Both need planMove-internal changes (scoring), not another mask variant.
 
 ## Where survival stands and why it still dies
 

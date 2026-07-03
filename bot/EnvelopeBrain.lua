@@ -338,9 +338,15 @@ end
 -- broken median 72 -> 141. BUT the holdout window 2001-2010 REGRESSED (mean 24.4 -> 18.4; seeds 2006/2008 with
 -- healthy baseline lulls went to zero reveals), and every-pair scoping was worse still (holdout mean 16.9). Net
 -- 20-seed mean is negative, so the default stays OFF until the 2006-regression is root-caused -- the mechanism
--- is proven, the interaction isn't understood. Flip LULL_SUPPORT_SHIELD (or PA_LULLSUPPORT=1) to A/B it.
-EnvelopeBrain.LULL_SUPPORT_SHIELD = os.getenv("PA_LULLSUPPORT") == "1"
-function EnvelopeBrain.lullShield(grid, rows, touchable)
+-- is proven, the interaction isn't understood. Modes (PA_LULLSUPPORT / LULL_SUPPORT_SHIELD): 0 = off (default,
+-- baseline byte-identical), 1 = always lock the contact stage, 2 = TRANSIT-ONLY (lock only while a big block is
+-- announced in transit, pendingBig >= 3 -- the early lull keeps full clear throughput, addressing the measured
+-- "masked lull clears less, board rides higher" failure of mode 1 on the holdout window).
+EnvelopeBrain.LULL_SUPPORT_SHIELD = tonumber(os.getenv("PA_LULLSUPPORT")) or 0
+function EnvelopeBrain.lullShield(grid, rows, touchable, lockStage)
+  -- direct callers (tests) omit lockStage: any non-zero mode means "exercise the support mask"; decide() passes
+  -- the mode-resolved value explicitly (mode 2 folds in the transit gate).
+  if lockStage == nil then lockStage = EnvelopeBrain.LULL_SUPPORT_SHIELD ~= 0 end
   local shielded = {}
   for r = 1, rows do
     local src, dst = touchable[r], {}
@@ -368,10 +374,10 @@ function EnvelopeBrain.lullShield(grid, rows, touchable)
         -- A stage 2+ rows above the rest can't brace a flat landing, so once the column is overheight RELEASE
         -- it entirely -- flatten/plan may level it -- and re-stage after. Gated inside the knob: OFF-mode
         -- behavior stays byte-identical to baseline.
-        local overheight = EnvelopeBrain.LULL_SUPPORT_SHIELD and t == maxT and (maxT - second) >= 2
+        local overheight = lockStage and t == maxT and (maxT - second) >= 2
         if not overheight then
           shielded[t][c] = false; shielded[t-1][c] = false
-          if t == maxT and EnvelopeBrain.LULL_SUPPORT_SHIELD then  -- contact column: clearing under it sinks the stage the block lands on
+          if t == maxT and lockStage then                          -- contact column: clearing under it sinks the stage the block lands on
             for r = 1, t - 2 do shielded[r][c] = false end
           end
           if t >= 3 then
@@ -603,7 +609,9 @@ function EnvelopeBrain:decide(state, stack, match)
         -- cocked trigger cell) is off-limits to clear/plan/flatten here; staging mechanics see the plain mask.
         -- Measured: without this, staging was rebuilt and re-mined by PLAN/CLEAR all lull long and 9/10 seeds
         -- arrived at the first landing with cocked=0 (median 12.2s); with it, 6/10 arrive cocked (median 18.4s).
-        local shielded = EnvelopeBrain.lullShield(grid, rows, touchable)
+        local lullMode = EnvelopeBrain.LULL_SUPPORT_SHIELD
+        local shielded = EnvelopeBrain.lullShield(grid, rows, touchable,
+          lullMode == 1 or (lullMode == 2 and pendingBig >= 3))
         -- REBUILD MATERIAL FIRST on a stripped board: a finished dig consumes the board (measured seed 1008: block 1
         -- fully broken, then the lull arrived at avgH 2.3 with two EMPTY columns and block 2 was unbreakable). RAISE
         -- is by far the fastest material source (a full 6-panel row per commit); waiting for it as the last resort

@@ -12,6 +12,27 @@ local chips = require("bot.chips")
 
 local M = {}
 
+-- DEFAULT_PRIORITIES: every distinct chip kind in bot/chipCache.lua, sorted by descending panels-cleared (a
+-- reasonable size-first order with no brain-level policy baked in -- EnvelopeBrain.lua builds its OWN ranked lists
+-- via extractByMeta for DANGER/OFFENSE/CATCH decision policy, which is out of scope for this module. This exists
+-- so callers besides EnvelopeBrain (bot/useChipsTest.lua, ad-hoc scripts) have a sane default without needing to
+-- duplicate that policy. FOUND (2026-07): useChipsTest.lua referenced this exact field name but it never existed,
+-- crashing (bad argument to ipairs, nil) on its default invocation (no explicit priority list on the command
+-- line) -- a real "untested piece" the test itself couldn't even run.
+M.DEFAULT_PRIORITIES = (function()
+  local cache = require("bot.chipCache")
+  local seen, rows = {}, {}
+  for _, c in ipairs(cache) do
+    if not seen[c.kind] then
+      seen[c.kind] = true
+      rows[#rows + 1] = { kind = c.kind, total = (c.meta and c.meta.total) or 0 }
+    end
+  end
+  table.sort(rows, function(a, b) if a.total ~= b.total then return a.total > b.total end return a.kind < b.kind end)
+  local kinds = {}; for _, r in ipairs(rows) do kinds[#kinds + 1] = r.kind end
+  return kinds
+end)()
+
 -- Candidate swap cells in the top band, ordered nearest-to-cursor first, ties broken by searchPriorities direction.
 local function cellOrder(grid, rows, cursor, band, searchPriorities, maxDistance)
   local top = BoardSim.maxHeight(grid, rows)

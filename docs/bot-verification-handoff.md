@@ -57,7 +57,11 @@ void. A quiescence-based re-measure of a 3-seed run showed ~17/18 MATCHED.
 | `chainSim.engineChain` (the real-engine repro helper itself) | fixed + exercised by chainSimVerify | had a board-loading bug: fixed-12-row padded puzzle strings scramble PuzzleSource's row mapping; must trim to occupied height |
 | catch primitives: `catchRoute`, `findTopOff`, `buildPair`, `flattenMove`, `breakRoute`, `garbageReveal`, `findCatch`, `dropETA` | `bot/tests/catchVerify.lua` | 8/8 OK |
 | `CursorController` (decision→input→engine execution) | `bot/tests/executorVerify.lua` | OK (clear fires, plain swap exchanges) |
-| `useChips` (catalog chip recognition) | `bot/useChipsTest.lua` (FIXED this session — crashed on default invocation, missing `DEFAULT_PRIORITIES` export) | VERIFY mode 100% precision by construction; **coverage only 58%** (23/40 puzzle boards yield nothing playable) — a real, open gap |
+| `useChips` (catalog chip recognition) | `bot/useChipsTest.lua` (FIXED this session — crashed on default invocation, missing `DEFAULT_PRIORITIES` export) | VERIFY mode 100% precision by construction; **coverage only 58%** (23/40 puzzle boards yield nothing playable) — root-caused 2026-07-03, see item #6 below |
+| `catchPrimitive.stageContact` / `stageTrigger` / `catchSlide` | `bot/tests/stageVerify.lua` (NEW 2026-07-03) | 8/8: convergence, tied-scan, donor guard, TRIGGER_TARGET cap, slide-stage + real fire, both completability gates; mutation-checked |
+| `BoardSim.digPlan` | `bot/tests/digPlanVerify.lua` (NEW 2026-07-03) | 4/4 known-depth boards break on the engine; caught + fixed a beam-pruning bug (spread digs) |
+| POP-NOW guard (`EnvelopeBrain` sealed branch) | `bot/tests/popNowVerify.lua` (NEW 2026-07-03) | fires CLEAR at stop_time=0, dormant at 90, clear pops on engine; caught + fixed the dead COMBO_3-append |
+| Lull shield + contact-first staging | `bot/tests/lullShieldVerify.lua` (NEW 2026-07-03) | exact mask, no staged-cell swaps over live lull play, BRACE_CONTACT preempts clears; under-mining hole documented |
 
 ### NOT yet individually verified (the finishing-swing list, priority order)
 
@@ -92,13 +96,42 @@ void. A quiescence-based re-measure of a 3-seed run showed ~17/18 MATCHED.
    (abandon PLAN swaps that predict 0 at fire) was considered and deliberately NOT added:
    a transient mid-cascade 0 could abandon a swap that would still clear; needs its own
    isolated study first.
-6. **`useChips` coverage gap** — 42% of puzzle boards return no chip even unverified.
-   Understand why (template set too narrow? search band? touchable gating?).
-7. **POP-NOW guard** (`EnvelopeBrain` sealed branch) — semantically justified, never
-   observed firing. Either construct the board state that exercises it or accept it as
-   dead code and remove it.
-8. **Lull shield + stageContact protections** (`EnvelopeBrain` lull branch) — verified only
-   by sweep aggregates (cocked-at-landing 1/10 → 6/10), not in isolation.
+6. ~~**`useChips` coverage gap`**~~ — UNDERSTOOD (2026-07-03). The 42% decomposes into two
+   distinct causes, neither of which is the search band or touchable gating:
+   - **8/40 (20%): recognition finds nothing, but NONE of those boards is dead** — brute
+     force shows 2 have a 1-swap clear and 6 have a 2-swap clear. All the misses are the
+     same missing template family: **pull-into-empty drop clears** (swap a panel into an
+     adjacent empty cell so its column compacts into a 3-match — e.g. board 11: pulling
+     the 1 out of c3r1 drops the 4 into a 4-4-4 row). The catalog has no such shape.
+   - **9/40 (22%): recognition returns a chip but engine-verify rejects every candidate**
+     (NO-VERIFY precision is only 59%). Root-caused examples (boards 21/29/30): the
+     recognizer proposes swaps whose own `BoardSim.simSwap` predicts total=0 — templates
+     assume a panel stays where it's swapped, but it falls through an empty column. A
+     cheap exact post-filter (simSwap on the proposed sequence, engine-proven 0/941)
+     would kill these false positives without a full engine verify.
+   - Fix candidates (deliberately NOT slipped in; each shifts live behavior and needs its
+     own sweep): (a) author the drop-clear template family, (b) simSwap post-filter in
+     `chips.recognize`, (c) exact 1-swap fallback scan when the catalog returns nothing.
+7. ~~**POP-NOW guard**~~ — DONE (2026-07-03): `bot/tests/popNowVerify.lua` constructs the
+   exact state (sealed block, bare stop clock, breakRoute = non-popping routing step,
+   plain 3-clear available) and **caught the real reason it never fired**: extractByMeta's
+   "COMBO_3 pinned dead-last in every state" was dead code (the isExcluded gate ran
+   first), so OFFENSE/DANGER lists never contained the bare 3-clear POP-NOW needs.
+   Making COMBO_3 reachable EVERYWHERE was measured WORSE (10-seed median 22.0s→17.4s —
+   the bot mines its own break material with cheap 3s), so the fix is a targeted opt-in:
+   POPNOW_PRIORITIES (ready-first + COMBO_3 last) used ONLY by the guard. Verified:
+   stop_time=0 → CLEAR fires and pops on the engine; stop_time=90 → BREAK_ROUTE, guard
+   dormant. Sweep after fix: median 22.0s (baseline restored).
+8. ~~**Lull shield + stageContact protections**~~ — DONE (2026-07-03):
+   `bot/tests/lullShieldVerify.lua`. The shield builder is extracted as pure
+   `EnvelopeBrain.lullShield` and unit-tested: masks EXACTLY the intact top pair + its
+   cocked trigger cell. Behaviorally: 6 successive live lull decisions never swap a
+   staged cell, and BRACE_CONTACT preempts a ready clear and cocks the contact column in
+   one step with the pair intact. **New KNOWN HOLE found**: the shield is cell-level
+   only — lull PLANs may clear panels UNDER the pair column, dropping the whole stage by
+   gravity (observed live in the test: pair rode down 3 rows, never swapped). The 6/10
+   cocked-at-landing sweep number includes this hole; extending the shield to the pair
+   column's support cells is a candidate improvement needing its own sweep validation.
 
 ### Deliberately non-engine (do NOT mistake these for physics verification)
 
@@ -134,6 +167,8 @@ luajit bot/tests/catchVerify.lua           # 8 catch primitives
 luajit bot/tests/executorVerify.lua        # controller execution
 luajit bot/tests/stageVerify.lua           # stageContact / stageTrigger / catchSlide (NEW 2026-07-03)
 luajit bot/tests/digPlanVerify.lua         # digPlan plans break garbage on the engine (NEW 2026-07-03)
+luajit bot/tests/popNowVerify.lua          # POP-NOW guard fires on a bare stop clock (NEW 2026-07-03)
+luajit bot/tests/lullShieldVerify.lua      # lull shield mask + contact-first staging (NEW 2026-07-03)
 luajit bot/useChipsTest.lua 40             # chip recognition precision/coverage
 luajit serverTestRunner.lua                # full server suite (unrelated but keep green)
 # integration sweep — LAST, only after pieces pass:
@@ -155,13 +190,21 @@ Pitfalls that burned this session — check these before "discovering" a bug:
 
 ## Git state
 
-- Work branch: `claude/bot-building-hpom4o`, fully pushed.
-- Everything is merged into **`bramp/multi-player`** (the fork's mainline — `beta` is the
+- Work branches: `claude/bot-building-hpom4o` (previous session) and
+  `claude/bot-verification-handoff-w7b53s` (2026-07-03 session, this doc's items #1-#8),
+  both fully pushed.
+- Prior work is merged into **`bramp/multi-player`** (the fork's mainline — `beta` is the
   upstream default but shares NO git history with this fork's branches; do not merge there).
-- All suites green at HEAD; survivalStress DETERMINISM and CONSTRUCTION PARITY both PASS.
+- All suites green at HEAD (now 8 bot suites — see run list above); 10-seed sweep at
+  HEAD: median 22.0s (unchanged from session start; this session was verification, not
+  tuning).
 
 ## Task tracker
 
-- #3 (10-seed median → 5 min) — BLOCKED by design until the piece list above is green.
-- #7 (catch completion rate) — the live umbrella task; the "NOT yet verified" list is its
-  current concrete content.
+- The 2026-07-03 finishing-swing list (#1-#8 above) is COMPLETE: every piece is either
+  proven in isolation on the real engine or root-caused with fix candidates recorded.
+- #3 (10-seed median → 5 min) — UNBLOCKED. The verified-piece prerequisites are met;
+  integration/tuning sweeps are now the legitimate next step.
+- #7 (catch completion rate) — the live umbrella task. Highest-leverage recorded leads:
+  the useChips drop-clear template family + simSwap post-filter (item #6), and the lull
+  shield under-mining hole (item #8).

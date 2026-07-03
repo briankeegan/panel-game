@@ -35,6 +35,11 @@ interrupted.
     candidate horizontal-3 (before the touch/adjacency checks that decide the actual swap).
   - `PA_BUILDPAIRDIAG=1` — **new**, prints `buildPair`'s `topPairCount` each call and the column/swap
     it picks when it acts.
+  - `PA_STAGEDIAG=1` — **new**, prints `stageTrigger`'s full-board cocked count each call plus which
+    column it routes, and `stageContact`'s tied-max-height-column list whenever more than one column
+    shares the board's tallest colored top.
+  - `PA_FLATDIAG=1` — **new**, prints `flattenMove`'s per-column tops, the chosen tall/short pair, and
+    the computed swap row each time it acts.
   - `PA_BREAKDIAG=1` — prints board state when `breakRoute` finds nothing to do
   - `PA_CATCHDIAG=1` — prints catch decisions incl. `active=`/`chaining=`/`nap=` (cascade state)
   - `PA_CATALOGDBG=1` / `PA_CATALOGDBG2=1` — catalog scan (`chips.recognize`) fit/verify/accept deltas
@@ -46,12 +51,10 @@ interrupted.
 
 ## Current git state
 
-- Branch: `claude/bot-building-hpom4o`, pushed through commit `d9db36cb` (which already included the
-  `breakRoute` distance-aware fix described in the previous version of this doc — it is NOT still
-  uncommitted, correcting what an earlier draft said).
-- This session's new changes to `bot/catchPrimitive.lua` (diagnostics + one real fix in `buildPair`,
-  see item 6) are **uncommitted as of writing this**; commit them right after this doc lands (see
-  "Immediate next step").
+- Branch: `claude/bot-building-hpom4o`, pushed through commit `05fce30b` (buildPair fix + breakRoute/
+  rowBreak verification writeup). This session's *new* changes (stageTrigger/stageContact fixes,
+  flattenMove verification, this doc update) are uncommitted as of writing this — commit them right
+  after this doc lands (see "Immediate next step").
 
 ## What's been verified correct so far (with evidence)
 
@@ -144,31 +147,105 @@ interrupted.
      genuine correctness fix (no more infinite cursor-move waste) and could matter on other seeds or
      after tuning `PAIR_TARGET`/board layouts where the shared-top-color adjacency comes up more.
 
+8. **`stageTrigger`** — **REAL BUG FOUND AND FIXED** (latent — see verification caveat below).
+   - Added `PA_STAGEDIAG`'s independent full-board recount of cocked columns, run alongside the old
+     scan-and-act-in-one-pass logic (no behavior change yet at that point). Swept all 10 seeds
+     (1001-1010, `600 3600 10`): the independent recount confirmed the counting mechanism behaves as
+     read from the code, but `fullBoardCocked` never exceeded `2` in this window (bot dies before
+     reaching `TRIGGER_TARGET=3`), so the overshoot scenario below was never actually exercised by
+     these particular seeds.
+   - Bug (found by code audit, mechanism confirmed correct via the diagnostic above): the old code
+     counted `cocked` and decided whether to route a swap IN THE SAME left-to-right pass, so the
+     `TRIGGER_TARGET` cap only held if every already-cocked column happened to sit at a LOWER column
+     index than any uncocked-but-pairable one. An uncocked pairable column at index 2 with 3 (already
+     at target) cocked columns at indices 4,5,6 would still get routed — staging a 4th column past the
+     cap — because the scan returns before ever reaching 4,5,6 to count them.
+   - Fix: split into two passes — count cocked columns across the WHOLE board first (extracted into
+     `isCockedTrigger`), bail immediately if already at target, otherwise scan (same left-to-right,
+     nearest-candidate-first priority as before) for the first uncocked routable column.
+   - **Verification caveat, stated plainly**: unlike the other fixes in this file, the overshoot this
+     fixes was **not observed actually happening** in the 10-seed sweep (cocked count topped out at 2,
+     never reached the target of 3 where the bug would bite) — it's a proven-by-code-reading latent
+     bug, confirmed via instrumentation to have the exact counting mechanism described, but not yet
+     caught in the act. It's fixed anyway (cheap, provably correct, zero risk to the already-verified
+     paths) because it will start mattering the moment other fixes extend survival time far enough to
+     sustain 3+ simultaneously-cocked columns — which is the entire point of this effort. Re-ran the
+     10-seed sweep after the fix: byte-identical per-seed results to before (this particular fix's
+     branch condition never diverged from the old code's decision on these seeds, as expected since
+     `cocked` never reached target either way).
+
+9. **`stageContact`** — **REAL BUG FOUND AND FIXED, with measured impact**.
+   - Added `PA_STAGEDIAG`'s tied-max-height-column list (fires whenever more than one column shares
+     the board's tallest colored top) alongside the old logic (no behavior change yet). Swept all 10
+     seeds with it on: zero tie print-outs anywhere — in the *old* code's trajectories, this particular
+     board state (two+ columns tied for tallest) apparently never arose in any of these 10 seeds'
+     (short) lifetimes.
+   - Bug (found by code audit): the old code did `return nil` for the WHOLE function the instant it
+     found the FIRST max-height column already cocked, abandoning any check of OTHER tied max-height
+     columns that might still need staging (no pair yet, or a pair but not cocked) — unlike
+     `stageTrigger`'s more careful design (which at least continues scanning other columns via `goto
+     nextcol`).
+   - Fix: changed the early `return nil` into a per-column skip (`if not alreadyCocked then ... end`,
+     falling through to the next tied column) — `return nil` now only fires after the whole loop finds
+     nothing actionable anywhere, matching `stageTrigger`'s pattern.
+   - **This fix has a measured, positive effect**, isolated by testing three variants (both fixes /
+     only the `stageTrigger` fix / neither): re-running the 10-seed `600 3600 10` sweep, **seed 1008**
+     went from 11.6s survival / 0 garbage broken (with the old `stageContact` logic, confirmed by
+     reverting just this fix and re-running) to **23.0s / 72 broken** with the fix applied — a real,
+     reproducible improvement, not sweep noise (bisected: keeping `stageTrigger`'s fix alone reproduces
+     the old 11.6s/0 result; only `stageContact`'s fix changes the outcome). Traced seed 1008 alone
+     with `PA_STAGEDIAG=1` on the FIXED code and found tied max-height columns are actually **very
+     common** on this seed once its trajectory diverges from the buggy path (dozens of ties across the
+     run, e.g. `maxT=4 tiedCols=[1,2,3,4,5,6]` — all six columns tied at one point) — so the old bug,
+     once triggered, was likely discarding real staging opportunities routinely, not in a rare corner
+     case. (The other 9 seeds' final numbers were unchanged, since their old trajectories apparently
+     never reached a tie before dying either way — consistent with how chaotic/cascading a small
+     board-state change can be frame-to-frame.)
+   - Median across the 10-seed sweep moved from 12.1s to 15.9s (mean 17.0s → 18.1s) purely from this
+     fix; re-ran the sweep twice to confirm the new numbers are stable/deterministic.
+
+10. **`flattenMove`** — verified structurally correct via single-seed trace; one minor defensive fix
+    applied (not a live bug, but a real edge case in the code as written).
+    - Added `PA_FLATDIAG` (prints per-column `tops`, the chosen tall/short pair, and the swap row).
+      Traced seed 1001: successive decisions showed `bestDiff` shrinking within each local region it
+      worked on (e.g. `4 → 3 → 2` around the same tall/short pair across calls, once other events in
+      between are accounted for), consistent with the documented "propagates tall→short across the
+      whole board" design — no oscillation, no stuck state, no invalid swap proposed.
+    - Found (by code audit, not by triggering it) that `bestDiff, bestC = 0, 0` combined with the
+      `bestDiff < (PA_FLAT_MIN or 2)` guard meant if someone ever ran with `PA_FLAT_MIN=0` (not a
+      realistic sweep value — the doc comment even says "PA_FLAT_MIN=1 = perfectly flat" as the
+      lowest sane setting — but nothing stops it), a fully-flat board (`bestDiff` stays `0`) would
+      fail the `< 0` check and fall through to use `bestC=0` as a column index — `tops[0]` is `nil` in
+      Lua, and the very next line compares it, which would error. Fixed defensively: `bestDiff`
+      initialized to `-1` instead of `0`, plus an explicit `bestC == 0` guard, so this can't happen
+      regardless of what `PA_FLAT_MIN` is set to. Zero behavior change for any realistic setting
+      (confirmed via the 10-seed sweep: identical results before/after this one-line guard).
+
 ## Not yet verified at all (still "fires but internals untraced")
 
-- `catchPrimitive.stageContact` / `stageTrigger` — the "brace for incoming garbage" staging logic
-- `catchPrimitive.flattenMove` — board-flattening move selection
 - The `PLAN`/`useChips.planMove` fallback path (only relevant outside DIG-ONLY mode, lower
-  priority since large-garbage mode gates the brain to DIG-ONLY per task #6)
-
-(`rowBreak` and `buildPair` are now verified — see items 6/7 above — and removed from this list.)
+  priority since large-garbage mode gates the brain to DIG-ONLY per task #6). This is the only
+  mechanic left on this list — everything else in `catchPrimitive.lua`'s substate machine
+  (`breakRoute`, `rowBreak`, `buildPair`, `stageTrigger`, `stageContact`, `flattenMove`) has now had
+  the single-seed instrumented treatment (see items 5-10 above).
 
 ## Immediate next step for whoever picks this up
 
-1. Commit the working-tree changes to `bot/catchPrimitive.lua` (PA_ELIGWHY, PA_ROWBREAKDIAG,
-   PA_BUILDPAIRDIAG diagnostics + the `ownsIntactPair` fix in `buildPair`) with a root-cause commit
-   message (matching the style of `b462d959`/`d9db36cb`), and push to `claude/bot-building-hpom4o`.
-   This has been done as part of this handoff update — check `git log` before redoing it.
-2. Continue the one-by-one verification through the remaining "not yet verified at all" list above,
-   in the same style: pick one seed, add targeted diagnostics, trace a real failure or confirm
-   correct behavior, fix if broken, verify the fix with the same seed before moving on.
-   `stageContact`/`stageTrigger` are the natural next pair (they're two halves of the same "cock the
-   next break" mechanism and share a lot of structure with the already-verified `breakRoute`/
-   `rowBreak`). Do this without pausing to ask which piece to check next — the owner has explicitly
-   asked for continuous progress through all pieces, not checkpoint-by-checkpoint sign-off.
-3. Only after every mechanic above is verified (or fixed) should work move to task #3
-   (generalize: 10-seed sweep vs 6x12, target median 5 min survival) and task #4 (freeze the
-   6x4 protocol, confirm verify suites + CI). Do not sweep/tune before that.
+1. Commit the working-tree changes to `bot/catchPrimitive.lua` (PA_STAGEDIAG, PA_FLATDIAG
+   diagnostics + the `stageTrigger`/`stageContact` fixes + the `flattenMove` defensive guard) and
+   this doc update, with a root-cause commit message (matching the style of `b462d959`/`d9db36cb`/
+   `05fce30b`), and push to `claude/bot-building-hpom4o`. This has been done as part of this handoff
+   update — check `git log` before redoing it.
+2. `useChips.planMove` is the last unverified mechanic. Since it's gated OFF in the large-garbage
+   DIG-ONLY brain path (per task #6), it's lower priority than everything already done — but the
+   owner's instruction was to verify EVERY mechanic before tuning, so don't skip it permanently, just
+   do it last. Same method: single seed (will need a mode/config where DIG-ONLY is off, or a seed/
+   moment where the brain falls through to PLAN even in DIG-ONLY, if that's possible — check
+   `EnvelopeBrain.lua`'s substate machine for when PLAN is actually reachable under large-garbage
+   settings first), targeted diagnostics, trace a real decision, confirm correct or fix.
+3. Once `planMove` is done, EVERY mechanic on the original list has been through hard single-seed
+   verification. Only then should work move to task #3 (generalize: 10-seed sweep vs 6x12, target
+   median 5 min survival) and task #4 (freeze the 6x4 protocol, confirm verify suites + CI).
 
 ## Task tracker state (as of this handoff)
 
@@ -179,8 +256,9 @@ interrupted.
 - #5 completed — per-mechanic outcome instrumentation (catch completion rate, reseal→re-break latency)
 - #6 completed — gate brain to dig-only mechanics for big garbage
 - #7 in_progress — fix CATCH execution until completion rate is high, then long survival (this is
-  the umbrella task the current verification pass falls under); `rowBreak` and `buildPair` are now
-  additionally verified/fixed under this task since this handoff
+  the umbrella task the current verification pass falls under); `rowBreak`, `buildPair`,
+  `stageTrigger`, `stageContact`, and `flattenMove` are now additionally verified/fixed under this
+  task since this handoff. Only `useChips.planMove` remains unverified.
 
 ## Files touched this session
 
@@ -190,9 +268,13 @@ interrupted.
   - `M.topRow` export, `findTopOff`/`findCatch` touchable-awareness, catalog diagnostics
     (committed in `b462d959`).
   - `breakRoute` distance-aware rewrite (committed in `d9db36cb`).
-  - **This session, uncommitted in the working tree**: `PA_ELIGWHY` diagnostic on `breakRoute`'s
-    finishability scan (resolves item 5's open question); `PA_ROWBREAKDIAG` diagnostic on
-    `rowBreak` (verifies item 6); `PA_BUILDPAIRDIAG` diagnostic plus the `ownsIntactPair` guard fix
-    on `buildPair` (finds + fixes the real bug in item 7).
+  - `PA_ELIGWHY` diagnostic on `breakRoute`'s finishability scan (resolves item 5's open question);
+    `PA_ROWBREAKDIAG` diagnostic on `rowBreak` (verifies item 6); `PA_BUILDPAIRDIAG` diagnostic plus
+    the `ownsIntactPair` guard fix on `buildPair` (finds + fixes the real bug in item 7).
+    **Committed** (`05fce30b`).
+  - **This session, uncommitted in the working tree**: `PA_STAGEDIAG` diagnostic plus the two-pass
+    counting fix on `stageTrigger` and the continue-scanning fix on `stageContact` (items 8/9);
+    `PA_FLATDIAG` diagnostic plus the `bestC`/`bestDiff` defensive guard on `flattenMove` (item 10).
 - `bot/survivalStress.lua` — `PA_DECDUMP`, `PA_VERIFYDIAG` diagnostics. **Committed** (`b462d959`).
-- `docs/bot-verification-handoff.md` — this file; supersedes the version committed in `d9db36cb`.
+- `docs/bot-verification-handoff.md` — this file; supersedes the version committed in `d9db36cb`/
+  `05fce30b`.

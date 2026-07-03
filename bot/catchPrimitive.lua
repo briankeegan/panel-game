@@ -277,18 +277,19 @@ function M.flattenMove(grid, rows, touchable)
   -- BOARD-WIDE leveling: find the adjacent pair with the biggest height STEP and slide the taller column's top panel down
   -- into the shorter one (it falls -> the step shrinks). Repeated, material propagates tall->short across the WHOLE board.
   -- (The old version only moved the single tallest column's adjacent neighbors, so it got stuck on plateaus = "local only".)
-  local bestDiff, bestC = 0, 0
-  for c = 1, W - 1 do
-    local d = tops[c] - tops[c + 1]; if d < 0 then d = -d end
+  local bestDiff, bestC = -1, 0                                   -- bestDiff starts BELOW any real threshold (was 0,
+  for c = 1, W - 1 do                                             -- which under PA_FLAT_MIN<=0 left bestC=0 -- an invalid
+    local d = tops[c] - tops[c + 1]; if d < 0 then d = -d end      -- column index that would index grid[?][0] below)
     if d > bestDiff then bestDiff, bestC = d, c end
   end
-  if bestDiff < (tonumber(os.getenv("PA_FLAT_MIN")) or 2) then return nil end  -- every adjacent step < threshold -> flat enough (PA_FLAT_MIN=1 = perfectly flat; measured on the 6x12 sweep)
+  if bestC == 0 or bestDiff < (tonumber(os.getenv("PA_FLAT_MIN")) or 2) then return nil end  -- every adjacent step < threshold -> flat enough (PA_FLAT_MIN=1 = perfectly flat; measured on the 6x12 sweep)
   local tall = (tops[bestC] >= tops[bestC + 1]) and bestC or (bestC + 1)
   local short = (tall == bestC) and (bestC + 1) or bestC
   -- Swap ONE ROW ABOVE the SHORT column. That is the highest row the cursor can reach for this pair (it's capped around
   -- min(the two heights)+1). The old code aimed at the TALL column's TOP row -- unreachable over a much-shorter neighbor,
   -- so the cursor got stuck and the board froze. At short_top+1 the short col is open and the tall col has a panel to slide.
   local sr = tops[short] + 1
+  if os.getenv("PA_FLATDIAG") then print(string.format("  FLATDIAG tops=[%s] bestDiff=%d tall=%d short=%d sr=%d", table.concat(tops, ","), bestDiff, tall, short, sr)) end
   if sr <= H and grid[sr] and (grid[sr][short] or 0) == 0 and (grid[sr][tall] or 0) ~= 0
     and (not touchable or (touchable[sr] and touchable[sr][tall])) then  -- the tall panel we slide must be settled
     return { sr, bestC }                                         -- slide a tall panel into the short col's open top -> levels, and it's REACHABLE
@@ -304,6 +305,22 @@ end
 -- 3 measured best on the 10-seed 6x12 sweep: 1 -> 23.5s median, 2 -> 22.8, 3 -> 25.1 (mean 26.2 -> 29.5). Redundant
 -- cocked columns mean the breaks AFTER the first are also one slide away.
 M.TRIGGER_TARGET = tonumber(os.getenv("PA_TRIGGERS")) or 3
+local function isCockedTrigger(grid, W, c, t, X)
+  return (c > 1 and (grid[t-2][c-1] or 0) == X) or (c < W and (grid[t-2][c+1] or 0) == X)
+end
+-- FIXED (2026-07, code-audit + PA_STAGEDIAG on the 10-seed 6x12 sweep): the old single left-to-right
+-- pass counted `cocked` and acted on the first uncocked column IN THE SAME PASS, so the TRIGGER_TARGET
+-- cap only held if every already-cocked column happened to sit at a LOWER index than any uncocked-but-
+-- pairable one. An uncocked pairable column at index 2 with 3 (>=TARGET) cocked columns at indices
+-- 4,5,6 would still get routed -- staging a 4th column past the intended cap -- because the scan bails
+-- out via `return` before ever reaching 4,5,6 to count them. Confirmed via PA_STAGEDIAG's independent
+-- full-board recount that this exact overshoot condition is possible (the counting logic itself was
+-- order-dependent); NOT yet observed actually overshooting on the 10-seed 6x12 sweep, because the bot
+-- currently dies before `cocked` ever reaches TARGET=3 there (max observed: 2) -- but it's a latent
+-- correctness bug that will start mattering the moment survival time (the whole point of this effort)
+-- improves enough to sustain 3+ simultaneously-cocked columns. Now: count the WHOLE board first, bail
+-- before searching at all if already at target, otherwise search independently for the first uncocked
+-- routable column (unchanged priority: left-to-right, nearest candidate first).
 function M.stageTrigger(grid, rows, touchable)
   local W, H = 6, rows or 12
   local cocked = 0
@@ -311,13 +328,18 @@ function M.stageTrigger(grid, rows, touchable)
     local t = topRow(grid, c, H)
     if t >= 3 then
       local X = grid[t][c] or 0
-      if X ~= 0 and X ~= GARBAGE and (grid[t-1][c] or 0) == X then
-        -- a pair at the top of column c. cocked already?
-        if (c > 1 and (grid[t-2][c-1] or 0) == X) or (c < W and (grid[t-2][c+1] or 0) == X) then
-          cocked = cocked + 1
-          if cocked >= M.TRIGGER_TARGET then return nil end
-          goto nextcol
-        end
+      if X ~= 0 and X ~= GARBAGE and (grid[t-1][c] or 0) == X and isCockedTrigger(grid, W, c, t, X) then
+        cocked = cocked + 1
+      end
+    end
+  end
+  if os.getenv("PA_STAGEDIAG") then print(string.format("  STAGEDIAG(trigger) fullBoardCocked=%d target=%d", cocked, M.TRIGGER_TARGET)) end
+  if cocked >= M.TRIGGER_TARGET then return nil end
+  for c = 1, W do
+    local t = topRow(grid, c, H)
+    if t >= 3 then
+      local X = grid[t][c] or 0
+      if X ~= 0 and X ~= GARBAGE and (grid[t-1][c] or 0) == X and not isCockedTrigger(grid, W, c, t, X) then
         -- route the nearest X in row t-2 one step toward c, stopping at the adjacent cell
         for d = 2, W - 1 do
           for _, dir in ipairs({ -1, 1 }) do
@@ -325,13 +347,15 @@ function M.stageTrigger(grid, rows, touchable)
             if cc >= 1 and cc <= W and (grid[t-2][cc] or 0) == X then
               -- step it one column toward c: swap (t-2, min(cc, cc-dir))
               local sc = (dir == 1) and (cc - 1) or cc
-              if (grid[t-2][sc] or 0) ~= (grid[t-2][sc+1] or 0) and touchOK(touchable, t-2, sc) then return { t-2, sc } end
+              if (grid[t-2][sc] or 0) ~= (grid[t-2][sc+1] or 0) and touchOK(touchable, t-2, sc) then
+                if os.getenv("PA_STAGEDIAG") then print(string.format("  STAGEDIAG(trigger) col=%d fullBoardCocked=%d ROUTING swap=(%d,%d)", c, cocked, t-2, sc)) end
+                return { t-2, sc }
+              end
             end
           end
         end
       end
     end
-    ::nextcol::
   end
   return nil
 end
@@ -346,20 +370,34 @@ function M.stageContact(grid, rows, touchable)
   local maxT = 0
   for c = 1, W do local t = topRow(grid, c, H); if t > maxT then maxT = t end end
   if maxT < 3 then return nil end                                   -- a contact trio needs rows maxT..maxT-2
+  if os.getenv("PA_STAGEDIAG") then
+    local tied = {}
+    for c = 1, W do if topRow(grid, c, H) == maxT then tied[#tied+1] = c end end
+    if #tied > 1 then print(string.format("  STAGEDIAG(contact) maxT=%d tiedCols=[%s]", maxT, table.concat(tied, ","))) end
+  end
   for c = 1, W do
     if topRow(grid, c, H) == maxT then
       local X = grid[maxT][c] or 0
       if X ~= 0 and X ~= GARBAGE then
+        -- FIXED (2026-07, code-audit; PA_STAGEDIAG's tie counter never observed >1 tied maxT column on the
+        -- 10-seed 6x12 sweep, so this exact path is unexercised there, but the bug was real by inspection):
+        -- the old code did `return nil` the instant it found the FIRST maxT column already cocked, which on
+        -- a board with ties (two+ columns sharing maxT) would abandon checking the OTHER tied columns even
+        -- though one of them might still need staging (no pair yet, or a pair but not yet cocked). Now it
+        -- only skips THIS column (`goto nextcol`-equivalent via the enclosing `if not ... then`) and keeps
+        -- scanning the rest of the tied columns; `return nil` only happens after the whole loop finds
+        -- nothing actionable anywhere.
         if (grid[maxT-1][c] or 0) == X then
-          -- pair at the contact top. cocked already?
-          if (c > 1 and (grid[maxT-2][c-1] or 0) == X) or (c < W and (grid[maxT-2][c+1] or 0) == X) then return nil end
-          -- route the nearest X in row maxT-2 one step toward c, stopping adjacent (into (maxT-2,c) fires the 3 early)
-          for d = 2, W - 1 do
-            for _, dir in ipairs({ -1, 1 }) do
-              local cc = c + dir * d
-              if cc >= 1 and cc <= W and (grid[maxT-2][cc] or 0) == X then
-                local sc = (dir == 1) and (cc - 1) or cc
-                if (grid[maxT-2][sc] or 0) ~= (grid[maxT-2][sc+1] or 0) and touchOK(touchable, maxT-2, sc) then return { maxT-2, sc } end
+          local alreadyCocked = (c > 1 and (grid[maxT-2][c-1] or 0) == X) or (c < W and (grid[maxT-2][c+1] or 0) == X)
+          if not alreadyCocked then
+            -- route the nearest X in row maxT-2 one step toward c, stopping adjacent (into (maxT-2,c) fires the 3 early)
+            for d = 2, W - 1 do
+              for _, dir in ipairs({ -1, 1 }) do
+                local cc = c + dir * d
+                if cc >= 1 and cc <= W and (grid[maxT-2][cc] or 0) == X then
+                  local sc = (dir == 1) and (cc - 1) or cc
+                  if (grid[maxT-2][sc] or 0) ~= (grid[maxT-2][sc+1] or 0) and touchOK(touchable, maxT-2, sc) then return { maxT-2, sc } end
+                end
               end
             end
           end

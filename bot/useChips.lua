@@ -422,15 +422,19 @@ local function chipSetupBonus(grid, rows, sr, sc)
   return best
 end
 local W_IMMEDIATE_TOTAL, W_IMMEDIATE_CHAIN, W_IMMEDIATE_FIRST = 30, 400, 20
--- TRUSTED_CHAIN_CAP (2026-07, root-caused via PA_PLANVERIFY ground-truth on live seeds, not a synthetic test):
--- chain>=2 predictions from BoardSim.simSwap were WRONG 13/13 times observed under large-garbage pressure -- several
--- predicted a 9-10 panel clear (chain=3) that the real engine cleared ZERO of. Root cause is the documented DEEP-CHAIN
--- PHANTOM in BoardSim.resolve: the real engine settles cascades wave-by-wave with a hover delay between links, but the
--- simulator instantly full-settles, so links past the first can align in the sim in ways that never actually fire.
--- The FIRST link is reliable (no wave-timing gap exists for it -- it's the direct, immediate result of the swap
--- itself); only cascaded links beyond that are unreliable. Cap resolve depth to 1 for scoring so planMove can't be
--- talked into a phantom deep chain by its own simulator. PA_MAXLINK (if set) still overrides for diagnostics/sweeps.
-local TRUSTED_CHAIN_CAP = tonumber(os.getenv("PA_TRUSTLINK")) or 1
+-- TRUSTED_CHAIN_CAP: RETIRED as a correctness cap (2026-07). Originally set to 1 after a live-seed PA_PLANVERIFY
+-- trace reported chain>=2 predictions WRONG 13/13 times ("DEEP-CHAIN PHANTOM": the engine settles cascades
+-- wave-by-wave with hover, so the simulator's instant full-settle supposedly aligned links that never fire for
+-- real). That diagnosis was WRONG -- it was measuring too early. PA_PLANVERIFY checked at a flat 90 frames since
+-- COMMIT, before travel+reaction+fire even happen, let alone a multi-link chain's per-link FLASH(28)/POP stagger;
+-- bot/tests/boardSimVerify.lua had the identical bug in its own 200-frame engine-clear wait. Both were fixed to
+-- wait for genuine quiescence (20 consecutive quiet frames) instead of a fixed deadline: boardSimVerify's
+-- "phantom" residual (11/941, every one a chain>=2 case) went to 0/941 the moment it was allowed to actually
+-- finish resolving. BoardSim.simSwap's cascade prediction is correct at every depth once measured correctly --
+-- see bot/BoardSim.lua's resolve() and bot/chainSim.lua's engineChain (which never had this bug and is now
+-- covered by bot/tests/chainSimVerify.lua: 0/379 mismatches). Left as a live override knob (PA_TRUSTLINK) in case
+-- a future regression needs to isolate deep-chain scoring again, but no longer capped by default.
+local TRUSTED_CHAIN_CAP = tonumber(os.getenv("PA_TRUSTLINK"))
 local function scoreSwap(grid, rows, r, c, immScale)             -- eval + chip-setup bonus + a (scalable) bonus for a clear NOW
   local g, chain, total, firstClear = BoardSim.simSwap(grid, rows, r, c, TRUSTED_CHAIN_CAP)
   local bonus = chipSetupBonus(g, rows, r, c)

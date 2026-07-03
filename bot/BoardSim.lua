@@ -25,6 +25,17 @@ BoardSim.isPlay = isPlay
 local function isGarbage(c) return c == GARBAGE end
 BoardSim.isGarbage = isGarbage
 
+-- FALLS UNDER GRAVITY: any occupied, non-garbage cell -- NOT the same set as isPlay. isPlay(1-6) is deliberately
+-- narrower for MATCH-FINDING (colors 7/8/9 are real, swappable, real-gameplay panels -- confirmed 2026-07 via a live
+-- seed, not just puzzles -- that never form a match). Gravity has no such exception: every real panel falls,
+-- regardless of whether its color is matchable. applyGravity used isPlay for this and got it wrong: a color-8 cell
+-- was neither moved (isPlay(8)==false, so the loop's write-pointer skipped it) nor protected -- a play panel falling
+-- past it in the SAME pass silently overwrote it, since the write-pointer logic assumes every row it doesn't
+-- explicitly move is already empty. Root-caused via PA_FIRECHECK/PA_PLANSTATE + a real-engine reproduction (Puzzle/
+-- Match/Stack) of the exact board+swap: BoardSim.simSwap predicted a match that BoardSim's OWN corrupted
+-- post-gravity grid didn't actually contain once compared cell-by-cell against the real engine's settle.
+local function fallsUnderGravity(c) return c ~= 0 and c ~= GARBAGE end
+
 -- color-only grid copy from a BoardState board. Carries a parallel `reveal` map
 -- (g.reveal[r][c] = real color a garbage cell will turn into when its block's
 -- bottom row breaks, captured by BoardState.extract from the engine's garbage
@@ -169,7 +180,7 @@ function BoardSim.applyGravity(g, rows)
     for c = 1, WIDTH do
       local write = 1
       for r = 1, rows do
-        if isPlay(g[r][c]) then
+        if fallsUnderGravity(g[r][c]) then
           if write ~= r then
             g[write][c] = g[r][c]; g[r][c] = 0
             if reveal then reveal[write][c] = reveal[r][c]; reveal[r][c] = nil end
@@ -186,7 +197,7 @@ function BoardSim.applyGravity(g, rows)
     -- 1) drop loose play panels one cell into empty space below
     for c = 1, WIDTH do
       for r = 2, rows do
-        if isPlay(g[r][c]) and g[r - 1][c] == 0 then
+        if fallsUnderGravity(g[r][c]) and g[r - 1][c] == 0 then
           g[r - 1][c] = g[r][c]; g[r][c] = 0
           if reveal then reveal[r - 1][c] = reveal[r][c]; reveal[r][c] = nil end
           moved = true

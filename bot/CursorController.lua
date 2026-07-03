@@ -171,6 +171,17 @@ function CursorController:nextInput(state, decision)
   else
     bits = 16; self.swapped = true; self._swappedCell = cell   -- aligned: swap once, and remember we fired here
     if os.getenv("PA_CURSORDIAG") then print(string.format("  CURSORDIAG FIRE kind=%s cell=(%d,%d)", tostring(self.lockedKind), cr, cc)) end
+    -- PA_FIRECHECK: at the EXACT frame a swap actually fires (not at decision time, ~90-130 frames earlier), recompute
+    -- what BoardSim.simSwap predicts for THIS SAME swap on the board as it is RIGHT NOW. If this still predicts a
+    -- clear, any later "did not materialize" is a real, still-unexplained bug (staleness ruled out -- the board hadn't
+    -- changed since this exact swap was re-checked). If it does NOT predict a clear here, the board genuinely
+    -- shifted between decision and execution (real staleness, not fixable without a same-frame re-validate).
+    if os.getenv("PA_FIRECHECK") and self.lockedKind == "PLAN" and state.board then
+      local BoardSim = require("bot.BoardSim")
+      local g = BoardSim.colorGrid(state.board, state.rows or 12)
+      local _, chain, total = BoardSim.simSwap(g, state.rows or 12, cr, cc, 1)
+      print(string.format("  FIRECHECK swap=(%d,%d) AT-FIRE-TIME predicts chain=%s total=%s", cr, cc, tostring(chain), tostring(total)))
+    end
   end
   return char(bits)
 end

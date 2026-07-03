@@ -57,6 +57,11 @@ interrupted.
   - `PA_CURSORDIAG=1` — **new**, in `CursorController.lua`: prints every `RISE-SHIFT` (a locked
     target's row bumped to follow the passive rise), `FIRE` (the cell a swap actually executes at),
     and `ABANDON` (a fired swap was refused/didn't clear and the lock let go) event.
+  - `PA_FIRECHECK=1` — **new**, in `CursorController.lua`: at the EXACT frame a `PLAN` swap fires,
+    recomputes `BoardSim.simSwap` on the board as it is AT THAT INSTANT and prints the prediction —
+    the key tool for telling real bugs (still predicts a clear at fire time, yet it doesn't happen)
+    apart from genuine staleness (predicts nothing — the board changed since the decision). Requires
+    `state.board` to be populated, so run alongside `PA_PLANVERIFY`.
   - `PA_BREAKDIAG=1` — prints board state when `breakRoute` finds nothing to do
   - `PA_CATCHDIAG=1` — prints catch decisions incl. `active=`/`chaining=`/`nap=` (cascade state)
   - `PA_CATALOGDBG=1` / `PA_CATALOGDBG2=1` — catalog scan (`chips.recognize`) fit/verify/accept deltas
@@ -322,35 +327,86 @@ interrupted.
       `chain>=2` predictions remain** (all correctly capped to `chain=1`) across the 10-seed sweep;
       `chain=1` predictions kept the same reliability as before this fix (still imperfect — see below
       — but that ceiling was already there, this fix didn't move it).
-    - **Honest residual, not swept under the rug**: `chain=1` predictions from `planMove` still
-      `DID-NOT-MATERIALIZE` in 28 of 84 sampled decisions (67% hit rate) on the 10-seed sweep. Not
-      individually root-caused one-by-one — the ones inspected are a mix of the already-explained
-      countdown artifact (item 11b, once per run) and generic snapshot staleness (the board can shift
-      in the ~90-130 frames between a decision and its execution, same latency window every substate
-      in this brain operates under). This is a bounded, non-systematic noise floor, structurally
-      different from the 13/13-always-wrong deep-chain bug that's now fixed — but it is NOT 100%, and
-      anyone continuing this work should not read "planMove verified" as "planMove's predictions are
-      always right." A late-game cluster of 6 consecutive total misses was also observed in the
-      injection-OFF parity baseline (seed 2024, frames ~2960-3570, a long, cluttered, no-garbage
-      endgame state) — flagged here, NOT investigated further this session; worth a dedicated look if
-      `planMove` behavior in long/cluttered boards becomes relevant.
-    - `bot/tests/catchVerify.lua`: 8/8 OK. `DETERMINISM: PASS`.
+    - **The owner pushed back hard on treating 67% as acceptable ("you're a computer, it should be
+      100%") — right to, and it led to one more real, confirmed, fixed bug (item 14 below), not just a
+      documentation exercise.**
+
+14. **`BoardSim.applyGravity` silently destroyed color-7/8/9 panels — a second, distinct bug found by
+    refusing to accept "inherent staleness" without proof.**
+    - Built `PA_FIRECHECK`: at the EXACT frame a `PLAN` swap physically fires (not ~90-130 frames
+      earlier at decision time), recompute what `BoardSim.simSwap` predicts on the board AS IT IS AT
+      THAT INSTANT. If it still predicts a clear and the real engine still doesn't deliver it, that
+      proves the board had NOT changed since the decision — ruling out staleness and proving a real,
+      persistent bug. Ran it: **10 of 12 remaining `DID-NOT-MATERIALIZE` cases in a 10-seed sweep
+      showed `FIRECHECK` still confidently predicting the clear at the exact moment of firing.** Only
+      2 were genuine staleness (`FIRECHECK` itself showed `chain=0/total=0` — the board had legitimately
+      changed). This is hard evidence "it's just staleness" was wrong as a blanket explanation.
+    - Picked one clean example (`swap=(7,1)`, predicted 3, actual 0, `FIRECHECK` confirmed 3 at fire
+      time) and reproduced the EXACT captured board+swap on the real engine (`Puzzle`/`Match`/`Stack`,
+      same pattern as `bot/tests/boardSimVerify.lua` — never a standalone reimplementation). Found:
+      `Stack:canSwap` returns true, the swap physically executes, and the panel visibly FALLS after
+      landing on an empty gap below it — completely correct, expected engine physics. But the panel
+      lands one row lower than `BoardSim` predicted, missing the vertical run entirely, because the
+      pre-swap board had a color-8 panel sitting in the fall path. Root cause: `applyGravity`'s
+      column-compaction loops (both the fast no-garbage path and the slow garbage-aware path) gated
+      on `isPlay(color)`, which only covers 1-6. Colors 7/8/9 are real, non-garbage, swappable panels
+      that legitimately occur in live gameplay (confirmed directly — this board came from an actual
+      seed, not a puzzle) but `isPlay` excludes them for MATCH-FINDING purposes (correct — they're
+      "blocker" colors that never form a match). `applyGravity` reused the same narrow check for
+      GRAVITY, which is wrong: a blocker panel still physically exists and must still fall/be
+      displaced correctly. Because it was neither moved nor protected, a play panel falling past its
+      row during the SAME compaction pass silently overwrote it, corrupting the simulated post-swap
+      board before `findMatches` ever ran.
+    - Fixed: added `fallsUnderGravity(c)` (`c ~= 0 and c ~= GARBAGE`, i.e. broader than `isPlay`) and
+      used it in both `applyGravity` loops instead of `isPlay`. Re-ran the exact reproduction:
+      `BoardSim.simSwap` now correctly predicts `chain=0/total=0`, matching the real engine's `0`
+      exactly.
+    - **Measured impact**: 10-seed sweep hit rate went from **66.7% (56/84) to 76.1% (51/67)**.
+      `bot/tests/catchVerify.lua`: 8/8 OK, unchanged. `bot/tests/boardSimVerify.lua`: unchanged at
+      11/941 (1.2%) — expected, that test only generates colors 1-3, so it never exercises this bug;
+      its residual is the separate, already-documented deep-chain phantom.
+    - **Kept digging past this fix, as instructed — the honest remaining picture**: re-ran
+      `PA_FIRECHECK` after this fix. Of the 12 `DID-NOT-MATERIALIZE` cases remaining, 10 STILL show
+      `FIRECHECK` confirming a valid prediction at the exact fire moment (one of those 10 is the
+      already-explained pre-game countdown, not a bug). Attempted one more real-engine reproduction
+      (`swap=(2,2)`, predicted 3, actual 1, all-normal panel states — ruling out the state-filtering
+      fixes above as the cause) and it did **not** cleanly reproduce: the isolated real-engine replay
+      cleared 6 panels, neither matching the live run's actual (1) nor the original prediction (3).
+      That three-way mismatch means either the board/state reconstruction for this specific capture
+      has an error, or the snapshot-correlation script mis-paired diagnostic lines for this case — it
+      is NOT confirmed as a new bug, and reporting it as one without a clean reproduction would repeat
+      the exact mistake (asserting a cause without hard evidence) this investigation was trying to
+      avoid. Stopped here rather than present a shaky finding as fact.
+    - **Final honest number**: hit rate is **76.1% (51/67)** after 4 real, independently-verified bugs
+      fixed today (items 12a, 12b, 13, 14). A meaningful majority of the remaining ~24% still shows
+      `FIRECHECK`-confirmed valid predictions at fire time, meaning **at least one more real bug likely
+      remains**, not yet found. This is not "inherent staleness" by the evidence gathered — it is an
+      open, unsolved problem, and should be picked up with the same `PA_FIRECHECK` methodology
+      (get a clean, correctly-correlated capture, reproduce on the real engine, trace exactly where
+      `BoardSim`'s simulation diverges) rather than assumed away.
+    - `bot/tests/catchVerify.lua`: 8/8 OK. `DETERMINISM: PASS` (10-seed sweep, both runs).
 
 ## Not yet verified at all
 
-None remaining from the original per-mechanic list. Every substate in `catchPrimitive.lua`
-(`breakRoute`, `rowBreak`, `buildPair`, `stageTrigger`, `stageContact`, `flattenMove`) and
-`useChips.planMove` has now had the single-seed, real-engine-ground-truth treatment the owner
-mandated (items 5-12 above). The one still-open, explicitly-scoped-out item is the deep-chain
-phantom limitation noted in item 12 — a known, pre-existing, documented approximation, not an
-unverified mechanic.
+Every substate in `catchPrimitive.lua` (`breakRoute`, `rowBreak`, `buildPair`, `stageTrigger`,
+`stageContact`, `flattenMove`) and `useChips.planMove` has had the single-seed, real-engine-
+ground-truth treatment the owner mandated (items 5-14 above). **This is NOT the same as "planMove's
+predictions are fully correct"** — item 14 ends with a real, open, unsolved gap: `planMove`'s hit
+rate is 76.1%, and most of the remaining misses are evidenced (via `PA_FIRECHECK`) to be a real bug,
+not staleness. Whoever picks this up next should treat that as active, unfinished work, not a
+footnote. The deep-chain phantom (item 13's original framing) is fixed, not just documented, as of
+today — the open item now is the still-unexplained ~24% `planMove` miss rate from item 14.
 
 ## Immediate next step for whoever picks this up
 
-Every mechanic on the original list is now verified (items 5-12). Next: task #3 (generalize —
-10-seed sweep vs 6x12, target median 5 min survival) and task #4 (freeze the 6x4 protocol, confirm
-verify suites + CI). The deep-chain phantom limitation (item 12) is a known, pre-existing gap to
-revisit during tuning, not a blocker.
+Do NOT treat this as "done, move to tuning." `planMove`'s hit rate is 76.1%, and item 14's
+`PA_FIRECHECK` evidence shows most of the remaining misses are a real, unfound bug, not staleness.
+Next step: repeat item 14's method — capture a clean, correctly-correlated `PA_PLANGRID`/
+`PA_PLANSTATE`/`PA_FIRECHECK` snapshot for a `DID-NOT-MATERIALIZE` case, reproduce it on the real
+engine (`Puzzle`/`Match`/`Stack`), and trace exactly where `BoardSim`'s simulation diverges — the
+same process that already found 4 distinct bugs today. Only once `PA_FIRECHECK` stops finding
+fire-time-confirmed-but-failed cases (or the remaining ones are conclusively staleness, not assumed)
+should work move to task #3 (10-seed generalization sweep) and task #4 (freeze the 6x4 protocol).
 
 ## Task tracker state (as of this handoff)
 

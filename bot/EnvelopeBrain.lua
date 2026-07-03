@@ -464,14 +464,24 @@ function EnvelopeBrain:decide(state, stack, match)
         if bc then fireChip(bc, "CLEAR")
         else local br = catchPrimitive.breakRoute(grid, rows, touchable)   -- finish a contact-column vertical-3
           if br then fireSwap(br, "BREAK_ROUTE")
-          else local cl = clearChip(false, true)                           -- activity + SUPPORT CLEARING: the block falls as its supports go
-            if cl then fireChip(cl, "CLEAR")
-            else local tg = catchPrimitive.stageContact(grid, rows, touchable) or catchPrimitive.stageTrigger(grid, rows, touchable)  -- RE-COCK the contact column between breaks (cocked seeds got exactly ONE break then stalled)
-              if tg then fireSwap(tg, "DIG_TRIGGER")
-              else local mv, total, chain = useChips.planMove(grid, rows, touchable, cursor, true, false)  -- ASSEMBLE a clear via setup swaps (no ready clear + no finishable break = the only path to dropping the block's supports)
-                if mv then firePlan(mv, total, chain)
-                else local fl = catchPrimitive.flattenMove(grid, rows, touchable)
-                  if fl then fireSwap(fl, "FLATTEN") else wait() end
+          else
+            -- DIG PLAN: beam-search a 1-3 swap sequence that BREAKS garbage (any match touching the block, not just
+            -- the rigid contact-column vertical-3 / rowBreak shapes). This planner existed but was never wired into
+            -- the dig-only tree -- exactly the tool for the first-landing boards where every contact column is a
+            -- dead end (no in-row donor) yet a 2-swap setup break exists. Budget-bounded (1200 sims); only the
+            -- first move is returned and it's re-planned each decision, so a shifting board self-corrects.
+            local dp = BoardSim.digPlan(grid, rows, 3)
+            if dp and touchable[dp[1]] and touchable[dp[1]][dp[2]] and touchable[dp[1]][dp[2] + 1] then
+              fireSwap(dp, "DIG_PLAN")
+            else local cl = clearChip(false, true)                         -- activity + SUPPORT CLEARING: the block falls as its supports go
+              if cl then fireChip(cl, "CLEAR")
+              else local tg = catchPrimitive.stageContact(grid, rows, touchable) or catchPrimitive.stageTrigger(grid, rows, touchable)  -- RE-COCK the contact column between breaks (cocked seeds got exactly ONE break then stalled)
+                if tg then fireSwap(tg, "DIG_TRIGGER")
+                else local mv, total, chain = useChips.planMove(grid, rows, touchable, cursor, true, false)  -- ASSEMBLE a clear via setup swaps (no ready clear + no finishable break = the only path to dropping the block's supports)
+                  if mv then firePlan(mv, total, chain)
+                  else local fl = catchPrimitive.flattenMove(grid, rows, touchable)
+                    if fl then fireSwap(fl, "FLATTEN") else wait() end
+                  end
                 end
               end
             end

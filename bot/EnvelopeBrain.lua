@@ -166,30 +166,42 @@ end
 -- extractByMeta(filter, rankFn) -> ordered kinds: every cache kind whose meta passes filter(meta, kind), sorted ASC by
 -- rankFn(kind, meta), with plain COMBO_3 force-appended LAST (policy). THE selection primitive -- filter can be static
 -- (OFFENSE/DANGER below) or situational (e.g. "garbage that breaks the incoming") computed per-decision.
-local function extractByMeta(filter, rankFn)
+local function extractByMeta(filter, rankFn, includeC3)
   local cache = require("bot.chipCache")
   local seen, rows, hasC3 = {}, {}, false
   for _, c in ipairs(cache) do
-    if not isExcluded(c.kind) and not seen[c.kind] and filter(c.meta, c.kind) then
+    -- COMBO_3 handling (2026-07-03, root-caused by bot/tests/popNowVerify.lua): the old code checked
+    -- `c.kind == "COMBO_3"` AFTER the isExcluded gate, which excludes COMBO_3 -- so the documented "pinned
+    -- dead-last in every state" was dead code and OFFENSE/DANGER never contained a plain 3-clear. Making it
+    -- reachable everywhere was then MEASURED WORSE on the 10-seed 6x12 sweep (median 22.0s -> 17.4s: the bot
+    -- mines its own break material with cheap 3s), so the exclusion stands for OFFENSE/DANGER and the append
+    -- is now an EXPLICIT opt-in (includeC3) for the callers whose semantics genuinely need a bare 3-clear:
+    -- POP-NOW ("any immediate pop beats a still frame at stop 0") -- without it that guard can never fire.
+    if c.kind == "COMBO_3" then hasC3 = hasC3 or (includeC3 and filter(c.meta, c.kind) or false)
+    elseif not isExcluded(c.kind) and not seen[c.kind] and filter(c.meta, c.kind) then
       seen[c.kind] = true
-      if c.kind == "COMBO_3" then hasC3 = true                  -- policy: plain 3-clear is the LAST RESORT in EVERY state
-      else rows[#rows + 1] = { kind = c.kind, r = rankFn(c.kind, c.meta) } end
+      rows[#rows + 1] = { kind = c.kind, r = rankFn(c.kind, c.meta) }
     end
   end
   table.sort(rows, function(a, b) if a.r ~= b.r then return a.r < b.r end return a.kind < b.kind end)
   local kinds = {}; for _, r in ipairs(rows) do kinds[#kinds + 1] = r.kind end
-  if hasC3 then kinds[#kinds + 1] = "COMBO_3" end               -- appended dead-last, after everything, in all states
+  if hasC3 then kinds[#kinds + 1] = "COMBO_3" end               -- appended dead-last, only when includeC3 opted in
   return kinds
 end
 local ANY = function() return true end
 -- OFFENSE: build biggest (ready-first, then size/depth). DANGER: the SAME set so it never goes empty, but READY
--- single-swap clears FIRST -- clear NOW; setups/chains fall back only when no ready clear exists. COMBO_3 is pinned
--- dead-last in BOTH by extractByMeta.
+-- single-swap clears FIRST -- clear NOW; setups/chains fall back only when no ready clear exists. NEITHER contains
+-- plain COMBO_3 (measured: allowing it mined break material, 10-seed median 22.0s -> 17.4s); POP-NOW opts in below.
 local OFFENSE_PRIORITIES = extractByMeta(ANY, rankKind)
-local DANGER_PRIORITIES = extractByMeta(ANY, function(kind, meta)
+local dangerRank = function(kind, meta)
   local notReady = (meta and (meta.swaps or 1) == 1 and (meta.chain or 0) == 0) and 0 or 1
   return notReady * 1000000 + rankKind(kind, meta)
-end)
+end
+local DANGER_PRIORITIES = extractByMeta(ANY, dangerRank)
+-- POP-NOW list: ready clears first AND the bare COMBO_3 available dead-last. Used ONLY by the sealed branch's
+-- POP-NOW guard, where ANY immediate pop beats a still frame at stop_time 0 -- without COMBO_3 here the guard
+-- could literally never fire on the boards it exists for (bot/tests/popNowVerify.lua).
+local POPNOW_PRIORITIES = extractByMeta(ANY, dangerRank, true)
 -- CATCH priorities: the catch CREDITS a freed-panel-completed 3+ (incl COMBO_3) as a CHAIN -- the panel falls from the
 -- breaking garbage onto a lined-up pair (Brian: "3+ is great, horizontal too"). So unlike OFFENSE/DANGER (which forbid the
 -- cheap STANDALONE 3-clear), the catch list KEEPS COMBO_3 -- appended last so a bigger combo/chain still wins when the drop
@@ -311,6 +323,36 @@ function EnvelopeBrain:tryCatch(grid, rows, stack, priorities, verify, touchable
   return nil
 end
 
+-- LULL SHIELD (pure; extracted 2026-07-03 so bot/tests/lullShieldVerify.lua can prove it in isolation): copy
+-- `touchable` with every intact top PAIR (X at t,t-1) and that pair's one cocked-trigger cell (t-2, c+-1, first
+-- match wins) masked NO-GO. Used by the LULL branch only -- clear/plan/flatten must not mine the staged break
+-- material (measured: without it 9/10 seeds hit the first landing with cocked=0); staging mechanics keep the
+-- plain mask. Shielding the sealed/breaking dig clears was measured 2s WORSE, so this never runs there.
+function EnvelopeBrain.lullShield(grid, rows, touchable)
+  local shielded = {}
+  for r = 1, rows do
+    local src, dst = touchable[r], {}
+    for c = 1, 6 do dst[c] = (src and src[c]) or false end
+    shielded[r] = dst
+  end
+  for c = 1, 6 do
+    local t = 0
+    for r = rows, 1, -1 do local v = grid[r][c] or 0; if v ~= 0 and v ~= BoardSim.GARBAGE then t = r; break end end
+    if t >= 2 then
+      local X = grid[t][c] or 0
+      if X ~= 0 and X ~= BoardSim.GARBAGE and (grid[t-1][c] or 0) == X then
+        shielded[t][c] = false; shielded[t-1][c] = false
+        if t >= 3 then
+          for _, nb in ipairs({ c - 1, c + 1 }) do
+            if nb >= 1 and nb <= 6 and (grid[t-2][nb] or 0) == X then shielded[t-2][nb] = false; break end
+          end
+        end
+      end
+    end
+  end
+  return shielded
+end
+
 function EnvelopeBrain:decide(state, stack, match)
   local rows = state.rows
   local grid = BoardSim.colorGrid(state.board, rows)
@@ -373,8 +415,8 @@ function EnvelopeBrain:decide(state, stack, match)
     --    or flatten ONLY to ENABLE the break -- no raise/plan distractions. C) no garbage -> the height state decides.
     -- breaking and lowestGarbageRow are mutually exclusive situations, so exactly ONE branch runs each frame.
     local breaking = stack and garbageReveal.breakingRow(stack)
-    local function clearChip(req, allowC3, mask)
-      local o = { chipPriorities = priorities, searchPriorities = search, verify = verify, touchable = mask or touchable }
+    local function clearChip(req, allowC3, mask, prios)
+      local o = { chipPriorities = prios or priorities, searchPriorities = search, verify = verify, touchable = mask or touchable }
       if req then o.requireBreak = true end
       local chip = useChips.useChips(grid, rows, cursor, o)
       if chip and chip.kind == "COMBO_3" and not allowC3 then return nil end  -- plain 3-clear: only under pressure (clear freed rows / drop height); held in OFFENSE so it doesn't drain the material we raised
@@ -480,7 +522,7 @@ function EnvelopeBrain:decide(state, stack, match)
         -- flight). When no pops are active and the banked stop is thinner than one cursor trip, the next swap
         -- must ITSELF pop: take any immediate clear over the otherwise-preferred multi-swap setups.
         if (not busy) and (stack.stop_time or 0) <= 45 and (stack.shake_time or 0) == 0 then
-          local pop = clearChip(true, true) or clearChip(false, true)
+          local pop = clearChip(true, true, nil, POPNOW_PRIORITIES) or clearChip(false, true, nil, POPNOW_PRIORITIES)
           if pop then fireChip(pop, "CLEAR") end
         end
         if move then -- POP-NOW fired above
@@ -526,27 +568,7 @@ function EnvelopeBrain:decide(state, stack, match)
         -- cocked trigger cell) is off-limits to clear/plan/flatten here; staging mechanics see the plain mask.
         -- Measured: without this, staging was rebuilt and re-mined by PLAN/CLEAR all lull long and 9/10 seeds
         -- arrived at the first landing with cocked=0 (median 12.2s); with it, 6/10 arrive cocked (median 18.4s).
-        local shielded = {}
-        for r = 1, rows do
-          local src, dst = touchable[r], {}
-          for c = 1, 6 do dst[c] = (src and src[c]) or false end
-          shielded[r] = dst
-        end
-        for c = 1, 6 do
-          local t = 0
-          for r = rows, 1, -1 do local v = grid[r][c] or 0; if v ~= 0 and v ~= BoardSim.GARBAGE then t = r; break end end
-          if t >= 2 then
-            local X = grid[t][c] or 0
-            if X ~= 0 and X ~= BoardSim.GARBAGE and (grid[t-1][c] or 0) == X then
-              shielded[t][c] = false; shielded[t-1][c] = false
-              if t >= 3 then
-                for _, nb in ipairs({ c - 1, c + 1 }) do
-                  if nb >= 1 and nb <= 6 and (grid[t-2][nb] or 0) == X then shielded[t-2][nb] = false; break end
-                end
-              end
-            end
-          end
-        end
+        local shielded = EnvelopeBrain.lullShield(grid, rows, touchable)
         -- REBUILD MATERIAL FIRST on a stripped board: a finished dig consumes the board (measured seed 1008: block 1
         -- fully broken, then the lull arrived at avgH 2.3 with two EMPTY columns and block 2 was unbreakable). RAISE
         -- is by far the fastest material source (a full 6-panel row per commit); waiting for it as the last resort

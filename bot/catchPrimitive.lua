@@ -130,16 +130,43 @@ function M.catchSlide(grid, rows, col, color, touchable)
   local W, H = 6, rows or 12
   local t = topRow(grid, col, H)
   if t < 1 then return nil end
-  for _, r in ipairs(t >= 2 and { t, t - 1 } or { t }) do
-    if (grid[r][col] or 0) ~= color then
-      for d = 1, W - 1 do
-        for _, dir in ipairs({ -1, 1 }) do
-          local cc = col + dir * d
-          if cc >= 1 and cc <= W and (grid[r][cc] or 0) == color then
-            local sc = (dir == 1) and (cc - 1) or cc
-            if (grid[r][sc] or 0) ~= (grid[r][sc + 1] or 0) and touchOK(touchable, r, sc) then return { r, sc } end
+  local targetRows = t >= 2 and { t, t - 1 } or { t }
+  -- COMPLETABILITY GATE: only start (or continue) a catch that can actually FINISH. Every target row still
+  -- missing the color must hold a donor whose slide path is SUPPORTED (an empty cell with nothing under it
+  -- swallows a slid panel -- it falls out of the row). Measured (seed 1008 catch trace): the bot spent 4 swaps
+  -- (~110 frames of a ~180-frame reveal) placing ONE of the two panels col 6 needed when the board held no
+  -- second donor at all -- a catch that could never complete, burning the window the feasible columns needed.
+  local function donorFor(r)
+    for d = 1, W - 1 do
+      for _, dir in ipairs({ -1, 1 }) do
+        local cc = col + dir * d
+        if cc >= 1 and cc <= W and (grid[r][cc] or 0) == color then
+          -- path from donor to target must not cross an unsupported hole
+          local ok, x, step = true, cc, (col > cc) and 1 or -1
+          x = x + step
+          while x ~= col do
+            local cell = grid[r][x] or 0
+            if cell == 0 or cell == RESOLVING then
+              local below = (r > 1) and (grid[r-1][x] or 0) or 1
+              if below == 0 or below == RESOLVING then ok = false; break end
+            end
+            x = x + step
           end
+          if ok then return cc, dir, d end
         end
+      end
+    end
+    return nil
+  end
+  for _, r in ipairs(targetRows) do
+    if (grid[r][col] or 0) ~= color and not donorFor(r) then return nil end  -- a missing row with no reachable donor = unfinishable
+  end
+  for _, r in ipairs(targetRows) do
+    if (grid[r][col] or 0) ~= color then
+      local cc, dir = donorFor(r)
+      if cc then
+        local sc = (dir == 1) and (cc - 1) or cc
+        if (grid[r][sc] or 0) ~= (grid[r][sc + 1] or 0) and touchOK(touchable, r, sc) then return { r, sc } end
       end
     end
   end

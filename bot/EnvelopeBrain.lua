@@ -511,6 +511,14 @@ function EnvelopeBrain:decide(state, stack, match)
             end
           end
         end
+        -- REBUILD MATERIAL FIRST on a stripped board: a finished dig consumes the board (measured seed 1008: block 1
+        -- fully broken, then the lull arrived at avgH 2.3 with two EMPTY columns and block 2 was unbreakable). RAISE
+        -- is by far the fastest material source (a full 6-panel row per commit); waiting for it as the last resort
+        -- behind buildPair meant it never rebuilt in the short inter-block window. Hold it off while a block is in
+        -- transit (pendingBig) and once the stack is tall enough that height itself is the risk.
+        if avgH < 3.5 and pendingBig < 3 and totalHeight < top - 5 and not busy then
+          self._substate = "RAISE"; move = { type = "RAISE" }
+        else
         local ct = catchPrimitive.stageContact(grid, rows, touchable)
         if ct then fireSwap(ct, "BRACE_CONTACT")
         else local cl = (height >= 5 and avgH >= 3) and clearChip(false, true, shielded) or nil  -- avgH floor: keep enough material for a contact trio (a stripped board can't break anything -- seed 1001 got mined to avgH 1.3, 0 breaks)
@@ -530,6 +538,7 @@ function EnvelopeBrain:decide(state, stack, match)
               end
             end
           end
+        end
         end
       end
     else

@@ -61,21 +61,37 @@ void. A quiescence-based re-measure of a 3-seed run showed ~17/18 MATCHED.
 
 ### NOT yet individually verified (the finishing-swing list, priority order)
 
-1. **`catchPrimitive.stageContact`** — no dedicated real-engine test. Fixed twice this
-   session by sweep-trace (anti-ping-pong donor guard, tied-column scan) but never proven
-   in isolation: "given board X, staging converges to a cocked contact trigger in N swaps,
-   monotonically, on the real engine."
-2. **`catchPrimitive.stageTrigger`** — same. Its TRIGGER_TARGET overshoot fix (2-pass count)
-   is code-audit-only, never exercised.
-3. **`catchPrimitive.catchSlide`** — the completability gate added this session is verified
-   only by sweep deltas. Needs an isolated test: donor exists → converges & catch fires on
-   real engine; no donor → returns nil immediately.
-4. **`BoardSim.digPlan`** — wired into the LIVE sealed-dig branch this session with no
-   dedicated test. Needs: boards where a known 2-3 swap dig exists → digPlan's moves,
-   played on the real engine, actually break garbage.
-5. **`useChips.planMove` end-to-end** — re-measure with the FIXED quiescence-based
-   `PA_PLANVERIFY` (the old numbers are void). One `DID-NOT-MATERIALIZE` at
-   framesWaited=33 appeared in the re-measure sample; unexplained, uninvestigated.
+1. ~~**`catchPrimitive.stageContact`**~~ — DONE (2026-07-03): `bot/tests/stageVerify.lua`
+   proves monotone convergence to a cocked contact trigger (2 swaps then idles), the
+   tied-column scan, and the anti-ping-pong donor guard, all on the real engine.
+   Mutation-checked (disabling the guard / the 2-pass count fails the suite).
+2. ~~**`catchPrimitive.stageTrigger`**~~ — DONE (same file): monotone convergence, pair
+   never fired early, and the TRIGGER_TARGET cap with cocked columns at HIGHER indices
+   than the routable one (the exact overshoot order), plus routing resumes above the cap.
+3. ~~**`catchPrimitive.catchSlide`**~~ — DONE (same file): 4 monotone slides stage both
+   cells, then a real finisher swap pops the vertical-3 on the engine; no-donor board
+   refused immediately; donor behind an unsupported hole refused.
+4. ~~**`BoardSim.digPlan`**~~ — DONE (2026-07-03): `bot/tests/digPlanVerify.lua` — known
+   min-depth boards (1/2/3 swaps by construction), real garbage via the receive path,
+   plans played on the engine with re-planning per swap. **Caught a real bug**: the beam
+   pruned spread-out digs (fives at c1/c4/c6 → nil) because the progress heuristic only
+   rewarded adjacent pairs, so the first gather slide looked like a pure shuffle. Fixed
+   with a tightest-triple span term in `digPlan`'s `progress()`; the depth-3 plan is now
+   found and re-plans shrink 3→2→1. 10-seed sweep after the fix: median 22.0s (no change).
+5. ~~**`useChips.planMove` end-to-end`**~~ — DONE (2026-07-03): 10-seed re-measure with the
+   fixed quiescence `PA_PLANVERIFY` + `PA_FIRECHECK` + `PA_CURSORDIAG`: **44 tracked plan
+   commits, 42 MATCHED, 2 DID-NOT-MATERIALIZE (95.5%)**. Both misses are EXPLAINED:
+   FIRECHECK shows simSwap itself predicted total=0 for the same swap AT FIRE TIME — the
+   board shifted during cursor travel (decision→execution staleness), not a prediction
+   bug. The old "unexplained framesWaited=33" signature is exactly this: the stale swap
+   fires fast, clears nothing, controller idles ~33f after commit. Every tracked fire
+   where FIRECHECK still predicted a clear materialized. Caveat for future readers: 299
+   of 429 raw PLAN fires log FIRECHECK total=0, but most are the known decide-cache
+   re-fires and mid-animation conservatism (colorGrid marks moving cells RESOLVING), NOT
+   tracked commits — do not read that number as a 70% miss rate. A fire-time re-validate
+   (abandon PLAN swaps that predict 0 at fire) was considered and deliberately NOT added:
+   a transient mid-cascade 0 could abandon a swap that would still clear; needs its own
+   isolated study first.
 6. **`useChips` coverage gap** — 42% of puzzle boards return no chip even unverified.
    Understand why (template set too narrow? search band? touchable gating?).
 7. **POP-NOW guard** (`EnvelopeBrain` sealed branch) — semantically justified, never
@@ -116,6 +132,8 @@ luajit bot/tests/boardSimVerify.lua        # BoardSim vs engine
 luajit bot/tests/chainSimVerify.lua        # chainSim vs engine
 luajit bot/tests/catchVerify.lua           # 8 catch primitives
 luajit bot/tests/executorVerify.lua        # controller execution
+luajit bot/tests/stageVerify.lua           # stageContact / stageTrigger / catchSlide (NEW 2026-07-03)
+luajit bot/tests/digPlanVerify.lua         # digPlan plans break garbage on the engine (NEW 2026-07-03)
 luajit bot/useChipsTest.lua 40             # chip recognition precision/coverage
 luajit serverTestRunner.lua                # full server suite (unrelated but keep green)
 # integration sweep — LAST, only after pieces pass:

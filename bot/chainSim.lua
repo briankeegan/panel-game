@@ -179,7 +179,17 @@ end
 function M.engineChain(grid, sr, sc)
   local Puzzle = require("common.engine.Puzzle"); local Match = require("common.engine.Match"); require("common.engine.checkMatches")
   local LP = require("common.data.LevelPresets"); local KDE = require("common.data.KeyDataEncoding")
-  local rows = {}; for r = H, 1, -1 do local s = {}; for c = 1, W do s[c] = (grid[r][c] ~= 0) and tostring(grid[r][c]) or "0" end; rows[#rows+1] = table.concat(s) end
+  -- FIXED (2026-07, found via chainSimVerify.lua -- this function had NO test before): must trim to the ACTUAL
+  -- occupied height (mr), not always emit the full fixed H=12 rows padded with leading empty rows. PuzzleSource
+  -- loads a puzzle string via a bottom-up FIFO (PuzzleSource:createPanels/:createNewRow) whose row-to-position
+  -- mapping depends on the TOTAL row count (Stack:starting_state calls new_row() getStartingBoardHeight()+1
+  -- times) -- padding with empty rows above the real content changes that count and scrambles which puzzle-string
+  -- row lands on which board row (confirmed directly: a full-H board loaded with ENTIRE COLUMNS coming out empty
+  -- that had real content in the input grid). bot/tests/boardSimVerify.lua's toStr() already does this correctly
+  -- (trims to mr); this was the one caller that didn't, and it had zero test coverage until chainSimVerify.lua.
+  local mr = 0
+  for r = 1, H do for c = 1, W do if (grid[r][c] or 0) ~= 0 then mr = r end end end
+  local rows = {}; for r = mr, 1, -1 do local s = {}; for c = 1, W do s[c] = (grid[r][c] ~= 0) and tostring(grid[r][c]) or "0" end; rows[#rows+1] = table.concat(s) end
   local p = Puzzle({ puzzleType = "moves", stack = table.concat(rows), moves = 1 })
   local m = Match(p:toPanelSource(false), p:toGameMode().matchRules)
   local st = m:createStackWithSettings(LP.getModern(10), true, "controller", nil); st:setMaxRunsPerFrame(1); m:start()

@@ -410,7 +410,12 @@ function BoardSim.digPlan(grid, rows, maxDepth)
       budget = budget - 1
       local ng = BoardSim.cloneGrid(g, rows)
       ng[sw[1]][sw[2]], ng[sw[1]][sw[2] + 1] = ng[sw[1]][sw[2] + 1], ng[sw[1]][sw[2]]
-      local _, _, _, gb = BoardSim.resolve(ng, rows)
+      -- CAPPED to the first link (see useChips.lua's TRUSTED_CHAIN_CAP writeup): uncapped, this hit the same
+      -- measured deep-chain phantom as scoreSwap (bot/tests/boardSimVerify.lua: 11/941 mismatches, all chain>=2
+      -- over-predictions) -- digPlan wired into a LIVE-firing branch (EnvelopeBrain's sealed-garbage dig path)
+      -- with no cap would trust a multi-link cascade to break garbage that the real engine's wave-settle timing
+      -- may never actually deliver.
+      local _, _, _, gb = BoardSim.resolve(ng, rows, 1)
       local fm = firstMove or sw
       if gb > 0 then
         if depth < bestDepth or (depth == bestDepth and gb > bestGb) then

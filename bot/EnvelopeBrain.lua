@@ -347,23 +347,37 @@ function EnvelopeBrain.lullShield(grid, rows, touchable)
     for c = 1, 6 do dst[c] = (src and src[c]) or false end
     shielded[r] = dst
   end
-  local maxT = 0
+  local tops, maxT = {}, 0
   for c = 1, 6 do
-    for r = rows, 1, -1 do local v = grid[r][c] or 0; if v ~= 0 and v ~= BoardSim.GARBAGE then if r > maxT then maxT = r end break end end
+    tops[c] = 0
+    for r = rows, 1, -1 do local v = grid[r][c] or 0; if v ~= 0 and v ~= BoardSim.GARBAGE then tops[c] = r; break end end
+    if tops[c] > maxT then maxT = tops[c] end
   end
+  local second = 0
+  for c = 1, 6 do if tops[c] < maxT and tops[c] > second then second = tops[c] end end
+  if second == 0 then second = maxT end                            -- all columns tied
   for c = 1, 6 do
-    local t = 0
-    for r = rows, 1, -1 do local v = grid[r][c] or 0; if v ~= 0 and v ~= BoardSim.GARBAGE then t = r; break end end
+    local t = tops[c]
     if t >= 2 then
       local X = grid[t][c] or 0
       if X ~= 0 and X ~= BoardSim.GARBAGE and (grid[t-1][c] or 0) == X then
-        shielded[t][c] = false; shielded[t-1][c] = false
-        if t == maxT and EnvelopeBrain.LULL_SUPPORT_SHIELD then    -- contact column: clearing under it sinks the stage the block lands on
-          for r = 1, t - 2 do shielded[r][c] = false end
-        end
-        if t >= 3 then
-          for _, nb in ipairs({ c - 1, c + 1 }) do
-            if nb >= 1 and nb <= 6 and (grid[t-2][nb] or 0) == X then shielded[t-2][nb] = false; break end
+        -- SPREAD RELEASE (2026-07-03, root-caused on holdout seed 2006 with PA_LULLSUPPORT=1): pair mask +
+        -- support mask together make the contact column COMPLETELY untouchable, so the rise grows it into a
+        -- runaway tower (2006 died at first landing on heights 4,5,1,4,6,7 -- block resting on the lone c6 tip,
+        -- provably unbreakable; OFF-baseline survives 48.2s there because mining was the tower relief valve).
+        -- A stage 2+ rows above the rest can't brace a flat landing, so once the column is overheight RELEASE
+        -- it entirely -- flatten/plan may level it -- and re-stage after. Gated inside the knob: OFF-mode
+        -- behavior stays byte-identical to baseline.
+        local overheight = EnvelopeBrain.LULL_SUPPORT_SHIELD and t == maxT and (maxT - second) >= 2
+        if not overheight then
+          shielded[t][c] = false; shielded[t-1][c] = false
+          if t == maxT and EnvelopeBrain.LULL_SUPPORT_SHIELD then  -- contact column: clearing under it sinks the stage the block lands on
+            for r = 1, t - 2 do shielded[r][c] = false end
+          end
+          if t >= 3 then
+            for _, nb in ipairs({ c - 1, c + 1 }) do
+              if nb >= 1 and nb <= 6 and (grid[t-2][nb] or 0) == X then shielded[t-2][nb] = false; break end
+            end
           end
         end
       end

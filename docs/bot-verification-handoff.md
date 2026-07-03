@@ -199,14 +199,28 @@ PA_MECH baseline at HEAD, dev seeds 1001-1010 + holdout 2001-2010 (20 seeds):
 
 The contact-column variant eliminates dev first-landing deaths entirely and doubles
 garbage broken — the seed-1001 causal chain is confirmed end to end. But BOTH variants
-regress the holdout window: seeds 2006/2008, whose baseline lulls were healthy (2006:
-4 reveals, 75% catch), collapse to zero reveals when the support mask is on. Net
-20-seed mean is negative, so the default stays OFF. **Open question for the next
-session: root-cause seed 2006 with PA_LULLSUPPORT=1 vs 0** — what does the mask block
-that ruins a lull that was working? (Hypotheses: the shielded contact column starves
-the only viable clear line on those boards; or RAISE loops displace the stage.) The
-isolation suite (`lullShieldVerify`) runs with the knob ON and proves the mechanism:
-the stage holds its built height through live lull play.
+regress the holdout window. **Seed-2006 root cause (2026-07-03)**: pair mask + support
+mask together make the contact column COMPLETELY untouchable, so the rise grows it into
+a runaway tower — 2006 died at first landing on heights 4,5,1,4,6,7 with the block
+resting on the lone c6 tip (OFF-baseline survives 48.2s there; mining was the tower's
+relief valve). A **v2 spread release** (column fully released once maxT ≥ second+2,
+`lullShieldVerify` PIECE 1b) fixes the total lockup but NOT the regression:
+
+| variant (knob ON) | dev med/mean (broken, zero-reveal) | holdout med/mean (broken, zero-reveal) |
+|---|---|---|
+| baseline (knob OFF) | 22.0 / 22.2 (72, 4) | 20.5 / 24.4 (69, 5) |
+| v1 contact-only support mask | 25.6 / 25.7 (141, **0**) | 15.2 / 18.4 (36, 5) |
+| v2 + spread release | 24.5 / 22.1 (138, 2) | 16.6 / 18.7 (36, 6) |
+
+Even with the release, 2006 arrives at injection with spread=3 and avgH=5.0 — the
+masked lull clears less overall, so the board rides HIGHER and lands jagged anyway.
+Conclusion: hard NO-GO masking of the stage conflicts with the flat-low posture on
+tall-lull seeds. The default stays OFF (baseline byte-identical, verified). Redesign
+directions for the next attempt, in order: (a) make PLAN/CLEAR scoring PREFER
+non-stage cells (soft cost) instead of hard masks; (b) apply the support mask only
+while a block is actually in transit (pendingBig gate) so the early lull keeps full
+clear throughput; (c) the untried per-column material floor (candidate 2), which
+attacks the hollow-columns half of the problem without touching stage protection.
 
 ## Where survival stands and why it still dies
 

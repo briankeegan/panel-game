@@ -70,6 +70,27 @@ end end
 check(exact, "lullShield exact mask")
 print("  RESULT: lullShield " .. (exact and "WORKS (pair r5c2/r4c2 + trigger r3c3 masked, everything else untouched)" or "BROKEN"))
 
+-- ============ PIECE 1b: SPREAD RELEASE -- an overheight stage column is released entirely ============
+-- Col2 pair sits 2 rows above every other column (maxT 5 vs 3). Pair+support masks on a tower made the column
+-- completely untouchable, so the rise grew it unboundedly (root-caused on holdout seed 2006: died at first
+-- landing on heights 4,5,1,4,6,7, block resting on the lone tower tip). Once spread >= 2 the shield must
+-- release the column -- flatten/plan may level it -- so here NOTHING is masked (the would-be trigger at r3c3
+-- included).
+print("\n########## PIECE 1b: overheight stage column is released (spread >= 2) ##########")
+local m1b, st1b = buildStack("050000" .. "050000" .. "215123" .. "321312" .. "132231")
+printBoard(st1b, "=== tower: col2 pair at maxT=5, all other columns height 3 ===")
+local g1b, bs1b = gridOf(st1b)
+local touch1b = BoardSim.touchableGrid(bs1b.board, bs1b.rows)
+local shield1b = EnvelopeBrain.lullShield(g1b, bs1b.rows, touch1b)
+local released = true
+for r = 1, bs1b.rows do for c = 1, 6 do
+  local want = touch1b[r] and touch1b[r][c] or false
+  local got = shield1b[r] and shield1b[r][c] or false
+  if want ~= got then released = false; print(string.format("  STILL MASKED (%d,%d)", r, c)) end
+end end
+check(released, "spread release (no masking on an overheight stage)")
+print("  RESULT: spread release " .. (released and "WORKS (tower column fully touchable again)" or "BROKEN (tower still locked -> runaway rise)"))
+
 -- ============ PIECE 2: live lull decisions never SWAP the staged cells; the pair survives as a unit ============
 -- All-maxT-cocked board -> stageContact idles, so the clear/plan/flatten/pair mechanics drive -- exactly the moves
 -- the shield exists to constrain. The shield's contract is CELL-level: no fired swap may displace (r5,c2)/(r4,c2)/

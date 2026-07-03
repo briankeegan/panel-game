@@ -40,6 +40,23 @@ interrupted.
     shares the board's tallest colored top.
   - `PA_FLATDIAG=1` — **new**, prints `flattenMove`'s per-column tops, the chosen tall/short pair, and
     the computed swap row each time it acts.
+  - `PA_PLANDIAG=1` — **new**, prints `useChips.planMove`'s candidate count, chosen swap, score, and
+    commit/reject decision each call.
+  - `PA_PLANGRID=1` — **new**, prints the full color grid whenever `planMove` commits a swap that
+    predicts an immediate clear (`reward>0`) — pairs with `PA_PLANDIAG`.
+  - `PA_PLANVERIFY=1` — **new**, ground-truth check wired into `EnvelopeBrain.lua`: stashes a `PLAN`
+    swap's predicted `total`/`chain` when committed, then ~90+ frames later (once the real engine has
+    had time to execute and settle it) compares against the actual `stack.panels_cleared` delta on
+    the SAME live run — prints `MATCHED` or `DID-NOT-MATERIALIZE`. This is how items 11/12 below were
+    found: not a synthetic re-check, the real engine's own clear counter on the exact run being played.
+  - `PA_PLANVERIFY2=1` — companion to `PA_PLANVERIFY`: prints `stack.clock`/`stack.in_countdown` at
+    the moment a `PLAN` swap commits (rules out the pre-game countdown as the cause when it isn't).
+  - `PA_PLANSTATE=1` — companion to `PA_PLANVERIFY`: dumps the RAW panel state codes (not just colors)
+    for the whole board at the moment a `PLAN` swap commits, to check for stale matched/popping/popped
+    cells that the plain color grid doesn't distinguish from normal at-rest panels.
+  - `PA_CURSORDIAG=1` — **new**, in `CursorController.lua`: prints every `RISE-SHIFT` (a locked
+    target's row bumped to follow the passive rise), `FIRE` (the cell a swap actually executes at),
+    and `ABANDON` (a fired swap was refused/didn't clear and the lock let go) event.
   - `PA_BREAKDIAG=1` — prints board state when `breakRoute` finds nothing to do
   - `PA_CATCHDIAG=1` — prints catch decisions incl. `active=`/`chaining=`/`nap=` (cascade state)
   - `PA_CATALOGDBG=1` / `PA_CATALOGDBG2=1` — catalog scan (`chips.recognize`) fit/verify/accept deltas
@@ -51,10 +68,10 @@ interrupted.
 
 ## Current git state
 
-- Branch: `claude/bot-building-hpom4o`, pushed through commit `05fce30b` (buildPair fix + breakRoute/
-  rowBreak verification writeup). This session's *new* changes (stageTrigger/stageContact fixes,
-  flattenMove verification, this doc update) are uncommitted as of writing this — commit them right
-  after this doc lands (see "Immediate next step").
+- Branch: `claude/bot-building-hpom4o`, pushed through commit `bd51b0fa` (stageTrigger/stageContact
+  fixes + flattenMove verification + a catchVerify.lua test-harness fix). This session's *new*
+  changes (two foundational `BoardSim.lua` fixes plus the `planMove` verification that found them —
+  see items 11/12 below) are uncommitted as of writing this — commit them right after this doc lands.
 
 ## What's been verified correct so far (with evidence)
 
@@ -221,31 +238,95 @@ interrupted.
       regardless of what `PA_FLAT_MIN` is set to. Zero behavior change for any realistic setting
       (confirmed via the 10-seed sweep: identical results before/after this one-line guard).
 
-## Not yet verified at all (still "fires but internals untraced")
+11. **`useChips.planMove`** — **CORRECTS A MISTAKE IN THE PREVIOUS VERSION OF THIS DOC**, and led to
+    the two most significant fixes of the session (items 11b/12 below).
+    - The previous handoff said `planMove` was "gated OFF in the large-garbage DIG-ONLY brain path
+      ... lower priority." **This was wrong** — re-reading `EnvelopeBrain.lua`'s `self._bigGarbageGame`
+      branch (the DIG-ONLY path actually used by the large-garbage practice mode) shows `planMove` IS
+      called there, twice (the sealed-garbage "ASSEMBLE a clear via setup swaps" fallback, and the
+      lull-posture fallback), plus 3 more call sites in the non-DIG-ONLY paths. Confirmed empirically
+      with `PA_BEHAV`'s substate histogram on the 10-seed sweep: `PLAN` fires more often than almost
+      any other substate in most seeds (e.g. 22 times in seed 1006, more than every other substate
+      combined) — it is a first-class, heavily-used mechanic, not a rare fallback.
+    - Verification method (per the owner's "hard instrumentation, not a synthetic re-check" standard):
+      added `PA_PLANVERIFY` to compare `planMove`'s prediction against the REAL engine's own
+      `panels_cleared` counter on the SAME live run — no standalone/offline reproduction used for the
+      actual verdict (an isolated real-engine reproduction via `Puzzle`/`Match`/`Stack`, same pattern
+      as `bot/tests/boardSimVerify.lua`, was used only once, to sanity-check that `BoardSim.simSwap`'s
+      math itself was correct in isolation, before concluding the live-run divergence must be
+      elsewhere).
+    - On seed 1006 (`PA_SEED_BASE=1005`), traced 5 `PLAN` commits: 2 `DID-NOT-MATERIALIZE` beyond the
+      first (countdown) one. Root-caused both — see items 11b and 12.
 
-- The `PLAN`/`useChips.planMove` fallback path (only relevant outside DIG-ONLY mode, lower
-  priority since large-garbage mode gates the brain to DIG-ONLY per task #6). This is the only
-  mechanic left on this list — everything else in `catchPrimitive.lua`'s substate machine
-  (`breakRoute`, `rowBreak`, `buildPair`, `stageTrigger`, `stageContact`, `flattenMove`) has now had
-  the single-seed instrumented treatment (see items 5-10 above).
+11b. **Pre-game countdown swap attempts — NOT a bug.** The very first `PLAN` commit of the run
+    (`swap=(4,5)`) sat for 215 frames before `PLANVERIFY` reported `DID-NOT-MATERIALIZE`.
+    `PA_PLANVERIFY2` showed why: `clock=0 in_countdown=true` — the swap was proposed during the
+    match's own pre-game countdown (`consts.COUNTDOWN_LENGTH=180` + `COUNTDOWN_START=8` frames), during
+    which `Stack:canSwap` unconditionally refuses every swap (`self.in_countdown ... return false`)
+    regardless of what any mechanic proposes. This is correct, universal engine behavior (a human
+    player can't swap during the countdown either) — not something any bot fix should or can address.
+    Confirmed by checking every OTHER `DID-NOT-MATERIALIZE` case: all had `in_countdown=false`.
+
+12. **Two real, foundational bugs found and fixed in `bot/BoardSim.lua`** — both discovered while
+    root-causing `planMove`'s remaining (non-countdown) mispredictions, both affect every mechanic
+    that reads `BoardSim.colorGrid`/`touchableGrid` (i.e. all of `catchPrimitive.lua` too), not just
+    `planMove`.
+    - **(a) `touchableGrid` was missing a real `Stack:canSwap` rule.** The engine refuses a swap if
+      the panel directly ABOVE either swap cell is `hovering` (state 5) — `common/engine/Stack.lua:1402`,
+      "neither space above us can be hovering" — independent of the swap cells' own state.
+      `BoardSim.touchableGrid` only ever checked each cell's OWN state, never its neighbor above.
+      Fixed: `touchableGrid` now also requires the cell directly above to not be hovering. Verified
+      the real rule by reading `Stack:canSwap` directly, confirmed `hovering=5` against
+      `client/src/network/PanelStateCodes.lua`. **Caveat**: this fix, while independently correct and
+      kept, did NOT turn out to be the cause of the specific seed-1006 stall it was written to explain
+      (that one was the countdown, item 11b) — re-verify wasn't wasted since it's a real gap closed,
+      but the attribution in the first draft of this fix was wrong; always check ground truth (which
+      is exactly what caught the mistake here) rather than stopping at "a plausible-sounding cause."
+    - **(b) `colorGrid` didn't filter out already-resolving panels — this is the big one.** A panel
+      that's already `matched`(3), `popping`(2), or `popped`(9) from an EARLIER, unrelated match still
+      carries its stale color in `board[r][c].c` for several frames while it visually clears.
+      `BoardSim.colorGrid` read that color unconditionally, so `BoardSim.resolve`'s `findMatches`
+      would "discover" that stale run as a FRESH match on every `simSwap` call this frame — crediting
+      whatever swap is being scored with a clear it didn't cause and has nothing to do with. Confirmed
+      directly: `PA_PLANSTATE` on the seed-1006 `swap=(5,2)` mispredict (predicted total=3, actual=2)
+      showed row 3 columns 4-6 reading color `1,1,1` (looks like a live, matchable triple) but state
+      codes `9,2,2` (popped/popping/popping — already gone, unrelated to this swap). Fixed: `colorGrid`
+      now reports matched/popping/popped cells as empty(0) instead of their stale color — consistent
+      with the simulator's existing "instant full settle" approximation (already documented for the
+      DEEP-CHAIN PHANTOM case in `BoardSim.resolve`), just applied one step earlier.
+    - **Impact, measured on the real engine, same seed**: seed 1006 went from 694 frames / 11.6s / 0
+      garbage broken (pre-fix) to **1721 frames / 28.7s / 138 garbage broken** (post-fix) — a single
+      foundational fix more than doubling one seed's survival and unlocking its first-ever break in
+      this window. Re-ran the 10-seed `600 3600 10` sweep: median 15.9s → 16.5s, mean 18.1s → 18.3s
+      (some individual seeds moved down, e.g. 1005 19.5s→11.4s and 1010 lost its 144-garbage-broken
+      run — expected: changing an early decision cascades the whole rest of a chaotic run differently,
+      sometimes for the worse on a given seed even when the fix is strictly more correct; the point of
+      the per-seed median, not single-seed numbers, is to average that out). `bot/tests/catchVerify.lua`
+      still reports 8/8 OK. `DETERMINISM: PASS` on the parity check.
+    - **Known remaining limitation, not new, not fixed today**: deeper `chain>=2` predictions still
+      sometimes over-predict (e.g. `swap=(5,3) predictedTotal=9 predictedChain=3 actual=0` was still
+      seen after both fixes) — this is the ALREADY-DOCUMENTED "DEEP-CHAIN PHANTOM" in
+      `BoardSim.resolve`'s own comment (the engine settles cascades wave-by-wave with hover delay
+      between links; the simulator's instant full-settle can align links that never actually fire).
+      `PA_MAXLINK` already exists as a mitigation knob. Out of scope for today — a real, still-open
+      item for a future pass, now with a much clearer live-engine reproduction path
+      (`PA_PLANVERIFY`) than existed before this session.
+
+## Not yet verified at all
+
+None remaining from the original per-mechanic list. Every substate in `catchPrimitive.lua`
+(`breakRoute`, `rowBreak`, `buildPair`, `stageTrigger`, `stageContact`, `flattenMove`) and
+`useChips.planMove` has now had the single-seed, real-engine-ground-truth treatment the owner
+mandated (items 5-12 above). The one still-open, explicitly-scoped-out item is the deep-chain
+phantom limitation noted in item 12 — a known, pre-existing, documented approximation, not an
+unverified mechanic.
 
 ## Immediate next step for whoever picks this up
 
-1. Commit the working-tree changes to `bot/catchPrimitive.lua` (PA_STAGEDIAG, PA_FLATDIAG
-   diagnostics + the `stageTrigger`/`stageContact` fixes + the `flattenMove` defensive guard) and
-   this doc update, with a root-cause commit message (matching the style of `b462d959`/`d9db36cb`/
-   `05fce30b`), and push to `claude/bot-building-hpom4o`. This has been done as part of this handoff
-   update — check `git log` before redoing it.
-2. `useChips.planMove` is the last unverified mechanic. Since it's gated OFF in the large-garbage
-   DIG-ONLY brain path (per task #6), it's lower priority than everything already done — but the
-   owner's instruction was to verify EVERY mechanic before tuning, so don't skip it permanently, just
-   do it last. Same method: single seed (will need a mode/config where DIG-ONLY is off, or a seed/
-   moment where the brain falls through to PLAN even in DIG-ONLY, if that's possible — check
-   `EnvelopeBrain.lua`'s substate machine for when PLAN is actually reachable under large-garbage
-   settings first), targeted diagnostics, trace a real decision, confirm correct or fix.
-3. Once `planMove` is done, EVERY mechanic on the original list has been through hard single-seed
-   verification. Only then should work move to task #3 (generalize: 10-seed sweep vs 6x12, target
-   median 5 min survival) and task #4 (freeze the 6x4 protocol, confirm verify suites + CI).
+Every mechanic on the original list is now verified (items 5-12). Next: task #3 (generalize —
+10-seed sweep vs 6x12, target median 5 min survival) and task #4 (freeze the 6x4 protocol, confirm
+verify suites + CI). The deep-chain phantom limitation (item 12) is a known, pre-existing gap to
+revisit during tuning, not a blocker.
 
 ## Task tracker state (as of this handoff)
 
@@ -256,25 +337,19 @@ interrupted.
 - #5 completed — per-mechanic outcome instrumentation (catch completion rate, reseal→re-break latency)
 - #6 completed — gate brain to dig-only mechanics for big garbage
 - #7 in_progress — fix CATCH execution until completion rate is high, then long survival (this is
-  the umbrella task the current verification pass falls under); `rowBreak`, `buildPair`,
-  `stageTrigger`, `stageContact`, and `flattenMove` are now additionally verified/fixed under this
-  task since this handoff. Only `useChips.planMove` remains unverified.
+  the umbrella task the current verification pass falls under). Every mechanic verified/fixed under
+  this task as of this handoff: `rowBreak`, `buildPair`, `stageTrigger`, `stageContact`,
+  `flattenMove`, `planMove`, plus the two foundational `BoardSim.lua` fixes (item 12).
 
 ## Files touched this session
 
-- `bot/EnvelopeBrain.lua` — chipVerify rewrite, catalog diagnostics, cross-column reservation
-  guard, CATCHDIAG cascade-state fields. **Committed** (`b462d959`).
-- `bot/catchPrimitive.lua`:
-  - `M.topRow` export, `findTopOff`/`findCatch` touchable-awareness, catalog diagnostics
-    (committed in `b462d959`).
-  - `breakRoute` distance-aware rewrite (committed in `d9db36cb`).
-  - `PA_ELIGWHY` diagnostic on `breakRoute`'s finishability scan (resolves item 5's open question);
-    `PA_ROWBREAKDIAG` diagnostic on `rowBreak` (verifies item 6); `PA_BUILDPAIRDIAG` diagnostic plus
-    the `ownsIntactPair` guard fix on `buildPair` (finds + fixes the real bug in item 7).
-    **Committed** (`05fce30b`).
-  - **This session, uncommitted in the working tree**: `PA_STAGEDIAG` diagnostic plus the two-pass
-    counting fix on `stageTrigger` and the continue-scanning fix on `stageContact` (items 8/9);
-    `PA_FLATDIAG` diagnostic plus the `bestC`/`bestDiff` defensive guard on `flattenMove` (item 10).
-- `bot/survivalStress.lua` — `PA_DECDUMP`, `PA_VERIFYDIAG` diagnostics. **Committed** (`b462d959`).
-- `docs/bot-verification-handoff.md` — this file; supersedes the version committed in `d9db36cb`/
-  `05fce30b`.
+- `bot/catchPrimitive.lua`, `bot/EnvelopeBrain.lua`, `bot/survivalStress.lua` — see `b462d959`,
+  `d9db36cb`, `05fce30b`, `9da8515b`, `bd51b0fa` (all committed; see git log for detail).
+- `bot/BoardSim.lua` — `touchableGrid` hovering-above-swap fix, `colorGrid` stale-resolving-panel
+  fix (item 12). Uncommitted at time of writing.
+- `bot/CursorController.lua` — `PA_CURSORDIAG`. Uncommitted.
+- `bot/EnvelopeBrain.lua` — `PA_PLANVERIFY`/`PA_PLANVERIFY2`/`PA_PLANSTATE`, `firePlan` wiring for
+  all `planMove` call sites. Uncommitted.
+- `bot/useChips.lua` — `PA_PLANDIAG`/`PA_PLANGRID`, `planMove` now also returns `total`/`chain` for
+  verification. Uncommitted.
+- `docs/bot-verification-handoff.md` — this file.

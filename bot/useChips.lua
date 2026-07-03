@@ -449,7 +449,7 @@ function M.planMove(grid, rows, touchable, cursor, force, keepMaterial)
     local s, g, total, chain, bonus = scoreSwap(grid, rows, sw[1], sw[2], immScale)
     local reward = (total > 0) and (W_IMMEDIATE_TOTAL * total + W_IMMEDIATE_CHAIN * chain) or 0
     local dist = (sw[1] > cr and sw[1] - cr or cr - sw[1]) + (sw[2] > cc and sw[2] - cc or cc - sw[2])  -- from the cursor
-    beam[#beam + 1] = { g = g, score = s, reward = reward, setup = bonus, first = sw, dist = dist }
+    beam[#beam + 1] = { g = g, score = s, reward = reward, setup = bonus, first = sw, dist = dist, total = total, chain = chain }
   end
   if #beam == 0 then return nil end
   local function trim(states)
@@ -483,8 +483,24 @@ function M.planMove(grid, rows, touchable, cursor, force, keepMaterial)
   -- sets up a recognized chip (setup), or improves the board. Only bail (-> raise/organize, never a junk @1,1 corner
   -- swap) when the best plan does NONE of those. Gating on the path -- not the mid-build leaf's eval -- is what lets
   -- depth commit a build whose payoff is a move or two out (the deep search was strangled by the old leaf-only guard).
-  if not force and best.reward == 0 and (best.setup or 0) == 0 and best.score <= eval(grid, rows) then return nil end  -- force (DANGER): any move beats standing still and dying
-  return best.first
+  local baseline = eval(grid, rows)
+  local reject = not force and best.reward == 0 and (best.setup or 0) == 0 and best.score <= baseline
+  if os.getenv("PA_PLANDIAG") then
+    print(string.format("  PLANDIAG cands=%d best=(%d,%d) score=%.1f baseline=%.1f reward=%d setup=%d force=%s -> %s",
+      #beam, best.first[1], best.first[2], best.score, baseline, best.reward, best.setup or 0, tostring(force), reject and "REJECT(nil)" or "COMMIT"))
+    if os.getenv("PA_PLANGRID") and not reject and best.reward > 0 then
+      local rows2 = rows
+      local rowStr = {}
+      for r = math.min(rows2, 12), 1, -1 do
+        local rc = {}
+        for c = 1, 6 do local v = grid[r] and grid[r][c] or 0; rc[c] = (v == GARBAGE) and "G" or tostring(v) end
+        rowStr[#rowStr + 1] = "r" .. r .. ":" .. table.concat(rc)
+      end
+      print("  PLANGRID swap=(" .. best.first[1] .. "," .. best.first[2] .. ") rows=" .. rows2 .. " " .. table.concat(rowStr, " "))
+    end
+  end
+  if reject then return nil end  -- force (DANGER): any move beats standing still and dying
+  return best.first, best.total, best.chain  -- extra returns (backward compatible) for PA_PLANVERIFY ground-truth tracking in EnvelopeBrain
 end
 
 return M

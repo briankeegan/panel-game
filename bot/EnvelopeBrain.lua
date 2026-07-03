@@ -388,6 +388,36 @@ function EnvelopeBrain:decide(state, stack, match)
       self._substate = kind; move = { type = "SWAP", pos = rc, swaps = { rc }, kind = kind }
     end
     local function wait() self._substate = "WAIT"; move = { type = "WAIT" } end
+    -- PA_PLANVERIFY (2026-07, root-causing whether planMove's predicted immediate clear actually lands on the REAL
+    -- engine, not a standalone reproduction): stash the prediction when a PLAN swap commits with total>0, then on a
+    -- LATER real decide() call (once the controller has had time to travel+execute+settle it) compare against the
+    -- stack's own panels_cleared counter -- ground truth from the SAME live run, not a synthetic re-check.
+    local function firePlan(mv, total, chain)
+      fireSwap(mv, "PLAN")
+      if os.getenv("PA_PLANVERIFY") and total and total > 0 and not self._planVerify then
+        self._planVerify = { frame = stack.clock or 0, before = stack.panels_cleared or 0, r = mv[1], c = mv[2], total = total, chain = chain or 0 }
+        if os.getenv("PA_PLANVERIFY2") then
+          print(string.format("  PLANVERIFY2 commit swap=(%d,%d) clock=%s in_countdown=%s", mv[1], mv[2], tostring(stack.clock), tostring(stack.in_countdown)))
+        end
+        if os.getenv("PA_PLANSTATE") then    -- raw panel STATE codes (not just color) for the whole board, to check
+          local parts = {}                    -- for stale matched(3)/popping(2) cells colorGrid doesn't filter out
+          for r = math.min(rows, 12), 1, -1 do
+            local rc = {}
+            for c = 1, 6 do local p = state.board[r] and state.board[r][c]; rc[c] = p and tostring(p.s) or "?" end
+            parts[#parts + 1] = "r" .. r .. ":" .. table.concat(rc, ",")
+          end
+          print("  PLANSTATE " .. table.concat(parts, " "))
+        end
+      end
+    end
+    if os.getenv("PA_PLANVERIFY") and self._planVerify and (stack.clock or 0) - self._planVerify.frame >= 90 then
+      local pv = self._planVerify
+      local actual = (stack.panels_cleared or 0) - pv.before
+      print(string.format("  PLANVERIFY swap=(%d,%d) predictedTotal=%d predictedChain=%d actualClearedByF%d=%d framesWaited=%d %s",
+        pv.r, pv.c, pv.total, pv.chain, stack.clock or 0, actual, (stack.clock or 0) - pv.frame,
+        (actual >= pv.total) and "MATCHED" or "DID-NOT-MATERIALIZE"))
+      self._planVerify = nil
+    end
     -- the deepest chain a single swap fires on the LIVE board (exact facts, depth matches engine). Memoized per decision.
     -- Its height drop is the escape; in DANGER we fire the deepest available, in OFFENSE only a worthwhile (deep) one.
     local _cb
@@ -405,8 +435,8 @@ function EnvelopeBrain:decide(state, stack, match)
     -- last resort when nothing direct is playable: build toward a break/clear (NOT a competing path -- only runs after the
     -- situation's real options all returned nil). keepMaterial holds in OFFENSE-with-garbage (build to break), clears in DANGER.
     local function planFallback()
-      local mv = useChips.planMove(grid, rows, touchable, cursor, st == "DANGER", false)  -- keepMaterial=false: under a flood, CLEAR/drop height rather than hold (the catch+break already supply the breaking)
-      if mv then fireSwap(mv, "PLAN") else wait() end
+      local mv, total, chain = useChips.planMove(grid, rows, touchable, cursor, st == "DANGER", false)  -- keepMaterial=false: under a flood, CLEAR/drop height rather than hold (the catch+break already supply the breaking)
+      if mv then firePlan(mv, total, chain) else wait() end
     end
     self._substate = nil
     if self._bigGarbageGame then
@@ -438,8 +468,8 @@ function EnvelopeBrain:decide(state, stack, match)
             if cl then fireChip(cl, "CLEAR")
             else local tg = catchPrimitive.stageContact(grid, rows, touchable) or catchPrimitive.stageTrigger(grid, rows, touchable)  -- RE-COCK the contact column between breaks (cocked seeds got exactly ONE break then stalled)
               if tg then fireSwap(tg, "DIG_TRIGGER")
-              else local mv = useChips.planMove(grid, rows, touchable, cursor, true, false)  -- ASSEMBLE a clear via setup swaps (no ready clear + no finishable break = the only path to dropping the block's supports)
-                if mv then fireSwap(mv, "PLAN")
+              else local mv, total, chain = useChips.planMove(grid, rows, touchable, cursor, true, false)  -- ASSEMBLE a clear via setup swaps (no ready clear + no finishable break = the only path to dropping the block's supports)
+                if mv then firePlan(mv, total, chain)
                 else local fl = catchPrimitive.flattenMove(grid, rows, touchable)
                   if fl then fireSwap(fl, "FLATTEN") else wait() end
                 end
@@ -459,8 +489,9 @@ function EnvelopeBrain:decide(state, stack, match)
         if ct then fireSwap(ct, "BRACE_CONTACT")
         else local cl = (height >= 5 and avgH >= 3) and clearChip(false, true) or nil  -- avgH floor: keep enough material for a contact trio (a stripped board can't break anything -- seed 1001 got mined to avgH 1.3, 0 breaks)
           if cl then fireChip(cl, "CLEAR")
-          else local mv = (height >= 5 and avgH >= 3) and useChips.planMove(grid, rows, touchable, cursor, true, false) or nil
-            if mv then fireSwap(mv, "PLAN")
+          else local mv, total, chain
+            if height >= 5 and avgH >= 3 then mv, total, chain = useChips.planMove(grid, rows, touchable, cursor, true, false) end
+            if mv then firePlan(mv, total, chain)
             else local fl = catchPrimitive.flattenMove(grid, rows, touchable)
               if fl then fireSwap(fl, "FLATTEN")
               else local tg = catchPrimitive.stageTrigger(grid, rows, touchable)
@@ -527,8 +558,8 @@ function EnvelopeBrain:decide(state, stack, match)
         elseif avgH >= 5 then
           -- TALL lull (no garbage yet, rise climbing): chase a clear BEFORE posture -- the plan-first order is what got
           -- the injection-off baseline to the 300s cap; unconditional it cost the landings, so it only runs when tall.
-          local mv = useChips.planMove(grid, rows, touchable, cursor, true, false)
-          if mv then fireSwap(mv, "PLAN")
+          local mv, total, chain = useChips.planMove(grid, rows, touchable, cursor, true, false)
+          if mv then firePlan(mv, total, chain)
           else local tg = catchPrimitive.stageTrigger(grid, rows, touchable)
             if tg then fireSwap(tg, "BRACE_TRIGGER")
             else local bp = catchPrimitive.buildPair(grid, rows, touchable)
@@ -539,8 +570,8 @@ function EnvelopeBrain:decide(state, stack, match)
           if tg then fireSwap(tg, "BRACE_TRIGGER")
           else local bp = catchPrimitive.buildPair(grid, rows, touchable)
             if bp then fireSwap(bp, "BRACE_PAIR")
-            else local mv = useChips.planMove(grid, rows, touchable, cursor, true, false)
-              if mv then fireSwap(mv, "PLAN") else wait() end
+            else local mv, total, chain = useChips.planMove(grid, rows, touchable, cursor, true, false)
+              if mv then firePlan(mv, total, chain) else wait() end
             end
           end
         end
@@ -566,8 +597,8 @@ function EnvelopeBrain:decide(state, stack, match)
             if cl then fireChip(cl, "CLEAR")
             else local fl = (not self._endless) and catchPrimitive.flattenMove(grid, rows, touchable) or nil  -- GARBAGE: LEVEL during the lull (only fires on a step>=2) so the block lands FLAT across all columns -> 6 break points, not the lopsided 1-column landing that stalls the break ~6s.
               if fl then fireSwap(fl, "FLATTEN")
-              else local mv = useChips.planMove(grid, rows, touchable, cursor, false, true)
-                if mv then fireSwap(mv, "PLAN")
+              else local mv, total, chain = useChips.planMove(grid, rows, touchable, cursor, false, true)
+                if mv then firePlan(mv, total, chain)
                 elseif not busy and safeToRaise then self._substate = "RAISE"; move = { type = "RAISE" }
                 else local bp = catchPrimitive.buildPair(grid, rows, touchable)  -- idle last-resort lock pre-lay (secondary). buildPair AHEAD of clearing rides the rise up. Keep it last.
                   if bp then fireSwap(bp, "BUILDPAIR") else wait() end

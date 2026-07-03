@@ -76,6 +76,9 @@ function CursorController:nextInput(state, decision)
   -- STALE cell and never fires the swap — the worst-decile dig-execution race.
   local disp = state.displacement or 16
   if self.lockedPos and self._lastDisp and disp > self._lastDisp + 6 then
+    if os.getenv("PA_CURSORDIAG") then
+      print(string.format("  CURSORDIAG RISE-SHIFT kind=%s pos=(%d,%d)->(%d,%d)", tostring(self.lockedKind), self.lockedPos[1], self.lockedPos[2], self.lockedPos[1] + 1, self.lockedPos[2]))
+    end
     self.lockedPos[1] = self.lockedPos[1] + 1
     if self.lockedSeq then for _, sw in ipairs(self.lockedSeq) do sw[1] = sw[1] + 1 end end -- the whole chip shifts up
     if self.lockedPos[1] > (state.rows or 12) then
@@ -162,10 +165,12 @@ function CursorController:nextInput(state, decision)
   elseif self._swappedCell == cell then
     -- SWAP ONCE: already fired this exact cell and the cursor hasn't moved off it, so the swap was refused (countdown /
     -- canSwap=false) or didn't clear. Don't grind it forever -- abandon so the brain can pick a different move.
+    if os.getenv("PA_CURSORDIAG") then print(string.format("  CURSORDIAG ABANDON kind=%s cell=(%d,%d) (swap fired but refused/no-clear)", tostring(self.lockedKind), cr, cc)) end
     self.locked, self.lockedSeq, self.lockedPos = nil, nil, nil; self.idle = true
     return IDLE
   else
     bits = 16; self.swapped = true; self._swappedCell = cell   -- aligned: swap once, and remember we fired here
+    if os.getenv("PA_CURSORDIAG") then print(string.format("  CURSORDIAG FIRE kind=%s cell=(%d,%d)", tostring(self.lockedKind), cr, cc)) end
   end
   return char(bits)
 end

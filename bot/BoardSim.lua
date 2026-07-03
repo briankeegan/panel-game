@@ -30,11 +30,28 @@ BoardSim.isGarbage = isGarbage
 -- bottom row breaks, captured by BoardState.extract from the engine's garbage
 -- buffer; nil if unknown). Stored under a string key so numeric row iteration is
 -- unaffected.
+-- ALREADY-RESOLVING panels (state matched(3), popping(2), popped(9) -- see PanelStateCodes) report as EMPTY(0), not
+-- their stale color. Root-caused 2026-07 via PA_PLANSTATE on a real seed: a panel mid-clear from an EARLIER match
+-- still carries its old color in board[r][c].c for several frames while it visually pops, so without this a run like
+-- three color-1 cells that are ALREADY matched/popping/popped still reads as three ordinary, at-rest color-1 panels.
+-- BoardSim.resolve's findMatches then "discovers" that stale run as a FRESH match on EVERY simSwap call this frame,
+-- crediting whatever swap is being scored with a clear it didn't cause and isn't related to -- inflating
+-- planMove/useChips predictions (confirmed: a candidate swap predicted total=3 while the engine only ever cleared 2,
+-- because 3 of the "3" were a pre-existing pop already in flight, unrelated to the swap). These panels ARE really
+-- there for gravity purposes for a few more frames in the real engine, but since this whole simulator already treats
+-- every resolve as an instant full-settle (see the DEEP-CHAIN PHANTOM note in BoardSim.resolve), treating them as
+-- already-gone is consistent with that same approximation and is a strict improvement over counting them as fresh,
+-- rematchable material forever.
+local RESOLVING_STATE = { [2] = true, [3] = true, [9] = true }  -- popping, matched, popped
 function BoardSim.colorGrid(board, rows)
   local g, reveal = {}, {}
   for r = 1, rows do
     local src, dst, rev = board[r], {}, {}
-    for c = 1, WIDTH do dst[c] = src[c].isGarbage and GARBAGE or src[c].c; rev[c] = src[c].reveal end
+    for c = 1, WIDTH do
+      local p = src[c]
+      dst[c] = (p.isGarbage and GARBAGE) or (RESOLVING_STATE[p.s] and 0) or p.c
+      rev[c] = p.reveal
+    end
     g[r] = dst; reveal[r] = rev
   end
   g.reveal = reveal
@@ -46,13 +63,24 @@ end
 -- popping(2), matched(3), hovering(5), falling(6), dimmed-garbage(7)) is a no-go: don't touch it, don't read it for a
 -- pattern. This lets the bot keep working the settled regions while other parts of the board are still resolving,
 -- instead of pausing the whole brain until the board is 100% still.
+-- ALSO (2026-07, root-caused via PA_PLANVERIFY/PA_CURSORDIAG on a real seed): the real engine's Stack:canSwap refuses
+-- ANY swap where the panel directly ABOVE either swap cell is hovering(5) -- "neither space above us can be hovering"
+-- -- independent of the swap cells' own state. This mask was missing that check entirely, so a cell whose own state
+-- was fine (normal/landing) but which had a hovering panel sitting on top of it still came back "touchable", and any
+-- mechanic that swapped through it (planMove above all -- it targets the active near-top band where freshly-landed
+-- hovering panels are common) got the swap silently REFUSED by the real engine every time. Confirmed: a captured
+-- live-run swap the bot re-decided identically 8 times in a row (the board never changing because the swap never
+-- actually executed) before finally drifting off the hovering panel by chance. Now baked in here so every caller
+-- (touchOK, legalSwaps, ...) gets the real rule for free without each one re-deriving it.
 function BoardSim.touchableGrid(board, rows)
   local g = {}
   for r = 1, rows do
     local src, dst = board[r], {}
+    local above = board[r + 1]
     for c = 1, WIDTH do
       local p = src[c]
-      dst[c] = (p and not p.isGarbage and (p.s == 0 or p.s == 4)) or false
+      local aboveHovering = above and above[c] and above[c].s == 5
+      dst[c] = (p and not p.isGarbage and (p.s == 0 or p.s == 4) and not aboveHovering) or false
     end
     g[r] = dst
   end

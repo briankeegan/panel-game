@@ -20,7 +20,12 @@ local function grid(st)
 end
 local function playSwap(m, st, r, c)
   st.cur_row, st.cur_col = r, c; st:receiveConfirmedInput(KDE.swap); m:run()
-  for k = 1, 60 do if st:game_ended() then break end st:receiveConfirmedInput("A"); m:run(); if k >= 3 and not st:hasActivePanels() and not st:hasChainingPanels() then break end end
+  -- 250, not 60 (2026-07): a swap that pops garbage doesn't clear it immediately -- the engine staggers each column's
+  -- reveal/convert countdown (confirmed up to ~180f for a 6-wide block in PIECE 7's own trace below), and
+  -- hasActivePanels() correctly stays true for the whole countdown. The old 60f cap bailed mid-countdown, so PIECE 6
+  -- always read garbageCount before it had a chance to drop -- a false negative, not a real breakRoute failure
+  -- (confirmed: the same board/swap DOES break within ~183f, see docs/bot-verification-handoff.md).
+  for k = 1, 250 do if st:game_ended() then break end st:receiveConfirmedInput("A"); m:run(); if k >= 3 and not st:hasActivePanels() and not st:hasChainingPanels() then break end end
 end
 local function printBoard(st, label)
   print(label); local g = grid(st)
@@ -61,10 +66,11 @@ printBoard(st2, "=== start: col3 top=5, need a 5 in r1 ===")
 local g2 = grid(st2)
 local to = catchPrimitive.findTopOff(g2, 3, 5, 6, st2.height)
 print("  findTopOff(col3,5) -> " .. (to == nil and "nil" or (to.already and "ALREADY" or ("swap (" .. to.swap[1] .. "," .. to.swap[2] .. ")"))))
+local pair = false                                -- hoisted (2026-07): must outlive the `if` below to reach the summary
 if to and to.swap then
   playSwap(m2, st2, to.swap[1], to.swap[2])
   local g3 = grid(st2); local t = topRow(g3, 3, st2.height)
-  local pair = (t >= 2 and g3[t][3] == 5 and g3[t - 1][3] == 5)
+  pair = (t >= 2 and g3[t][3] == 5 and g3[t - 1][3] == 5)
   printBoard(st2, "=== after findTopOff swap ===")
   print("  RESULT: findTopOff " .. (pair and "WORKS (pair [5,5] at col3)" or "did NOT build the pair"))
 
@@ -212,5 +218,11 @@ local dropOK = #etas > 0 and etas[1] > 0 and etas[#etas] <= etas[1]
 print("  dropETA during break: " .. (#etas > 0 and (etas[1] .. " -> " .. etas[#etas] .. " over " .. #etas .. " samples") or "NONE"))
 print("  RESULT: dropETA " .. (dropOK and "WORKS (positive budget, counts down toward the drop)" or "did NOT produce a sensible budget"))
 
+-- FIXED (2026-07): every status below used to be a hardcoded "OK" regardless of what its own RESULT line above
+-- actually measured -- so a real failure (see breakRoute, which failed here until the playSwap timeout fix above)
+-- was silently reported as passing. Now each one reads the same boolean its RESULT: line already computed.
 print("\n================= SUMMARY =================")
-print("  catchRoute=OK(stacks via fall)  findTopOff=OK  buildPair=OK  flattenMove=OK  breakRoute=OK  garbageReveal=OK  findCatch=" .. (cat and "OK" or "??") .. "  dropETA=" .. (dropOK and "OK" or "??"))
+print("  catchRoute=" .. (built and "OK" or "??") .. "(stacks via fall)  findTopOff=" .. (pair and "OK" or "??")
+  .. "  buildPair=" .. (pairOK and "OK" or "??") .. "  flattenMove=" .. ((fl and sp1 < sp0) and "OK" or "??")
+  .. "  breakRoute=" .. (broke and "OK" or "??") .. "  garbageReveal=" .. ((sawBreaking and sawOpen) and "OK" or "??")
+  .. "  findCatch=" .. (cat and "OK" or "??") .. "  dropETA=" .. (dropOK and "OK" or "??"))

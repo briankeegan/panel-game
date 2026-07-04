@@ -256,7 +256,15 @@ end
 
 function EnvelopeBrain:tryCatch(grid, rows, stack, priorities, verify, touchable)
   local open = garbageReveal.openColumns(stack)
-  for c = BoardSim.WIDTH, 1, -1 do
+  -- serve order: committed column first (PA_CATCHSTICK, see knob comment), then 6->1 as always. The commit is
+  -- set below whenever a column yields an action, and dropped when its column closes or the window ends.
+  local order = {}
+  local committed = EnvelopeBrain.CATCH_STICK and self._catchCol or nil
+  if committed and not open[committed] then committed = nil; self._catchCol = nil end
+  if committed then order[#order + 1] = committed end
+  for cc = BoardSim.WIDTH, 1, -1 do if cc ~= committed then order[#order + 1] = cc end end
+  if next(open) == nil then self._catchCol = nil end
+  for _, c in ipairs(order) do
     local color = open[c]
     if color then
       local reserved = reservedCellsFrom(grid, rows, open, c)
@@ -291,10 +299,12 @@ function EnvelopeBrain:tryCatch(grid, rows, stack, priorities, verify, touchable
       end
       if cat and cat.kind ~= "TOPOFF" then
         if os.getenv("PA_CATCHDIAG") then print(string.format("  CATCHDIAG col=%d color=%d CATALOG kind=%s", c, color, cat.kind)) end
+        self._catchCol = c
         return { swaps = cat.swaps, kind = "CATCH_" .. cat.kind }
       end       -- catalog combo/chain
       if cat and cat.kind == "TOPOFF" and cat.swap then
         if os.getenv("PA_CATCHDIAG") then print(string.format("  CATCHDIAG col=%d color=%d TOPOFF swap=(%d,%d)", c, color, cat.swap[1], cat.swap[2])) end
+        self._catchCol = c
         return { swaps = { cat.swap }, kind = "CATCH_TOPOFF" }
       end -- 1-swap floor
       if cat and cat.kind == "TOPOFF" and cat.already then
@@ -304,18 +314,21 @@ function EnvelopeBrain:tryCatch(grid, rows, stack, priorities, verify, touchable
         -- disturb the very pair just finished (traced: 4 slides built a matching pair at col5, it broke again 1
         -- decision later once nothing signaled "hold, don't touch this column"). ready=true holds without disturbing it.
         if os.getenv("PA_CATCHDIAG") then print(string.format("  CATCHDIAG col=%d color=%d ALREADY-READY (holding)", c, color)) end
+        self._catchCol = c
         return { ready = true, col = c }
       end
       if not os.getenv("PA_NOSLIDE") then
         local slide = catchPrimitive.catchSlide(grid, rows, c, color, guarded)  -- horizontal-slide: no height requirement, monotonic convergence
         if slide then
           if os.getenv("PA_CATCHDIAG") then print(string.format("  CATCHDIAG col=%d color=%d SLIDE swap=(%d,%d)", c, color, slide[1], slide[2])) end
+          self._catchCol = c
           return { swaps = { slide }, kind = "CATCH_SLIDE" }
         end
       end
       local route = (not os.getenv("PA_NOROUTE")) and catchPrimitive.catchRoute(grid, rows, c, color, guarded) or nil  -- multi-swap stack; PA_NOROUTE isolates whether ONLY this disruptive path hurts vs the 1-swap topoff
       if route then
         if os.getenv("PA_CATCHDIAG") then print(string.format("  CATCHDIAG col=%d color=%d ROUTE swap=(%d,%d)", c, color, route[1], route[2])) end
+        self._catchCol = c
         return { swaps = { route }, kind = "CATCH_ROUTE" }
       end
     end
@@ -384,6 +397,15 @@ EnvelopeBrain.LULL_FLOOR_CLEAR = tonumber(os.getenv("PA_FLOORCLEAR")) or 0
 -- big-garbage game -- immediate-clear rewards scaled 0.15x ALL lull long; eval still steers, ready CLEAR chips
 -- are untouched, only the planner's appetite for strip-mining clears changes.
 EnvelopeBrain.TRANSIT_HOLD = tonumber(os.getenv("PA_TRANSITHOLD")) or 0
+-- CATCH STICKINESS (2026-07-04, from a PA_TRACE/PA_CATCHDIAG anatomy of holdout seed 2002 -- default-OFF knob):
+-- tryCatch re-serves open columns 6->1 EVERY decision, so with 2+ open columns two donor walks run INTERLEAVED
+-- in the same surface row (traced: col2 walking a 3 leftward via slides (1,5),(1,4) while col4 walks a 2
+-- rightward via (1,1),(1,2),(1,3)) -- each row-1 swap displaces the other walk's donor, and at ~30 frames per
+-- slide neither converges inside the ~110-frame reveal window (seed 2002: reveals=1 catchDone=0, died 20.6s).
+-- Same thrash class breakRoute had before it learned to commit to ONE target. PA_CATCHSTICK=1: once a column
+-- yields an actionable catch, SERVE IT FIRST on subsequent decisions of the same window; other columns are
+-- fallbacks only when the committed column yields nothing. Commit clears when the window ends (no open columns).
+EnvelopeBrain.CATCH_STICK = os.getenv("PA_CATCHSTICK") == "1"
 -- pure (unit-tested in lullShieldVerify PIECE 6): copy `base`, additionally mask every cell of each column
 -- whose top is 1..floor. Empty columns stay as-is (nothing there to mine; filling them must stay legal in the
 -- masks that allow it).

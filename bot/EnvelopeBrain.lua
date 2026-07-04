@@ -341,12 +341,19 @@ end
 -- is proven, the interaction isn't understood. Modes (PA_LULLSUPPORT / LULL_SUPPORT_SHIELD): 0 = off (default,
 -- baseline byte-identical), 1 = always lock the contact stage, 2 = TRANSIT-ONLY (lock only while a big block is
 -- announced in transit, pendingBig >= 3 -- the early lull keeps full clear throughput, addressing the measured
--- "masked lull clears less, board rides higher" failure of mode 1 on the holdout window).
+-- "masked lull clears less, board rides higher" failure of mode 1 on the holdout window; measured a NO-OP: the
+-- stage-sinking mining happens before the announcement), 3 = SOFT (2026-07-04): no hard support mask at all --
+-- lull CLEAR tries the support-locked mask first but FALLS BACK to the plain pair shield (throughput never
+-- lost), and lull PLAN scores stage-column sinking as a soft cost (PA_SINKW per dropped row, useChips.planMove
+-- opts) instead of forbidding it. Attacks mode 1's holdout regression (starved clears -> board rides higher)
+-- while keeping its dev win (stage survives to landing).
 EnvelopeBrain.LULL_SUPPORT_SHIELD = tonumber(os.getenv("PA_LULLSUPPORT")) or 0
+EnvelopeBrain.SINK_W = tonumber(os.getenv("PA_SINKW")) or 120  -- mode 3 soft cost per row a lull PLAN sinks the stage's contact column (a plain 3-clear's immediate reward is ~500: 120*3=360 loses to a real clear, wins ties)
 function EnvelopeBrain.lullShield(grid, rows, touchable, lockStage)
   -- direct callers (tests) omit lockStage: any non-zero mode means "exercise the support mask"; decide() passes
   -- the mode-resolved value explicitly (mode 2 folds in the transit gate).
   if lockStage == nil then lockStage = EnvelopeBrain.LULL_SUPPORT_SHIELD ~= 0 end
+  local stageCols = nil                                            -- 2nd return: contact columns whose support got locked (mode 3 reads these as SOFT-cost columns)
   local shielded = {}
   for r = 1, rows do
     local src, dst = touchable[r], {}
@@ -379,6 +386,7 @@ function EnvelopeBrain.lullShield(grid, rows, touchable, lockStage)
           shielded[t][c] = false; shielded[t-1][c] = false
           if t == maxT and lockStage then                          -- contact column: clearing under it sinks the stage the block lands on
             for r = 1, t - 2 do shielded[r][c] = false end
+            stageCols = stageCols or {}; stageCols[c] = true
           end
           if t >= 3 then
             for _, nb in ipairs({ c - 1, c + 1 }) do
@@ -389,7 +397,7 @@ function EnvelopeBrain.lullShield(grid, rows, touchable, lockStage)
       end
     end
   end
-  return shielded
+  return shielded, stageCols
 end
 
 function EnvelopeBrain:decide(state, stack, match)
@@ -612,6 +620,10 @@ function EnvelopeBrain:decide(state, stack, match)
         local lullMode = EnvelopeBrain.LULL_SUPPORT_SHIELD
         local shielded = EnvelopeBrain.lullShield(grid, rows, touchable,
           lullMode == 1 or (lullMode == 2 and pendingBig >= 3))
+        -- mode 3 SOFT: the pair shield above stays plain; a second, support-LOCKED mask is only the CLEAR
+        -- first-preference (fallback keeps throughput), and its stage columns become planMove's soft sink cost.
+        local hardShield, stageCols
+        if lullMode == 3 then hardShield, stageCols = EnvelopeBrain.lullShield(grid, rows, touchable, true) end
         -- REBUILD MATERIAL FIRST on a stripped board: a finished dig consumes the board (measured seed 1008: block 1
         -- fully broken, then the lull arrived at avgH 2.3 with two EMPTY columns and block 2 was unbreakable). RAISE
         -- is by far the fastest material source (a full 6-panel row per commit); waiting for it as the last resort
@@ -622,10 +634,11 @@ function EnvelopeBrain:decide(state, stack, match)
         else
         local ct = catchPrimitive.stageContact(grid, rows, touchable)
         if ct then fireSwap(ct, "BRACE_CONTACT")
-        else local cl = (height >= 5 and avgH >= 3) and clearChip(false, true, shielded) or nil  -- avgH floor: keep enough material for a contact trio (a stripped board can't break anything -- seed 1001 got mined to avgH 1.3, 0 breaks)
+        else local cl = (height >= 5 and avgH >= 3) and ((hardShield and clearChip(false, true, hardShield)) or clearChip(false, true, shielded)) or nil  -- avgH floor: keep enough material for a contact trio (a stripped board can't break anything -- seed 1001 got mined to avgH 1.3, 0 breaks). mode 3: prefer a clear that spares the stage support, fall back to any clear
           if cl then fireChip(cl, "CLEAR")
           else local mv, total, chain
-            if height >= 5 and avgH >= 3 then mv, total, chain = useChips.planMove(grid, rows, shielded, cursor, true, false) end
+            if height >= 5 and avgH >= 3 then mv, total, chain = useChips.planMove(grid, rows, shielded, cursor, true, false,
+              stageCols and { sinkCols = stageCols, sinkW = EnvelopeBrain.SINK_W } or nil) end
             if mv then firePlan(mv, total, chain)
             else local fl = catchPrimitive.flattenMove(grid, rows, shielded)
               if fl then fireSwap(fl, "FLATTEN")

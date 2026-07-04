@@ -159,6 +159,54 @@ end
 check(cocked, "staging converges, pair intact")
 print("  RESULT: contact-first " .. ((braceFirst and cocked) and "WORKS (staged before clearing, cocked in one step)" or "BROKEN"))
 
+-- ============ PIECE 4: SOFT sink cost (mode 3) -- planMove steers mining off the stage column, never forbids it ============
+-- Mode 1's hard support mask fixed dev but regressed holdout (starved clears -> board rides higher, seed 2006).
+-- Mode 3 replaces the mask with a scoring cost: planMove(opts.sinkCols/sinkW) charges per row a candidate board
+-- DROPS a protected column. Contract: (a) lullShield(lockStage=true) reports WHICH columns it locked (2nd return);
+-- (b) given a strictly-better clear that sinks the stage vs a lesser clear that doesn't, a big sinkW flips the
+-- choice to the non-sinking clear; (c) SOFT means available -- when the sinking clear is the ONLY clear, default
+-- sinkW still fires it (a hard mask never could).
+print("\n########## PIECE 4: soft sink cost (PA_LULLSUPPORT=3) ##########")
+local useChips = require("bot.useChips")
+-- col2 = stage: pair 5/5 on top of support 6,4,4. Swap (3,1) pulls the 4 in -> vertical 4,4,4 clears col2's
+-- support AND cascades (the falling 5s line up with the r1 5s in c1/c3 -> chain 2): the strictly-best clear,
+-- sinking the stage 4 rows. Swap (3,4) pushes a 3 into c5 -> plain vertical 3,3,3, col2 untouched.
+-- (a) on board A (spread 1, no release) the 2nd return names exactly the locked contact column; on the piece-4
+-- board below (stage 2 above the rest) the spread release kicks in and it must stay nil -- soft cost obeys the
+-- same overheight relief valve as the hard mask.
+do
+  local mA, stA = buildStack(BOARD_A)
+  local gA, bsA = gridOf(stA)
+  local _, colsA = EnvelopeBrain.lullShield(gA, bsA.rows, BoardSim.touchableGrid(bsA.board, bsA.rows), true)
+  check(colsA and colsA[2] and next(colsA, next(colsA)) == nil, "lullShield reports the locked stage column (2nd return = {c2})")
+end
+local m4, st4 = buildStack("050000" .. "050000" .. "460300" .. "241635" .. "545331")
+printBoard(st4, "=== piece-4 board (c2 stage over minable support; rival clear in c5) ===")
+local g4, bs4 = gridOf(st4)
+local touch4 = BoardSim.touchableGrid(bs4.board, bs4.rows)
+local shield4, stageCols4 = EnvelopeBrain.lullShield(g4, bs4.rows, touch4, true)
+check(stageCols4 == nil, "overheight stage: 2nd return nil (soft cost released with the mask)")
+local function col2After(mv)
+  if not mv then return nil end
+  local g = select(1, BoardSim.simSwap(g4, bs4.rows, mv[1], mv[2]))
+  local h = 0; for r = bs4.rows, 1, -1 do if (g[r][2] or 0) ~= 0 then h = r; break end end
+  return h
+end
+local mvBase = useChips.planMove(g4, bs4.rows, touch4, { 1, 3 }, true, false)
+local mvSoft = useChips.planMove(g4, bs4.rows, touch4, { 1, 3 }, true, false, { sinkCols = { [2] = true }, sinkW = 5000 })
+print(string.format("  baseline  -> swap (%s,%s), c2 height after = %s", mvBase and mvBase[1] or "-", mvBase and mvBase[2] or "-", tostring(col2After(mvBase))))
+print(string.format("  soft cost -> swap (%s,%s), c2 height after = %s", mvSoft and mvSoft[1] or "-", mvSoft and mvSoft[2] or "-", tostring(col2After(mvSoft))))
+check(mvBase and col2After(mvBase) < 5, "baseline planMove prefers the stage-sinking chain clear (the cost has something to flip)")
+check(mvSoft and col2After(mvSoft) == 5, "sink cost steers planMove to the non-sinking clear")
+-- (c) only-clear board: kill the c5 rival (donor 3 -> 6); the sinking clear must STILL fire at the DEFAULT weight.
+local m4c, st4c = buildStack("050000" .. "050000" .. "460600" .. "241635" .. "545331")
+local g4c, bs4c = gridOf(st4c)
+local touch4c = BoardSim.touchableGrid(bs4c.board, bs4c.rows)
+local mvOnly = useChips.planMove(g4c, bs4c.rows, touch4c, { 1, 3 }, true, false, { sinkCols = { [2] = true }, sinkW = EnvelopeBrain.SINK_W })
+print(string.format("  only-clear board, default sinkW=%d -> swap (%s,%s)", EnvelopeBrain.SINK_W, mvOnly and mvOnly[1] or "-", mvOnly and mvOnly[2] or "-"))
+check(mvOnly and mvOnly[1] == 3 and mvOnly[2] == 1, "soft not hard: the only clear still fires at default weight")
+print("  RESULT: soft sink cost " .. ((mvSoft and col2After(mvSoft) == 5 and mvOnly and mvOnly[1] == 3) and "WORKS (steers when a rival exists, yields when it's the only clear)" or "BROKEN"))
+
 print("\n================= SUMMARY =================")
 if #fails > 0 then
   print("  FAILED: " .. table.concat(fails, ", "))

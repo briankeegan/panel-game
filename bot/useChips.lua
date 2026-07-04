@@ -507,12 +507,30 @@ end
 local BEAM_W = 8
 local BEAM_D = tonumber(os.getenv("PA_BEAM_D")) or 1        -- depth-1 greedy, re-planned EVERY frame: deeper plans go stale on the rising board (d2 cleared 51 vs d1 154, 20x slower). knob stays for experiments (env PA_BEAM_D)
 local NODE_BUDGET = 400 * BEAM_D                            -- sim budget scales with depth so deeper levels aren't starved
-function M.planMove(grid, rows, touchable, cursor, force, keepMaterial)
+function M.planMove(grid, rows, touchable, cursor, force, keepMaterial, opts)
   if not touchable then return nil end
   local immScale = keepMaterial and 0.15 or 1   -- garbage imminent/present: devalue immediate clears so the planner HOLDS material (don't strip the stack down -> it stays tall enough for the block to land breakable) instead of clearing it low
   local cr = (cursor and cursor[1]) or 1
   local cc = (cursor and cursor[2]) or 3
-  local _, peak = colHeights(grid, rows)
+  local heights0, peak = colHeights(grid, rows)
+  -- SOFT SINK COST (2026-07-04, lull support-shield redesign): opts.sinkCols = { [col]=true }, opts.sinkW = weight.
+  -- The v1 HARD support mask fixed the seed-1001 stage-sinking death (dev zero-reveal 4->0) but regressed the
+  -- holdout window: masking the contact column starves lull clear throughput, the board rides higher and lands
+  -- jagged anyway (seed 2006). Instead of forbidding swaps, charge sinkW per row the resulting board DROPS a
+  -- protected column -- a stage-sinking clear can still win when it's the only real move, but loses ties to
+  -- equal-value mining elsewhere. Charged against every candidate board (depth-1 and beam leaves alike) by
+  -- comparing the protected columns' heights to the PRE-plan board.
+  local sinkCols, sinkW = opts and opts.sinkCols or nil, opts and opts.sinkW or 0
+  local function sinkPenalty(g)
+    if not sinkCols then return 0 end
+    local dropped = 0
+    for c in pairs(sinkCols) do
+      local h = 0
+      for r = rows, 1, -1 do if g[r] and g[r][c] ~= 0 then h = r; break end end
+      if h < heights0[c] then dropped = dropped + (heights0[c] - h) end
+    end
+    return sinkW * dropped
+  end
   local hiRow = math.min(rows, peak + 1)                          -- only swap within/just above the occupied band
   local budget = NODE_BUDGET
   local beam = {}
@@ -520,6 +538,7 @@ function M.planMove(grid, rows, touchable, cursor, force, keepMaterial)
     if budget <= 0 then break end
     budget = budget - 1
     local s, g, total, chain, bonus = scoreSwap(grid, rows, sw[1], sw[2], immScale)
+    if sinkCols then s = s - sinkPenalty(g) end
     local reward = (total > 0) and (W_IMMEDIATE_TOTAL * total + W_IMMEDIATE_CHAIN * chain) or 0
     local dist = (sw[1] > cr and sw[1] - cr or cr - sw[1]) + (sw[2] > cc and sw[2] - cc or cc - sw[2])  -- from the cursor
     beam[#beam + 1] = { g = g, score = s, reward = reward, setup = bonus, first = sw, dist = dist, total = total, chain = chain }
@@ -544,7 +563,7 @@ function M.planMove(grid, rows, touchable, cursor, force, keepMaterial)
         local g2, chain, total = BoardSim.simSwap(node.g, rows, sw[1], sw[2], TRUSTED_CHAIN_CAP)
         local lbonus = chipSetupBonus(g2, rows, sw[1], sw[2])
         local reward = node.reward + ((total > 0) and (W_IMMEDIATE_TOTAL * total + W_IMMEDIATE_CHAIN * chain) or 0)
-        local leaf = { g = g2, score = eval(g2, rows) + W_CHIP * lbonus + reward, reward = reward, setup = math.max(node.setup or 0, lbonus), first = node.first, dist = node.dist }
+        local leaf = { g = g2, score = eval(g2, rows) + W_CHIP * lbonus + reward - sinkPenalty(g2), reward = reward, setup = math.max(node.setup or 0, lbonus), first = node.first, dist = node.dist }
         nxt[#nxt + 1] = leaf
         if leaf.score > best.score or (leaf.score == best.score and leaf.dist < best.dist) then best = leaf end
       end

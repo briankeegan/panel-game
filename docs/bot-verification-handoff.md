@@ -301,6 +301,56 @@ pattern from mode 3). Both untried. The rides-high failure class (seed 2009, avg
 at injection) is the OPPOSITE failure and any material-retention change must be
 sanity-checked against it.
 
+## MECHANICAL DECOMPOSITION (2026-07-04, after Brian's "horrible numbers" challenge — read this before tuning ANYTHING else)
+
+Full-funnel measurement across 20 seeds (dev+holdout, PA_MECH+PA_DEATH+PA_BEHAV), plus
+three controlled comparisons: 2.5x cursor speed (PA_RF=5 PA_CMI=2), human-rate 6x4
+blocks (300s cap), and the L10 physics constants read from the engine.
+
+**The pieces work in isolation; the pipeline output is 12-50x below requirement.**
+
+Funnel (6x12 @ 600f, current defaults):
+| stage | live rate | requirement |
+|---|---|---|
+| staging (cocked at injection) | 13/20 seeds | — |
+| first break happens at all | 13/20 (only 9/13 cocked seeds break; 4 cocked seeds NEVER convert) | every block |
+| rows converted per reveal window | 1.0-1.2 (breakEvents ≈ reveals, every seed) | ~12 per block (6x12), 4 (6x4) |
+| windows per game | 0-5 | ~12 per block |
+| catch completion per window | 59% | ~100% |
+| re-break latency when catch completes | 5-30f | fine |
+| actions per 600f | ~20 (throttle: react 10-16f + move 4-9f/cell + settle 8f) | — |
+
+Death classes: (A) hollow/jagged landing, no break exists (1006 board: 8 garbage rows
+on a 2-4 high board, 29 total actions, 0 breaks); (B) board rides high, lands at
+ceiling (2009: avgH 6.5, 24 PLAN decisions but only 3 own panels cleared all game).
+
+Controlled comparisons — what is NOT the bottleneck:
+- **Cursor speed is not binding**: 2.5x faster controller → median 23.9s vs 25.6s,
+  same mean, same reveal counts. Extra APM does not convert into breaks.
+- **The preset is not the excuse**: human-rate 6x4 (needs only 4 rows/600f) → median
+  29.9s, nobody past 44s of the 300s cap, and the SAME seeds (1001/1004/1006) still
+  break zero garbage across 6x12-throttled, 6x12-fast AND 6x4.
+
+L10 physics (engine-read): stop_time awards are MAX not additive (chain 56+2·len ≈
+60-82f, topped-out chain ≈ 88-98f, 4-combo 30f), maxHealth=1, FLASH 28f, POP 7f/panel.
+There is no banking; the only steady state with garbage overhead is CONTINUOUS
+activity bridged by ≤1.5s stop windows — i.e. a standing chain.
+
+**Root cause: the bot has no sustained dig chain.** breakEvents ≈ reveals means every
+window converts exactly one row, reseals, and the bot spends 300-600f re-staging from
+scratch — the loop's period is ~10-20x the required 50-150f/row. All of this session's
+wins (soft shield, catch stickiness) polish the 1-row-per-window loop; no polish of
+that loop reaches 4-12 rows/window. The two real work items, in order:
+1. **First-break reliability** (kills 7/20 seeds before the loop even starts, and
+   4/13 cocked triggers never convert — needs its own anatomy: WHY does a cocked
+   contact column fail to fire when the block lands on it?).
+2. **DIG CHAIN ENGINE**: inside a reveal window, while freed panels fall, pre-place
+   the next trigger under the NEXT garbage row so each conversion re-breaks — plan two
+   steps ahead within the window instead of reacting after reseal. Success metric:
+   breakEvents per window > 2 (currently 1.0-1.2), then rows/game against the
+   12-per-block line. This is a design+build task on the scale of the catch system,
+   not a knob.
+
 ## Where survival stands and why it still dies
 
 10-seed 6x12 protocol (`PA_SEED_BASE=1000, 600 3600 10 "" hard 6 12`): dev median 25.5s

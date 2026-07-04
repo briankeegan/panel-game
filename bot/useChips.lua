@@ -521,15 +521,24 @@ function M.planMove(grid, rows, touchable, cursor, force, keepMaterial, opts)
   -- equal-value mining elsewhere. Charged against every candidate board (depth-1 and beam leaves alike) by
   -- comparing the protected columns' heights to the PRE-plan board.
   local sinkCols, sinkW = opts and opts.sinkCols or nil, opts and opts.sinkW or 0
-  local function sinkPenalty(g)
-    if not sinkCols then return 0 end
-    local dropped = 0
-    for c in pairs(sinkCols) do
-      local h = 0
-      for r = rows, 1, -1 do if g[r] and g[r][c] ~= 0 then h = r; break end end
-      if h < heights0[c] then dropped = dropped + (heights0[c] - h) end
+  -- PER-COLUMN MATERIAL FLOOR (2026-07-04, candidate c): opts.floorH/floorW. avgH gates let two columns go
+  -- hollow while the average looks fine (seed-1001 anatomy: landed on 5,5,2,3,4,5, no <=3-swap break existed).
+  -- Charge floorW per row ANY column of a candidate board sits below floorH -- absolute, not delta, so the
+  -- planner is also REWARDED for refilling an already-hollow column, not just discouraged from mining one.
+  local floorH, floorW = opts and opts.floorH or 0, opts and opts.floorW or 0
+  local function softPenalty(g)
+    if not sinkCols and floorH == 0 then return 0 end
+    local p = 0
+    for c = 1, WIDTH do
+      local prot, deficit = sinkCols and sinkCols[c], floorH > 0
+      if prot or deficit then
+        local h = 0
+        for r = rows, 1, -1 do if g[r] and g[r][c] ~= 0 then h = r; break end end
+        if prot and h < heights0[c] then p = p + sinkW * (heights0[c] - h) end
+        if floorH > 0 and h < floorH then p = p + floorW * (floorH - h) end
+      end
     end
-    return sinkW * dropped
+    return p
   end
   local hiRow = math.min(rows, peak + 1)                          -- only swap within/just above the occupied band
   local budget = NODE_BUDGET
@@ -538,7 +547,7 @@ function M.planMove(grid, rows, touchable, cursor, force, keepMaterial, opts)
     if budget <= 0 then break end
     budget = budget - 1
     local s, g, total, chain, bonus = scoreSwap(grid, rows, sw[1], sw[2], immScale)
-    if sinkCols then s = s - sinkPenalty(g) end
+    if opts then s = s - softPenalty(g) end
     local reward = (total > 0) and (W_IMMEDIATE_TOTAL * total + W_IMMEDIATE_CHAIN * chain) or 0
     local dist = (sw[1] > cr and sw[1] - cr or cr - sw[1]) + (sw[2] > cc and sw[2] - cc or cc - sw[2])  -- from the cursor
     beam[#beam + 1] = { g = g, score = s, reward = reward, setup = bonus, first = sw, dist = dist, total = total, chain = chain }
@@ -563,7 +572,7 @@ function M.planMove(grid, rows, touchable, cursor, force, keepMaterial, opts)
         local g2, chain, total = BoardSim.simSwap(node.g, rows, sw[1], sw[2], TRUSTED_CHAIN_CAP)
         local lbonus = chipSetupBonus(g2, rows, sw[1], sw[2])
         local reward = node.reward + ((total > 0) and (W_IMMEDIATE_TOTAL * total + W_IMMEDIATE_CHAIN * chain) or 0)
-        local leaf = { g = g2, score = eval(g2, rows) + W_CHIP * lbonus + reward - sinkPenalty(g2), reward = reward, setup = math.max(node.setup or 0, lbonus), first = node.first, dist = node.dist }
+        local leaf = { g = g2, score = eval(g2, rows) + W_CHIP * lbonus + reward - softPenalty(g2), reward = reward, setup = math.max(node.setup or 0, lbonus), first = node.first, dist = node.dist }
         nxt[#nxt + 1] = leaf
         if leaf.score > best.score or (leaf.score == best.score and leaf.dist < best.dist) then best = leaf end
       end

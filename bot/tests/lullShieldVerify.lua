@@ -207,6 +207,21 @@ print(string.format("  only-clear board, default sinkW=%d -> swap (%s,%s)", Enve
 check(mvOnly and mvOnly[1] == 3 and mvOnly[2] == 1, "soft not hard: the only clear still fires at default weight")
 print("  RESULT: soft sink cost " .. ((mvSoft and col2After(mvSoft) == 5 and mvOnly and mvOnly[1] == 3) and "WORKS (steers when a rival exists, yields when it's the only clear)" or "BROKEN"))
 
+-- ============ PIECE 5: per-column MATERIAL FLOOR (candidate c) -- hollowing a column costs, refilling pays ============
+-- On the only-clear board the (3,1) chain clear hollows c2 to height 1 (floor-3 deficits: c2 +2, c1 +1, c3 +1 vs
+-- any neutral swap). Soft contract, same shape as PIECE 4: an overwhelming floorW steers planMove OFF the only
+-- clear (it prefers a neutral swap that keeps material), while the default weight lets the clear fire (deficit
+-- cost ~4*120 < the chain clear's ~900 immediate reward).
+print("\n########## PIECE 5: per-column material floor (PA_LULLFLOOR) ##########")
+local mvFloorBig = useChips.planMove(g4c, bs4c.rows, touch4c, { 1, 3 }, true, false, { floorH = 3, floorW = 100000 })
+local mvFloorDef = useChips.planMove(g4c, bs4c.rows, touch4c, { 1, 3 }, true, false, { floorH = 3, floorW = EnvelopeBrain.FLOOR_W })
+print(string.format("  floorW=100000 -> swap (%s,%s); floorW=%d -> swap (%s,%s)",
+  mvFloorBig and mvFloorBig[1] or "-", mvFloorBig and mvFloorBig[2] or "-", EnvelopeBrain.FLOOR_W,
+  mvFloorDef and mvFloorDef[1] or "-", mvFloorDef and mvFloorDef[2] or "-"))
+check(mvFloorBig and not (mvFloorBig[1] == 3 and mvFloorBig[2] == 1), "overwhelming floor cost steers off the hollowing clear")
+check(mvFloorDef and mvFloorDef[1] == 3 and mvFloorDef[2] == 1, "default floor weight still fires the hollowing clear (soft)")
+print("  RESULT: material floor " .. ((mvFloorBig and not (mvFloorBig[1] == 3 and mvFloorBig[2] == 1) and mvFloorDef and mvFloorDef[1] == 3) and "WORKS (cost scales with hollowing, never forbids)" or "BROKEN"))
+
 print("\n================= SUMMARY =================")
 if #fails > 0 then
   print("  FAILED: " .. table.concat(fails, ", "))

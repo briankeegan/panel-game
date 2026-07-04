@@ -354,6 +354,14 @@ end
 -- recovers the old baseline exactly.
 EnvelopeBrain.LULL_SUPPORT_SHIELD = tonumber(os.getenv("PA_LULLSUPPORT")) or 3
 EnvelopeBrain.SINK_W = tonumber(os.getenv("PA_SINKW")) or 120  -- mode 3 soft cost per row a lull PLAN sinks the stage's contact column (a plain 3-clear's immediate reward is ~500: 120*3=360 loses to a real clear, wins ties). Swept {60,120,250}: flat plateau
+-- PER-COLUMN MATERIAL FLOOR (2026-07-04, handoff candidate c -- default-OFF knob pending sweeps): lull PLANs
+-- pay PA_FLOORW per row any column of the candidate board sits below PA_LULLFLOOR rows. The avgH>=3 lull gates
+-- can't see two hollow columns behind a fine average (seed-1001 landed on 5,5,2,3,4,5 with NO <=3-swap break;
+-- zero-reveal seeds 1006/2001/2003/2010 all show the hollow/jagged injection posture under mode 3). Absolute
+-- (not delta) so refilling a hollow column is rewarded, not just hollowing discouraged. Lull PLAN only -- the
+-- dig branch MUST mine under the block.
+EnvelopeBrain.LULL_FLOOR = tonumber(os.getenv("PA_LULLFLOOR")) or 0
+EnvelopeBrain.FLOOR_W = tonumber(os.getenv("PA_FLOORW")) or 120
 function EnvelopeBrain.lullShield(grid, rows, touchable, lockStage)
   -- direct callers (tests) omit lockStage: any non-zero mode means "exercise the support mask"; decide() passes
   -- the mode-resolved value explicitly (mode 2 folds in the transit gate).
@@ -642,8 +650,14 @@ function EnvelopeBrain:decide(state, stack, match)
         else local cl = (height >= 5 and avgH >= 3) and ((hardShield and clearChip(false, true, hardShield)) or clearChip(false, true, shielded)) or nil  -- avgH floor: keep enough material for a contact trio (a stripped board can't break anything -- seed 1001 got mined to avgH 1.3, 0 breaks). mode 3: prefer a clear that spares the stage support, fall back to any clear
           if cl then fireChip(cl, "CLEAR")
           else local mv, total, chain
-            if height >= 5 and avgH >= 3 then mv, total, chain = useChips.planMove(grid, rows, shielded, cursor, true, false,
-              stageCols and { sinkCols = stageCols, sinkW = EnvelopeBrain.SINK_W } or nil) end
+            if height >= 5 and avgH >= 3 then
+              local softOpts = nil
+              if stageCols or EnvelopeBrain.LULL_FLOOR > 0 then
+                softOpts = { sinkCols = stageCols, sinkW = EnvelopeBrain.SINK_W,
+                             floorH = EnvelopeBrain.LULL_FLOOR, floorW = EnvelopeBrain.FLOOR_W }
+              end
+              mv, total, chain = useChips.planMove(grid, rows, shielded, cursor, true, false, softOpts)
+            end
             if mv then firePlan(mv, total, chain)
             else local fl = catchPrimitive.flattenMove(grid, rows, shielded)
               if fl then fireSwap(fl, "FLATTEN")

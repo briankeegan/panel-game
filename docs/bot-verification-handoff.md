@@ -229,10 +229,39 @@ space is now exhausted; what remains is real design work:
     (seed-1001 class) without touching stage protection at all.
 Both need planMove-internal changes (scoring), not another mask variant.
 
+**Mode 3 (SOFT sink cost, option a) MEASURED 2026-07-04 — WINS, now the DEFAULT.**
+Implementation: `useChips.planMove` takes `opts.sinkCols/sinkW` and charges sinkW per
+row a candidate board drops a protected column (never forbids the swap); lull CLEAR
+tries the support-locked mask first and FALLS BACK to the plain pair shield, so a
+clear is never lost, only steered; `lullShield` returns its locked contact columns as
+a 2nd value (nil under the spread release, so the soft cost obeys the same overheight
+relief valve). Unit-proven in `lullShieldVerify` PIECE 4 (cost flips a strictly-better
+sinking chain clear to the rival; the only-clear board still fires at default weight).
+
+| variant | dev median/mean (zero-rev, broken med) | holdout median/mean (zero-rev, broken med) |
+|---|---|---|
+| mode 0 (old baseline) | 22.0 / 22.2 (4/10, 72) | 20.5 / 24.4 (5/10, 69) |
+| mode 1 hard mask | 25.6 / 25.7 (0/10, 141) | 15.2 / 18.4 (5/10, 36) |
+| **mode 3 soft, sinkW=120** | **25.5 / 26.9 (3/10, 105)** | **22.9 / 24.0 (4/10, 105)** |
+
+First variant with a dev win and NO holdout regression: zero-reveal 9/20 → 7/20 (the
+primary metric), both medians up, holdout mean flat. Seed 2006 lands at 30.3s (down
+from its 48.2s mode-0 outlier but no longer collapsing the window; it breaks 138 and
+gets 2 reveals — not a zero-reveal death). sinkW swept {60,120,250}: a flat plateau
+on both windows (dev 23.9/25.5/23.9, holdout 22.9/22.9/21.6 median) — the mechanism
+(losing ties, keeping wins) does the work, not the weight. `PA_LULLSUPPORT=0` recovers
+the old baseline byte-identically (verified pre-flip on a 3-seed sweep); the env-unset
+default was verified to reproduce the measured mode-3 sweep exactly.
+Candidate (c) (per-column material floor) remains unmeasured — the next scoring lever
+if the remaining 7/20 zero-reveal seeds (1001/1004/1006, 2001/2003/2009/2010) show
+hollow-column landings under mode 3.
+
 ## Where survival stands and why it still dies
 
-10-seed 6x12 protocol (`PA_SEED_BASE=1000, 600 3600 10 "" hard 6 12`): median ~22s,
-holdout window (2001-2010) ~22.1s — vs 11.6s at session start. Two failure modes remain:
+10-seed 6x12 protocol (`PA_SEED_BASE=1000, 600 3600 10 "" hard 6 12`): dev median 25.5s
+(mean 26.9), holdout window (2001-2010) median 22.9s (mean 24.0) — vs 11.6s at the
+2026-07-03 session start (numbers as of the 2026-07-04 mode-3 default flip). Two
+failure modes remain:
 
 1. **First-landing deaths (~4/10 seeds)**: at the moment the block lands, the board offers
    no pop and no ≤2-swap break; with garbage over the top, health drains every still frame

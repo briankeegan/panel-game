@@ -347,8 +347,13 @@ end
 -- lost), and lull PLAN scores stage-column sinking as a soft cost (PA_SINKW per dropped row, useChips.planMove
 -- opts) instead of forbidding it. Attacks mode 1's holdout regression (starved clears -> board rides higher)
 -- while keeping its dev win (stage survives to landing).
-EnvelopeBrain.LULL_SUPPORT_SHIELD = tonumber(os.getenv("PA_LULLSUPPORT")) or 0
-EnvelopeBrain.SINK_W = tonumber(os.getenv("PA_SINKW")) or 120  -- mode 3 soft cost per row a lull PLAN sinks the stage's contact column (a plain 3-clear's immediate reward is ~500: 120*3=360 loses to a real clear, wins ties)
+-- MODE 3 IS THE DEFAULT (2026-07-04): first variant measured to win dev WITHOUT a holdout regression --
+-- dev median/mean 22.0/22.2 -> 25.5/26.9, holdout 20.5/24.4 -> 22.9/24.0, zero-reveal seeds 9/20 -> 7/20,
+-- broken median 72/69 -> 105/105 (10-seed 600/3600 hard 6x12, PA_MECH). sinkW swept {60,120,250}: a plateau
+-- (both windows within noise across the whole range), so the default weight is untuned-insensitive. PA_LULLSUPPORT=0
+-- recovers the old baseline exactly.
+EnvelopeBrain.LULL_SUPPORT_SHIELD = tonumber(os.getenv("PA_LULLSUPPORT")) or 3
+EnvelopeBrain.SINK_W = tonumber(os.getenv("PA_SINKW")) or 120  -- mode 3 soft cost per row a lull PLAN sinks the stage's contact column (a plain 3-clear's immediate reward is ~500: 120*3=360 loses to a real clear, wins ties). Swept {60,120,250}: flat plateau
 function EnvelopeBrain.lullShield(grid, rows, touchable, lockStage)
   -- direct callers (tests) omit lockStage: any non-zero mode means "exercise the support mask"; decide() passes
   -- the mode-resolved value explicitly (mode 2 folds in the transit gate).

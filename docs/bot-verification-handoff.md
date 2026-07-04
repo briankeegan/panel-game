@@ -372,3 +372,16 @@ Pitfalls that burned this session — check these before "discovering" a bug:
 - #7 (catch completion rate) — the live umbrella task. Highest-leverage recorded leads:
   the useChips drop-clear template family + simSwap post-filter (item #6), and the lull
   shield under-mining hole (item #8).
+
+**Drop-clear template family RE-EXAMINED (2026-07-04): lead is DEAD under measured
+policy — do not build it.** Catalog-only corpus coverage is 27/40; the 13 misses split
+7 one-swap drop clears (all covered by `exactOneSwap` where opted in) + 6 two-swap
+setups. Tracing the consumers: (1) POP-NOW already gets every 1-swap drop via
+exactFallback, and 2-swap setups can't serve POP-NOW (the first swap doesn't pop);
+(2) OFFENSE/DANGER deliberately exclude bare-3 kinds (measured 22.0→17.4s when
+allowed — the bot mines its own break material), and a drop-clear kind is bare-3
+material by construction: named `COMBO_3_*` it's policy-excluded everywhere, named
+anything else it leaks into OFFENSE/DANGER against that measurement; (3) the catch
+path measured 2.2s worse with fallback-surfaced bare 3s. So templates would improve a
+recognizer-ceiling metric (corpus coverage) with NO live consumer. The corpus 85%
+number already reflects the ceiling via the test's own exactFallback opt-in.

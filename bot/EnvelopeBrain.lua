@@ -362,6 +362,31 @@ EnvelopeBrain.SINK_W = tonumber(os.getenv("PA_SINKW")) or 120  -- mode 3 soft co
 -- dig branch MUST mine under the block.
 EnvelopeBrain.LULL_FLOOR = tonumber(os.getenv("PA_LULLFLOOR")) or 0
 EnvelopeBrain.FLOOR_W = tonumber(os.getenv("PA_FLOORW")) or 120
+-- CLEAR-side floor PREFERENCE (2026-07-04, default-OFF knob): the PLAN-side floor above was measured a NO-GO
+-- (floor=2 byte-identical no-op, floor=3 regressed BOTH windows -- taxing every clear near short columns
+-- starves lull throughput exactly like the mode-1 hard mask did). But the hollow-column mining is mostly CLEAR
+-- chips, and mode 3's win came from the CLEAR try-order trick: PREFER a clear that avoids the protected cells,
+-- fall back to any clear -- zero throughput cost. PA_FLOORCLEAR=N masks all cells of columns at height <= N in
+-- the lull CLEAR's FIRST attempt only; the fallback chain (stage-locked mask, then plain pair shield) is
+-- unchanged behind it.
+EnvelopeBrain.LULL_FLOOR_CLEAR = tonumber(os.getenv("PA_FLOORCLEAR")) or 0
+-- pure (unit-tested in lullShieldVerify PIECE 6): copy `base`, additionally mask every cell of each column
+-- whose top is 1..floor. Empty columns stay as-is (nothing there to mine; filling them must stay legal in the
+-- masks that allow it).
+function EnvelopeBrain.floorMask(grid, rows, base, floor)
+  local out = {}
+  for r = 1, rows do
+    local src, dst = base[r], {}
+    for c = 1, 6 do dst[c] = (src and src[c]) or false end
+    out[r] = dst
+  end
+  for c = 1, 6 do
+    local h = 0
+    for r = rows, 1, -1 do local v = grid[r][c] or 0; if v ~= 0 then h = r; break end end
+    if h > 0 and h <= floor then for r = 1, h do out[r][c] = false end end
+  end
+  return out
+end
 function EnvelopeBrain.lullShield(grid, rows, touchable, lockStage)
   -- direct callers (tests) omit lockStage: any non-zero mode means "exercise the support mask"; decide() passes
   -- the mode-resolved value explicitly (mode 2 folds in the transit gate).
@@ -637,6 +662,8 @@ function EnvelopeBrain:decide(state, stack, match)
         -- first-preference (fallback keeps throughput), and its stage columns become planMove's soft sink cost.
         local hardShield, stageCols
         if lullMode == 3 then hardShield, stageCols = EnvelopeBrain.lullShield(grid, rows, touchable, true) end
+        local floorPref = EnvelopeBrain.LULL_FLOOR_CLEAR > 0
+          and EnvelopeBrain.floorMask(grid, rows, hardShield or shielded, EnvelopeBrain.LULL_FLOOR_CLEAR) or nil
         -- REBUILD MATERIAL FIRST on a stripped board: a finished dig consumes the board (measured seed 1008: block 1
         -- fully broken, then the lull arrived at avgH 2.3 with two EMPTY columns and block 2 was unbreakable). RAISE
         -- is by far the fastest material source (a full 6-panel row per commit); waiting for it as the last resort
@@ -647,7 +674,7 @@ function EnvelopeBrain:decide(state, stack, match)
         else
         local ct = catchPrimitive.stageContact(grid, rows, touchable)
         if ct then fireSwap(ct, "BRACE_CONTACT")
-        else local cl = (height >= 5 and avgH >= 3) and ((hardShield and clearChip(false, true, hardShield)) or clearChip(false, true, shielded)) or nil  -- avgH floor: keep enough material for a contact trio (a stripped board can't break anything -- seed 1001 got mined to avgH 1.3, 0 breaks). mode 3: prefer a clear that spares the stage support, fall back to any clear
+        else local cl = (height >= 5 and avgH >= 3) and ((floorPref and clearChip(false, true, floorPref)) or (hardShield and clearChip(false, true, hardShield)) or clearChip(false, true, shielded)) or nil  -- avgH floor: keep enough material for a contact trio (a stripped board can't break anything -- seed 1001 got mined to avgH 1.3, 0 breaks). mode 3: prefer a clear that spares the stage support, fall back to any clear; PA_FLOORCLEAR adds a first preference that also spares short columns
           if cl then fireChip(cl, "CLEAR")
           else local mv, total, chain
             if height >= 5 and avgH >= 3 then

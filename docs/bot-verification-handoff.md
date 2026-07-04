@@ -252,9 +252,20 @@ on both windows (dev 23.9/25.5/23.9, holdout 22.9/22.9/21.6 median) — the mech
 (losing ties, keeping wins) does the work, not the weight. `PA_LULLSUPPORT=0` recovers
 the old baseline byte-identically (verified pre-flip on a 3-seed sweep); the env-unset
 default was verified to reproduce the measured mode-3 sweep exactly.
-Candidate (c) (per-column material floor) remains unmeasured — the next scoring lever
-if the remaining 7/20 zero-reveal seeds (1001/1004/1006, 2001/2003/2009/2010) show
-hollow-column landings under mode 3.
+**Candidate (c) PLAN-side floor MEASURED (2026-07-04): NO-GO.** The remaining 7/20
+zero-reveal seeds under mode 3 split into hollow/jagged injection postures (1006:
+7,7,6,1,3,3; 2001: 4,4,3,2,5,6; 2003: 6,5,2,5,4,5; 2010: 7,6,3,3,3,5) and rides-high
+(2009: avgH 6.5) — so the floor had real targets. Implemented as `opts.floorH/floorW`
+in the same planMove soft-cost slot (absolute deficit, so refilling pays; knobs
+`PA_LULLFLOOR`/`PA_FLOORW`, default OFF; unit piece 5): floor=2 was BYTE-IDENTICAL to
+mode 3 on both windows (never flips a decision), floor=3 REGRESSED both (dev median
+25.5 → 19.1: seeds 1003/1007 collapsed to zero reveals; holdout 22.9 → 18.0: 2006
+30.3s → 12.6s). Same signature as the mode-1 hard mask: taxing every clear near short
+columns starves lull throughput. Lesson recorded: PLAN-side scoring pressure on
+material retention consistently backfires; the win pattern is CLEAR TRY-ORDERING
+(prefer-then-fallback, zero throughput cost). `PA_FLOORCLEAR=N` (default OFF) is that
+variant for short columns — mask columns at height <= N in the lull CLEAR's first
+attempt only (`EnvelopeBrain.floorMask`, unit piece 6); sweeps pending.
 
 ## Where survival stands and why it still dies
 

@@ -222,6 +222,26 @@ check(mvFloorBig and not (mvFloorBig[1] == 3 and mvFloorBig[2] == 1), "overwhelm
 check(mvFloorDef and mvFloorDef[1] == 3 and mvFloorDef[2] == 1, "default floor weight still fires the hollowing clear (soft)")
 print("  RESULT: material floor " .. ((mvFloorBig and not (mvFloorBig[1] == 3 and mvFloorBig[2] == 1) and mvFloorDef and mvFloorDef[1] == 3) and "WORKS (cost scales with hollowing, never forbids)" or "BROKEN"))
 
+-- ============ PIECE 6: floorMask -- CLEAR-preference mask covers exactly the short columns ============
+-- On the piece-4 board (heights 3,5,2,3,2,2), floorMask(base, floor=3) must additionally mask the OCCUPIED
+-- cells (r <= colH) of c1/c3/c4/c5/c6 (all <= 3) and leave c2 (height 5) exactly as `base`. Cells ABOVE a short
+-- column's top stay as base -- swapping a panel in over the top is how the column gets refilled, and that must
+-- remain legal.
+print("\n########## PIECE 6: floorMask (PA_FLOORCLEAR) masks exactly the short columns' occupied cells ##########")
+local fm = EnvelopeBrain.floorMask(g4, bs4.rows, touch4, 3)
+local fmOK = true
+local h4 = {}
+for c = 1, 6 do h4[c] = 0; for r = bs4.rows, 1, -1 do if (g4[r][c] or 0) ~= 0 then h4[c] = r; break end end end
+for r = 1, bs4.rows do for c = 1, 6 do
+  local base = touch4[r] and touch4[r][c] or false
+  local want = base
+  if h4[c] > 0 and h4[c] <= 3 and r <= h4[c] then want = false end
+  local got = fm[r] and fm[r][c] or false
+  if want ~= got then fmOK = false; print(string.format("  MISMATCH (%d,%d): want %s got %s (colH=%d)", r, c, tostring(want), tostring(got), h4[c])) end
+end end
+check(fmOK, "floorMask masks exactly the short columns on top of base")
+print("  RESULT: floorMask " .. (fmOK and "WORKS (short columns masked, tall column untouched, base respected)" or "BROKEN"))
+
 print("\n================= SUMMARY =================")
 if #fails > 0 then
   print("  FAILED: " .. table.concat(fails, ", "))

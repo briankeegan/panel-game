@@ -374,11 +374,16 @@ EnvelopeBrain.LULL_FLOOR_CLEAR = tonumber(os.getenv("PA_FLOORCLEAR")) or 0
 -- hollowing (c4 4 -> 1, tops 7,7,6,1,3,3 at injection) is a lull PLAN at f580-594, INSIDE the ~120-frame
 -- transit window before the f600 landing. The lull PLAN passes keepMaterial=false, so 20 frames before a
 -- block lands the planner still takes full immediate-clear rewards and strip-mines for them. planMove already
--- HAS the hold-material mode (keepMaterial -> immScale 0.15, built for garbage-imminent boards); this gates it
--- on pendingBig >= 3, i.e. exactly while a tall block is announced. Unlike mode 2 (stage-column transit LOCK,
--- measured no-op because the STAGE mining happens pre-announcement), this devalues immediate clears in ALL
--- columns during transit -- the fatal mining is in non-stage columns and happens IN transit.
-EnvelopeBrain.TRANSIT_HOLD = os.getenv("PA_TRANSITHOLD") == "1"
+-- HAS the hold-material mode (keepMaterial -> immScale 0.15, built for garbage-imminent boards); mode 1 gates it
+-- on pendingBig >= 3, i.e. exactly while a tall block is announced.
+-- Mode 1 MEASURED (2026-07-04): byte-identical NO-OP on both windows, and the trace says why -- the harness's
+-- blocks land ~40-50f after announcement and the fatal mining (f580-594 on seed 1006) is BEFORE the f600
+-- announcement, so there is structurally no lull-decision window with pendingBig >= 3 before a first landing
+-- (this also fully explains the mode-2 shield no-op). The bot can't see an unannounced block -- but it KNOWS
+-- volleys recur (self._bigGarbageGame is sticky). Mode 2: keepMaterial unconditionally in the lull PLAN of a
+-- big-garbage game -- immediate-clear rewards scaled 0.15x ALL lull long; eval still steers, ready CLEAR chips
+-- are untouched, only the planner's appetite for strip-mining clears changes.
+EnvelopeBrain.TRANSIT_HOLD = tonumber(os.getenv("PA_TRANSITHOLD")) or 0
 -- pure (unit-tested in lullShieldVerify PIECE 6): copy `base`, additionally mask every cell of each column
 -- whose top is 1..floor. Empty columns stay as-is (nothing there to mine; filling them must stay legal in the
 -- masks that allow it).
@@ -692,8 +697,9 @@ function EnvelopeBrain:decide(state, stack, match)
                 softOpts = { sinkCols = stageCols, sinkW = EnvelopeBrain.SINK_W,
                              floorH = EnvelopeBrain.LULL_FLOOR, floorW = EnvelopeBrain.FLOOR_W }
               end
-              mv, total, chain = useChips.planMove(grid, rows, shielded, cursor, true,
-                EnvelopeBrain.TRANSIT_HOLD and pendingBig >= 3, softOpts)
+              local hold = (EnvelopeBrain.TRANSIT_HOLD == 1 and pendingBig >= 3)
+                or (EnvelopeBrain.TRANSIT_HOLD == 2 and self._bigGarbageGame == true)
+              mv, total, chain = useChips.planMove(grid, rows, shielded, cursor, true, hold, softOpts)
             end
             if mv then firePlan(mv, total, chain)
             else local fl = catchPrimitive.flattenMove(grid, rows, shielded)

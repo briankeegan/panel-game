@@ -280,6 +280,27 @@ each drop of an already-low column to the substate that caused it (CLEAR/PLAN/FL
 cascade), then design against the actual mechanism instead of guessing a third time.
 All three floor knobs stay (default OFF) as measured negative results.
 
+**PROVENANCE TRACE RUN (2026-07-04, `PA_HOLLOW` in survivalStress):** seed 1006's
+fatal hollowing (c4 4→1, injection tops 7,7,6,1,3,3) is a lull **PLAN** clear at
+f580-594 — 6-20 frames BEFORE the f600 injection. The culprit substate is PLAN
+throughout (not CLEAR chips — consistent with PA_FLOORCLEAR's no-op), and the fatal
+window is PRE-announcement. Follow-ups measured:
+- `PA_TRANSITHOLD=1` (keepMaterial in the lull PLAN while pendingBig ≥ 3): NO-OP,
+  byte-identical both windows. Structural: harness blocks land ~40-50f after
+  announcement, so no lull decision ever sees pendingBig ≥ 3 before a first landing.
+  This also fully explains shield mode 2's no-op.
+- `PA_TRANSITHOLD=2` (keepMaterial ALL lull long in a big-garbage game): seed-1006
+  probe — c4 stays filled (4 not 1) but the board rides to avgH 7.0 (vs 4.5) and dies
+  SOONER (13.4s vs 16.1s). Devaluing immediate clears starves the rise-fight.
+**Standing conclusion:** pre-announcement strip-mining cannot be fixed by scoring-level
+material retention (three knob families now agree); the first-landing hollow problem
+needs CONTEXT-AWARE targeting — e.g. only tax a clear when the board is short enough
+that the rise-fight doesn't need it, or make the lull PLAN prefer clears whose panels
+come from ABOVE-average columns at equal reward (a tie-order, not a tax; the win
+pattern from mode 3). Both untried. The rides-high failure class (seed 2009, avgH 6.5
+at injection) is the OPPOSITE failure and any material-retention change must be
+sanity-checked against it.
+
 ## Where survival stands and why it still dies
 
 10-seed 6x12 protocol (`PA_SEED_BASE=1000, 600 3600 10 "" hard 6 12`): dev median 25.5s

@@ -405,7 +405,11 @@ EnvelopeBrain.TRANSIT_HOLD = tonumber(os.getenv("PA_TRANSITHOLD")) or 0
 -- Same thrash class breakRoute had before it learned to commit to ONE target. PA_CATCHSTICK=1: once a column
 -- yields an actionable catch, SERVE IT FIRST on subsequent decisions of the same window; other columns are
 -- fallbacks only when the committed column yields nothing. Commit clears when the window ends (no open columns).
-EnvelopeBrain.CATCH_STICK = os.getenv("PA_CATCHSTICK") == "1"
+-- DEFAULT ON (2026-07-04, paired sweeps): holdout median/mean 22.9/24.0 -> 23.7/25.2 with seeds 2005 +7.2s and
+-- 2007 +7.5s (2007's catch now completes, 0 -> 1) and window catch-completion 54% -> 60%; dev flat (median
+-- 25.5 -> 25.6, 7 seeds byte-identical, one seed -9.9s traced to healthy downstream divergence -- its catches
+-- converge slides -> TOPOFF -> READY and complete 2/3). PA_CATCHSTICK=0 restores the re-serve-every-frame order.
+EnvelopeBrain.CATCH_STICK = (os.getenv("PA_CATCHSTICK") or "1") == "1"
 -- pure (unit-tested in lullShieldVerify PIECE 6): copy `base`, additionally mask every cell of each column
 -- whose top is 1..floor. Empty columns stay as-is (nothing there to mine; filling them must stay legal in the
 -- masks that allow it).

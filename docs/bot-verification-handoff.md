@@ -373,6 +373,23 @@ Pitfalls that burned this session — check these before "discovering" a bug:
   the useChips drop-clear template family + simSwap post-filter (item #6), and the lull
   shield under-mining hole (item #8).
 
+**Catch target churn FOUND and FIXED (2026-07-04, now DEFAULT ON — `PA_CATCHSTICK`).**
+Seed-2002 anatomy (PA_TRACE + PA_CATCHDIAG): with 2+ open columns in one reveal,
+tryCatch's re-serve-6→1-every-decision ran two donor walks INTERLEAVED in the same
+surface row (col2 walking a 3 leftward via slides (1,5),(1,4) while col4 walks a 2
+rightward via (1,1),(1,2),(1,3)) — each row-1 swap displaces the other walk's donor,
+and at ~30f per slide neither converged inside the ~110f window. Same thrash class
+breakRoute had before it committed to one target. Fix: the first column to yield an
+actionable catch is served FIRST for the rest of the window (fallback to others only
+when it has no move; commit drops when the column closes or the window ends). Paired
+sweeps: holdout median/mean 22.9/24.0 → 23.7/25.2 (2005 +7.2s, 2007 +7.5s with its
+catch now completing), window catch-completion 54% → 60%; dev flat (7 seeds
+byte-identical; 1009 −9.9s traced to healthy downstream divergence — its catches
+converge slides → TOPOFF → READY, 2/3 complete). Remaining catch-completion lead from
+the same trace: a single slide-walk is ~30f per step, so 3+ step walks can't finish a
+window regardless of stickiness — donor DISTANCE, not order, is the next constraint
+(e.g. prefer the open column with the nearest donor instead of highest-numbered).
+
 **Drop-clear template family RE-EXAMINED (2026-07-04): lead is DEAD under measured
 policy — do not build it.** Catalog-only corpus coverage is 27/40; the 13 misses split
 7 one-swap drop clears (all covered by `exactOneSwap` where opted in) + 6 two-swap

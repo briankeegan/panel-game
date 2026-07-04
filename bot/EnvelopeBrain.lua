@@ -370,6 +370,15 @@ EnvelopeBrain.FLOOR_W = tonumber(os.getenv("PA_FLOORW")) or 120
 -- the lull CLEAR's FIRST attempt only; the fallback chain (stage-locked mask, then plain pair shield) is
 -- unchanged behind it.
 EnvelopeBrain.LULL_FLOOR_CLEAR = tonumber(os.getenv("PA_FLOORCLEAR")) or 0
+-- TRANSIT HOLD (2026-07-04, from the PA_HOLLOW provenance trace -- default-OFF knob): seed 1006's fatal
+-- hollowing (c4 4 -> 1, tops 7,7,6,1,3,3 at injection) is a lull PLAN at f580-594, INSIDE the ~120-frame
+-- transit window before the f600 landing. The lull PLAN passes keepMaterial=false, so 20 frames before a
+-- block lands the planner still takes full immediate-clear rewards and strip-mines for them. planMove already
+-- HAS the hold-material mode (keepMaterial -> immScale 0.15, built for garbage-imminent boards); this gates it
+-- on pendingBig >= 3, i.e. exactly while a tall block is announced. Unlike mode 2 (stage-column transit LOCK,
+-- measured no-op because the STAGE mining happens pre-announcement), this devalues immediate clears in ALL
+-- columns during transit -- the fatal mining is in non-stage columns and happens IN transit.
+EnvelopeBrain.TRANSIT_HOLD = os.getenv("PA_TRANSITHOLD") == "1"
 -- pure (unit-tested in lullShieldVerify PIECE 6): copy `base`, additionally mask every cell of each column
 -- whose top is 1..floor. Empty columns stay as-is (nothing there to mine; filling them must stay legal in the
 -- masks that allow it).
@@ -683,7 +692,8 @@ function EnvelopeBrain:decide(state, stack, match)
                 softOpts = { sinkCols = stageCols, sinkW = EnvelopeBrain.SINK_W,
                              floorH = EnvelopeBrain.LULL_FLOOR, floorW = EnvelopeBrain.FLOOR_W }
               end
-              mv, total, chain = useChips.planMove(grid, rows, shielded, cursor, true, false, softOpts)
+              mv, total, chain = useChips.planMove(grid, rows, shielded, cursor, true,
+                EnvelopeBrain.TRANSIT_HOLD and pendingBig >= 3, softOpts)
             end
             if mv then firePlan(mv, total, chain)
             else local fl = catchPrimitive.flattenMove(grid, rows, shielded)

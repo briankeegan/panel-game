@@ -265,7 +265,20 @@ columns starves lull throughput. Lesson recorded: PLAN-side scoring pressure on
 material retention consistently backfires; the win pattern is CLEAR TRY-ORDERING
 (prefer-then-fallback, zero throughput cost). `PA_FLOORCLEAR=N` (default OFF) is that
 variant for short columns — mask columns at height <= N in the lull CLEAR's first
-attempt only (`EnvelopeBrain.floorMask`, unit piece 6); sweeps pending.
+attempt only (`EnvelopeBrain.floorMask`, unit piece 6).
+
+**PA_FLOORCLEAR MEASURED (2026-07-04): byte-identical NO-OP at floors 2 AND 3, both
+windows** — the preferred (short-column-sparing) clear is always the same chip the
+unmasked call picks anyway. Combined verdict on the floor family: the hollow injection
+postures are NOT created by lull CLEAR chip choice, and PLAN-side retention pressure
+only starves throughput. The hollow columns must come from elsewhere — cascade
+side-effects of legitimate clears, FLATTEN routing, or simply never being filled
+(RAISE adds uniform rows; nothing preferentially rebuilds a low column). **Next step
+recorded: hollow-column PROVENANCE trace** — instrument seeds 1006/2003 (clear
+hollow-at-injection cases) with a per-decision column-height delta log attributing
+each drop of an already-low column to the substate that caused it (CLEAR/PLAN/FLATTEN/
+cascade), then design against the actual mechanism instead of guessing a third time.
+All three floor knobs stay (default OFF) as measured negative results.
 
 ## Where survival stands and why it still dies
 

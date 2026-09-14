@@ -14,6 +14,18 @@ local BootScene = class(function(scene, sceneParams)
   scene.message = "Startup"
   scene.migrationPath = scene:checkIfMigrationIsPossible()
 
+  -- consts.lua's own early swap only knows the OS, not the portraitMode setting
+  -- (config isn't loaded yet at that point). By here config IS loaded (love.conf
+  -- already called readConfigFile), so correct the canvas dimensions to match the
+  -- actual setting. This used to only happen inside BootScene:migrate(), which
+  -- checkIfMigrationIsPossible() only ever triggers on Linux/OS X -- so on Android
+  -- turning Mobile View off and restarting never picked up the landscape canvas.
+  if system.isPortraitMode() then
+    consts.CANVAS_WIDTH, consts.CANVAS_HEIGHT = 720, 1280
+  else
+    consts.CANVAS_WIDTH, consts.CANVAS_HEIGHT = 1280, 720
+  end
+
   local saveDir = love.filesystem.getSaveDirectory()
 
   if scene.migrationPath then

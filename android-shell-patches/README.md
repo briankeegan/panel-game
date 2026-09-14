@@ -5,31 +5,46 @@ love-android has no vendored source in this repo — `build-shells.yml`'s
 reconfigures it via `gradle.properties` text swaps (rebrand step) plus
 whatever gets installed from here.
 
-## Orientation (not handled here anymore)
+## Orientation lock
 
-Earlier versions of this directory patched `GameActivity.java` to force
-screen orientation from `config.portraitMode` via
-`setRequestedOrientation()` in `attachBaseContext()`. That was removed: it
-raced love-android's own native orientation logic and produced an
-intermittent black screen on restart (sometimes the Java-side request won,
-sometimes the native one did, depending on boot timing).
+`GameActivityOrientation.java.inc` overrides `setOrientationBis()`, inserted
+into the freshly-cloned `GameActivity.java` right before its `onCreate()`, by
+the "Patch orientation lock from config.portraitMode" step in
+`package-android`. It locks the installed app's screen orientation to the
+axis matching the in-game Mobile View toggle (`config.portraitMode` in
+conf.json): landscape-only when off, portrait-only when on (each still
+following the sensor within that axis — e.g. either landscape direction, or
+right-side-up/upside-down portrait — just never crossing into the other
+axis).
 
-love-android has no direct "set orientation" API of its own — internally,
-`SDLActivity.setOrientationBis()` decides portrait vs. landscape purely from
-whether `t.window.width`/`t.window.height` (from `conf.lua`) is a wide or a
-tall rectangle, and calls `setRequestedOrientation()` itself, natively, when
-it creates the window. The fix now lives entirely in `conf.lua` at the repo
-root: it overrides `config.windowWidth`/`config.windowHeight` from
-`config.portraitMode` on every boot (mobile only), before love reads them,
-so love-android's own orientation request is the single source of truth
-instead of two independent things calling `setRequestedOrientation()`.
-`gradle.properties`' `app.orientation` is still set to `unspecified` here
-(rebrand step) so the manifest doesn't statically lock orientation and
-fight that native request either.
+`setOrientationBis(int w, int h, boolean resizable, String hint)` is
+love-android's own extension point for exactly this: it's explicitly marked
+`/** This can be overridden */` in `SDLActivity`, and it's the exact call
+site the native engine already uses to request orientation when it creates
+the window. Overriding it means our request replaces SDL's own computed one
+at that same, already-correctly-timed call site, instead of requesting
+orientation independently from a different point in the Activity lifecycle.
 
-Because the fix lives in `conf.lua`, it ships in the Lua-only `.love`
-hot-update (`unofficial-team-release.yml`) — no APK rebuild or reinstall
-needed to pick it up.
+That distinction matters because of an earlier, different bug: with
+`t.window.resizable = true` (needed for the desktop build) and no
+orientation hint set from `conf.lua`, SDL's own logic in this method always
+requests `FULL_SENSOR` — free rotation on all 4 sides — regardless of
+`t.window.width`/`t.window.height`. An earlier version of this patch instead
+called `setRequestedOrientation()` on its own from `attachBaseContext()`,
+which raced that native `FULL_SENSOR` request from a separate point in the
+Activity lifecycle: sometimes the Java-side call won, sometimes the native
+one did, depending on boot timing — producing an intermittent black screen,
+and, even when it didn't crash, no actual *lock* (the app could still freely
+rotate once booted). Overriding `setOrientationBis()` instead avoids the
+race entirely by not introducing a second call site at all.
+
+If love-android's `GameActivity.java` changes upstream and the `onCreate()`
+anchor line moves or disappears, the patch step will fail loudly (it asserts
+the anchor is present) rather than silently no-op.
+
+This lives in native Java, so unlike most of this repo's Lua changes, it
+needs a full APK rebuild (`build-shells-N` tag) to take effect — it does not
+ship through the Lua-only `.love` hot-update.
 
 ## debug.keystore
 

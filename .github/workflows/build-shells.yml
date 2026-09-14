@@ -323,16 +323,19 @@ jobs:
           echo 'app.name=Unofficial Panel Attack FFA &amp; Team' >> gradle.properties
           sed -i "s|^app.version_name=.*|app.version_name=$VER|" gradle.properties
           sed -i "s|^app.version_code=.*|app.version_code=$VCODE|" gradle.properties
-          # Leave orientation unspecified at the manifest level: conf.lua now derives
-          # portrait vs. landscape from config.portraitMode via t.window.width/height on
-          # every boot (love-android's SDLActivity decides orientation from that aspect
-          # ratio natively), so a static manifest lock here would only fight it.
+          # Leave orientation unspecified at the manifest level: the
+          # setOrientationBis() override installed below requests the real,
+          # config.portraitMode-driven lock at runtime, before the first frame. This
+          # is just what shows for the instant before that override runs.
           sed -i 's|^app.orientation=.*|app.orientation=unspecified|' gradle.properties
           grep -E '^app\.(name|application_id|version|orientation)' gradle.properties
           # launcher icon is android:icon="@drawable/love" -> overwrite each density
           for d in drawable-mdpi drawable-hdpi drawable-xhdpi drawable-xxhdpi drawable-xxxhdpi; do
             cp "$GITHUB_WORKSPACE/updater-shell/icon.png" "app/src/main/res/$d/love.png"
           done
+
+      - name: Patch orientation lock from config.portraitMode (android-shell-patches/)
+        run: python3 android-shell-patches/patch_orientation.py
 
       - name: Install stable debug keystore (android-shell-patches/debug.keystore)
         run: |

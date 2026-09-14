@@ -55,6 +55,10 @@ on:
         description: 'lobby: how long to stay in the lobby before the bot leaves.'
         required: false
         default: '120'
+      exact_name:
+        description: 'lobby: use bot_name verbatim instead of appending the run number. The name must then be one the server has never seen, or login is denied.'
+        required: false
+        default: ''
 
 jobs:
   bot-vs-bot:
@@ -163,7 +167,16 @@ jobs:
       - name: Say what to look for in the lobby
         id: whoami
         run: |
-          name="${{ inputs.bot_name }}${{ github.run_number }}"
+          # The run number is appended so each dispatch registers a NEW
+          # account — see the note above the job. exact_name opts out when a
+          # specific name is wanted; that name then has to be one the server
+          # has never seen, because a fresh runner re-registers it from
+          # scratch and the server denies a name already taken.
+          if [ -n "${{ inputs.exact_name }}" ]; then
+            name="${{ inputs.bot_name }}"
+          else
+            name="${{ inputs.bot_name }}${{ github.run_number }}"
+          fi
           name="${name:0:16}"
           echo "name=$name" >> "$GITHUB_OUTPUT"
           {

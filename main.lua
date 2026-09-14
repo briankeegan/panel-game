@@ -101,6 +101,13 @@ end
 ---@diagnostic disable-next-line: duplicate-set-field
 function love.focus(f)
   GAME.focused = f
+  if not f then
+    -- Android doesn't reliably call love.quit() when the app is backgrounded
+    -- or killed by the OS (home button, task-switch away, memory pressure), so
+    -- settings that only got saved there (Mobile View, input method, etc.)
+    -- silently reverted on next launch. Persist on every focus loss instead.
+    pcall(write_conf_file)
+  end
 end
 
 -- Called every few fractions of a second to update the game

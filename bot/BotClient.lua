@@ -68,8 +68,12 @@ local BotClient = class(function(self, opts)
   self.ip = opts.ip or "127.0.0.1"
   self.port = opts.port or 49569
   self.name = opts.name or "BotBella"
-  self.brainKind = opts.brain or "heuristic"   -- "heuristic"|"random"|"expert"|"search"
-  self.searchProfile = opts.searchProfile       -- optional per-player eval weights (brain == "search")
+  -- "weighted" is the evaluator brain (bot/WeightedBrain.lua): weights a
+  -- search FOUND, scoring the board a move leaves. Anything else that is not
+  -- "random" gets EnvelopeBrain, the shape-catalog brain, which is what every
+  -- name here used to mean -- brainKind was declared and then never read.
+  self.brainKind = opts.brain or "heuristic"   -- "heuristic"|"random"|"expert"|"search"|"weighted"
+  self.searchProfile = opts.searchProfile       -- weight-set path for brain == "weighted" (bot/profiles/*.json)
   self.cursorSpeed = opts.cursorSpeed -- { cursorMoveInterval, reactionFrames } direct knobs; nil = full speed
   self.gameplay = TcpClient({ name = "bot-gameplay", defaultPort = self.port })
   -- Persisted server identity so re-runs reuse the same account instead of
@@ -356,7 +360,15 @@ function BotClient:startMatch()
   -- the bot simulates an EMPTY board from frame 0 (no panels -> brain always
   -- WAITs -> cursor never moves -> the human sees a blank board).
   self.match:start()
-  if self.brainKind ~= "random" then
+  if self.brainKind == "weighted" then
+    -- The evaluator brain. searchProfile names the weight set; nil takes
+    -- bot/profiles/trained.json, the set the cross-entropy search converged
+    -- on. Constructing it validates the weights, so a typo'd feature name
+    -- fails here rather than after a match has been played against nothing.
+    self.brain = require("bot.WeightedBrain").new({ profile = self.searchProfile })
+    self.controller = require("bot.CursorController").new(self.cursorSpeed)
+    self.boardState = require("bot.BoardState")
+  elseif self.brainKind ~= "random" then
     -- THE bot, full strength. EnvelopeBrain now plays online here (the only thing it needed
     -- from SearchBrain was this seat in the online-play loop).
     self.brain = require("bot.EnvelopeBrain").new({})

@@ -211,7 +211,18 @@ local function runSeed(seed, injectGarbage)
     end
   end)
 
-  local brain = require("bot.EnvelopeBrain").new({ bigGarbage = garbH >= 3 }) -- THE bot; announce a tall-block mode up front (like the training preset's visible queue)
+  -- WHICH BRAIN. PA_BRAIN=weighted runs bot/WeightedBrain.lua (the evaluator,
+  -- scored by weights a search found) through this identical harness, so the
+  -- two brains can be compared on the same seeds, the same garbage and the
+  -- same cursor pacing. Anything else is EnvelopeBrain, the shape-catalog
+  -- brain, which is what this file has always run. The `profile` CLI argument
+  -- names the weight set when the weighted brain is selected.
+  local brain
+  if os.getenv("PA_BRAIN") == "weighted" then
+    brain = require("bot.WeightedBrain").new({ profile = profilePath })
+  else
+    brain = require("bot.EnvelopeBrain").new({ bigGarbage = garbH >= 3 }) -- THE bot; announce a tall-block mode up front (like the training preset's visible queue)
+  end
   local _rf, _cmi = tonumber(os.getenv("PA_RF")), tonumber(os.getenv("PA_CMI"))  -- MIDDLE speed test: faster than throttled but enough pacing for swaps to resolve (full speed/reaction0 thrashed the routing)
   local controller = CursorController.new(
     (_rf or _cmi) and { cursorMoveInterval = _cmi or 2, reactionFrames = _rf or 5 }

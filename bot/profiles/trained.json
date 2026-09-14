@@ -1,0 +1,28 @@
+{
+  "_comment": "TRAINED WEIGHTS for bot/WeightedBrain.lua — GENERATED, do not hand-tune. Found by the cross-entropy search in the GameCreator repo (games/the-game/ai/eval/train.js), which stopped itself when the numbers stopped moving rather than at a generation budget. Ported here with bot/PanelEval.lua; the port is checked feature-by-feature against the JavaScript on 393 real boards by bot/tests/panelEvalVerify.lua.",
+  "source": "trained.replace.l10-puyo-dens-s2.0911-212621.g00360.json",
+  "_heldOut": "2683 against the previous AI's 679 (+295%) on seeds it never trained on, measured in that repo's own game",
+  "_switches": "A WEIGHT SET IS ONLY A BOT WHEN PAIRED WITH THE SWITCHES IT WAS FOUND UNDER. density:true is the one that matters here and is honoured (see `density` below). depth:1 and beam:6 describe that search's lookahead; this brain plans one swap, which is depth 1.",
+  "density": true,
+  "weights": {
+    "matchPotential": 75,
+    "chainPotential": 169,
+    "comboPotential": 85,
+    "staircase": 8,
+    "flatTop": 86,
+    "links": 144,
+    "colourVariance": 219,
+    "edgePenalty": 209,
+    "garbageOnBoard": 104,
+    "maxHeight": 108,
+    "fillRatio": 93,
+    "roughness": 47,
+    "garbageAdjacency": 27,
+    "colourScarcity": 54,
+    "garbageSent": 193,
+    "chainLength": 45,
+    "scoreEarned": 87,
+    "garbageCleared": 64,
+    "travelCost": 13
+  }
+}

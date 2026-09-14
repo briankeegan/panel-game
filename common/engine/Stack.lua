@@ -13,6 +13,15 @@ local LevelData = require("common.data.LevelData")
 table.clear = require("table.clear")
 local RollbackBuffer = require("common.engine.RollbackBuffer")
 local WigglePay = require("common.engine.WigglePay")
+local Smoothing = require("common.lib.smoothing")
+
+-- View-stack pacing constants. SMOOTH_TIME is how long it takes the
+-- per-stack catch-up rate to "mostly" reach a new target after the
+-- buffer changes — 200ms feels natural for visible-but-not-laggy
+-- transitions. TICK_DT is fixed at the engine's nominal 60Hz; the
+-- smoothing is per-Match:run-cycle, not wall-clock.
+local VIEW_SMOOTH_TIME_S = 0.2
+local VIEW_TICK_DT_S     = 1 / 60
 local KeyDataEncoding = require("common.data.KeyDataEncoding")
 local InputCompression= require("common.data.InputCompression")
 local MatchRules = require("common.data.MatchRules")
@@ -65,6 +74,7 @@ local PANELS_TO_NEXT_SPEED =
   45, 45, 45, 45, 45, 45, 45, 45, math.huge}
 
 ---@class PanelSource : canRollback
+---@field rollbackBuffer RollbackBuffer per-source rollback memory (set by subclasses)
 ---@field generateStartingBoard fun(self: PanelSource, stack: Stack): string
 ---@field generateGarbagePanels fun(self: PanelSource, stack:Stack): string
 ---@field getStartingBoardHeight fun(self: PanelSource, stack: Stack): integer how many rows are to be generated at the start
@@ -137,6 +147,7 @@ local DIRECTION_ROW = {up = 1, down = -1, left = 0, right = 0}
 ---@field cursorDirection CursorDirection? direction of the current movement key
 ---@field cur_row integer row the cursor is on
 ---@field cur_col integer the column the left half of the cursor is on (or just the cursor in case of touch)
+---@field cursorLock boolean? true while a swap is locking the cursor in place
 ---@field queuedSwapRow integer row in which a swap for next frame has been queued; 0 if none queued
 ---@field queuedSwapColumn integer column of the left (or in case of touch the "target") panel for which a swap has been queued for next frame; 0 if none queued
 ---@field top_cur_row integer the maximum row index the cursor is allowed to go at the moment
@@ -152,9 +163,20 @@ local DIRECTION_ROW = {up = 1, down = -1, left = 0, right = 0}
 ---@field panelTemplate (Panel | fun(row: integer, column: integer, id: integer?): Panel) A template class based on Panel enriched by tailor made closures containing references to the Stack
 ---@field swapStallingBackLog table tracks swaps that will incur a health cost for stalling if not swapping would have resulted in health loss
 ---@field swappingPanelCount integer how many panels are swapping on this frame
----@field panelSource PanelSource where the Stack gets its panels from 
+---@field panelSource PanelSource where the Stack gets its panels from
 ---@field swapCount integer
 ---@field wasToppedOut boolean if the stack was topped out at the start of the frame
+---@field clock integer engine tick counter (includes countdown frames)
+---@field stopWatch integer in-game timer in frames (excludes countdown)
+---@field stopWatchIsRunning boolean true once gameplay starts (after countdown)
+---@field countdownOffsetFrames integer? frames the countdown consumed; subtracted from clock to derive stopWatch
+---@field game_over_clock integer engine clock at which this stack died (0 if still alive)
+---@field game_over_stopWatch integer in-game timer value at death (countdown excluded); 0 if alive
+---@field receivedGarbage table received-garbage queue keyed by frame
+---@field garbageMode integer? garbage targeting mode for multi-opponent stacks
+---@field incomingGarbage GarbageQueue
+---@field outgoingGarbage GarbageQueue
+---@field _renderHost table? render-layer host parked on the engine so render-layer helpers can read render-only fields (e.g. danger_col, danger_timer) that don't belong on the engine but are needed by viewer code. Engine itself never reads this.
 
 
 -- Represents the full panel stack for one player
@@ -223,7 +245,12 @@ local Stack = class(
       end
     end
 
-    s.max_runs_per_frame = 3
+    -- Local=3 for brief render hitches. View=4 so buffer backlog (e.g. after a
+    -- network stall) actually drains: with cap=1, smoothing.targetRate's ramp
+    -- to maxRate is a no-op and the view stays permanently behind by however
+    -- much pending input ever queued up. 4 lets the existing smoothDamp ramp
+    -- catch up gracefully without flooding any single frame.
+    s.max_runs_per_frame = args.is_local and 3 or 4
 
     s.displacement = 16
     s.wasToppedOut = false
@@ -419,11 +446,12 @@ function Stack:rollbackCopy()
   copy.shake_time = self.shake_time
   copy.peak_shake_time = self.peak_shake_time
   copy.shake_time_on_frame = self.shake_time_on_frame
-  copy.do_countdown = self.do_countdown
+  copy.in_countdown = self.in_countdown
   copy.has_risen = self.has_risen
   copy.metalPanelsQueued = self.metalPanelsQueued
   copy.panels_cleared = self.panels_cleared
   copy.game_over_clock = self.game_over_clock
+  copy.game_over_stopWatch = self.game_over_stopWatch
   copy.highestGarbageIdMatched = self.highestGarbageIdMatched
   copy.swapCount = self.swapCount
 
@@ -475,11 +503,12 @@ local function internalRollbackToFrame(stack, clock)
   stack.shake_time = copy.shake_time
   stack.peak_shake_time = copy.peak_shake_time
   stack.shake_time_on_frame = copy.shake_time_on_frame
-  stack.do_countdown = copy.do_countdown
+  stack.in_countdown = copy.in_countdown
   stack.has_risen = copy.has_risen
   stack.metalPanelsQueued = copy.metalPanelsQueued
   stack.panels_cleared = copy.panels_cleared
   stack.game_over_clock = copy.game_over_clock
+  stack.game_over_stopWatch = copy.game_over_stopWatch
   stack.highestGarbageIdMatched = copy.highestGarbageIdMatched
   stack.queuedSwapColumn = copy.queuedSwapColumn
   stack.queuedSwapRow = copy.queuedSwapRow
@@ -539,6 +568,10 @@ function Stack:rollbackToFrame(clock)
     self.incomingGarbage:rollbackToFrame(self.stopWatch)
     self.outgoingGarbage:rollbackToFrame(self.stopWatch)
     self.panelSource:rollbackToFrame(clock)
+    -- Garbage queue restore only reverts stagedGarbage to its frame-F shape;
+    -- network-injected G events from frames after F have to be re-played
+    -- through the forward re-sim or they vanish from staging permanently.
+    self:markNetworkGarbageNeedsReplay(self.stopWatch)
 
     self.rollbackCount = self.rollbackCount + 1
     -- match will try to fast forward this stack to that frame
@@ -652,7 +685,7 @@ function Stack:controls()
     local cursorColumn, cursorRow
     raise, cursorRow, cursorColumn = TouchDataEncoding.latinStringToTouchData(sdata, self.width)
     local canSetCursor = true
-    if self.do_countdown then
+    if self.in_countdown then
       if self.animatingCursorDuringCountdown then
         canSetCursor = false
       end
@@ -718,7 +751,37 @@ function Stack:controls()
   end
 end
 
-function Stack:shouldRun(runsSoFar)
+-- Sub-tick lerp of animated render fields against rollbackBuffer's prev tick.
+-- Returns a saved-state table for restoreRenderInterp; nil = no interp applied.
+---@param alpha number? sub-tick fraction in [0,1]; nil/>=1 = no interp
+---@return table? saved
+function Stack:applyRenderInterp(alpha)
+  if self.is_local or not alpha or alpha >= 1 then return nil end
+  if not self.rollbackBuffer then return nil end
+  local prev = self.rollbackBuffer:peekPrevious()
+  if not prev or prev.clock ~= self.clock - 1 then return nil end
+  local saved = {displacement = self.displacement, cur_col = self.cur_col, cur_row = self.cur_row}
+  -- displacement is mod 16; skip lerp across the wrap
+  if math.abs(self.displacement - prev.displacement) < 8 then
+    self.displacement = prev.displacement + (self.displacement - prev.displacement) * alpha
+  end
+  self.cur_col = prev.cur_col + (self.cur_col - prev.cur_col) * alpha
+  self.cur_row = prev.cur_row + (self.cur_row - prev.cur_row) * alpha
+  return saved
+end
+
+---@param saved table?
+function Stack:restoreRenderInterp(saved)
+  if not saved then return end
+  self.displacement = saved.displacement
+  self.cur_col = saved.cur_col
+  self.cur_row = saved.cur_row
+end
+
+---@param runsSoFar integer
+---@param remoteCapTight boolean? when true and this is a non-local stack,
+---  the per-cycle iteration cap is reduced to 1
+function Stack:shouldRun(runsSoFar, remoteCapTight)
   if self:game_ended() then
     return false
   end
@@ -733,23 +796,68 @@ function Stack:shouldRun(runsSoFar)
   -- If we are local we always want to catch up and run the new input which is already appended
   if self.is_local then
     return buffer_len > 0
-  else
-    -- If we are not local, we want to run faster to catch up.
-    if buffer_len >= 15 - runsSoFar then
-      -- way behind, run at max speed.
-      return runsSoFar < self.max_runs_per_frame
-    elseif buffer_len >= 10 - runsSoFar then
-      -- When we're closer, run fewer times per frame, so things are less choppy.
-      -- This might have a side effect of taking a little longer to catch up
-      -- since we don't always run at top speed.
-      local maxRuns = math.min(2, self.max_runs_per_frame)
-      return runsSoFar < maxRuns
-    elseif buffer_len >= 1 then
-      return runsSoFar == 0
-    end
   end
 
-  return false
+  -- View-stack pacing: smoothed catch-up.
+  --
+  -- The old design was a bucket function: buffer 1-9 → 1×, 10-14 → 2×,
+  -- 15+ → max. That works correctness-wise but it can look jarring —
+  -- a single-frame change in buffer flips the rate sharply, the stack
+  -- visibly lurches into faster motion. The user is watching this
+  -- view-stack render and wants it to look smooth.
+  --
+  -- New design (visual-smoothness focused, not catch-up-speed focused):
+  -- 1. smootherstep maps buffer → target rate (no threshold flip-flop)
+  -- 2. SmoothDamp eases current rate toward target (no abrupt rate jumps)
+  -- 3. Accumulator quantizes the fractional rate into integer per-cycle runs
+  -- 4. End-game bypass: if game_over_clock is set but not yet reached,
+  --    snap to max — player wants the match resolved fast, not paced
+  --
+  -- The plan is recomputed once per Match:run cycle (runsSoFar=0 is the
+  -- start of a cycle); subsequent shouldRun calls within the same cycle
+  -- just check the precomputed plan. Per-stack state, scales linearly
+  -- in player count.
+  if runsSoFar == 0 then
+    local target = Smoothing.targetRate(buffer_len, self.max_runs_per_frame)
+
+    local pendingDeath = (self.game_over_clock or 0) > 0
+    -- play_to_end: spectator/joiner catch-up races at max rate (smoothing would let a still-live game's input outpace it and hang "Catching up")
+    if pendingDeath or self.play_to_end then
+      -- Race to the end. Skip smoothing.
+      self._smoothedRate = self.max_runs_per_frame
+      self._smoothedRateVelocity = 0
+      self._smoothedRateAccum = 0
+    elseif self._smoothedRate == nil then
+      -- First time we're planning for this stack: snap to target rather
+      -- than ramp from zero (which would make a steady-state stack run
+      -- 0 ticks for the first ~smoothTime seconds while SmoothDamp
+      -- ramps up).
+      self._smoothedRate = target
+      self._smoothedRateVelocity = 0
+    else
+      self._smoothedRate, self._smoothedRateVelocity = Smoothing.smoothDamp(
+        self._smoothedRate, target, self._smoothedRateVelocity,
+        VIEW_SMOOTH_TIME_S, VIEW_TICK_DT_S)
+    end
+
+    self._smoothedRateAccum = (self._smoothedRateAccum or 0) + self._smoothedRate
+    local planned = math.floor(self._smoothedRateAccum)
+    self._smoothedRateAccum = self._smoothedRateAccum - planned
+
+    -- Hard caps: never exceed max_runs_per_frame in one cycle, never
+    -- claim to run more frames than we have input for.
+    if planned > self.max_runs_per_frame then planned = self.max_runs_per_frame end
+    if planned > buffer_len then planned = buffer_len end
+    if planned < 0 then planned = 0 end
+    -- Local-prioritized tight cap: when local is racing to catch up, drop
+    -- this cycle's remote run to at most 1 so we don't steal CPU from local.
+    -- SmoothDamp accumulator carries the unspent rate forward, so remotes
+    -- still converge over many cycles — just one tick at a time.
+    if remoteCapTight and planned > 1 and not (self.play_to_end or pendingDeath) then planned = 1 end
+    self._smoothedPlannedRuns = planned
+  end
+
+  return runsSoFar < (self._smoothedPlannedRuns or 0)
 end
 
 -- Runs one step of the stack.
@@ -942,11 +1050,15 @@ function Stack:runPhysics()
 
   --prof.push("passive raise")
   -- Phase 0 //////////////////////////////////////////////////////////////
-  -- Stack automatic rising
-  if self.behaviours.passiveRaise then
+  -- Stack automatic rising. Also fires while prevent_manual_raise is set
+  -- so the deferred final tick of a manual raise (displacement 1 → 0 +
+  -- new_row, see handleManualRaise / issue #663) still completes when
+  -- passiveRaise is off. Without this, no-raise endless gets stuck at
+  -- displacement 1 after one raise and blocks all subsequent input.
+  if self.behaviours.passiveRaise or self.prevent_manual_raise then
     if self:advancePassiveRaise() then
-      if self:checkGameOver() then
-        self:setGameOver()
+      if self:checkDeath() then
+        self:recordDeath()
       end
     end
   end
@@ -976,10 +1088,21 @@ function Stack:runPhysics()
   self:updateActivePanelCount()
   --prof.push("chain update")
   -- if at the end of the routine there are no chain panels, the chain ends.
-  if self.chain_counter ~= 0 and not self:hasChainingPanels() then
+  -- Belt-and-suspenders: also finalize if currentChain is sitting in the queue
+  -- with chain_counter already 0 — a rollback or other state-restore can leave
+  -- the two views out of sync, and an orphaned unfinalized chain at the back
+  -- of stagedGarbage permanently halts outgoing damage.
+  local hasChainInQueue = self.outgoingGarbage
+                          and self.outgoingGarbage.currentChain ~= nil
+  if (self.chain_counter ~= 0 or hasChainInQueue) and not self:hasChainingPanels() then
+    if self.chain_counter == 0 and hasChainInQueue then
+      logger.warn(string.format(
+        "Stack[%s]: finalizing orphaned chain (chain_counter=0 but currentChain present) at stopWatch=%d",
+        tostring(self.which), self.stopWatch))
+    end
     self.chain_counter = 0
 
-    if self.outgoingGarbage then
+    if hasChainInQueue then
       logger.debug("Player " .. self.which .. " chain ended at " .. self.stopWatch)
       self.outgoingGarbage:finalizeCurrentChain(self.stopWatch)
     end
@@ -993,8 +1116,8 @@ function Stack:runPhysics()
   self:removeExtraRows()
 
   if not self:checkGameWin() then
-    if self:checkGameOver() then
-      self:setGameOver()
+    if self:checkDeath() then
+      self:recordDeath()
     end
   end
 end
@@ -1025,9 +1148,9 @@ function Stack:handleManualRaise()
         -- why is this game over check needed?
         -- manual raise halts passive raise and only passive raise leads to health reduction
         -- replacing this with health reduction could be a viable alternative
-        -- see also: https://github.com/panel-attack/panel-game/issues/437 and comments within checkGameOver itself
-        if self:checkGameOver() then
-          self:setGameOver()
+        -- see also: https://github.com/panel-attack/panel-game/issues/437 and comments within checkDeath itself
+        if self:checkDeath() then
+          self:recordDeath()
         end
       else
         self.has_risen = true
@@ -1139,7 +1262,7 @@ function Stack:advancePassiveRaise()
 end
 
 function Stack:runCountdown()
-  self.do_countdown = true
+  self.in_countdown = true
   self.rise_lock = true
   if self.clock == 0 then
     self.animatingCursorDuringCountdown = true
@@ -1178,7 +1301,7 @@ function Stack:runCountdown()
     end
     if self.countdown_timer == 0 then
       --we are done counting down
-      self.do_countdown = false
+      self.in_countdown = false
       self.countdown_timer = nil
     end
     if self.countdown_timer then
@@ -1196,19 +1319,32 @@ function Stack:game_ended()
   end
 end
 
--- Sets the current stack as "lost"
--- Also begins drawing game over effects
-function Stack:setGameOver()
+-- Records the death of this stack at the given clock frame (defaults to self.clock).
+-- Emits the "gameOver" signal once; subsequent calls with the same frame are no-ops.
+-- An explicit clock can be passed by external callers (e.g. loose-sync DeathEvent handler)
+-- that know the authoritative death frame before the sim has caught up to it.
+---@param clock integer? frame the stack died on (defaults to self.clock)
+---@param stopWatch integer? authoritative stopWatch value from the dying engine.
+---  When supplied (remote D-event), used verbatim instead of re-deriving via
+---  this stack's countdownOffsetFrames — the sender's offset is the source of
+---  truth for what their own timer showed.
+function Stack:recordDeath(clock, stopWatch)
+  clock = clock or self.clock
 
   if self.game_over_clock > 0 then
-    -- it is possible that game over is set twice on the same frame
+    -- it is possible that death is recorded twice on the same frame
     -- this happens if someone died to passive raise while holding manual raise
-    -- we shouldn't try to set game over again under any other circumstances however
-    assert(self.clock == self.game_over_clock, "game over was already set to a different clock time")
+    -- we shouldn't try to record death again under any other circumstances however
+    assert(self.game_over_clock == clock, "game over was already set to a different clock time")
     return
   end
 
-  self.game_over_clock = self.clock
+  self.game_over_clock = clock
+  if stopWatch then
+    self.game_over_stopWatch = math.max(0, stopWatch)
+  else
+    self.game_over_stopWatch = math.max(0, clock - (self.countdownOffsetFrames or 0))
+  end
 
   self:emitSignal("gameOver", self)
 end
@@ -1240,7 +1376,7 @@ function Stack:canSwap(panel1, panel2)
   if math.abs(panel1.column - panel2.column) ~= 1 or panel1.row ~= panel2.row then
     -- panels are not horizontally adjacent, can't swap
     return false
-  elseif self.do_countdown or self.clock <= 1 then
+  elseif self.in_countdown or self.clock <= 1 then
     -- swapping is not possible during countdown and on the first frame
     return false
   elseif self.stackOverConditions[MatchRules.StackOverConditions.SWAPS] and self.stackOverConditions[MatchRules.StackOverConditions.SWAPS] <= self.swapCount then
@@ -1357,7 +1493,7 @@ function Stack:tryDropGarbage()
   local garbage = self.incomingGarbage:pop()
   logger.debug(string.format("%d Dropping garbage on stack %d - height %d  width %d  %s", self.stopWatch, self.which, garbage.height, garbage.width, garbage.isMetal and "Metal" or ""))
 
-  self:dropGarbage(garbage.width, garbage.height, garbage.isMetal)
+  self:dropGarbage(garbage.width, garbage.height, garbage.isMetal, garbage.senderId)
 
   return true
 end
@@ -1371,7 +1507,7 @@ function Stack:getGarbageSpawnColumn(garbageWidth)
   return spawnColumn
 end
 
-function Stack:dropGarbage(width, height, isMetal)
+function Stack:dropGarbage(width, height, isMetal, senderId)
   -- garbage always drops in row 13
   local originRow = self.height + 1
   -- combo garbage will alternate it's spawn column
@@ -1403,6 +1539,7 @@ function Stack:dropGarbage(width, height, isMetal)
           panel.state = "falling"
           panel.row = row
           panel.column = col
+          panel.senderId = senderId
           if isMetal then
             panel.metal = isMetal
           end
@@ -1636,8 +1773,21 @@ local function isCompletedChain(garbage)
   return garbage.isChain and garbage.finalized
 end
 
-function Stack:checkGameOver()
+function Stack:checkDeath()
   if self.game_over_clock <= 0 then
+    -- Live loose-sync: only the authoritative (local) player decides their own
+    -- death. Remote view-stacks get game_over_clock set via _applyDeathEventNow
+    -- when the source player's D arrives. Running checkDeath on a view-stack
+    -- lets the two engines conclude death at different frames, which
+    -- (a) shows mismatched OUT timestamps on each side and (b) silently drops
+    -- outbound garbage because Match:distributeGarbageToTargets skips targets
+    -- whose view-stack game_over_clock > 0. Replays and offline play don't have
+    -- D events on the wire, so they keep running checkDeath normally.
+    if self.is_local == false
+       and LOOSE_SYNC_GARBAGE
+       and GAME and GAME.netClient and GAME.netClient:isConnected() then
+      return false
+    end
     for stackOverCondition, value in pairs(self.stackOverConditions) do
       if stackOverCondition == MatchRules.StackOverConditions.HEALTH then
         if self.health <= value and self.shake_time <= 0 then
@@ -1671,9 +1821,14 @@ function Stack:checkGameOver()
         end
       end
     end
-  else
-    return true
   end
+  -- If game_over_clock is already set (> 0), return false: recordDeath has
+  -- already run and callers should not call it again at a different clock.
+  -- (Previously this fell through to `else return true`, which caused a crash
+  -- when _applyDeathEventNow wrote game_over_clock externally at frame N while
+  -- the local sim was still catching up at frame M < N — checkDeath returned
+  -- true, recordDeath fired at clock M ≠ N, and the assert tripped.)
+  return false
 end
 
 function Stack:checkGameWin()
@@ -1760,7 +1915,10 @@ end
 
 ---@param doCountdown boolean
 function Stack:setCountdown(doCountdown)
-  self.do_countdown = doCountdown
+  self.in_countdown = doCountdown
+  -- Persistent offset for clock→stopWatch conversion (recordDeath uses it).
+  self.countdownOffsetFrames = doCountdown
+      and (consts.COUNTDOWN_START + consts.COUNTDOWN_LENGTH) or 0
   if doCountdown then
     self.behaviours.delaySimulationUntil = "countdownEnded"
     self.stopWatchIsRunning = false

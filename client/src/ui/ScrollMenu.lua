@@ -3,6 +3,7 @@ local ScrollContainer = import("./ScrollContainer")
 local class = require("common.lib.class")
 local util = require("common.lib.util")
 local GraphicsUtil = require("client.src.graphics.graphics_util")
+local system = require("client.src.system")
 local tableUtils = require("common.lib.tableUtils")
 local FocusDirector = import("./FocusDirector")
 
@@ -37,6 +38,10 @@ function ScrollMenu:selectPrevious()
     return
   end
 
+  if self.children[self.selectedIndex] and self.children[self.selectedIndex].setSelected then
+    self.children[self.selectedIndex]:setSelected(false)
+  end
+
   local child
   for i = self.selectedIndex - 1, self.selectedIndex - #self.children, -1 do
     local index = wrap(1, i, #self.children)
@@ -46,6 +51,7 @@ function ScrollMenu:selectPrevious()
       break
     end
   end
+  if child and child.setSelected then child:setSelected(true) end
   self:keepVisible(-child.y, child.height)
   GAME.theme:playMoveSfx()
 end
@@ -53,6 +59,10 @@ end
 function ScrollMenu:selectNext()
   if not self.selectedIndex then
     return
+  end
+
+  if self.children[self.selectedIndex] and self.children[self.selectedIndex].setSelected then
+    self.children[self.selectedIndex]:setSelected(false)
   end
 
   local child
@@ -64,6 +74,7 @@ function ScrollMenu:selectNext()
       break
     end
   end
+  if child and child.setSelected then child:setSelected(true) end
   self:keepVisible(-child.y, child.height)
   GAME.theme:playMoveSfx()
 end
@@ -88,7 +99,11 @@ end
 function ScrollMenu:select(uiElement)
   for i, child in ipairs(self.children) do
     if child == uiElement and child.receiveInputs and child.isEnabled and child.isVisible then
+      if self.selectedIndex and self.children[self.selectedIndex] and self.children[self.selectedIndex].setSelected then
+        self.children[self.selectedIndex]:setSelected(false)
+      end
       self.selectedIndex = i
+      if child.setSelected then child:setSelected(true) end
       self:keepVisible(-child.y, child.height)
       return true
     end
@@ -96,7 +111,15 @@ function ScrollMenu:select(uiElement)
   return false
 end
 
----@param inputs InputConfiguration
+-- MenuEsc contract: pressing escape jumps the selection to the last child.
+-- If already on the last child, escape is forwarded to that child's
+-- receiveInputs — and Button.receiveInputs treats MenuEsc identically to
+-- MenuSelect (it fires onClick). The net effect: the last child IS the back
+-- action. So any menu passed to setFocus (i.e. any nested submenu) MUST end
+-- with a back button whose onClick calls `menu:yieldFocus()`. Without one,
+-- escaping on the last item fires whatever action that item has — e.g. a
+-- "Relaxed" button would start a game instead of cancelling out.
+---@param inputs InputConfiguration | InputManager structurally compatible — both expose isDown/isPressed/isPressedWithRepeat
 ---@param dt number?
 function ScrollMenu:receiveInputs(inputs, dt)
   if not self.isEnabled or not self.selectedIndex then
@@ -107,7 +130,7 @@ function ScrollMenu:receiveInputs(inputs, dt)
     self.focused:receiveInputs(inputs, dt)
   else
     local selectedElement = self.children[self.selectedIndex]
-  
+
     if inputs.isDown["MenuEsc"] then
       if self:getLastIndex() ~= self.selectedIndex then
         self:selectLast()
@@ -139,17 +162,17 @@ function ScrollMenu:addChild(uiElement)
     y = self.padding
   end
   uiElement.y = y
+  -- portrait: center each item within the menu width (no-op when the item already
+  -- fills the width, so flyout sub-menus are unaffected). Desktop/landscape untouched.
+  if system.isPortraitMode() and self.width and uiElement.width and uiElement.width < self.width then
+    uiElement.x = (self.width - uiElement.width) / 2
+  end
   ScrollContainer.addChild(self, uiElement)
 end
 
 function ScrollMenu:drawChildren()
   for i, uiElement in ipairs(self.children) do
     if uiElement.isVisible then
-      if self.selectedIndex and i == self.selectedIndex then
-        GraphicsUtil.setColor(0.6, 0.6, 1, 0.5)
-        love.graphics.rectangle("fill", uiElement.x, uiElement.y, uiElement.width, uiElement.height)
-        love.graphics.rectangle("line", uiElement.x, uiElement.y, uiElement.width, uiElement.height)
-      end
       uiElement:draw()
     end
   end

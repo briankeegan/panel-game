@@ -44,7 +44,7 @@ local function createEndlessClientMatch(playerCount, theme)
     for i, stack in ipairs(clientMatch.stacks) do
       stack.theme = theme
       -- different theme changes the offsets so we need to recalculate graphics values
-      stack:moveForRenderIndex(i)
+      stack:moveForLayoutSlot(i)
     end
   end
 
@@ -383,12 +383,12 @@ local function testCurrentStackPositioning()
   local stack1 = match.stacks[1]
   local stack2 = match.stacks[2]
   
-  -- Player 1 positioning values (renderIndex = 1) - ORIGINAL values before moveToPosition refactor
+  -- Player 1 positioning values (layoutSlot = 1) - ORIGINAL values before moveToPosition refactor
   assert(stack1.frameOriginX == 76) 
   assert(stack1.panelOriginX == 80) -- frameOriginX + panelOriginXOffset(4)
   assert(stack1.origin_x == 80)     -- Original positioning calculation
   
-  -- Player 2 positioning values (renderIndex = 2) - ORIGINAL values before moveToPosition refactor
+  -- Player 2 positioning values (layoutSlot = 2) - ORIGINAL values before moveToPosition refactor
   -- Using math.floor to handle floating point precision
   assert(math.floor(stack2.frameOriginX) == 246) -- Original: 246.66666666667
   assert(math.floor(stack2.panelOriginX) == 250) -- Original: 250.66666666667  
@@ -409,8 +409,38 @@ local function testCenterPositioning()
   assert(math.floor(stack.frameOriginX * 100) == 15933) -- 159.33333333333 * 100
   assert(math.floor(stack.panelOriginX * 100) == 16333) -- 163.33333333333 * 100  
   assert(math.floor(stack.origin_x * 100) == 16333)     -- 163.33333333333 * 100
-  assert(stack.renderIndex == 1)
+  assert(stack.layoutSlot == 1)
   assert(stack.mirror_x == 1)
 end
 
 test(testCenterPositioning)
+-- Test for 3-player layout
+local function test3PlayerLayout()
+  local match = createEndlessClientMatch(3, defaultTheme)
+  
+  assert(match ~= nil)
+  assert(#match.stacks == 3)
+  
+  -- Test that moveStacks() properly handles 3 players
+  match:moveStacks()
+  
+  -- Player 1 (local, full size) should be on the left with layoutSlot 1
+  local stack1 = match.stacks[1]
+  assert(stack1.layoutSlot == 1)
+  assert(stack1.mirror_x == 1)
+  
+  -- Players 2 and 3 (smaller) should be on the right
+  local stack2 = match.stacks[2]
+  local stack3 = match.stacks[3]
+  
+  assert(stack2.layoutSlot == 2)
+  assert(stack3.layoutSlot == 3)
+  
+  -- Stack 1 (big left) sits apart from the right-zone pair.
+  assert(stack1.frameOriginX ~= stack2.frameOriginX)
+  -- Players 2 & 3 are side-by-side on the right: different X, same row (same Y).
+  assert(stack2.frameOriginX ~= stack3.frameOriginX)
+  assert(stack2.frameOriginY == stack3.frameOriginY)
+end
+
+test(test3PlayerLayout)

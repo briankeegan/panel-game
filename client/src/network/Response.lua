@@ -1,17 +1,37 @@
 local class = require("common.lib.class")
+---@diagnostic disable-next-line: different-requires
+local socket = require("socket")
 
 -- how many seconds it takes for a request to give up waiting for a response
 local REQUEST_TIMEOUT = 5
 
-local function createResponseCoroutine(responseTypes)
-  local startTime = love.timer.getTime()
+-- love-free monotonic-ish clock so the headless bot client can reuse Response.
+-- Under LÖVE this is the same love.timer.getTime() as before; headless falls
+-- back to luasocket's wall clock (both callers below use the same source).
+local function now()
+  if love and love.timer then return love.timer.getTime() end
+  return socket.gettime()
+end
+
+-- Responses are drained from the queue of the SAME client that sent the
+-- request (passed in by Request:send). Dual-socket split means a J-message
+-- response lands on lobbyClient and an H-message response lands on whichever
+-- client sent the handshake — both clients need their own response routing.
+local function createResponseCoroutine(client, responseTypes)
+  local startTime = now()
   local cr = coroutine.create(
     function ()
       local response
+      -- Fallback through GAME.netClient.tcpClient was retained from an earlier
+      -- refactor but `tcpClient` no longer exists on NetClient. All real
+      -- callers pass `client` (see Request.lua:45). Assert so a future caller
+      -- that drops the arg fails loud instead of hitting a now-nil field.
+      assert(client, "Response: client (TcpClient) is required")
+      local queue = client.receivedMessageQueue
 
-      while not response and love.timer.getTime() < startTime + REQUEST_TIMEOUT do
+      while not response and now() < startTime + REQUEST_TIMEOUT do
         coroutine.yield()
-        response = GAME.netClient.tcpClient.receivedMessageQueue:pop_next_with(unpack(responseTypes))
+        response = queue:pop_next_with(unpack(responseTypes))
       end
 
       return response
@@ -22,9 +42,9 @@ local function createResponseCoroutine(responseTypes)
 end
 
 -- A simple wrapper for responses to client requests to the server
-local Response = class(function(response, responseTypes)
+local Response = class(function(response, responseTypes, client)
   response.responseTypes = responseTypes
-  response.coroutine = createResponseCoroutine(responseTypes)
+  response.coroutine = createResponseCoroutine(client, responseTypes)
   response.awaitingResponse = true
   response.given = false
 end)

@@ -49,9 +49,9 @@ function MainMenu:refresh()
   self.uiRoot:addChild(self.menu)
 end
 
-function MainMenu:createMainMenu()
-
-  local menuItems = {ui.MenuItem.createButtonMenuItem("mm_1_endless", nil, nil, function()
+function MainMenu:createOgMenu()
+  local ogItems = {
+    ui.MenuItem.createButtonMenuItem("mm_1_endless", nil, nil, function()
       GAME.battleRoom = BattleRoom.createLocalFromGameMode(GameModes.getPreset(GameModes.IDs.ONE_PLAYER_ENDLESS), EndlessGame)
       if GAME.battleRoom then
         switchToScene(EndlessMenu({battleRoom = GAME.battleRoom}))
@@ -81,57 +81,91 @@ function MainMenu:createMainMenu()
     ui.MenuItem.createButtonMenuItem("mm_1_challenge_mode", nil, nil, function()
       switchToScene(ChallengeModeMenu())
     end),
-    ui.MenuItem.createButtonMenuItem("mm_2_vs_online", {""}, nil, function()
-      switchToScene(Lobby({serverIp = "panelattack.com"}))
-    end),
     ui.MenuItem.createButtonMenuItem("mm_2_vs_local", nil, nil, function()
       switchToScene(LocalGameModeSelectionScene())
     end),
-    ui.MenuItem.createButtonMenuItem("mm_replay_browser", nil, nil, function()
-      switchToScene(ReplayBrowser())
+    ui.MenuItem.createButtonMenuItem("lb_back", nil, nil, function()
+      GAME.theme:playCancelSfx()
+      self.menu:detach()
+      self.menu = self:createMainMenu()
+      self.uiRoot:addChild(self.menu)
     end),
-    ui.MenuItem.createButtonMenuItem("mm_configure", nil, nil, function()
+  }
+  return ui.Menu.createCenteredMenu(ogItems)
+end
+
+function MainMenu:createMainMenu()
+
+  -- run_client.sh exports PA_SHOW_LOCAL=true so local dev always sees the Localhost option
+  -- without having to toggle the in-game debug setting.
+  local showLocalEnv = os.getenv("PA_SHOW_LOCAL") == "true"
+  local showDebugServers = DebugSettings.showDebugServers() or showLocalEnv
+
+  local menuItems = {
+    ui.MenuItem.createButtonMenuItem("mm_2_vs_online", {""}, nil, function()
+      switchToScene(Lobby({serverIp = "104.156.250.136"}))
+    end),
+  }
+
+  if showDebugServers then
+    menuItems[#menuItems + 1] = ui.MenuItem.createButtonMenuItem("Localhost Server", nil, false, function()
+      switchToScene(Lobby({serverIp = "Localhost"}))
+    end)
+  end
+
+  local restItems = {}
+
+  -- Configure input is keyboard/controller setup — meaningless on touch; hide in
+  -- portrait. Desktop/landscape keeps it.
+  if not system.isPortraitMode() then
+    restItems[#restItems + 1] = ui.MenuItem.createButtonMenuItem("mm_configure", nil, nil, function()
       switchToScene(InputConfigMenu())
-    end),
-    ui.MenuItem.createButtonMenuItem("mm_set_name", nil, nil, function()
-      switchToScene(SetNameMenu())
-    end),
-    ui.MenuItem.createButtonMenuItem("mm_options", nil, nil, function()
-      switchToScene(OptionsMenu())
-    end),
-    ui.MenuItem.createButtonMenuItem("mm_fullscreen", {"\n(Alt+Enter)"}, nil, function()
+    end)
+  end
+
+  restItems[#restItems + 1] = ui.MenuItem.createButtonMenuItem("mm_set_name", nil, nil, function()
+    switchToScene(SetNameMenu())
+  end)
+  restItems[#restItems + 1] = ui.MenuItem.createButtonMenuItem("mm_options", nil, nil, function()
+    switchToScene(OptionsMenu())
+  end)
+  restItems[#restItems + 1] = ui.MenuItem.createButtonMenuItem("mm_replay_browser", nil, nil, function()
+    switchToScene(ReplayBrowser())
+  end)
+
+  -- Fullscreen is meaningless in portrait (the game fills the phone) — hide it
+  -- there. Desktop/landscape keeps it in its usual spot.
+  if not system.isPortraitMode() then
+    restItems[#restItems + 1] = ui.MenuItem.createButtonMenuItem("mm_fullscreen", {"\n(Alt+Enter)"}, nil, function()
       GAME.theme:playValidationSfx()
       GAME:toggleFullscreen()
-    end),
-    ui.MenuItem.createButtonMenuItem("mm_quit", nil, nil, function() love.event.quit() end )
-  }
+    end)
+  end
+
+  restItems[#restItems + 1] = ui.MenuItem.createButtonMenuItem("og stuff", nil, false, function()
+    self.menu:detach()
+    self.menu = self:createOgMenu()
+    self.uiRoot:addChild(self.menu)
+  end)
+
+  for _, item in ipairs(restItems) do
+    menuItems[#menuItems + 1] = item
+  end
 
   local menu = ui.Menu.createCenteredMenu(menuItems)
 
-  local debugMenuItems = {ui.MenuItem.createButtonMenuItem("Beta Server", nil, false, function() switchToScene(Lobby({serverIp = "betaserver.panelattack.com", serverPort = 59569})) end),
-                          ui.MenuItem.createButtonMenuItem("Localhost Server", nil, false, function() switchToScene(Lobby({serverIp = "Localhost"})) end)
-                        }
-
-  local function addDebugMenuItems()
-    if DebugSettings.showDebugServers() then
-      for i, menuItem in ipairs(debugMenuItems) do
-        menu:addMenuItem(i + 7, menuItem)
-      end
-    end
-    if DebugSettings.showDesignHelper() then
-      menu:addMenuItem(#menu.menuItems, ui.MenuItem.createButtonMenuItem("Design Helper", nil, nil, function()
-          switchToScene(DesignHelper())
-        end))
-    end
+  if showDebugServers then
+    menu:addMenuItem(#menu.menuItems + 1, ui.MenuItem.createButtonMenuItem("Beta Server", nil, false, function() switchToScene(Lobby({serverIp = "betaserver.panelattack.com", serverPort = 59569})) end))
+  end
+  if DebugSettings.showDesignHelper() then
+    menu:addMenuItem(#menu.menuItems + 1, ui.MenuItem.createButtonMenuItem("Design Helper", nil, nil, function()
+      switchToScene(DesignHelper())
+    end))
   end
 
-  local function removeDebugMenuItems()
-    for i, menuItem in ipairs(debugMenuItems) do
-      menu:removeMenuItem(menuItem[1].id)
-    end
-  end
+  -- Quit is appended last so MenuEsc jumps straight to it (matches the back-button convention).
+  menu:addMenuItem(#menu.menuItems + 1, ui.MenuItem.createButtonMenuItem("mm_quit", nil, nil, function() love.event.quit() end))
 
-  addDebugMenuItems()
   return menu
 end
 
@@ -166,29 +200,33 @@ end
 function MainMenu:drawSelf()
   GAME.theme.images.bg_main:draw()
   local fontHeight = GraphicsUtil.getGlobalFont():getHeight()
-  local infoYPosition = 705 - fontHeight / 2
+  -- portrait: stamp the version/notices at the bottom, centered (landscape keeps
+  -- them at the old y=705, right-aligned).
+  local pm = system.isPortraitMode()
+  local infoAlign = pm and "center" or "right"
+  local infoX = pm and 0 or -5
+  local infoYPosition = (pm and (consts.CANVAS_HEIGHT - 18) or 705) - fontHeight / 2
 
-  local loveString = system.loveVersionString()
-  if loveString == "11.3.0" then
-    GraphicsUtil.printf(loc("love_version_warning"), -5, infoYPosition, consts.CANVAS_WIDTH, "right")
+  if not system.isRecommendedLoveVersion() then
+    GraphicsUtil.printf(loc("love_version_warning", system.loveVersionString()), infoX, infoYPosition, consts.CANVAS_WIDTH, infoAlign)
     infoYPosition = infoYPosition - fontHeight
   end
 
+  -- Always show the build stamp (consts.BUILD_VERSION), whether or not the
+  -- updater global is present. updateAvailable is only ever true when the
+  -- updater is active, so it's safe to read here.
+  local version
+  if updateAvailable then
+    version = "New version available! Restart the game to download!"
+  elseif DEBUG_ENABLED then
+    version = "PA Version: debug"
+  else
+    version = "PA Version: " .. consts.BUILD_VERSION
+  end
+  GraphicsUtil.printf(version, infoX, infoYPosition, consts.CANVAS_WIDTH, infoAlign)
+  infoYPosition = infoYPosition - fontHeight
+
   if GAME.updater then
-    local version
-    if updateAvailable then
-      version = "New " .. GAME.updater.activeReleaseStream.name .. " version available! Restart the game to download!"
-    else
-      if DEBUG_ENABLED then
-        version = "PA Version: debug"
-      else
-        version = "PA Version: " .. GAME.updater.activeReleaseStream.name .. " " .. (GAME.updater.activeVersion and GAME.updater.activeVersion.version or "dev")
-      end
-    end
-    GraphicsUtil.printf(version, -5, infoYPosition, consts.CANVAS_WIDTH, "right")
-    infoYPosition = infoYPosition - fontHeight
-
-
     local showUpdaterUpdateWarning = false
     if system.meetsLoveVersionRequirement(12, 0) and GAME.updater.version.major < 2 or (GAME.updater.version.major == 2 and GAME.updater.version.minor < 0) then
       showUpdaterUpdateWarning = true
@@ -202,7 +240,7 @@ function MainMenu:drawSelf()
     end
 
     if showUpdaterUpdateWarning then
-      GraphicsUtil.printf(loc("auto_updater_version_warning") .. " https://panelattack.com", -5, infoYPosition, consts.CANVAS_WIDTH, "right")
+      GraphicsUtil.printf(loc("auto_updater_version_warning") .. " https://github.com/briankeegan/panel-game/releases", infoX, infoYPosition, consts.CANVAS_WIDTH, infoAlign)
       infoYPosition = infoYPosition - fontHeight
     end
   end

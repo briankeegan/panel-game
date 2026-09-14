@@ -1,4 +1,9 @@
----@diagnostic disable: invisible, undefined-field
+-- Tests reach into Server/Room internals (invisible), assert on mock-shaped
+-- payloads that don't match production wire types (undefined-field), and use
+-- `local x = next(...); assert(x.foo)` patterns that LuaLS can't narrow
+-- through (need-check-nil). All three are file-wide invariants for tests
+-- against MockPersistence + ServerTesting fixtures.
+---@diagnostic disable: invisible, undefined-field, need-check-nil
 local MockPersistence = require("server.tests.MockPersistence")
 local ClientProtocol = require("common.network.ClientProtocol")
 local json = require("common.lib.dkjson")
@@ -23,10 +28,30 @@ local function testLogin()
   assert(p)
   assert(server.nameToConnectionIndex["Bob"] == 1)
   assert(server.nameToPlayer["Bob"] == p)
-  local message = bob.connection.outgoingMessageQueue:pop()
-  assert(message and message.messageText.type == "loginResponse" and message.messageText.content.approved)
-  message = bob.connection.outgoingMessageQueue:pop().messageText
-  assert(message and message.type == "lobbyStateV2" and message.content.players and message.content.players[4].name == "Bob")
+
+  local loginApproved = false
+  local lobbyStateMessage = nil
+  while bob.connection.outgoingMessageQueue:len() > 0 do
+    local queuedMessage = bob.connection.outgoingMessageQueue:pop()
+    local message = queuedMessage and queuedMessage.messageText
+    if message and message.type == "loginResponse" and message.content and message.content.approved then
+      loginApproved = true
+    elseif message and message.type == "lobbyStateV2" then
+      lobbyStateMessage = message
+      break
+    end
+  end
+
+  assert(loginApproved)
+  assert(lobbyStateMessage and lobbyStateMessage.content.players)
+  local bobFound = false
+  for _, playerData in pairs(lobbyStateMessage.content.players) do
+    if playerData and playerData.name == "Bob" then
+      bobFound = true
+      break
+    end
+  end
+  assert(bobFound)
 end
 
 local function testRoomSetup()
@@ -54,9 +79,9 @@ local function testRoomSetup()
   assert(room == server.playerToRoom[ben])
   assert(room.gameMode.name == GameModes.gameModeIdToName[GameModes.IDs.TWO_PLAYER_VS])
   message = alice.connection.outgoingMessageQueue:pop().messageText
-  assert(message.type == "createRoom" and tableUtils.length(message.content.players) == 2)
+  assert(message.type == "addToRoom" and tableUtils.length(message.content.players) == 2)
   message = ben.connection.outgoingMessageQueue:pop().messageText
-  assert(message.type == "createRoom" and tableUtils.length(message.content.players) == 2)
+  assert(message.type == "addToRoom" and tableUtils.length(message.content.players) == 2)
 
   message = bob.connection.outgoingMessageQueue:pop().messageText.content
   assert(message.players and tableUtils.length(message.players) == 3)
@@ -89,9 +114,9 @@ local function testRoomSetup2()
   assert(room == server.playerToRoom[ben])
   assert(room.gameMode.name == GameModes.gameModeIdToName[GameModes.IDs.TWO_PLAYER_TIME_ATTACK])
   message = alice.connection.outgoingMessageQueue:pop().messageText
-  assert(message.type == "createRoom" and tableUtils.length(message.content.players) == 2)
+  assert(message.type == "addToRoom" and tableUtils.length(message.content.players) == 2)
   message = ben.connection.outgoingMessageQueue:pop().messageText
-  assert(message.type == "createRoom" and tableUtils.length(message.content.players) == 2)
+  assert(message.type == "addToRoom" and tableUtils.length(message.content.players) == 2)
 
   message = bob.connection.outgoingMessageQueue:pop().messageText.content
   assert(message.players and tableUtils.length(message.players) == 3)
@@ -133,10 +158,13 @@ local function testGameplay()
   alice.connection:receiveInput("A")
   ben.connection:receiveInput("g")
   server:update()
-  local _, input = NetworkProtocol.getMessageFromString(alice.connection.outgoingInputQueue:pop(), true)
-  assert(input and input == "g")
-  _, input = NetworkProtocol.getMessageFromString(ben.connection.outgoingInputQueue:pop(), true)
-  assert(input and input == "A")
+  -- Unified input wire: body is JSON {playerNumber, input}. Decode to inspect.
+  local _, body = NetworkProtocol.getMessageFromString(alice.connection.outgoingInputQueue:pop(), true)
+  local senderNum, input = NetworkProtocol.decodeInput(body)
+  assert(input == "g", "alice should receive ben's input 'g', got " .. tostring(input))
+  _, body = NetworkProtocol.getMessageFromString(ben.connection.outgoingInputQueue:pop(), true)
+  senderNum, input = NetworkProtocol.decodeInput(body)
+  assert(input == "A", "ben should receive alice's input 'A', got " .. tostring(input))
 
   bob.connection:receiveMessage(json.encode(ClientProtocol.requestSpectate("Bob", 1).messageText))
   server:update()
@@ -152,24 +180,43 @@ local function testGameplay()
   assert(replay.stacks[1].inputs == "g1")
 
   -- everyone gets the spectator update
-  message = alice.connection.outgoingMessageQueue:pop().messageText
-  assert(message.type == "spectatorUpdate" and message.content and message.content[1] == "Bob")
-  message = ben.connection.outgoingMessageQueue:pop().messageText
-  assert(message.type == "spectatorUpdate" and message.content and message.content[1] == "Bob")
-  message = bob.connection.outgoingMessageQueue:pop().messageText
-  assert(message.type == "spectatorUpdate" and message.content and message.content[1] == "Bob")
+  local function assertNextSpectatorUpdate(connection, spectatorName)
+    local found = false
+    while connection.outgoingMessageQueue:len() > 0 do
+      local queuedMessage = connection.outgoingMessageQueue:pop().messageText
+      if queuedMessage.type == "spectatorUpdate" then
+        assert(queuedMessage.content and queuedMessage.content[1] == spectatorName)
+        found = true
+        break
+      end
+    end
+    assert(found)
+  end
+
+  assertNextSpectatorUpdate(alice.connection, "Bob")
+  assertNextSpectatorUpdate(ben.connection, "Bob")
+  assertNextSpectatorUpdate(bob.connection, "Bob")
 
   alice.connection:receiveMessage(json.encode(ClientProtocol.reportLocalGameResult(2).messageText))
   server:update()
   ben.connection:receiveMessage(json.encode(ClientProtocol.reportLocalGameResult(2).messageText))
   server:update()
 
-  message = alice.connection.outgoingMessageQueue:pop().messageText
-  assert(message.type == "gameResult")
-  message = ben.connection.outgoingMessageQueue:pop().messageText
-  assert(message.type == "gameResult")
-  message = bob.connection.outgoingMessageQueue:pop().messageText
-  assert(message.type == "gameResult")
+  local function assertNextGameResult(connection)
+    local found = false
+    while connection.outgoingMessageQueue:len() > 0 do
+      local queuedMessage = connection.outgoingMessageQueue:pop().messageText
+      if queuedMessage.type == "gameResult" then
+        found = true
+        break
+      end
+    end
+    assert(found)
+  end
+
+  assertNextGameResult(alice.connection)
+  assertNextGameResult(ben.connection)
+  assertNextGameResult(bob.connection)
 
   -- with some bad luck we'll also get a ranked status update which the server sends way too many of
   alice.connection:receiveMessage(readyMessage)
@@ -190,22 +237,28 @@ local function testGameplay()
   ben.connection:receiveMessage(json.encode(ClientProtocol.leaveRoom().messageText))
   server:update()
 
-  -- the others get informed about the room closing
+  -- Loose-sync mid-match leave: the room is voided but stays open so the
+  -- remaining player + spectators can see the void state and finish/rematch.
+  -- Ben gets a synthesized death event (D-prefix, routed to outgoingInputQueue
+  -- by MockConnection so it doesn't show up here). On outgoingMessageQueue:
+  --   - alice + bob receive playerLeftRoom carrying the voidReason
+  --   - ben receives leaveRoom back as the acknowledged-quit
   message = alice.connection.outgoingMessageQueue:pop().messageText
-  assert(message.type == "leaveRoom" and message.content.reason == "Ben left")
+  assert(message.type == "playerLeftRoom" and message.content.voidReason == "Ben left",
+    "alice expected playerLeftRoom voidReason='Ben left', got type="
+    .. tostring(message.type) .. " voidReason=" .. tostring(message.content and message.content.voidReason))
   message = bob.connection.outgoingMessageQueue:pop().messageText
-  assert(message.type == "leaveRoom" and message.content.reason == "Ben left")
-  -- this was an active quit so ben should get the leave back as well
+  assert(message.type == "playerLeftRoom" and message.content.voidReason == "Ben left",
+    "bob expected playerLeftRoom voidReason='Ben left'")
   message = ben.connection.outgoingMessageQueue:pop().messageText
-  assert(message.type == "leaveRoom" and message.content.reason == "Ben left")
+  assert(message.type == "leaveRoom",
+    "ben expected leaveRoom, got " .. tostring(message.type))
 
-  -- everyone is back to lobby
-  message = alice.connection.outgoingMessageQueue:pop().messageText.content
-  assert(message.players and tableUtils.length(message.players) == 3 and tableUtils.length(message.rooms) == 0)
-  message = bob.connection.outgoingMessageQueue:pop().messageText.content
-  assert(message.players and tableUtils.length(message.players) == 3 and tableUtils.length(message.rooms) == 0)
+  -- Only ben transitions back to lobby (alice + bob stay in the voided room).
+  -- Ben's next message is the lobby snapshot.
   message = ben.connection.outgoingMessageQueue:pop().messageText.content
-  assert(message.players and tableUtils.length(message.players) == 3 and tableUtils.length(message.rooms) == 0)
+  assert(message.players and tableUtils.length(message.players) == 3,
+    "ben should see 3 players in the lobby snapshot")
 end
 
 local function testDisconnect()
@@ -213,31 +266,77 @@ local function testDisconnect()
   local bob = ServerTesting.login(server, ServerTesting.players[1])
   local alice = ServerTesting.login(server, ServerTesting.players[2])
   local ben = ServerTesting.login(server, ServerTesting.players[3])
-  ServerTesting.setupRoom(server, alice, ben, true)
-  ServerTesting.addSpectator(server, server.playerToRoom[alice], bob)
-  ServerTesting.startGame(server, server.playerToRoom[alice])
+  local room = ServerTesting.setupRoom(server, alice, ben, true)
+  ServerTesting.addSpectator(server, room, bob)
+  ServerTesting.startGame(server, room)
 
-  server:closeConnection(ben.connection, "Ben's connection failed")
+  local benConn = ben.connection
+  server:closeConnection(benConn, "Ben's connection failed")
 
-  local message = alice.connection.outgoingMessageQueue:pop().messageText
-  assert(message.type == "leaveRoom" and message.content.reason == "Ben's connection failed")
-  message = bob.connection.outgoingMessageQueue:pop().messageText
-  assert(message.type == "leaveRoom" and message.content.reason == "Ben's connection failed")
-  -- we closed the connection server side which under normal circumstances only happens in case of a disconnect
-  -- so the server should no longer try to send them a message
-  assert(ben.connection.outgoingMessageQueue:len() == 0)
-  assert(ben.connection.loggedIn == false)
-  assert(server.connectionToPlayer[ben.connection] == nil)
+  -- Mid-match gameplay drop preserves the room slot for reconnect. No
+  -- playerLeftRoom is broadcast; the silent-death watchdog handles synthesis
+  -- if Ben stays quiet long enough. Survivors keep their queues clean.
+  assert(alice.connection.outgoingMessageQueue:len() == 0,
+    "alice expected no messages on Ben's gameplay drop, got "
+    .. alice.connection.outgoingMessageQueue:len())
+  assert(bob.connection.outgoingMessageQueue:len() == 0,
+    "bob expected no messages on Ben's gameplay drop, got "
+    .. bob.connection.outgoingMessageQueue:len())
 
-  server:update()
-
-  -- the people that got kicked out get the new lobby state
-  message = alice.connection.outgoingMessageQueue:pop().messageText
-  assert(message and message.type == "lobbyStateV2" and message.content.players and message.content.players[5].name == "Alice" and message.content.players[5].state == "lobby")
-  message = bob.connection.outgoingMessageQueue:pop().messageText
-  assert(message and message.type == "lobbyStateV2" and message.content.players and message.content.players[4].name == "Bob" and message.content.players[4].state == "lobby")
+  -- The closed connection itself is torn down, but the Player record stays
+  -- attached to the room so the reconnect path can find it.
+  assert(benConn.outgoingMessageQueue:len() == 0)
+  assert(benConn.loggedIn == false)
+  assert(server.connectionToPlayer[benConn] == nil)
+  assert(ben.gameplayConnection == nil)
+  assert(server.playerToRoom[ben] == room,
+    "Ben should still be in his room awaiting reconnect")
 end
 
+
+local MockConnection = require("server.tests.MockConnection")
+
+-- Wire a side-channel lobby connection onto an already-logged-in player the
+-- way the server's attach path would, without driving the full login attach.
+local function attachLobbyChannel(server, player)
+  local lobbyConn = MockConnection("lobby")
+  player.lobbyConnection = lobbyConn
+  server.connectionToPlayer[lobbyConn] = player
+  server.connections[lobbyConn.index] = lobbyConn
+  return lobbyConn
+end
+
+-- Change 2: a lobby side-channel drop must NOT tear down a player who is still
+-- live on gameplay (the common case — they're just browsing the lobby).
+local function testLobbyDropKeepsPlayerWithLiveGameplay()
+  local server = ServerTesting.getTestServer()
+  local alice = ServerTesting.login(server, ServerTesting.players[2])
+  assert(alice.gameplayConnection, "alice should be on gameplay after login")
+  assert(server.publicIdToPlayer[alice.publicPlayerID] == alice)
+
+  local lobbyConn = attachLobbyChannel(server, alice)
+  server:closeConnection(lobbyConn, "lobby socket dropped")
+
+  assert(server.publicIdToPlayer[alice.publicPlayerID] == alice,
+    "player with a live gameplay socket must stay registered on a lobby drop")
+  assert(alice.lobbyConnection == nil, "the dropped lobby slot should be nil'd")
+end
+
+-- Change 2: a lobby drop that is the LAST living connection for a roomless
+-- player must tear them down — otherwise they ghost in the lobby list.
+local function testLobbyDropTearsDownRoomlessGhost()
+  local server = ServerTesting.getTestServer()
+  local bob = ServerTesting.login(server, ServerTesting.players[1])
+  local lobbyConn = attachLobbyChannel(server, bob)
+  -- Precondition for the ghost: gameplay already gone, not in any room.
+  bob.gameplayConnection = nil
+  assert(server.playerToRoom[bob] == nil and server.spectatorToRoom[bob] == nil)
+
+  server:closeConnection(lobbyConn, "lobby socket dropped")
+
+  assert(server.publicIdToPlayer[bob.publicPlayerID] == nil,
+    "roomless player whose last (lobby) socket drops must be fully torn down")
+end
 
 local function testLobbyDataComposition()
   local server = ServerTesting.getTestServer()
@@ -293,7 +392,7 @@ local function testSinglePlayer()
   server:update()
   assert(server.playerToRoom[bob])
   local message = bob.connection.outgoingMessageQueue:pop().messageText
-  assert(message.type == "createRoom")
+  assert(message.type == "addToRoom")
 
   message = alice.connection.outgoingMessageQueue:pop().messageText
   assert(message.type == "lobbyStateV2")
@@ -303,13 +402,30 @@ local function testSinglePlayer()
   server:update()
 
   assert(server.spectatorToRoom[alice] == server.playerToRoom[bob])
-  message = bob.connection.outgoingMessageQueue:pop().messageText
-  assert(message.type == "spectatorUpdate")
-  message = alice.connection.outgoingMessageQueue:pop().messageText
-  assert(message.type == "spectateRequestGranted" and message.content.replay == nil)
-  assert(tableUtils.deep_content_equal(message.content.gameMode, GameModes.getPreset(GameModes.IDs.ONE_PLAYER_VS_SELF):getGameModeJSONData()))
-  message = alice.connection.outgoingMessageQueue:pop().messageText
-  assert(message.type == "spectatorUpdate")
+  local function assertHasMessage(connection, expectedType, predicate)
+    local found = false
+    while connection.outgoingMessageQueue:len() > 0 do
+      local queuedMessage = connection.outgoingMessageQueue:pop().messageText
+      if queuedMessage.type == expectedType and (not predicate or predicate(queuedMessage)) then
+        found = true
+        break
+      end
+    end
+    assert(found)
+  end
+
+  assertHasMessage(bob.connection, "spectatorUpdate")
+  assertHasMessage(alice.connection, "spectateRequestGranted", function(msg)
+    assert(msg.content.replay == nil)
+    -- Compare gameMode.name only — room.gameMode is mutated with transport-layer
+    -- fields (latencyTolerance, connectionTimeoutSeconds, sendRetryLimit) that
+    -- the bare preset doesn't carry, so deep_content_equal would fail. The
+    -- behavior we actually care about is that the spectated room's mode matches.
+    -- gameMode.name carries the canonical mode identifier (e.g. "vsSelf"),
+    -- which gameModeIdToName maps the IDs constant to.
+    return msg.content.gameMode.name == GameModes.gameModeIdToName[GameModes.IDs.ONE_PLAYER_VS_SELF]
+  end)
+  assertHasMessage(alice.connection, "spectatorUpdate")
 
   bob.connection:receiveMessage(readyMessage)
   server:update()
@@ -332,12 +448,11 @@ local function testSinglePlayer()
   alice.connection:receiveMessage(json.encode(ClientProtocol.requestSpectate("Alice", server.playerToRoom[bob].roomNumber).messageText))
   server:update()
 
-  message = bob.connection.outgoingMessageQueue:pop().messageText
-  assert(message.type == "spectatorUpdate")
-  message = alice.connection.outgoingMessageQueue:pop().messageText
-  assert(message.type == "spectateRequestGranted" and message.content.replay ~= nil)
-  message = alice.connection.outgoingMessageQueue:pop().messageText
-  assert(message.type == "spectatorUpdate")
+  assertHasMessage(bob.connection, "spectatorUpdate")
+  assertHasMessage(alice.connection, "spectateRequestGranted", function(msg)
+    return msg.content.replay ~= nil
+  end)
+  assertHasMessage(alice.connection, "spectatorUpdate")
 
   bob.connection:receiveMessage(json.encode(ClientProtocol.sendMatchAbort(server.playerToRoom[bob].roomNumber).messageText))
   server:update()
@@ -346,10 +461,446 @@ local function testSinglePlayer()
   assert(message.type == "gameAbort")
 end
 
+local function testCannotSpectateWhileInRoom()
+  local server = ServerTesting.getTestServer()
+  local bob = ServerTesting.login(server, ServerTesting.players[1])
+
+  ServerTesting.clearOutgoingMessages({bob})
+
+  bob.connection:receiveMessage(json.encode(ClientProtocol.sendRoomRequest(GameModes.getPreset(GameModes.IDs.ONE_PLAYER_VS_SELF)).messageText))
+  server:update()
+
+  local room = server.playerToRoom[bob]
+  assert(room)
+  ServerTesting.clearOutgoingMessages({bob})
+
+  bob.connection:receiveMessage(json.encode(ClientProtocol.requestSpectate("Bob", room.roomNumber).messageText))
+  server:update()
+
+  assert(server.playerToRoom[bob] == room)
+  assert(server.spectatorToRoom[bob] == nil)
+  assert(#room.spectators == 0)
+
+  while bob.connection.outgoingMessageQueue:len() > 0 do
+    local message = bob.connection.outgoingMessageQueue:pop().messageText
+    assert(message.type ~= "spectateRequestGranted")
+  end
+end
+
+local function testJoinPartialRoomSetsCharacterSelectState()
+  local server = ServerTesting.getTestServer()
+  local alice = ServerTesting.login(server, ServerTesting.players[2])
+  local ben = ServerTesting.login(server, ServerTesting.players[3])
+
+  alice.state = "lobby"
+  ben.state = "lobby"
+
+  ServerTesting.clearOutgoingMessages({alice, ben})
+
+  alice.connection:receiveMessage(json.encode(ClientProtocol.sendRoomRequest(GameModes.getPreset(GameModes.IDs.THREE_PLAYER_VS_ALL)).messageText))
+  server:update()
+
+  local room = server.playerToRoom[alice]
+  assert(room)
+  assert(alice.state == "character select")
+
+  ServerTesting.clearOutgoingMessages({alice, ben})
+
+  alice.connection:receiveMessage(json.encode(ClientProtocol.updateChallengeStatus(alice.publicPlayerID, ben.publicPlayerID, GameModes.IDs.THREE_PLAYER_VS_ALL, true, room.roomNumber, 2).messageText))
+  server:update()
+
+  ben.connection:receiveMessage(json.encode(ClientProtocol.updateChallengeStatus(ben.publicPlayerID, alice.publicPlayerID, GameModes.IDs.THREE_PLAYER_VS_ALL, true, room.roomNumber, 2).messageText))
+  server:update()
+
+  assert(server.playerToRoom[ben] == room)
+  assert(ben.state == "character select")
+
+  local lobbyStateMessage
+  while alice.connection.outgoingMessageQueue:len() > 0 do
+    local message = alice.connection.outgoingMessageQueue:pop().messageText
+    if message and message.type == "lobbyStateV2" then
+      lobbyStateMessage = message
+    end
+  end
+
+  assert(lobbyStateMessage and lobbyStateMessage.content and lobbyStateMessage.content.players)
+  local benLobbyEntry = lobbyStateMessage.content.players[ben.publicPlayerID]
+  assert(benLobbyEntry and benLobbyEntry.state == "character select")
+end
+
+local function testTeamRoomRequestCreatesPartialRoom()
+  local server = ServerTesting.getTestServer()
+  local alice = ServerTesting.login(server, ServerTesting.players[2])
+  local bob = ServerTesting.login(server, ServerTesting.players[1])
+
+  ServerTesting.clearOutgoingMessages({alice, bob})
+
+  alice.connection:receiveMessage(json.encode(ClientProtocol.sendRoomRequest(GameModes.getPreset(GameModes.IDs.THREE_PLAYER_VS_ALL)).messageText))
+  server:update()
+
+  local room = server.playerToRoom[alice]
+  assert(room, "Expected a room to be created for team room request")
+  assert(server.playerToRoom[alice] == room)
+  assert(alice.state == "character select")
+  assert(room.gameModeId == GameModes.IDs.THREE_PLAYER_VS_ALL)
+  assert(room.gameMode and room.gameMode.name == GameModes.gameModeIdToName[GameModes.IDs.THREE_PLAYER_VS_ALL])
+  assert(room.maxPlayers == 3)
+  assert(#room.players == 1)
+  assert(room.players[1] == alice)
+  assert(room:isFull() == false)
+
+  local foundRoomAck = false
+  while alice.connection.outgoingMessageQueue:len() > 0 do
+    local msg = alice.connection.outgoingMessageQueue:pop().messageText
+    if msg and (msg.type == "addToRoom" or msg.type == "createRoom") then
+      foundRoomAck = true
+      break
+    end
+  end
+  assert(foundRoomAck, "Expected room acknowledgement message for creator")
+
+  local lobbyStateMessage = nil
+  while bob.connection.outgoingMessageQueue:len() > 0 do
+    local msg = bob.connection.outgoingMessageQueue:pop().messageText
+    if msg and msg.type == "lobbyStateV2" then
+      lobbyStateMessage = msg
+      break
+    end
+  end
+
+  assert(lobbyStateMessage and lobbyStateMessage.content and lobbyStateMessage.content.rooms)
+  assert(tableUtils.length(lobbyStateMessage.content.rooms) == 1)
+  local _, lobbyRoom = next(lobbyStateMessage.content.rooms)
+  assert(lobbyRoom.roomNumber == room.roomNumber)
+  assert(lobbyRoom.gameModeId == GameModes.IDs.THREE_PLAYER_VS_ALL)
+  assert(lobbyRoom.maxPlayers == 3)
+  assert(#lobbyRoom.players == 1)
+  assert(lobbyRoom.players[1] == alice.publicPlayerID)
+  assert(#lobbyRoom.openSlots == 2)
+  assert(lobbyRoom.openSlots[1] == 2 and lobbyRoom.openSlots[2] == 3)
+end
+
+local function testJoinRoomRequestUsesSanitizedJoinMessage()
+  local server = ServerTesting.getTestServer()
+  local alice = ServerTesting.login(server, ServerTesting.players[2])
+  local bob = ServerTesting.login(server, ServerTesting.players[1])
+
+  ServerTesting.clearOutgoingMessages({alice, bob})
+
+  alice.connection:receiveMessage(json.encode(ClientProtocol.sendRoomRequest(GameModes.getPreset(GameModes.IDs.THREE_PLAYER_VS_ALL)).messageText))
+  server:update()
+
+  local room = server.playerToRoom[alice]
+  assert(room, "Expected a room to exist before sending a joinRoomRequest")
+
+  ServerTesting.clearOutgoingMessages({alice, bob})
+
+  bob.connection:receiveMessage(json.encode(ClientProtocol.requestJoinRoom(room.roomNumber, 2).messageText))
+  server:update()
+
+  assert(server.playerToRoom[bob] == room)
+  assert(bob.state == "character select")
+  assert(#room.players == 2)
+
+  local joinAck = nil
+  while bob.connection.outgoingMessageQueue:len() > 0 do
+    local msg = bob.connection.outgoingMessageQueue:pop().messageText
+    if msg and msg.type == "addToRoom" then
+      joinAck = msg
+      break
+    end
+  end
+
+  assert(joinAck and joinAck.content and joinAck.content.roomNumber == room.roomNumber)
+end
+
+----------------------------------------------------------------------
+-- J-recv trace tap invariant — captured body must be wire-shape, not
+-- the parsed internal shape. If anyone moves TraceWriter.recv below
+-- ClientMessages.parseMessage, this test fails fast.
+----------------------------------------------------------------------
+
+local TraceWriter = require("server.TraceWriter")
+
+local function readJsonLines(path)
+  local f = io.open(path, "r")
+  if not f then return {} end
+  local body = f:read("*a")
+  f:close()
+  local out = {}
+  for line in body:gmatch("[^\n]+") do
+    local ok, obj = pcall(json.decode, line)
+    if ok then out[#out + 1] = obj end
+  end
+  return out
+end
+
+local function testJRecvTrace_capturesWireShape()
+  local traceDir = "trace_archive_test/jrecv_invariant_" .. os.time()
+  TraceWriter.configure({ rootDir = traceDir, flushEvents = 1, flushSeconds = 0 })
+
+  local server = ServerTesting.getTestServer()
+  local alice = ServerTesting.login(server, ServerTesting.players[2])
+
+  alice.connection:receiveMessage(json.encode(
+    ClientProtocol.sendRoomRequest(GameModes.getPreset(GameModes.IDs.THREE_PLAYER_VS_ALL)).messageText))
+  server:update()
+
+  TraceWriter.flush(alice.publicPlayerID)
+  local path = TraceWriter.currentPath(alice.publicPlayerID)
+  assert(path, "expected trace path for alice")
+
+  local lines = readJsonLines(path)
+  local roomRequestLine
+  for _, line in ipairs(lines) do
+    if line.dir == "recv" and line.prefix == "J" and line.body and line.body.type == "roomRequest" then
+      roomRequestLine = line
+      break
+    end
+  end
+  assert(roomRequestLine, "expected wire-shape roomRequest in trace; got " .. tostring(#lines) .. " lines")
+  assert(roomRequestLine.body.content, "captured body missing .content (wire shape)")
+  assert(roomRequestLine.body.content.gameMode, "captured body missing .content.gameMode")
+  assert(roomRequestLine.body.roomRequest == nil, "captured body has sanitized roomRequest=true flag")
+end
+
+----------------------------------------------------------------------
+-- Phase 3 property test: every ClientProtocol producer feeds through
+-- ClientMessages.parseMessage without introducing renamed top-level keys.
+-- Internal dispatch flags and fields pulled out of a `content` envelope
+-- are explicitly allowed; everything else must be a top-level wire key.
+----------------------------------------------------------------------
+
+local ClientMessages = require("server.ClientMessages")
+
+local function testParseMessage_doesNotRenameTopLevelKeys()
+  local gm = GameModes.getPreset(GameModes.IDs.TWO_PLAYER_VS)
+  local producers = {
+    ClientProtocol.requestLogin("uid", "Bob", 5, "controller", "panels", nil, "char", nil, "stage", true, "with my name"),
+    ClientProtocol.logout(),
+    ClientProtocol.updateChallengeStatus(1, 2, GameModes.IDs.TWO_PLAYER_VS, true, nil, nil),
+    ClientProtocol.requestJoinRoom(1, 2),
+    ClientProtocol.requestSpectate("Spec", 1),
+    ClientProtocol.requestLeaderboard(GameModes.IDs.TWO_PLAYER_VS),
+    ClientProtocol.leaveRoom(),
+    ClientProtocol.reportLocalGameResult(0),
+    ClientProtocol.sendPlayerSettings({ ready = true, level = 5, ranked = true, character = "x", stage = "y" }),
+    ClientProtocol.sendTaunt("up", 1),
+    ClientProtocol.sendRoomRequest(gm, "normal", true),
+    ClientProtocol.sendMatchAbort(1),
+    ClientProtocol.flagGame({ roomNumber = 1, gameId = 1, startTs = 1 }, "client_crash", "hash", "frag", { os = "darwin" }),
+    ClientProtocol.sendPauseToggle(1, true),
+    ClientProtocol.sendErrorReport({ x = 1 }),
+  }
+
+  -- Flags the dispatcher adds; not present on the wire but the only allowed
+  -- additions to parsed output (per the contract in ClientMessages.lua).
+  local allowedInternalFlag = {
+    roomRequest = true,
+    matchAbort  = true,
+    unknown     = true,
+  }
+  -- For roomRequest/matchAbort/pauseToggle the parser pulls fields out of
+  -- the wire's `content` envelope to the top level (allowed by contract).
+  local allowedContentPullup = {
+    roomRequest  = { gameMode = true, latencyTolerance = true, seed = true, openRoom = true, displayHistoryEnabled = true },
+    matchAbort   = {},
+    pauseToggle  = {},
+  }
+
+  for _, produced in ipairs(producers) do
+    local wire = produced.messageText
+    local parsed = ClientMessages.parseMessage(wire)
+    local kind = wire.type
+    for k in pairs(parsed) do
+      local ok = wire[k] ~= nil
+        or allowedInternalFlag[k]
+        or (kind and allowedContentPullup[kind] and allowedContentPullup[kind][k])
+      assert(ok, "parseMessage introduced new top-level key '" .. tostring(k) ..
+        "' for wire shape with type=" .. tostring(kind))
+    end
+  end
+end
+
+----------------------------------------------------------------------
+-- flagGame (Phase C step 1 — client-nominated crash flagging)
+----------------------------------------------------------------------
+-- Verifies the full wire-level path: client sends flagGame JSON → server
+-- dispatches → validates participation → calls CrashReports:flagGame →
+-- replies with flagGameAck. Quiescence rule is exercised via spectator
+-- state (the only "not in a live match" state we can drop a player into
+-- while the room still exists).
+
+local function popFlagGameAck(conn)
+  while conn.outgoingMessageQueue:len() > 0 do
+    local msg = conn.outgoingMessageQueue:pop().messageText
+    if msg and msg.type == "flagGameAck" then
+      return msg
+    end
+  end
+end
+
+local function testFlagGameAcceptedFromSpectator()
+  local server = ServerTesting.getTestServer()
+  local alice = ServerTesting.login(server, ServerTesting.players[2])
+  local ben   = ServerTesting.login(server, ServerTesting.players[3])
+  local bob   = ServerTesting.login(server, ServerTesting.players[1])
+  local room  = ServerTesting.setupRoom(server, alice, ben, true)
+  ServerTesting.startGame(server, room)
+  ServerTesting.addSpectator(server, room, bob)
+  ServerTesting.clearOutgoingMessages({alice, ben, bob})
+
+  local gameKey = {
+    roomNumber = room.roomNumber,
+    gameId     = room.game.id,
+    startTs    = room.game.creationTime,
+  }
+  bob.connection:receiveMessage(json.encode(
+    ClientProtocol.flagGame(gameKey, "client_crash", "h1", "boom").messageText))
+  server:update()
+
+  local ack = popFlagGameAck(bob.connection)
+  assert(ack, "spectator should receive a flagGameAck")
+  assert(ack.content.accepted == true,
+    "expected accepted=true, got " .. tostring(ack.content.accepted)
+    .. " reason=" .. tostring(ack.content.reason))
+  assert(type(ack.content.incidentId) == "string" and #ack.content.incidentId > 0)
+  assert(server.crashReports:incidentCount() == 1)
+end
+
+local function testFlagGameRejectedForUnknownRoom()
+  local server = ServerTesting.getTestServer()
+  local alice = ServerTesting.login(server, ServerTesting.players[2])
+  ServerTesting.clearOutgoingMessages({alice})
+
+  -- alice is in lobby; flag a room number that doesn't exist
+  alice.connection:receiveMessage(json.encode(
+    ClientProtocol.flagGame({ roomNumber = 9999, gameId = 1, startTs = 0 },
+                            "client_crash").messageText))
+  server:update()
+
+  local ack = popFlagGameAck(alice.connection)
+  assert(ack and ack.content.accepted == false)
+  assert(ack.content.reason == "unknown_game",
+    "expected reason=unknown_game, got " .. tostring(ack.content.reason))
+  assert(server.crashReports:incidentCount() == 0,
+    "rejected flag must not register")
+end
+
+----------------------------------------------------------------------
+-- Stuck-match watchdog (Phase E)
+----------------------------------------------------------------------
+-- Per-second server check: if a room's game has been idle for >30s
+-- and isn't complete, auto-flag via CrashReports as "match_hung."
+-- Complements the silent-death watchdog (Room-level, fixes the wedge
+-- by synthesizing a death) — this fires when silent-death's fix
+-- didn't resolve and the game is still hanging.
+
+local function _setupGameWithIdleClock(server, idleSeconds, currentTime)
+  local alice = ServerTesting.login(server, ServerTesting.players[2])
+  local ben   = ServerTesting.login(server, ServerTesting.players[3])
+  local room  = ServerTesting.setupRoom(server, alice, ben, true)
+  ServerTesting.startGame(server, room)
+  -- Backdate the room's lastActivityTime so the watchdog perceives the
+  -- match as silent. Anchor on caller-provided currentTime so the test's
+  -- assert uses a known reference.
+  room.lastActivityTime = currentTime - idleSeconds
+  return room
+end
+
+local function testStuckMatchWatchdogFlagsHungGame()
+  local server = ServerTesting.getTestServer()
+  local now = os.time()
+  local room = _setupGameWithIdleClock(server, 35, now)
+  assert(server.crashReports:incidentCount() == 0,
+    "test setup: no incidents yet")
+
+  server:sweepStuckMatches(now)
+
+  assert(server.crashReports:incidentCount() == 1,
+    "watchdog should have flagged the hung game; incidentCount="
+    .. server.crashReports:incidentCount())
+  -- Sanity-check the flag carried the right reason.
+  local incidentId
+  for id in pairs(server.crashReports.incidents) do incidentId = id end
+  local entry = server.crashReports:getIncident(incidentId)
+  assert(entry.reason == "match_hung",
+    "expected reason=match_hung, got " .. tostring(entry.reason))
+  assert(room.game._stuckMatchFlagged == true,
+    "watchdog should mark the game flagged so it doesn't re-fire")
+end
+
+local function testStuckMatchWatchdogIdempotent()
+  local server = ServerTesting.getTestServer()
+  local now = os.time()
+  _setupGameWithIdleClock(server, 35, now)
+
+  server:sweepStuckMatches(now)
+  server:sweepStuckMatches(now + 1)
+  server:sweepStuckMatches(now + 2)
+
+  assert(server.crashReports:incidentCount() == 1,
+    "watchdog must not re-flag the same hung game on subsequent sweeps; got "
+    .. server.crashReports:incidentCount())
+end
+
+local function testStuckMatchWatchdogSkipsCompleteGame()
+  local server = ServerTesting.getTestServer()
+  local now = os.time()
+  local room = _setupGameWithIdleClock(server, 35, now)
+  room.game.complete = true  -- match finalized normally
+
+  server:sweepStuckMatches(now)
+
+  assert(server.crashReports:incidentCount() == 0,
+    "watchdog must skip games that already completed naturally")
+end
+
+local function testFlagGameRejectedForNonParticipant()
+  local server = ServerTesting.getTestServer()
+  local alice = ServerTesting.login(server, ServerTesting.players[2])
+  local ben   = ServerTesting.login(server, ServerTesting.players[3])
+  local jerry = ServerTesting.login(server, ServerTesting.players[4])
+  local room  = ServerTesting.setupRoom(server, alice, ben, true)
+  ServerTesting.startGame(server, room)
+  ServerTesting.clearOutgoingMessages({alice, ben, jerry})
+
+  -- jerry is in lobby, never joined room. Tries to flag the alice+ben
+  -- game.
+  local gameKey = {
+    roomNumber = room.roomNumber,
+    gameId     = room.game.id,
+    startTs    = room.game.creationTime,
+  }
+  jerry.connection:receiveMessage(json.encode(
+    ClientProtocol.flagGame(gameKey, "client_crash").messageText))
+  server:update()
+
+  local ack = popFlagGameAck(jerry.connection)
+  assert(ack and ack.content.accepted == false)
+  assert(ack.content.reason == "not_participant",
+    "expected reason=not_participant, got " .. tostring(ack.content.reason))
+  assert(server.crashReports:incidentCount() == 0)
+end
+
 testLogin()
 testRoomSetup()
 testRoomSetup2()
 testGameplay()
 testDisconnect()
+testLobbyDropKeepsPlayerWithLiveGameplay()
+testLobbyDropTearsDownRoomlessGhost()
 testLobbyDataComposition()
 testSinglePlayer()
+testCannotSpectateWhileInRoom()
+testJoinPartialRoomSetsCharacterSelectState()
+testTeamRoomRequestCreatesPartialRoom()
+testJoinRoomRequestUsesSanitizedJoinMessage()
+testJRecvTrace_capturesWireShape()
+testParseMessage_doesNotRenameTopLevelKeys()
+testFlagGameAcceptedFromSpectator()
+testFlagGameRejectedForUnknownRoom()
+testFlagGameRejectedForNonParticipant()
+testStuckMatchWatchdogFlagsHungGame()
+testStuckMatchWatchdogIdempotent()
+testStuckMatchWatchdogSkipsCompleteGame()

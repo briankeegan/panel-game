@@ -24,7 +24,8 @@ local MenuItem = class(
 end,
 UiElement)
 
-MenuItem.PADDING = 2
+MenuItem.PADDING = 8
+MenuItem.GROUP_PADDING = 15
 
 ---Takes a label and an optional extra element and makes and combines them into a menu item which is suitable for inserting into a menu
 ---@param label UiElement the label or left element to display
@@ -32,6 +33,43 @@ MenuItem.PADDING = 2
 ---@return MenuItem
 function MenuItem.createMenuItem(label, item)
   assert(label ~= nil)
+
+  -- portrait: enlarge menu-button text uniformly. Catches EVERY button menu item —
+  -- the createButtonMenuItem path AND scenes that build their own TextButton then
+  -- call createMenuItem (e.g. PuzzleMenu). Here 'label' is the TextButton and its
+  -- .label is the inner text label.
+  if item == nil and system.isPortraitMode() and label.label and label.label.fontSize then
+    local bl = label.label
+    bl.fontSize = math.floor(bl.fontSize * 2.25)
+    local t = bl.text
+    bl.text = nil
+    bl.drawable = nil
+    bl:setText(t, bl.replacementTable, bl.translate)
+    local w, h = bl:getEffectiveDimensions()
+    label.width = math.max(label.width, math.floor(w) + 2 * (label.WIDTH_PADDING or 16))
+    label.height = math.max(label.height, math.floor(h) + 2 * (label.HEIGHT_PADDING or 10))
+  end
+
+  -- portrait: stack the title above its control (full width) instead of side by
+  -- side. Wide option rows (e.g. 5-button composition / player count) no longer
+  -- cram onto one line, and the controls get room to be big + tappable.
+  if item ~= nil and system.isPortraitMode() then
+    local menuItem = MenuItem({x = 0, y = 0})
+    label.hAlign = "center"
+    label.vAlign = "top"
+    label.x = 0
+    label.y = 0
+    local labelH = math.max(30, label.height + MenuItem.PADDING)
+    item.hAlign = "center"
+    item.vAlign = "top"
+    item.x = 0
+    item.y = labelH
+    menuItem.width = math.max(label.width, item.width) + (2 * MenuItem.PADDING)
+    menuItem.height = labelH + item.height + MenuItem.PADDING
+    menuItem:addChild(item)
+    menuItem:addChild(label)
+    return menuItem
+  end
 
   label.vAlign = "center"
   label.x = MenuItem.PADDING
@@ -48,7 +86,7 @@ function MenuItem.createMenuItem(label, item)
   end
 
   if item ~= nil then
-    local spaceBetween = 16
+    local spaceBetween = 24
     item.x = label.width + spaceBetween
     item.vAlign = "center"
     if system.isMobileOS() or DebugSettings.simulateMobileOS() then
@@ -57,10 +95,29 @@ function MenuItem.createMenuItem(label, item)
     menuItem.width = item.x + item.width + MenuItem.PADDING
     menuItem:addChild(item)
   end
+
+  -- Support section headers / team separators.
+  if label.isSectionHeader then
+    menuItem.height = menuItem.height + (2 * MenuItem.GROUP_PADDING)
+    label.y = MenuItem.GROUP_PADDING
+  end
+
   menuItem:addChild(label)
-
-
   return menuItem
+end
+
+function MenuItem.createSectionHeader(text)
+  local label = Label({
+    text = text,
+    translate = false,
+    hAlign = "center",
+    vAlign = "center"
+  })
+  label.isSectionHeader = true
+
+  local section = MenuItem.createMenuItem(label)
+  section.height = section.height + (2 * MenuItem.GROUP_PADDING)
+  return section
 end
 
 ---Creates a menu item with just a button, using a pre-created Label
@@ -73,6 +130,8 @@ function MenuItem.createButtonMenuItemWithLabel(label, onClick, width)
   local BUTTON_WIDTH = width or 140
   label.hAlign = "center"
   label.vAlign = "center"
+  -- the portrait big-button bump lives in createMenuItem now, so it applies to
+  -- every button menu item (including scenes that build their own TextButton).
 
   local textButton = TextButton({
     label = label,
@@ -217,20 +276,29 @@ end
 
 ---Draws the menu item background and selection highlight
 function MenuItem:drawSelf()
-  local baseOpacity = 0.15
+  local cornerRadius = 32
+  local borderWidth = 4
+
   if self.selected then
-    local selectedAdditionalOpacity = 0.5
-    local fillOpacity = (math.cos(6 * love.timer.getTime()) + 1) / 16 + baseOpacity + selectedAdditionalOpacity
-    local borderOpacity = (math.cos(6 * love.timer.getTime()) + 1) / 4 + baseOpacity + selectedAdditionalOpacity
     local bgColor = GAME.theme.colors.menuSelectedBackgroundColor
     local borderColor = GAME.theme.colors.menuSelectedBorderColor
-    GraphicsUtil.drawRectangle("fill", self.x, self.y, self.width, self.height, bgColor[1], bgColor[2], bgColor[3], fillOpacity)
-    GraphicsUtil.drawRectangle("line", self.x, self.y, self.width, self.height, borderColor[1], borderColor[2], borderColor[3], borderOpacity)
+
+    GraphicsUtil.drawRectangle("fill", self.x, self.y, self.width, self.height, bgColor[1], bgColor[2], bgColor[3], 1.0, cornerRadius, cornerRadius)
+
+    for w = 0, borderWidth - 1 do
+      GraphicsUtil.drawRectangle("line", self.x + w, self.y + w, self.width - 2*w, self.height - 2*w,
+        borderColor[1], borderColor[2], borderColor[3], 1.0, cornerRadius, cornerRadius)
+    end
   else
     local bgColor = GAME.theme.colors.menuDefaultBackgroundColor
     local borderColor = GAME.theme.colors.menuDefaultBorderColor
-    GraphicsUtil.drawRectangle("fill", self.x, self.y, self.width, self.height, bgColor[1], bgColor[2], bgColor[3], baseOpacity)
-    GraphicsUtil.drawRectangle("line", self.x, self.y, self.width, self.height, borderColor[1], borderColor[2], borderColor[3], baseOpacity)
+
+    GraphicsUtil.drawRectangle("fill", self.x, self.y, self.width, self.height, bgColor[1], bgColor[2], bgColor[3], bgColor[4], cornerRadius, cornerRadius)
+
+    for w = 0, 0 do
+      GraphicsUtil.drawRectangle("line", self.x + w, self.y + w, self.width - 2*w, self.height - 2*w,
+        borderColor[1], borderColor[2], borderColor[3], borderColor[4], cornerRadius, cornerRadius)
+    end
   end
 end
 

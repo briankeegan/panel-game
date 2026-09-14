@@ -5,12 +5,17 @@ local LevelPresets = require("common.data.LevelPresets")
 local tableUtils = require("common.lib.tableUtils")
 local Signal = require("common.lib.signal")
 local logger = require("common.lib.logger")
+local TraceWriter = require("server.TraceWriter")
+local socket = require("common.lib.socket")
 
 ---@alias PlayerState ("lobby" | "character select" | "playing" | "spectating" | "paused")
 ---@alias PublicPlayerID integer
 
 ---@class ServerPlayer : Signal
----@field package connection Connection ONLY FOR SENDING; accessing this in tests is fine, otherwise not, all message processing has to go through server
+---@field package connection Connection backward-compat alias for gameplayConnection (legacy callers / tests)
+---@field package gameplayConnection Connection? socket carrying YOUR I (outgoing), G targeting you, your D. Lean for low latency.
+---@field package lobbyConnection Connection? socket carrying J — lobby/room/chat/replays/settings
+---@field package spectateConnection Connection? socket carrying opponents' I/G/D — bulky, isolated from gameplay so it can't HoL-block
 ---@field userId privateUserId
 ---@field publicPlayerID PublicPlayerID
 ---@field character string id of the specific character that was picked
@@ -30,6 +35,11 @@ local logger = require("common.lib.logger")
 ---@field name string
 ---@field player_number integer?
 ---@field state PlayerState
+---@field challengedAt integer? wall-clock seconds when this player was last challenged; nil = not challenged
+---@field seatId integer? authoritative seat id assigned via TeamUtils.assignSeatIdentity; nil in non-team modes
+---@field publicId integer? legacy alias for publicPlayerID, set by some payload paths
+---@field stackIndex integer? dense engine slot for the active match; only meaningful while a match is live
+---@field spectatedRoom Room? room this player is currently spectating; nil for active players or unattached
 ---@overload fun(privatePlayerID: privateUserId, connection: Connection, name: string, publicId: integer): ServerPlayer
 local Player = class(
 ---@param self ServerPlayer
@@ -40,7 +50,20 @@ local Player = class(
 function(self, privatePlayerID, connection, name, publicId)
   connection.loggedIn = true
   self.userId = privatePlayerID
-  self.connection = connection
+  -- Bind the incoming connection to the appropriate channel slot. The
+  -- other channel sockets attach later via Player:attachConnection.
+  local channel = connection.channel or "gameplay"
+  if channel == "lobby" then
+    self.lobbyConnection = connection
+  elseif channel == "spectate" then
+    self.spectateConnection = connection
+  else
+    self.gameplayConnection = connection
+  end
+  -- Backward-compat alias: legacy code (server.lua TCP_NODELAY tweaks,
+  -- tests reading outgoingMessageQueue) reaches in via player.connection.
+  -- Point it at gameplayConnection when available, then lobby, then spectate.
+  self.connection = self.gameplayConnection or self.lobbyConnection or self.spectateConnection
   self.name = name or "noname"
   self.publicPlayerID = publicId
 
@@ -114,8 +137,8 @@ function Player:updateSettings(settings)
     self.stage_is_random = settings.stage_is_random
   end
 
-  if settings.wants_ranked_match ~= nil then
-    self.wants_ranked_match = settings.wants_ranked_match
+  if settings.ranked ~= nil then
+    self.wants_ranked_match = settings.ranked
   end
 
   if settings.wants_ready ~= nil then
@@ -128,6 +151,10 @@ function Player:updateSettings(settings)
 
   if settings.levelData ~= nil then
     self.levelData = settings.levelData
+  end
+
+  if settings.endless_no_raise ~= nil then
+    self.endlessNoRaise = settings.endless_no_raise == true
   end
 
   self:emitSignal("settingsUpdated", self)
@@ -143,32 +170,195 @@ function Player:addToRoom(room)
   self.room = room
   self.wantsReady = false
   self.ready = false
+  local sendRetryLimit = room.gameMode and room.gameMode.sendRetryLimit
+  for _, conn in ipairs({self.gameplayConnection, self.lobbyConnection}) do
+    if conn and sendRetryLimit then
+      conn.sendRetryLimit = sendRetryLimit
+    end
+  end
 end
 
 function Player:removeFromRoom(room, reason)
-  if self.room then
-    logger.info("Clearing room " .. room.roomNumber .. " for player " .. self.name)
-    -- if there is no socket the room got closed because the player hard DCd so shouldn't update state in that case
-    if self.connection.socket then
-      self.state = "lobby"
-      self.player_number = nil
-      self:sendJson(ServerProtocol.leaveRoom(room.roomNumber, reason))
-    end
-  else
-    logger.error("Trying to remove player " .. self.name .. " from room " .. room.roomNumber .. " even though they have no room assigned")
+  if not self.room then
+    return
   end
+
+  logger.info("Clearing room " .. room.roomNumber .. " for player " .. self.name)
+  self.player_number = nil
+  self:sendJson(ServerProtocol.leaveRoom(room.roomNumber, reason))
 
   self.room = nil
   self.wantsReady = false
   self.ready = false
+  for _, conn in ipairs({self.gameplayConnection, self.lobbyConnection}) do
+    if conn then
+      conn.sendRetryLimit = 5
+    end
+  end
+end
+
+-- Attach the second-channel connection after the first one logged in.
+-- Called by the login flow when the OTHER socket authenticates as the same
+-- player (matched by privateUserId).
+function Player:attachConnection(connection)
+  connection.loggedIn = true
+  local channel = connection.channel or "gameplay"
+  if channel == "lobby" then
+    self.lobbyConnection = connection
+  elseif channel == "spectate" then
+    self.spectateConnection = connection
+  else
+    self.gameplayConnection = connection
+  end
+  self.connection = self.gameplayConnection or self.lobbyConnection or self.spectateConnection
+end
+
+-- JSON message types whose loss would strand the client in a wrong state
+-- (no match start, no match end, no room transition). These ALWAYS ride
+-- on the gameplay socket — the channel whose loss means full disconnect.
+-- Lobby socket is allowed to silently drop without notice; routing these
+-- there means an in-flight loss strands the player invisibly.
+--
+-- Everything not in this set goes on lobby: lobbyStateV2 broadcasts,
+-- challengeUpdate, taunts, leaderboard requests, etc.
+-- Names match the literal `type` strings in common/network/ServerProtocol.lua.
+-- These are gameplay-state transitions whose loss would strand the client
+-- in a wrong state and require either a manual retry or disconnect.
+local CRITICAL_STATE_MESSAGE_TYPES = {
+  loginResponse          = true,  -- login completion
+  createRoom             = true,  -- room/match starting
+  addToRoom              = true,  -- joining an existing room
+  playerJoinedRoom       = true,  -- room roster change
+  playerLeftRoom         = true,  -- room roster change
+  leaveRoom              = true,  -- player exited a room
+  matchStart             = true,  -- match begins
+  matchEnd               = true,  -- in case present
+  gameResult             = true,  -- match ended, here's the verdict
+  gameAbort              = true,  -- match aborted mid-flight
+  pauseNotification      = true,  -- pause state changed mid-match
+  spectateRequestGranted = true,  -- spectator joining mid-match
+  flagGameAck            = true,  -- crash-report ack
+}
+
+local function _isCriticalState(message)
+  local msgType = message and message.messageText and message.messageText.type
+  return msgType and CRITICAL_STATE_MESSAGE_TYPES[msgType] == true
+end
+
+-- Pick the destination connection for an outbound JSON message.
+-- Critical state messages → gameplay (the can-never-silently-drop channel).
+-- Everything else → lobby (with gameplay fallback if lobby isn't up).
+-- Returns nil if no usable connection at all.
+local function _jsonConnection(self, message)
+  if _isCriticalState(message) then
+    local gc = self.gameplayConnection
+    if gc and gc.socket then return gc end
+    -- Critical message but no gameplay socket — try lobby as last resort
+    -- (shouldn't happen; gameplay loss should have already disconnected).
+    local lc = self.lobbyConnection
+    if lc and lc.socket then return lc end
+    return nil
+  end
+  local lc = self.lobbyConnection
+  if lc and lc.socket then return lc end
+  local gc = self.gameplayConnection
+  if gc and gc.socket then return gc end
+  return nil
+end
+
+-- Pick the destination connection for a raw prefixed message. J → lobby,
+-- everything else → gameplay, with cross-channel fallback during rollout.
+-- NOTE: this default routing is appropriate for YOUR critical data
+-- (outgoing inputs, gameResult). For OPPONENT-relayed I/G/D, callers
+-- should use Player:sendSpectate explicitly to keep the gameplay socket lean.
+-- Helper: extract the prefix byte from a wire message. v009 framing is
+-- [4-byte BE length][prefix][body], so the prefix sits at byte 5. Tests
+-- (and a couple of legacy call sites) sometimes pass raw "Iabc" strings
+-- without the length prefix; fall back to byte 1 in that case so the
+-- routing keeps working.
+local function _prefixOf(message)
+  if type(message) ~= "string" then return nil end
+  if #message >= 5 then return message:sub(5, 5) end
+  if #message > 0 then return message:sub(1, 1) end
+  return nil
+end
+
+local function _rawConnection(self, message)
+  local prefix = _prefixOf(message)
+  if prefix == "J" then
+    -- Raw "J<body>" form is rare on the server side (most JSON goes through
+    -- sendJson which has access to the message-type metadata). Without that
+    -- metadata we can't tell critical from chatter, so default to lobby.
+    -- Anything time-sensitive should be using sendJson(message) with the
+    -- {messageType, messageText} shape so the critical-state routing fires.
+    return _jsonConnection(self, nil)
+  end
+  local gc = self.gameplayConnection
+  if gc and gc.socket then return gc end
+  -- Last-resort fallback so gameplay messages don't silently disappear
+  -- if the gameplay channel hasn't connected (shouldn't happen in steady
+  -- state, but possible during the brief window before both sockets are up).
+  local sc = self.spectateConnection
+  if sc and sc.socket then return sc end
+  local lc = self.lobbyConnection
+  if lc and lc.socket then return lc end
+  return nil
+end
+
+-- Pick the destination for a SPECTATE-channel message (opponent's I/G/D
+-- you're rendering, not data targeting you). Falls back to gameplay if the
+-- spectate socket isn't connected so the data is still delivered.
+local function _spectateConnection(self)
+  local sc = self.spectateConnection
+  if sc and sc.socket then return sc end
+  local gc = self.gameplayConnection
+  if gc and gc.socket then return gc end
+  return nil
 end
 
 function Player:sendJson(message)
-  self.connection:sendJson(message)
+  local conn = _jsonConnection(self, message)
+  if not conn then
+    return
+  end
+  -- Stamp wall-clock for client-side server-time-offset estimation.
+  if message and type(message.messageText) == "table" then
+    message.messageText.serverTimeMs = math.floor(socket.gettime() * 1000)
+  end
+  conn:sendJson(message)
+  pcall(function()
+    if self.publicPlayerID then
+      TraceWriter.send(self.publicPlayerID, "J", message and message.messageText)
+    end
+  end)
 end
 
 function Player:send(message)
-  self.connection:send(message)
+  local conn = _rawConnection(self, message)
+  if not conn then
+    return
+  end
+  conn:send(message)
+  pcall(function()
+    if self.publicPlayerID and type(message) == "string" and #message > 0 then
+      TraceWriter.send(self.publicPlayerID, _prefixOf(message), message)
+    end
+  end)
+end
+
+-- Send opponent-relayed data (I from another player, telegraph G, opponent D)
+-- via the spectate channel so the gameplay socket stays lean.
+function Player:sendSpectate(message)
+  local conn = _spectateConnection(self)
+  if not conn then
+    return
+  end
+  conn:send(message)
+  pcall(function()
+    if self.publicPlayerID and type(message) == "string" and #message > 0 then
+      TraceWriter.send(self.publicPlayerID, _prefixOf(message), message)
+    end
+  end)
 end
 
 ---@return boolean
@@ -177,9 +367,6 @@ function Player:isReady()
 end
 
 function Player:setup_game()
-  if self.state ~= "spectating" then
-    self.state = "playing"
-  end
 end
 
 ---@return boolean
@@ -191,9 +378,38 @@ function Player:usesModifiedLevelData()
   end
 end
 
----@param state PlayerState
-function Player:setState(state)
-  self.state = state
+-- Clear per-match transient fields between matches. Owns the full set so
+-- callers don't have to remember each one (mirrors client MatchParticipant
+-- :resetMatchTransientState).
+function Player:resetMatchTransientState()
+  self.cursor = "__Ready"
+  self.ready = false
+  self.wantsReady = false
+end
+
+-- player.state is derived from (self.room, room.game, room.paused, self.spectatedRoom).
+local function _derivedState(player)
+  local room = player.room
+  if room then
+    if room.paused then return "paused" end
+    if room.game then return "playing" end
+    return "character select"
+  end
+  if player.spectatedRoom then return "spectating" end
+  return "lobby"
+end
+
+Player.__index = function(t, key)
+  if key == "state" then return _derivedState(t) end
+  return rawget(Player, key)
+end
+
+Player.__newindex = function(t, key, value)
+  if key == "state" then
+    logger.warn("Ignored player.state write for " .. tostring(t.name) .. " (state is derived)")
+    return
+  end
+  rawset(t, key, value)
 end
 
 return Player

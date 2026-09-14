@@ -9,11 +9,17 @@ local PanelCarousel = class(function(carousel, options)
 end, Carousel)
 
 function PanelCarousel:createPassenger(id)
-  local stackPanel = StackPanel({alignment = "left", height = 20, hAlign = "center", vAlign = "center"})
+  -- portrait: scale the panel icons to the carousel height so a tall mobile
+  -- carousel shows big panels. Desktop keeps the original fixed 20px.
+  local sz = 20
+  if require("client.src.system").isPortraitMode() then
+    sz = math.max(20, math.floor((self.height or 30) * 0.6))
+  end
+  local stackPanel = StackPanel({alignment = "left", height = sz, hAlign = "center", vAlign = "center"})
   local panelImages = {}
   -- outlineColor
   for color = 1, #panels[id].displayIcons do
-    panelImages[color] = ImageContainer({image = panels[id].displayIcons[color], vAlign = "center", drawBorders = false, width = 20, height = 20})
+    panelImages[color] = ImageContainer({image = panels[id].displayIcons[color], vAlign = "center", drawBorders = false, width = sz, height = sz})
   end
 
   for i = 1, self.colorCount do

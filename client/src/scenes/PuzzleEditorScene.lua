@@ -57,7 +57,14 @@ function PuzzleEditorScene:customLoad()
   self.touchInputDetector = TouchInputDetector(self.match.stacks[1])
 
   if self.match.stacks[1] then
-    self.match.stacks[1].engine.do_countdown = true
+    -- Editor abuses the in_countdown flag to disable cursor swap (Stack:canSwap
+    -- early-returns when in_countdown) and freeze cursor animation. Direct
+    -- write rather than setCountdown() because we DON'T want setCountdown's
+    -- side effects (delaySimulationUntil, stopWatchIsRunning toggle) — the
+    -- editor isn't running the sim, it just needs the input guards.
+    -- TODO: introduce a proper Stack:setEditorFrozen(true) for this case so
+    -- the editor stops piggybacking on countdown semantics.
+    self.match.stacks[1].engine.in_countdown = true
 
     -- Initialize cursor position from puzzle if set
     if self.originalPuzzle.cursorStartLeft then

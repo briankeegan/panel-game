@@ -1,3 +1,4 @@
+---@diagnostic disable: undefined-field, need-check-nil
 local logger = require("common.lib.logger")
 local separator = package.config:sub(1, 1) --determines os directory separator (i.e. "/" or "\")
 local fileUtils = require("client.src.FileUtils")
@@ -22,7 +23,7 @@ local function finishedMatchForPath(path)
 
   if #match.players > 1 then
     local lastClock = -1
-    while not match:hasEnded() and lastClock ~= match.stacks[1].clock do
+    while not match:isLocallyEnded() and lastClock ~= match.stacks[1].clock do
       lastClock = match.stacks[1].clock
       match:run()
     end

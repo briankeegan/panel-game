@@ -1,6 +1,7 @@
 local class = require("common.lib.class")
 local Response = require("client.src.network.Response")
 local NetworkProtocol = require("common.network.NetworkProtocol")
+local consts = require("common.engine.consts")
 local logger = require("common.lib.logger")
 
 local Request = class(function(self, tcpClient, messageType, messageText, responseTypes)
@@ -11,16 +12,12 @@ local Request = class(function(self, tcpClient, messageType, messageText, respon
 end)
 
 function Request.toJsonMessage(messageText)
-  local jsonResult = nil
-  local status, errorString = pcall(
-    function()
-      jsonResult = json.encode(messageText)
-    end
-  )
-  if status == false and error and type(errorString) == "string" then
-      error("Crash encoding JSON: " .. table_to_string(messageText) .. " with error: " .. errorString)
+  local ok, jsonOrErr = pcall(json.encode, messageText)
+  if not ok then
+    error("Crash encoding JSON: " .. table_to_string(messageText) .. " with error: " .. tostring(jsonOrErr))
   end
-  return NetworkProtocol.markedMessageForTypeAndBody(NetworkProtocol.clientMessageTypes.jsonMessage.prefix, jsonResult)
+  return NetworkProtocol.markedMessageForTypeAndBody(
+    NetworkProtocol.clientMessageTypes.jsonMessage.prefix, jsonOrErr)
 end
 
 -- sends the request, updates awaitingResponse status field
@@ -29,7 +26,12 @@ function Request:send()
   if self.messageType.prefix == "J" then
     message = Request.toJsonMessage(self.messageText)
   elseif self.messageType.prefix == "H" then
-    message = NetworkProtocol.clientMessageTypes.versionCheck.prefix .. NetworkProtocol.NETWORK_VERSION
+    -- Handshake body is consts.BUILD_VERSION ("<engine>.<patch>", e.g.
+    -- "001.0013"). Server accepts iff engine versions match exactly and our
+    -- patch >= the server's patch.
+    message = NetworkProtocol.markedMessageForTypeAndBody(
+      NetworkProtocol.clientMessageTypes.versionCheck.prefix,
+      consts.BUILD_VERSION)
   else
     error("Trying to send a message with message type " .. table_to_string(self.messageType) .. " that has no interaction defined")
   end
@@ -37,8 +39,10 @@ function Request:send()
   self.tcpClient:send(message)
 
   -- in network, all responses from the server get mapped into "json" responses
+  -- Pass the sending client so Response drains from THAT client's queue —
+  -- otherwise dual-socket responses arrive on the wrong queue and never resolve.
   if self.responseTypes and #self.responseTypes > 0 then
-    return Response(self.responseTypes)
+    return Response(self.responseTypes, self.tcpClient)
   else
     return nil
   end

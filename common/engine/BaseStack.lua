@@ -2,6 +2,7 @@ local class = require("common.lib.class")
 local Signal = require("common.lib.signal")
 local GarbageQueue = require("common.engine.GarbageQueue")
 local MatchRules = require("common.data.MatchRules")
+local consts = require("common.engine.consts")
 
 ---@class BaseStack : canRollback
 ---@field engineVersion string
@@ -13,7 +14,8 @@ local MatchRules = require("common.data.MatchRules")
 ---@field stopWatch integer how many times the game physics have run; unlike a clock and just like a stopWatch this frame timer only runs when the simulation is running
 ---@field stopWatchIsRunning boolean if the stack is running the game physics during runs
 ---@field game_over_clock integer What the clock time was when the Stack went game over
----@field do_countdown boolean if the stack is currently performing a countdown / will perform a countdown at the start of the match;<br> this is state, the value will change at the end of countdown
+---@field game_over_stopWatch integer? in-game timer at death (countdown excluded); set by Stack subclass when game_over_clock fires
+---@field in_countdown boolean runtime toggle — true while the pre-match countdown is pending/ticking, cleared when it hits zero. NOT a mode flag (use Match.doCountdown for "does this match have a countdown"). For clock→stopWatch conversions use `countdownOffsetFrames`.
 ---@field countdown_timer boolean? ephemeral timer used for tracking countdown progress at the start of the game
 ---@field outgoingGarbage GarbageQueue
 ---@field incomingGarbage GarbageQueue
@@ -30,6 +32,7 @@ local MatchRules = require("common.data.MatchRules")
 ---@field supportedStackWinConditions StackWinCondition[]
 ---@field stackOverConditions table<StackOverCondition, any> Array of enumerated values signifying ways of going game over
 ---@field stackWinConditions table<StackWinCondition, any> Array of enumerated values signifying ways of ending the game without going game over
+---@field _networkGarbageLog { frame: integer, garbage: any, applied: boolean }[] Frame-stamped log of network-injected garbage (loose-sync G events) that lands outside the deterministic input pipeline. Entries are flipped applied=false on rollback and re-drained during forward re-sim by Match:pushGarbageTo.
 
 ---@class BaseStack : Signal
 local BaseStack = class(
@@ -81,6 +84,16 @@ function(self, args)
   self.rollbackCopyPool = Queue()
   self.rollbackCount = 0
   self.lastRollbackFrame = -1 -- the last frame we had to rollback from
+
+  -- Frame-stamped log of network-injected garbage (loose-sync G events).
+  -- These calls land outside the engine's deterministic input pipeline, so
+  -- rollbackToFrame would otherwise erase their effect on staged garbage
+  -- and the forward re-sim would have no way to recover them. Each entry:
+  --   { frame = stopWatch at receive, garbage = snapshot, applied = bool }
+  -- On rollback, entries with frame > rollbackTarget are flipped to
+  -- applied=false; Match:pushGarbageTo drains them at their original frame
+  -- during forward re-sim, so state converges back to what was on screen.
+  self._networkGarbageLog = {}
 end)
 
 BaseStack.TYPE = "BaseStack"
@@ -109,14 +122,92 @@ function BaseStack:getReadyGarbageAt(clock)
   return self.outgoingGarbage:popFinishedTransitsAt(clock)
 end
 
-function BaseStack:receiveGarbage(garbageDelivery)
+function BaseStack:receiveGarbage(garbageDelivery, senderId)
+  if senderId then
+    for _, g in ipairs(garbageDelivery) do
+      g.senderId = senderId
+    end
+  end
   self.incomingGarbage:pushTable(garbageDelivery)
+end
+
+---Apply garbage that arrived via a network G event AND record it for rollback
+---replay. Use this from the loose-sync receive path; do NOT use it for
+---engine-internal garbage (Match:deliverOutgoingGarbage already replays those
+---deterministically via the input-driven forward sim).
+---@param garbageArray Garbage[] wire-form garbage records from the G payload
+---@param senderId integer? sender's stack index, attached to each garbage entry so it flows through to panel.senderId at drop time (used by the renderer to pick the correct character art for the breaking block)
+function BaseStack:applyNetworkGarbage(garbageArray, senderId)
+  -- Snapshot is immutable; correctChainingFlag will mutate `finalized` on
+  -- whichever copy reaches the queue, so keep our log copy separate.
+  local snapshot = {}
+  for i, g in ipairs(garbageArray) do
+    snapshot[i] = shallowcpy(g)
+  end
+  -- Trim entries older than the maximum rollback window — they can never
+  -- be replayed (rollback can't reach that far back).
+  local cutoff = self.stopWatch - (MAX_LAG or 0) - 60
+  local log = self._networkGarbageLog
+  local writeIdx = 0
+  for i = 1, #log do
+    if log[i].frame >= cutoff then
+      writeIdx = writeIdx + 1
+      if writeIdx ~= i then log[writeIdx] = log[i] end
+    end
+  end
+  for i = #log, writeIdx + 1, -1 do log[i] = nil end
+  log[#log + 1] = { frame = self.stopWatch, garbage = snapshot, applied = true, senderId = senderId }
+
+  local workingCopy = {}
+  for i, g in ipairs(garbageArray) do
+    workingCopy[i] = shallowcpy(g)
+  end
+  self:receiveGarbage(workingCopy, senderId)
+end
+
+---Called from Stack/SimulatedStack:rollbackToFrame after the garbage queues
+---have been restored. Any network-applied garbage whose receive frame is
+---past the rollback target had its effect on stagedGarbage erased by the
+---queue restore, so flag it for re-application during forward re-sim.
+---@param rollbackFrame integer
+function BaseStack:markNetworkGarbageNeedsReplay(rollbackFrame)
+  local log = self._networkGarbageLog
+  for i = #log, 1, -1 do
+    if log[i].frame > rollbackFrame then
+      log[i].applied = false
+    else
+      break -- log is appended in frame order, so we're done
+    end
+  end
+end
+
+---Called from Match:pushGarbageTo once per about-to-tick frame. Replays
+---any network garbage marked needs-replay whose frame matches stopWatch,
+---so the staging state mirrors what was there originally at this frame.
+---@param frame integer
+function BaseStack:drainNetworkGarbageForFrame(frame)
+  local log = self._networkGarbageLog
+  for i = 1, #log do
+    local entry = log[i]
+    if entry.frame > frame then return end
+    if entry.frame == frame and not entry.applied then
+      local workingCopy = {}
+      for j, g in ipairs(entry.garbage) do
+        workingCopy[j] = shallowcpy(g)
+      end
+      self:receiveGarbage(workingCopy, entry.senderId)
+      entry.applied = true
+    end
+  end
 end
 
 ---@param doCountdown boolean
 function BaseStack:setCountdown(doCountdown)
-  self.do_countdown = doCountdown
-  self.stopWatchIsRunning = not self.do_countdown
+  self.in_countdown = doCountdown
+  -- Persistent offset for clock→stopWatch conversion (recordDeath uses it).
+  self.countdownOffsetFrames = doCountdown
+      and (consts.COUNTDOWN_START + consts.COUNTDOWN_LENGTH) or 0
+  self.stopWatchIsRunning = not self.in_countdown
 end
 
 ---@param maxRunsPerFrame integer
@@ -183,8 +274,9 @@ function BaseStack:game_ended()
 end
 
 ---@param runsSoFar integer how many runs the Stack already did this frame
+---@param remoteCapTight boolean? non-local stacks cap planning to 1 this cycle when true
 ---@return boolean
-function BaseStack:shouldRun(runsSoFar)
+function BaseStack:shouldRun(runsSoFar, remoteCapTight)
   error("did not implement shouldRun")
 end
 

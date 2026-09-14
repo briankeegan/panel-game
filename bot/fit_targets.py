@@ -1,0 +1,176 @@
+#!/usr/bin/env python3
+"""Emit the FIT-TARGET VECTOR for a player (or a bot) — the single machine-readable
+ground truth the weight-fit regresses against and compare_profiles.py scores against.
+
+Same code runs on a human board-row corpus OR a bot's parsed games, so both sides are
+measured identically (apples-to-apples). Combines:
+  - offense   : chain% / combo% / blocksPerMin / chainLen (median + histogram, x-notation)   [from stats.jsonl]
+  - priority  : per-bucket {swap, raise, clearStart, dig} over the joint 12-cell schema  [board rows]
+  - activity  : swaps_per_clear                                                     [board rows]
+  - survival  : height median/p90, garbage_on_board_pct                            [board rows]
+
+chainLen is recoverable WITHOUT a re-emit: chain garbage height == chain links
+(GarbageQueue:addChainLink starts height 1, +1/link), so chainLen = height + 1 for isChain sends.
+
+Usage: fit_targets.py <board_corpus_dir> [stats.jsonl] [sample] > targets.json
+"""
+import sys, os, gzip, json, glob, statistics, collections
+
+MATCHED, POPPING = 3, 2
+
+
+def tier(h):
+    return "low" if h < 8 else ("mid" if h <= 11 else "high")
+
+
+def med(xs):
+    return round(statistics.median(xs), 2) if xs else None
+
+
+def board_targets(corpus, sample):
+    files = sorted(glob.glob(os.path.join(corpus, "*.jsonl.gz")))
+    step = max(1, len(files) // sample); files = files[::step][:sample]
+    cell = collections.defaultdict(lambda: collections.Counter())
+    swaps = clears = 0
+    heights = []
+    gb_frames = total = 0
+    # CLOCK/TIMING signals (Brian: "stoptime accumulation + more"; bot: eta/displacement).
+    # eta-reaction = the behavioral signature of clock-awareness: do they act in the
+    # window BEFORE incoming lands vs only after. All computable from existing rows
+    # (incoming[].eta, displacement, danger). stopTime needs a re-emit (added to parseReplays).
+    danger_frames = wait_frames = total_acts = 0
+    disp_sum = stoptime_sum = 0.0
+    # event-aligned anticipation: action rate in the WINDOW before a garbage LANDING
+    # (gb cells increase) vs baseline. Robust to the eta-queue problem (no eta needed).
+    PRE_WIN = 30
+    landings = pre_land_frames = pre_land_acts = 0
+    for fp in files:
+        try:
+            rows = [json.loads(l) for l in gzip.open(fp, "rt")]
+        except Exception:
+            continue
+        in_clear, prevGb = False, None
+        window = []  # recent per-frame acts (sliding, len <= PRE_WIN), reset per game
+        for r in rows:
+            board = r["board"]; cells = [c for row in board for c in row]
+            h = 0
+            for ri in range(len(board) - 1, -1, -1):
+                if any(c["c"] != 0 for c in board[ri]):
+                    h = ri + 1; break
+            heights.append(h)
+            gb = sum(1 for c in cells if c["c"] in (8, 9))
+            if gb > 0:
+                gb_frames += 1
+            total += 1
+            inc = bool(r.get("incoming"))
+            key = f"{tier(h)}|{'in' if inc else 'noIn'}|{'gb' if gb > 0 else 'noGb'}"
+            d = cell[key]
+            d["frames"] += 1
+            dec = r["action"]["decision"]["type"]
+            if dec == "SWAP": d["swap"] += 1; swaps += 1
+            if dec == "RAISE": d["raise"] += 1
+            if prevGb is not None and gb < prevGb:
+                d["digCells"] += (prevGb - gb)
+            landing = prevGb is not None and gb > prevGb  # garbage just landed this frame
+            m = sum(1 for c in cells if c["s"] in (MATCHED, POPPING))
+            if m > 0 and not in_clear:
+                d["clearStart"] += 1; clears += 1; in_clear = True
+            elif m == 0:
+                in_clear = False
+            prevGb = gb
+            # --- clock/timing signals ---
+            act = 1 if dec in ("SWAP", "RAISE") else 0
+            total_acts += act
+            if r.get("danger"):
+                danger_frames += 1
+            if dec == "WAIT":
+                wait_frames += 1
+            disp_sum += r.get("displacement") or 0
+            stoptime_sum += r.get("stopTime") or 0   # populated after re-emit
+            # event-aligned anticipation: on a landing, score the PRECEDING window's acts
+            if landing and window:
+                pre_land_acts += sum(window); pre_land_frames += len(window); landings += 1
+            window.append(act)
+            if len(window) > PRE_WIN:
+                window.pop(0)
+    # per-bucket rates, occupancy-weighted (skip <1% cells — §26)
+    buckets = {}
+    tot = sum(cell[k]["frames"] for k in cell) or 1
+    for k, c in cell.items():
+        f = c["frames"]
+        if f < 0.01 * tot:
+            continue
+        buckets[k] = {
+            "occupancy": round(f / tot, 4),
+            "swap": round(100 * c["swap"] / f, 2),
+            "raise": round(100 * c["raise"] / f, 2),
+            "clearStart_per1k": round(1000 * c["clearStart"] / f, 2),
+            "dig_per1k": round(1000 * c["digCells"] / f, 2),
+        }
+    return {
+        "buckets": buckets,
+        "swaps_per_clear": round(swaps / clears, 2) if clears else None,
+        "height_med": med(heights),
+        "height_p90": sorted(heights)[int(0.9 * (len(heights) - 1))] if heights else None,
+        "garbage_on_board_pct": round(100 * gb_frames / total, 1) if total else None,
+        "timing": {
+            # event-aligned anticipation: act-rate in the 30f BEFORE a garbage landing vs
+            # the player's baseline act-rate. Positive = they prep before the hit (clock-aware).
+            # ~0 under constant pressure = honestly, that player doesn't get to anticipate.
+            "act_prelanding_pct": round(100 * pre_land_acts / pre_land_frames, 2) if pre_land_frames else None,
+            "act_baseline_pct": round(100 * total_acts / total, 2) if total else None,
+            "anticipation": (round(100 * pre_land_acts / pre_land_frames - 100 * total_acts / total, 2)
+                             if pre_land_frames and total else None),
+            "landings_per_1k": round(1000 * landings / total, 2) if total else None,
+            "danger_pct": round(100 * danger_frames / total, 2) if total else None,
+            "displacement_mean": round(disp_sum / total, 3) if total else None,
+            "wait_pct": round(100 * wait_frames / total, 2) if total else None,
+            # stopTime density = free-build frames generated per frame (offense density).
+            # 0 until the corpus is re-emitted via BoardState.extract (carries stopTime).
+            "stoptime_density": round(stoptime_sum / total, 4) if total else None,
+        },
+        "n_games": len(files),
+    }
+
+
+def offense_targets(stats_path):
+    games = [json.loads(l) for l in open(stats_path) if l.strip()]
+    pieces = [g for game in games for g in game["garbage"]]
+    n = len(pieces) or 1
+    n_chain = sum(1 for p in pieces if p.get("isChain"))
+    # chain LENGTH (x-notation) = chain-garbage height + 1 (GarbageQueue: height == #links == chainLen-1;
+    # verified maxChain=8 <-> tallest chain garbage height 7). Audit 4. Hist bins x2..x8, x9+ catch-all
+    # (orange's defining tail runs x9->x36; collapse to one bin for the clone-fit TV distance, keep the
+    # true peak as a scalar).
+    lengths = [p["height"] + 1 for p in pieces if p.get("isChain")]
+    len_hist = collections.Counter(min(L, 9) for L in lengths)
+    # combo SIZE (panels cleared) = garbage width + 1 (width-6 = 7+). Sizes +4..+6, +7 catch-all.
+    sizes = [min(p.get("width", 0) + 1, 7) for p in pieces if not p.get("isChain")]
+    size_hist = collections.Counter(s for s in sizes if s >= 4)
+    frames = [g["frames"] for g in games if g["frames"]]
+    total_frames = sum(frames)
+    return {
+        "chainPct": round(100 * n_chain / n, 1),
+        "comboPct": round(100 * (n - n_chain) / n, 1),
+        "blocksPerMin": round(60 * 60 * len(pieces) / total_frames, 1) if total_frames else None,
+        "chainLen_med": med(lengths),
+        "chainLen_peak": max(lengths) if lengths else 0,
+        "chainLen_hist": {str(k): len_hist[k] for k in sorted(len_hist)},
+        "comboSize_hist": {str(k): size_hist[k] for k in sorted(size_hist)},
+        "n_pieces": len(pieces),
+    }
+
+
+def main():
+    corpus = sys.argv[1]
+    stats = sys.argv[2] if len(sys.argv) > 2 and sys.argv[2].endswith(".jsonl") else None
+    sample = int([a for a in sys.argv[2:] if a.isdigit()][0]) if any(a.isdigit() for a in sys.argv[2:]) else 120
+    out = {"source": corpus, "_schema": "fit_targets/v1"}
+    out["board"] = board_targets(corpus, sample)
+    if stats and os.path.exists(stats):
+        out["offense"] = offense_targets(stats)
+    print(json.dumps(out, indent=2))
+
+
+if __name__ == "__main__":
+    main()

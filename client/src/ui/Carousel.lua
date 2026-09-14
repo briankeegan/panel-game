@@ -5,6 +5,14 @@ local class = require("common.lib.class")
 local GraphicsUtil = require("client.src.graphics.graphics_util")
 local tableUtils = require("common.lib.tableUtils")
 local DebugSettings = require("client.src.debug.DebugSettings")
+local system = require("client.src.system")
+
+-- portrait: width of the tappable left/right arrow zones on a carousel. Narrow +
+-- edge-hugging so the content reads as centered between the arrows.
+local function arrowZoneWidth(carousel)
+  if not system.isPortraitMode() then return 0 end
+  return math.min(carousel.width * 0.22, 96)
+end
 
 local function calculateFontSize(height)
   return math.floor(height / 2) + 1
@@ -91,6 +99,15 @@ function Carousel:drawSelf()
   if DebugSettings.showUIElementBorders() then
     GraphicsUtil.drawRectangle("line", self.x, self.y, self.width, self.height)
   end
+  -- portrait: big tappable < > arrows on the sides (touch can't keyboard-arrow)
+  local zoneW = arrowZoneWidth(self)
+  if zoneW > 0 and #self.passengers > 1 then
+    -- glyph sized well under the zone width so the arrow can't overflow/clip
+    local delta = math.max(36, math.min(math.floor(self.height * 0.7), math.floor(zoneW * 0.62)))
+    local cy = self.y + self.height / 2 - (GraphicsUtil.fontSize + delta) / 2
+    GraphicsUtil.printf("<", self.x, cy, zoneW, "center", nil, 1, delta)
+    GraphicsUtil.printf(">", self.x + self.width - zoneW, cy, zoneW, "center", nil, 1, delta)
+  end
 end
 
 function Carousel:onPassengerUpdate(selectedPassenger)
@@ -153,7 +170,22 @@ function Carousel:onDrag(x, y)
 end
 
 function Carousel:onRelease(x, y)
-  self:onDrag(x, y)
+  -- portrait: a TAP (no real drag) in a side arrow zone steps the carousel.
+  local tappedArrow = false
+  local zoneW = arrowZoneWidth(self)
+  if zoneW > 0 and #self.passengers > 1 and math.abs(x - self.initialTouchX) < 20 then
+    local screenX = self:getScreenPos()
+    if x <= screenX + zoneW then
+      self:moveToNextPassenger(-1)
+      tappedArrow = true
+    elseif x >= screenX + self.width - zoneW then
+      self:moveToNextPassenger(1)
+      tappedArrow = true
+    end
+  end
+  if not tappedArrow then
+    self:onDrag(x, y)
+  end
   self.swiping = false
   self.initialTouchX = 0
   self.initialTouchY = 0

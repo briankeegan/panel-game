@@ -80,6 +80,9 @@ function RunTimeGraph:draw()
   love.graphics.scale(GAME.canvasXScale, GAME.canvasYScale)
 
   BarGraph.drawGraphs(self.graphs)
+  -- "isrunning" is a LuaJIT extension to collectgarbage not in the Lua 5.1
+  -- enum the bundled love stubs use; safe at runtime.
+  ---@diagnostic disable-next-line: param-type-mismatch
   if not collectgarbage("isrunning") then
     self.memAllocGraph:draw()
   end

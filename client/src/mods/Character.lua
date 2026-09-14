@@ -564,6 +564,7 @@ function Character:validate()
 end
 
 --- Stack number 1 equals left side, 2 is right side
+---@return love.Texture? portrait image, or nil if the mod ships no such portrait
 function Character:portraitImage(stackNumber)
   local portraitImageName = self:portraitName(stackNumber)
   return self.images[portraitImageName]
@@ -586,6 +587,9 @@ end
 
 function Character:drawPortrait(stackNumber, x, y, fade, scale)
   local portraitImage = self:portraitImage(stackNumber)
+  -- Some character mods ship no portrait (or it failed to load); skip rather
+  -- than crash the whole draw on a nil image.
+  if not portraitImage then return end
   local portraitImageWidth, portraitImageHeight = portraitImage:getDimensions()
 
   local portraitImageX = x

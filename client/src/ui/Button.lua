@@ -12,13 +12,19 @@ local input = require("client.src.inputManager")
 ---@class Button : UiElement
 ---@field backgroundColor number[]
 ---@field outlineColor number []
----@field onClick fun(button: Button?, input: table?, timeHeld: number?)
+---@field onClick fun(button: Button?, input: table?, timeHeld: number?)?
 ---@field currentlyPressed boolean
+---@field selected boolean
 local Button = class(
   function(self, options)
-    self.backgroundColor = options.backgroundColor or {.3, .3, .3, .7}
-    self.outlineColor = options.outlineColor or {.5, .5, .5, .7}
+    self.backgroundColor = options.backgroundColor or {1.0, 0.08, 0.58, 0.8}
+    self.outlineColor = options.outlineColor or {1.0, 0.08, 0.58, 1.0}
+    -- optional per-button overrides for the selected look (used by ButtonGroup to
+    -- make the chosen toggle obviously pink + yellow border). nil = use theme.
+    self.selectedBackgroundColor = options.selectedBackgroundColor
+    self.selectedBorderColor = options.selectedBorderColor
     self.currentlyPressed = false
+    self.selected = false
 
     -- callbacks
     self.onClick = options.onClick
@@ -27,8 +33,10 @@ local Button = class(
 )
 
 Button.TYPE = "Button"
-Button.WIDTH_PADDING = 3
-Button.HEIGHT_PADDING = 3
+Button.WIDTH_PADDING = 16
+Button.HEIGHT_PADDING = 10
+Button.CORNER_RADIUS = 32
+Button.BORDER_WIDTH = 4
 
 function Button:onClick()
   GAME.theme:playValidationSfx()
@@ -46,6 +54,10 @@ function Button:onRelease(x, y, timeHeld)
   self.currentlyPressed = false
 end
 
+function Button:setSelected(selected)
+  self.selected = selected
+end
+
 function Button:receiveInputs(input)
   if input.isDown["MenuSelect"] then
     self:onClick(input)
@@ -56,20 +68,24 @@ function Button:receiveInputs(input)
 end
 
 function Button:drawBackground()
-  if self.backgroundColor[4] > 0 then
-    if self.currentlyPressed then 
-      GraphicsUtil.setColor(self.backgroundColor[1], self.backgroundColor[2], self.backgroundColor[3], 1)
-    else
-      GraphicsUtil.setColor(self.backgroundColor[1], self.backgroundColor[2], self.backgroundColor[3], self.backgroundColor[4])
-    end
-    GraphicsUtil.drawRectangle("fill", self.x, self.y, self.width, self.height)
-    GraphicsUtil.setColor(1, 1, 1, 1)
-  end
+  local bgColor = (self.selected or self.currentlyPressed)
+    and (self.selectedBackgroundColor or GAME.theme.colors.menuSelectedBackgroundColor)
+    or  GAME.theme.colors.menuDefaultBackgroundColor
+  GraphicsUtil.drawRectangle("fill", self.x, self.y, self.width, self.height,
+    bgColor[1], bgColor[2], bgColor[3], bgColor[4],
+    self.CORNER_RADIUS, self.CORNER_RADIUS)
+  GraphicsUtil.setColor(1, 1, 1, 1)
 end
 
 function Button:drawOutline()
-  GraphicsUtil.setColor(self.outlineColor)
-  GraphicsUtil.drawRectangle("line", self.x, self.y, self.width, self.height)
+  local borderColor = self.selected
+    and (self.selectedBorderColor or GAME.theme.colors.menuSelectedBorderColor)
+    or  GAME.theme.colors.menuDefaultBorderColor
+  for w = 0, self.BORDER_WIDTH - 1 do
+    GraphicsUtil.drawRectangle("line", self.x + w, self.y + w, self.width - 2*w, self.height - 2*w,
+      borderColor[1], borderColor[2], borderColor[3], borderColor[4],
+      self.CORNER_RADIUS, self.CORNER_RADIUS)
+  end
   GraphicsUtil.setColor(1, 1, 1, 1)
 end
 

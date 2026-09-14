@@ -42,6 +42,7 @@ function ServerMessages.toServerMenuState(player)
   menuState.inputMethod = player.settings.inputMethod
   menuState.cursor = "__Ready" -- play pretend
   menuState.levelData = player.settings.levelData
+  menuState.endless_no_raise = player.settings.endlessNoRaise == true
 
   return menuState
 end
@@ -63,7 +64,8 @@ local function sanitizePlayerSettings1(settings, publicId)
     hasLoaded = settings.loaded,
     ready = settings.ready,
     publicId = publicId,
-    playerNumber = settings.playerNumber
+    playerNumber = settings.playerNumber,
+    endlessNoRaise = settings.endless_no_raise == true
   }
 end
 
@@ -89,7 +91,16 @@ function ServerMessages.sanitizeRoomMessage(message)
       player.ratingInfo = player.rating
       player.rating = nil
     end
-    return { gameResult = message.content }
+    -- teamWins / winnerTeamIndex / winnerIndex / endTick live at the outer
+    -- message level (sibling of content) to keep `content` a JSON array —
+    -- see ServerProtocol.gameResult for why.
+    return {
+      gameResult = message.content,
+      teamWins = message.teamWins,
+      winnerTeamIndex = message.winnerTeamIndex,
+      winnerIndex = message.winnerIndex,
+      endTick = message.endTick,
+    }
   elseif message.type == "matchStart" then
     local replay = ReplayV3.createFromTable(message.content, false)
 
@@ -97,13 +108,36 @@ function ServerMessages.sanitizeRoomMessage(message)
     {
       replay = replay,
       match_start = true,
+      startAtMs = message.startAtMs,
+      startInMs = message.startInMs,
     }
   elseif message.type == "spectatorUpdate" then
     return { spectators = message.content }
+  elseif message.type == "pauseNotification" then
+    return { pauseNotification = message.content }
   elseif message.type == "rankedUpdate" then
     return {
       ranked_match_approved = message.content.ranked,
       reasons = message.content.reasons,
+    }
+  elseif message.type == "playerJoinedRoom" then
+    local joined = message.content
+    return {
+      playerJoinedRoom = {
+        playerNumber = joined.playerNumber,
+        name = joined.name,
+        publicId = joined.publicId,
+        settings = joined.settings and sanitizePlayerSettings1(joined.settings, joined.publicId) or nil,
+      }
+    }
+  elseif message.type == "playerLeftRoom" then
+    return {
+      playerLeftRoom = {
+        publicId = message.content.publicId,
+        name = message.content.name,
+        voidReason = message.content.voidReason,
+        heldSlots = message.content.heldSlots,
+      }
     }
   elseif message.type == "gameAbort" then
     return { gameAbort = true, source = message.content.source }
@@ -142,7 +176,7 @@ function ServerMessages.sanitizeServerMessage(message)
     return { lobbyStateV2 = true, content = content }
   elseif message.type == "leaderboardReport" then
     return { leaderboard_report = message.content }
-  elseif message.type == "spectateRequestGranted" then
+  elseif message.type == "spectateRequestGranted" or message.type == "joinQueued" then
     local winCounts = {}
     local players = {}
     for index, player in pairs(message.content.players) do
@@ -160,24 +194,30 @@ function ServerMessages.sanitizeServerMessage(message)
       message.content.replay = ReplayV3.createFromTable(message.content.replay, false)
     end
 
-    return
-    {
-      spectate_request_granted = true,
+    local result = {
       stageId = message.content.stage,
       ranked = message.content.ranked,
       winCounts = winCounts,
       players = players,
       gameMode = message.content.gameMode,
-      replay = message.content.replay
+      replay = message.content.replay,
+      roomNumber = message.content.roomNumber,
+      displayHistoryEnabled = message.content.displayHistoryEnabled == true,
     }
+    result.spectate_request_granted = true
+    if message.type == "joinQueued" then
+      result.joinQueued = true
+      result.pendingPromotion = true
+    end
+    return result
   elseif message.type == "createRoom" then
     local players = {}
-    for i, player in ipairs(message.content.players) do
+    for index, player in pairs(message.content.players) do
       players[player.playerNumber] = {
         playerNumber = player.playerNumber,
         ratingInfo = player.rating,
         name = player.name,
-        publicId = player.publicId,
+        publicId = player.publicId or -index,
         settings = sanitizePlayerSettings1(player.settings),
       }
       players[player.playerNumber].settings.playerNumber = player.playerNumber
@@ -188,7 +228,32 @@ function ServerMessages.sanitizeServerMessage(message)
       ranked = message.content.ranked,
       players = players,
       roomNumber = message.content.roomNumber,
-      gameMode = message.content.gameMode
+      gameMode = message.content.gameMode,
+      teamWins = message.content.teamWins,
+      displayHistoryEnabled = message.content.displayHistoryEnabled == true,
+    }
+  elseif message.type == "addToRoom" then
+    local players = {}
+    for index, player in pairs(message.content.players) do
+      players[player.playerNumber] = {
+        playerNumber = player.playerNumber,
+        ratingInfo = player.rating,
+        name = player.name,
+        publicId = player.publicId or -index,
+        settings = sanitizePlayerSettings1(player.settings),
+      }
+      players[player.playerNumber].settings.playerNumber = player.playerNumber
+    end
+
+    return {
+      addToRoom = true,
+      ranked = message.content.ranked,
+      players = players,
+      roomNumber = message.content.roomNumber,
+      gameMode = message.content.gameMode,
+      teamWins = message.content.teamWins,
+      heldSlots = message.content.heldSlots,
+      displayHistoryEnabled = message.content.displayHistoryEnabled == true,
     }
   else
     return message
@@ -219,6 +284,8 @@ function ServerMessages.sanitizePlayerMessage(message)
         receiverId = content.receiverId,
         gameModeId = content.gameModeId,
         challengeActive = content.challengeActive,
+        roomNumber = content.roomNumber,
+        slotNumber = content.slotNumber,
       }
     }
   end

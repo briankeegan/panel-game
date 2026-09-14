@@ -24,16 +24,53 @@ function save.write_user_id_file(userID, serverIP)
   FileUtils.write("servers/" .. serverIP, "user_id.txt", tostring(userID))
 end
 
--- reads the "user_id.txt" file of the directory of the connected ip
+-- reads the "user_id.txt" file of the directory of the connected ip.
+-- Reads the real save-dir path via io first: love 12's love.filesystem can't see
+-- files written after the client launched (the quirk FileUtils.readJsonFileFresh
+-- already dodges for replays), so a user_id persisted on first login otherwise
+-- reads back as nil on re-login — the client then re-registers as a new user and
+-- the server rejects the now-taken name. Falls back to love.filesystem for
+-- source-mounted / first-run paths.
 function save.read_user_id_file(serverIP)
+  local relPath = "servers/" .. serverIP .. "/user_id.txt"
   local userID
-  pcall(
-    function()
-      userID = love.filesystem.read("servers/" .. serverIP .. "/user_id.txt")
-      userID = userID:match("^%s*(.-)%s*$")
+  local saveDir = FileUtils.getSaveDir()
+  logger.debug("read_user_id_file: saveDir=" .. tostring(saveDir) .. " relPath=" .. relPath)
+  if saveDir then
+    local f = io.open(saveDir .. "/" .. relPath, "r")
+    if f then
+      userID = f:read("*a")
+      f:close()
     end
-  )
+  end
+  if not userID then
+    pcall(function() userID = love.filesystem.read(relPath) end)
+  end
+  if userID then
+    userID = userID:match("^%s*(.-)%s*$")
+    if userID == "" then userID = nil end
+  end
   return userID
+end
+
+-- Moves user_id.txt → user_id.txt.bak so a stale credential doesn't permanently
+-- block login while leaving a manual-restore breadcrumb if we cleared in error.
+-- Returns true if a file was moved (or no file existed to begin with).
+---@param serverIP string
+---@return boolean
+function save.backup_user_id_file(serverIP)
+  local path = "servers/" .. serverIP .. "/user_id.txt"
+  local bakPath = path .. ".bak"
+  local content = love.filesystem.read(path)
+  if not content then return true end
+  local ok = pcall(function()
+    love.filesystem.write(bakPath, content)
+    love.filesystem.remove(path)
+  end)
+  if not ok then
+    logger.warn("Failed to back up " .. path)
+  end
+  return ok
 end
 
 -- I think this is unnecessary as we use the path with love.filesystem.read which assumes / as the separator

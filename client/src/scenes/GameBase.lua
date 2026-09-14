@@ -15,7 +15,46 @@ local ui = require("client.src.ui")
 local FileUtils = require("client.src.FileUtils")
 local ClientStack = require("client.src.ClientStack")
 local MatchRules = require("common.data.MatchRules")
+local GameModes = require("common.data.GameModes")
 local DebugSettings = require("client.src.debug.DebugSettings")
+local TeamUtils = require("common.data.TeamUtils")
+local socket = require("common.lib.socket")
+
+-- Grace period after a local player dies before the spectator controls
+-- (cycle hint, focused-stack border, "Viewing: <name>" label, arrow-key
+-- focus cycling) become available. Without this, the UI floods in at the
+-- exact moment of death, which players read as "the game broke" rather
+-- than "I died and can now watch teammates".
+--
+-- The window isn't fixed: it scales to how far behind the surviving
+-- teammates' stacks are rendering relative to the local clock (framesBehind
+-- / 60). That lag is the only thing the grace is really covering — once the
+-- other screens have caught up, there's nothing left to settle. On a clean
+-- connection that's a fraction of a second (near-instant); it only stretches
+-- toward the ceiling when the game is genuinely laggy. Clamped to a floor so
+-- the death animation always gets a beat to read, and a ceiling that matches
+-- the old fixed value.
+local DEAD_LOCAL_GRACE_FLOOR_SECONDS = 0.5
+local DEAD_LOCAL_GRACE_CEIL_SECONDS = 3
+
+-- Shorter wall-clock window before the dead local's MenuEsc → waiting-room
+-- exit is honored. Without this, a player who was holding Esc when they died
+-- (or who reflexively jams it on death) bails out before they realize what
+-- happened. Same dt-accumulator pattern as the spectator grace, just a fixed
+-- tighter window — exiting is a smaller commitment than swapping into
+-- spectator UI.
+local DEAD_LOCAL_EXIT_GRACE_SECONDS = 0.5
+
+-- Chip-background uses the canonical palette with translucency (alpha 0.85).
+local CHIP_ALPHA = 0.85
+
+local function teamColorForStack(match, stack, stackIndex)
+  local player = match.players and match.players[stackIndex]
+  return TeamUtils.teamColorForPlayer(match, player, CHIP_ALPHA)
+end
+
+local isSharedTeamMode = TeamUtils.isSharedTeamMode
+local isFFA = TeamUtils.isFFA
 
 -- Scene template for running any type of game instance (endless, vs-self, replays, etc.)
 ---@class GameBase : Scene
@@ -84,6 +123,86 @@ function GameBase:customGameOverSetup() end
 
 -- end abstract functions
 
+local teamLetter = TeamUtils.teamLetter
+
+local function joinPlayerNames(players)
+  local names = {}
+  for _, player in ipairs(players) do
+    names[#names + 1] = player.name
+  end
+  return table.concat(names, ", ")
+end
+
+-- Match a winner (Player / PlayerStack wrapper / engine Stack — different
+-- call paths produce different shapes) to the corresponding Player.
+local function winnerToPlayer(winner, players)
+  for _, p in ipairs(players) do
+    if winner == p then return p end
+    if winner.player and winner.player == p then return p end
+    if winner.engine and p.stack and p.stack.engine == winner.engine then return p end
+    if p.stack and p.stack == winner then return p end
+    if p.stack and p.stack.engine == winner then return p end
+    if winner.which and p.playerNumber and winner.which == p.playerNumber then return p end
+  end
+  return nil
+end
+
+function GameBase.buildTeamResultText(match, winners)
+  local gameMode = match.gameMode
+  if not gameMode or gameMode.stackInteraction ~= GameModes.StackInteractions.TEAM_VERSUS then
+    return nil
+  end
+
+  local localTeam = nil
+  for _, player in ipairs(match.players) do
+    if player.isLocal then
+      localTeam = TeamUtils.teamIndexForPlayer(match, player)
+      break
+    end
+  end
+
+  local winnerTeamIndex = nil
+
+  -- Server is authoritative for online matches. Its per-tick living-teams
+  -- check resolves a simultaneous-KO across all teams (everyone dead before
+  -- the tick) as a draw — something the engine's local getWinners heuristic
+  -- ("highest game_over_clock") can't see, so it would otherwise crown the
+  -- team that died last. Trust the server's verdict; fall back to engine
+  -- winners only when there is no server (offline / replay).
+  if match.hasServerOutcome and match:hasServerOutcome() then
+    winnerTeamIndex = match:getServerWinnerTeamIndex()
+  else
+    local winnerTeams = {}
+    for _, winner in ipairs(winners) do
+      local matched = winnerToPlayer(winner, match.players)
+      if matched then
+        local teamIndex = TeamUtils.teamIndexForPlayer(match, matched)
+        if teamIndex then
+          winnerTeams[teamIndex] = true
+        end
+      end
+    end
+    local count = 0
+    for teamIndex, _ in pairs(winnerTeams) do
+      winnerTeamIndex = teamIndex
+      count = count + 1
+    end
+    if count ~= 1 then
+      winnerTeamIndex = nil
+    end
+  end
+
+  if winnerTeamIndex then
+    if localTeam then
+      return (localTeam == winnerTeamIndex) and "YOUR TEAM WINS" or "YOUR TEAM LOSES"
+    end
+    -- Spectator without a team allegiance: keep a minimal neutral message.
+    return "Team " .. teamLetter(winnerTeamIndex) .. " wins"
+  end
+
+  return "DRAW"
+end
+
 -- returns "stage" or "character" depending on which should be used according to the config.use_music_from setting
 function GameBase:getPreferredMusicSourceType()
   if config.use_music_from == "stage" or config.use_music_from == "characters" then
@@ -142,7 +261,28 @@ function GameBase:getStageTrack()
 end
 
 -- unlike regular asset load, this function connects the used assets to the match so they cannot be unloaded
+--
+-- This is the canonical match-start preload gate. Each `loadModFor(_, _, true)`
+-- call invokes ModLoader.wait() which busy-pumps the load coroutine until the
+-- mod's `fullyLoaded` flag flips. With threaded asset decode, the coroutine
+-- yields between decode requests so the worker can run concurrently while
+-- main pumps; mods that were already `fullyLoaded` at scene-enter return
+-- immediately. When this function returns every match stack's character and
+-- the stage are ready — no asset streams in during play.
 function GameBase:loadAssets(match)
+  local preloadStartMs = math.floor(love.timer.getTime() * 1000)
+
+  -- If anything below still needs a (blocking) force-load, paint a loading screen
+  -- first so the wait shows feedback instead of a frozen frame.
+  local needsLoad = false
+  for _, stack in ipairs(match.stacks) do
+    if stack.character and not stack.character.fullyLoaded then needsLoad = true end
+  end
+  if not match.stageId then match.stageId = StageLoader.fullyResolveStageSelection(match.stageId) end
+  local s = stages[match.stageId]
+  if s and not s.fullyLoaded then needsLoad = true end
+  if needsLoad and GAME.presentLoadingString then GAME:presentLoadingString(loc("ld_loading")) end
+
   for i, stack in ipairs(match.stacks) do
     logger.debug("Force loading character " .. stack.character.id .. " as part of GameBase:load")
     ModController:loadModFor(stack.character, stack, true)
@@ -161,6 +301,9 @@ function GameBase:loadAssets(match)
     logger.debug("Force loading stage " .. stage.id .. " as part of GameBase:load")
     ModController:loadModFor(stage, match, true)
   end
+  local preloadElapsedMs = math.floor(love.timer.getTime() * 1000) - preloadStartMs
+  logger.info("GameBase preload: " .. preloadElapsedMs .. "ms for "
+    .. #match.stacks .. " character(s) + stage " .. tostring(match.stageId))
 end
 
 function GameBase:initializeFrameInfo()
@@ -185,6 +328,7 @@ function GameBase:load()
       self.pauseMenu:setVisibility(false)
       -- Clear focus when pause menu is hidden
       self.uiRoot:setFocus(nil)
+      self:_resumeFromScrub()
       self.match:togglePause()
       if self.stageTrack and self.pauseState.musicWasPlaying then
         SoundController:playMusic(self.stageTrack)
@@ -193,6 +337,11 @@ function GameBase:load()
     end),
     ui.MenuItem.createButtonMenuItem("back", nil, true, function()
       GAME.theme:playCancelSfx()
+      if self.match.endScrub then
+        self.match:endScrub(nil)
+      end
+      self.scrubCursor = nil
+      self.scrubPauseFrame = nil
       self.match:abort()
       self:startNextScene()
     end),
@@ -213,6 +362,18 @@ function GameBase:load()
 
   self:initializeFrameInfo()
 
+  -- Scrub modes: clear death state a reused stack may carry in from a prior
+  -- round so a rewind never resumes into a gated (unresponsive) stack.
+  if self:_canScrub() then
+    for _, stack in ipairs(self.match.stacks) do
+      local e = stack.engine
+      if e and e.game_over_clock and e.game_over_clock > 0 then
+        e.game_over_clock = -1
+        e.game_over_stopWatch = 0
+      end
+    end
+  end
+
   self:customLoad()
 end
 
@@ -230,6 +391,7 @@ function GameBase:handlePause()
     if self.match.supportsPause and (playerPressingStart(self.match) or input.allKeys.isDown["escape"] or (not GAME.focused and not self.match.isPaused)) then
       self.match:togglePause()
       self.pauseMenu:setVisibility(true)
+      self:_initScrubState()
 
       if self.stageTrack then
         self.pauseState.musicWasPlaying = self.stageTrack:isPlaying()
@@ -238,10 +400,116 @@ function GameBase:handlePause()
       GAME.theme:playValidationSfx()
     end
   else
-    if (self.pauseMenu.hasFocus == nil or self.pauseMenu.hasFocus == false) and playerPressingStart(self.match) == false then
+    self:_handleScrubInput()
+    -- Only the player who can act on the menu (resume / quit) should focus
+    -- it. supportsPause is false for spectator matches and pauseNotification
+    -- is now suppressed for spectators upstream (NetClient:processPause-
+    -- Notification) so this branch is player-only — defensive guard kept.
+    if self.match.supportsPause
+        and (self.pauseMenu.hasFocus == nil or self.pauseMenu.hasFocus == false)
+        and playerPressingStart(self.match) == false then
       self.uiRoot:setFocus(self.pauseMenu)
     end
   end
+end
+
+local SCRUB_STEP_FRAMES = 30
+
+-- Subclasses opt in by setting `supportsScrub = true` on the class.
+GameBase.supportsScrub = false
+
+function GameBase:_canScrub()
+  return self.supportsScrub == true
+end
+
+function GameBase:_initScrubState()
+  if not self:_canScrub() then return end
+  local clock = self.match.engine and self.match.engine.clock or 0
+  self.scrubPauseFrame = clock
+  self.scrubCursor = clock
+end
+
+function GameBase:_scrubMinCursor()
+  -- Scrub cursor is in engine-clock space. Floor at the end of the countdown
+  -- when one is configured so rewind can reach gameplay-frame 0 but not
+  -- before "GO!" — there's nothing to render in countdown frames and the
+  -- engine's pre-countdown state isn't meaningful to scrub into.
+  local engine = self.match and self.match.engine
+  if engine and engine.doCountdown then
+    return consts.COUNTDOWN_START + consts.COUNTDOWN_LENGTH
+  end
+  return 0
+end
+
+function GameBase:_handleScrubInput()
+  if not self.scrubCursor then return end
+  local minCursor = self:_scrubMinCursor()
+  local maxCursor = self.scrubPauseFrame
+  if input:isPressedWithRepeat("MenuLeft") and self.scrubCursor > minCursor then
+    self.scrubCursor = math.max(minCursor, self.scrubCursor - SCRUB_STEP_FRAMES)
+    self.match:scrubToFrame(self.scrubCursor)
+    GAME.theme:playValidationSfx()
+  elseif input:isPressedWithRepeat("MenuRight") and self.scrubCursor < maxCursor then
+    self.scrubCursor = math.min(maxCursor, self.scrubCursor + SCRUB_STEP_FRAMES)
+    self.match:scrubToFrame(self.scrubCursor)
+    GAME.theme:playValidationSfx()
+  end
+end
+
+function GameBase:_resumeFromScrub()
+  if not self.scrubCursor then return end
+  if self.match.endScrub then
+    local commitFrame = (self.scrubCursor < self.scrubPauseFrame) and self.scrubCursor or nil
+    self.match:endScrub(commitFrame)
+  end
+  self.scrubCursor = nil
+  self.scrubPauseFrame = nil
+end
+
+function GameBase:drawScrubIndicator()
+  if not self.match.isPaused or not self.scrubCursor then return end
+  local minCursor = self:_scrubMinCursor()
+  local atStart = self.scrubCursor <= minCursor
+  local atEnd = self.scrubCursor >= self.scrubPauseFrame
+  local y = 500
+  local w = consts.CANVAS_WIDTH
+
+  -- Disabled side renders gray+translucent (not just dim white) so it reads
+  -- as blocked at the boundary instead of merely subtle.
+  local activeR, activeG, activeB = 1, 1, 1
+  local disabledR, disabledG, disabledB, disabledA = 0.4, 0.4, 0.4, 0.5
+
+  if atStart then
+    GraphicsUtil.setColor(disabledR, disabledG, disabledB, disabledA)
+  else
+    GraphicsUtil.setColor(activeR, activeG, activeB, 1)
+  end
+  GraphicsUtil.printf("< Rewind", 0, y, w * 0.45, "right")
+
+  GraphicsUtil.setColor(1, 1, 1, 1)
+  -- Match the in-game timer (ClientMatch:drawTimer) which reads stack.stopWatch.
+  -- engine.clock includes COUNTDOWN_START + COUNTDOWN_LENGTH; stopWatch starts
+  -- at gameplay-start. Strip the countdown frames at display time only — the
+  -- cursor itself stays in clock-frame space because that's what the engine rewinds against.
+  local countdownOffset = (self.match.engine and self.match.engine.doCountdown)
+      and (consts.COUNTDOWN_START + consts.COUNTDOWN_LENGTH)
+      or 0
+  local function fmt(frame)
+    local s = math.max(0, math.floor((frame - countdownOffset) / 60))
+    return string.format("%d:%02d", math.floor(s / 60), s % 60)
+  end
+  local label = string.format("%s -> %s",
+    fmt(self.scrubCursor), fmt(self.scrubPauseFrame))
+  GraphicsUtil.printf(label, 0, y, w, "center")
+
+  if atEnd then
+    GraphicsUtil.setColor(disabledR, disabledG, disabledB, disabledA)
+  else
+    GraphicsUtil.setColor(activeR, activeG, activeB, 1)
+  end
+  GraphicsUtil.printf("Forward >", w * 0.55, y, w * 0.45, "left")
+
+  GraphicsUtil.setColor(1, 1, 1, 1)
 end
 
 function GameBase:setupGameOver()
@@ -258,31 +526,151 @@ function GameBase:setupGameOver()
   if self.text == nil then
     if #self.match.players == 1 then
       self.text = loc("pl_gameover")
+    elseif isFFA(self.match.gameMode) then
+      if self.match:hasLocalPlayer() then
+        local localWon = false
+        for _, winner in ipairs(winners) do
+          if winner.isLocal then
+            localWon = true
+            break
+          end
+        end
+        if localWon then
+          self.text = loc("pl_you_win")
+        elseif #winners > 0 then
+          self.text = loc("pl_you_lose")
+        else
+          self.text = loc("ss_draw")
+        end
+      elseif #winners == 1 then
+        self.text = loc("ss_p_wins", winners[1].name)
+      else
+        self.text = loc("ss_draw")
+      end
+    elseif self.match.gameMode and self.match.gameMode.stackInteraction == GameModes.StackInteractions.TEAM_VERSUS then
+      self.text = GameBase.buildTeamResultText(self.match, winners)
     elseif #winners == 1 then
       self.text = loc("ss_p_wins", winners[1].name)
     else
       self.text = loc("ss_draw")
     end
   end
-  
+
   self:customGameOverSetup()
 end
 
+-- Build a short subtitle if any non-local stack died for a reason other than
+-- a normal top-out. Surfaces server-synthesized deaths (silent watchdog,
+-- mid-match disconnect) so the player understands they won by default rather
+-- than by their opponent actually losing. Returns nil for the all-topOut case.
+function GameBase:_buildDeathReasonSubtitle()
+  if not self.match or not self.match.stacks then return nil end
+  local reasons = {}
+  for _, stack in ipairs(self.match.stacks) do
+    local reason = stack and stack._deathReason
+    if reason and reason ~= "topOut" and not stack.is_local then
+      reasons[reason] = true
+    end
+  end
+  if reasons["disconnect"] then return "Opponent disconnected" end
+  if reasons["silent"] then return "Opponent stalled (server inferred)" end
+  return nil
+end
+
+-- Build the per-frame placement list. Computed fresh each draw so it picks
+-- up gameResult populated AFTER setupGameOver runs (the locally-detected
+-- match-end fires the game-over screen before the server's payload arrives).
+function GameBase:_buildPlacementLines()
+  if not self.match or not self.match.players or #self.match.players < 3 then
+    return nil
+  end
+  -- match.players is frozen at match start; the live room roster drops players
+  -- who left mid-match. Filter departed players out of the ranking when online.
+  local present
+  if GAME.netClient and GAME.netClient:isConnected() and GAME.battleRoom then
+    present = {}
+    for _, p in ipairs(GAME.battleRoom.players) do
+      if p.publicId then present[p.publicId] = true end
+    end
+  end
+  local rows = {}
+  for _, p in ipairs(self.match.players) do
+    if p.lastPlacement and p.name and (present == nil or not p.publicId or present[p.publicId]) then
+      rows[#rows + 1] = { placement = p.lastPlacement, name = p.name }
+    end
+  end
+  if #rows == 0 then return nil end
+  table.sort(rows, function(a, b) return a.placement < b.placement end)
+  local lines = {}
+  for _, r in ipairs(rows) do
+    lines[#lines + 1] = r.placement .. ". " .. r.name
+  end
+  return lines
+end
+
 function GameBase:runGameOver()
-  -- wait()
+  -- gameOverStartTime is normally set by setupGameOver, which runs from the
+  -- matchEnded signal listener (wired in load()). A spectator who joins a
+  -- match that's already in its end-of-match window can land here with
+  -- match.ended already true but the signal already fired before our listener
+  -- attached — i.e. setupGameOver never ran for us. Lazy-initialize the
+  -- timing fields so the subtraction below doesn't crash.
+  if self.gameOverStartTime == nil then
+    self:setupGameOver()
+  end
   local displayTime = love.timer.getTime() - self.gameOverStartTime
 
   self.match:run()
 
-  -- if conditions are met, leave the game over screen
+  local minDisplayMet = displayTime >= self.minDisplayTime
+  local maxDisplayMet = self.maxDisplayTime ~= -1 and displayTime >= self.maxDisplayTime
+
+  -- Post-death rewind: escape OR Start opens the pause/rewind menu in scenes
+  -- that opt into scrub (mirrors the alive-state pause trigger). Any other key
+  -- continues to the next scene. Check both the raw key (love's love.keypressed)
+  -- AND the menu-level binding — different code paths can populate one without the other.
+  local escapePressed = input.allKeys.isDown["escape"] or input.isDown["MenuEsc"] or playerPressingStart(self.match)
   local keyPressed = self:readyToProceedToNextScene()
 
-  if ((displayTime >= self.maxDisplayTime and self.maxDisplayTime ~= -1) or (displayTime >= self.minDisplayTime and keyPressed)) then
+  if minDisplayMet and escapePressed and self:_canScrub() then
+    logger.info("Post-death escape: entering pause/rewind")
+    self:_enterPostDeathPause()
+    return
+  end
+
+  if minDisplayMet and escapePressed and not self:_canScrub() then
+    logger.info(string.format(
+      "Post-death escape: scrub disabled (supportsScrub=%s, specs=%d)",
+      tostring(self.supportsScrub),
+      self.match and self.match.spectators and #self.match.spectators or -1))
+  end
+
+  if maxDisplayMet or (minDisplayMet and keyPressed) then
     GAME.theme:playValidationSfx()
     collectgarbage("collect")
     collectgarbage("collect")
     self:startNextScene()
   end
+end
+
+function GameBase:_enterPostDeathPause()
+  if not self.match.supportsPause then return end
+  -- Resurrect the match so update() flows to runGame (→ handlePause) instead
+  -- of runGameOver. If the user resumes without actually rewinding, the
+  -- engine's stack is still game-over so shouldFinalize re-fires
+  -- handleMatchEnd next tick and we land back in the game-over screen.
+  self.match.ended = false
+  self.gameOverStartTime = nil
+
+  self.match:togglePause()
+  self.pauseMenu:setVisibility(true)
+  self:_initScrubState()
+
+  if self.stageTrack then
+    self.pauseState.musicWasPlaying = self.stageTrack:isPlaying()
+    SoundController:pauseMusic()
+  end
+  GAME.theme:playValidationSfx()
 end
 
 function GameBase:readyToProceedToNextScene()
@@ -294,21 +682,92 @@ function GameBase:startNextScene()
   GAME.navigationStack:pop(nil, function() self.match:deinit() end)
 end
 
+-- Pop back to the waiting room (CharacterSelect2p) without aborting or
+-- deiniting the match. Used when a dead local player wants to leave the game
+-- view but stay in the room — teammates keep playing, and the match stays on
+-- BattleRoom so they can spectate it again from CharacterSelect.
+function GameBase:exitToWaitingRoom()
+  GAME.navigationStack:pop()
+end
+
+-- Fail-loud recovery: when the engine throws, asserts trip, or the freeze
+-- watchdog fires, snapshot diagnostics and drop back to the lobby instead of
+-- leaving the player staring at a frozen scene. Everything is pcall-wrapped so
+-- partial state can't block the navigation pop.
+function GameBase:bailOnFrozenMatch(reason)
+  logger.error("[freeze-recovery] aborting match: " .. tostring(reason))
+  pcall(function()
+    if self.match and self.match.stacks then
+      for i, stack in ipairs(self.match.stacks) do
+        local engine = stack and stack.engine
+        local clk = engine and engine.clock or "?"
+        local goc = engine and engine.game_over_clock or "?"
+        local buf = engine and engine.confirmedInput and #engine.confirmedInput or "?"
+        logger.error(string.format(
+          "[freeze-recovery] stack %d: clock=%s game_over_clock=%s confirmedInput=%s",
+          i, tostring(clk), tostring(goc), tostring(buf)))
+      end
+    end
+  end)
+  pcall(function()
+    if self.match then self.match:abort() end
+  end)
+  -- Online vs offline teardown. Offline scenes (PuzzleGame, ReplayGame, etc)
+  -- don't have a "Lobby" in their nav stack, so popToName would unwind too far.
+  -- Freeze-recovery explicitly bails out of the room — announce the leave to
+  -- the server before tearing down local state.
+  local isOnline = GAME.netClient and GAME.netClient:isConnected() and GAME.battleRoom
+  if isOnline then
+    pcall(function() GAME.netClient:leaveRoom() end)
+    pcall(function() GAME.battleRoom:shutdown() end)
+    pcall(function() GAME.navigationStack:popToName("Lobby") end)
+  else
+    pcall(function() GAME.navigationStack:pop() end)
+  end
+end
+
 function GameBase:runGame(dt)
   self:handlePause()
 
+  if self.match.isPaused then
+    if self.frameInfo.startTime then
+      self.frameInfo.startTime = self.frameInfo.startTime + dt
+    end
+    return
+  end
+
   if self.frameInfo.startTime == nil then
-    self.frameInfo.startTime = love.timer.getTime()
+    -- Server-scheduled start: hold engine ticks until the target wall-clock,
+    -- then anchor frameInfo.startTime to the scheduled moment so catch-up math
+    -- advances the engine to where it should be. Falls back to start-on-arrival
+    -- if no schedule was received (first match before offset is estimated, or
+    -- offline modes).
+    local schedMs = self.match and self.match.scheduledStartLocalMs
+    if schedMs then
+      local nowMs = math.floor(socket.gettime() * 1000)
+      if nowMs < schedMs then
+        return  -- hold; engine starts on the next tick that crosses the target
+      end
+      local latenessSec = (nowMs - schedMs) / 1000
+      self.frameInfo.startTime = love.timer.getTime() - latenessSec
+    else
+      self.frameInfo.startTime = love.timer.getTime()
+    end
   end
 
   local framesRun = 0
   self.frameInfo.currentTime = love.timer.getTime()
   self.frameInfo.expectedFrameCount = math.ceil((self.frameInfo.currentTime - self.frameInfo.startTime) * 60)
+  local isFreshFrame = true
   repeat
     prof.push("Match:run")--, self.match.clock)
     self.frameInfo.frameCount = self.frameInfo.frameCount + 1
     framesRun = framesRun + 1
-    self.match:run()
+    if self.match.setLocalWallClockDeficit then
+      self.match:setLocalWallClockDeficit(self.frameInfo.expectedFrameCount - self.frameInfo.frameCount)
+    end
+    self.match:run(isFreshFrame)
+    isFreshFrame = false
     prof.pop("Match:run")
   until (self.frameInfo.frameCount >= self.frameInfo.expectedFrameCount)
   self.droppedFrameCount = self.droppedFrameCount + (framesRun - 1)
@@ -358,22 +817,93 @@ end
 
 function GameBase:update(dt)
   if self.match.ended then
-    self:runGameOver()
-  else
-    if not self.match:hasLocalPlayer() then
+    local ok, err = xpcall(function() self:runGameOver() end, debug.traceback)
+    if not ok then
+      self:bailOnFrozenMatch("runGameOver error: " .. tostring(err))
+    end
+    self.uiRoot:handleFocusedInput(input, dt)
+    self.uiRoot:update(dt)
+    return
+  end
+
+  do
+    local isPureSpectator = not self.match:hasLocalPlayer()
+    local isDeadLocal = self.match:isLocalPlayerEliminated()
+
+    -- Real-time grace timer after local death. Accumulates in wall-clock dt
+    -- (not engine frames) so a paused or laggy game still progresses through
+    -- the window. Reset whenever we aren't a dead local — covers respawn
+    -- between rounds and the pure-spectator path. Accumulated before the
+    -- MenuEsc check below so the exit grace can read it.
+    if isDeadLocal then
+      if not self.deathGraceTimer then
+        -- Death transition: sample the target window once, scaled to the
+        -- worst clock skew among the surviving teammate stacks. Sampling once
+        -- (not every frame) keeps the threshold from jittering as framesBehind
+        -- fluctuates. framesBehind is meaningless for snapshot-driven remotes,
+        -- so those contribute 0 and the floor applies.
+        self.deathGraceTarget = self:computeDeathGraceTarget()
+      end
+      self.deathGraceTimer = (self.deathGraceTimer or 0) + dt
+    else
+      self.deathGraceTimer = nil
+      self.deathGraceTarget = nil
+    end
+
+    if isPureSpectator then
       if input.isDown["MenuEsc"] then
         GAME.theme:playCancelSfx()
         self.match:abort()
         if GAME.netClient:isConnected() then
+          GAME.netClient:leaveRoom()
           GAME.battleRoom:shutdown()
         end
         GAME.navigationStack:popToName("Lobby")
         return
       end
+    elseif isDeadLocal then
+      -- Dead local player: let them duck back to the waiting room without
+      -- aborting the match. Teammates keep playing on the server; this client
+      -- just unmounts the game scene. The match stays on BattleRoom so they
+      -- can re-enter to spectate by clicking ready in CharacterSelect.
+      local exitGraceMet = (self.deathGraceTimer or 0) >= DEAD_LOCAL_EXIT_GRACE_SECONDS
+      if exitGraceMet and input.isDown["MenuEsc"] then
+        GAME.theme:playCancelSfx()
+        self:exitToWaitingRoom()
+        return
+      end
     end
-    self:runGame(dt)
+
+    -- Spectator focus switching: only meaningful at 3+ stacks. Available to
+    -- pure spectators immediately, and to dead local players only after the
+    -- clock-scaled grace period (so the hint / focused-stack snap doesn't pop
+    -- in at the exact instant of death).
+    local spectatorControlsReady = #self.match.stacks >= 3 and (isPureSpectator
+      or (isDeadLocal and (self.deathGraceTimer or 0) >= (self.deathGraceTarget or DEAD_LOCAL_GRACE_CEIL_SECONDS)))
+    if spectatorControlsReady then
+      if isDeadLocal and not self.match.spectatorFocus then
+        -- First grace-period expiry after death: snap focus to your own stack
+        -- so the "Viewing: <yourname>" label appears. Arrow keys cycle to live
+        -- teammates from there, which swaps the focused stack into the
+        -- big-left container via ClientMatch:cycleSpectatorFocus.
+        for _, stack in ipairs(self.match.stacks) do
+          if stack.is_local then
+            self.match.spectatorFocus = TeamUtils.slotOf(stack.player, stack.player_number)
+            self.match:moveStacks()
+            break
+          end
+        end
+      end
+      self:pollSpectatorFocusInput()
+    end
+
+    local ok, err = xpcall(function() self:runGame(dt) end, debug.traceback)
+    if not ok then
+      self:bailOnFrozenMatch("runGame error: " .. tostring(err))
+      return
+    end
   end
-  
+
   self.uiRoot:handleFocusedInput(input, dt)
   self.uiRoot:update(dt)
 end
@@ -382,9 +912,27 @@ function GameBase:draw()
   if not self.match.isPaused or self.match.renderDuringPause then
     prof.push("GameBase:draw")
     self:drawBackground()
+    if self.match.setRenderInterpAlpha then
+      if self.frameInfo.startTime and self.frameInfo.frameCount > 0 then
+        local elapsedFrames = (love.timer.getTime() - self.frameInfo.startTime) * 60
+        self.match:setRenderInterpAlpha(elapsedFrames - (self.frameInfo.frameCount - 1))
+      else
+        self.match:setRenderInterpAlpha(1)
+      end
+    end
     prof.push("Match:render")
     self.match:render()
     prof.pop("Match:render")
+    -- Display-history replication parallel render (Phase C, see
+    -- DISPLAY_HISTORY_PLAN.md). When the BattleRoom flag is off, this is
+    -- a no-op. When on, BattleRoom blacks out each remote view-stack's
+    -- region and re-draws via DisplayClientStack — the binary toggle
+    -- specified in the design (never side-by-side with the old viewer).
+    if GAME.battleRoom and GAME.battleRoom.renderDisplayStacks then
+      GAME.battleRoom:renderDisplayStacks(self.match)
+    elseif self.match and self.match.renderDisplayStacks then
+      self.match:renderDisplayStacks(self.match)
+    end
     prof.push("GameBase:drawHUD")
     self:drawHUD()
     self:drawEndGameText()
@@ -393,13 +941,15 @@ function GameBase:draw()
       self:customDraw()
     end
     self:drawForegroundOverlay()
+    self:drawSpectatorHint()
     prof.pop("GameBase:draw")
   end
 
   if self.match.isPaused then
     self.match:draw_pause()
+    self:drawScrubIndicator()
   end
-  
+
   self.uiRoot:draw()
 
   if config.show_fps then
@@ -426,61 +976,193 @@ end
 
 function GameBase:drawHUD()
   if not self.match.isPaused then
+    -- "shared team" = real teams with multiple players (2v2, 1v2 asymmetric).
+    -- FFA (3p/4p) falls through this and shows per-player WINS in the LSS column.
+    local isTeamMode = isSharedTeamMode(self.match.gameMode)
+
+    -- Team colors don't change mid-match — team composition is fixed at
+    -- match start. Cache on first draw; the per-match GameBase scene gets
+    -- torn down on match end so a new match recomputes naturally. Was
+    -- previously a per-draw recompute that burned love.update budget.
+    if not self._teamColorCached then
+      for i, stack in ipairs(self.match.stacks) do
+        stack._teamColor = teamColorForStack(self.match, stack, i)
+      end
+      self._teamColorCached = true
+    end
+
     for i, stack in ipairs(self.match.stacks) do
-      if stack.engine.stackOverConditions[MatchRules.StackOverConditions.SWAPS] then
-        stack:drawMoveCount()
-      end
-      if config.show_ingame_infos then
-        if not stack.engine.stackOverConditions[MatchRules.StackOverConditions.SWAPS] then
-          stack:drawScore()
-          stack:drawSpeed()
+      stack:withPanelTransform(function()
+        if stack.engine.stackOverConditions[MatchRules.StackOverConditions.SWAPS] then
+          stack:drawMoveCount()
         end
-        stack:drawMultibar()
-      end
+        if config.show_ingame_infos then
+          if not stack.engine.stackOverConditions[MatchRules.StackOverConditions.SWAPS] then
+            stack:drawScore()
+            stack:drawSpeed()
+          end
+          stack:drawMultibar()
+        end
 
-      -- Draw VS HUD
-      if stack.player then
-        stack:drawPlayerName()
-        stack:drawWinCount()
-        stack:drawRating()
-      end
+        if stack.player then
+          stack:drawPlayerName()
+          stack:drawRating()
+          -- Non-team modes: per-player wins go in the LSS panel below SPEED
+          -- (theme winLabel_Pos is anchored there). Team modes suppress it
+          -- because the team scoreboard at the top already shows team W/L.
+          if not isTeamMode then
+            stack:drawWinCount()
+          end
+        end
 
-      stack:drawLevel()
-      if stack.analytic and not DebugSettings.showStackDebugInfo() then
-        --prof.push("Stack:drawAnalyticData")
-        stack:drawAnalyticData()
-        --prof.pop("Stack:drawAnalyticData")
-      end
+        if stack.analytic and not DebugSettings.showStackDebugInfo() then
+          stack:drawAnalyticData()
+        end
+        stack:drawLevel()
+      end)
     end
 
     if not DebugSettings.showStackDebugInfo() and GAME.battleRoom and GAME.battleRoom.spectatorString then -- this is printed in the same space as the debug details
       GraphicsUtil.print(GAME.battleRoom.spectatorString, themes[config.theme].spectators_Pos[1], themes[config.theme].spectators_Pos[2])
     end
-
-    self:drawCommunityMessage()
   end
+end
+
+-- Grace window (seconds) for the current death, scaled to the worst clock
+-- skew among the surviving teammate stacks. framesBehind is meaningless for
+-- snapshot-driven remotes (their engine doesn't tick), so in that mode every
+-- remote contributes 0 and the floor applies. Clamped to [floor, ceil].
+function GameBase:computeDeathGraceTarget()
+  local snapshotRemotes = GAME.battleRoom and GAME.battleRoom.displayHistoryEnabled
+  local maxBehind = 0
+  if not snapshotRemotes then
+    for _, stack in ipairs(self.match.stacks) do
+      if not stack.is_local then
+        local behind = stack.engine and stack.engine.framesBehind or 0
+        if behind > maxBehind then maxBehind = behind end
+      end
+    end
+  end
+  local seconds = maxBehind / 60
+  return math.max(DEAD_LOCAL_GRACE_FLOOR_SECONDS, math.min(DEAD_LOCAL_GRACE_CEIL_SECONDS, seconds))
+end
+
+-- Spectator focus switching: click a stack to view it, or Left/Right to cycle.
+-- Both are device-independent — the menu keys aggregate every input config and
+-- the mouse needs no claimed device, so it works regardless of what the player
+-- picked at character select.
+function GameBase:pollSpectatorFocusInput()
+  if input.mouse.isDown[1] then
+    local mx, my = GAME:transform_coordinates(love.mouse.getPosition())
+    self.match:setSpectatorFocus(self.match:stackSlotAtCanvasPoint(mx, my))
+  end
+
+  if input:isPressedWithRepeat("MenuLeft") then
+    self.match:cycleSpectatorFocus(-1)
+  elseif input:isPressedWithRepeat("MenuRight") then
+    self.match:cycleSpectatorFocus(1)
+  end
+end
+
+function GameBase:drawSpectatorHint()
+  -- Pure spectators and dead-but-still-watching local players both get the
+  -- "<  >  Switch Player" hint and the focused-player highlight. Live local
+  -- players don't (they're playing, not spectating). Dead locals are gated by
+  -- a brief grace period so the UI doesn't flood in at the moment of death
+  -- (deathGraceTimer accumulates in GameBase:update while isDeadLocal).
+  if #self.match.stacks < 3 then return end
+  if self.match:hasLocalPlayer() then
+    if not self.match:isLocalPlayerEliminated() then return end
+    if (self.deathGraceTimer or 0) < (self.deathGraceTarget or DEAD_LOCAL_GRACE_CEIL_SECONDS) then return end
+  end
+  local consts = require("common.engine.consts")
+  local font = GraphicsUtil.getGlobalFont()
+  local hint = "<  >  or click   Switch Player"
+  local hintW = font:getWidth(hint)
+  local hintX = (consts.CANVAS_WIDTH - hintW) / 2
+  local hintY = consts.CANVAS_HEIGHT - font:getHeight() - 6
+
+  -- focused player name + highlight border around their stack
+  local focusName
+  if self.match.spectatorFocus then
+    for _, stack in ipairs(self.match.stacks) do
+      if TeamUtils.slotOf(stack.player, stack.player_number) == self.match.spectatorFocus and stack.player then
+        focusName = stack.player.name
+        if self.match:stackIsOnScreen(stack) then
+          local x = stack.frameOriginX * stack.gfxScale
+          local y = stack.frameOriginY * stack.gfxScale
+          local w = stack:canvasWidth()
+          local h = stack:canvasHeight()
+          local pad = 4
+          local prevLineWidth = love.graphics.getLineWidth()
+          love.graphics.setLineWidth(3)
+          GraphicsUtil.drawRectangle("line", x - pad, y - pad, w + pad * 2, h + pad * 2, 1, 1, 0.4, 1)
+          love.graphics.setLineWidth(prevLineWidth)
+        end
+        break
+      end
+    end
+  end
+
+  if focusName then
+    local nameText = "Viewing: " .. focusName
+    local nameW = font:getWidth(nameText)
+    local nameX = (consts.CANVAS_WIDTH - nameW) / 2
+    GraphicsUtil.print(nameText, nameX + 1, hintY - font:getHeight() - 3 + 1, {0, 0, 0, 0.7})
+    GraphicsUtil.print(nameText, nameX,     hintY - font:getHeight() - 3,     {1, 1, 1, 1})
+  end
+
+  GraphicsUtil.print(hint, hintX + 1, hintY + 1, {0, 0, 0, 0.7})
+  GraphicsUtil.print(hint, hintX,     hintY,     {1, 1, 0.6, 1})
 end
 
 function GameBase:drawEndGameText()
   if self.match.ended then
 
-    local message = self.text
-    if message == nil then
-      message = ""
-    end
+    local message = self.text or ""
+    local continueText = loc("continue_button")
+    local subtitle = self:_buildDeathReasonSubtitle()
 
     local gameOverPosition = themes[config.theme].gameover_text_Pos
     local font = GraphicsUtil.getGlobalFont()
     local padding = 4
-    local maxWidth = math.max(font:getWidth(message), font:getWidth(loc("continue_button")))
-    local height = font:getHeight() * 2 + 3*padding
-    local drawY = gameOverPosition[2]
+    local lineHeight = font:getHeight()
 
-    -- Background
+    local placementLines = self:_buildPlacementLines() or {}
+
+    -- Width is max across every drawn line.
+    local maxWidth = math.max(font:getWidth(message), font:getWidth(continueText))
+    if subtitle then
+      local sw = font:getWidth(subtitle)
+      if sw > maxWidth then maxWidth = sw end
+    end
+    for _, line in ipairs(placementLines) do
+      local w = font:getWidth(line)
+      if w > maxWidth then maxWidth = w end
+    end
+
+    -- Height: message + optional subtitle + N placement lines + continue prompt + padding between each.
+    local totalLines = 2 + #placementLines + (subtitle and 1 or 0)
+    local height = lineHeight * totalLines + (totalLines + 1) * padding
+    -- Center the block vertically on the canvas — theme's gameover_text_Pos
+    -- sits at y=60 which covers the stack's name chip / OUT marker / timer.
+    local drawY = (consts.CANVAS_HEIGHT - height) / 2
+
     GraphicsUtil.drawRectangle("fill", gameOverPosition[1] - maxWidth/2 - padding, drawY, maxWidth + 2*padding, height, 0, 0, 0, 0.8)
 
-    GraphicsUtil.print(message, gameOverPosition[1] - font:getWidth(message)/2, drawY + padding)
-    GraphicsUtil.print(loc("continue_button"), gameOverPosition[1] - font:getWidth(loc("continue_button"))/2, drawY + padding + font:getHeight() + padding )
+    local cursorY = drawY + padding
+    GraphicsUtil.print(message, gameOverPosition[1] - font:getWidth(message)/2, cursorY)
+    cursorY = cursorY + lineHeight + padding
+    if subtitle then
+      GraphicsUtil.print(subtitle, gameOverPosition[1] - font:getWidth(subtitle)/2, cursorY,
+        {0.85, 0.85, 0.5, 1})
+      cursorY = cursorY + lineHeight + padding
+    end
+    for _, line in ipairs(placementLines) do
+      GraphicsUtil.print(line, gameOverPosition[1] - font:getWidth(line)/2, cursorY)
+      cursorY = cursorY + lineHeight + padding
+    end
+    GraphicsUtil.print(continueText, gameOverPosition[1] - font:getWidth(continueText)/2, cursorY)
   end
 end
 

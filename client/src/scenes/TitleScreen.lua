@@ -25,6 +25,15 @@ local function titleDrawPressStart(percent)
   GraphicsUtil.printf(loc("continue_button"), x, y, textMaxWidth, "center", {1,1,1,percent}, nil, 16)
 end
 
+local function titleDrawUnofficialHeader()
+  local headerWidth = consts.CANVAS_WIDTH
+  local y = 26
+
+  -- Soft shadow + larger text for readability without a boxed banner.
+  GraphicsUtil.printf("Unofficial Team & FFA Mode", 0, y + 2, headerWidth, "center", {0.12, 0.06, 0.18, 0.85}, nil, 26)
+  GraphicsUtil.printf("Unofficial Team & FFA Mode", 0, y, headerWidth, "center", {0.88, 0.72, 1, 1}, nil, 26)
+end
+
 function TitleScreen:update(dt)
   self.backgroundImg:update(dt)
   local keyPressed = tableUtils.trueForAny(input.allKeys.isDown, function(key) return key end)
@@ -36,6 +45,7 @@ end
 
 function TitleScreen:draw()
   self.backgroundImg:draw()
+  titleDrawUnofficialHeader()
   titleDrawPressStart(((math.sin(5 * love.timer.getTime()) / 2 + .5) ^ .5) / 2 + .5)
 end
 

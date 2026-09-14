@@ -4,6 +4,16 @@ local class = require("common.lib.class")
 
 -- An object that manages touches on the screen and translates them to swaps on a stack
 ---@class TouchInputDetector
+---@field stack PlayerStack the stack this detector is bound to
+---@field width integer panel grid width (mirrors engine.width)
+---@field height integer panel grid height (mirrors engine.height)
+---@field touchInputController TouchInputController
+---@field touchingStack boolean true while a touch is held (even if dragged off the stack)
+---@field touchingRaise boolean? true while the raise area is being touched
+---@field touchedCell { row: integer, col: integer } cell under the current touch ({0,0} = none)
+---@field previousTouchedCell { row: integer, col: integer } cell touched last frame; used for press/drag/release detection
+---@field handleTouch fun(self, screenX: number, screenY: number)? optional touch handler set by ClientStack
+---@field debugString string? developer overlay text set by debug code
 local TouchInputDetector =
   class(
   function(self, stack)

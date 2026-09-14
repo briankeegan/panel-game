@@ -5,6 +5,17 @@ local Focusable = require(PATH .. ".Focusable")
 local class = require("common.lib.class")
 local util = require("common.lib.util")
 
+---@class Leaderboard : UiElement
+---@field label Label
+---@field string string?
+---@field data table?
+---@field visibleEntries integer
+---@field firstVisibleIndex integer?
+---@field lastVisibleIndex integer?
+---@field isFocusable boolean from Focusable mixin
+---@field hasFocus boolean from Focusable mixin
+---@field yieldFocus fun(self)? assigned dynamically by FocusDirector when focus is granted
+---@field setVisibility fun(self, visible: boolean)? inherited from UiElement
 local Leaderboard = class(function(self, options)
   self.label = Label({
     text = "",

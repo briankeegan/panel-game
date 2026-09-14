@@ -78,6 +78,7 @@ end
 function Scores:getNRecordsMatchingFilterForPuzzleUUID(n, filter, puzzleUUID)
   local filteredTable = {}
   local records = self:getRecordsForPuzzleUUID(puzzleUUID)
+  if not filter then return records end
   for i = #records, 1, -1 do
     local value = records[i]
     if filter(value) then

@@ -2,21 +2,35 @@ local Queue = require("common.lib.Queue")
 local class = require("common.lib.class")
 
 local index = 0
-local MockConnection = class(function(self)
+local MockConnection = class(function(self, channel)
   index = index + 1
   self.index = index
+  self.channel = channel or "gameplay"
   self.socket = {close = function() end, getpeername = function() return "170.46.23.4", math.random(40000,60000) end}
   self.outgoingMessageQueue = Queue()
   self.outgoingInputQueue = Queue()
   self.incomingMessageQueue = Queue()
   self.incomingInputQueue = Queue()
+  -- Loose-sync queues; match the real Connection's field set so
+  -- Server:processMessages doesn't crash dereferencing them.
+  self.incomingGarbageQueue = Queue()
+  self.incomingDeathQueue = Queue()
+  self.incomingRewindQueue = Queue()
+  -- Display-history replication queue (parallel system; always present so
+  -- Server:processMessages can drain it. Empty unless a test sends `Y`.)
+  self.incomingDisplayEventQueue = Queue()
 end)
 
 function MockConnection:update(t) end
 
 function MockConnection:send(message)
-  local prefix = message:sub(1, 1)
-  if prefix == "I" or prefix == "J" then
+  -- v009 framing: [4-byte BE length][prefix][body]. Prefix sits at byte 5.
+  -- Tests sometimes pass un-framed strings like "Iabc"; fall back to byte 1
+  -- so routing-level tests work without rebuilding wire frames.
+  local prefix = #message >= 5 and message:sub(5, 5) or message:sub(1, 1)
+  -- I = unified input prefix (v008+); G/D = loose-sync event prefixes
+  -- (GarbageEvent, DeathEvent). J = JSON message.
+  if prefix == "I" or prefix == "J" or prefix == "G" or prefix == "D" or prefix == "R" then
     self.outgoingInputQueue:push(message)
   end
 end

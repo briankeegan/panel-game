@@ -1,0 +1,77 @@
+{
+  "_note": "BASELINE: current HAND-TUNED profiles scored vs human targets (2 games each, current pre-EVAL-FROZEN eval). All POOR (~0.5 vs 0.095 floor) \u2014 quantifies that hand-tuning does not reproduce players. Bot never visits the buried high-occupancy human cells (under-attacks, games short) => fitting requires the robust+offense-capable frozen eval first. Re-run as fitted profiles at EVAL FROZEN.",
+  "floor": 0.095,
+  "baseline": {
+    "chaos952": {
+      "overall": 0.4997,
+      "components": {
+        "offense": 0.4482,
+        "priority": 0.6267,
+        "activity": 0.7114,
+        "survival": 0.1115
+      },
+      "per_bucket": {
+        "low|noIn|noGb": 0.363,
+        "mid|noIn|gb": 0.708,
+        "high|noIn|gb": 1.0,
+        "low|noIn|gb": 0.696
+      },
+      "missing_buckets": [
+        "mid|noIn|noGb",
+        "mid|in|noGb",
+        "high|in|gb",
+        "mid|in|gb",
+        "low|in|gb",
+        "low|in|noGb"
+      ],
+      "verdict": "POOR \u2014 as far from target as a different player (collapsed)"
+    },
+    "kekeke": {
+      "overall": 0.5433,
+      "components": {
+        "offense": 0.494,
+        "priority": 0.6816,
+        "activity": 0.6179,
+        "survival": 0.2611
+      },
+      "per_bucket": {
+        "low|noIn|noGb": 0.639,
+        "mid|noIn|noGb": 0.481,
+        "mid|in|noGb": 0.74,
+        "mid|noIn|gb": 0.772
+      },
+      "missing_buckets": [
+        "high|in|gb",
+        "mid|in|gb",
+        "high|in|noGb",
+        "high|noIn|gb"
+      ],
+      "verdict": "POOR \u2014 as far from target as a different player (collapsed)"
+    },
+    "mscl": {
+      "overall": 0.5563,
+      "components": {
+        "offense": 0.4162,
+        "priority": 0.7702,
+        "activity": 0.5594,
+        "survival": 0.3807
+      },
+      "per_bucket": {
+        "low|noIn|noGb": 0.489,
+        "mid|noIn|noGb": 0.746,
+        "low|in|noGb": 0.767,
+        "mid|noIn|gb": 0.942,
+        "low|noIn|gb": 0.684
+      },
+      "missing_buckets": [
+        "mid|in|noGb",
+        "high|noIn|gb",
+        "high|in|gb",
+        "mid|in|gb",
+        "low|in|gb",
+        "high|in|noGb"
+      ],
+      "verdict": "POOR \u2014 as far from target as a different player (collapsed)"
+    }
+  }
+}

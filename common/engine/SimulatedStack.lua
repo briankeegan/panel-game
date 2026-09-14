@@ -41,7 +41,7 @@ end
 function SimulatedStack:run()
   if self.stopWatchIsRunning then
     self:runPhysics()
-  elseif self.do_countdown and self.countdown_timer > 0 then
+  elseif self.in_countdown and self.countdown_timer > 0 then
     if self.healthEngine then
       self.healthEngine.clock = self.clock
     end
@@ -49,7 +49,7 @@ function SimulatedStack:run()
       self.countdown_timer = self.countdown_timer - 1
     end
     if self.countdown_timer == 0 then
-      self.do_countdown = nil
+      self.in_countdown = nil
       self.stopWatchIsRunning = true
     end
   else
@@ -79,13 +79,16 @@ function SimulatedStack:runPhysics()
   end
 
   if self.health <= 0 then
-    self:setGameOver()
+    self:recordDeath()
   end
 
   self.stopWatch = self.stopWatch + 1
 end
 
-function SimulatedStack:setGameOver()
+function SimulatedStack:recordDeath()
+  if self.game_over_clock > 0 then
+    return
+  end
   self.game_over_clock = self.clock
 
   self:emitSignal("gameOver")
@@ -188,6 +191,7 @@ function SimulatedStack:rollbackToFrame(clock)
     if self.attackEngine then
       self.attackEngine:rollbackToFrame(self.stopWatch)
     end
+    self:markNetworkGarbageNeedsReplay(self.stopWatch)
 
     self.lastRollbackFrame = self.clock
     self.clock = clock
@@ -215,7 +219,7 @@ function SimulatedStack:rewindToFrame(clock)
 end
 
 function SimulatedStack:starting_state()
-  if self.do_countdown then
+  if self.in_countdown then
     self.countdown_timer = consts.COUNTDOWN_LENGTH
   end
 end

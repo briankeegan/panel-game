@@ -160,9 +160,26 @@ end
 ---@param streamed boolean?
 ---@return love.Source?
 function fileUtils.loadSoundFromSupportExtensions(path_and_filename, streamed)
+  -- Lazily require to avoid a hard graphics_util ↔ FileUtils dependency
+  -- cycle at module load — we only need decode when actually loading a file.
+  local AssetDecodeClient = require("client.src.mods.AssetDecodeClient")
   for k, extension in ipairs(fileUtils.SUPPORTED_SOUND_FORMATS) do
-    if fileUtils.exists(path_and_filename .. extension) then
-      return love.audio.newSource(path_and_filename .. extension, streamed and "stream" or "static")
+    local fullPath = path_and_filename .. extension
+    if fileUtils.exists(fullPath) then
+      if AssetDecodeClient.enabled and coroutine.running() ~= nil then
+        local result = AssetDecodeClient.decodeSound(fullPath, streamed and true or false)
+        if result then
+          if result.streamed and result.path then
+            return love.audio.newSource(result.path, "stream")
+          end
+          if result.soundData then
+            local ok, source = pcall(love.audio.newSource, result.soundData, "static")
+            if ok then return source end
+          end
+        end
+        return nil
+      end
+      return love.audio.newSource(fullPath, streamed and "stream" or "static")
     end
   end
   return nil
@@ -274,10 +291,78 @@ function fileUtils.saveTextureToFile(texture, filePath, format)
   love.filesystem.write(filePath .. "." .. format, data)
 end
 
+-- List a save-dir-relative folder straight from the OS, bypassing
+-- love.filesystem. This love pre-release's getDirectoryItems is unreliable
+-- per-window — a long-lived client won't show replays written after it launched
+-- or by another client — so the replay browser reads the real disk instead.
+-- Falls back to the (possibly stale) love listing if io.popen isn't available.
+function fileUtils.freshDirectoryItems(relPath)
+  local saveDir = love.filesystem.getSaveDirectory()
+  local ok, p = pcall(io.popen, 'ls -1A "' .. saveDir .. '/' .. relPath .. '" 2>/dev/null')
+  if ok and p then
+    local results = {}
+    for line in p:lines() do
+      local startOfFile = string.sub(line, 0, string.len(PREFIX_OF_IGNORED_DIRECTORIES))
+      if line ~= "" and startOfFile ~= PREFIX_OF_IGNORED_DIRECTORIES and line ~= ".DS_Store" then
+        results[#results + 1] = line
+      end
+    end
+    p:close()
+    return results
+  end
+  return fileUtils.getFilteredDirectoryItems(relPath)
+end
+
+-- Read + decode a save-dir-relative JSON file straight from the OS (same reason
+-- as freshDirectoryItems). Falls back to the love.filesystem reader.
+function fileUtils.readJsonFileFresh(relPath)
+  local saveDir = love.filesystem.getSaveDirectory()
+  local f = io.open(saveDir .. "/" .. relPath, "r")
+  if not f then
+    return fileUtils.readJsonFile(relPath)
+  end
+  local content = f:read("*a")
+  f:close()
+  if not content then
+    return nil
+  end
+  local value, _, errorMsg = json.decode(content)
+  if errorMsg then
+    logger.error("Error reading " .. relPath .. ":\n" .. errorMsg)
+    return nil
+  end
+  return value
+end
+
+-- Replay root. Normally just "replays". But when several clients run on one
+-- machine they all share a single love save dir (this love build ignores the
+-- per-client identity), so namespace by the launching player's name to keep
+-- each client's replays separate — a window then only ever reads files it
+-- wrote itself, so its own games show up immediately. No PLAYER_NAME (a normal
+-- single-client launch) -> unchanged "replays/..." layout.
+function fileUtils.replayBasePath()
+  local who = os.getenv("PLAYER_NAME")
+  if who and who ~= "" then
+    return "replays/" .. who
+  end
+  return "replays"
+end
+
 ---@param replay ReplayV3
 function fileUtils.saveReplay(replay)
   local path = replay:generatePath("/")
-  local filename = replay:generateFileName()
+  -- Swap the "replays" root for the (possibly player-scoped) one.
+  local base = fileUtils.replayBasePath()
+  if base ~= "replays" then
+    path = base .. path:sub(#"replays" + 1)
+  end
+  -- game_<n> is the sequence within this roster's folder. Count existing
+  -- replays already there (getDirectoryItems returns {} for a new folder).
+  local gameIndex = 0
+  for _, f in ipairs(love.filesystem.getDirectoryItems(path)) do
+    if f:sub(-5) == ".json" then gameIndex = gameIndex + 1 end
+  end
+  local filename = replay:generateFileName(gameIndex)
   GAME.lastReplayPath = path
   fileUtils.writeJson(path, filename .. ".json", replay, replay.keyOrder)
 end
@@ -341,9 +426,81 @@ function fileUtils.getMatchingFiles(files, pattern, validExtensions, separator)
   return matchedFiles
 end
 
+-- Per-client save dir. On our love build love.filesystem.read/write resolve to
+-- the project-dir basename and ignore the identity, so multiple run_client.sh
+-- clients collide; the identity-derived path (LOVE_IDENTITY + HOME, macOS) keeps
+-- them isolated. Falls back to getSaveDirectory() when LOVE_IDENTITY is unset.
+function fileUtils.getSaveDir()
+  local identity = os.getenv("LOVE_IDENTITY")
+  local home = os.getenv("HOME")
+  if identity and home then
+    return home .. "/Library/Application Support/LOVE/" .. identity
+  end
+  return love.filesystem.getSaveDirectory and love.filesystem.getSaveDirectory()
+end
+
+-- True only for a named dev client (run_client.sh sets LOVE_IDENTITY). Outside
+-- that, scoped read/write fall back to the untouched love.filesystem path.
+function fileUtils.isScopedSaveDir()
+  return os.getenv("LOVE_IDENTITY") ~= nil and os.getenv("HOME") ~= nil
+end
+
+-- Write a save-dir-relative file, isolated per client when scoped.
+function fileUtils.writeScoped(filename, data)
+  if fileUtils.isScopedSaveDir() then
+    fileUtils.write("", filename, data)
+  else
+    love.filesystem.write(filename, data)
+  end
+end
+
+-- Read+decode a save-dir-relative JSON file, isolated per client when scoped.
+function fileUtils.readScoped(filename)
+  if not fileUtils.isScopedSaveDir() then
+    return fileUtils.readJsonFile(filename)
+  end
+  local f = io.open(fileUtils.getSaveDir() .. "/" .. filename, "r")
+  if not f then return nil end
+  local content = f:read("*a")
+  f:close()
+  if not content then return nil end
+  local value, _, errorMsg = json.decode(content)
+  if errorMsg then
+    logger.error("Error reading " .. filename .. ":\n" .. errorMsg)
+    return nil
+  end
+  return value
+end
+
+-- Existence check matching readScoped's lookup location.
+function fileUtils.existsScoped(filename)
+  if not fileUtils.isScopedSaveDir() then
+    return fileUtils.exists(filename)
+  end
+  local f = io.open(fileUtils.getSaveDir() .. "/" .. filename, "r")
+  if f then
+    f:close()
+    return true
+  end
+  return false
+end
+
 ---@param path string
 ---@param data string
 function fileUtils.write(path, filename, data)
+  local saveDir = fileUtils.getSaveDir()
+  if saveDir and io then
+    local fullDir = saveDir .. "/" .. path
+    os.execute('mkdir -p "' .. fullDir .. '"')
+    local f, err = io.open(fullDir .. "/" .. filename, "w")
+    if f then
+      f:write(data)
+      f:close()
+      return
+    else
+      logger.warn("fileUtils.write: io.open failed (" .. tostring(err) .. ") — falling back to love.filesystem")
+    end
+  end
   love.filesystem.createDirectory(path)
   local success, message = love.filesystem.write(path .. "/" .. filename, data)
   if not success then

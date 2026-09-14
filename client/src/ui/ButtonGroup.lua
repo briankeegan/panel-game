@@ -6,6 +6,18 @@ local tableUtils = require("common.lib.tableUtils")
 
 local BUTTON_PADDING = 5
 
+-- Make the chosen option obvious: selected button = pink fill + yellow border,
+-- the rest fall back to the theme's default (dim) look. Applies everywhere.
+local SELECTED_FILL = {1.0, 0.18, 0.55, 0.95}
+local SELECTED_BORDER = {1.0, 0.86, 0.0, 1.0}
+local function applySelection(self)
+  for i, button in ipairs(self.buttons) do
+    button.selected = (i == self.selectedIndex)
+    button.selectedBackgroundColor = SELECTED_FILL
+    button.selectedBorderColor = SELECTED_BORDER
+  end
+end
+
 -- UIElement representing a set of buttons which share state (think radio buttons)
 
 -- forced override for each of the button's onClick function
@@ -45,8 +57,8 @@ local function setButtons(self, buttons, values, selectedIndex)
   end
   self.width = overallWidth
   self.height = overallHeight
-  self.buttons[self.selectedIndex].backgroundColor = {.5, .5, 1, .7}
   self.value = self.values[self.selectedIndex]
+  applySelection(self)
 end
 
 local function setActiveButton(self, selectedIndex)
@@ -78,11 +90,10 @@ ButtonGroup.TYPE = "ButtonGroup"
 -- updates the color of the selected button
 -- updates the value to the selected button's value
 function ButtonGroup:buttonClicked(button)
-  self.buttons[self.selectedIndex].backgroundColor = {.3, .3, .3, .7}
   local i = tableUtils.indexOf(self.buttons, button)
-  self.buttons[i].backgroundColor = {.5, .5, 1, .7}
   self.value = self.values[i]
   self.selectedIndex = i
+  applySelection(self)
 end
 
 function ButtonGroup:receiveInputs(input)
@@ -106,8 +117,8 @@ function ButtonGroup:refreshLayout()
   end
   self.width = overallWidth
   self.height = overallHeight
-  self.buttons[self.selectedIndex].backgroundColor = {.5, .5, 1, .7}
   self.value = self.values[self.selectedIndex]
+  applySelection(self)
 end
 
 function ButtonGroup:removeButton(button)

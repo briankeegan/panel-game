@@ -1,10 +1,11 @@
 local class = require("common.lib.class")
 local ClientMessages = require("common.network.ClientProtocol")
+local consts = require("common.engine.consts")
 local save = require("client.src.save")
+local TraceWriter = require("client.src.network.TraceWriter")
+local logger = require("common.lib.logger")
 
--- abstraction level function
--- returns things as a parameter list so the API in ClientProtocol can be more explicit about which parameters it expects
---  (which it cannot if things are passed as tables)
+-- Pull the chunk of player settings that ride along on a fresh login.
 local function toLoginData(configuration, localPlayer)
   local ps = localPlayer.settings
   local c = configuration
@@ -21,125 +22,315 @@ local function toLoginData(configuration, localPlayer)
     c.save_replays_publicly
 end
 
--- returns true/false as the first return value to indicate success or failure of the login
--- returns a string with a message to display for the user
--- not meant to be called directly as it may block update for a good while, hence local, use the LoginRoutine instead!
-local function login(tcpClient, ip, port)
+-- Wait for a coroutine-driven sendRequest to resolve. Yields the status
+-- string while waiting so the caller can drive progress to the UI.
+local function awaitResponse(response, waitingMessage)
+  local status, value = response:tryGetValue()
+  while status == "waiting" do
+    coroutine.yield(waitingMessage)
+    status, value = response:tryGetValue()
+  end
+  return status, value
+end
+
+-- Full login: version check + full login_request with all player settings.
+-- Used once, on the gameplay socket. Returns the full result table.
+local function fullLogin(client, ip, port, userId)
   local result = {loggedIn = false, message = ""}
 
-  if not tcpClient:connectToServer(ip, port) then
-    result.loggedIn = false
+  if not client:connectToServer(ip, port) then
     result.message = loc("ss_could_not_connect")
     return result
-  else
-    -- this should also probably be elsewhere
-    GAME.connected_server_ip = ip
-    GAME.connected_server_port = port
+  end
 
-    local response = tcpClient:sendRequest(ClientMessages.requestVersionCompatibilityCheck())
-    local status, value = response:tryGetValue()
-    while status == "waiting" do
-      coroutine.yield("Checking version compatibility with the server")
-      status, value = response:tryGetValue()
+  local status, value = awaitResponse(
+    client:sendRequest(ClientMessages.requestVersionCompatibilityCheck()),
+    "Checking version compatibility with the server")
+
+  if status == "timeout" then
+    result.message = loc("nt_conn_timeout")
+    return result
+  elseif status ~= "received" then
+    error("Unexpected status " .. tostring(status) .. " on version check to " .. ip)
+  end
+
+  if not value.versionCompatible then
+    result.message = loc("nt_ver_err")
+    -- Always include the local build so the user can read it off even
+    -- when the server didn't send its version back (older server, or
+    -- the rejection body got eaten). The server-side build + direct
+    -- download URL get appended too when serverBuildVersion is present.
+    result.message = result.message
+      .. "\n\nYour build:   " .. consts.BUILD_VERSION
+    if type(value.serverBuildVersion) == "string" and value.serverBuildVersion ~= "" then
+      local serverBuild = value.serverBuildVersion
+      local loveFile = "unofficial-panel-attack-ffa-and-team.love"
+      local downloadUrl = "https://github.com/briankeegan/panel-game/releases/download/build-"
+        .. serverBuild .. "/" .. loveFile
+      result.message = result.message
+        .. "\nServer build: " .. serverBuild
+        .. "\n\nDownload: " .. downloadUrl
+    else
+      result.message = result.message
+        .. "\nServer build: (server didn't report — likely an older build)"
     end
+    return result
+  end
 
-    if status == "timeout" then
-      result.loggedIn = false
-      result.message = loc("nt_conn_timeout")
-      return result
-    elseif status == "received" then
-      if not value.versionCompatible then
-        result.loggedIn = false
-        result.message = loc("nt_ver_err")
-        return result
-      else
-        local userId = save.read_user_id_file(ip)
-        if not userId then
-          userId = "need a new user id"
+  status, value = awaitResponse(
+    client:sendRequest(ClientMessages.requestLogin(userId, toLoginData(config, GAME.localPlayer))),
+    "Logging in")
+
+  if status == "timeout" then
+    result.message = loc("nt_conn_timeout")
+    return result
+  elseif status ~= "received" then
+    error("Unexpected status " .. tostring(status) .. " on login to " .. ip)
+  end
+
+  if not value.login_successful then
+    result.message = loc("lb_error_msg") .. "\n" .. (value.reason or "")
+    if value.ban_duration then
+      result.message = result.message .. "\n" .. value.ban_duration
+    end
+    result.reason = value.reason
+    return result
+  end
+
+  result.loggedIn = true
+  result.new_user_id = value.new_user_id
+  result.publicId = value.publicId
+  result.serverTime = value.serverTime
+  result.name_changed = value.name_changed
+  result.old_name = value.old_name
+  result.new_name = value.new_name
+  result.server_notice = value.server_notice
+  return result
+end
+
+-- Session claim: skip version check, send minimal login_request. The server
+-- recognizes the user_id as already logged in via the gameplay socket and
+-- attaches this connection to the existing Player.
+local function claimSession(client, ip, port, userId, name)
+  local result = {loggedIn = false, message = ""}
+
+  if not client:connectToServer(ip, port) then
+    result.message = loc("ss_could_not_connect")
+    return result
+  end
+
+  local status, value = awaitResponse(
+    client:sendRequest(ClientMessages.requestSessionClaim(userId, name)),
+    "Attaching side-channel socket")
+
+  if status == "timeout" then
+    result.message = loc("nt_conn_timeout")
+    return result
+  elseif status ~= "received" then
+    error("Unexpected status " .. tostring(status) .. " on session claim to " .. ip)
+  end
+
+  if not value.login_successful then
+    result.message = (value.reason or "session claim denied")
+    return result
+  end
+
+  result.loggedIn = true
+  return result
+end
+
+-- Drive multiple coroutines per tick until they all finish. Each routine's
+-- terminal return value lands in entry.result.
+local function runInParallel(routines)
+  while true do
+    local anyAlive = false
+    for _, entry in pairs(routines) do
+      if coroutine.status(entry.co) ~= "dead" then
+        anyAlive = true
+        local ok, ret = coroutine.resume(entry.co)
+        if not ok then
+          error(ret)
         end
-
-        response = tcpClient:sendRequest(ClientMessages.requestLogin(userId, toLoginData(config, GAME.localPlayer)))
-        status, value = response:tryGetValue()
-        while status == "waiting" do
-          coroutine.yield("Logging in")
-          status, value = response:tryGetValue()
-        end
-
-        if status == "timeout" then
-          result.loggedIn = false
-          result.message = loc("nt_conn_timeout")
-          return result
-        elseif status == "received" then
-          if value.login_successful then
-            result.loggedIn = true
-            if value.new_user_id then
-              save.write_user_id_file(value.new_user_id, GAME.connected_server_ip)
-              result.message = loc("lb_user_new", config.name)
-            elseif value.name_changed then
-              result.message = loc("lb_user_update", value.old_name, value.new_name)
-            else
-              result.message = loc("lb_welcome_back", config.name)
-            end
-            if value.server_notice then
-              result.message = result.message .. "\n" value.server_notice:gsub("\\n", "\n")
-            end
-            if value.publicId then
-              GAME.localPlayer.publicId = value.publicId
-            end
-            result.serverTime = value.serverTime
-
-            return result
-          else --if result.login_denied then
-            result.loggedIn = false
-            result.message = loc("lb_error_msg") .. "\n" .. value.reason
-            if value.ban_duration then
-              result.message = result.message .. "\n" .. value.ban_duration
-            end
-            return result
-          end
-        else
-          error("Unexpected status " .. status .. " trying to login with user id on the server " .. ip)
+        if coroutine.status(entry.co) == "dead" then
+          entry.result = ret
         end
       end
-    else
-      error("Unexpected status " .. status .. " trying to verify version compatibility with the server " .. ip)
     end
+    if not anyAlive then return end
+    coroutine.yield("Attaching side channels")
   end
 end
 
--- A wrapper class around the login process
--- Allows to advance the login process bit by bit via calling progress
-local LoginRoutine = class(function(self, tcpClient, ip, port)
-  self.tcpClient = tcpClient
+-- Full login on gameplay (one real handshake). Then lobby and spectate
+-- attach in parallel via the lightweight session-claim path.
+local function login(gameplayClient, ip, gameplayPort, lobbyClient, lobbyPort, spectateClient, spectatePort)
+  GAME.connected_server_ip = ip
+  GAME.connected_server_port = gameplayPort
+
+  local storedUserId = save.read_user_id_file(ip) or "need a new user id"
+  local gameplayResult = fullLogin(gameplayClient, ip, gameplayPort, storedUserId)
+
+  -- One-shot recovery: if the server rejects our stored userId as unknown
+  -- (e.g. a wiped/rebuilt server and our name has since been claimed by
+  -- someone else, so the server-side accept-unknown path can't help), back
+  -- up the stale id and retry as a new registration. Strict reason match
+  -- keeps this from firing on any other deny — losing user_id.txt to a
+  -- transient bug would silently orphan the account.
+  local recoveredFromStaleId = false
+  if not gameplayResult.loggedIn
+      and storedUserId ~= "need a new user id"
+      and type(gameplayResult.reason) == "string"
+      and gameplayResult.reason:find("user ID", 1, true)
+      and gameplayResult.reason:find("not found", 1, true) then
+    logger.warn("Server rejected stored user_id as unknown — backing up and retrying as new user.")
+    save.backup_user_id_file(ip)
+    gameplayClient:resetNetwork()
+    gameplayResult = fullLogin(gameplayClient, ip, gameplayPort, "need a new user id")
+    recoveredFromStaleId = gameplayResult.loggedIn
+  end
+
+  if not gameplayResult.loggedIn then
+    return gameplayResult
+  end
+
+  -- If the server issued a new user_id, persist it and use it for the
+  -- session-claim handshakes so they match the right Player.
+  local effectiveUserId = storedUserId
+  if gameplayResult.new_user_id then
+    save.write_user_id_file(gameplayResult.new_user_id, ip)
+    logger.info("Persisted server-issued user_id " .. tostring(gameplayResult.new_user_id)
+      .. " to servers/" .. ip .. "/user_id.txt")
+    effectiveUserId = gameplayResult.new_user_id
+  end
+
+  local routines = {
+    lobby = { co = coroutine.create(function()
+      return claimSession(lobbyClient, ip, lobbyPort, effectiveUserId, config.name)
+    end)},
+  }
+  if spectateClient then
+    routines.spectate = { co = coroutine.create(function()
+      return claimSession(spectateClient, ip, spectatePort, effectiveUserId, config.name)
+    end)}
+  end
+  runInParallel(routines)
+
+  if not routines.lobby.result or not routines.lobby.result.loggedIn then
+    logger.warn("Lobby socket session-claim failed ("
+      .. tostring(routines.lobby.result and routines.lobby.result.message or "no result")
+      .. "). Continuing without lobby HoL protection — JSON falls back to gameplay.")
+    lobbyClient:resetNetwork()
+  end
+  if spectateClient then
+    if not routines.spectate.result or not routines.spectate.result.loggedIn then
+      logger.warn("Spectate socket session-claim failed ("
+        .. tostring(routines.spectate.result and routines.spectate.result.message or "no result")
+        .. "). Continuing without spectate isolation — opponent traffic falls back to gameplay.")
+      spectateClient:resetNetwork()
+    end
+  end
+
+  -- Assemble the user-facing message from the gameplay login (the side
+  -- sockets are bookkeeping and have nothing new to say).
+  local message
+  if gameplayResult.new_user_id then
+    message = loc("lb_user_new", config.name)
+  elseif gameplayResult.name_changed then
+    message = loc("lb_user_update", gameplayResult.old_name, gameplayResult.new_name)
+  else
+    message = loc("lb_welcome_back", config.name)
+  end
+  if recoveredFromStaleId then
+    message = message
+      .. "\n\nNote: the server didn't recognize your previous account, so a new one was registered."
+      .. "\nYour old user id is backed up at servers/" .. ip .. "/user_id.txt.bak"
+  end
+  if gameplayResult.server_notice then
+    message = message .. "\n" .. gameplayResult.server_notice:gsub("\\n", "\n")
+  end
+
+  if gameplayResult.publicId then
+    GAME.localPlayer.publicId = gameplayResult.publicId
+    -- Recovery: addToRoom can arrive before login finishes (server eagerly
+    -- pushes the room snapshot when a known user reconnects). At that point
+    -- GAME.localPlayer.publicId is still -1 and config.name may not match the
+    -- server's name for this account, so the local-player match in
+    -- BattleRoom.createFromServerMessage fails and a remote-flagged stub is
+    -- created in our slot. The stub's stale hasLoaded/wantsReady then gates
+    -- refreshReadyStates and the user gets stuck on "Loading" forever after
+    -- clicking Ready. Now that we know our publicId, swap the stub back to
+    -- GAME.localPlayer so signals + isLocal short-circuit refreshReadyStates
+    -- work correctly.
+    if GAME.battleRoom and GAME.battleRoom.players then
+      for i, p in ipairs(GAME.battleRoom.players) do
+        if p ~= GAME.localPlayer and not p.isLocal and p.publicId == gameplayResult.publicId then
+          GAME.localPlayer.playerNumber = p.playerNumber
+          GAME.battleRoom.players[i] = GAME.localPlayer
+          if GAME.battleRoom.connectSignal then
+            GAME.battleRoom:connectSignal("allAssetsLoadedChanged", GAME.localPlayer, GAME.localPlayer.setLoaded)
+          end
+          if GAME.battleRoom.emitSignal then
+            GAME.battleRoom:emitSignal("rosterChanged")
+          end
+          if GAME.netClient and GAME.netClient.registerPlayerUpdates then
+            GAME.netClient:registerPlayerUpdates(GAME.battleRoom)
+          end
+          break
+        end
+      end
+    end
+  end
+
+  TraceWriter.beginSession(os.time())
+
+  return {
+    loggedIn = true,
+    message = message,
+    serverTime = gameplayResult.serverTime,
+  }
+end
+
+-- Coroutine wrapper. Advance via progress() each frame.
+local LoginRoutine = class(function(self, gameplayClient, ip, gameplayPort, lobbyClient, lobbyPort, spectateClient, spectatePort)
+  self.gameplayClient = gameplayClient
+  self.lobbyClient = lobbyClient
+  self.spectateClient = spectateClient
   self.routine = coroutine.create(login)
   self.ip = ip
-  self.port = port
+  self.gameplayPort = gameplayPort
+  self.lobbyPort = lobbyPort or ((gameplayPort or 49569) + 1)
+  self.spectatePort = spectatePort or ((gameplayPort or 49569) + 2)
 end)
 
--- returns false and the current progress of the login process as a string message while in progress
--- returns true and a result table {loggedIn = val, message = "msg"} when finishing and on further queries
+-- false + progress string while in flight, true + result table when done.
 function LoginRoutine:progress()
   if coroutine.status(self.routine) == "dead" then
     return true, self.result
-  else
-    local success, status = coroutine.resume(self.routine, self.tcpClient, self.ip, self.port)
-    if success then
-      if type(status) == "table" then
-        self.result = status
-        if self.result.loggedIn == false then
-          self.tcpClient:resetNetwork()
-        end
-        return true, status
-      else
-        self.status = status
-        return false, status
-      end
-    else
-      GAME.crashTrace = debug.traceback(self.routine)
-      error(status)
-    end
   end
+  local success, status = coroutine.resume(
+    self.routine,
+    self.gameplayClient, self.ip, self.gameplayPort,
+    self.lobbyClient, self.lobbyPort,
+    self.spectateClient, self.spectatePort)
+  if not success then
+    GAME.crashTrace = debug.traceback(self.routine)
+    error(status)
+  end
+  if type(status) == "table" then
+    self.result = status
+    if self.result.loggedIn == false then
+      self.gameplayClient:resetNetwork()
+      if self.lobbyClient then self.lobbyClient:resetNetwork() end
+      if self.spectateClient then self.spectateClient:resetNetwork() end
+    end
+    return true, status
+  end
+  self.status = status
+  return false, status
 end
 
+-- Public re-export so NetClient's reconnect path can re-claim a side socket
+-- without re-running the full version-check + login_request handshake.
+LoginRoutine.claimSession = claimSession
 
 return LoginRoutine

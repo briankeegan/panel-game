@@ -62,12 +62,18 @@ local ui = {
   Line = import("./Line"),
   ---@source LobbyChallengeButton.lua
   LobbyChallengeButton = import("./LobbyChallengeButton"),
+  ---@source LobbyRoomJoinButton.lua
+  LobbyRoomJoinButton = import("./LobbyRoomJoinButton"),
+  ---@source LobbyRoomInviteButton.lua
+  LobbyRoomInviteButton = import("./LobbyRoomInviteButton"),
   ---@source Menu.lua
   Menu = import("./Menu"),
   ---@source MenuItem.lua
   MenuItem = import("./MenuItem"),
   ---@source MultiPlayerSelectionWrapper.lua
   MultiPlayerSelectionWrapper = import("./MultiPlayerSelectionWrapper"),
+  ---@source OverlayContainer.lua
+  OverlayContainer = import("./OverlayContainer"),
   ---@source PagedUniGrid.lua
   PagedUniGrid = import("./PagedUniGrid"),
   ---@source PanelCarousel.lua

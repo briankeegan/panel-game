@@ -4,13 +4,14 @@ local StackBehaviours = require("common.data.StackBehaviours")
 local logger = require("common.lib.logger")
 local MatchRules = require("common.data.MatchRules")
 local GameModes = require("common.data.GameModes")
+local TeamUtils = require("common.data.TeamUtils")
 local consts = require("common.engine.consts")
 require("common.lib.timezones")
 local tableUtils = require("common.lib.tableUtils")
 local InputCompression = require("common.data.InputCompression")
 local ReplayV2 = require("common.compatibility.ReplayV2")
 
-local REPLAY_VERSION = 3
+local REPLAY_VERSION = 4
 
 ---@class ReplayPanelSource
 ---@field sourceType ReplayPanelSourceType
@@ -35,10 +36,11 @@ local REPLAY_VERSION = 3
 
 ---@class BaseStackMetadata
 ---@field stackIndex integer
----@field renderIndex integer?
+---@field layoutSlot integer?
 ---@field panelId string?
 ---@field characterId string?
 ---@field wins integer?
+---@field seatId integer? canonical team seat assignment; single-player/legacy replays default to stackIndex on load
 
 ---@class StackMetadata : BaseStackMetadata
 ---@field publicId integer?
@@ -57,12 +59,33 @@ local REPLAY_VERSION = 3
 ---@field stageId string? The stage that was picked for the match on the machine saving the replay
 ---@field winnerIndex integer? index of players that won the match; nil if incomplete or the match concluded with a tie
 ---@field winnerId integer? publicId of the player that won the match; negative if unknown; nil if incomplete or the match concluded with a tie
+---@field winnerTeam integer? winning team index (1-based) for team modes; the engine collapses a team win to a tie, so this is recorded separately. nil for FFA/VS/solo/incomplete
 ---@field ranked boolean? If the match counted towards a ladder
 ---@field incomplete boolean? If the match was finished by an abort
 ---@field completed boolean? If the match that is represented by the replay has already finished
 ---@field gameId integer? The identifier for the game on the server it was played on
 ---@field duration integer? How long the game took in frames
 ---@field gameModeName ("timeattack" | "endless" | "vsSelf" | "training" | "challenge" | "VS" | "puzzle")?
+---@field playersPerTeam (integer|integer[])? Per-match team shape after server compaction (e.g. open 3v4 played 2v2 ships {2,2}). Absent on replays from before this field shipped — consumers fall back to the gameMode preset.
+---@field teamCount integer? Per-match team count after compaction. Same backfill rule as playersPerTeam.
+
+---@class CrossPlayerGarbageEvent
+---@field sender integer slot of the sender (the player who attacked)
+---@field senderFrame integer the sender's stopWatch when garbage was emitted
+---@field recipients integer[] slot indices of the recipient stacks
+---@field garbage table garbage payload (array of Garbage records)
+---@field serverWallClockMs integer? when the server relayed it (latency telemetry)
+
+---@class CrossPlayerDeathEvent
+---@field sender integer slot of the dead player
+---@field senderFrame integer the dead stack's game_over_clock
+---@field stopWatch integer? the dead stack's game_over_stopWatch (sender-authoritative display value; missing on old clients)
+---@field reason string? cause of death (e.g. "topOut")
+---@field serverWallClockMs integer? when the server relayed it
+
+---@class CrossPlayerEvents
+---@field garbage CrossPlayerGarbageEvent[]
+---@field deaths CrossPlayerDeathEvent[]
 
 ---@class ReplayV3
 ---@field engineVersion string The engine version the replay was generated with
@@ -71,6 +94,7 @@ local REPLAY_VERSION = 3
 ---@field rules MatchRules
 ---@field stacks ReplayBaseStack[]
 ---@field garbageFlows GarbageFlow[]
+---@field crossPlayerEvents CrossPlayerEvents? loose-sync authoritative event log (V4+)
 ---@field metadata ReplayMetadata
 ---@overload fun(engineVersion: string, rules: MatchRules, panelSource: ReplayPanelSource): ReplayV3
 local ReplayV3 = class(
@@ -85,11 +109,16 @@ function(self, engineVersion, rules, panelSource)
   self.panelSource = panelSource
   self.stacks = {}
   self.garbageFlows = {}
+  -- Loose-sync V4: authoritative event log captured server-side at relay time.
+  -- Empty for vsSelf/puzzle/training/local replays; populated for networked
+  -- play so playback can apply the exact same garbage + death events that
+  -- happened live, instead of re-deriving them from a synchronized sim.
+  self.crossPlayerEvents = { garbage = {}, deaths = {} }
   self.metadata = { stacks = {}, timestamp = to_UTC(os.time()) }
 end)
 
 -- so that json.encode always has the same basic structure
-ReplayV3.keyOrder = {keyorder = {"engineVersion", "replayVersion", "panelSource", "rules", "stacks", "garbageFlows", "metadata"}}
+ReplayV3.keyOrder = {keyorder = {"engineVersion", "replayVersion", "panelSource", "rules", "stacks", "garbageFlows", "crossPlayerEvents", "displayHistory", "metadata"}}
 
 ---@enum ReplayPanelSourceType
 ReplayV3.panelSourceTypes = { seedV1 = 1, puzzle = 2, seedV2 = 3 }
@@ -117,12 +146,80 @@ function ReplayV3:setTimestamp(timestamp)
   self.metadata.timestamp = timestamp
 end
 
-function ReplayV3:generateFileName()
-  local time = os.date("*t", self.metadata.timestamp)
+-- Solo modes get a fixed, descriptive folder + filename. Everything else is a
+-- multiplayer match (versus / team / FFA) that folders by roster instead.
+local SOLO_MODE_FOLDERS = {
+  timeattack = "Time Attack",
+  endless = "Endless",
+  puzzle = "Puzzle",
+  vsSelf = "Vs Self",
+  training = "Training",
+  challenge = "Challenge Mode",
+}
+
+-- True when the saved team shape has at least one team of 2+ (a real team mode,
+-- as opposed to FFA where every team is size 1).
+local function hasTeams(metadata)
+  local ppt = metadata.playersPerTeam
+  if type(ppt) == "number" then return ppt > 1 end
+  if type(ppt) == "table" then
+    for _, n in ipairs(ppt) do if n > 1 then return true end end
+  end
+  return false
+end
+
+-- Short folder/label prefix for a multiplayer replay.
+local function multiplayerPrefix(metadata)
+  if hasTeams(metadata) then return "Team" end
+  if #metadata.stacks == 2 then return "VS" end
+  return "FFA"
+end
+
+-- Roster names, alphabetically sorted so the same set of players always maps to
+-- one folder regardless of seat order — only a genuine join/leave makes a new one.
+local function sortedPlayerNames(metadata)
+  local names = {}
+  for _, player in ipairs(metadata.stacks) do
+    names[#names + 1] = player.name or "?"
+  end
+  table.sort(names)
+  return names
+end
+
+-- Winner label for a multiplayer filename: team color for team modes, player
+-- name for FFA/VS, else draw/INCOMPLETE.
+local function winnerLabel(metadata)
+  if metadata.incomplete then return "INCOMPLETE" end
+  if hasTeams(metadata) then
+    if metadata.winnerTeam then return TeamUtils.teamColorName(metadata.winnerTeam) end
+    return "draw"
+  end
+  if metadata.winnerIndex and metadata.stacks[metadata.winnerIndex] then
+    return metadata.stacks[metadata.winnerIndex].name or ("P" .. metadata.winnerIndex)
+  end
+  return "draw"
+end
+
+---@param gameIndex integer? sequence of this game within its roster folder; omitted on solo modes
+function ReplayV3:generateFileName(gameIndex)
+  local metadata = self.metadata
+  local time = os.date("*t", metadata.timestamp)
+
+  if not SOLO_MODE_FOLDERS[metadata.gameModeName] then
+    -- Multiplayer: the folder already carries date + roster, so the file just
+    -- needs sequence + winner + clock — e.g. game_0_winner_Pink_20-06-41.
+    local clock = string.format("%02d-%02d-%02d", time.hour, time.min, time.sec)
+    local parts = {}
+    if gameIndex then parts[#parts + 1] = "game_" .. gameIndex end
+    parts[#parts + 1] = "winner_" .. winnerLabel(metadata)
+    parts[#parts + 1] = clock
+    return table.concat(parts, "_")
+  end
+
   local filename = "v" .. self.engineVersion .. "-"
   filename = filename .. string.format("%04d-%02d-%02d-%02d-%02d-%02d", time.year, time.month, time.day, time.hour, time.min, time.sec)
 
-  for i, player in ipairs(self.metadata.stacks) do
+  for i, player in ipairs(metadata.stacks) do
     local stack = self.stacks[player.stackIndex]
     if stack.stackType == ReplayV3.stackTypes.Stack then
       ---@cast stack ReplayStack
@@ -143,30 +240,16 @@ function ReplayV3:generateFileName()
     end
   end
 
-  filename = filename .. "-" .. self.metadata.gameModeName
+  filename = filename .. "-" .. metadata.gameModeName
 
-  if self.metadata.gameModeName == "VS" then
-    if tableUtils.trueForAll(self.stacks, function(p) return p.stackType == ReplayV3.stackTypes.Stack end) then
-      filename = filename .. (self.metadata.ranked and "ranked" or "casual")
-    end
-
-    if not self.metadata.incomplete then
-      if self.metadata.winnerIndex then
-        filename = filename .. "-P" .. self.metadata.winnerIndex .. "wins"
-      else
-        filename = filename .. "-draw"
-      end
-    end
-  end
-
-  if self.metadata.incomplete then
+  if metadata.incomplete then
     filename = filename .. "-INCOMPLETE"
   end
 
   return filename
 end
 
----@param outcome (0 | 1 | 2 | nil)
+---@param outcome integer? winning stack index (1..N); 0 for a tie; nil for an incomplete/aborted match
 function ReplayV3:setOutcome(outcome)
   if outcome == nil then
     self.metadata.incomplete = true
@@ -180,10 +263,16 @@ function ReplayV3:setOutcome(outcome)
       self.metadata.winnerId = nil
     else
       self.metadata.winnerIndex = outcome
-      for i, player in ipairs(self.metadata.stacks) do
-        if player.stackIndex == i and self.stacks[i].stackType == ReplayV3.stackTypes.Stack then
+      -- winnerId is the WINNER's publicId. Match the metadata stack at the
+      -- winning index — the old loop matched every dense human stack and so
+      -- left winnerId pointing at whichever player came last, not the winner.
+      self.metadata.winnerId = nil
+      for _, player in ipairs(self.metadata.stacks) do
+        if player.stackIndex == outcome and self.stacks[outcome]
+            and self.stacks[outcome].stackType == ReplayV3.stackTypes.Stack then
           ---@cast player StackMetadata
           self.metadata.winnerId = player.publicId
+          break
         end
       end
     end
@@ -197,29 +286,13 @@ function ReplayV3:generatePath(pathSeparator)
   local sep = pathSeparator
   local path = "replays" .. sep .. "v" .. self.engineVersion .. sep .. string.format("%04d" .. sep .. "%02d" .. sep .. "%02d", now.year, now.month, now.day)
 
-  if self.metadata.gameModeName == "timeattack" then
-    path = path .. sep .. "Time Attack"
-  elseif self.metadata.gameModeName == "endless" then
-    path = path .. sep .. "Endless"
-  elseif self.metadata.gameModeName == "puzzle" then
-    path = path .. sep .. "Puzzle"
-  elseif self.metadata.gameModeName == "vsSelf" then
-    path = path .. sep .. "Vs Self"
-  elseif self.metadata.gameModeName == "training" then
-    path = path .. sep .. "Training"
-  elseif self.metadata.gameModeName == "challenge" then
-    path = path .. sep .. "Challenge Mode"
-  elseif self.metadata.gameModeName == "VS" then
-    local names = {}
-    for i, player in ipairs(self.metadata.stacks) do
-      ---@cast player StackMetadata
-      names[i] = player.name
-    end
-    -- sort player names alphabetically for folder name so we don't have a folder "a-vs-b" and also "b-vs-a"
-    table.sort(names)
-    path = path .. sep .. table.concat(names, "-vs-")
+  local soloFolder = SOLO_MODE_FOLDERS[self.metadata.gameModeName]
+  if soloFolder then
+    path = path .. sep .. soloFolder
   else
-    path = path .. sep .. "Unknown"
+    -- Multiplayer (versus / team / FFA): <MODE>_<sorted roster>, e.g.
+    -- FFA_Cat_vs_Sam_vs_Smith. Sorted so a roster maps to one folder.
+    path = path .. sep .. multiplayerPrefix(self.metadata) .. "_" .. table.concat(sortedPlayerNames(self.metadata), "_vs_")
   end
 
   return path
@@ -261,9 +334,9 @@ function ReplayV3.replayCanBeViewed(replay)
     -- replay is from a newer game version, we can't watch
     -- or maybe we can but there is no way to verify we can
     return false
-  elseif replay.engineVersion < consts.VERSION_MIN_VIEW then
-    -- there were breaking changes since the version the replay was recorded on
-    -- definitely can not watch
+  elseif replay.engineVersion < consts.ENGINE_VERSION then
+    -- replay is from an older engine version; only current-version replays
+    -- are watchable, so deny
     return false
   else
     if replay.engineVersion == consts.ENGINE_VERSIONS.LEVELDATA then
@@ -295,6 +368,19 @@ function ReplayV3.createFromV3Data(replayData)
 
   ---@cast replayData ReplayV3
 
+  -- Backfill the loose-sync event log for replays saved before V4 — empty
+  -- is the right default for non-networked / pre-loose-sync replays since
+  -- playback falls back to the simulation-derived garbage path.
+  if not replayData.crossPlayerEvents then
+    replayData.crossPlayerEvents = { garbage = {}, deaths = {} }
+  end
+  if not replayData.crossPlayerEvents.garbage then
+    replayData.crossPlayerEvents.garbage = {}
+  end
+  if not replayData.crossPlayerEvents.deaths then
+    replayData.crossPlayerEvents.deaths = {}
+  end
+
   for i, stack in ipairs(replayData.stacks) do
     if stack.stackType == 1 then
       ---@cast stack ReplayStack
@@ -321,7 +407,9 @@ function ReplayV3.createFromTable(t, completed)
     -- there was a problem reading the file
     return replay
   else
-    if t.replayVersion == 3 then
+    if t.replayVersion == 3 or t.replayVersion == 4 then
+      -- V3 and V4 share the loader path; V4 adds crossPlayerEvents on top.
+      -- createFromV3Data backfills the field to empty for V3 inputs.
       replay = ReplayV3.createFromV3Data(t)
       t.metadata.completed = completed
     else

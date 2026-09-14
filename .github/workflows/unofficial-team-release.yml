@@ -1,0 +1,46 @@
+name: unofficial-team-release
+
+on:
+  push:
+    branches:
+      - "bramp/multi-player"
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read BUILD_VERSION from consts.lua
+        id: build_version
+        run: |
+          VERSION=$(grep -E 'consts\.BUILD_VERSION\s*=' common/engine/consts.lua | sed -E 's/.*"([^"]+)".*/\1/')
+          if [ -z "$VERSION" ]; then echo "could not find BUILD_VERSION"; exit 1; fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Detected BUILD_VERSION=$VERSION"
+
+      - name: Build .love file
+        run: ./build.sh just-love
+
+      - name: Move .love to workspace
+        run: mv ../dev-build/panel-attack.love ./unofficial-panel-attack-ffa-and-team.love
+
+      - name: Create GitHub release
+        run: |
+          # Tag is build-<BUILD_VERSION> — the same release LoginRoutine.lua's
+          # download URL and the in-game auto-updater (build versioning) both
+          # read. The updater grabs the first asset, so its name is cosmetic.
+          # Delete-before-create makes non-bump redeploys (same tag) idempotent.
+          TAG="build-${{ steps.build_version.outputs.version }}"
+          gh release delete "$TAG" --yes --cleanup-tag 2>/dev/null || true
+          gh release create "$TAG" \
+            unofficial-panel-attack-ffa-and-team.love \
+            --target bramp/multi-player \
+            --prerelease \
+            --title "Unofficial Panel Attack FFA & Team — $TAG"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

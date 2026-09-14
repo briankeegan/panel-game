@@ -1,0 +1,422 @@
+name: build-shells
+
+# Builds the auto-updating desktop shells (Windows/macOS/Linux) for
+# "Unofficial Panel Attack FFA & Team" and publishes them to a stable `launcher` release
+# that teammates download once. Triggered on demand — shells only change when the
+# LÖVE version or the updater shell changes (rarely).
+#
+# How to run it (this is a FORK; we never touch the upstream `beta` default branch,
+# so the workflow_dispatch button is unavailable — it requires the default branch).
+# Instead push a `build-shells-*` tag from this branch; the tag's commit runs this
+# file directly. Normal code pushes do NOT trigger it.
+#   git tag build-shells-1 && git push origin build-shells-1   (bump the number each run)
+on:
+  workflow_dispatch:   # kept for if this ever lands on the default branch
+  push:
+    tags:
+      - 'build-shells-*'
+
+permissions:
+  contents: write
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Stage 1 — compile lua-https per platform (LÖVE 11.5 has no bundled `https`).
+  # Backends per platform: macOS=NSURL (built-in), Linux=openssl, Windows=schannel.
+  # Output is always the module `https` with empty prefix -> https.so / https.dll.
+  # ---------------------------------------------------------------------------
+  lua-https:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Build the Linux .so on an OLDER runner: a native lib links the runner's
+          # glibc as a MINIMUM version. ubuntu-latest (24.04, glibc 2.39) made
+          # https.so demand GLIBC_2.38, which breaks on teammates' older distros.
+          # ubuntu-22.04 (glibc 2.35) runs on far more systems.
+          - { os: ubuntu-22.04,   plat: linux, out: https.so }
+          - { os: macos-latest,   plat: macos, out: https.so }
+          - { os: windows-latest, plat: win64, out: https.dll }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Clone lua-https
+        run: git clone --depth 1 https://github.com/love2d/lua-https.git lua-https-src
+
+      # --- Linux: openssl backend, LuaJIT headers only (module isn't linked to lua) ---
+      - name: Linux deps + build
+        if: matrix.plat == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake libluajit-5.1-dev libcurl4-openssl-dev
+          # CURL backend, NOT bare openssl. The openssl backend's minimal HTTP
+          # parser does NOT de-chunk `Transfer-Encoding: chunked` responses, so
+          # large GitHub API replies came back with raw chunk framing
+          # ("8000\r\n[{...") and json.decode read the leading "8000" as a number
+          # and crashed. libcurl de-chunks properly. (Proven in a container against
+          # live GitHub + real LÖVE 11.5.) https.so dlopens libcurl at runtime
+          # (no hard ELF link); libcurl4 ships on essentially all desktop Linux.
+          cmake -S lua-https-src -B build -DCMAKE_BUILD_TYPE=Release -DUSE_CURL_BACKEND=ON
+          cmake --build build --config Release
+
+      # --- macOS: NSURL backend (Foundation, built-in), LuaJIT headers from brew ---
+      - name: macOS deps + build
+        if: matrix.plat == 'macos'
+        run: |
+          brew install luajit cmake
+          LUAJIT_PREFIX="$(brew --prefix luajit)"
+          # Universal binary so one .so covers Intel + Apple Silicon teammates.
+          # NSURL backend resolves lua_* at load time, so the single-arch luajit
+          # lib here is only for headers/detection, not linked into the module.
+          cmake -S lua-https-src -B build -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
+            -DLUAJIT_INCLUDE_DIR="$LUAJIT_PREFIX/include/luajit-2.1" \
+            -DLUAJIT_LIBRARY="$(echo $LUAJIT_PREFIX/lib/libluajit-5.1.*dylib | head -1)"
+          cmake --build build --config Release
+
+      # --- Windows: schannel/wininet backends, but the module MUST link a LuaJIT
+      # import lib, so build LuaJIT 2.1 first (msvcbuild) and point CMake at it.
+      # Do NOT hardcode a vcvarsall path: the runner's VS version moves (2022 ->
+      # VS18/2026), which broke the build. msvc-dev-cmd finds whatever VS is present. ---
+      - name: Windows set up MSVC env
+        if: matrix.plat == 'win64'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Windows build LuaJIT + lua-https
+        if: matrix.plat == 'win64'
+        shell: cmd
+        run: |
+          git clone --depth 1 https://github.com/LuaJIT/LuaJIT.git luajit
+          cd luajit\src && call msvcbuild.bat && cd ..\..
+          if not exist "%CD%\luajit\src\lua51.lib" ( echo ERROR: LuaJIT build produced no lua51.lib & exit /b 1 )
+          rem DEFAULT Windows backends (no flags): both WinINet + schannel compiled,
+          rem HTTPS.cpp prefers WinINet (full OS HTTP client, de-chunks). CONFIRMED
+          rem WORKING by real Windows users (online play, auto-update, name persists),
+          rem so we do NOT force WinINet-only (that needed an unvalidated ws2_32 link
+          rem hack and risked regressing a proven-good config).
+          cmake -S lua-https-src -B build ^
+            -DLUAJIT_INCLUDE_DIR="%CD%\luajit\src" ^
+            -DLUAJIT_LIBRARY="%CD%\luajit\src\lua51.lib"
+          cmake --build build --config Release
+
+      - name: Collect artifact
+        shell: bash
+        run: |
+          mkdir -p out
+          found=$(find build -name '${{ matrix.out }}' -type f | head -1)
+          if [ -z "$found" ]; then echo "https lib not found:"; find build -name 'https*'; exit 1; fi
+          cp "$found" "out/${{ matrix.out }}"
+          echo "built: $found"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: https-${{ matrix.plat }}
+          path: out/${{ matrix.out }}
+
+  # ---------------------------------------------------------------------------
+  # Stage 2a — package the WINDOWS + LINUX shells on Linux (one runner, no signing
+  # needed for those two). macOS is built separately on a Mac runner (stage 2b)
+  # because only macOS can codesign the .app.
+  # ---------------------------------------------------------------------------
+  package-unix:
+    needs: lua-https
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch compiled https libs
+        uses: actions/download-artifact@v4
+        with:
+          pattern: https-*
+          path: https-libs
+      - name: Place https libs into the shell
+        run: |
+          mkdir -p updater-shell/https/win64 updater-shell/https/linux
+          cp https-libs/https-win64/https.dll updater-shell/https/win64/https.dll
+          cp https-libs/https-linux/https.so  updater-shell/https/linux/https.so
+
+      - name: Install tools (xvfb for headless love-build, zip)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb zip libfuse2
+
+      # love-build's own bundled LÖVE 12 RUNS the tool; build.lua's love='11.5'
+      # is what the shells SHIP.
+      - name: Download standalone love-build (Linux)
+        run: |
+          mkdir -p tool && cd tool
+          curl -fsSL "https://github.com/ellraiser/love-build/releases/download/v0.9/love-build-0.9-linux.zip" -o lb.zip
+          # -o: the zip has a .DirIcon collision; overwrite instead of prompting
+          # (CI has no stdin -> EOF -> fail). It's an AppDir: launch via AppRun.
+          # bin/ is stored mode 000, so restore owner perms before use.
+          unzip -q -o lb.zip
+          chmod -R u+rwX . && chmod +x AppRun
+
+      - name: Package windows + linux shells
+        run: |
+          xvfb-run --auto-servernum tool/AppRun "$(pwd)/updater-shell/main.lua" "windows,linux" 2>&1 | tee /tmp/love-build.log
+          grep -E "built .* successfully|build finished|error" /tmp/love-build.log || true
+
+      - name: Collect windows + linux zips
+        run: |
+          save="$HOME/.local/share/love-build/output"
+          folder=$(ls "$save" 2>/dev/null | head -1)
+          [ -z "$folder" ] && { echo "no love-build output under $save"; find "$HOME/.local/share" -maxdepth 3 -type d; exit 1; }
+          mkdir -p dist
+          for plat in windows linux; do
+            f=$(find "$save/$folder" -iname "*-$plat.zip" | head -1)
+            [ -z "$f" ] && { echo "MISSING $plat zip"; exit 1; }
+            cp "$f" "dist/unofficial-panel-attack-ffa-and-team-$plat.zip" && echo "collected $plat"
+          done
+          ls -lh dist/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shells-unix
+          path: dist/*.zip
+
+  # ---------------------------------------------------------------------------
+  # Stage 2b — package + SIGN the macOS shell on a Mac runner. Mirrors the proven
+  # local recipe in build-shells.sh: fix love-build's unescaped '&' in Info.plist,
+  # drop the stray Contents/MacOS/lbconfig.lua, then ad-hoc codesign so Gatekeeper
+  # doesn't flag the .app as "damaged or incomplete".
+  # ---------------------------------------------------------------------------
+  package-macos:
+    needs: lua-https
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch compiled https lib (universal arm64+x86_64)
+        uses: actions/download-artifact@v4
+        with:
+          name: https-macos
+          path: https-macos
+      - name: Place https lib into the shell
+        run: |
+          mkdir -p updater-shell/https/macos
+          cp https-macos/https.so updater-shell/https/macos/https.so
+
+      # love-build's own bundled LÖVE 12 RUNS the tool; build.lua's love='11.5'
+      # is what the shell SHIPS.
+      - name: Download standalone love-build (macOS)
+        run: |
+          mkdir -p tool && cd tool
+          curl -fsSL "https://github.com/ellraiser/love-build/releases/download/v0.9/love-build-0.9-macos.zip" -o lb.zip
+          unzip -q -o lb.zip
+          # The zip stores Contents/MacOS/ as mode 000 (no search bit), so the
+          # love binary inside is unreachable ("Permission denied"). Restore perms.
+          chmod -R u+rwX love-build.app
+          xattr -dr com.apple.quarantine love-build.app 2>/dev/null || true
+
+      - name: Package macOS shell
+        run: |
+          save="$HOME/Library/Application Support/love-build/output"
+          rm -rf "$save"/* 2>/dev/null || true
+          # love-build is a GUI LÖVE app that leaves its window open after "Build
+          # Finished" and never exits, so run it backgrounded and stop it once the
+          # macos zip appears (same watchdog as build-shells.sh).
+          "tool/love-build.app/Contents/MacOS/love" "$(pwd)/updater-shell/main.lua" "macos" >/tmp/lb.log 2>&1 &
+          lb_pid=$!
+          for _ in $(seq 1 150); do
+            ls "$save"/*/*-macos.zip >/dev/null 2>&1 && break
+            kill -0 "$lb_pid" 2>/dev/null || break
+            sleep 2
+          done
+          sleep 2
+          pkill -f love-build 2>/dev/null || true
+          kill "$lb_pid" 2>/dev/null || true
+          wait "$lb_pid" 2>/dev/null || true
+          grep -iE "built .* successfully|build finished|error" /tmp/lb.log | tail -10 || true
+
+      - name: Fix + ad-hoc sign + repackage the .app
+        run: |
+          save="$HOME/Library/Application Support/love-build/output"
+          folder=$(ls -t "$save" 2>/dev/null | head -1)
+          src=$(find "$save/$folder" -iname "*-macos.zip" | head -1)
+          [ -z "$src" ] && { echo "no macos zip produced"; cat /tmp/lb.log; exit 1; }
+          tmp=$(mktemp -d)
+          unzip -q "$src" -d "$tmp"
+          chmod -R u+rwx "$tmp"   # love-build's .app dirs are 700, block find/edit
+          app=$(find "$tmp" -iname "*.app" -maxdepth 2 | head -1)
+          [ -z "$app" ] && { echo "no .app inside the zip"; exit 1; }
+          # love-build writes the app name into Info.plist unescaped -> a '&' in
+          # "FFA & Team" corrupts the XML ("damaged"). Fix BEFORE signing.
+          if ! plutil -lint "$app/Contents/Info.plist" >/dev/null 2>&1; then
+            sed -i '' 's/ & / \&amp; /g' "$app/Contents/Info.plist"
+            echo "fixed Info.plist (& -> &amp;)"
+          fi
+          # Stray lbconfig.lua in Contents/MacOS/ invalidates the --deep signature;
+          # the game reads the Resources/ copy, so remove the MacOS/ one.
+          rm -f "$app/Contents/MacOS/lbconfig.lua"
+          xattr -cr "$app"
+          codesign --force --deep --sign - "$app"
+          codesign --verify --deep --strict "$app" && echo "signature verified"
+          mkdir -p dist
+          dest="$(pwd)/dist/unofficial-panel-attack-ffa-and-team-macos.zip"
+          ( cd "$tmp" && zip -q -r -y "$dest" "$(basename "$app")" )
+          ls -lh dist/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shells-macos
+          path: dist/*.zip
+
+  # ---------------------------------------------------------------------------
+  # Stage 2c — package the Android APK (love-android 11.5a + lua-https NDK module).
+  # NON-BLOCKING (continue-on-error): a broken Android leg must NEVER stop the
+  # three desktop shells from publishing. Same updater-shell, same build-<VERSION>
+  # GitHub releases as desktop. lua-https is proven on 11.5 Android (JNI ->
+  # HttpURLConnection backend, de-chunks). See the android_apk_plan notes.
+  # ---------------------------------------------------------------------------
+  package-android:
+    needs: lua-https
+    continue-on-error: true     # Android failures cannot block the desktop release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'    # love-android 11.5a requires JDK 17
+      - uses: android-actions/setup-android@v3
+      - name: Install pinned NDK + cmake (love-android 11.5a)
+        run: |
+          yes | sdkmanager "platforms;android-34" "build-tools;34.0.0" \
+                           "ndk;25.2.9519653" "cmake;3.22.1"
+
+      - name: Read BUILD_VERSION
+        id: bv
+        run: echo "version=$(grep -E 'consts\.BUILD_VERSION\s*=' common/engine/consts.lua | sed -E 's/.*\"([^\"]+)\".*/\1/')" >> "$GITHUB_OUTPUT"
+
+      - name: Clone love-android 11.5a and wire lua-https
+        run: |
+          git clone --depth 1 --branch 11.5a --recurse-submodules \
+            https://github.com/love2d/love-android.git la
+          # lua-https ships its own Android.mk (LOCAL_MODULE_FILENAME := https) and
+          # java.txt (= src/android/java); folder MUST be named `https` (AGP bug).
+          git clone --depth 1 https://github.com/love2d/lua-https.git \
+            la/love/src/jni/lua-modules/lua-https
+          test -f la/love/src/jni/lua-modules/lua-https/Android.mk
+
+      - name: Target arm ABIs + x86_64 (real devices + emulator testing)
+        run: |
+          # x86_64 included so the APK runs on x86_64 Android (Chromebooks) AND the
+          # CI emulator, which lets android-run reproduce + capture crashes.
+          sed -i 's/^APP_ABI := .*/APP_ABI := armeabi-v7a arm64-v8a x86_64/' la/love/src/jni/Application.mk
+          grep '^APP_ABI' la/love/src/jni/Application.mk
+
+      - name: Rebrand — own app id, name, icon (not the generic LÖVE app)
+        run: |
+          VER="${{ steps.bv.outputs.version }}"
+          VCODE=$(echo "$VER" | tr -cd '0-9' | sed 's/^0*//')
+          cd la
+          # love-android reads these from gradle.properties (designed for rebranding).
+          sed -i 's|^app.application_id=.*|app.application_id=com.panelattack.ffateam|' gradle.properties
+          sed -i 's|^app.name_byte_array=|#app.name_byte_array=|' gradle.properties
+          sed -i '/^app.name=/d' gradle.properties
+          # Real name. The '&' is pre-escaped as &amp;: AGP substitutes the manifest
+          # placeholder as RAW text, so a literal '&' breaks android:label XML (same
+          # class of bug as the macOS Info.plist '&'); '&amp;' is valid XML and renders
+          # as '&' on the device.
+          echo 'app.name=Unofficial Panel Attack FFA &amp; Team' >> gradle.properties
+          sed -i "s|^app.version_name=.*|app.version_name=$VER|" gradle.properties
+          sed -i "s|^app.version_code=.*|app.version_code=$VCODE|" gradle.properties
+          # Lock the device to PORTRAIT (love-android defaults to landscape, which made
+          # the portrait game render sideways). Mobile defaults to portrait mode.
+          sed -i 's|^app.orientation=.*|app.orientation=sensorPortrait|' gradle.properties
+          grep -E '^app\.(name|application_id|version|orientation)' gradle.properties
+          # launcher icon is android:icon="@drawable/love" -> overwrite each density
+          for d in drawable-mdpi drawable-hdpi drawable-xhdpi drawable-xxhdpi drawable-xxxhdpi; do
+            cp "$GITHUB_WORKSPACE/updater-shell/icon.png" "app/src/main/res/$d/love.png"
+          done
+
+      - name: Build the updater-shell boot .love (with embedded offline base)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VER="${{ steps.bv.outputs.version }}"
+          # Embed the current game .love where the updater discovers installed
+          # versions: updater/<stream>/<version>/game.love. buildVersion makes any
+          # newer build-<VERSION> supersede it, so this is just an offline first-run
+          # seed. Best-effort: if the release asset isn't found, first run needs net.
+          mkdir -p updater-shell/updater/team/"$VER"
+          gh release download "build-$VER" --repo "$GITHUB_REPOSITORY" \
+            --pattern '*.love' --output updater-shell/updater/team/"$VER"/game.love \
+            || echo "WARN: no base .love for build-$VER; first run will require network"
+          # Boot .love = the updater shell. Exclude the desktop https libs (Android
+          # gets https from the NDK module) and tests.
+          ( cd updater-shell && zip -qr "$GITHUB_WORKSPACE/boot.love" . \
+              -x 'https/*' -x 'updater/tests/*' -x '.git/*' -x '.DS_Store' )
+          mkdir -p la/app/src/embed/assets
+          cp "$GITHUB_WORKSPACE/boot.love" la/app/src/embed/assets/game.love
+
+      - name: Build APK
+        run: |
+          cd la && chmod +x gradlew
+          # Debug variant = auto-signed + sideload-installable. TODO: stable release
+          # keystore via secret (debug key differs per run -> APK in-place updates
+          # would need reinstall; game updates come via downloaded .love regardless).
+          ./gradlew --no-daemon assembleEmbedNoRecordDebug
+
+      - name: Collect APK
+        run: |
+          APK=$(find la/app/build/outputs/apk -path '*/debug/*' -name '*.apk' | head -1)
+          [ -z "$APK" ] && APK=$(find la/app/build/outputs/apk -name '*.apk' | head -1)
+          [ -z "$APK" ] && { echo "no apk produced"; exit 1; }
+          mkdir -p dist
+          cp "$APK" dist/unofficial-panel-attack-ffa-and-team-android.apk
+          ls -lh dist/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shells-android
+          path: dist/*.apk
+
+  # ---------------------------------------------------------------------------
+  # Stage 3 — publish all three signed/working shells to the stable `launcher`
+  # release that teammates download once.
+  # ---------------------------------------------------------------------------
+  release:
+    # package-android is continue-on-error, so a failed Android leg still satisfies
+    # this `needs` and the three desktop shells publish regardless.
+    needs: [package-unix, package-macos, package-android]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read BUILD_VERSION (for release title)
+        id: bv
+        run: echo "version=$(grep -E 'consts\.BUILD_VERSION\s*=' common/engine/consts.lua | sed -E 's/.*\"([^\"]+)\".*/\1/')" >> "$GITHUB_OUTPUT"
+
+      - name: Download all shell artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: shells-*
+          path: dist
+          merge-multiple: true
+
+      - name: Publish to the stable `launcher` release
+        run: |
+          ls -lh dist/
+          # Desktop shells are REQUIRED (assert). The Android APK is OPTIONAL — added
+          # only if package-android produced it, so a broken Android leg never blocks.
+          test -f dist/unofficial-panel-attack-ffa-and-team-windows.zip
+          test -f dist/unofficial-panel-attack-ffa-and-team-linux.zip
+          test -f dist/unofficial-panel-attack-ffa-and-team-macos.zip
+          FILES="dist/unofficial-panel-attack-ffa-and-team-windows.zip dist/unofficial-panel-attack-ffa-and-team-linux.zip dist/unofficial-panel-attack-ffa-and-team-macos.zip"
+          if [ -f dist/unofficial-panel-attack-ffa-and-team-android.apk ]; then
+            FILES="$FILES dist/unofficial-panel-attack-ffa-and-team-android.apk"
+            echo "including Android APK"
+          else
+            echo "no Android APK this run (package-android failed or skipped) — publishing desktop only"
+          fi
+          gh release delete launcher --yes --cleanup-tag 2>/dev/null || true
+          gh release create launcher \
+            $FILES \
+            --target bramp/multi-player \
+            --title "Panel Attack FFA & Team — Launcher (${{ steps.bv.outputs.version }})" \
+            --notes "Download your platform's launcher once; it auto-updates the game on every launch. macOS is ad-hoc signed — if Gatekeeper still complains, right-click → Open the first time. Android: sideload the .apk (enable install from unknown sources)."
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

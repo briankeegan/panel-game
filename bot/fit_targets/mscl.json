@@ -1,0 +1,117 @@
+{
+  "source": "bot/data/mscl_bot",
+  "_schema": "fit_targets/v1",
+  "board": {
+    "buckets": {
+      "low|noIn|noGb": {
+        "occupancy": 0.0816,
+        "swap": 7.43,
+        "raise": 13.9,
+        "clearStart_per1k": 1.55,
+        "dig_per1k": 0.25
+      },
+      "mid|noIn|noGb": {
+        "occupancy": 0.0965,
+        "swap": 15.15,
+        "raise": 11.31,
+        "clearStart_per1k": 9.8,
+        "dig_per1k": 24.48
+      },
+      "mid|in|noGb": {
+        "occupancy": 0.0607,
+        "swap": 13.64,
+        "raise": 0.61,
+        "clearStart_per1k": 6.38,
+        "dig_per1k": 26.71
+      },
+      "low|in|noGb": {
+        "occupancy": 0.0176,
+        "swap": 13.37,
+        "raise": 9.95,
+        "clearStart_per1k": 9.17,
+        "dig_per1k": 7.02
+      },
+      "high|noIn|gb": {
+        "occupancy": 0.0538,
+        "swap": 16.69,
+        "raise": 0.63,
+        "clearStart_per1k": 6.56,
+        "dig_per1k": 39.75
+      },
+      "mid|noIn|gb": {
+        "occupancy": 0.1266,
+        "swap": 17.21,
+        "raise": 6.26,
+        "clearStart_per1k": 6.63,
+        "dig_per1k": 44.61
+      },
+      "mid|in|gb": {
+        "occupancy": 0.2283,
+        "swap": 15.73,
+        "raise": 0.7,
+        "clearStart_per1k": 6.86,
+        "dig_per1k": 18.25
+      },
+      "low|in|gb": {
+        "occupancy": 0.0144,
+        "swap": 15.4,
+        "raise": 9.25,
+        "clearStart_per1k": 7.61,
+        "dig_per1k": 17.11
+      },
+      "high|in|gb": {
+        "occupancy": 0.2924,
+        "swap": 15.87,
+        "raise": 0.12,
+        "clearStart_per1k": 5.81,
+        "dig_per1k": 25.6
+      },
+      "high|in|noGb": {
+        "occupancy": 0.0205,
+        "swap": 15.71,
+        "raise": 0.12,
+        "clearStart_per1k": 3.67,
+        "dig_per1k": 100.03
+      }
+    },
+    "swaps_per_clear": 23.95,
+    "height_med": 11,
+    "height_p90": 12,
+    "garbage_on_board_pct": 72.2,
+    "timing": {
+      "act_prelanding_pct": 22.01,
+      "act_baseline_pct": 18.93,
+      "anticipation": 3.09,
+      "landings_per_1k": 6.18,
+      "danger_pct": 36.22,
+      "displacement_mean": 10.865,
+      "wait_pct": 81.07,
+      "stoptime_density": 0.0
+    },
+    "n_games": 70
+  },
+  "offense": {
+    "chainPct": 34.7,
+    "comboPct": 65.3,
+    "blocksPerMin": 22.5,
+    "chainLen_med": 3.0,
+    "chainLen_peak": 26,
+    "chainLen_hist": {
+      "2": 552,
+      "3": 350,
+      "4": 182,
+      "5": 75,
+      "6": 28,
+      "7": 10,
+      "8": 2,
+      "9": 3
+    },
+    "comboSize_hist": {
+      "4": 934,
+      "5": 836,
+      "6": 434,
+      "7": 60
+    },
+    "n_pieces": 3466
+  }
+}

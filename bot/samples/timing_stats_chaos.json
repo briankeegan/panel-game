@@ -1,0 +1,29 @@
+{
+  "games":776,
+  "swapInterval_frames":{
+    "n":126470,
+    "median":15,
+    "p25":7,
+    "p75":28
+  },
+  "reactionFrames_idleProxy":{
+    "n":221215,
+    "median":4,
+    "p25":2,
+    "p75":6
+  },
+  "apm":{
+    "n":776,
+    "median":405.80309368099,
+    "p25":385.63771608172,
+    "p75":429.22924276611
+  },
+  "note":"60fps. From raw input sequences. reactionFrames = median idle-run before an action burst (the agreed v0 proxy). Overall (un-bucketed) — skill buckets pending ELO (RAISE-C).",
+  "cursorMoveInterval_frames":{
+    "n":197083,
+    "median":11,
+    "p25":8,
+    "p75":17
+  },
+  "player_id":935
+}

@@ -1,3 +1,16 @@
+-- Test/parse-mode dispatch. run_tests.sh sets PA_TEST_MODE=1 and bot/parse.sh
+-- sets PA_PARSE_MODE=1 so love can use this same main.lua as the entry point but
+-- hand off to the test runner / replay parser. Avoids the old file-swap scheme
+-- that left main.lua stranded when a run was SIGKILL'd.
+if os.getenv("PA_TEST_MODE") == "1" then
+  require("testLauncher")
+  return
+end
+if os.getenv("PA_PARSE_MODE") == "1" then
+  require("bot.parseReplays")
+  return
+end
+
 local logger = require("common.lib.logger")
 require("common.lib.mathExtensions")
 local utf8 = require("common.lib.utf8Additions")
@@ -29,6 +42,12 @@ function love.run()
   return CustomRun.run()
 end
 
+-- Dev e2e harness (inert unless PA_AUTO_REPLAY is set): drives the REAL app via
+-- synthesized key presses — menus -> replay browser -> open replay -> spectate
+-- -> (optional) fork -> play -> screenshot. See client/src/debug/AppDriver.lua.
+-- Wired in love.load / love.update.
+local AppDriver = require("client.src.debug.AppDriver")
+
 -- Called at the beginning to load the game
 -- Either called directly or from auto_updater
 -- Intentional override
@@ -57,6 +76,15 @@ function love.load(args, rawArgs)
     end
   end
 
+  if os.getenv("PA_SIMULATE_MOBILE") == "1" then
+    -- portrait phone window for local mobile-styling screenshots.
+    -- Size is configurable so we can mock different phones:
+    --   PA_MOBILE_W / PA_MOBILE_H  (default 540x960, a typical portrait phone)
+    local mw = tonumber(os.getenv("PA_MOBILE_W")) or 540
+    local mh = tonumber(os.getenv("PA_MOBILE_H")) or 960
+    love.window.updateMode(mw, mh, {fullscreen = false, resizable = true})
+  end
+
   local newPixelWidth, newPixelHeight = love.graphics.getWidth(), love.graphics.getHeight()
   logger.debug("Updating canvas scale from love.load")
   GAME:updateCanvasPositionAndScale(newPixelWidth, newPixelHeight)
@@ -66,6 +94,7 @@ function love.load(args, rawArgs)
     prof.enable(DebugSettings.getProfileFrameTimes())
     prof.setDurationFilter(DebugSettings.getProfileThreshold() / 1000)
   end
+  AppDriver.init()
 end
 
 -- Intentional override
@@ -92,6 +121,8 @@ function love.update(dt)
   touchHandler:update(dt)
 
   GAME:update(dt)
+
+  AppDriver.update()
 end
 
 local statOrder -- in reverse of the desired display order
@@ -135,10 +166,12 @@ function love.draw()
       local key = statOrder[i]
       local value = stats[key]
       if value then
+        ---@type string|number
+        local display = value
         if string.find(key, "memory") then
-          value = string.format("%.2f MB", value / 1024 / 1024)
+          display = string.format("%.2f MB", value / 1024 / 1024)
         end
-        love.graphics.printf(key .. ": " .. value, 0, height - i * 16, width, "right")
+        love.graphics.printf(key .. ": " .. display, 0, height - i * 16, width, "right")
       end
     end
   end
@@ -237,9 +270,19 @@ function love.quit()
   pcall(love.filesystem.write, "debug.log", tostring(logger.messageBuffer))
 
   if GAME.updater then
-    while GAME.updater.state ~= GAME_UPDATER_STATES.idle do
+    -- Bound the drain: the updater finishes on background network threads, and a
+    -- stalled mobile connection can leave it non-idle forever, hanging Quit. Cap
+    -- the wait; an in-flight download just defers to next launch (re-fetched).
+    local deadline = love.timer.getTime() + 2
+    while GAME.updater.state ~= GAME_UPDATER_STATES.idle and love.timer.getTime() < deadline do
       GAME.updater:update()
     end
+  end
+
+  -- Android: love.event.quit() only finishes the activity; the process can linger
+  -- so a relaunch resumes stale state. Force a real exit after cleanup above.
+  if love.system.getOS() == "Android" then
+    os.exit(0)
   end
 end
 
@@ -295,14 +338,15 @@ function love.errorhandler(msg)
     local detailedErrorLogString = Game.detailedErrorLogString(errorData)
     errorData.detailedErrorLogString = detailedErrorLogString
     if GAME.updater and not DEBUG_ENABLED and not os.getenv("LOCAL_LUA_DEBUGGER_VSCODE") then
-      GAME.netClient:sendErrorReport(errorData, consts.SERVER_LOCATION, 49569)
+      -- crash reporting disabled on this branch (bramp/multi-player uses a separate server)
     end
     return detailedErrorLogString
   end
 
   local success, detailedErrorLogString = pcall(getGameErrorData, sanitizedMessage, sanitizedTrace)
   local errorLines = {}
-  table.insert(errorLines, "Error: Please share your crash.log with the developers to get help with this!\n")
+  table.insert(errorLines, "Unofficial build notice: Do NOT report this to official Panel Attack / Discord developers.")
+  table.insert(errorLines, "Contact bramp and share your crash.log to get help with this!\n")
   if success then
     table.insert(errorLines, detailedErrorLogString)
     logger.info(detailedErrorLogString)
@@ -354,12 +398,19 @@ function love.errorhandler(msg)
   love.graphics.setColor(1, 1, 1)
   love.graphics.origin()
 
+  local canvasScale = 1
   if GAME then
-    local success, canvasScale = pcall(GAME.newCanvasSnappedScale, GAME)
+    local success, scale = pcall(GAME.newCanvasSnappedScale, GAME)
     if success then
+      canvasScale = scale
       love.graphics.scale(canvasScale)
     end
   end
+
+  -- Restart button (graphics-space rect; mouse hit-test divides by canvasScale).
+  local restartBtn = { w = 140, h = 40, margin = 16 }
+  restartBtn.x = (love.graphics.getWidth() / canvasScale) - restartBtn.w - restartBtn.margin
+  restartBtn.y = restartBtn.margin
 
   local function draw()
     if not love.graphics.isActive() then
@@ -369,9 +420,40 @@ function love.errorhandler(msg)
     love.graphics.clear(love.graphics.getBackgroundColor())
     local positionX = 40
     local positionY = positionX
+
+    -- Wrong-LOVE-version hint above the crash message. Hard-coded English and
+    -- pcall-guarded — the crash screen must never crash, and loc()/system may
+    -- be in an undefined state if they're what blew up.
+    pcall(function()
+      if not system.isRecommendedLoveVersion() then
+        local warning = string.format(
+          "You are running LOVE %s. Panel Attack is tested against LOVE 11.5. Install it from https://love2d.org/",
+          system.loveVersionString())
+        local font = love.graphics.getFont()
+        local wrapWidth = love.graphics.getWidth() - positionX
+        local _, lines = font:getWrap(warning, wrapWidth)
+        love.graphics.setColor(1, 0.85, 0.2, 1)
+        love.graphics.printf(warning, positionX, positionY, wrapWidth)
+        love.graphics.setColor(1, 1, 1, 1)
+        positionY = positionY + (#lines + 1) * font:getHeight()
+      end
+    end)
+
     love.graphics.printf(messageToDraw, positionX, positionY, love.graphics.getWidth() - positionX)
 
+    love.graphics.setColor(0.25, 0.45, 0.85, 1)
+    love.graphics.rectangle("fill", restartBtn.x, restartBtn.y, restartBtn.w, restartBtn.h, 6, 6)
+    love.graphics.setColor(1, 1, 1, 1)
+    love.graphics.rectangle("line", restartBtn.x, restartBtn.y, restartBtn.w, restartBtn.h, 6, 6)
+    love.graphics.printf("Restart", restartBtn.x, restartBtn.y + restartBtn.h / 2 - 8, restartBtn.w, "center")
+
     love.graphics.present()
+  end
+
+  local function restartHit(mx, my)
+    local x, y = mx / canvasScale, my / canvasScale
+    return x >= restartBtn.x and x <= restartBtn.x + restartBtn.w
+       and y >= restartBtn.y and y <= restartBtn.y + restartBtn.h
   end
 
   local fullErrorText = messageToDraw
@@ -397,7 +479,12 @@ function love.errorhandler(msg)
         return 1
       elseif e == "keypressed" and a == "c" and love.keyboard.isDown("lctrl", "rctrl") then
         copyToClipboard()
+      elseif e == "mousepressed" and restartHit(a, b) then
+        return "restart"
       elseif e == "touchpressed" then
+        if restartHit(b, c) then
+          return "restart"
+        end
         local name = love.window.getTitle()
         if #name == 0 or name == "Untitled" then
           name = "Game"

@@ -1,0 +1,266 @@
+-- getSplitCascadeShapes.lua — TWO-COLOR 6-clears that fire as a CASCADE: a swap fires a trigger run (color 3), it
+-- clears, the 1s and 2s above FALL into place, and a 3-run of 1 + a 3-run of 2 fire as the second wave (3+3). Matches:
+--     r4: 1 2          swap completes the 3 3 3, it clears, the top 1 and 2 drop ->
+--     r3: 3 3 3        col of 1 -> 1 1 1   and   col of 2 -> 2 2 2  both fire
+--     r2: 1 2
+--     r1: 1 2
+-- Method: build that topology for every column position + trigger layout, brute-force the swap, keep what the ENGINE
+-- verifies clears exactly 3 ones + 3 twos + 3 threes in a chain. Kind = COMBO_3_3_CASCADE_3.
+--   luajit bot/getSplitCascadeShapes.lua
+require("bot.headlessBoot"); do local l = require("common.lib.logger"); l.setLogLevel(l.levels.ERROR) end
+_G.loc = _G.loc or function(s) return tostring(s) end
+local shapeCache = require("bot.shapeCache")
+local getCascadeShapes = require("bot.getCascadeShapes")   -- reuse single-color cascades to compose the bent/5-run cases
+local getSplitShapes = require("bot.getSplitShapes")       -- reuse the real solved splits (bent included) to inject triggers into
+local getComboShapes = require("bot.getComboShapes")       -- single-color clearing configs (incl. bent/L) for the wave-2
+local Match = require("common.engine.Match"); require("common.engine.checkMatches")
+local LP = require("common.data.LevelPresets"); local KDE = require("common.data.KeyDataEncoding"); local Puzzle = require("common.engine.Puzzle")
+local _cascMemo = {}
+local function cascadesOf(n, m) local k = n*100+m; if not _cascMemo[k] then _cascMemo[k] = getCascadeShapes.enumerate(n, m) end return _cascMemo[k] end
+
+local W, H = 6, 12
+local A, B, C = 1, 2, 3                 -- two combo colors + the trigger color
+-- SETTLE_CAP exists ONLY to stop an infinite loop if the engine ever fails to report "settled" (an engine bug). The
+-- loop early-breaks at the real settle, so this never limits a real chip — raising it is free. Set it ABOVE the board's
+-- PHYSICAL MAXIMUM cascade: a 6x12 board has <=72 panels; the deepest possible chain pops every one (~9 frames each)
+-- across its links plus the falls, well under ~2500 frames. 3000 sits above anything the board can produce, so nothing
+-- real ever hits it. maxSettle/capHits report the actual slowest settle and warn if a chip ever does hit the guard.
+local SETTLE_CAP = 3000
+local maxSettle, capHits = 0, 0
+local function settle(st, m)           -- run until the engine reports settled; return the frame it settled on
+  for k = 1, SETTLE_CAP do
+    if st:game_ended() then if k > maxSettle then maxSettle = k end; return k end
+    st:receiveConfirmedInput("A"); m:run()
+    if k >= 2 and not st:hasActivePanels() and not st:hasChainingPanels() then if k > maxSettle then maxSettle = k end; return k end
+  end
+  capHits = capHits + 1; if SETTLE_CAP > maxSettle then maxSettle = SETTLE_CAP end; return SETTLE_CAP
+end
+local function filler(r, c) return ((r + c) % 2 == 0) and 5 or 6 end
+
+local function clone(g) local n = {}; for r = 1, H do n[r] = {}; for c = 1, W do n[r][c] = g[r][c] end end; return n end
+local function support(g) for c = 1, W do local top = 0; for r = 1, H do if g[r][c] ~= 0 then top = r end end
+  for r = 1, top do if g[r][c] == 0 then g[r][c] = filler(r, c) end end end end
+local function settleCols(g) for c = 1, W do local s = {}; for r = 1, H do if g[r][c] ~= 0 then s[#s+1] = g[r][c] end end; for r = 1, H do g[r][c] = s[r] or 0 end end end
+local function applySwap(g, r, c) local n = clone(g); n[r][c], n[r][c+1] = n[r][c+1], n[r][c]; settleCols(n); return n end
+local function stackString(g)
+  local mr = 0; for r = 1, H do for c = 1, W do if g[r][c] ~= 0 then mr = math.max(mr, r) end end end
+  local rows = {}; for r = mr, 1, -1 do local row = {}; for c = 1, 6 do row[c] = (g[r][c] ~= 0) and tostring(g[r][c]) or "0" end; rows[#rows+1] = table.concat(row) end
+  return table.concat(rows)
+end
+local function anyRun(g)
+  for r = 1, H do for c = 1, W do local v = g[r][c]
+    if v ~= 0 then
+      if c <= W-2 and g[r][c+1]==v and g[r][c+2]==v then return true end
+      if r <= H-2 and g[r+1][c]==v and g[r+2][c]==v then return true end
+    end end end
+  return false
+end
+local function bld(str)
+  local p = Puzzle({ puzzleType = "moves", stack = str, moves = 99 })
+  local m = Match(p:toPanelSource(false), p:toGameMode().matchRules)
+  local st = m:createStackWithSettings(LP.getModern(10), true, "controller", nil); st:setMaxRunsPerFrame(1); m:start()
+  for i = 1, 160 do if st:game_ended() then break end st:receiveConfirmedInput("A"); m:run(); if i >= 2 and not st:hasActivePanels() and not st:hasChainingPanels() then break end end
+  return m, st
+end
+-- swapping (r,c)<->(r,c+1) must clear EXACTLY 3 A + 3 B + 3 C (and nothing else)
+-- swapping (r,c)<->(r,c+1) must clear EXACTLY sa A + sb B + 3 C (trigger), nothing else
+local function firesSplitCascade(g, r, c, sa, sb)
+  local ok, res = pcall(function()
+    local m, st = bld(stackString(g))
+    local function cnt(col) local n=0 for rr=1,st.height do for cc=1,6 do if (st.panels[rr][cc].color or 0)==col then n=n+1 end end end return n end
+    local function others() local n=0 for rr=1,st.height do for cc=1,6 do local v=st.panels[rr][cc].color or 0; if v~=0 and v~=A and v~=B and v~=C then n=n+1 end end end return n end
+    local a0,b0,c0,o0 = cnt(A),cnt(B),cnt(C),others()
+    st.cur_row, st.cur_col = r, c; st:receiveConfirmedInput(KDE.swap); m:run()
+    settle(st, m)            -- run to the REAL settle (records timing); cap is just a runaway guard
+    return (a0-cnt(A))==sa and (b0-cnt(B))==sb and (c0-cnt(C))==3 and (o0-others())==0
+  end)
+  return ok and res
+end
+
+-- every straight n-run (horizontal or vertical) in a low window — the wave-2 (post-fall) shape of one combo color
+local function straightRuns(n)
+  local out = {}
+  for r = 1, 5 do for c = 1, W - (n-1) do local s={}; for i=0,n-1 do s[#s+1]={r,c+i} end; out[#out+1]=s end end          -- horizontal
+  for r = 1, 5 - (n-1) do for c = 1, W do local s={}; for i=0,n-1 do s[#s+1]={r+i,c} end; out[#out+1]=s end end          -- vertical
+  return out
+end
+
+-- GENERAL reverse-construction. Target = wave-2 state: a straight 3-A run + 3-B run (their positions AFTER the fall).
+-- Insert a horizontal trigger at row `trow`, cols [tc..tc+2]: every target cell in those columns at/above trow is
+-- RAISED by 1 (so firing the trigger drops it back). Columns outside the trigger don't move -> a run that straddles
+-- the trigger boundary breaks non-uniformly, which is exactly how horizontal/bent completions arise. Place 2 trigger
+-- C's + 1 displaced (an end) so a single swap fires it; the ENGINE confirms the 3+3+3 cascade. Pre-match check throws
+-- out the uniform (still-matched) raises.
+local function enumerateRaw(sa, sb)
+  sa, sb = sa or 3, sb or 3
+  local kind = string.format("COMBO_%d_%d_CASCADE_3", sa, sb)
+  local found = {}
+  local function record(g, sr, sc)            -- engine-verify + dedup by shape
+    if not anyRun(g) and firesSplitCascade(g, sr, sc, sa, sb) then
+      local kk = shapeCache.canonShape(g)
+      if kk and not found[kk] then found[kk] = { g = clone(g), sample = clone(g), sr = sr, sc = sc, key = kk, kind = kind } end
+    end
+  end
+  ------------------------------------------------------ PASS 2: compose two single-color cascades on a SHARED trigger
+  -- a-cascade (COMBO_sa_CASCADE_3: primary=color1, riser=color2) + b-cascade (COMBO_sb_CASCADE_3) that have the SAME
+  -- riser+swap. Recolor: a-primary->A, b-primary->B, the shared riser->trigger C. One swap fires the riser; both
+  -- primaries cascade. This reaches the bent / 5-run cases the raise method can't (the 5 falls into a line, doesn't
+  -- have to break a straight run). The ENGINE confirms each. Reuses getCascadeShapes — no re-derivation.
+  do
+    local la, lb = cascadesOf(sa, 3), cascadesOf(sb, 3)
+    for _, Ac in ipairs(la) do
+      local ar, ac = Ac.sr, Ac.sc
+      local aPrim, aRiserSet, nRiser = {}, {}, 0
+      for r = 1, H do for c = 1, W do local v = Ac.g[r][c]
+        if v == 1 then aPrim[#aPrim+1] = { r, c } elseif v == 2 then aRiserSet[r*100+c] = true; nRiser = nRiser + 1 end end end
+      for _, Bc in ipairs(lb) do
+        local dr, dc = ar - Bc.sr, ac - Bc.sc
+        -- B's riser (translated) must land exactly on A's riser -> a genuinely shared trigger
+        local riserOK, cntR = true, 0
+        for r = 1, H do for c = 1, W do if Bc.g[r][c] == 2 then cntR = cntR + 1
+          if not aRiserSet[(r+dr)*100+(c+dc)] then riserOK = false end end end end
+        if riserOK and cntR == nRiser then
+          local g = {}; for r = 1, H do g[r] = {}; for c = 1, W do g[r][c] = 0 end end
+          local ok = true
+          for _, p in ipairs(aPrim) do g[p[1]][p[2]] = A end                 -- a-primary -> color 1
+          for k in pairs(aRiserSet) do g[math.floor(k/100)][k%100] = C end    -- shared riser -> trigger 3
+          for r = 1, H do for c = 1, W do if Bc.g[r][c] == 1 then local nr, nc = r+dr, c+dc
+            if nr < 1 or nr > H or nc < 1 or nc > W or g[nr][nc] ~= 0 then ok = false; break end
+            g[nr][nc] = B end end if not ok then break end end
+          if ok then support(g); record(g, ar, ac) end
+        end
+      end
+    end
+  end
+  ------------------------------------------------------ inject a 3-trigger into a solved target `occ` (key->A/B), every
+  -- position: lift the target's cells in the trigger columns, drop in 2 C's + 1 displaced (one swap fires it). record()
+  -- engine-verifies + the no-pre-match / no-leftover / no-shortcut gates. Works for straight OR bent targets.
+  local function raiseInject(occ)
+    local low = H+1; for k in pairs(occ) do low = math.min(low, math.floor(k/100)) end
+    if low ~= 1 then return end                                     -- floor-anchor
+    for trow = 1, 5 do
+      for tc = 1, W - 2 do
+        local inSpan = { [tc]=true, [tc+1]=true, [tc+2]=true }
+        local p = {}; for r = 1, H do p[r] = {}; for c = 1, W do p[r][c] = 0 end end
+        local okp = true
+        for k, col in pairs(occ) do local r, c = math.floor(k/100), k%100
+          local nr = (inSpan[c] and r >= trow) and r + 1 or r
+          if nr > H or p[nr][c] ~= 0 then okp = false; break end
+          p[nr][c] = col
+        end
+        if okp and p[trow][tc] == 0 and p[trow][tc+1] == 0 and p[trow][tc+2] == 0 then
+          for _, disp in ipairs({ "L", "R" }) do
+            local g = clone(p)
+            local dcol = (disp == "L") and (tc - 1) or (tc + 3)
+            if dcol >= 1 and dcol <= W and g[trow][dcol] == 0 then
+              local missing = (disp == "L") and tc or (tc + 2)
+              for _, cc in ipairs({ tc, tc+1, tc+2 }) do if cc ~= missing then g[trow][cc] = C end end
+              g[trow][missing] = filler(trow, missing); g[trow][dcol] = C
+              support(g)
+              record(g, trow, (disp == "L") and dcol or (tc + 2))
+            end
+          end
+        end
+      end
+    end
+  end
+  ------------------------------------------------------ PASS 1: inject into every straight a-run x b-run combination
+  local RunsA, RunsB = straightRuns(sa), straightRuns(sb)
+  for _, Arun in ipairs(RunsA) do
+    for _, Brun in ipairs(RunsB) do
+      local occ, bad = {}, false
+      for _, p in ipairs(Arun) do occ[p[1]*100+p[2]] = A end
+      for _, p in ipairs(Brun) do local k=p[1]*100+p[2]; if occ[k] then bad=true break end occ[k]=B end
+      if not bad then raiseInject(occ) end
+    end
+  end
+  ------------------------------------------------------ PASS 3: compose ANY single-color CLEARING config (incl. bent/L)
+  -- the wave-2 isn't a single-swap split (e.g. two separate L's only form by the fall), so build it from single-color
+  -- clearing shapes: take each getComboShapes(sa) solved arrangement as the A-side and each getComboShapes(sb) solved as
+  -- the B-side, place them together floor-anchored at every horizontal offset, and inject a trigger. Reaches the L+L 5+5.
+  local function solvedCells(rec)
+    local s = applySwap(rec.sample, rec.sr, rec.sc)
+    local cells, minr, minc = {}, H+1, W+1
+    for r = 1, H do for c = 1, W do if s[r][c] == 1 then cells[#cells+1] = { r, c }; minr = math.min(minr, r); minc = math.min(minc, c) end end end
+    local out = {}; for _, p in ipairs(cells) do out[#out+1] = { p[1]-minr+1, p[2]-minc+1 } end   -- normalize to floor/left
+    return out
+  end
+  local aCfgs, bCfgs = {}, {}
+  for _, r in ipairs(require("bot.chipSizes").comboShapes(sa)) do aCfgs[#aCfgs+1] = solvedCells(r) end
+  for _, r in ipairs(require("bot.chipSizes").comboShapes(sb)) do bCfgs[#bCfgs+1] = solvedCells(r) end
+  for _, aC in ipairs(aCfgs) do
+    for _, bC in ipairs(bCfgs) do
+      for bShiftR = 0, 6 do                                          -- lift B (rests on filler/other panels above the floor)
+        for bShiftC = 0, W - 1 do                                    -- slide B across
+          local occ, ok = {}, true
+          for _, p in ipairs(aC) do occ[p[1]*100 + p[2]] = A end
+          for _, p in ipairs(bC) do local r, c = p[1] + bShiftR, p[2] + bShiftC
+            if r > H or c > W or occ[r*100 + c] then ok = false; break end
+            occ[r*100 + c] = B
+          end
+          if ok then raiseInject(occ) end
+        end
+      end
+    end
+  end
+  local list = {}; for _, rec in pairs(found) do list[#list+1] = rec end
+  table.sort(list, function(a, b) return a.key < b.key end)
+  return list
+end
+-- persistent cache: the inject pass computes once per pair, reused across regens + by getSplitCascadeSetups
+local function enumerate(sa, sb)
+  return require("bot.chipStore").memoEnum("getSplitCascadeShapes", (sa or 3) .. "_" .. (sb or 3), function() return enumerateRaw(sa, sb) end)
+end
+
+local Mod = { enumerate = enumerate }
+
+----------------------------------------------------------------- render
+local function sym(v) if v == 0 then return "." elseif v >= 5 then return "*" else return tostring(v) end end
+local function render(rec)
+  local g, sr, sc = rec.sample, rec.sr, rec.sc
+  local minr,maxr,minc,maxc = H,1,W,1
+  for r=1,H do for c=1,W do if g[r][c]~=0 and g[r][c]<5 then minr=math.min(minr,r);maxr=math.max(maxr,r);minc=math.min(minc,c);maxc=math.max(maxc,c) end end end
+  minc = math.min(minc, sc); maxc = math.max(maxc, sc+1)
+  local lines = {}
+  for r = maxr, minr, -1 do
+    local row = {}
+    for c = minc, maxc do local ch = sym(g[r][c])
+      if r == sr and (c == sc or c == sc+1) then ch = "["..ch.."]" else ch = " "..ch.." " end
+      row[#row+1] = ch end
+    lines[#lines+1] = ("     " .. table.concat(row)):gsub("%s+$","")
+  end
+  return lines
+end
+
+local PAIRS = require("bot.chipSizes").PAIRS
+
+if arg and arg[0] and arg[0]:match("getSplitCascadeShapes") then
+  local sa, sb = tonumber(arg[1]) or 3, tonumber(arg[2]) or 3
+  local list = enumerate(sa, sb)
+  print(string.format("COMBO_%d_%d_CASCADE_3 (fire trigger -> A/B fall -> %d+%d): %d distinct   (1/2=combo · 3=trigger · *=support · [..]=swap)\n", sa, sb, sa, sb, #list))
+  for i, rec in ipairs(list) do
+    print(string.format("#%d  swap (%d,%d)", i, rec.sr, rec.sc))
+    for _, row in ipairs(render(rec)) do print(row) end
+    print("")
+  end
+  local bake = require("bot.chipBake")
+  local chips = {}
+  for _, v in ipairs(list) do chips[#chips+1] = bake.author(v.g, v.sr, v.sc, v.kind, { { v.sr, v.sc } }) end
+  local cnt = bake.upsert(string.format("^COMBO_%d_%d_CASCADE_3$", sa, sb), chips)
+  print(string.format("baked %d COMBO_%d_%d_CASCADE_3 chips into cache (cache now %d total)", #chips, sa, sb, cnt))
+  print(string.format("[timing] slowest cascade settled at %d frames (ceiling %d, %.0f%% headroom); ceiling hits: %d",
+    maxSettle, SETTLE_CAP, 100 * (1 - maxSettle / SETTLE_CAP), capHits))
+end
+
+Mod.timing = function() return maxSettle, capHits, SETTLE_CAP end
+
+local function produce()
+  local out = {}
+  for _, p in ipairs(PAIRS) do
+    for _, v in ipairs(enumerate(p[1], p[2])) do out[#out+1] = { g = v.g, sr = v.sr, sc = v.sc, kind = v.kind, absSwaps = { { v.sr, v.sc } } } end
+  end
+  return out
+end
+require("bot.chipRegistry").register{ name = "getSplitCascadeShapes", produce = produce }
+
+return Mod

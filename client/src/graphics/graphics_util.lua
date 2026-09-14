@@ -2,6 +2,7 @@ local consts = require("common.engine.consts")
 local logger = require("common.lib.logger")
 local FileUtils = require("client.src.FileUtils")
 local system = require("client.src.system")
+local AssetDecodeClient = require("client.src.mods.AssetDecodeClient")
 
 -- Utility methods for drawing
 local GraphicsUtil = {
@@ -13,6 +14,12 @@ local GraphicsUtil = {
   quadPool = {}
 }
 
+-- True only on a real phone, or when mocking it locally (PA_SIMULATE_MOBILE).
+-- Desktop is never affected by any of the mobile/portrait gating below.
+local function isMobilePortrait()
+  return system.isPortraitMode()
+end
+
 -- a local table to quickly crosscheck whether a quad is in the quadpool or not by using the quad as the index
 -- the calling code can always try to release the same quad twice and by keeping a reference we can make sure that doesn't happen
 ---@type table<love.Quad, true?>
@@ -21,7 +28,7 @@ local quadReference = {}
 ---@class PixelFontMap
 ---@field charWidth number
 ---@field charHeight number
----@field atlas love.Texture
+---@field atlas love.Texture? nil only for the placeholder map Theme uses when blankAtlas failed to load
 ---@field charToQuad table<string, love.Quad>
 
 ---@param characters string
@@ -58,6 +65,23 @@ function GraphicsUtil.privateLoadImage(path_and_name)
   return image
 end
 
+-- Decodes via the worker thread then constructs the Image on main. dpiscale
+-- must be passed explicitly — the worker returns raw ImageData with no
+-- filename context, so love.graphics.newImage(imageData) would default to 1.
+function GraphicsUtil.privateLoadImageThreaded(path_and_name, dpiscale)
+  local imageData = AssetDecodeClient.decodeImage(path_and_name)
+  if not imageData then return nil end
+  local image
+  local status = pcall(function()
+    image = love.graphics.newImage(imageData, {dpiscale = dpiscale or 1})
+  end)
+  if not image then
+    return nil
+  end
+  logger.trace("loaded asset (threaded): " .. path_and_name)
+  return image
+end
+
 function GraphicsUtil.privateLoadImageWithExtensionAndScale(pathAndName, extension, scale)
   local scaleSuffixString = "@" .. scale .. "x"
   if scale == 1 then
@@ -67,7 +91,17 @@ function GraphicsUtil.privateLoadImageWithExtensionAndScale(pathAndName, extensi
   local fileName = pathAndName .. scaleSuffixString .. extension
 
   if FileUtils.exists(fileName) then
-    local result = GraphicsUtil.privateLoadImage(fileName)
+    -- Threaded decode path when called from inside a coroutine (i.e. the
+    -- ModLoader bulk load). Direct on-main load elsewhere — fonts, UI
+    -- assets, one-shot loads — to avoid the worker round-trip overhead.
+    -- Gated on AssetDecodeClient.enabled so boot's setupRoutine doesn't pay
+    -- a frame round-trip per asset.
+    local result
+    if AssetDecodeClient.enabled and coroutine.running() ~= nil then
+      result = GraphicsUtil.privateLoadImageThreaded(fileName, scale)
+    else
+      result = GraphicsUtil.privateLoadImage(fileName)
+    end
     if result then
       assert(result:getDPIScale() == scale, "The image " .. pathAndName .. " didn't wasn't created with the scale: " .. scale .. " did you make sure the width and height are divisible by the scale?")
       -- We would like to use linear for shrinking and nearest for growing,
@@ -254,6 +288,11 @@ function GraphicsUtil.getGlobalFontWithSize(fontSize)
 end
 
 function GraphicsUtil.setGlobalFont(filepath, size, dpiScale)
+  -- Mobile/portrait only: scale the base font up so menus & buttons (sized from
+  -- the label font) grow proportionally. Gated — desktop keeps its exact size.
+  if isMobilePortrait() then
+    size = math.floor(size * 2)
+  end
   GraphicsUtil.setFontDpiScale(dpiScale)
   GraphicsUtil.fontCache = {}
   GraphicsUtil.fontFile = filepath
@@ -282,6 +321,11 @@ function GraphicsUtil.setShader(shader)
 end
 
 -- Draws text at the given spot
+---@param str string|number text to print (numbers stringified by love.graphics.print)
+---@param x number?
+---@param y number?
+---@param color table?
+---@param scale number?
 function GraphicsUtil.print(str, x, y, color, scale)
   x = x or 0
   y = y or 0

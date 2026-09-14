@@ -9,6 +9,7 @@ local PlayerStack = require("client.src.PlayerStack")
 require("client.src.network.PlayerStack")
 local logger = require("common.lib.logger")
 local StackBehaviours = require("common.data.StackBehaviours")
+local TeamUtils = require("common.data.TeamUtils")
 ---@module "common.data.LevelData"
 
 
@@ -22,6 +23,7 @@ local StackBehaviours = require("common.data.StackBehaviours")
 ---@field style Styles
 ---@field wantsRanked boolean
 ---@field inputMethod InputMethod
+---@field endlessNoRaise boolean?
 
 
 -- A player is mostly a data representation of a Panel Attack player
@@ -35,6 +37,8 @@ local StackBehaviours = require("common.data.StackBehaviours")
 ---@field playerNumber integer?
 ---@field inputConfiguration InputConfiguration?
 ---@field lastUsedInputConfiguration InputConfiguration?
+---@field _netClientSettingsHooked boolean? guard set by NetClient.registerPlayerUpdates so re-registration after a disconnect doesn't double-subscribe
+---@field _charSelectLevelHooked boolean? guard set by CharacterSelect:onRosterChanged so mid-session drop-ins don't double-subscribe the levelDataChanged listener
 ---@overload fun(name: string, publicId: integer, isLocal: boolean?): Player
 local Player = class(
 ---@param self Player
@@ -62,6 +66,7 @@ function(self, name, publicId, isLocal)
   settings.wantsRanked = true
   settings.inputMethod = "controller"
   settings.attackEngineSettings = nil
+  settings.endlessNoRaise = false
 
   -- planned for the future, players don't have public ids yet
   self.publicId = publicId or -1
@@ -89,6 +94,7 @@ function(self, name, publicId, isLocal)
   self:createSignal("ratingChanged")
   self:createSignal("leagueChanged")
   self:createSignal("wantsRankedChanged")
+  self:createSignal("endlessNoRaiseChanged")
 end,
 MatchParticipant)
 
@@ -191,6 +197,14 @@ function Player:setStyle(style)
   end
 end
 
+function Player:setEndlessNoRaise(value)
+  value = value == true
+  if self.settings.endlessNoRaise ~= value then
+    self.settings.endlessNoRaise = value
+    self:emitSignal("endlessNoRaiseChanged", value)
+  end
+end
+
 function Player:setRating(rating)
   if self.rating and tonumber(self.rating) then
     -- only save a rating if we actually have one, tonumber assures that rating does not track placement progress instead
@@ -273,9 +287,16 @@ end
 
 ---@param stackMetadata StackMetadata
 ---@return Player
+---@param stackMetadata StackMetadata
 function Player.createFromReplayMetadata(stackMetadata)
   local player = Player(stackMetadata.name, stackMetadata.publicId, false)
-  player.playerNumber = stackMetadata.stackIndex
+  -- seatId is canonical. A missing seatId in a team-mode replay will cause
+  -- teamIndexForPlayer to error loudly at render time — by design.
+  if stackMetadata.seatId then
+    TeamUtils.assignSeatIdentity(player, stackMetadata.seatId)
+  else
+    logger.warn("Player.createFromReplayMetadata: stackMetadata.seatId missing (legacy replay?)")
+  end
   player:setWinCount(stackMetadata.wins)
   player:setPanels(stackMetadata.panelId)
   player:setCharacter(stackMetadata.characterId)
@@ -303,8 +324,6 @@ function Player:updateSettings(settings)
         self:emitSignal("selectedCharacterIdChanged", self.settings.selectedCharacterId)
       end
     elseif settings.selectedCharacterId and characters[settings.selectedCharacterId] then
-      -- if we don't have their character rolled from their bundle, but the bundle itself, use that
-      -- very unlikely tbh
       self:setCharacter(settings.selectedCharacterId)
     elseif self.settings.characterId == "" then
       -- we don't have their character and we didn't roll them a random character yet
@@ -322,8 +341,6 @@ function Player:updateSettings(settings)
         self:emitSignal("selectedStageIdChanged", self.settings.selectedStageId)
       end
     elseif settings.selectedStageId and stages[settings.selectedStageId] then
-      -- if we don't have their stage rolled from their bundle, but the bundle itself, use that
-      -- very unlikely tbh
       self:setStage(settings.selectedStageId)
     elseif self.settings.stageId == "" then
       -- we don't have their stage and we didn't roll them a random stage yet
@@ -347,16 +364,27 @@ function Player:updateSettings(settings)
     self:setInputMethod(settings.inputMethod)
   end
 
-  -- these are both simply not sent by the server for some messages so make sure they are there
-  if settings.wantsReady ~= nil then
-    self:setWantsReady(settings.wantsReady)
-  end
-  if settings.hasLoaded ~= nil then
-    self:setLoaded(settings.hasLoaded)
+  -- wantsReady / hasLoaded / ready are CLIENT-authoritative for the local
+  -- player — they reflect "did the user click ready" and "are my mods loaded
+  -- on this machine," neither of which the server can know better than we do.
+  -- The server's menu_state echo of our own state arrives stale (we already
+  -- moved on locally) and previously stomped wantsReady → false the moment we
+  -- clicked ready, leaving the user stuck in the waiting room. For REMOTE
+  -- players the server stays authoritative — they're the only source.
+  if not self.isLocal then
+    if settings.wantsReady ~= nil then
+      self:setWantsReady(settings.wantsReady)
+    end
+    if settings.hasLoaded ~= nil then
+      self:setLoaded(settings.hasLoaded)
+    end
+    if settings.ready ~= nil then
+      self:setReady(settings.ready)
+    end
   end
 
-  if settings.ready ~= nil then
-    self:setReady(settings.ready)
+  if settings.endlessNoRaise ~= nil then
+    self:setEndlessNoRaise(settings.endlessNoRaise)
   end
 end
 

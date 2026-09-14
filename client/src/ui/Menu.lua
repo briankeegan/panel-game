@@ -6,6 +6,9 @@ local Label = require(PATH .. ".Label")
 local directsFocus = require(PATH .. ".FocusDirector")
 local class = require("common.lib.class")
 local input = require("client.src.inputManager")
+local system = require("client.src.system")
+local DebugSettings = require("client.src.debug.DebugSettings")
+local consts = require("common.engine.consts")
 
 local NAVIGATION_BUTTON_WIDTH = 30
 
@@ -57,6 +60,11 @@ function Menu.createCenteredMenu(items, height, options)
   options.vAlign = "center"
   options.menuItems = items
   options.height = height or themes[config.theme].main_menu_max_height
+  -- portrait: use (almost) the whole screen as the viewport so the buttons can be
+  -- big and still fit without scrolling (fitToScreen sizes them to this).
+  if system.isPortraitMode() then
+    options.height = math.floor(consts.CANVAS_HEIGHT * 0.92)
+  end
 
   local menu = Menu(options)
   return menu
@@ -80,7 +88,36 @@ function Menu:setMenuItems(menuItems)
     self:addChild(menuItem)
     self.menuItems[#self.menuItems + 1] = menuItem
   end
+  self:fitToScreen()
   self:setSelectedIndex(1)
+end
+
+-- portrait: shrink the (big) buttons just enough that the whole menu fits on one
+-- screen without scrolling. Only scales DOWN — menus with few items stay full size.
+function Menu:fitToScreen()
+  if not system.isPortraitMode() then return end
+  local n = #self.menuItems
+  if n == 0 then return end
+  local vpad = 30
+  local itemsH = 0
+  for _, it in ipairs(self.menuItems) do itemsH = itemsH + it.height end
+  -- fit the items into the menu's own viewport (set to ~full screen in portrait)
+  local avail = self.height - (n - 1) * vpad
+  if itemsH <= avail then return end
+  local scale = avail / itemsH
+  for _, it in ipairs(self.menuItems) do
+    local btn = it.textButton
+    if btn and btn.label and btn.label.fontSize then
+      btn.label.fontSize = math.max(14, math.floor(btn.label.fontSize * scale))
+      local t = btn.label.text
+      btn.label.text = nil
+      btn.label.drawable = nil
+      btn.label:setText(t, btn.label.replacementTable, btn.label.translate)
+      local _, h = btn.label:getEffectiveDimensions()
+      btn.height = math.floor(h + (btn.HEIGHT_PADDING or 0) * 2)
+    end
+    it.height = math.floor(it.height * scale)
+  end
 end
 
 function Menu:layout()
@@ -96,13 +133,16 @@ function Menu:layout()
     return
   end
 
+  -- portrait: more breathing room between the (big) buttons
+  local vpad = system.isPortraitMode() and 30 or Menu.BUTTON_VERTICAL_PADDING
+
   -- If sizeToFit is enabled, recalculate height from content
   if self.sizeToFit then
     self.height = 0
     for i, menuItem in ipairs(self.menuItems) do
       self.height = self.height + menuItem.height
       if i < #self.menuItems then
-        self.height = self.height + Menu.BUTTON_VERTICAL_PADDING
+        self.height = self.height + vpad
       end
     end
   end
@@ -133,7 +173,7 @@ function Menu:layout()
     end
     currentY = currentY + menuItem.height
     if i < #self.menuItems then
-      currentY = currentY + Menu.BUTTON_VERTICAL_PADDING
+      currentY = currentY + vpad
     end
     if menuFull == false then
       self.lastActiveIndex = i
@@ -142,7 +182,15 @@ function Menu:layout()
     self.width = math.max(self.width, menuItem.width)
     self.totalHeight = self.totalHeight + menuItem.height
     if i < #self.menuItems then
-      self.totalHeight = self.totalHeight + Menu.BUTTON_VERTICAL_PADDING
+      self.totalHeight = self.totalHeight + vpad
+    end
+  end
+
+  -- portrait: center each button within the menu column (otherwise items sit at
+  -- the left edge with ragged right edges). Desktop/landscape layout untouched.
+  if system.isPortraitMode() then
+    for _, menuItem in ipairs(self.menuItems) do
+      menuItem.x = (self.width - menuItem.width) / 2
     end
   end
 
@@ -224,15 +272,20 @@ function Menu:setSelectedIndex(index)
   elseif self.firstActiveIndex > index then
     self.yOffset = self.menuItemYOffsets[index]
   elseif self.lastActiveIndex < index then
-    local currentIndex = 1
-    local bottomOfDesiredIndex = self.menuItemYOffsets[index] + self.menuItems[index].height
-    while self.menuItemYOffsets[currentIndex] + self.height < bottomOfDesiredIndex do
-      currentIndex = currentIndex + 1
-      if currentIndex >= #self.menuItems then
-        break
+    -- guard: when an item is added then selected before layout() rebuilds the
+    -- offsets, menuItemYOffsets[index] is nil; skip rather than crash (layout()
+    -- runs right after and fixes the offset). Behaviour-neutral when offsets exist.
+    if self.menuItemYOffsets[index] and self.menuItems[index] then
+      local currentIndex = 1
+      local bottomOfDesiredIndex = self.menuItemYOffsets[index] + self.menuItems[index].height
+      while self.menuItemYOffsets[currentIndex] + self.height < bottomOfDesiredIndex do
+        currentIndex = currentIndex + 1
+        if currentIndex >= #self.menuItems then
+          break
+        end
       end
+      self.yOffset = self.menuItemYOffsets[currentIndex]
     end
-    self.yOffset = self.menuItemYOffsets[currentIndex]
   end
   self.selectedIndex = index
   if #self.menuItems > 0 then

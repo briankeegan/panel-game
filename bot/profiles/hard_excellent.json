@@ -1,0 +1,13 @@
+{
+  "_comment": "EXCELLENT-HARD SearchBrain profile: tuned to WIN contested matches vs an active attacker by counter-pressuring (attacking while defending) instead of going pure-defense under garbage. Loaded by the deployed hard bot. Eval DEFAULTS stay at robust values (counterPressure=0 == robust-hard); this profile turns the knobs up. Schema = bot/profiles/example.json.",
+  "counterPressure": 0.6,
+  "chainUnit": 60,
+  "comboUnit": 48,
+  "futureDiscount": 0.6,
+  "chainDepthWhenSafe": 1.3,
+  "heightBand": [6, 8],
+  "_meta": {
+    "style": "COUNTER-PRESSURE: keeps attacking (combos) while buried so it reaches and wins the contested states a pure-defense bot never enters. counterPressure relaxes the buried offense-suppression (0.35 -> 0.74 offenseScale). comboUnit up for combo volume; chainDepthWhenSafe slightly up to build a little deeper when fully safe.",
+    "tunedAgainst": "win-rate vs bot/profiles/kekeke.json (aggressive high-builder), offense-under-pressure, survival p10."
+  }
+}

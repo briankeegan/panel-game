@@ -30,6 +30,54 @@ local ModController = require("client.src.mods.ModController")
 ---@field isLocal boolean if the participant is controlled by a local player
 ---@field playerNumber integer the (external) id for the player within the room; used to assign server messages to the correct player when spectating
 ---@field stack ClientStack?
+---@field stackIndex integer? dense engine slot for the active match; only meaningful while a match is live
+---@field seatId integer? authoritative seat id assigned by the server (TeamUtils.assignSeatIdentity)
+---@field publicId PublicPlayerID? server's stable public id for this participant
+---@field lastPlacement integer? ordinal placement from the just-ended match (1 = winner). nil until first match completes
+---@field lastMatchOutClock integer? death stopWatch (frames, countdown excluded) from the just-ended match; 0 if this participant didn't die
+---@field rating (number|string)? current ELO; can be a placement-progress string in early ranked play
+---@field league string? league tier ("none", "bronze", ...) derived from rating
+---@field cursor table? CharacterSelect-scoped GridCursor widget; scene-bound
+
+-- ============================================================================
+-- Field lifecycle classification
+-- ============================================================================
+-- These categories are load-bearing — most "stale state contaminating a new
+-- match" bugs trace back to mutating a per-match field on an object whose
+-- lifecycle is account-level.
+--
+-- IDENTITY (account-level, never cleared after construction):
+--   name, publicId, isLocal, human
+--
+-- PER-ROOM (cleared when leaving a room, persists across matches in same room):
+--   seatId, playerNumber, player_number       — seat in the lobby (refreshed
+--                                                via TeamUtils.assignSeatIdentity
+--                                                on join / rejoin)
+--   wins, modifiedWins, winrate, expectedWinrate
+--   settings.*                                  — character / stage / level /
+--                                                 panels / wantsRanked picks
+--   ready, wantsReady, hasLoaded                — per-character-select cycle,
+--                                                 reset between matches by
+--                                                 resetMatchTransientState
+--   rating, league, ratingHistory               — per-room view of ladder data
+--
+-- PER-MATCH (must NOT leak from one match to the next — cleared by
+-- clearPerMatchState before the new match's state is written):
+--   stack            — ClientStack ref (built fresh each match)
+--   stackIndex       — dense engine position; only meaningful during a match
+--   lastPlacement    — outcome of the just-ended match
+--
+-- SCENE-BOUND (owned by the scene that installs them, cleared by scene
+-- lifecycle, must NEVER be touched by match flow):
+--   cursor           — GridCursor widget installed by CharacterSelect
+--   inputConfiguration — input device claim
+--
+-- Adding a new field? Decide which category it belongs to and document here.
+-- "Per-match" fields belong in clearPerMatchState. "Per-room" fields belong in
+-- the relevant reset path (MatchParticipant:reset, leaveRoom, etc.). Mutating
+-- a "scene-bound" field from match-flow code is how the GridCursor crash
+-- happened.
+-- ============================================================================
 
 -- a match participant represents the minimum spec for a what constitutes a "player" in a battleRoom / match
 ---@class MatchParticipant : Signal
@@ -59,6 +107,7 @@ function(self)
   self:createSignal("readyChanged")
   self:createSignal("hasLoadedChanged")
   self:createSignal("attackEngineSettingsChanged")
+  self:createSignal("placementChanged")
 end)
 
 function MatchParticipant:reset()
@@ -77,12 +126,21 @@ function MatchParticipant:getWinCountForDisplay()
 end
 
 function MatchParticipant:setWinCount(count)
-  self.wins = count
+  self.wins = tonumber(count) or 0
   self:emitSignal("winsChanged", self:getWinCountForDisplay())
 end
 
 function MatchParticipant:incrementWinCount()
-  self:setWinCount(self.wins + 1)
+  self:setWinCount((self.wins or 0) + 1)
+end
+
+-- Last match's ordinal placement (1 = winner, 2 = runner-up, etc.) from the
+-- server's gameResult payload. Nil until first match completes.
+function MatchParticipant:setPlacement(placement)
+  self.lastPlacement = placement
+  -- Fired after onMatchEnded already captured lastMatchOutClock from the engine,
+  -- so subscribers can read both fields atomically.
+  self:emitSignal("placementChanged", placement, self.lastMatchOutClock)
 end
 
 function MatchParticipant:setWinrate(winrate)
@@ -99,9 +157,8 @@ function MatchParticipant:setStage(stageId)
   if stageId ~= self.settings.selectedStageId then
     self.settings.selectedStageId = StageLoader.resolveStageSelection(stageId)
     self:emitSignal("selectedStageIdChanged", self.settings.selectedStageId)
+    self:refreshStage()
   end
-  -- even if it's the same stage as before, refresh the pick, cause it could be bundle or random
-  self:refreshStage()
 end
 
 function MatchParticipant:refreshStage()
@@ -109,12 +166,9 @@ function MatchParticipant:refreshStage()
   self.settings.stageId = StageLoader.resolveBundle(self.settings.selectedStageId)
   if currentId ~= self.settings.stageId then
     self:emitSignal("stageIdChanged", self.settings.stageId)
-    if not stages[self.settings.stageId].fullyLoaded then
-      logger.debug("Loading stage " .. self.settings.stageId .. " as part of refreshStage for player " .. self.name)
-      ModController:loadModFor(stages[self.settings.stageId], self)
-      if self.isLocal then
-        self:setLoaded(false)
-      end
+    local stage = ModController:loadStageIdFor(self, self.settings.stageId)
+    if self.isLocal and not stage.fullyLoaded then
+      self:setLoaded(false)
     end
   end
 end
@@ -127,9 +181,8 @@ function MatchParticipant:setCharacter(characterId)
       self.settings.selectedCharacterId = consts.RANDOM_CHARACTER_SPECIAL_VALUE
     end
     self:emitSignal("selectedCharacterIdChanged", self.settings.selectedCharacterId)
+    self:refreshCharacter()
   end
-  -- even if it's the same character as before, refresh the pick, cause it could be bundle or random
-  self:refreshCharacter()
 end
 
 function MatchParticipant:refreshCharacter()
@@ -137,12 +190,9 @@ function MatchParticipant:refreshCharacter()
   self.settings.characterId = CharacterLoader.resolveBundle(self.settings.selectedCharacterId)
   if currentId ~= self.settings.characterId then
     self:emitSignal("characterIdChanged", self.settings.characterId)
-    if not characters[self.settings.characterId].fullyLoaded then
-      logger.debug("Loading character " .. self.settings.characterId .. " as part of refreshCharacter for player " .. self.name)
-      ModController:loadModFor(characters[self.settings.characterId], self)
-      if self.isLocal then
-        self:setLoaded(false)
-      end
+    local character = ModController:loadCharacterIdFor(self, self.settings.characterId)
+    if self.isLocal and not character.fullyLoaded then
+      self:setLoaded(false)
     end
   end
 end
@@ -163,6 +213,8 @@ end
 
 function MatchParticipant:setWantsReady(wantsReady)
   if wantsReady ~= self.settings.wantsReady then
+    logger.info(string.format("setWantsReady %s -> %s for %s (isLocal=%s)",
+      tostring(self.settings.wantsReady), tostring(wantsReady), tostring(self.name), tostring(self.isLocal)))
     self.settings.wantsReady = wantsReady
     self:emitSignal("wantsReadyChanged", wantsReady)
   end
@@ -177,6 +229,8 @@ end
 
 function MatchParticipant:setLoaded(hasLoaded)
   if hasLoaded ~= self.hasLoaded then
+    logger.info(string.format("setLoaded %s -> %s for %s (isLocal=%s)",
+      tostring(self.hasLoaded), tostring(hasLoaded), tostring(self.name), tostring(self.isLocal)))
     self.hasLoaded = hasLoaded
     self:emitSignal("hasLoadedChanged", hasLoaded)
   end
@@ -192,13 +246,89 @@ function MatchParticipant:setAttackEngineSettings(attackEngineSettings)
   end
 end
 
+-- Per-character-select-cycle reset. Server resends authoritative values via
+-- menu_state at character-select, but resetting locally first avoids a stale-
+-- display window between match-end and the server snapshot arriving.
+--
+-- NOTE: deliberately does NOT touch hasLoaded. The local player's hasLoaded is
+-- owned by BattleRoom.allAssetsLoaded (signal-driven), and remote players'
+-- hasLoaded is owned by server menu_state. Slamming it false here would leave
+-- it stuck false between matches: assets are still loaded so the BattleRoom
+-- signal doesn't re-fire, and the ready button stays gated. Mod changes still
+-- correctly set loaded=false via refreshCharacter / refreshStage when the new
+-- mod isn't fullyLoaded.
+function MatchParticipant:resetMatchTransientState()
+  if self.human then
+    self:setWantsReady(false)
+  end
+  self:setReady(false)
+  -- self.cursor is scene-bound (CharacterSelect's GridCursor widget). Match-
+  -- flow code must not touch it.
+end
+
+-- Clear PER-MATCH state. Called at match start (in ClientMatch.createFromReplay)
+-- before the new match's seat / stack identity gets written to a carried-over
+-- player object. Without this, a player who rejoined into a different seat (or
+-- whose stack index changed because of roster compaction) keeps stale pointers
+-- to the previous match's ClientStack and placement. See the field-lifecycle
+-- comment block above.
+function MatchParticipant:clearPerMatchState()
+  self.stack = nil
+  self.stackIndex = nil
+  self.lastPlacement = nil
+  self.lastMatchOutClock = nil
+end
+
 -- a callback that runs whenever a match ended
 ---@param match ClientMatch
 function MatchParticipant:onMatchEnded(match)
-   -- to prevent the game from instantly restarting, unready all players
-   if self.human then
-    self:setWantsReady(false)
-   end
+  -- Captured before clearPerMatchState nils self.stack. stopWatch excludes the
+  -- countdown so it lines up with the in-game timer. 0 = never died (winner).
+  if self.stack and self.stack.engine then
+    self.lastMatchOutClock = self.stack.engine.game_over_stopWatch or 0
+  end
+
+  -- Runner-up fallback: ClientMatch's backfill stamps non-winner stacks at
+  -- match-end when their D event raced match-end, but that path can still
+  -- miss the last-to-die in some loose-sync orderings (their game_over_clock
+  -- gets recorded mid-frame, this signal fires before the next engine tick
+  -- normalizes stopWatch, or spectator view-stacks reach this callback
+  -- before _applyDeathEventNow finishes). Snap any non-winner with no
+  -- recorded out-time to the match's end stopwatch so the "Out: M:SS" row
+  -- still shows. Gated on self.stack so participants who never played
+  -- this match (e.g. mid-session joiners between matches) stay at nil.
+  if (self.lastMatchOutClock or 0) == 0
+     and match and match.engine
+     and self.stack and self.stack.engine then
+    local winners = match.engine.getWinners and match.engine:getWinners() or {}
+    local isWinner = false
+    for _, w in ipairs(winners) do
+      if w == self.stack.engine then isWinner = true; break end
+    end
+    if not isWinner then
+      -- Note: match.engine has no `stopWatch` field (Match exposes `clock`
+      -- only; stopWatch is per-Stack). This read evaluates to nil in
+      -- practice, so the fallback `or 0` is what actually fires. Leaving as
+      -- a no-op rather than rewiring to self.stack.engine.stopWatch — the
+      -- downstream consumers (placement renderer, replay metadata) appear
+      -- to be fine with the 0 sentinel. Revisit if the value is ever used
+      -- as a real timestamp.
+      ---@diagnostic disable-next-line: undefined-field
+      self.lastMatchOutClock = match.engine.stopWatch or 0
+    end
+  end
+
+  -- If the server's gameResult beat us to setPlacement (common: server S
+  -- arrives before the local engine finalizes), placementChanged already
+  -- fired with lastMatchOutClock = nil and the match-out row stayed blank.
+  -- Re-emit so subscribers update with the now-captured value. Listeners
+  -- (promoteNameToTop, mountStatsAbovePlacement) are idempotent, so the
+  -- second fire is harmless when we got here in the natural order.
+  if self.lastPlacement then
+    self:emitSignal("placementChanged", self.lastPlacement, self.lastMatchOutClock)
+  end
+
+  self:resetMatchTransientState()
   -- Skip refresh if character and stage are locked (e.g., in puzzle mode)
   if not self.settings.lockCharacterAndStage then
     self:refreshCharacter()

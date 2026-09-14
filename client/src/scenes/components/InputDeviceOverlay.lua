@@ -468,6 +468,31 @@ function InputDeviceOverlay:updateSelf(dt)
   end
 end
 
+-- Auto-restore the local player's last-used device (config.inputConfigurationId)
+-- so a returning player isn't forced to re-pick every launch. Silent (no SFX /
+-- animation, unlike assignDevice) and best-effort: only the client's own player,
+-- only if the saved device exists and is free. Anything else falls back to the
+-- normal hold-to-confirm overlay, so there's no regression.
+function InputDeviceOverlay:restoreSavedDeviceIfPossible()
+  local savedId = config.inputConfigurationId
+  if not savedId then return end
+  local player = GAME.localPlayer
+  if not player or player:hasInputConfiguration() then return end
+  if not tableUtils.contains(self.players, player) then return end
+
+  local device
+  if savedId == "touch" then
+    device = inputManager.getTouchInputConfiguration()
+  else
+    for _, cfg in ipairs(inputManager.inputConfigurations) do
+      if cfg.id == savedId and not cfg:isEmpty() then device = cfg break end
+    end
+  end
+  if device and not device.claimed then
+    player:restrictInputs(device)
+  end
+end
+
 function InputDeviceOverlay:openInputDeviceOverlayIfNeeded()
   if self.active then
     return
@@ -476,6 +501,19 @@ function InputDeviceOverlay:openInputDeviceOverlayIfNeeded()
   if #self.players == 0 then
     -- no local players
     return
+  end
+
+  -- mobile mode: touch is the only input. Assign every local player to touch and
+  -- never show the device-assignment overlay (no keyboard/controller option).
+  if require("client.src.system").isPortraitMode() then
+    for _, player in ipairs(self.players) do
+      player:setInputMethod("touch")
+    end
+    return
+  end
+
+  if not self:allPlayersAssigned() then
+    self:restoreSavedDeviceIfPossible()
   end
 
   if not self:allPlayersAssigned() then
@@ -495,6 +533,14 @@ function InputDeviceOverlay:drawSelf()
 end
 
 function InputDeviceOverlay:open()
+  -- mobile mode: touch only — never show the device picker, just ensure touch
+  -- (covers the direct "change input" path too)
+  if require("client.src.system").isPortraitMode() then
+    for _, player in ipairs(self.players) do
+      player:setInputMethod("touch")
+    end
+    return
+  end
   self.deviceState = {}
   self.touchTargetSlot = nil
   self.autoCloseTimer = 0

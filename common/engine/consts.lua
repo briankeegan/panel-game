@@ -31,8 +31,17 @@ consts.ENGINE_VERSIONS.TOUCH_COMPATIBLE = "047"
 consts.ENGINE_VERSIONS.LEVELDATA = "048"
 consts.ENGINE_VERSIONS.WIGGLE_PUNISH = "049"
 
-consts.ENGINE_VERSION = consts.ENGINE_VERSIONS.WIGGLE_PUNISH -- The current engine version
-consts.VERSION_MIN_VIEW = consts.ENGINE_VERSIONS.LEVELDATA -- The lowest version number that can be watched
+-- Build version: "<engineVersion>.<patch>" (e.g. "001.0013"). Single source
+-- of truth for versioning — deploy.sh bumps the patch here. It also gates
+-- play: the server (server/Connection.lua) requires a matching engine version
+-- AND a client patch >= its own. ENGINE_VERSION is derived from this so the
+-- two can never drift.
+consts.BUILD_VERSION = "049.0085"
+
+-- Engine/simulation version: the "<engineVersion>" half of BUILD_VERSION.
+-- Stamped into replays; the ENGINE_VERSIONS table above names historical
+-- engine values used by the replay-compat branches in Stack.lua / ReplayV3.lua.
+consts.ENGINE_VERSION = consts.BUILD_VERSION:match("^(%d+)%.") -- The current engine version
 
 consts.COUNTDOWN_CURSOR_SPEED = 4 --one move every this many frames
 consts.COUNTDOWN_START = 8
@@ -43,12 +52,12 @@ consts.PUZZLES_LOAD_DIRECTORY = "client/assets/default_data/puzzles"
 
 consts.SERVER_SAVE_DIRECTORY = "servers/"
 consts.LEGACY_SERVER_LOCATION = "18.188.43.50"
-consts.SERVER_LOCATION = "panelattack.com"
+consts.SERVER_LOCATION = "localhost"
 
 consts.SUPER_SELECTION_DURATION = 0.5 -- seconds
 consts.SUPER_SELECTION_START = 0.1 -- time held at which super enable is considered started
 
-consts.DEFAULT_THEME_DIRECTORY = "Panel Attack Modern"
+consts.DEFAULT_THEME_DIRECTORY = "Girly Vibrant"
 
 consts.SCOREMODE_TA    = 1
 consts.SCOREMODE_PDP64 = 2 -- currently not used
@@ -73,5 +82,22 @@ consts.SPEED_TO_RISE_TIME = tableUtils.map(
 -- 20, 15, 15, 15, 10, 10, 10
 
 consts.ATTACK_TYPE = { combo=0, chain=1, shock=2 }
+
+-- On mobile (or when mocking it locally via PA_SIMULATE_MOBILE) the game runs in
+-- PORTRAIT: swap the canvas to a tall/narrow aspect so every scene — which reads
+-- these constants — lays out vertically (no rotation). Guarded so the headless
+-- server (no love) and desktop are unaffected.
+do
+  local mobile = false
+  if love and love.system and love.system.getOS then
+    local osName = love.system.getOS()
+    mobile = (osName == "Android" or osName == "iOS")
+  end
+  if os and os.getenv and os.getenv("PA_SIMULATE_MOBILE") == "1" then mobile = true end
+  if mobile then
+    consts.CANVAS_WIDTH = 720
+    consts.CANVAS_HEIGHT = 1280
+  end
+end
 
 return consts

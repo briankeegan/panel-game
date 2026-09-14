@@ -10,7 +10,7 @@ local tableUtils = require("common.lib.tableUtils")
 local SoundController = require("client.src.music.SoundController")
 local UpdatingImage = require("client.src.graphics.UpdatingImage")
 
-local MAX_SUPPORTED_PLAYERS = 2
+local MAX_SUPPORTED_PLAYERS = 3
 
 -- from https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2
 local flags = {
@@ -60,19 +60,19 @@ Theme =
     self.main_menu_max_height = 0
 
     self.colors = {
-      menuDefaultBackgroundColor = {1, 1, 1, 0.15},
-      menuDefaultBorderColor = {1, 1, 1, 0.15},
-      menuSelectedBackgroundColor = {0.6, 0.6, 1, 0.15},
-      menuSelectedBorderColor = {0.6, 0.6, 1, 0.15},
-      activeBackgroundColor = {0.2, 0.3, 0.4, 0.9},
-      darkTransparentBackgroundColor = {0, 0, 0, 0.75},
-      highlightTextColor = {1, 1, 0.3, 1},
-      inputSlotDefaultBackgroundColor = {0.2, 0.2, 0.2, 0.9},
-      inputSlotDefaultBorderColor = {0.4, 0.4, 0.4, 0.9},
-      inputSlotSelectedBackgroundColor = {0.2, 0.2, 0.34, 1.0},
-      inputSlotSelectedBorderColor = {0.5, 0.5, 0.8, 1.0},
-      incompleteConfigBackgroundColor = {0.918, 0.251, 0.275, 1.0},
-      configCorrectBackgroundColor = {0.3, .3, .3, 0.7}
+      menuDefaultBackgroundColor = {0.58, 0.22, 0.85, 0.90},
+      menuDefaultBorderColor = {1.0, 0.50, 0.82, 1.0},
+      menuSelectedBackgroundColor = {1.0, 0.08, 0.58, 1.0},
+      menuSelectedBorderColor = {1.0, 0.84, 0.0, 1.0},
+      activeBackgroundColor = {1.0, 0.08, 0.58, 0.95},
+      darkTransparentBackgroundColor = {0.22, 0.05, 0.40, 0.92},
+      highlightTextColor = {1.0, 0.84, 0.0, 1.0},
+      inputSlotDefaultBackgroundColor = {0.58, 0.22, 0.85, 0.90},
+      inputSlotDefaultBorderColor = {1.0, 0.50, 0.82, 1.0},
+      inputSlotSelectedBackgroundColor = {1.0, 0.08, 0.58, 1.0},
+      inputSlotSelectedBorderColor = {1.0, 0.84, 0.0, 1.0},
+      incompleteConfigBackgroundColor = {1.0, 0.08, 0.58, 1.0},
+      configCorrectBackgroundColor = {0.0, 0.85, 0.40, 0.9}
     }
   end
 )
@@ -334,10 +334,13 @@ function Theme:loadMenuGraphics()
 
   self:loadFont()
 
-  local titleImage = self:load_theme_img("background/title", false)
+  local titleImage = self:load_theme_img("background/unofficial_brand_full", false) or self:load_theme_img("background/title", false)
   if titleImage then
     self.images.bg_title = UpdatingImage(titleImage, self.bg_title_is_tiled, self.bg_title_speed_x, self.bg_title_speed_y, consts.CANVAS_WIDTH, consts.CANVAS_HEIGHT)
   end
+
+  -- Optional square branding image for unofficial build scenes.
+  self.images.unofficial_brand_square = self:load_theme_img("background/unofficial_brand_square", false)
 
   self.images.bg_select_screen = UpdatingImage(self:load_theme_img("background/select_screen"), self.bg_select_screen_is_tiled, self.bg_select_screen_speed_x, self.bg_select_screen_speed_y, consts.CANVAS_WIDTH, consts.CANVAS_HEIGHT)
   self.images.bg_readme = UpdatingImage(self:load_theme_img("background/readme"), self.bg_readme_is_tiled, self.bg_readme_speed_x, self.bg_readme_speed_y, consts.CANVAS_WIDTH, consts.CANVAS_HEIGHT)
@@ -516,7 +519,15 @@ function Theme:loadIngameLabels()
     self.images.scoreLabels[i] = self:load_theme_img("score_" .. i .. "P")
     self.images.ratingLabels[i] = self:load_theme_img("rating_" .. i .. "P")
     local numberAtlas = self:load_theme_img("numbers_" .. i .. "P")
-    self.fontMaps.numbers[i] = GraphicsUtil.createPixelFontMap(numberAtlasCharacters, numberAtlas)
+    -- fall back to player 1's atlas when theme doesn't have a player-specific one
+    if not numberAtlas and self.fontMaps.numbers[1] then
+      self.fontMaps.numbers[i] = self.fontMaps.numbers[1]
+    elseif numberAtlas then
+      self.fontMaps.numbers[i] = GraphicsUtil.createPixelFontMap(numberAtlasCharacters, numberAtlas)
+    else
+      -- nil guard: if neither player-specific nor fallback exists, set to nil
+      self.fontMaps.numbers[i] = nil
+    end
   end
 
   self.images.IMG_time = self:load_theme_img("time")
@@ -525,6 +536,26 @@ function Theme:loadIngameLabels()
 
   self.images.IMG_casual = self:load_theme_img("casual")
   self.images.IMG_ranked = self:load_theme_img("ranked")
+
+  local pixelFontCharacters = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ&?!%*."
+  local pixelFontBlueAtlas = self:load_theme_img("pixel_font_blue")
+
+  if pixelFontBlueAtlas then
+    self.fontMaps.pixelFontBlue = GraphicsUtil.createPixelFontMap(pixelFontCharacters, pixelFontBlueAtlas)
+  else
+    logger.warn("Missing pixel_font_blue atlas for theme " .. tostring(self.name) .. ", using blank fallback.")
+    local blankAtlas = self:load_theme_img("transparent", true)
+    if blankAtlas then
+      self.fontMaps.pixelFontBlue = GraphicsUtil.createPixelFontMap(pixelFontCharacters, blankAtlas)
+    else
+      self.fontMaps.pixelFontBlue = {
+        atlas = nil,
+        charWidth = 1,
+        charHeight = 1,
+        charToQuad = {}
+      }
+    end
+  end
 
   self:loadLevelNumberAtlasses()
 end
@@ -591,17 +622,26 @@ function Theme:loadLevelNumberAtlasses()
   self.images.levelNumberAtlas = {}
   local levels = 11
   for i = 1, MAX_SUPPORTED_PLAYERS do
-    self.images.levelNumberAtlas[i] = {}
-    self.images.levelNumberAtlas[i].image = self:load_theme_img("level_numbers_" .. i .. "P")
-    local charWidth = self.images.levelNumberAtlas[i].image:getWidth() / levels
-    local charHeight = self.images.levelNumberAtlas[i].image:getHeight()
-    local quads = {}
-    for j = 1, levels do
-      quads[j] = GraphicsUtil:newRecycledQuad((j - 1) * charWidth, 0, charWidth, charHeight, self.images.levelNumberAtlas[i].image:getDimensions())
+    local image = self:load_theme_img("level_numbers_" .. i .. "P")
+    -- fall back to player 1's atlas when theme doesn't have a player-specific one
+    if not image and self.images.levelNumberAtlas[1] then
+      self.images.levelNumberAtlas[i] = self.images.levelNumberAtlas[1]
+    elseif image then
+      self.images.levelNumberAtlas[i] = {}
+      self.images.levelNumberAtlas[i].image = image
+      local charWidth = image:getWidth() / levels
+      local charHeight = image:getHeight()
+      local quads = {}
+      for j = 1, levels do
+        quads[j] = GraphicsUtil:newRecycledQuad((j - 1) * charWidth, 0, charWidth, charHeight, image:getDimensions())
+      end
+      self.images.levelNumberAtlas[i].quads = quads
+      self.images.levelNumberAtlas[i].charWidth = charWidth
+      self.images.levelNumberAtlas[i].charHeight = charHeight
+    else
+      -- nil guard: if neither player-specific nor fallback exists, set to nil
+      self.images.levelNumberAtlas[i] = nil
     end
-    self.images.levelNumberAtlas[i].quads = quads
-    self.images.levelNumberAtlas[i].charWidth = charWidth
-    self.images.levelNumberAtlas[i].charHeight = charHeight
   end
 end
 
@@ -968,7 +1008,15 @@ function Theme:getGridCursor(index)
     loadGridCursors(self)
   end
 
-  return self.images.IMG_char_sel_cursors[index]
+  if self.images.IMG_char_sel_cursors and self.images.IMG_char_sel_cursors[index] and self.images.IMG_char_sel_cursors[index][1] then
+    return self.images.IMG_char_sel_cursors[index]
+  end
+
+  if self.images.IMG_char_sel_cursors and self.images.IMG_char_sel_cursors[1] and self.images.IMG_char_sel_cursors[1][1] then
+    return self.images.IMG_char_sel_cursors[1]
+  end
+
+  error("Theme is missing character select cursor assets")
 end
 
 ---@return love.Texture
@@ -1087,7 +1135,21 @@ function Theme:getPlayerNumberIcon(index)
     loadPlayerNumberIcons(self)
   end
 
-  return self.images.IMG_players[index]
+  if self.images.IMG_players and self.images.IMG_players[index] then
+    return self.images.IMG_players[index]
+  end
+
+  if self.images.IMG_players and self.images.IMG_players[1] then
+    return self.images.IMG_players[1]
+  end
+
+  for _, icon in pairs(self.images.IMG_players or {}) do
+    if icon then
+      return icon
+    end
+  end
+
+  error("Theme is missing player number icons")
 end
 
 ---@param deviceType string
@@ -1239,7 +1301,7 @@ function Theme:reload()
     ---@type ClientMatch
     local match = activeScene.match
     for i, stack in ipairs(match.stacks) do
-      stack:assignAssets(self:getIngameAssetPack(stack.renderIndex))
+      stack:assignAssets(self:getIngameAssetPack(stack.layoutSlot))
     end
   end
 end

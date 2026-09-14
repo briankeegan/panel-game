@@ -1,4 +1,5 @@
 local Scene = require("client.src.scenes.Scene")
+local GraphicsUtil = require("client.src.graphics.graphics_util")
 local consts = require("common.engine.consts")
 local logger = require("common.lib.logger")
 local BattleRoom = require("client.src.BattleRoom")
@@ -14,6 +15,8 @@ local class = require("common.lib.class")
 local tableUtils = require("common.lib.tableUtils")
 local LevelPresets      = require("common.data.LevelPresets")
 local Stack = require("common.engine.Stack")
+local system = require("client.src.system")
+local ModLoader = require("client.src.mods.ModLoader")
 
 -- Scene for the puzzle selection menu
 ---@class PuzzleMenu : Scene
@@ -77,7 +80,11 @@ function PuzzleMenu:startGame(puzzleSet, puzzleSetIterator)
   assert(puzzleSetIterator)
 
   local player = self.battleRoom.players[1]
-  assert(player.inputConfiguration, "Player must have an input configuration assigned before starting puzzle game")
+  -- touch players have no device inputConfiguration (they use inputMethod "touch"),
+  -- so requiring a config blocked puzzle start on phones. Accept touch, matching
+  -- BattleRoom's own readiness check.
+  assert(player.inputConfiguration or player.settings.inputMethod == "touch",
+    "Player must have an input configuration (or touch) assigned before starting puzzle game")
 
   GAME.localPlayer:setLevel(config.puzzle_level)
   GAME.localPlayer:setLevelData(LevelPresets.getModern(config.puzzle_level))
@@ -131,7 +138,8 @@ end
 function PuzzleMenu:load(sceneParams)
   self:updateCurrentPuzzleSet()
 
-  local tickLength = 16
+  -- portrait: match the waiting-room level slider size (createLevelSlider uses 40)
+  local tickLength = system.isPortraitMode() and 40 or 16
   self.levelSlider = ui.LevelSlider({
       tickLength = tickLength,
       value = config.puzzle_level or 5,
@@ -199,6 +207,7 @@ function PuzzleMenu:load(sceneParams)
 
   self.previewStackPanel:addElement(self.puzzleDescriptionLabel)
 
+  local portrait = system.isPortraitMode()
   self.containerStackPanel = ui.StackPanel(
     {
       alignment = "left",
@@ -212,15 +221,33 @@ function PuzzleMenu:load(sceneParams)
 
   self.containerStackPanel:addElement(self.menu)
 
-  local horizontalSpacer = ui.UiElement({width = 20, height = 1})
-  self.containerStackPanel:addElement(horizontalSpacer)
-
-  self.containerStackPanel:addElement(self.previewStackPanel)
+  if not portrait then
+    -- landscape: menu + preview side by side
+    local horizontalSpacer = ui.UiElement({width = 20, height = 1})
+    self.containerStackPanel:addElement(horizontalSpacer)
+    self.containerStackPanel:addElement(self.previewStackPanel)
+  end
 
   self.uiRoot:addChild(self.containerStackPanel)
+
+  -- portrait: no board preview on the menu — it reads like a playable board
+  -- appearing before you start. The board only shows once you click into the
+  -- puzzle (PuzzleGame). Landscape keeps the side-by-side preview above.
+
   self.uiRoot:addChild(self.puzzleHierarchyDisplay)
 
   self:createInputDeviceOverlay()
+
+  -- Preload the character/stage mods now, while the user is browsing puzzles, so
+  -- clicking a puzzle starts instantly instead of stalling ~1-3s on a silent mod
+  -- load (puzzles skip character-select, where other modes hide this cost).
+  -- updateLoadingState resolves + kicks off the load itself; no refresh needed.
+  if self.battleRoom then
+    -- Pin the puzzle char+stage to the room so they stay warm across every puzzle
+    -- in the session (instant Starts); BattleRoom:shutdown frees them on exit.
+    self.battleRoom.pinModsToRoom = true
+    self.battleRoom:updateLoadingState()
+  end
 end
 
 function PuzzleMenu:createInputDeviceOverlay()
@@ -404,6 +431,8 @@ function PuzzleMenu:previewFunctionForPuzzleSet(puzzleSet, puzzleSetIndices, ind
 end
 
 function PuzzleMenu:createEditPuzzleButton(puzzleSet, index)
+  -- portrait has no menu preview to anchor the edit button to; skip it there
+  if system.isPortraitMode() then return end
   self:removeEditButton()
   
   -- Create clickable image button for edit
@@ -698,6 +727,16 @@ end
 
 
 function PuzzleMenu:updateSelf(dt)
+  -- Puzzles skip character-select, so the character+stage mods load on a silent
+  -- 1-asset/frame background drain that takes ~1-3s; clicking a puzzle before it
+  -- finishes stalls the start. While browsing the menu, drain the queue several
+  -- assets per frame so it's warm in a fraction of a second. Puzzle-menu only.
+  if self.battleRoom and not self.battleRoom.allAssetsLoaded then
+    for _ = 1, 12 do
+      if not ModLoader.update() then break end
+    end
+  end
+
   self.inputDeviceOverlay:openInputDeviceOverlayIfNeeded()
 
   if self.inputDeviceOverlay:isActive() then
@@ -709,6 +748,7 @@ end
 
 function PuzzleMenu:draw()
   themes[config.theme].images.bg_main:draw()
+  GraphicsUtil.drawRectangle("fill", 0, 0, consts.CANVAS_WIDTH, consts.CANVAS_HEIGHT, 0, 0, 0, 0.55)
   self.uiRoot:draw()
 end
 
@@ -729,7 +769,7 @@ function PuzzleMenu:getDisplayStack(puzzle)
   local engineStack = Stack(args)
 
   local playerStack = GAME.localPlayer:createClientStack(engineStack)
-  playerStack:moveForRenderIndex(1)
+  playerStack:moveForLayoutSlot(1)
   engineStack:starting_state()
 
   return playerStack

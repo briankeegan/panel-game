@@ -1,0 +1,10 @@
+{
+  "_comment": "Aggressive sparring attacker for the win-rate harness: high combo+chain offense with proactive chain-building when safe, but a normal height band (not suicidally tall like kekeke). Represents the active attacker the EXCELLENT-hard bot must beat in a contested match.",
+  "comboUnit": 50,
+  "chainUnit": 70,
+  "futureDiscount": 0.7,
+  "chainDepthWhenSafe": 1.6,
+  "counterPressure": 0.7,
+  "heightBand": [7, 10],
+  "actMargin": 0.8
+}

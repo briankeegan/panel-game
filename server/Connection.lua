@@ -1,10 +1,43 @@
 local class = require("common.lib.class")
 local logger = require("common.lib.logger")
 local NetworkProtocol = require("common.network.NetworkProtocol")
+local consts = require("common.engine.consts")
 local time = os.time
+local socket = require("common.lib.socket")
 local Queue = require("common.lib.Queue")
 
-local TIME_OUT = 10
+-- Per-connection RTT samples kept for adaptive start-budget sizing
+-- (Room:start_match widens the +500ms grace using max-RTT-in-room, and uses
+-- min-RTT for each player's one-way start correction).
+-- 8 samples × the steady probe below (~300ms) = ~2.4s of recent history; min
+-- filters jitter, and the fixed cadence keeps the window fresh at match start
+-- regardless of lobby traffic.
+local RTT_SAMPLE_WINDOW = 8
+
+-- Steady RTT-probe cadence. Sub-second and traffic-independent so the min/max
+-- RTT window is fresh when Room:start_match computes per-player start offsets.
+local RTT_PROBE_INTERVAL_MS = 300
+
+-- Millisecond wall-clock for the probe cadence and ack round-trip timing.
+-- Injectable via Connection's 4th constructor arg so tests can drive the
+-- cadence deterministically; production uses socket.gettime.
+local function defaultNowMs()
+  return math.floor(socket.gettime() * 1000)
+end
+
+local DEFAULT_SEND_RETRY_LIMIT = 5
+-- Drop a socket that has gone fully silent. A healthy client acks every ping
+-- unconditionally (TcpClient replies even on a malformed body), so no inbound
+-- for this long means the peer is actually gone — not merely quiet. Generous
+-- vs worst-case RTT plus a run of missed pings. This is NOT the app-level
+-- idle-disconnect we deliberately avoid: it keys off pings a live client always
+-- answers, so a player sitting silent in a match never trips it.
+local ACK_DEADLINE = 30
+-- Cap on un-parsed inbound leftovers. With length-prefixed v009 framing a
+-- peer could announce a huge frame length and never deliver the body; this
+-- bounds that. Real frames are well under this — the largest JSON we send
+-- (replays, lobby snapshots) is comfortably under 1 MB.
+local MAX_LEFTOVERS_BYTES = 4 * 1024 * 1024
 
 ---@alias InputProcessor { processInput: function }
 
@@ -12,6 +45,7 @@ local TIME_OUT = 10
 ---@class Connection
 ---@field index integer the unique identifier of the connection
 ---@field socket TcpSocket the luasocket object
+---@field channel string "gameplay" or "lobby"; which listener accepted this connection
 ---@field leftovers string remaining data from the socket that hasn't been processed yet
 ---@field loggedIn boolean if there exists a player owning this connection somewhere
 ---@field lastCommunicationTime integer timestamp when the last message was received; for dropping the connection if heartbeats aren't returned
@@ -19,28 +53,78 @@ local TIME_OUT = 10
 ---@field incomingMessageQueue Queue
 ---@field outgoingMessageQueue Queue
 ---@field incomingInputQueue Queue
+---@field incomingGarbageQueue Queue loose-sync GarbageEvent bodies awaiting room relay
+---@field incomingDeathQueue Queue loose-sync DeathEvent bodies awaiting room relay
+---@field incomingRewindQueue Queue pause-mode RewindEvent bodies awaiting room relay
+---@field incomingDisplayEventQueue Queue display-history replication batches awaiting room relay
 ---@field sendRetryCount integer
 ---@field sendRetryLimit integer
 ---@field inputProcessor InputProcessor?
----@overload fun(socket: any, index: integer) : Connection
+---@overload fun(socket: any, index: integer, nowMsFn: (fun(): integer)?) : Connection
 local Connection = class(
 ---@param self Connection
 ---@param socket TcpSocket
 ---@param index integer
-  function(self, socket, index)
+---@param nowMsFn (fun(): integer)? optional ms-clock override (tests); defaults to socket.gettime
+  function(self, socket, index, nowMsFn)
     self.index = index
     self.socket = socket
+    self.channel = "gameplay" -- default; Server:_acceptOnListener overrides for lobby
     self.leftovers = ""
     self.loggedIn = false
     self.lastCommunicationTime = time()
     self.lastPingTime = self.lastCommunicationTime
+    -- 0 → first update() seeds it and fires one probe promptly. Kept out of the
+    -- constructor so construction never depends on the ms clock (only update()
+    -- and the ack handler touch it, via self._nowMs).
+    self.lastPingTimeMs = 0
+    self._nowMs = nowMsFn or defaultNowMs
     self.incomingMessageQueue = Queue()
     self.outgoingMessageQueue = Queue()
     self.incomingInputQueue = Queue()
+    self.incomingGarbageQueue = Queue()
+    self.incomingDeathQueue = Queue()
+    self.incomingRewindQueue = Queue()
+    self.incomingDisplayEventQueue = Queue()
     self.sendRetryCount = 0
-    self.sendRetryLimit = 5
+    self.sendRetryLimit = DEFAULT_SEND_RETRY_LIMIT
+    self.rttSamples = nil
   end
 )
+
+---@return integer? maximum RTT in ms across recent samples, or nil if none
+-- For start-budget sizing we need the worst-case round-trip we've recently
+-- observed, not the best — a cleanest-path estimate (min) leaves the budget
+-- too tight for jittery clients, and their matchStart arrives late.
+function Connection:getMaxRecentRttMs()
+  if not self.rttSamples or #self.rttSamples == 0 then return nil end
+  local m = self.rttSamples[1]
+  for i = 2, #self.rttSamples do
+    if self.rttSamples[i] > m then m = self.rttSamples[i] end
+  end
+  return m
+end
+
+---@return integer? minimum RTT in ms across recent samples, or nil if none
+-- For per-client one-way-latency correction (startInMs computation): min RTT
+-- is the cleanest sample, hence the best estimate of actual one-way delay.
+-- Max would over-correct and start fast clients too late.
+function Connection:getMinRecentRttMs()
+  if not self.rttSamples or #self.rttSamples == 0 then return nil end
+  local m = self.rttSamples[1]
+  for i = 2, #self.rttSamples do
+    if self.rttSamples[i] < m then m = self.rttSamples[i] end
+  end
+  return m
+end
+
+function Connection:_recordRttSample(rttMs)
+  if not self.rttSamples then self.rttSamples = {} end
+  table.insert(self.rttSamples, 1, rttMs)
+  if #self.rttSamples > RTT_SAMPLE_WINDOW then
+    table.remove(self.rttSamples)
+  end
+end
 
 -- dedicated method for sending JSON messages
 function Connection:sendJson(messageInfo)
@@ -49,7 +133,17 @@ function Connection:sendJson(messageInfo)
   end
 
   local json = json.encode(messageInfo.messageText)
-  logger.debug("Connection " .. self.index .. " Sending JSON: " .. json)
+  -- High-frequency broadcasts (lobbyStateV2 fires on every settings churn)
+  -- bury everything else in the log. Log only the type for those, full JSON
+  -- for the rest.
+  local msgType = messageInfo.messageText and messageInfo.messageText.type
+  if msgType == "lobbyStateV2" then
+    -- silently dropped — too noisy at debug level
+  elseif msgType then
+    logger.debug("Connection " .. self.index .. " Sending " .. tostring(msgType))
+  else
+    logger.debug("Connection " .. self.index .. " Sending JSON: " .. json)
+  end
   local message = NetworkProtocol.markedMessageForTypeAndBody(messageInfo.messageType.prefix, json)
 
   self.outgoingMessageQueue:push(message)
@@ -72,19 +166,42 @@ function Connection:close()
   self.incomingMessageQueue:clear()
   self.outgoingMessageQueue:clear()
   self.incomingInputQueue:clear()
+  self.incomingGarbageQueue:clear()
+  self.incomingDeathQueue:clear()
+  self.incomingRewindQueue:clear()
   self.socket:close()
   self.socket = nil
 end
 
 -- Handle NetworkProtocol.clientMessageTypes.versionCheck
+-- Body is the client's BUILD_VERSION ("<engine>.<patch>", e.g. "001.0013").
+-- The client may play iff its engine version equals ours AND its patch is
+-- >= ours: a newer client patch is fine (server is just behind on a deploy),
+-- an older patch or a different engine version is not. Rejection body carries
+-- the server's BUILD_VERSION so the client can tell the user which build +
+-- .love file to grab.
+local function buildParts(build)
+  local v, p = tostring(build):match("^(%d+)%.(%d+)$")
+  return v, tonumber(p)
+end
+
 local function H(connection, version)
-  if version ~= NetworkProtocol.NETWORK_VERSION then
-    connection:send(NetworkProtocol.serverMessageTypes.versionWrong.prefix)
+  local clientV, clientP = buildParts(version)
+  local serverV, serverP = buildParts(consts.BUILD_VERSION)
+  local compatible = clientV ~= nil and clientV == serverV and clientP >= serverP
+  if not compatible then
+    logger.info(string.format(
+      "Connection %d: rejecting handshake (client build %q, server build %s)",
+      connection.index, tostring(version), consts.BUILD_VERSION))
+    connection:send(NetworkProtocol.markedMessageForTypeAndBody(
+      NetworkProtocol.serverMessageTypes.versionWrong.prefix, consts.BUILD_VERSION))
   else
-    connection:send(NetworkProtocol.serverMessageTypes.versionCorrect.prefix)
+    connection:send(NetworkProtocol.markedMessageForTypeAndBody(
+      NetworkProtocol.serverMessageTypes.versionCorrect.prefix, ""))
   end
 end
 
+---@return boolean # false if the connection should be torn down (buffer cap exceeded)
 local function data_received(connection, data)
   connection.lastCommunicationTime = time()
   connection.leftovers = connection.leftovers .. data
@@ -92,7 +209,6 @@ local function data_received(connection, data)
   while true do
     local type, message, remaining = NetworkProtocol.getMessageFromString(connection.leftovers, false)
     if type then
-      -- when type is not nil, the others are most certainly not nil too
       ---@cast remaining string
       ---@cast message string
       connection:processMessage(type, message)
@@ -101,6 +217,12 @@ local function data_received(connection, data)
       break
     end
   end
+  if #connection.leftovers > MAX_LEFTOVERS_BYTES then
+    logger.warn("Connection " .. connection.index .. ": leftover unparsed buffer exceeded "
+      .. MAX_LEFTOVERS_BYTES .. " bytes (likely malformed frame). Closing.")
+    return false
+  end
+  return true
 end
 
 ---@return boolean
@@ -111,7 +233,9 @@ local function read(connection)
     data = partialData
   end
   if data and data:len() > 0 then
-    data_received(connection, data)
+    if not data_received(connection, data) then
+      return false
+    end
   end
   if error == "closed" then
     return false
@@ -157,14 +281,14 @@ end
 function Connection:update(t, canRead, canSend)
   if canRead then
     if not read(self) then
-      logger.info("Closing connection " .. self.index .. ". Connection.read failed with closed error.")
+      logger.info("[DISCONNECT-PATH-1] Closing connection " .. self.index .. ". Socket read failed with closed error.")
       return false
     end
   end
 
   if canSend then
     if not sendQueuedMessages(self) then
-      logger.info("Send for connection " .. self.index .. " failed because the socket has been closed or the retry limit has been surpassed")
+      logger.info("[DISCONNECT-PATH-2] Closing connection " .. self.index .. ". Send failed (retries=" .. self.sendRetryCount .. "/" .. self.sendRetryLimit .. ")")
       return false
     end
   end
@@ -172,21 +296,45 @@ function Connection:update(t, canRead, canSend)
   if not canRead and not canSend then
     -- it is possible for the socket to "close" based on internal status as luasocket implements its own connection keeping
     -- luasocket does not give a good way to check this easily as closed sockets are ignored in socket.select so we need to check
-    if (not self.socket) or (self.socket:getpeername() == nil) then
+    if (not self.socket) then
+      logger.info("[DISCONNECT-PATH-3a] Closing connection " .. self.index .. ". Socket object is nil.")
+      return false
+    elseif (self.socket:getpeername() == nil) then
+      logger.info("[DISCONNECT-PATH-3b] Closing connection " .. self.index .. ". Peer lookup failed (getpeername returned nil).")
       return false
     end
   end
 
   if t ~= self.lastCommunicationTime then
-    if t - self.lastCommunicationTime > TIME_OUT then
-      logger.info("Closing connection for " .. self.index .. ". Connection timed out (>10 sec)")
+    local timeSinceLastComm = t - self.lastCommunicationTime
+    -- A live client acks every ping; total silence past the deadline means the
+    -- peer is gone (half-open socket, no FIN/RST), which socket:receive won't
+    -- report. Drop it here so the player doesn't ghost in the lobby.
+    if timeSinceLastComm > ACK_DEADLINE then
+      logger.info("[DISCONNECT-PATH-4] Closing connection " .. self.index
+        .. ". No inbound for " .. timeSinceLastComm .. "s; peer unresponsive to pings.")
       return false
-    elseif t > self.lastPingTime and t - self.lastCommunicationTime > 1 then
-      -- Request a ping to make sure the connection is still active
-      self:send(NetworkProtocol.serverMessageTypes.ping.prefix)
-      -- we don't want to ping for every run we're waiting for an answer
-      self.lastPingTime = t
     end
+    -- No app-level idle-disconnect: a player with a room slot must not get
+    -- booted just because they stopped sending lobby chatter. The steady RTT
+    -- probe below elicits the acks that keep the deadline above satisfied.
+  end
+
+  -- Steady RTT probe: fixed sub-second cadence, independent of other traffic.
+  -- The keepalive ping used to fire only after >1s of silence, so pre-match
+  -- ready/settings chatter suppressed it and Room:start_match read a stale
+  -- min-RTT window when computing each player's startInMs. Probing on a fixed
+  -- interval keeps getMin/MaxRecentRttMs fresh, so start-time alignment is
+  -- computed from current samples. Body carries serverTimeMs; the client echoes
+  -- it back in its E ack and we diff against now — using the echoed value (not a
+  -- stored send-time) lets multiple in-flight pings self-correlate without
+  -- per-ping bookkeeping. Body + ack path unchanged, so no client change needed.
+  local nowMs = self._nowMs()
+  if nowMs - self.lastPingTimeMs >= RTT_PROBE_INTERVAL_MS then
+    self:send(NetworkProtocol.markedMessageForTypeAndBody(
+      NetworkProtocol.serverMessageTypes.ping.prefix, '{"serverTimeMs":' .. nowMs .. '}'))
+    self.lastPingTimeMs = nowMs
+    self.lastPingTime = t
   end
 
   return true
@@ -200,10 +348,32 @@ function Connection:processMessage(messageType, data)
     self.incomingMessageQueue:push(data)
   elseif messageType == "I" then
     self.incomingInputQueue:push(data)
+  elseif messageType == "G" then
+    self.incomingGarbageQueue:push(data)
+  elseif messageType == "D" then
+    self.incomingDeathQueue:push(data)
+  elseif messageType == "R" then
+    self.incomingRewindQueue:push(data)
+  elseif messageType == "Y" then
+    -- Display-history replication batch (parallel system). Best-effort relay
+    -- — no queue+retry, no game-state recording. See DISPLAY_HISTORY_PLAN.md.
+    self.incomingDisplayEventQueue:push(data)
   elseif messageType == "H" then
     H(self, data)
   elseif messageType == "E" then
-    -- Nothing to do here, the fact we got a message from the client updates the lastCommunicationTime
+    -- E ack: client echoes back the serverTimeMs we stamped on our ping.
+    -- Diff against now to record RTT. Empty body (legacy clients) → no sample.
+    if data and #data > 0 then
+      local ok, decoded = pcall(json.decode, data)
+      if ok and type(decoded) == "table" and type(decoded.echoedServerTimeMs) == "number" then
+        local nowMs = self._nowMs()
+        local rttMs = nowMs - decoded.echoedServerTimeMs
+        -- Sanity-bound: drop nonsense samples (clock skew, replay).
+        if rttMs >= 0 and rttMs < 10000 then
+          self:_recordRttSample(rttMs)
+        end
+      end
+    end
   end
 end
 

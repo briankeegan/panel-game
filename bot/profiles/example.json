@@ -1,0 +1,12 @@
+{
+  "_comment": "Per-player SearchBrain eval-weight profile (DATA_CONTRACT §19/§20). Data track produces one per player from their corpus (analyze_strategy.py). Run: brain=search + searchProfile=bot/profiles/<player>.json (or PA_SEARCH_PROFILE env via playBot). Any omitted key falls back to SearchBrain DEFAULTS. heightBand is [low,high] rows.",
+  "w_chain": 1.0,
+  "w_survival": 1.0,
+  "w_shape": 1.0,
+  "w_breakGarbage": 1.0,
+  "chainUnit": 60,
+  "comboUnit": 15,
+  "futureDiscount": 0.7,
+  "heightBand": [6, 9],
+  "actMargin": 1.0
+}

@@ -1,3 +1,8 @@
+-- Unbuffered stdout so log output flushes promptly even when the server
+-- enters an idle accept loop. With default block buffering, a hung-looking
+-- test run is usually just lines stuck in the buffer waiting on activity.
+io.stdout:setvbuf("no")
+
 local util = require("common.lib.util")
 util.addToCPath("./common/lib/??")
 util.addToCPath("./server/lib/??")
@@ -21,10 +26,11 @@ end
 
 -- We must launch the server from the root directory so all the requires are the right path relatively.
 require("server.server_globals")
-require("server.tests.LoginTests")
-require("server.tests.ServerTests")
-require("server.tests.LeaderboardTests")
-require("server.tests.RoomTests")
+
+-- Server runtime no longer runs tests inline. Use `zsh run_server_tests.sh`
+-- to run the server-side suite in its own headless luajit process — it
+-- doesn't bind a port, doesn't touch the real database, and doesn't kill
+-- your running dev server.
 
 local database = require("server.PADatabase")
 local Server = require("server.server")

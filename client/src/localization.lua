@@ -40,7 +40,7 @@ function Localization:get_language()
 end
 
 function Localization.refresh_global_strings(self)
-  join_community_msg = loc("join_community" ,"\ndiscord." .. consts.SERVER_LOCATION)
+  join_community_msg = "Unofficial build: contact bramp for issues"
 end
 
 function Localization.csv_line(line, acc)
@@ -167,7 +167,7 @@ end
 
 -- Gets the localized string for a loc key
 ---@param textKey string
----@param ... string?
+---@param ... string|number|nil
 function loc(textKey, ...)
   local code = Localization.codes[Localization.lang_index]
 
@@ -221,7 +221,7 @@ end
 
 ---@param languageCode LanguageCode
 ---@param textKey string
----@param ... string?
+---@param ... string|number|nil
 ---@return string
 function Localization.localize(languageCode, textKey, ...)
   if not languageCode or not Localization.data[languageCode] then

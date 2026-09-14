@@ -1,5 +1,6 @@
 local UIElement = require("client.src.ui.UIElement")
 local ui = require("client.src.ui")
+local system = require("client.src.system")
 local class = require("common.lib.class")
 local GraphicsUtil = require("client.src.graphics.graphics_util")
 local MatchRules = require("common.data.MatchRules")
@@ -66,17 +67,21 @@ function PuzzleGoalDisplay:createLabels()
     vAlign = "top"
   })
   
+  -- portrait: the goal sits at the full-width top of the screen, so the objective
+  -- text goes to the RIGHT of the heading (e.g. "SWAP  Make a swap to clear...")
+  -- with a bigger font + wider wrap instead of the narrow below-the-heading size.
+  local portrait = system.isPortraitMode()
   self.objectiveLabel = ui.Label({
-    x = BACKGROUND_PADDING,
-    y = BACKGROUND_PADDING_VERTICAL + 60,
+    x = portrait and (BACKGROUND_PADDING + 200) or BACKGROUND_PADDING,
+    y = portrait and (BACKGROUND_PADDING_VERTICAL + 8) or (BACKGROUND_PADDING_VERTICAL + 60),
     width = 0,
     height = 0,
     text = "",
-    fontSize = 16,
+    fontSize = portrait and 26 or 16,
     translate = true,
     hAlign = "left",
     vAlign = "top",
-    wrapWidth = 200
+    wrapWidth = portrait and 470 or 200
   })
   
   self:addChild(self.headingLabel)
@@ -187,9 +192,16 @@ function PuzzleGoalDisplay:updateDimensions()
   local headingHeight = self.headingLabel.drawable and self.headingLabel.drawable:getHeight() or 0
   local objectiveHeight = self.objectiveLabel.drawable and self.objectiveLabel.drawable:getHeight() or 0
   local contentHeight = headingHeight + objectiveHeight + 10
-  
-  self.width = contentWidth + (BACKGROUND_PADDING * 2)
-  self.height = contentHeight + (BACKGROUND_PADDING_VERTICAL * 2)
+
+  if system.isPortraitMode() then
+    -- objective sits to the RIGHT of the heading (offset 200), so the box must be
+    -- wide enough to cover it and only as tall as the taller of the two.
+    self.width = math.max(headingWidth, 200 + objectiveWidth) + (BACKGROUND_PADDING * 2)
+    self.height = math.max(headingHeight, 8 + objectiveHeight) + (BACKGROUND_PADDING_VERTICAL * 2)
+  else
+    self.width = contentWidth + (BACKGROUND_PADDING * 2)
+    self.height = contentHeight + (BACKGROUND_PADDING_VERTICAL * 2)
+  end
 end
 
 function PuzzleGoalDisplay:drawSelf()

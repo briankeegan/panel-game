@@ -2,13 +2,66 @@ local GameBase = require("client.src.scenes.GameBase")
 local class = require("common.lib.class")
 local consts = require("common.engine.consts")
 local Telegraph = require("client.src.graphics.Telegraph")
+local GameModes = require("common.data.GameModes")
+local TeamUtils = require("common.data.TeamUtils")
 local GraphicsUtil = require("client.src.graphics.graphics_util")
 local ui = require("client.src.ui")
 local input = require("client.src.inputManager")
 local system = require("client.src.system")
 local DebugSettings = require("client.src.debug.DebugSettings")
+local TeamUtils = require("common.data.TeamUtils")
 
 local PortraitGame = class(function(self, sceneParams)
+
+local teamLetter = TeamUtils.teamLetter
+local isFFA = TeamUtils.isFFA
+
+local function buildTeamResultText(match, winners)
+  local teams = {}
+  local winnerTeams = {}
+  local maxTeamIndex = 0
+
+  for _, player in ipairs(match.players) do
+    local teamIndex = TeamUtils.teamIndexForPlayer(match, player)
+    if teamIndex then
+      teams[teamIndex] = teams[teamIndex] or {}
+      teams[teamIndex][#teams[teamIndex] + 1] = player.name
+      if teamIndex > maxTeamIndex then maxTeamIndex = teamIndex end
+    end
+  end
+
+  for _, winner in ipairs(winners) do
+    for _, player in ipairs(match.players) do
+      if player == winner then
+        local teamIndex = TeamUtils.teamIndexForPlayer(match, player)
+        if teamIndex then
+          winnerTeams[teamIndex] = true
+        end
+        break
+      end
+    end
+  end
+
+  local winnerTeamIndex = nil
+  local winnerTeamCount = 0
+  for teamIndex, _ in pairs(winnerTeams) do
+    winnerTeamIndex = teamIndex
+    winnerTeamCount = winnerTeamCount + 1
+  end
+
+  local rosterParts = {}
+  for i = 1, maxTeamIndex do
+    local names = teams[i] and table.concat(teams[i], ", ") or "-"
+    rosterParts[#rosterParts + 1] = "Team " .. teamLetter(i) .. ": " .. names
+  end
+  local roster = table.concat(rosterParts, " | ")
+
+  if winnerTeamCount == 1 and winnerTeamIndex then
+    return "Team " .. teamLetter(winnerTeamIndex) .. " wins | " .. roster
+  end
+
+  return "Draw | " .. roster
+end
 end,
 GameBase)
 
@@ -33,19 +86,16 @@ local function getTimer(match)
 end
 
 function PortraitGame:customLoad()
-  self.uiRoot.width = consts.CANVAS_HEIGHT
-  self.uiRoot.height = consts.CANVAS_WIDTH
+  -- uiRoot must be PORTRAIT (narrow x tall). Legacy hard-swapped consts assuming
+  -- a landscape base (HEIGHT=720 -> width, WIDTH=1280 -> height); our portrait
+  -- build already swaps consts, so that double-swaps into landscape and throws
+  -- the raise button / timer off-screen. Use short edge = width, long = height
+  -- so it's correct regardless of consts orientation.
+  self.uiRoot.width = math.min(consts.CANVAS_WIDTH, consts.CANVAS_HEIGHT)
+  self.uiRoot.height = math.max(consts.CANVAS_WIDTH, consts.CANVAS_HEIGHT)
 
-  local communityMessage = ui.Label({
-    text = "join_community",
-    replacements = {"\ndiscord." .. consts.SERVER_LOCATION},
-    translate = true,
-    hAlign = "center",
-    vAlign = "top",
-    y = 10,
-  })
-  self.uiRoot.communityMessage = communityMessage
-  self.uiRoot:addChild(self.uiRoot.communityMessage)
+  -- community/unofficial-build banner removed in-game: not needed here and it just
+  -- collides with the stats at the top.
 
   local timerScale = themes[config.theme].time_Scale
   self.uiRoot.timer = ui.PixelFontLabel({
@@ -59,6 +109,14 @@ function PortraitGame:customLoad()
   self.uiRoot:addChild(self.uiRoot.timer)
 
   self:flipToPortrait()
+
+  -- reusable stats overlay drawn in the margins on top of the board
+  local statsStack = self.match.stacks[1]
+  if statsStack then
+    local PortraitStatsOverlay = require("client.src.ui.PortraitStatsOverlay")
+    self.statsOverlay = PortraitStatsOverlay({stack = statsStack})
+    self.uiRoot:addChild(self.statsOverlay)
+  end
 end
 
 function PortraitGame:drawBar(stack, image, quad, themePositionOffset, height, yOffset, rotate, scale)
@@ -165,7 +223,11 @@ function PortraitGame:draw()
         end
       end
 
-      if stack.garbageTarget then --and stack.garbageTarget.is_local and stack.garbageTarget.inputMethod == "touch" then
+      if stack.garbageTargets and #stack.garbageTargets > 0 then
+        for _, target in ipairs(stack.garbageTargets) do
+          Telegraph:render(stack, target)
+        end
+      elseif stack.garbageTarget then
         Telegraph:render(stack, stack.garbageTarget)
       end
     end
@@ -175,7 +237,30 @@ function PortraitGame:draw()
     local winners = self.match:getWinners()
     local pos = themes[config.theme].gameover_text_Pos
     local message
-    if #winners == 1 then
+    if TeamUtils.isFFA(self.match.gameMode) then
+      if self.match:hasLocalPlayer() then
+        local localWon = false
+        for _, winner in ipairs(winners) do
+          if winner.isLocal then
+            localWon = true
+            break
+          end
+        end
+        if localWon then
+          message = loc("pl_you_win")
+        elseif #winners > 0 then
+          message = loc("pl_you_lose")
+        else
+          message = loc("ss_draw")
+        end
+      elseif #winners == 1 then
+        message = loc("ss_p_wins", winners[1].name)
+      else
+        message = loc("ss_draw")
+      end
+    elseif self.match.gameMode and self.match.gameMode.stackInteraction == GameModes.StackInteractions.TEAM_VERSUS then
+      message = GameBase.buildTeamResultText(self.match, winners)
+    elseif #winners == 1 then
       message = loc("ss_p_wins", winners[1].name)
     else
       message = loc("ss_draw")
@@ -190,15 +275,19 @@ function PortraitGame:draw()
 end
 
 function PortraitGame:flipToPortrait()
-  -- recreate the global canvas in portrait dimensions
-  GAME.globalCanvas = love.graphics.newCanvas(consts.CANVAS_HEIGHT, consts.CANVAS_WIDTH, {dpiscale=GAME:newCanvasSnappedScale()})
+  -- Legacy assumes a LANDSCAPE base canvas/window and flips to portrait here.
+  -- In our portrait build the base is ALREADY portrait, so flipping would invert
+  -- it back to landscape (the squished-strip bug). Only flip in the legacy case.
+  if not system.isPortraitMode() then
+    -- recreate the global canvas in portrait dimensions
+    GAME.globalCanvas = love.graphics.newCanvas(consts.CANVAS_HEIGHT, consts.CANVAS_WIDTH, {dpiscale=GAME:newCanvasSnappedScale()})
 
-  local width, height, _ = love.window.getMode()
-  if system.isMobileOS() or DebugSettings.simulateMobileOS() then
-    -- flip the window dimensions to portrait
-    love.window.updateMode(height, width, {})
-    love.window.setFullscreen(true)
-    --GAME:updateCanvasPositionAndScale(width, height)
+    local width, height, _ = love.window.getMode()
+    if system.isMobileOS() or DebugSettings.simulateMobileOS() then
+      -- flip the window dimensions to portrait
+      love.window.updateMode(height, width, {})
+      love.window.setFullscreen(true)
+    end
   end
 
   for _, player in ipairs(self.match.players) do
@@ -242,14 +331,18 @@ function PortraitGame:flipToPortrait()
 end
 
 function PortraitGame:returnToLandscape()
-  -- recreate the global canvas in landscape dimensions
-  GAME.globalCanvas = love.graphics.newCanvas(consts.CANVAS_WIDTH, consts.CANVAS_HEIGHT, {dpiscale=GAME:newCanvasSnappedScale()})
-  -- flip the window dimensions to landscape
-  local width, height, _ = love.window.getMode()
-  if system.isMobileOS() or DebugSettings.simulateMobileOS() then
-    love.window.updateMode(height, width, {})
-    love.window.setFullscreen(false)
-    --GAME:updateCanvasPositionAndScale(width, height)
+  -- Mirror flipToPortrait: in our portrait build the menus are ALSO portrait, so
+  -- there is nothing to restore — leaving the canvas/window portrait keeps the
+  -- menus correct. Only the legacy (landscape-base) path flips back.
+  if not system.isPortraitMode() then
+    -- recreate the global canvas in landscape dimensions
+    GAME.globalCanvas = love.graphics.newCanvas(consts.CANVAS_WIDTH, consts.CANVAS_HEIGHT, {dpiscale=GAME:newCanvasSnappedScale()})
+    -- flip the window dimensions to landscape
+    local width, height, _ = love.window.getMode()
+    if system.isMobileOS() or DebugSettings.simulateMobileOS() then
+      love.window.updateMode(height, width, {})
+      love.window.setFullscreen(false)
+    end
   end
   for _, player in ipairs(self.match.players) do
     if player.isLocal and player.human and player.settings.inputMethod == "touch" then

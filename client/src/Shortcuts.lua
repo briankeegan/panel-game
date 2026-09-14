@@ -66,22 +66,30 @@ local function handleCopy()
   end
 end
 
-local function handleDumpAttackPattern(playerNumber)
+---Debug-only: dump the Nth player's attack pattern to disk.
+---@param stackIndex integer 1-based dense match position (NOT a seatId).
+---  Ctrl+1 / Ctrl+2 bindings hardcode 1 and 2, so this is "the first /
+---  second player in the match" regardless of which lobby seats they
+---  originally occupied. ClientMatch.players is dense from match start.
+local function handleDumpAttackPattern(stackIndex)
   local activeScene = GAME.navigationStack:getActiveScene()
+  if not (activeScene and activeScene.match) then return end
 
-  if activeScene and activeScene.match then
-    local player = activeScene.match.players[playerNumber]
-
-    if player and player.stack then
-      local data, state = player.stack:getAttackPatternData()
-      if data then
-        FileUtils.writeJson("training", data.extraInfo.dateGenerated .. "_" .. data.extraInfo.playerName .. "_" .. data.extraInfo.gpm .. "gpm.json", data, state)
-      else
-        logger.debug("Tried to export attack patterns from a stack that did not send any attacks")
-      end
-      return true
-    end
+  local player = activeScene.match.players[stackIndex]
+  if not (player and player.stack) then
+    logger.warn(string.format(
+      "handleDumpAttackPattern: no player at stackIndex %d (match has %d players)",
+      stackIndex, activeScene.match.players and #activeScene.match.players or 0))
+    return
   end
+
+  local data, state = player.stack:getAttackPatternData()
+  if data then
+    FileUtils.writeJson("training", data.extraInfo.dateGenerated .. "_" .. data.extraInfo.playerName .. "_" .. data.extraInfo.gpm .. "gpm.json", data, state)
+  else
+    logger.debug("Tried to export attack patterns from a stack that did not send any attacks")
+  end
+  return true
 end
 
 local function modifyWinCounts(functionIndex)

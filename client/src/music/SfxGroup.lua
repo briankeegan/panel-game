@@ -1,5 +1,6 @@
 local class = require("common.lib.class")
 local tableUtils = require("common.lib.tableUtils")
+local AssetDecodeClient = require("client.src.mods.AssetDecodeClient")
 
 -- A group of SFX that belong together
 -- Only 1 SFX in the group may play at the same time
@@ -21,7 +22,16 @@ function(self, fileGroup, volumeMultiplier)
   self.sources = {}
   -- if there are gaps in indexedFiles, tough luck, they'll get ignored
   for i, filename in ipairs(continuouslyIndexedFiles) do
-    self.sources[i] = love.audio.newSource(fileGroup.path .. "/" .. filename, "static")
+    local fullPath = fileGroup.path .. "/" .. filename
+    local source = nil
+    if AssetDecodeClient.enabled and coroutine.running() ~= nil then
+      local result = AssetDecodeClient.decodeSound(fullPath, false)
+      if result and result.soundData then
+        local ok, s = pcall(love.audio.newSource, result.soundData, "static")
+        if ok then source = s end
+      end
+    end
+    self.sources[i] = source or love.audio.newSource(fullPath, "static")
   end
 end)
 

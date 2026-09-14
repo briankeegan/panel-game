@@ -1,6 +1,8 @@
 local Match = require("common.engine.Match")
 local class = require("common.lib.class")
 local logger = require("common.lib.logger")
+local TraceWriter = require("client.src.network.TraceWriter")
+local NetworkProtocol = require("common.network.NetworkProtocol")
 local StageLoader = require("client.src.mods.StageLoader")
 local ModController = require("client.src.mods.ModController")
 local consts = require("common.engine.consts")
@@ -13,15 +15,21 @@ local CharacterLoader = require("client.src.mods.CharacterLoader")
 local ReplayV3 = require("common.data.ReplayV3")
 local GraphicsUtil = require("client.src.graphics.graphics_util")
 local Telegraph = require("client.src.graphics.Telegraph")
+local socket = require("socket")
+
+-- Lua 5.1 / LuaJIT has `unpack` as a global; 5.2+ moved it to `table.unpack`.
+-- LÖVE 11.x runs on LuaJIT so call sites using `table.unpack` crash here.
+local unpack = table.unpack or unpack
 local MatchParticipant = require("client.src.MatchParticipant")
 local ChallengeModePlayerStack = require("client.src.ChallengeModePlayerStack")
 local NetworkProtocol = require("common.network.NetworkProtocol")
 local DebugSettings = require("client.src.debug.DebugSettings")
+local TeamUtils = require("common.data.TeamUtils")
 ---@module "client.src.ChallengeModePlayerStack"
 
 ---@class ClientMatch
 ---@field players (Player|ChallengeModePlayer)[]
----@field stacks (PlayerStack|ChallengeModePlayerStack)[]
+---@field stacks (PlayerStack|ChallengeModePlayerStack)[] Dense 1..N array; mirrors engine.stacks (see common/engine/Match.lua dense-array invariant).
 ---@field engine Match
 ---@field matchRules MatchRules
 ---@field replay ReplayV3
@@ -38,8 +46,23 @@ local DebugSettings = require("client.src.debug.DebugSettings")
 ---@field winners MatchParticipant[]
 ---@field panelSource PanelSource
 ---@field gameMode GameMode
+---@field scheduledStartLocalMs integer? wall-clock ms (socket.gettime()*1000) target for engine tick 0; set by NetClient from server-stamped startInMs
+---@field fromReplay boolean? true when this match was reconstructed from a saved replay
+---@field _serverConfirmedEnd boolean? set by NetClient when the server's gameResult arrives
+---@field _scheduledOverlayLocalMs integer? wall-clock ms anchor for the match-end overlay (scheduledStartLocalMs + endTick/60s)
+---@field noRaiseMode boolean? endless rewind/no-raise practice flag; suppresses score save and tweaks engine pacing
 
 --- The ClientMatch is a way to create a match that will run with graphics and sounds on a client.
+---
+--- INVARIANT (read before indexing match.players or match.stacks):
+--- Both arrays are DENSE 1..N indexed by stackIndex (engine slot), NOT by
+--- seatId (lobby slot). setupFromGameMode and createFromReplay both call
+--- TeamUtils.assignStackIndices at match start so player.stackIndex /
+--- player.player_number agree with the server during a live match.
+--- player.playerNumber and player.seatId still carry the lobby seatId.
+---
+--- Network events (I, G, D from the server) carry stackIndex on the wire —
+--- index directly into self.stacks / self.engine.stacks.
 ---@class ClientMatch : Signal
 ---@overload fun(players: MatchParticipant[], ranked: boolean): ClientMatch
 local ClientMatch = class(
@@ -65,6 +88,14 @@ end)
 
 local countdownEnd = consts.COUNTDOWN_START + consts.COUNTDOWN_LENGTH
 
+-- Modes whose game scene supports pause-mode scrubbing. These render the
+-- playfield underneath the pause overlay so the player (and now spectators)
+-- can see the frozen frame. Mode-level so player + spectator + replay paths
+-- all derive the same answer instead of each customLoad setting it ad hoc.
+local function _scrubEligibleScene(gameScene)
+  return gameScene == "EndlessGame" or gameScene == "VsSelfGame"
+end
+
 ---@param battleRoom BattleRoom
 function ClientMatch.createFromBattleRoom(battleRoom)
   local clientMatch = ClientMatch.createFromGameMode(battleRoom.players, battleRoom.mode, battleRoom:createPanelSource(), battleRoom.ranked, battleRoom.preferredStageId)
@@ -82,8 +113,24 @@ function ClientMatch.createFromGameMode(players, gameMode, panelSource, ranked, 
   clientMatch.gameMode = gameMode
   clientMatch.stackInteraction = gameMode.stackInteraction
   clientMatch.matchRules = gameMode.matchRules
+
+  if (gameMode.gameScene == "EndlessGame" or gameMode.gameScene == "VsSelfGame") and players[1] and players[1].settings.endlessNoRaise then
+    clientMatch.noRaiseMode = true
+    local rules = {}
+    for k, v in pairs(clientMatch.matchRules) do rules[k] = v end
+    local mods = {}
+    for k, v in pairs(rules.stackSetupModifications or {}) do mods[k] = v end
+    local behaviours = {}
+    for k, v in pairs(mods.behaviours or {}) do behaviours[k] = v end
+    behaviours.passiveRaise = false
+    mods.behaviours = behaviours
+    rules.stackSetupModifications = mods
+    clientMatch.matchRules = rules
+  end
+
   clientMatch.panelSource = panelSource
   clientMatch.supportsPause = #players == 1 and players[1].isLocal
+  clientMatch.renderDuringPause = _scrubEligibleScene(gameMode.gameScene)
 
   clientMatch:setupFromGameMode()
 
@@ -92,19 +139,49 @@ end
 
 ---@param replay ReplayV3
 ---@param players MatchParticipant[]?
+---@param gameMode GameMode? optional — when provided, restores team setup on the engine for online play
 ---@return ClientMatch
-function ClientMatch.createFromReplay(replay, players)
+function ClientMatch.createFromReplay(replay, players, gameMode)
   local engine = Match.createFromReplay(replay)
 
-  -- we only need to reconstruct the players from the metadata
-  -- unless we already got them passed in
-  players = players or {}
+  -- Build a publicId-keyed index of any passed-in players so we can preserve
+  -- player object identity across matches by STABLE identifier (publicId),
+  -- not by stack position. Stack index is just a per-match slot — the same
+  -- index can hold a different person from one match to the next if anyone
+  -- rejoined into a different seat. Matching by publicId means a returning
+  -- player keeps the same Lua object (so subscribers like rosterChanged stay
+  -- wired up) and gets their seat refreshed to whatever THIS match says.
+  local priorByPublicId = {}
+  for _, p in pairs(players or {}) do
+    if p and p.publicId then priorByPublicId[p.publicId] = p end
+  end
+  players = {}
 
   for _, stackMetadata in ipairs(replay.metadata.stacks) do
+    ---@cast stackMetadata StackMetadata
     local stackData = replay.stacks[stackMetadata.stackIndex]
 
-    if not players[stackMetadata.stackIndex] then
-      if stackData.stackType == 1 then
+    if not stackData then
+      logger.warn(string.format(
+        "ClientMatch.createFromReplay: skipping metadata stackIndex %d (no stackData in replay with %d stacks)",
+        stackMetadata.stackIndex, #replay.stacks))
+    else
+      -- Backfill seat identity for replays saved before seatId was persisted
+      -- (or by an older client). assignSeatIdentity no-ops on nil, which would
+      -- leave player.playerNumber unset and make the team-color lookup throw;
+      -- default to stackIndex so the shared view always has a seat to read.
+      if not stackMetadata.seatId then
+        stackMetadata.seatId = stackMetadata.stackIndex
+      end
+      local prior = stackMetadata.publicId and priorByPublicId[stackMetadata.publicId]
+      if prior then
+        -- Same person, possibly new seat. Wipe per-match state first so stale
+        -- pointers (stack ref from last match, lastPlacement) can't leak into
+        -- the new match — see MatchParticipant's field-lifecycle docs.
+        prior:clearPerMatchState()
+        TeamUtils.assignSeatIdentity(prior, stackMetadata.seatId)
+        players[stackMetadata.stackIndex] = prior
+      elseif stackData.stackType == 1 then
         ---@cast stackMetadata StackMetadata
         players[stackMetadata.stackIndex] = Player.createFromReplayMetadata(stackMetadata)
       elseif stackData.stackType == 2 then
@@ -120,6 +197,11 @@ function ClientMatch.createFromReplay(replay, players)
   clientMatch.replay = replay
   clientMatch.engine = engine
   clientMatch.supportsPause = #players == 1 and players[1].isLocal
+  if replay.rules and replay.rules.stackSetupModifications
+      and replay.rules.stackSetupModifications.behaviours
+      and replay.rules.stackSetupModifications.behaviours.passiveRaise == false then
+    clientMatch.noRaiseMode = true
+  end
   clientMatch.stacks = {}
   clientMatch.spectators = {}
   clientMatch.spectatorString = ""
@@ -127,6 +209,46 @@ function ClientMatch.createFromReplay(replay, players)
   clientMatch:setStage(replay.metadata.stageId)
 
   clientMatch.players = players
+
+  -- Same lock-in as the live path so replay playback / spectator joins also
+  -- see player.stackIndex set. The replay-keyed assignment above already put
+  -- each player at their stackIndex position, so this re-derives the same
+  -- index — it just stamps it onto the player object too.
+  TeamUtils.assignStackIndices(clientMatch.players)
+
+  -- Resolve gameMode from the replay metadata when the caller didn't pass one
+  -- (saved-replay viewing via ReplayBrowser, etc). This way every match constructed
+  -- via createFromReplay gets the correct end-condition / team behavior automatically.
+  if not gameMode and replay.metadata and replay.metadata.gameModeName then
+    local modeId = GameModes.nameToGameModeId[replay.metadata.gameModeName]
+    if modeId then
+      gameMode = GameModes.getPreset(modeId)
+    end
+  end
+
+  -- Restore team configuration on the engine. Without this, Match:hasEnded skips
+  -- the TEAMS_ACTIVE check (it requires self.teams) and a team match never ends
+  -- until literally every stack dies — even the surviving team. Garbage targets
+  -- are already populated above from replay.garbageFlows; we just need teams +
+  -- garbageMode for hasEnded and shared-mode distribution to work.
+  if gameMode then
+    -- replay.metadata.playersPerTeam carries the *compacted* per-match shape
+    -- (e.g. {1,1} when a 1v2 room starts with one player per team). Use it
+    -- for engine team setup so slot→team math is correct after compaction.
+    -- Do NOT put it on matchGameMode: isSharedTeamMode needs the preset's
+    -- shape (e.g. {1,2}) to return true, and subsequent reads of
+    -- clientMatch.gameMode.playersPerTeam should reflect the mode definition,
+    -- not the reduced roster of a single match.
+    local compactedPpt = replay.metadata.playersPerTeam
+    local matchGameMode = setmetatable({
+      teamCount = replay.metadata.teamCount or gameMode.teamCount,
+    }, {__index = gameMode})
+    clientMatch.gameMode = matchGameMode
+    clientMatch.stackInteraction = matchGameMode.stackInteraction
+    clientMatch.matchRules = matchGameMode.matchRules
+    clientMatch.renderDuringPause = _scrubEligibleScene(matchGameMode.gameScene)
+    clientMatch:_wireGarbageTargets(matchGameMode.stackInteraction, matchGameMode, compactedPpt)
+  end
 
   -- and assign their stacks from the engine
   for i, player in ipairs(clientMatch.players) do
@@ -139,6 +261,64 @@ function ClientMatch.createFromReplay(replay, players)
       clientStack:enableCatchup(true)
     end
     clientMatch.stacks[i] = clientStack
+    -- Backref so renderers resolve garbage senderId against the match that
+    -- owns the stack, not the global GAME.battleRoom.match (which onMatchEnded
+    -- nils at match end while the dead board is still on screen — that nil made
+    -- garbage blocks fall back from the thrower's theme to the board owner's).
+    clientStack.match = clientMatch
+  end
+
+  -- Loose-sync catch-up: when a spectator / mid-match joiner receives a
+  -- partial replay, the inputs cover the historical sim but garbage and
+  -- death deliveries were driven by G/D events at runtime — not derivable
+  -- from inputs alone. Queue them up here so ClientMatch:run can replay
+  -- them at the right sender frames as catch-up progresses.
+  --
+  -- Skip for completed replays: those play back offline (looseSyncActive
+  -- false), so deliverOutgoingGarbage / pushGarbageTo direct-push from the
+  -- sim. Applying events on top would double-deliver.
+  if not replay.metadata.completed and replay.crossPlayerEvents then
+    clientMatch.pendingHistoricalGarbage = {}
+    for i, ev in ipairs(replay.crossPlayerEvents.garbage or {}) do
+      clientMatch.pendingHistoricalGarbage[i] = ev
+    end
+    clientMatch.pendingHistoricalDeaths = {}
+    for i, ev in ipairs(replay.crossPlayerEvents.deaths or {}) do
+      clientMatch.pendingHistoricalDeaths[i] = ev
+    end
+  end
+
+  -- For 2+ player replays with saved snapshot history, wire up the same
+  -- spectator display pipeline used during live play. Each sender's batches
+  -- feed through applyBatch (delta resolution, HUD mirror) and render via
+  -- renderDisplayStacks — identical to the live spectator path, no new code.
+  if replay.displayHistory and #replay.displayHistory > 0 then
+    local DisplayClientStack = require("client.src.network.DisplayClientStack")
+    clientMatch._displayHistory      = replay.displayHistory
+    clientMatch._displayHistoryIndex = 1
+    clientMatch._displayStacks       = {}
+    -- Build pid→viewStack index for DisplayClientStack construction.
+    local stackByPid = {}
+    for _, cs in ipairs(clientMatch.stacks) do
+      local p = cs.player
+      if p then
+        local pid = p.publicId or p.playerNumber
+        if pid then stackByPid[pid] = cs end
+      end
+    end
+    -- One DisplayClientStack per unique sender in the history.
+    for _, batch in ipairs(replay.displayHistory) do
+      local pid = batch.from
+      if pid and not clientMatch._displayStacks[pid] then
+        local viewStack = stackByPid[pid]
+        clientMatch._displayStacks[pid] = DisplayClientStack.new(pid, viewStack and viewStack.player, viewStack)
+        -- Suppress the engine-based render for this stack; snapshot owns it.
+        if viewStack then
+          viewStack.canvas = nil
+          viewStack.displayRendered = true
+        end
+      end
+    end
   end
 
   clientMatch:sharedSetup()
@@ -148,6 +328,11 @@ end
 
 function ClientMatch:setupFromGameMode()
   self.engine = Match(self.panelSource, self.matchRules)
+
+  -- Lock in stackIndex (engine slot) on each player. Mirrors the server's
+  -- start_match compaction so player.stackIndex / .player_number line up
+  -- with the BE during a live match — no more "FE has nil stackIndex" gap.
+  TeamUtils.assignStackIndices(self.players)
 
   self.stacks = {}
 
@@ -163,9 +348,11 @@ function ClientMatch:setupFromGameMode()
 
     clientStack = player:createClientStack(engineStack)
     self.stacks[i] = clientStack
+    clientStack.match = self -- see backref note in createFromReplay
   end
 
   if self.stackInteraction == GameModes.StackInteractions.ATTACK_ENGINE then
+    -- Inline: creates additional simulated stacks beyond the player stacks.
     for _, player in ipairs(self.players) do
       local engineStack = self.engine:createSimulatedStackWithSettings(player.settings.attackEngineSettings)
       local attackEngineHost = ChallengeModePlayerStack({
@@ -176,20 +363,11 @@ function ClientMatch:setupFromGameMode()
         match = self,
       })
       self.engine:addTarget(engineStack, player.stack.engine)
+      attackEngineHost.match = self -- backref (constructor ignores args.match)
       self.stacks[#self.stacks+1] = attackEngineHost
     end
-  elseif self.stackInteraction == GameModes.StackInteractions.SELF then
-    for _, stack in ipairs(self.stacks) do
-      self.engine:addTarget(stack.engine, stack.engine)
-    end
-  elseif self.stackInteraction == GameModes.StackInteractions.VERSUS then
-    for i, stack1 in ipairs(self.stacks) do
-      for j, stack2 in ipairs(self.stacks) do
-        if i ~= j then
-          self.engine:addTarget(stack1.engine, stack2.engine)
-        end
-      end
-    end
+  else
+    self:_wireGarbageTargets(self.stackInteraction, self.gameMode, nil)
   end
 
   self:sharedSetup()
@@ -202,23 +380,140 @@ function ClientMatch:sharedSetup()
   self.engine.debug.vsFramesBehind = DebugSettings.getVSFramesBehind()
 end
 
-function ClientMatch:run()
-  if self.isPaused or self.engine:hasEnded() then
+---Target-wiring dispatch shared by setupFromGameMode and createFromReplay.
+---Sets up engine garbage relationships (addTarget calls / team setup) based on
+---stackInteraction. ATTACK_ENGINE is NOT handled here — it also creates new
+---simulated stacks, so it stays inline in setupFromGameMode.
+---@param stackInteraction integer GameModes.StackInteractions value
+---@param gameMode table? required for TEAM_VERSUS
+---@param compactedPlayersPerTeam integer|integer[]|nil per-match compacted shape from replay metadata (overrides gameMode.playersPerTeam when present)
+function ClientMatch:_wireGarbageTargets(stackInteraction, gameMode, compactedPlayersPerTeam)
+  local engine = self.engine
+  if not engine then return end
+
+  if stackInteraction == GameModes.StackInteractions.SELF then
+    for _, engineStack in ipairs(engine.stacks) do
+      engine:addTarget(engineStack, engineStack)
+    end
+  elseif stackInteraction == GameModes.StackInteractions.VERSUS then
+    -- 1v1 (incl. Challenge mode vs the attack-engine opponent): each stack targets
+    -- the other. This branch was dropped when the team-garbage refactor merged
+    -- wiring into _wireGarbageTargets, which silently killed Challenge garbage
+    -- (the only VERSUS mode). Restored from beta.
+    for i, s1 in ipairs(engine.stacks) do
+      for j, s2 in ipairs(engine.stacks) do
+        if i ~= j then engine:addTarget(s1, s2) end
+      end
+    end
+  elseif stackInteraction == GameModes.StackInteractions.TEAM_VERSUS then
+    if not (gameMode and gameMode.teamCount) then return end
+    local ppt = compactedPlayersPerTeam or gameMode.playersPerTeam
+    if not ppt then return end
+    local teams = TeamUtils.createTeams(#engine.stacks, gameMode.teamCount, ppt)
+    engine:setTeams(teams)
+    if gameMode.garbageMode then
+      engine:setGarbageMode(gameMode.garbageMode)
+    end
+    engine:setupTeamGarbageTargets()
+  end
+end
+
+function ClientMatch:run(isFreshFrame)
+  if isFreshFrame == nil then isFreshFrame = true end
+  -- Architectural rule: engine ticks until WE have finalized (self.ended set
+  -- by handleMatchEnd), not until Match:hasEnded thinks the match is over.
+  -- The old code early-returned on engine:hasEnded(), which is a LOCAL
+  -- inference from this client's view-stacks — that froze engine.clock the
+  -- same tick a local stack died and stranded anything waiting on clock
+  -- progress (this is what caused the 3p FFA stuck-match bug).
+  --
+  -- In live online play we now keep ticking until the SERVER confirms match
+  -- end (gameResult arrives). For offline/replay (no server authority) the
+  -- local hasEnded is authoritative and triggers handleMatchEnd directly.
+  -- See ClientMatch:shouldFinalize for the decision.
+  --
+  -- Pause is intentionally NOT a stop condition here. The engine just runs
+  -- when called. Scene-level callers (GameBase, PuzzleGame, ReplayGame,
+  -- PortraitGame) check their own pause state before calling :run() —
+  -- making pause an engine concept too would re-introduce the same
+  -- "freeze engine on a UX condition" foot-gun we removed for hasEnded.
+  -- isPaused remains the announce-side coordination point (pauseChanged
+  -- signal → NetClient sends pauseToggle); the engine just doesn't read it.
+  if self.ended then
     self:runGameOver()
     return
   end
 
-  for _, stack in ipairs(self.stacks) do
+  -- Drain any queued historical G/D events that the sim has now caught up
+  -- to. Deaths run first so the sender's stack stops at game_over_clock
+  -- before this tick advances it further; garbage second so it lands while
+  -- the recipient's stack is still healthy enough to receive it.
+  self:drainPendingHistoricalEvents()
+
+  for i, stack in ipairs(self.stacks) do
     -- if stack.cpu then
     --   stack.cpu:run(stack)
     -- end
-    if stack.is_local and stack.send_controls and not stack:game_ended() --[[and not stack.cpu]] then
+    local willPoll = stack.is_local and stack.send_controls and not stack:game_ended() --[[and not stack.cpu]]
+    if willPoll then
       ---@cast stack PlayerStack
-      stack:send_controls()
+      stack:send_controls(isFreshFrame)
+    end
+
+    -- Trace capture: per-stack poll-state transitions. Emit only when
+    -- the polling decision flips for a stack — the 3p FFA bug had all
+    -- three clients fall silent at the same moment, and a marker here
+    -- tells us whether polling STOPPED FIRING (caller stopped calling)
+    -- versus polling still firing but short-circuiting internally.
+    if self._tracePollState[i] ~= willPoll then
+      self._tracePollState[i] = willPoll
+      -- TraceWriter.localEvent has its own state.disabled check + pcall,
+      -- so skip the outer pcall closure (per-tick allocation budget).
+      TraceWriter.localEvent("sendControlsPoll", {
+        stack   = i,
+        polling = willPoll,
+        reason  = (not willPoll) and (
+          (not stack.is_local      and "not_local") or
+          (not stack.send_controls and "no_send_controls") or
+          (stack:game_ended()      and "game_ended") or
+          "other"
+        ) or nil,
+        clock = self.engine and self.engine.clock or nil,
+      })
     end
   end
 
   local runs = math.max(unpack(self.engine:run()))
+
+  -- Drain replay snapshot history up to the current engine clock. Feeds
+  -- each batch through the same applyBatch path the live spectator view
+  -- uses — delta resolution, HUD mirror, panel cache all work unchanged.
+  if self._displayHistory then
+    local clock = self.engine.clock
+    while self._displayHistoryIndex <= #self._displayHistory do
+      local batch = self._displayHistory[self._displayHistoryIndex]
+      if batch.snapshot and batch.snapshot.f and batch.snapshot.f > clock then break end
+      local ds = self._displayStacks and self._displayStacks[batch.from]
+      if ds then ds:applyBatch(batch) end
+      self._displayHistoryIndex = self._displayHistoryIndex + 1
+    end
+  end
+
+  -- Trace capture: detect per-stack game-over transitions. Emit a marker
+  -- the first frame each stack reaches game_over_clock > 0. TraceWriter
+  -- handles its own protection; outer pcall closure removed so this loop
+  -- doesn't allocate a per-tick closure during normal play.
+  for i, stack in ipairs(self.stacks) do
+    local goc = stack.engine and stack.engine.game_over_clock or -1
+    if not self._traceGameOverEmitted[i] and goc and goc > 0 then
+      self._traceGameOverEmitted[i] = true
+      TraceWriter.localEvent("stackGameOver", { stack = i, frame = goc })
+    end
+  end
+
+  -- Keep shared-mode telegraph targets aligned with the next living recipient
+  -- selected by the engine's round-robin cursor.
+  self:refreshSharedModeTelegraphTargets()
 
   if self.panicTickStartTime and self.panicTickStartTime == self.engine.clock then
     self:updateDangerMusic()
@@ -233,23 +528,359 @@ function ClientMatch:run()
   self:playCountdownSfx()
   self:playTimeLimitDepletingSfx()
 
-  if self.engine:hasEnded() then
+  -- drain visuals and confirm elimination for stacks that died mid-match.
+  -- Use game_over_clock > 0 (death has been recorded) rather than game_ended()
+  -- (sim clock caught up past death) so remote stacks in loose-sync — whose
+  -- clock is permanently pinned below game_over_clock once input stops — still
+  -- get their death animation played.
+  for _, stack in ipairs(self.stacks) do
+    local deathRecorded = stack.engine and stack.engine.game_over_clock > 0
+    if stack:game_ended() or deathRecorded then
+      stack:runGameOver(self.engine.clock)
+    end
+  end
+
+  if self:shouldFinalize() then
     self.engine:handleMatchEnd()
     self:handleMatchEnd()
   end
 end
 
+---Decide whether the match is authoritatively over and should finalize.
+---Live online: only the server's gameResult (or an abort) is authoritative.
+---Offline / replay / client-driven solo: the local engine:hasEnded() is
+---authoritative — no remote players to wait for.
+---@return boolean
+function ClientMatch:shouldFinalize()
+  if self.engine.aborted then return true end
+  if self._serverConfirmedEnd then
+    -- Hold finalize until the shared wall-clock anchor when we have one,
+    -- so the match-end overlay fires at the same moment on every client.
+    -- If endTick or scheduledStartLocalMs is missing (legacy server, replay
+    -- bootstrap, etc.) the anchor is nil and we finalize immediately —
+    -- matches today's behavior.
+    if self._scheduledOverlayLocalMs then
+      local nowMs = math.floor(socket.gettime() * 1000)
+      if nowMs < self._scheduledOverlayLocalMs then
+        return false
+      end
+    end
+    return true
+  end
+  if self.fromReplay then return self.engine:isLocallyEnded() end
+  if not (GAME.battleRoom and GAME.battleRoom.online) then
+    return self.engine:isLocallyEnded()
+  end
+  -- Client-driven solo (vsSelf, endless): local sim is authoritative — server
+  -- confirmation is nice-to-have for replay storage but never gates the
+  -- player's experience. Time Attack stays server-gated (leaderboard depends
+  -- on server-validated timing).
+  local modeName = self.gameMode and self.gameMode.name
+  if (modeName == "vsSelf" or modeName == "endless")
+      and #self.players == 1 and self.players[1].isLocal then
+    return self.engine:isLocallyEnded()
+  end
+  -- Live online: finalize the instant WE locally know the match is decided
+  -- (OG-style snappy end) instead of waiting for the server's gameResult.
+  -- evaluateEndConditions won't fire while aliveCount > 1, so this stays safe
+  -- for 3+ FFA / teams (the 3p stuck bug came from the OLD hasEnded freezing
+  -- the clock early, not from this corrected logic). The server's gameResult
+  -- still arrives and remains the authority for winner/order — it decorates
+  -- the already-shown result (GameBase rebuilds placement when it lands) and
+  -- no longer gates the freeze. _serverConfirmedEnd above is the backstop.
+  return self.engine:isLocallyEnded()
+end
+
+---Called by NetClient when a gameResult message arrives. The server has
+---spoken; the match is over no matter what the local view thinks.
+function ClientMatch:serverConfirmedEnd()
+  self._serverConfirmedEnd = true
+end
+
+-- ClientMatch composes Match (self.engine); delegate scene-layer setters
+-- so callers don't need to know about the composition boundary.
+function ClientMatch:setLocalWallClockDeficit(frames)
+  self.engine:setLocalWallClockDeficit(frames)
+end
+
+function ClientMatch:setRenderInterpAlpha(alpha)
+  self.engine:setRenderInterpAlpha(alpha)
+end
+
+---Records the canonical match-end engine clock from the server. Combined
+---with scheduledStartLocalMs (set at match start) this gives a shared
+---wall-clock anchor (startMs + endTick/60s) that every client uses to fire
+---the match-end overlay at the same instant, regardless of when each
+---client's gameResult message arrived.
+---@param endTick integer? nil for aborted-no-death matches; no anchor applied
+function ClientMatch:setServerEndTick(endTick)
+  if not endTick or not self.scheduledStartLocalMs then
+    return
+  end
+  self._scheduledOverlayLocalMs =
+    self.scheduledStartLocalMs + math.floor(endTick * 1000 / 60)
+end
+
+---Records the server-authoritative outcome. Online consumers prefer this
+---over the engine's local getWinners (which only sees game_over_clock and
+---can't tell "team won" from "all dead on the same tick").
+---@param outcome { winnerTeamIndex: integer?, winnerIndex: integer? }
+function ClientMatch:setServerOutcome(outcome)
+  self._hasServerOutcome = true
+  self._serverWinnerTeamIndex = outcome.winnerTeamIndex
+  self._serverWinnerIndex = outcome.winnerIndex
+  self:_checkWinnerMismatch()
+end
+
+---Logs [WINNER-MISMATCH] once if the local winner (captured at handleMatchEnd)
+---disagrees with the server's authoritative winner. Fired from whichever side
+---completes the pair. Online + definitive-server-winner only — offline/replay
+---has no server, and a server-declared tie isn't a "wrong winner" to compare.
+function ClientMatch:_checkWinnerMismatch()
+  if self._winnerMismatchChecked then return end
+  if not self._localWinnerNums or not self._hasServerOutcome then return end
+  if not (GAME.battleRoom and GAME.battleRoom.online) then return end
+  if not (self._serverWinnerIndex or self._serverWinnerTeamIndex) then return end
+  self._winnerMismatchChecked = true
+
+  local localKey, serverKey
+  if self._serverWinnerTeamIndex then
+    local teams = {}
+    for _, num in ipairs(self._localWinnerNums) do
+      teams[tostring(self.engine and TeamUtils.teamIndexForOrNil(self.engine, num))] = true
+    end
+    local teamList = {}
+    for t in pairs(teams) do teamList[#teamList + 1] = t end
+    table.sort(teamList)
+    localKey, serverKey = "team:" .. table.concat(teamList, ","), "team:" .. tostring(self._serverWinnerTeamIndex)
+  else
+    localKey, serverKey = "p:" .. table.concat(self._localWinnerNums, ","), "p:" .. tostring(self._serverWinnerIndex)
+  end
+  if localKey ~= serverKey then
+    logger.warn(string.format("[WINNER-MISMATCH] local=%s server=%s", localKey, serverKey))
+  end
+end
+
+---True once a gameResult has been received from the server. Callers can
+---use this to decide whether to trust `getServerWinnerTeamIndex` / `Index`
+---over local engine heuristics.
+function ClientMatch:hasServerOutcome()
+  return self._hasServerOutcome == true
+end
+
+---@return integer? nil means tie, non-team mode, or no server outcome yet
+function ClientMatch:getServerWinnerTeamIndex()
+  return self._serverWinnerTeamIndex
+end
+
+---@return integer? nil means tie, team mode, or no server outcome yet
+function ClientMatch:getServerWinnerIndex()
+  return self._serverWinnerIndex
+end
+
+---Drain historical G/D events whose senderFrame has been reached by the
+---corresponding sender stack. Called once per ClientMatch:run tick so events
+---land at approximately the same point in the sim as they did live.
+---No-op when there is no queue (most matches).
+---
+---An event is "ready" when the sender stack's stopWatch has reached the
+---event's senderFrame, OR the sender's stack is already game-over (any
+---remaining events for that sender can't sensibly wait any longer).
+function ClientMatch:drainPendingHistoricalEvents()
+  -- Common-case fast exit: no historical events queued. Skips the local
+  -- `isReady` closure allocation that would otherwise fire every Match:run
+  -- iter — under multi-iter catch-up this allocation was hitting on every
+  -- engine tick in offline / live-sync matches that never need draining.
+  local deaths = self.pendingHistoricalDeaths
+  local garbage = self.pendingHistoricalGarbage
+  if (not deaths or #deaths == 0) and (not garbage or #garbage == 0) then
+    return
+  end
+
+  -- Parked events come exclusively from spectator catch-up now (live
+  -- players don't park). Ready when the local clock has reached the
+  -- sender's frame, OR the sender is known dead so no more catch-up
+  -- frames will arrive for them.
+  local function isReady(ev)
+    local frame = ev.senderFrame or 0
+    local localClock = (self.engine and self.engine.clock) or 0
+    if localClock >= frame then return true end
+    local senderStack = self.engine and self.engine.stacks[ev.sender]
+    if senderStack and (senderStack.game_over_clock or -1) > 0 then return true end
+    return false
+  end
+
+  if deaths and #deaths > 0 then
+    local kept = {}
+    for _, ev in ipairs(deaths) do
+      if isReady(ev) then
+        local stack = self.stacks[ev.sender]
+        if stack and stack.engine and not stack.is_local then
+          self:_applyDeathEventNow(ev, stack)
+          pcall(function()
+            TraceWriter.localEvent("applyDrained", {
+              event       = "D",
+              sender      = ev.sender,
+              senderFrame = ev.senderFrame,
+              clock       = self.engine and self.engine.clock or nil,
+            })
+          end)
+        end
+      else
+        kept[#kept + 1] = ev
+      end
+    end
+    self.pendingHistoricalDeaths = kept
+  end
+
+  if garbage and #garbage > 0 then
+    local kept = {}
+    for _, ev in ipairs(garbage) do
+      if isReady(ev) then
+        self:_applyGarbageEventNow(ev)
+        pcall(function()
+          TraceWriter.localEvent("applyDrained", {
+            event       = "G",
+            sender      = ev.sender,
+            senderFrame = ev.senderFrame,
+            clock       = self.engine and self.engine.clock or nil,
+          })
+        end)
+      else
+        kept[#kept + 1] = ev
+      end
+    end
+    self.pendingHistoricalGarbage = kept
+  end
+end
+
 function ClientMatch:handleMatchEnd()
+  if self.ended then return end -- idempotent: shouldFinalize can flip true multiple ways
   self.ended = true
+
+  -- [WINNER-MISMATCH] diagnostic: capture the LOCAL winner now. With local
+  -- finalize we get here BEFORE the server's gameResult arrives, so the
+  -- comparison can't run yet — store it and let _checkWinnerMismatch fire
+  -- whichever side completes the pair (here if the server already answered,
+  -- or from setServerOutcome when it lands). Silence == always agreed; a hit
+  -- means the local getWinners would have crowned the wrong winner.
+  if GAME.battleRoom and GAME.battleRoom.online then
+    local nums = {}
+    for _, ws in ipairs(self.engine and self.engine:getWinners() or {}) do
+      for _, stack in ipairs(self.stacks) do
+        if stack.engine == ws then
+          nums[#nums + 1] = (stack.player and stack.player.playerNumber) or stack.player_number
+        end
+      end
+    end
+    table.sort(nums)
+    self._localWinnerNums = nums
+    self:_checkWinnerMismatch()
+  end
+
+  -- Backfill OUT markers for any non-winning stack whose D event never landed.
+  -- 3p+ FFA: the last dying player's D event and the server's match-end signal
+  -- can race — if match-end is processed first on a survivor's client, the
+  -- late D leaves game_over_clock unset and no OUT marker appears.
+  -- Stamp those with the match-end frame so every survivor at least sees
+  -- "OUT at <match-end>" rather than nothing.
+  --
+  -- Prefer the server's authoritative winner (winnerIndex / winnerTeamIndex,
+  -- set by processGameResult before serverConfirmedEnd unblocks shouldFinalize
+  -- in the online path). The engine's FFA getWinners can incorrectly include
+  -- the runner-up as a co-winner when their D event hadn't applied yet —
+  -- their game_over_clock stays 0 so the "highest game_over_clock" rule
+  -- doesn't filter them out, and the backfill then skips them, leaving no
+  -- OUT marker either in-game or in the post-match card.
+  local winnerSet = {}
+  local hasDefinitiveServerWinner = self._hasServerOutcome
+    and (self._serverWinnerIndex or self._serverWinnerTeamIndex)
+  if hasDefinitiveServerWinner then
+    for _, stack in ipairs(self.stacks) do
+      local engine = stack.engine
+      if engine then
+        local snum = (stack.player and stack.player.playerNumber) or stack.player_number
+        local steam = nil
+        if self._serverWinnerTeamIndex and self.engine and stack.player then
+          steam = TeamUtils.teamIndexForOrNil(self.engine, stack.player.playerNumber)
+        end
+        local isServerWinner =
+          (self._serverWinnerIndex and snum == self._serverWinnerIndex)
+          or (self._serverWinnerTeamIndex and steam and steam == self._serverWinnerTeamIndex)
+        if isServerWinner then winnerSet[engine] = true end
+      end
+    end
+  else
+    -- Tie (server outcome present but no winner) or offline/replay path.
+    for _, ws in ipairs(self.engine and self.engine:getWinners() or {}) do
+      winnerSet[ws] = true
+    end
+  end
+  -- Safety net for the winner. The backfill below stamps every stack whose
+  -- death was never recorded (game_over_clock <= 0) so a loser whose D event
+  -- was lost in the match-end race still gets an OUT marker. That set also
+  -- includes the true winner, who must be excluded. If the server-derived
+  -- winnerSet matched none of those survivors (winnerIndex/teamIndex mapping
+  -- disagreed with our stack roster), fall back to the engine's getWinners so
+  -- we never stamp the actual winner with a bogus OUT time.
+  local matchedSurvivor = false
+  for _, stack in ipairs(self.stacks) do
+    local engine = stack.engine
+    if engine and (engine.game_over_clock or 0) <= 0 and winnerSet[engine] then
+      matchedSurvivor = true
+      break
+    end
+  end
+  if not matchedSurvivor then
+    for _, ws in ipairs(self.engine and self.engine:getWinners() or {}) do
+      winnerSet[ws] = true
+    end
+  end
+
+  local endFrame = self.engine and self.engine.clock or 0
+  if endFrame > 0 then
+    for _, stack in ipairs(self.stacks) do
+      local engine = stack.engine
+      if engine and (engine.game_over_clock or 0) <= 0 and not winnerSet[engine] then
+        engine:recordDeath(endFrame)
+      end
+    end
+  end
+
   -- this prepares everything about the replay except the save location
   self:finalizeReplay()
+  -- Trace capture: mark when the local match-end fired. Lets the trace
+  -- distinguish "match-end UI mounted normally" from "client wedged
+  -- without ever finalizing" — the diagnostic gap the 3p FFA stuck-
+  -- match investigation hit.
+  pcall(function()
+    TraceWriter.localEvent("matchEnded", { clock = self.engine and self.engine.clock or nil })
+  end)
+  -- Per-match garbage accounting summary. sent counts events emitted FROM
+  -- this machine; applied/dropped count events processed BY this machine
+  -- (which includes ones we sent and bounced back, plus ones other clients
+  -- sent that targeted any stack visible on our screen). Cross-machine
+  -- reconciliation = sum across all clients' logs; sent_total should equal
+  -- applied_total + dropped_total. Within one machine, applied+dropped is
+  -- what we processed; sent is what we shipped.
+  local eng = self.engine
+  if eng then
+    logger.info(string.format(
+      "G match summary: sent=%d/%dp  applied=%d/%dp  dropped=%d/%dp",
+      eng._gSentEvents or 0, eng._gSentPieces or 0,
+      eng._gAppliedEvents or 0, eng._gAppliedPieces or 0,
+      eng._gDroppedEvents or 0, eng._gDroppedPieces or 0))
+  end
   -- execute callbacks
   self:emitSignal("matchEnded", self)
 end
 
 function ClientMatch:runGameOver()
+  -- Keep ticking so view-stacks that hadn't caught up at match-end keep
+  -- draining queued inputs toward game_over_clock and play out their death.
+  self.engine:run()
   for _, stack in ipairs(self.stacks) do
-    stack:runGameOver()
+    stack:runGameOver(self.engine.clock)
   end
 end
 
@@ -258,6 +889,47 @@ function ClientMatch:start()
 
   self.engine:start()
 
+  -- Trace capture: open a per-game file and emit a synthetic matchStart
+  -- so single-player traces have a bootstrap. Multiplayer flows already
+  -- captured a real matchStart via the network tap (it lands in the
+  -- match-scope file or pre-match ring); the synthetic emit here is a
+  -- harmless duplicate for those cases. Also emit a slotMap derived from
+  -- the replay metadata — the binding's already in matchStart.metadata,
+  -- but a flat slotMap line lets the diff util compare slot↔name↔
+  -- publicId↔layoutSlot across clients in one glance.
+  pcall(function()
+    TraceWriter.beginGame(os.time())
+    if self.replay then
+      TraceWriter.recv(
+        NetworkProtocol.serverMessageTypes.jsonMessage.prefix,
+        { type = "matchStart", content = self.replay })
+      local slots = {}
+      for _, m in ipairs(self.replay.metadata.stacks or {}) do
+        ---@cast m StackMetadata
+        slots[#slots + 1] = {
+          stackIndex  = m.stackIndex,
+          name        = m.name,
+          publicId    = m.publicId,    -- cross-client player identity
+          layoutSlot  = m.layoutSlot, -- display position only
+        }
+      end
+      TraceWriter.localEvent("slotMap", {
+        slots = slots,
+        clock = self.engine and self.engine.clock or 0,
+      })
+    end
+  end)
+  -- Per-stack game-over tracking. ClientMatch:run polls this after each
+  -- engine tick to emit a `stackGameOver` trace marker the first frame
+  -- a stack's engine.game_over_clock crosses 0. Without this, the trace
+  -- can't tell "engines reached game-over locally" from "engines wedged."
+  self._traceGameOverEmitted = {}
+  -- Per-stack send_controls poll-state tracking. Marker fires only on
+  -- transitions (start polling / stop polling) so we don't drown the
+  -- trace in 60Hz heartbeats. Tells us if/when the caller stopped
+  -- calling send_controls for each stack.
+  self._tracePollState = {}
+
   -- outgoing garbage is already correctly directed by Match
   -- but the relationship is indirect between engine stacks to reduce coupling
   -- for rendering telegraph, it helps to explicitly know where garbage is being sent
@@ -265,6 +937,7 @@ function ClientMatch:start()
   -- (there are some other pieces missing still to actually support that)
   -- here on client side we can simply acknowledge that only up to 2 players per match are supported
 
+  self.spectatorFocus = nil
   self:moveStacks()
   for _, stack in ipairs(self.stacks) do
     stack:connectSignal("dangerMusicChanged", self, self.updateDangerMusic)
@@ -295,40 +968,200 @@ function ClientMatch:hasLocalPlayer()
   return false
 end
 
+-- True when the match has at least one local player AND every local player's
+-- stack has been eliminated (game_over_clock set). Used by the game scene to
+-- offer a "back to waiting room" exit while teammates fight on.
+---@return boolean
+function ClientMatch:isLocalPlayerEliminated()
+  local sawLocal = false
+  for _, stack in ipairs(self.stacks) do
+    if stack.is_local then
+      sawLocal = true
+      if not stack.engine or stack.engine.game_over_clock <= 0 then
+        return false
+      end
+    end
+  end
+  return sawLocal
+end
+
 -- Should be called prior to clearing the match.
 -- Consider recycling any memory that might leave around a lot of garbage.
 -- Note: You can just leave the variables to clear / garbage collect on their own if they aren't large.
 function ClientMatch:deinit()
+  -- Trace capture: close the per-game file (force-flushes pending lines).
+  -- Pass engine.clock so the gameEnded marker carries both wall ts (auto)
+  -- AND the engine frame at which the match wrapped up.
+  pcall(function()
+    TraceWriter.endGame({ clock = self.engine and self.engine.clock or nil })
+  end)
   for i = 1, #self.stacks do
     self.stacks[i]:deinit()
+  end
+  self.pendingHistoricalDeaths = nil
+  self.pendingHistoricalGarbage = nil
+  -- Players are IMMORTAL (Lobby/CharacterSelect keep them across matches via
+  -- BattleRoom.players / GAME.localPlayer). Without releasing player.stack
+  -- here, the just-ended match's ClientStack → engine Stack (with its 43k-slot
+  -- confirmedInput) → Match graph stays reachable through every Player until
+  -- the NEXT match's createFromReplay runs clearPerMatchState. In a 7p FFA
+  -- that's tens of MB held across all of character select.
+  -- Doing this in deinit (not in MatchParticipant:onMatchEnded) avoids racing
+  -- the unordered matchEnded subscribers — GameBase.genericOnMatchEnded reads
+  -- player.stack.engine in winnerToPlayer.
+  if self.players then
+    for _, p in ipairs(self.players) do
+      p.stack = nil
+      p.stackIndex = nil
+    end
   end
 end
 
 function ClientMatch:moveStacks()
-  if self.replay and self.replay.metadata.completed then
-    if tableUtils.trueForAll(self.replay.metadata.stacks, function(s) return s.renderIndex end) then
-      for _, stackMetadata in ipairs(self.replay.metadata.stacks) do
-        self.stacks[stackMetadata.stackIndex]:moveForRenderIndex(stackMetadata.renderIndex)
+
+  -- Viewer-relative rotation. The focused stack lands in slot 1 (big-left).
+  -- Every other stack gets a slot based on its OFFSET from the focus, not its
+  -- absolute player_number — so the layout stays positionally consistent for
+  -- the viewer regardless of who's on which team. P+1 always lands in the same
+  -- small slot, P+2 in the same, etc.
+  --
+  -- Rank order: outward-alternating from +1 → -1 → +2 → -2 → ...
+  --   N=4: focus, +1, +3, +2                       (+3 == -1, +2 == opposite)
+  --   N=5: focus, +1, +4, +2, +3
+  --   N=6: focus, +1, +5, +2, +4, +3
+  --   N=7: focus, +1, +6, +2, +5, +3, +4
+  -- Closed-form: rank(off) = 2*off-1 if 2*off <= N, else 2*(N-off).
+  -- Rotation pivots on SEAT (player.playerNumber == seatId), not on the
+  -- engine's dense stack index. Slot is what stays stable when somebody
+  -- leaves and rejoins into a different position; stack index renumbers
+  -- under compaction and would break the viewer's positional muscle memory.
+  local stacks = shallowcpy(self.stacks)
+  local function slotOf(stack)
+    return (stack.player and stack.player.playerNumber) or stack.player_number
+  end
+
+  local maxSlot = 0
+  for _, s in ipairs(stacks) do
+    local slot = slotOf(s)
+    if slot and slot > maxSlot then maxSlot = slot end
+  end
+
+  local focus = self.spectatorFocus
+  if not focus then
+    for _, s in ipairs(stacks) do
+      if s.is_local then focus = slotOf(s); break end
+    end
+  end
+  -- A finished replay has no local player to anchor the default focus. Seed it
+  -- from the recorded layout (slot 1 = the board that was up-front at record
+  -- time) so it opens as recorded, then < > rotates exactly like live spectate.
+  if not focus and self.replay and self.replay.metadata.completed and self.replay.metadata.stacks then
+    for _, sm in ipairs(self.replay.metadata.stacks) do
+      if sm.layoutSlot == 1 and self.stacks[sm.stackIndex] then
+        focus = slotOf(self.stacks[sm.stackIndex])
+        break
       end
-      return
     end
   end
 
-  -- we want to render the stacks in a particular order so that the local player ends up as P1 (left side)
-  -- BUT: we want to keep player indexing consistent over boundaries (client <-> replay <- server) to not mess with replay saving
-  -- so we solve the rendering requirement via a shallowcpy and assigning positions directly to the stacks rather than starting reordering shenanigans all across the code base
-  local stacks = shallowcpy(self.stacks)
+  -- Simple sequential offset: +1, +2, +3, ..., +N-1. The existing
+  -- moveForLayoutSlotN layout functions fill the small-stack zone
+  -- column-major (col 2 top, col 2 bottom, col 3 top, col 3 bottom, ...),
+  -- so sequential rank produces "top row = odd offsets, bottom row = even
+  -- offsets" naturally for any N. Viewer sees +1 top-left, +2 bottom-left,
+  -- +3 top-of-next-col, etc.
+  local function viewerRelativeRank(slot)
+    if slot == focus then return 0 end
+    local off = (slot - focus) % maxSlot
+    if off == 0 then off = maxSlot end
+    return off
+  end
+
   table.sort(stacks, function(a, b)
+    if focus then
+      return viewerRelativeRank(slotOf(a)) < viewerRelativeRank(slotOf(b))
+    end
     if a.is_local == b.is_local then
-      return a.player_number < b.player_number
+      return slotOf(a) < slotOf(b)
     else
       return a.is_local
     end
   end)
 
   for i, stack in ipairs(stacks) do
-    stack:moveForRenderIndex(i)
+    if #self.stacks == 3 then
+      stack:moveForLayoutSlot3Player(i)
+    elseif #self.stacks == 4 then
+      stack:moveForLayoutSlot4PlayerHorizontal(i)
+    elseif #self.stacks == 5 then
+      stack:moveForLayoutSlot5Player(i)
+    elseif #self.stacks == 6 then
+      stack:moveForLayoutSlot6Player(i)
+    elseif #self.stacks == 7 then
+      stack:moveForLayoutSlot7Player(i)
+    else
+      stack:moveForLayoutSlot(i)
+    end
   end
+end
+
+-- Cycles spectator focus forward (direction=1) or backward (direction=-1) through live stacks.
+-- The focused stack moves into the big-left render position via moveStacks;
+-- containers stay where they are, only the players inside them swap.
+function ClientMatch:cycleSpectatorFocus(direction)
+  -- Track focus by seat (slotOf), matching moveStacks' rotation pivot.
+  local live = {}
+  for _, stack in ipairs(self.stacks) do
+    if self:stackIsOnScreen(stack) then
+      live[#live + 1] = TeamUtils.slotOf(stack.player, stack.player_number)
+    end
+  end
+  table.sort(live)
+  if #live == 0 then return end
+  if not self.spectatorFocus then
+    self.spectatorFocus = live[direction > 0 and 1 or #live]
+  else
+    local idx = 1
+    for i, pn in ipairs(live) do
+      if pn == self.spectatorFocus then idx = i break end
+    end
+    idx = ((idx - 1 + direction) % #live) + 1
+    self.spectatorFocus = live[idx]
+  end
+  -- Restamp positions so the newly focused stack lands in layoutSlot 1
+  -- (big-left); other stacks shift into the small containers around it.
+  self:moveStacks()
+end
+
+-- A stack is focusable/clickable when it's currently drawn on screen — either
+-- via its own canvas (normal render path) or via the display-history pipeline,
+-- which nils stack.canvas and draws remotes through DisplayClientStack instead.
+-- Keying focus off canvas alone silently excluded every remote board (so a
+-- spectator, whose stacks are all remote, could cycle through nothing).
+function ClientMatch:stackIsOnScreen(stack)
+  return stack.canvas ~= nil or stack.displayRendered == true
+end
+
+-- Focus a specific seat directly (mouse-click path). No-op if already focused.
+function ClientMatch:setSpectatorFocus(slot)
+  if not slot or self.spectatorFocus == slot then return end
+  self.spectatorFocus = slot
+  self:moveStacks()
+end
+
+-- Seat (slotOf) of the stack whose on-screen rect contains the given
+-- canvas-space point, or nil. Rect math mirrors GameBase:drawSpectatorHint.
+function ClientMatch:stackSlotAtCanvasPoint(x, y)
+  for _, stack in ipairs(self.stacks) do
+    if self:stackIsOnScreen(stack) then
+      local sx = stack.frameOriginX * stack.gfxScale
+      local sy = stack.frameOriginY * stack.gfxScale
+      if x >= sx and x <= sx + stack:canvasWidth() and y >= sy and y <= sy + stack:canvasHeight() then
+        return TeamUtils.slotOf(stack.player, stack.player_number)
+      end
+    end
+  end
+  return nil
 end
 
 function ClientMatch:setStage(stageId)
@@ -352,8 +1185,9 @@ function ClientMatch:getWinningPlayerCharacter()
   local character = characters[consts.RANDOM_CHARACTER_SPECIAL_VALUE]
   local maxWins = -1
   for i = 1, #self.players do
-    if self.players[i].wins > maxWins then
-      character = self.players[i].stack.character
+    local stack = self.players[i].stack
+    if stack and self.players[i].wins > maxWins then
+      character = stack.character
       maxWins = self.players[i].wins
     end
   end
@@ -366,16 +1200,295 @@ function ClientMatch:togglePause()
     error("Tried to pause a non-pausable match")
   end
   self.isPaused = not self.isPaused
+  if self.isPaused then
+    self.everPaused = true
+  end
   self:emitSignal("pauseChanged", self)
-end
-
----@param doCountdown boolean if the match should have a countdown before physics start
-function ClientMatch:setCountdown(doCountdown)
-  self.engine:setCountdown(doCountdown)
 end
 
 function ClientMatch:rewindToFrame(frame)
   self.engine:rewindToFrame(frame)
+end
+
+-- Scrub UI uses a preview engine (built from the replay) to display the
+-- rewound state while paused. The live engine stays frozen at pauseFrame —
+-- all PlayerStack signal listeners stay attached to it. Only the client
+-- stacks' .engine pointer is flipped to preview for the render.
+--
+-- Inputs are SHARED: preview.confirmedInput points at live.confirmedInput.
+-- No copy, no compression round-trip. During pause nothing writes inputs,
+-- so the shared array is read-only.
+function ClientMatch:scrubToFrame(targetFrame)
+  if not self.replay then
+    logger.warn("scrubToFrame: no replay on match")
+    return false
+  end
+  if targetFrame < 0 then
+    logger.warn("scrubToFrame: negative target " .. targetFrame)
+    return false
+  end
+
+  if not self._scrubLiveEngine then
+    self._scrubLiveEngine = self.engine
+    self._scrubLiveEngineStacks = {}
+    for i, cs in ipairs(self.stacks) do
+      self._scrubLiveEngineStacks[i] = cs.engine
+    end
+  end
+
+  local live = self._scrubLiveEngine
+  local preview = self._scrubPreview
+  local needsRebuild = (not preview) or preview.clock > targetFrame
+
+  if needsRebuild then
+    preview = Match.createFromReplay(self.replay)
+    -- Preview is always offline sim; in-progress source replay has completed=false
+    -- so createFromReplay leaves fromReplay=false. Force it on for strict timing.
+    preview.fromReplay = true
+    -- Force per-frame rollback saves so _transplantPreviewState can extract a
+    -- snapshot at targetFrame. Match:shouldSaveRollback otherwise returns
+    -- false in single-player modes (no garbage senders), buffer stays empty.
+    preview:setAlwaysSaveRollbacks(true)
+    for i, prevStack in ipairs(preview.stacks) do
+      local livStack = live.stacks[i]
+      if livStack and livStack.confirmedInput then
+        -- Share live's input buffer so preview reads the actual played history.
+        prevStack.confirmedInput = livStack.confirmedInput
+      end
+      -- Keep is_local=false (default from createFromReplay): the local-stack
+      -- shouldRun short-circuit consumes the entire input buffer in one call,
+      -- overshooting our target. Non-local view-stack pacing respects
+      -- max_runs_per_frame=1 so preview:run() advances exactly one frame.
+      prevStack.is_local = false
+      prevStack.max_runs_per_frame = 1
+    end
+    preview:start()
+    self._scrubPreview = preview
+  end
+
+  while preview.clock < targetFrame do
+    preview:run()
+  end
+
+  self.engine = preview
+  for i, cs in ipairs(self.stacks) do
+    if preview.stacks[i] then
+      cs.engine = preview.stacks[i]
+    end
+  end
+
+  return true
+end
+
+-- Called on unpause. If commitFrame is provided AND earlier than the live
+-- engine's clock, transplant preview state at that frame into the live
+-- engine's rollback buffers and let live's own rewindToFrame apply it.
+-- Either way, restore client stack pointers to live and drop preview.
+-- The live engine object is never replaced — every signal listener stays.
+function ClientMatch:endScrub(commitFrame, fromNetwork)
+  if not self._scrubLiveEngine then return end
+  local live = self._scrubLiveEngine
+  local preview = self._scrubPreview
+
+  local needsTruncate = false
+  if commitFrame and preview and commitFrame < live.clock then
+    needsTruncate = self:_transplantPreviewState(commitFrame)
+  end
+
+  -- Restore client-stack pointers to live BEFORE truncating. truncateInputsAt
+  -- walks self.stacks[i].engine.confirmedInput — if pointers still reference
+  -- preview, we'd replace preview's array reference (preview gets dropped
+  -- anyway) and leave live's untruncated. The result was new inputs landing
+  -- past live's old #ci and the original flow replaying after resume.
+  self.engine = live
+  for i, cs in ipairs(self.stacks) do
+    if self._scrubLiveEngineStacks[i] then
+      cs.engine = self._scrubLiveEngineStacks[i]
+    end
+  end
+
+  if needsTruncate then
+    self:truncateInputsAt(commitFrame)
+    if not fromNetwork and GAME.battleRoom and GAME.battleRoom.online and GAME.netClient then
+      GAME.netClient:sendRewindEvent({ senderFrame = commitFrame })
+    end
+  end
+
+  -- Resume backstop: clear death state the snapshot restore may miss (same as
+  -- applyRewindEvent) and clamp clock so buffer_len can't go negative — both
+  -- gate input for controller and touch alike, freezing the board on resume.
+  local floor = (needsTruncate and commitFrame) or live.clock
+  for _, stack in ipairs(live.stacks) do
+    if stack.game_over_clock and stack.game_over_clock > floor then
+      stack.game_over_clock = -1
+      stack.game_over_stopWatch = 0
+    end
+    if stack.confirmedInput and stack.clock > #stack.confirmedInput then
+      stack.clock = #stack.confirmedInput
+    end
+  end
+
+  self._scrubLiveEngine = nil
+  self._scrubLiveEngineStacks = nil
+  self._scrubPreview = nil
+end
+
+-- Move preview's rollback snapshots at targetFrame into the corresponding
+-- live buffers, then ride the live stack's existing rewindToFrame to apply
+-- them — same code path as online rollback. Per-stack components only:
+-- panelSource is cloned per stack (Stack ctor line 190), so per-stack
+-- injection is correct.
+function ClientMatch:_transplantPreviewState(targetFrame)
+  local live = self._scrubLiveEngine
+  local preview = self._scrubPreview
+  if not live or not preview then return false end
+
+  for i, livStack in ipairs(live.stacks) do
+    local prevStack = preview.stacks[i]
+    if not prevStack then
+      logger.warn("Scrub transplant: preview missing stack " .. i)
+      return false
+    end
+
+    local snap = prevStack.rollbackBuffer:rollbackToFrame(targetFrame)
+    if not snap then
+      logger.warn("Scrub transplant: no main snapshot at frame " .. targetFrame)
+      return false
+    end
+    livStack.rollbackBuffer:saveCopy(targetFrame, snap)
+
+    local sw = snap.stopWatch
+    if prevStack.incomingGarbage and prevStack.incomingGarbage.rollbackBuffer
+        and livStack.incomingGarbage and livStack.incomingGarbage.rollbackBuffer then
+      local g = prevStack.incomingGarbage.rollbackBuffer:rollbackToFrame(sw)
+      if g then
+        livStack.incomingGarbage.rollbackBuffer:saveCopy(sw, g)
+      end
+    end
+    if prevStack.outgoingGarbage and prevStack.outgoingGarbage.rollbackBuffer
+        and livStack.outgoingGarbage and livStack.outgoingGarbage.rollbackBuffer then
+      local g = prevStack.outgoingGarbage.rollbackBuffer:rollbackToFrame(sw)
+      if g then
+        livStack.outgoingGarbage.rollbackBuffer:saveCopy(sw, g)
+      end
+    end
+    if prevStack.panelSource and prevStack.panelSource.rollbackBuffer
+        and livStack.panelSource and livStack.panelSource.rollbackBuffer then
+      local p = prevStack.panelSource.rollbackBuffer:rollbackToFrame(targetFrame)
+      if p then
+        livStack.panelSource.rollbackBuffer:saveCopy(targetFrame, p)
+      end
+    end
+
+    -- PlayerStack:onRollback restores analytics from its own rollbackBuffer
+    -- (only the last ~MAX_LAG frames). For deep scrub rewinds the buffer
+    -- has no copy at targetFrame, which raises. Snapshot current analytics
+    -- at targetFrame so onRollback finds something — analytics stay at
+    -- their current value (acceptable: pause already disqualifies the run).
+    local clientStack = self.stacks[i]
+    if clientStack and clientStack.analytic and clientStack.analytic.saveForRollback then
+      clientStack.analytic:saveForRollback(targetFrame)
+    end
+
+    livStack:rewindToFrame(targetFrame)
+
+    -- No button is held on scrub commit; drop the restored manual-raise latch so the stack doesn't self-raise on resume.
+    if livStack.manual_raise ~= nil then
+      livStack.manual_raise = false
+      livStack.manual_raise_yet = false
+    end
+  end
+
+  live.clock = targetFrame
+  live.ended = false
+  return true
+end
+
+-- After a pause-mode rewind, drop input history past the cursor so resuming
+-- starts a fresh timeline from `frame`. REPLACE the table rather than nil
+-- out trailing entries: `#t` on a table with explicit nils in the array part
+-- is undefined in Lua, so send_controls's `confirmedInput[#ci+1] = input`
+-- can write past the truncate point and the engine reads idle in between.
+-- That manifested as "second rewind shows the original flow" — new inputs
+-- ended up appended at the old end, not at `frame+1`.
+function ClientMatch:truncateInputsAt(frame)
+  for _, stack in ipairs(self.stacks) do
+    local engineStack = stack.engine
+    if engineStack and engineStack.confirmedInput then
+      local oldCi = engineStack.confirmedInput
+      local newCi = table.new(43200, 0)
+      local copyUntil = math.min(frame, #oldCi)
+      for i = 1, copyUntil do
+        newCi[i] = oldCi[i]
+      end
+      engineStack.confirmedInput = newCi
+    end
+  end
+  self.scrubbed = true
+end
+
+---Server-relayed RewindEvent from a peer (the player who paused + rewound).
+---Spectators / non-rewinding clients use this to keep their view-stack in
+---sync. Reuses the scrub flow when our live engine is past the rewind frame;
+---otherwise just truncates so we don't consume soon-to-be-replaced inputs.
+---@param body table {sender, senderFrame, ...}
+function ClientMatch:applyRewindEvent(body)
+  local targetFrame = body and body.senderFrame
+  if type(targetFrame) ~= "number" or targetFrame < 0 then return end
+
+  if self.engine and self.engine.clock > targetFrame then
+    self:scrubToFrame(targetFrame)
+    self:endScrub(targetFrame, true)
+  else
+    self:truncateInputsAt(targetFrame)
+  end
+
+  -- Any stack whose game_over_clock is past the rewind frame is alive again.
+  -- Transplant restores this for stacks rolled back; we also need it for the
+  -- "not yet caught up" path (live.clock <= targetFrame) where state copy is
+  -- skipped — otherwise the spec keeps rendering OUT for the player whose
+  -- recordDeath set game_over_clock pre-rewind.
+  if self.engine and self.engine.stacks then
+    for _, stack in ipairs(self.engine.stacks) do
+      if stack.game_over_clock and stack.game_over_clock > targetFrame then
+        stack.game_over_clock = 0
+        stack.game_over_stopWatch = 0
+      end
+    end
+  end
+end
+
+---Render snapshot-based display stacks for replay playback. Mirrors
+---BattleRoom:renderDisplayStacks so the same GameBase draw hook works for
+---both live play (GAME.battleRoom) and replay (self.match).
+---@param match ClientMatch
+function ClientMatch:renderDisplayStacks(match)
+  if not self._displayStacks then return end
+  if not match or not match.stacks then return end
+  local Telegraph = require("client.src.graphics.Telegraph")
+  for _, stack in ipairs(match.stacks) do
+    local player = stack.player
+    if not player then goto continue end
+    local pid = player.publicId or player.playerNumber
+    local displayStack = pid and self._displayStacks[pid]
+    if displayStack then
+      pcall(displayStack.render, displayStack, stack)
+      if stack.drawPopEffects and stack.drawCards then
+        stack:withDrawArea(0, 0, function()
+          pcall(stack.drawPopEffects, stack)
+          pcall(stack.drawCards, stack)
+        end)
+      end
+      -- Telegraphs (outgoing garbage icons). Snapshot mirrors
+      -- outgoingGarbage onto the engine so existing Telegraph:render works.
+      if not stack:game_ended() and stack.garbageTargets then
+        for _, target in ipairs(stack.garbageTargets) do
+          pcall(Telegraph.render, Telegraph, stack, target)
+        end
+      end
+    end
+    ::continue::
+  end
 end
 
 ---@return ReplayV3?
@@ -388,6 +1501,11 @@ function ClientMatch:finalizeReplay()
     replay:setRanked(self.ranked)
     if self.gameMode then
       replay.metadata.gameModeName = self.gameMode.name
+      -- Persist team shape so playback reconstructs seats/colors. No local
+      -- compaction exists (that's a server room concept), so the preset shape
+      -- is the played shape for client-saved matches.
+      replay.metadata.playersPerTeam = self.gameMode.playersPerTeam
+      replay.metadata.teamCount = self.gameMode.teamCount
     end
 
     for i, stack in ipairs(self.stacks) do
@@ -395,7 +1513,7 @@ function ClientMatch:finalizeReplay()
       ---@type BaseStackMetadata
       local metadata = {
         stackIndex = stackIndex,
-        renderIndex = stack.renderIndex,
+        layoutSlot = stack.layoutSlot,
         characterId = stack.character.id,
         panelId = stack.panels_dir,
       }
@@ -403,6 +1521,8 @@ function ClientMatch:finalizeReplay()
       local player = stack.player
       if player then
         metadata.wins = player.wins
+        -- Seat identity drives team color in the shared (spectator) view.
+        metadata.seatId = player.seatId
         if player.human then
           ---@cast metadata StackMetadata
           ---@cast player Player
@@ -428,25 +1548,151 @@ function ClientMatch:finalizeReplay()
       replay.metadata.stacks[i] = metadata
     end
 
+    -- Save snapshot history for 2+ player matches so the replay viewer
+    -- can feed it through the same spectator display pipeline.
+    if GAME.battleRoom and GAME.battleRoom._replayDisplayHistory
+        and #GAME.battleRoom._replayDisplayHistory > 0 then
+      self.replay.displayHistory = GAME.battleRoom._replayDisplayHistory
+    end
+
+    -- Garbage-arrival log (additive) for the "play from here" fork. Lives in
+    -- crossPlayerEvents.garbage; ignored by normal (completed) playback.
+    if GAME.battleRoom and GAME.battleRoom._replayGarbageEvents
+        and #GAME.battleRoom._replayGarbageEvents > 0 then
+      self.replay.crossPlayerEvents = self.replay.crossPlayerEvents or { garbage = {}, deaths = {} }
+      self.replay.crossPlayerEvents.garbage = GAME.battleRoom._replayGarbageEvents
+    end
+
     ReplayV3.finalizeReplay(self.engine, self.replay)
+
+    -- ReplayV3.finalizeReplay derives the winner from the local engine's
+    -- getWinners, which in loose-sync can disagree with the server: a remote
+    -- death that hasn't been applied yet leaves extra stacks at game_over_clock
+    -- 0, so the engine sees multiple survivors and records a false "draw".
+    -- The on-screen result already trusts the server outcome — make the saved
+    -- replay use the SAME source so screen and replay (and every client's
+    -- replay) always agree.
+    if self:hasServerOutcome() then
+      self.replay.metadata.winnerTeam = self:getServerWinnerTeamIndex()
+      local winnerIndex = self:getServerWinnerIndex()
+      if winnerIndex then
+        -- setOutcome stamps winnerIndex + the matching winnerId. For team
+        -- modes the server reports the winning team's representative player.
+        self.replay:setOutcome(winnerIndex)
+      else
+        -- nil winnerIndex with a server outcome = genuine tie / no winner.
+        self.replay:setOutcome(0)
+      end
+    elseif TeamUtils.isSharedTeamMode(self.gameMode) and not self.replay.metadata.winnerTeam then
+      -- Offline team game (no server outcome): the engine collapses a team win
+      -- into a tie, so recover the team-aware winner so the replay records it.
+      local winners = self:getWinners()
+      local first = winners[1]
+      if first and first.playerNumber then
+        local teamIndex = TeamUtils.teamIndexForPlayer(self, first)
+        local sameTeam = teamIndex ~= nil
+        for _, w in ipairs(winners) do
+          if not w.playerNumber or TeamUtils.teamIndexForPlayer(self, w) ~= teamIndex then
+            sameTeam = false
+            break
+          end
+        end
+        if sameTeam then
+          self.replay.metadata.winnerTeam = teamIndex
+          self.replay.metadata.winnerIndex = first.stackIndex
+        end
+      end
+    end
   end
 
   return replay
 end
 
 function ClientMatch:initializeTelegraphRelationships()
-  for i, garbageTargets in ipairs(self.engine.garbageTargets) do
-    for _, engineStack in ipairs(garbageTargets) do
-      local index = tableUtils.indexOf(self.engine.stacks, engineStack)
-      self.stacks[i]:setGarbageTarget(self.stacks[index])
+  -- Build a target LIST per stack so N-player FFA/team modes render a Telegraph
+  -- to every enemy. The legacy 1v1 code path used setGarbageTarget (singular),
+  -- which silently overwrote when called more than once — keeping only the last
+  -- enemy. The render loop below iterates stack.garbageTargets so all enemies
+  -- get the flying-icon animation.
+  --
+  -- Shared (round-robin) mode caveat: the engine's garbageTargets list contains
+  -- every enemy because the round-robin pick happens at delivery time, not at
+  -- setup. If we rendered to all of them we'd visually show every enemy taking
+  -- a hit while only one actually receives. For shared mode, restrict the
+  -- client list to a single target (the first enemy — matches the round-robin
+  -- counter's initial position). For "all" mode and 1v1, take every target.
+  local garbageMode = (self.gameMode and self.gameMode.garbageMode)
+    or (self.engine and self.engine.garbageMode)
+  local sharedMode = garbageMode == "shared"
+  for i, engineTargets in ipairs(self.engine.garbageTargets) do
+    local clientStack = self.stacks[i]
+    if clientStack then
+      local clientTargets = {}
+      for _, engineStack in ipairs(engineTargets) do
+        local index = tableUtils.indexOf(self.engine.stacks, engineStack)
+        if self.stacks[index] then
+          clientTargets[#clientTargets + 1] = self.stacks[index]
+          if sharedMode and #engineTargets > 1 then
+            break
+          end
+        end
+      end
+      clientStack:setGarbageTargets(clientTargets)
     end
   end
 
-  for recipientStack, garbageSources in pairs(self.engine.garbageSources) do
-    local recipientIndex = tableUtils.indexOf(self.engine.stacks, recipientStack)
-    for _, engineStack in ipairs(garbageSources) do
-      local index = tableUtils.indexOf(self.engine.stacks, engineStack)
-      self.stacks[recipientIndex]:setGarbageSource(self.stacks[index])
+  -- Per-stack garbageSource is gone — each garbage cell now carries its own
+  -- senderId on the wire (see DisplayEventCapture:snapshotCell). The renderer
+  -- looks up the character from match.stacks[panel.senderId] per-cell. Both
+  -- sender and spec arrive at the same answer from the same data instead of
+  -- diverging local match-setup state.
+
+  self:refreshSharedModeTelegraphTargets()
+end
+
+function ClientMatch:refreshSharedModeTelegraphTargets()
+  if not self.engine then
+    return
+  end
+
+  local garbageMode = (self.gameMode and self.gameMode.garbageMode)
+    or (self.engine and self.engine.garbageMode)
+  if garbageMode ~= "shared" then
+    return
+  end
+
+  local teamStateBySender = self.engine.teamGarbageState
+  if not teamStateBySender then
+    return
+  end
+
+  for senderIndex, engineTargets in ipairs(self.engine.garbageTargets) do
+    if #engineTargets > 1 then
+      local teamState = teamStateBySender[senderIndex]
+      if teamState and teamState.enemyIndices and #teamState.enemyIndices > 0 then
+        local startIndex = teamState.currentTargetIndex or 1
+        local chosenRecipientIndex = nil
+        local i = startIndex
+
+        for _ = 1, #teamState.enemyIndices do
+          local recipientIndex = teamState.enemyIndices[i]
+          local recipientStack = self.engine.stacks[recipientIndex]
+          if recipientStack and not recipientStack:game_ended() then
+            chosenRecipientIndex = recipientIndex
+            break
+          end
+          i = (i % #teamState.enemyIndices) + 1
+        end
+
+        local senderClientStack = self.stacks[senderIndex]
+        if senderClientStack then
+          if chosenRecipientIndex and self.stacks[chosenRecipientIndex] then
+            senderClientStack:setGarbageTargets({ self.stacks[chosenRecipientIndex] })
+          else
+            senderClientStack:setGarbageTargets({})
+          end
+        end
+      end
     end
   end
 end
@@ -539,11 +1785,15 @@ function ClientMatch:drawMatchTime(timeString, themePositionOffset, scale)
 end
 
 function ClientMatch:drawTimer()
-  -- Draw the timer for time attack
+  -- Max over stacks so the clock keeps counting while anyone is alive. Derive
+  -- from clock, not stopWatch: snapshot-driven remote stacks never run Stack:run
+  -- so their stopWatch is frozen, and a dead local stack's freezes too.
   local frames = 0
-  local stack = self.stacks[1]
-  if stack ~= nil and stack.engine.stopWatch ~= nil and tonumber(stack.engine.stopWatch) ~= nil then
-    frames = stack.engine.stopWatch
+  for _, stack in ipairs(self.stacks) do
+    local engine = stack ~= nil and stack.engine
+    if engine and tonumber(engine.clock) ~= nil then
+      frames = math.max(frames, engine.clock - (engine.countdownOffsetFrames or 0))
+    end
   end
 
   if self.engine.timeLimit then
@@ -555,8 +1805,128 @@ function ClientMatch:drawTimer()
 
   local timeString = frames_to_time_string(frames, self.engine.ended)
 
-  self:drawMatchLabel(themes[config.theme].images.IMG_time, themes[config.theme].timeLabel_Pos, themes[config.theme].timeLabel_Scale)
-  self:drawMatchTime(timeString, themes[config.theme].time_Pos, themes[config.theme].time_Scale)
+  local timePos = themes[config.theme].time_Pos
+  if #self.stacks > 2 then
+    timePos = {timePos[1], timePos[2] + 120}
+  end
+  self:drawMatchTime(timeString, timePos, themes[config.theme].time_Scale)
+end
+
+local teamColors = TeamUtils.TEAM_COLORS
+
+---@param text string
+---@param maxWidth number
+---@param font love.Font
+---@return string
+local function clampTextToWidth(text, maxWidth, font)
+  if font:getWidth(text) <= maxWidth then
+    return text
+  end
+
+  local ellipsis = "..."
+  local result = text
+  while #result > 0 and font:getWidth(result .. ellipsis) > maxWidth do
+    result = result:sub(1, #result - 1)
+  end
+
+  if result == "" then
+    return ellipsis
+  end
+
+  return result .. ellipsis
+end
+
+function ClientMatch:drawTeamScoreboard()
+  if self.stackInteraction ~= GameModes.StackInteractions.TEAM_VERSUS then
+    return
+  end
+
+  local canvasWidth = GAME.globalCanvas:getWidth()
+  local battleRoom = GAME.battleRoom
+  local teamWins = battleRoom and battleRoom.teamWins
+
+  -- Shared 2-team banner header (pink/purple). Use battleRoom players/mode (same
+  -- path as the waiting room) so sparse-slot rooms (e.g. P1+P3 after P2 left) map
+  -- playerNumbers to team colours correctly via gameMode derivation instead of the
+  -- dense-indexed engine.teams table.
+  local TeamBannerHeader = require("client.src.graphics.TeamBannerHeader")
+  local bannerPlayers = (battleRoom and battleRoom.players) or self.players
+  local bannerMode   = (battleRoom and battleRoom.mode)    or self.gameMode
+  TeamBannerHeader.draw(bannerMode, bannerPlayers, teamWins, canvasWidth)
+  TeamBannerHeader.drawGarbageModeBelowBanner(bannerMode, canvasWidth, "match")
+
+  -- For >2 teams, fall through to the legacy section-row layout below.
+  local teamCount = self.gameMode.teamCount or 2
+  if teamCount == 2 then return end
+
+  local teamData = {}
+  for i, player in ipairs(self.players) do
+    local teamIndex = TeamUtils.teamIndexForPlayer(self, player)
+    if not teamIndex then break end
+    if not teamData[teamIndex] then
+      teamData[teamIndex] = {names = {}, wins = 0}
+    end
+    teamData[teamIndex].names[#teamData[teamIndex].names + 1] = player.name or ("P" .. i)
+    if teamWins and teamWins[teamIndex] then
+      teamData[teamIndex].wins = teamWins[teamIndex]
+    else
+      teamData[teamIndex].wins = math.max(teamData[teamIndex].wins, player:getWinCountForDisplay())
+    end
+  end
+
+  local topY = (#self.stacks >= 4) and 4 or 8
+  local font = GraphicsUtil.getGlobalFont()
+
+  do
+    local sectionWidth = canvasWidth / teamCount
+    local blockHeight = 22
+    local blockPadX = 6
+    for t = 1, teamCount do
+      local data = teamData[t]
+      if data then
+        local color = teamColors[t] or teamColors[1]
+        local label = table.concat(data.names, "+") .. "  " .. data.wins
+        label = clampTextToWidth(label, sectionWidth - (blockPadX * 2) - 8, font)
+        local blockX = (t - 1) * sectionWidth + blockPadX
+        local blockW = sectionWidth - (blockPadX * 2)
+        GraphicsUtil.drawRectangle("fill", blockX, topY, blockW, blockHeight,
+          color[1], color[2], color[3], 0.85)
+        GraphicsUtil.printf(label, blockX, topY + 4, blockW, "center", {1, 1, 1, 1})
+      end
+    end
+  end
+end
+
+function ClientMatch:drawStackSeparators()
+  if #self.stacks ~= 4 then
+    return
+  end
+
+  local byLayoutSlot = {}
+  for _, stack in ipairs(self.stacks) do
+    byLayoutSlot[stack.layoutSlot] = stack
+  end
+
+  local s1 = byLayoutSlot[1]
+  local s2 = byLayoutSlot[2]
+  local s3 = byLayoutSlot[3]
+  local s4 = byLayoutSlot[4]
+  if not (s1 and s2 and s3 and s4) then
+    return
+  end
+
+  local function leftX(stack) return stack.frameOriginX * stack.gfxScale end
+  local function rightX(stack) return leftX(stack) + stack:canvasWidth() end
+  local function topY(stack) return stack.frameOriginY * stack.gfxScale end
+  local function bottomY(stack) return topY(stack) + stack:canvasHeight() end
+
+  local separatorX = (math.max(rightX(s1), rightX(s3)) + math.min(leftX(s2), leftX(s4))) / 2
+  local separatorY = (math.max(bottomY(s1), bottomY(s2)) + math.min(topY(s3), topY(s4))) / 2
+
+  GraphicsUtil.setColor(1, 1, 1, 0.2)
+  GraphicsUtil.drawRectangle("fill", separatorX - 1, 0, 2, GAME.globalCanvas:getHeight())
+  GraphicsUtil.drawRectangle("fill", 0, separatorY - 1, GAME.globalCanvas:getWidth(), 2)
+  GraphicsUtil.setColor(1, 1, 1, 1)
 end
 
 function ClientMatch:drawMatchType()
@@ -577,16 +1947,29 @@ function ClientMatch:drawCommunityMessage()
   end
 end
 
+-- framesBehind is meaningless for snapshot-driven remotes — their engine
+-- doesn't tick under displayHistoryEnabled so stack.clock stays at 0
+-- while match.clock advances. Treat such stacks as not-behind for the
+-- rollback / desync UI overlays.
+local function _framesBehindMeaningful(stack)
+  if stack.is_local then return true end
+  return not (GAME.battleRoom and GAME.battleRoom.displayHistoryEnabled)
+end
+
 local function isRollbackActive(stack)
+  if not _framesBehindMeaningful(stack) then return false end
   return stack.engine.framesBehind > GARBAGE_DELAY_LAND_TIME
 end
 
 function ClientMatch:render()
   if config.show_fps and #self.stacks > 1 then
-    local drawY = 23
+    local drawY = #self.stacks > 2 and 90 or 23
     for i = 1, #self.stacks do
       local stack = self.stacks[i]
-      GraphicsUtil.print("P" .. stack.renderIndex .." Average Latency: " .. stack.engine.framesBehind, 1, drawY)
+      local label = _framesBehindMeaningful(stack)
+        and tostring(stack.engine.framesBehind)
+        or "(snapshot)"
+      GraphicsUtil.print("P" .. stack.layoutSlot .." Average Latency: " .. label, 1, drawY)
       drawY = drawY + 11
     end
 
@@ -600,7 +1983,10 @@ function ClientMatch:render()
         GraphicsUtil.draw(themes[config.theme].images.IMG_bug, x, y, 0, iconSize / icon_width, iconSize / icon_height)
       end
     else
-      if tableUtils.trueForAny(self.stacks, function(stack) return stack.engine.framesBehind > MAX_LAG * 0.75 end) then
+      if tableUtils.trueForAny(self.stacks, function(stack)
+        if not _framesBehindMeaningful(stack) then return false end
+        return stack.engine.framesBehind > MAX_LAG * 0.75
+      end) then
         -- let the spectator know the game is about to die
         local iconSize = 60
         local icon_width, icon_height = themes[config.theme].images.IMG_bug:getDimensions()
@@ -639,14 +2025,21 @@ function ClientMatch:render()
   end
 
   if not self.isPaused or self.renderDuringPause then
+    local alpha = self.engine.renderInterpAlpha
     for _, stack in ipairs(self.stacks) do
       -- don't render stacks that only have an attack engine
       if stack.player or stack.engine.healthEngine then
-        stack:render(self.engine.ended)
+        stack:render(self.engine.ended, nil, nil, alpha)
       end
 
-      if stack.garbageTarget then
-        Telegraph:render(stack, stack.garbageTarget)
+      if stack.canvas and not stack:game_ended() then
+        if stack.garbageTargets and #stack.garbageTargets > 0 then
+          for _, target in ipairs(stack.garbageTargets) do
+            Telegraph:render(stack, target)
+          end
+        elseif stack.garbageTarget then
+          Telegraph:render(stack, stack.garbageTarget)
+        end
       end
     end
 
@@ -658,6 +2051,7 @@ function ClientMatch:render()
     end
 
     self:drawTimer()
+    self:drawTeamScoreboard()
   end
 end
 
@@ -671,6 +2065,20 @@ end
 
   -- Draw the pause menu
 function ClientMatch:draw_pause()
+  local isSpectatorView = not self:hasLocalPlayer()
+
+  -- Spec view of a scrub-eligible match (endless / vs-self) only: the
+  -- player may be rewinding, so dim the playfield instead of layering a
+  -- menu — specs have no menu. Other spec views and the player keep their
+  -- existing look.
+  if isSpectatorView
+      and self.gameMode
+      and (self.gameMode.gameScene == "EndlessGame"
+        or self.gameMode.gameScene == "VsSelfGame") then
+    GraphicsUtil.drawRectangle("fill",
+      0, 0, consts.CANVAS_WIDTH, consts.CANVAS_HEIGHT, 0, 0, 0, 0.55)
+  end
+
   if not self.renderDuringPause then
     local image = themes[config.theme].images.pause
     local scale = consts.CANVAS_WIDTH / math.max(image:getWidth(), image:getHeight()) -- keep image ratio
@@ -684,46 +2092,331 @@ function ClientMatch:draw_pause()
   end
   local y = 260
   GraphicsUtil.printf(loc("pause"), 0, y, consts.CANVAS_WIDTH, "center", nil, 1, 10)
-  GraphicsUtil.printf(loc("pl_pause_help"), 0, y + 30, consts.CANVAS_WIDTH, "center", nil, 1)
+  -- Scrub keybind hint is player-only. Specs have no controls; showing
+  -- "← / → to rewind" would be misleading.
+  if not isSpectatorView then
+    GraphicsUtil.printf(loc("pl_pause_help"), 0, y + 30, consts.CANVAS_WIDTH, "center", nil, 1)
+  end
 end
 
+-- Self.winners here is the ClientMatch cache (MatchParticipant[]). The engine
+-- Match has its own separately-cached self.winners (BaseStack[]) — different
+-- objects, different types, no actual collision.
 function ClientMatch:getWinners()
-  if not self.winners and self.engine:hasEnded() then
-    local winningStacks = self.engine:getWinners()
+  -- Gate on engine.winners (cached once by Match:handleMatchEnd) rather
+  -- than isLocallyEnded(), which can flap and latch an empty cache.
+  if (not self.winners or #self.winners == 0) and self.engine.winners ~= nil then
+    local winningStacks = self.engine:getWinners() or {}
     local winners = {}
     for _, stack in ipairs(winningStacks) do
       for _, player in ipairs(self.players) do
-        if player.stack.engine == stack then
+        -- A player with a nil stack is a half-constructed participant (e.g.
+        -- replay loader skipped a slot because its metadata had no stackData);
+        -- they can't be the holder of an engine winner, so just skip.
+        if player.stack and player.stack.engine == stack then
           winners[#winners+1] = player
           break
         end
       end
     end
     self.winners = winners
-    return self.winners
-  else
-    return self.winners
+  end
+
+  return self.winners or {}
+end
+
+---@param stackIndex integer dense engine slot of the sender (NOT a seatId).
+---  Server-relayed input frames carry stackIndex (see common/engine/Match
+---  invariant: stacks[i].player_number == i during a match).
+---@param input string encoded input string
+function ClientMatch:receiveInput(stackIndex, input)
+  local stack = stackIndex and self.stacks[stackIndex]
+  if not stack or stack.is_local then return end
+  ---@diagnostic disable-next-line: param-type-mismatch
+  stack:receiveConfirmedInput(input)
+end
+
+---Loose-sync: handle an incoming GarbageEvent from the server.
+---
+---The server is the single source of truth: it relays G to every player
+---including the sender, so the visual on the sender's view of the recipient
+---only fires after the server confirms (and possibly redirects) the
+---delivery. This function applies the garbage to whichever stack the server
+---said is the recipient — local-authoritative for gameplay on the actual
+---player's machine, view-stack for visual on everyone else's screens. No
+---is_local filter; the server already redirected if needed and the
+---sender's machine no longer does a local visual push in
+---deliverOutgoingGarbage.
+---@param body table parsed event payload: {sender, senderFrame, serverWallClockMs, recipients, garbage}
+function ClientMatch:applyGarbageEvent(body)
+  if not body or type(body.recipients) ~= "table" or type(body.garbage) ~= "table" then
+    logger.warn("applyGarbageEvent: malformed body, dropping")
+    return
+  end
+
+  -- Record the server-confirmed arrival for the "play from here" fork. Purely
+  -- additive: stamped into replay.crossPlayerEvents.garbage at finalize and only
+  -- read by the takeover, never by normal playback. No-op unless recording.
+  local gLog = GAME and GAME.battleRoom and GAME.battleRoom._replayGarbageEvents
+  if gLog then
+    local recipients = {}
+    for i = 1, #body.recipients do recipients[i] = body.recipients[i] end
+    local garbage = {}
+    for i = 1, #body.garbage do garbage[i] = body.garbage[i] end
+    gLog[#gLog + 1] = {
+      sender = body.sender,
+      senderFrame = body.senderFrame,
+      recipients = recipients,
+      garbage = garbage,
+    }
+  end
+
+  -- Defer fires ONLY for spectators catching up via replay backlog.
+  -- They have no local stack with a stake; visual correctness wants
+  -- garbage applied at the original sender frame (when view-stacks
+  -- reach it via input replication), not on arrival. Live players
+  -- (including rejoiners) apply immediately — their local stack owns
+  -- game outcome and any backlog drains via their own confirmedInput
+  -- queue, not via parking garbage.
+  --
+  -- This decouples G delivery from per-stack clock comparisons. The
+  -- only condition consulted is the room-level spectating flag.
+  local spectating = GAME and GAME.battleRoom and GAME.battleRoom.spectating
+  if spectating and body.senderFrame then
+    local localClock = (self.engine and self.engine.clock) or 0
+    if localClock + 60 < body.senderFrame then
+      body._parkedAtMs = math.floor((love.timer.getTime() or 0) * 1000)
+      self.pendingHistoricalGarbage = self.pendingHistoricalGarbage or {}
+      self.pendingHistoricalGarbage[#self.pendingHistoricalGarbage + 1] = body
+      pcall(function()
+        TraceWriter.localEvent("applyDeferred", {
+          event       = "G",
+          sender      = body.sender,
+          senderFrame = body.senderFrame,
+          localClock  = localClock,
+        })
+      end)
+      return
+    end
+  end
+
+  self:_applyGarbageEventNow(body)
+end
+
+---Internal: apply a GarbageEvent without the catch-up defer check.
+---Called by applyGarbageEvent (in-sync path) and by drainPendingHistoricalEvents.
+---@param body table parsed event payload
+function ClientMatch:_applyGarbageEventNow(body)
+  -- Self-attack echo guard. Match:deliverOutgoingGarbage emits a G for vsSelf
+  -- (local source → local target) so spectators see the drop, but it also
+  -- direct-pushes locally for responsiveness. The server's relay of that G
+  -- lands back on the sender. Without this guard the bounce would apply
+  -- garbage a second time on the player's own stack.
+  if body.sender and type(body.recipients) == "table" and #body.recipients == 1
+      and body.recipients[1] == body.sender then
+    local senderStack = self.stacks[body.sender]
+    if senderStack and senderStack.is_local then
+      logger.info(string.format(
+        "G skip echo: stack[%d] self-attack already applied locally",
+        body.sender))
+      return
+    end
+  end
+
+  local garbageCount = (type(body.garbage) == "table") and #body.garbage or 0
+  local engine = self.engine
+  for _, recipientIndex in ipairs(body.recipients) do
+    local stack = self.stacks[recipientIndex]
+    if stack and stack.engine then
+      -- Frozen remote (engine sim paused for non-local stacks): pushing
+      -- G onto incomingGarbage queues that nothing drains piles up
+      -- memory and never lands. Local stacks still get the G — those
+      -- are the only landings that matter for game outcome.
+      local frozen = engine and engine.pauseNonLocalSimulation and not stack.is_local
+      if frozen then
+        engine._gSkippedFrozenEvents = (engine._gSkippedFrozenEvents or 0) + 1
+        engine._gSkippedFrozenPieces = (engine._gSkippedFrozenPieces or 0) + garbageCount
+      else
+        logger.info(string.format(
+          "G apply: sender=%s senderFrame=%s -> stack[%d] (is_local=%s) garbageCount=%d",
+          tostring(body.sender), tostring(body.senderFrame), recipientIndex,
+          tostring(stack.is_local), garbageCount))
+        if engine then
+          engine._gAppliedEvents = (engine._gAppliedEvents or 0) + 1
+          engine._gAppliedPieces = (engine._gAppliedPieces or 0) + garbageCount
+        end
+        stack.engine:applyNetworkGarbage(body.garbage, body.sender)
+      end
+    else
+      -- Recipient not landable: slot was emptied (mid-match leave) or the
+      -- engine hasn't booted yet (mod still loading on a spectator/rejoiner).
+      -- Without this warn the drop is invisible — the only existing log on
+      -- this path was the success-path `G apply` line above.
+      local reason = (not stack) and "stack_not_present" or "engine_not_initialized"
+      logger.warn(string.format(
+        "G apply DROPPED: sender=%s senderFrame=%s -> stack[%d] reason=%s garbageCount=%d",
+        tostring(body.sender), tostring(body.senderFrame), recipientIndex,
+        reason, garbageCount))
+      if engine then
+        engine._gDroppedEvents = (engine._gDroppedEvents or 0) + 1
+        engine._gDroppedPieces = (engine._gDroppedPieces or 0) + garbageCount
+      end
+    end
+  end
+
+  -- Item 4 of smoother-visuals goal: observer-side immediate feedback.
+  -- One bump per G event regardless of recipient count (all-mode fans
+  -- out, but it's still one attack). Bumps the SENDER's view-stack
+  -- shake so anyone watching the attacker — recipient + third-party
+  -- observers — sees "attacker hit something" the instant G arrives,
+  -- decaying as Y delivers the authoritative shake. Skip if sender is
+  -- us (our own engine shook live from the sim already).
+  if body.sender and GAME and GAME.battleRoom and GAME.battleRoom._displayStacks then
+    local senderStack = self.stacks[body.sender]
+    if senderStack and not senderStack.is_local and senderStack.player then
+      local pid = senderStack.player.publicId or senderStack.player.playerNumber
+      local ds = pid and GAME.battleRoom._displayStacks[pid]
+      if ds then
+        -- Scale roughly with attack size; cap so a huge combo doesn't
+        -- spike the screen beyond what the real shake will be.
+        local bump = math.min(30, garbageCount * 4)
+        ds:bumpShake(bump)
+      end
+    end
+  end
+
+  -- Self-heal the round-robin cursor: G is the canonical "who got hit"
+  -- per delivery (the server even redirects when the original recipient is
+  -- dead). distributeGarbageToTargets advances each client's cursor based
+  -- on local liveness view, which can briefly diverge at death boundaries
+  -- — fine for the bookkeeping, but refreshSharedModeTelegraphTargets uses
+  -- the cursor to draw next-target arrows, so the divergence is player-
+  -- visible. Re-anchor the cursor to the just-hit recipient's position +
+  -- next-living, so every client's telegraph points the same place.
+  -- Shared mode only: G in "all" mode carries every recipient at once.
+  if body.sender and type(body.recipients) == "table" and #body.recipients == 1 then
+    local engine = self.engine
+    local teamState = engine and engine.teamGarbageState and engine.teamGarbageState[body.sender]
+    if teamState and teamState.enemyIndices then
+      local hitRecipient = body.recipients[1]
+      local stacks = engine.stacks
+      -- Find the hit recipient's position in the enemy list, then advance
+      -- the cursor to the next-living after that position. Same predicate
+      -- as Match.lua's engine cursor and Room.lua's _redirectIfDead — one
+      -- rule, three call sites via TeamUtils.findNextLiving.
+      local hitIndex
+      for i, slot in ipairs(teamState.enemyIndices) do
+        if slot == hitRecipient then
+          hitIndex = i
+          break
+        end
+      end
+      if hitIndex then
+        local _, _, nextLivingIndex = TeamUtils.findNextLiving(
+          teamState.enemyIndices, hitIndex,
+          function(slot)
+            local s = stacks[slot]
+            return s and not s:game_ended()
+          end
+        )
+        if nextLivingIndex then
+          teamState.currentTargetIndex = nextLivingIndex
+        end
+      end
+    end
   end
 end
 
----@param prefix "I" | "U"
----@param input string
-function ClientMatch:receiveInput(prefix, input)
-  if self:hasLocalPlayer() then
-    if self.players[1].human and self.players[1].isLocal then
-      ---@diagnostic disable-next-line: param-type-mismatch
-      self.stacks[2]:receiveConfirmedInput(input)
-    elseif self.players[2].human and self.players[2].isLocal then
-      ---@diagnostic disable-next-line: param-type-mismatch
-      self.stacks[1]:receiveConfirmedInput(input)
+---Loose-sync: handle an incoming DeathEvent from the server.
+---Marks the (remote) sender's stack as game-ended at body.senderFrame.
+---Skips local-authoritative stacks — those set their own game_over_clock via
+---the engine's natural top-out detection, no override needed.
+---@param body table parsed event payload: {sender, senderFrame, serverWallClockMs, reason}
+function ClientMatch:applyDeathEvent(body)
+  if not body or type(body.sender) ~= "number" or type(body.senderFrame) ~= "number" then
+    logger.warn("applyDeathEvent: malformed body, dropping")
+    return
+  end
+
+  local stack = self.stacks[body.sender]
+  if not stack or not stack.engine then
+    logger.warn("applyDeathEvent: no stack/engine at slot " .. tostring(body.sender))
+    return
+  end
+
+  if stack.is_local then
+    if body and body.inferred then
+      -- Server's silent-death watchdog timed us out. Apply locally so we
+      -- transition to game-over instead of playing-but-server-ignored.
+      logger.warn(string.format(
+        "applyDeathEvent: server synth-killed our local stack at senderFrame=%d reason=%s",
+        body.senderFrame, tostring(body.reason)))
+      self:_applyDeathEventNow(body, stack)
     end
-  else
-    if prefix == NetworkProtocol.serverMessageTypes.opponentInput.prefix then
-      ---@diagnostic disable-next-line: param-type-mismatch
-      self.stacks[2]:receiveConfirmedInput(input)
-    else
-      ---@diagnostic disable-next-line: param-type-mismatch
-      self.stacks[1]:receiveConfirmedInput(input)
+    return
+  end
+
+  -- Always set game_over_clock immediately. The previous design deferred
+  -- to pendingHistoricalDeaths if the view-stack was >60 frames behind
+  -- the sender's death frame ("catch-up defer"). That created a deadlock:
+  -- once a sender dies, server/Room.lua:716 stops relaying their inputs,
+  -- so the view-stack on every other client is permanently pinned at the
+  -- last frame before the death. stopWatch never advances past senderFrame,
+  -- drainPendingHistoricalEvents never applies the death, game_over_clock
+  -- stays -1, Match.isDone's loose-sync bypass (Match.lua:760, which is
+  -- there specifically to cover this case) never fires, the match never
+  -- ends. The Amber/Bev/Koozie hung-match was this bug.
+  --
+  -- For spectator/rejoiner catch-up (the other case the defer existed
+  -- to handle), pendingHistoricalDeaths is preloaded at match-create
+  -- time from replay.crossPlayerEvents.deaths (ClientMatch:createFromReplay
+  -- around line 194-197). That path is untouched; this change only
+  -- affects D events arriving live during a running match.
+  --
+  -- _applyDeathEventNow is idempotent — it no-ops if game_over_clock is
+  -- already > 0 — so a deferred death later re-applied via the drain
+  -- doesn't double-set.
+  self:_applyDeathEventNow(body, stack)
+end
+
+---Internal: apply a DeathEvent without the catch-up defer check.
+---@param body table parsed event payload
+---@param stack ClientStack the recipient client stack (must be non-nil, non-local)
+function ClientMatch:_applyDeathEventNow(body, stack)
+  -- Call recordDeath (not a direct write) so the engine emits its "gameOver"
+  -- signal — that triggers onGameOver → _pendingVisualDeath → applyVisualDeath.
+  -- Previously this wrote game_over_clock directly, bypassing the signal and
+  -- leaving remote stacks with no death animation.
+  local engine = stack.engine
+  ---@cast engine Stack
+  if engine.game_over_clock <= 0 then
+    -- Sender's stopWatch is authoritative for display; receiver-side derivation
+    -- only matters for legacy clients that don't ship it. Mismatch between the
+    -- two implies sender/receiver disagreed on countdownOffsetFrames (was the
+    -- "OUT time off" symptom).
+    if body.stopWatch then
+      local derived = math.max(0, body.senderFrame - (engine.countdownOffsetFrames or 0))
+      if derived ~= body.stopWatch then
+        logger.warn(string.format(
+          "DeathEvent stopWatch mismatch: stack[%d] sender=%d derived=%d offset=%s senderFrame=%d",
+          body.sender, body.stopWatch, derived,
+          tostring(engine.countdownOffsetFrames), body.senderFrame))
+      end
+    end
+    engine:recordDeath(body.senderFrame, body.stopWatch)
+    -- Stamp the reason on the stack so the match-end UI can distinguish
+    -- "opponent topped out" from "opponent disconnected / went silent".
+    stack._deathReason = body and body.reason
+    logger.info(string.format("DeathEvent applied: stack[%d] game_over_clock=%d game_over_stopWatch=%d (reason=%s)",
+      body.sender, body.senderFrame, engine.game_over_stopWatch or -1, tostring(body and body.reason)))
+
+    local needed = body.senderFrame - #engine.confirmedInput
+    if needed > 0 then
+      if needed > 18000 then
+        logger.warn("DeathEvent senderFrame far ahead; capping top-up at 18000 frames")
+        needed = 18000
+      end
+      engine:receiveConfirmedInput(string.rep("A", needed))
     end
   end
 end

@@ -61,6 +61,8 @@ end
 ---@field senderId (string | integer | nil)
 ---@field type string
 ---@field content (table | string)
+---@field startAtMs integer? wall-clock server time at which the match should start; injected by Room.startGame onto start_match messages for legacy clients. Newer clients prefer startInMs.
+---@field startInMs integer? per-client countdown-from-receive in ms; injected by Room.startGame per-player so each client lands on the same wall-clock instant regardless of one-way delay. Computed as budgetMs - minRtt/2 for players, budgetMs for spectators.
 
 local settingsUpdateTemplate = {
   sender = "player",
@@ -120,6 +122,35 @@ local leaveRoomTemplate =
   content = { reason = "" }
 }
 
+---Crash-replay nomination ack. Sent in response to a client's flagGame
+---message — see docs/CRASH_REPLAY_PLAN.md "flagGame wire shape". The
+---accepted flag tells the client whether to keep its local pending_crashes/
+---file (true ⇒ the server will request a slice; false ⇒ free-to-delete
+---unless reason is "bucket_full" in which case retry later).
+---@param gameKey table the gameKey the client sent; echoed back so the
+---  client can disambiguate which pending nomination this ack belongs to
+---@param accepted boolean
+---@param info string accepted ⇒ incidentId; rejected ⇒ rejection reason
+---@return {messageType: table, messageText: ServerMessage}
+function ServerProtocol.flagGameAck(gameKey, accepted, info)
+  return {
+    messageType = msgTypes.jsonMessage,
+    messageText = {
+      sender = "server",
+      type   = "flagGameAck",
+      content = {
+        gameKey    = gameKey,
+        accepted   = accepted and true or false,
+        -- Two-faced field: incidentId on accepted, reason on rejected.
+        -- The client distinguishes via the accepted flag, not by parsing
+        -- this value's shape.
+        incidentId = accepted and info or nil,
+        reason     = (not accepted) and info or nil,
+      },
+    },
+  }
+end
+
 ---@param roomId integer
 ---@param reason string?
 ---@return {messageType: table, messageText: ServerMessage}
@@ -163,29 +194,89 @@ local addToRoomTemplate = {
   },
 }
 
+---@param players table
+---@return integer[]
+local function sortedNumericKeys(players)
+  local keys = {}
+  for k, _ in pairs(players or {}) do
+    if type(k) == "number" then
+      keys[#keys + 1] = k
+    end
+  end
+  table.sort(keys)
+  return keys
+end
+
 ---@param room Room
 ---@param replay ReplayV3?
-function ServerProtocol.addToRoom(room, replay)
+---@param recipient ServerPlayer? the player receiving this message; when provided,
+---  the payload includes their player_number so the client can identify itself
+---  authoritatively without relying on the publicId/name heuristic (which races
+---  with login completion and breaks for renamed accounts).
+function ServerProtocol.addToRoom(room, replay, recipient)
   local addToRoomMessage = addToRoomTemplate
   local content = addToRoomMessage.content
   content.roomNumber = room.roomNumber
   content.gameMode = room.gameMode
+  -- Authoritative "which slot is you" — see recipient docstring above.
+  content.localPlayerNumber = recipient and recipient.player_number or nil
   content.ranked = (replay and replay.metadata.ranked or room.ranked)
   content.replay = replay
   content.stage = (replay and replay.metadata.stageId or nil)
   content.players = {}
 
-  for i, player in ipairs(room.players) do
-    -- publicId can't be the key as it would disallow developers playing against themselves for testing
-    content.players[player.player_number] = {
-      settings = player:getSettings(),
-      rating = room.ratings[i],
-      winCount = room.win_counts[i],
-      name = player.name,
-      publicId = player.publicPlayerID,
-      playerNumber = player.player_number
-    }
+  if room.eachPlayer then
+    for slot, player in room:eachPlayer() do
+      -- publicId can't be the key as it would disallow developers playing against themselves for testing
+      content.players[player.player_number] = {
+        settings = player:getSettings(),
+        rating = room.ratings[slot],
+        winCount = room.win_counts[slot],
+        name = player.name,
+        publicId = player.publicPlayerID,
+        playerNumber = player.player_number
+      }
+    end
+  else
+    for _, i in ipairs(sortedNumericKeys(room.players)) do
+      local player = room.players[i]
+      content.players[player.player_number] = {
+        settings = player:getSettings(),
+        rating = room.ratings[i],
+        winCount = room.win_counts[i],
+        name = player.name,
+        publicId = player.publicPlayerID,
+        playerNumber = player.player_number
+      }
+    end
   end
+
+  -- Always clear before conditionally re-setting because addToRoomTemplate is shared
+  -- across calls (every call does `addToRoomMessage = addToRoomTemplate`); a leftover
+  -- teamWins/heldSlots from a previous call would otherwise leak into a fresh room.
+  content.teamWins = nil
+  if room.team_win_counts then
+    content.teamWins = {}
+    for teamIndex, wins in ipairs(room.team_win_counts) do
+      content.teamWins[teamIndex] = wins
+    end
+  end
+
+  -- Held slots: empty array for open-FFA rooms, populated when a fixed-roster
+  -- invite room has leavers whose slots are reserved for rejoin.
+  content.heldSlots = room.getHeldSlots and room:getHeldSlots() or {}
+
+  local owner = room.players and room.players[1] or nil
+  if not owner and room.eachPlayer then
+    local _, firstPlayer = room:eachPlayer()()
+    owner = firstPlayer
+  end
+  content.ownerId = owner and owner.publicPlayerID or nil
+
+  -- Per-room "Spectator View" flag (DISPLAY_HISTORY_PLAN.md). Echoed to
+  -- every joiner so all clients in the room agree on whether to run the
+  -- parallel display-history viewer. Default false for legacy clients.
+  content.displayHistoryEnabled = room.displayHistoryEnabled == true
 
   return {
     messageType = msgTypes.jsonMessage,
@@ -220,16 +311,35 @@ function ServerProtocol.spectateRequestGranted(room, replay)
   content.stage = (replay and replay.metadata.stageId or nil)
   content.players = {}
 
-  for i, player in ipairs(room.players) do
-    content.players[player.player_number] = {
-      settings = player:getSettings(),
-      rating = room.ratings[i],
-      winCount = room.win_counts[i],
-      name = player.name,
-      publicId = player.publicPlayerID,
-      playerNumber = player.player_number
-    }
+  if room.eachPlayer then
+    for slot, player in room:eachPlayer() do
+      content.players[player.player_number] = {
+        settings = player:getSettings(),
+        rating = room.ratings[slot],
+        winCount = room.win_counts[slot],
+        name = player.name,
+        publicId = player.publicPlayerID,
+        playerNumber = player.player_number
+      }
+    end
+  else
+    for _, i in ipairs(sortedNumericKeys(room.players)) do
+      local player = room.players[i]
+      content.players[player.player_number] = {
+        settings = player:getSettings(),
+        rating = room.ratings[i],
+        winCount = room.win_counts[i],
+        name = player.name,
+        publicId = player.publicPlayerID,
+        playerNumber = player.player_number
+      }
+    end
   end
+
+  -- Per-room display-history flag (DISPLAY_HISTORY_PLAN.md). Spectators
+  -- need it too so the new viewer activates for them when the room is
+  -- using it.
+  content.displayHistoryEnabled = room.displayHistoryEnabled == true
 
   return {
     messageType = msgTypes.jsonMessage,
@@ -257,16 +367,33 @@ function ServerProtocol.createRoom(room)
   content.gameMode = room.gameMode
   content.players = {}
 
-  for i, player in ipairs(room.players) do
-    content.players[player.player_number] = {
-      settings = player:getSettings(),
-      rating = room.ratings[i],
-      winCount = room.win_counts[i],
-      name = player.name,
-      publicId = player.publicPlayerID,
-      playerNumber = player.player_number
-    }
+  if room.eachPlayer then
+    for slot, player in room:eachPlayer() do
+      content.players[player.player_number] = {
+        settings = player:getSettings(),
+        rating = room.ratings[slot],
+        winCount = room.win_counts[slot],
+        name = player.name,
+        publicId = player.publicPlayerID,
+        playerNumber = player.player_number
+      }
+    end
+  else
+    for _, i in ipairs(sortedNumericKeys(room.players)) do
+      local player = room.players[i]
+      content.players[player.player_number] = {
+        settings = player:getSettings(),
+        rating = room.ratings[i],
+        winCount = room.win_counts[i],
+        name = player.name,
+        publicId = player.publicPlayerID,
+        playerNumber = player.player_number
+      }
+    end
   end
+
+  -- Per-room display-history flag (DISPLAY_HISTORY_PLAN.md).
+  content.displayHistoryEnabled = room.displayHistoryEnabled == true
 
   return {
     messageType = msgTypes.jsonMessage,
@@ -325,7 +452,7 @@ local loginResponseTemplate = {
 }
 
 ---@param publicId integer
----@param notice string
+---@param notice string?
 ---@param newId privateUserId?
 ---@param newName string?
 ---@param oldName string?
@@ -378,18 +505,48 @@ local gameResultTemplate = {
 ---@param room Room
 function ServerProtocol.gameResult(game, room)
   local gameResultMessage = gameResultTemplate
+  -- Wire keyed by seatId (matches client's roomPlayer.playerNumber after
+  -- match end). game.players is the dense view; win_counts is seatId-keyed;
+  -- ratings + getPlacement are stackIndex-keyed.
   local content = {}
-  for _, player in ipairs(game.players) do
-    -- publicId can't be the key as it would disallow developers playing against themselves for testing
-    content[player.player_number] = {
-      rating = room.ratings[player.player_number],
-      winCount = room.win_counts[player.player_number],
-      placement = game:getPlacement(player),
+  for stackIdx, player in pairs(game.players) do
+    local seatId = player.seatId or stackIdx
+    content[seatId] = {
+      rating = room.ratings[stackIdx],
+      winCount = room.win_counts[seatId],
+      placement = game:getPlacement(player, stackIdx),
       publicId = player.publicPlayerID
     }
   end
 
   gameResultMessage.content = content
+
+  -- For team games, attach per-team wins as a sibling field on the message itself rather
+  -- than inside content. content is encoded as a JSON array (integer keys); adding a
+  -- string-keyed sibling there would force dkjson to encode the whole thing as an object,
+  -- which would break every client that does `for i in ipairs(content)` or
+  -- `content[playerNumber]`. Keeping teamWins outside content sidesteps that.
+  gameResultMessage.teamWins = nil
+  if room.team_win_counts then
+    local teamWins = {}
+    for teamIndex, wins in ipairs(room.team_win_counts) do
+      teamWins[teamIndex] = wins
+    end
+    gameResultMessage.teamWins = teamWins
+  end
+
+  -- Server's authoritative winner. nil = tie (or non-team mode handled
+  -- by content[slot].placement on the client). Sibling of `content` for
+  -- the same JSON-encoding reason as `teamWins`.
+  gameResultMessage.winnerTeamIndex = game.winnerTeamIndex
+  gameResultMessage.winnerIndex = game.winnerIndex
+
+  -- Canonical match-end engine clock. Clients anchor their match-end overlay
+  -- to (matchStartLocalMs + endTick/60) so it fires at the same wall-clock
+  -- moment everywhere regardless of gameResult delivery jitter. nil when no
+  -- eliminations exist (aborted no-death match, timeout finish) — client
+  -- falls back to firing the overlay on arrival.
+  gameResultMessage.endTick = game:getEndTick()
 
   return {
     messageType = msgTypes.jsonMessage,
@@ -454,8 +611,10 @@ function ServerProtocol.taunt(player, type, index)
   tauntMessage.senderId = player.publicPlayerID
   tauntMessage.content.type = type
   tauntMessage.content.index = index
-  -- to support the transition
+  -- playerNumber is stackIndex during a match; seatId is the lobby-stable
+  -- identifier the client uses to find the sender in room.players.
   tauntMessage.content.playerNumber = player.player_number
+  tauntMessage.content.seatId = player.seatId
 
   return {
     messageType = msgTypes.jsonMessage,
@@ -474,8 +633,10 @@ local challengeUpdateTemplate = {
 ---@param receiver ServerPlayer
 ---@param gameModeId GameModeID? nil if the challenged picks the game mode
 ---@param challengeActive boolean
+---@param roomNumber integer? optional room number for team room invites
+---@param slotNumber integer? optional slot number for team room invites
 ---@return {messageType: table, messageText: ServerMessage}
-function ServerProtocol.sendChallengeUpdate(sender, receiver, gameModeId, challengeActive)
+function ServerProtocol.sendChallengeUpdate(sender, receiver, gameModeId, challengeActive, roomNumber, slotNumber)
   local challengeMessage = challengeUpdateTemplate
   challengeMessage.senderId = sender.publicPlayerID
   challengeMessage.content.sender = sender.name
@@ -484,6 +645,8 @@ function ServerProtocol.sendChallengeUpdate(sender, receiver, gameModeId, challe
   challengeMessage.content.receiverId = receiver.publicPlayerID
   challengeMessage.content.gameModeId = gameModeId
   challengeMessage.content.challengeActive = challengeActive
+  challengeMessage.content.roomNumber = roomNumber
+  challengeMessage.content.slotNumber = slotNumber
 
   return {
     messageType = msgTypes.jsonMessage,
@@ -531,6 +694,120 @@ function ServerProtocol.sendPauseNotification(roomNumber, source, paused)
   return {
     messageType = msgTypes.jsonMessage,
     messageText = pauseNotificationMessage,
+  }
+end
+
+local playerJoinedRoomTemplate = {
+  sender = "room",
+  senderId = nil,
+  type = "playerJoinedRoom",
+  content = {
+    playerNumber = nil,
+    name = nil,
+    publicId = nil,
+    settings = nil,
+  }
+}
+
+---@param room Room
+---@param player ServerPlayer
+---@return {messageType: table, messageText: ServerMessage}
+function ServerProtocol.playerJoinedRoom(room, player)
+  local playerJoinedRoomMessage = playerJoinedRoomTemplate
+  playerJoinedRoomMessage.senderId = room.roomNumber
+  playerJoinedRoomMessage.content.playerNumber = player.player_number
+  playerJoinedRoomMessage.content.name = player.name
+  playerJoinedRoomMessage.content.publicId = player.publicPlayerID
+  playerJoinedRoomMessage.content.settings = player:getSettings()
+
+  return {
+    messageType = msgTypes.jsonMessage,
+    messageText = playerJoinedRoomMessage,
+  }
+end
+
+local playerLeftRoomTemplate = {
+  sender = "room",
+  senderId = nil,
+  type = "playerLeftRoom",
+  content = {
+    publicId = nil,
+    name = nil,
+    voidReason = nil,
+    heldSlots = nil,
+  }
+}
+
+---Sent to remaining players + spectators when a player leaves/disconnects from a
+---multi-player room. Tells the client to remove that player from the local room
+---view. If voidReason is set the client also marks the room voided (mid-game abort);
+---nil means the room stays open and the leaver can rejoin from the lobby.
+---heldSlots reflects the room's reservation state after the leave so room members
+---can render "Held — <name>" rows without waiting for the next lobby snapshot.
+---@param roomNumber roomNumber
+---@param publicId integer the leaver's publicPlayerID
+---@param name string the leaver's display name
+---@param voidReason string? human-readable reason, nil when room stays open
+---@param heldSlots {publicId:integer, name:string, slotNumber:integer}[]? snapshot of held slots after the leave
+---@return {messageType: table, messageText: ServerMessage}
+function ServerProtocol.playerLeftRoom(roomNumber, publicId, name, voidReason, heldSlots)
+  local msg = playerLeftRoomTemplate
+  msg.senderId = roomNumber
+  msg.content.publicId = publicId
+  msg.content.name = name
+  msg.content.voidReason = voidReason
+  msg.content.heldSlots = heldSlots or {}
+  return {
+    messageType = msgTypes.jsonMessage,
+    messageText = msg,
+  }
+end
+
+local joinQueuedTemplate = {
+  sender = "server",
+  type = "joinQueued",
+  content = {
+    roomNumber = 0,
+    ranked = nil,
+    replay = nil,
+    stage = nil,
+    players = nil,
+  },
+}
+
+-- Mid-match dynamic-roster join: player is queued for promotion at the next
+-- character-select. Payload mirrors spectateRequestGranted so the client can
+-- render the in-progress match while waiting. The pendingPromotion flag tells
+-- the client to expect an addToRoom transition at match end.
+---@param room Room
+---@param replay ReplayV3?
+---@return {messageType: table, messageText: ServerMessage}
+function ServerProtocol.joinQueued(room, replay)
+  local msg = joinQueuedTemplate
+  local content = msg.content
+  content.roomNumber = room.roomNumber
+  content.gameMode = room.gameMode
+  content.ranked = (replay and replay.metadata.ranked or room.ranked)
+  content.replay = replay
+  content.stage = (replay and replay.metadata.stageId or nil)
+  content.players = {}
+
+  if room.eachPlayer then
+    for slot, player in room:eachPlayer() do
+      content.players[player.player_number] = {
+        settings = player:getSettings(),
+        rating = room.ratings[slot],
+        winCount = room.win_counts[slot],
+        name = player.name,
+        publicId = player.publicPlayerID,
+        playerNumber = player.player_number,
+      }
+    end
+  end
+
+  return {
+    messageType = msgTypes.jsonMessage,
+    messageText = msg,
   }
 end
 

@@ -9,10 +9,20 @@ require("client.src.developer")
 function love.conf(t)
   -- Set the identity before loading the config file
   -- as we need it set to get to the correct load directory.
-  love.filesystem.setIdentity("Panel Attack")
+  -- Distinct identity: this is a separate game and must never share its save
+  -- dir (config, user-id, replays, logs) with a real Panel Attack install.
+  local identity = os.getenv("LOVE_IDENTITY") or "Unofficial Panel Attack FFA & Team"
+  love.filesystem.setIdentity(identity)
   readConfigFile(config)
+  if os.getenv("PLAYER_NAME") then
+    config.name = os.getenv("PLAYER_NAME")
+  end
 
-  --t.identity = "" -- (already set above) -- The name of the save directory (string)
+  -- t.identity is the canonical conf-time path; setIdentity above sets the
+  -- live filesystem identity for the read above. Without setting BOTH, Love12
+  -- pre-release falls back to the project-dir basename (e.g. "panel-game") for
+  -- the save dir, so multiple per-player clients collide on one debug.log.
+  t.identity = identity
   t.appendidentity = false            -- Search files in source directory before save directory (boolean)
 
   local loveMajor = love.getVersion()
@@ -46,8 +56,8 @@ function love.conf(t)
   t.audio.mic = false                 -- Request and use microphone capabilities in Android (boolean)
   t.audio.mixwithsystem = false       -- Keep background music playing when opening LOVE (boolean, iOS and Android only)
 
-  t.window.title = "Panel Attack"          -- The window title (string)
-  t.window.icon = "client/assets/panels/__default/panel11.png"                      -- Filepath to an image to use as the window's icon (string)
+  t.window.title = "Unofficial Panel Attack FFA & Team"          -- The window title (string)
+  t.window.icon = "client/assets/themes/Panel Attack Modern/background/unofficial_brand_square.png"                      -- Filepath to an image to use as the window's icon (string)
   t.window.width = config.windowWidth            -- The window width (number)
   t.window.height = config.windowHeight          -- The window height (number)
   t.window.borderless = config.borderless  -- Remove all border visuals from the window (boolean)

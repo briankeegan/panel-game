@@ -8,14 +8,192 @@ local Scene = require("client.src.scenes.Scene")
 local ui = require("client.src.ui")
 local GraphicsUtil = require("client.src.graphics.graphics_util")
 local Character = require("client.src.mods.Character")
+local TeamUtils = require("common.data.TeamUtils")
 local LevelPresets = require("common.data.LevelPresets")
 local InputDeviceOverlay = require("client.src.scenes.components.InputDeviceOverlay")
+
+-- Flavor text shown under each player's name before they've played a match
+-- this session, in place of the (still-empty) position / match-out rows.
+-- Deterministic per player via a name-byte-sum hash so it doesn't flicker.
+local FLAVOR_QUOTES = {
+  -- general
+  "Stack high, fall slow.",
+  "When in doubt, swap it out.",
+  "Every chain starts small.",
+  "Patience builds combos.",
+  "Garbage in, garbage out.",
+  "Look before you swap.",
+  "Slow is smooth. Smooth is chain.",
+  "Don't take it for granite.",
+  "Be the panel.",
+  "Keep calm and clear on.",
+  "Two panels, one match.",
+  "Climb every column.",
+  "Today's stack, tomorrow's combo.",
+  "Even level 8 starts at 1.",
+  "Mind the gap.",
+  "Drop. Match. Repeat.",
+  "Chains over matches.",
+  "The early swap catches the combo.",
+  "It's not the stack, it's the chain.",
+  "Block by block.",
+  "Find your chain.",
+  "Swap fast, think faster.",
+  "A combo a day.",
+  "Stay grounded.",
+  "Rome wasn't stacked in a day.",
+  "Top out? More like top wow.",
+  "Panel in haste, repent at topout.",
+  "Behind every chain is a swap.",
+  "Don't just clear — combo.",
+  "The best time to swap was a frame ago.",
+  -- catch
+  "Always be catching.",
+  "Catch you on the swap side.",
+  "A good catch is half the chain.",
+  "Catch flights, not feelings. Also catch panels.",
+  -- chain
+  "Mystery chains: when the game stops counting.",
+  "Chains heavier than your stack.",
+  "x13 or bust.",
+  "Forge your chains. Drop them on others.",
+  "Chain reactions. Zero regrets.",
+  "Skill chains? More like skill thrills.",
+  -- clear
+  "Clear conscience, clear panels.",
+  "The path is clear. (Mostly.)",
+  "Clearance sale: everything must combo.",
+  -- combo
+  "Combo, ergo sum.",
+  "Five combos and chill.",
+  "Combo see, combo do.",
+  "+5 makes the heart grow fonder.",
+  -- combo storm
+  "Forecast: combo storm. Pack a chain.",
+  "Eye of the combo storm.",
+  "When it storms, it combos.",
+  -- DAS
+  "Hold the direction, hold the dream.",
+  "DAS-tardly fast.",
+  "DAS-ing through the rows.",
+  -- downstacking
+  "What goes up must downstack.",
+  "Downstack or down go you.",
+  "Downstacking: gravity's wingman.",
+  -- factory
+  "Factory settings: full pressure.",
+  "Open the factory. Close the lid on hope.",
+  "The factory never sleeps.",
+  -- frame trick
+  "Frame-perfect, frame-perfectionist.",
+  "One frame from glory.",
+  "Live by the frame, die by the frame.",
+  -- garbage
+  "Garbage in, garbage chain out.",
+  "Treasure your garbage. It chains.",
+  "One player's garbage, another player's combo.",
+  "Wasting garbage is just waste.",
+  -- ghost
+  "Believe in ghost matches.",
+  "Who you gonna call? Ghost matches.",
+  "Ghosts in the panel.",
+  -- insert
+  "Insert chain here.",
+  "Insert coin, receive combo.",
+  -- locked out
+  "Locked out? Read the panels.",
+  "No moves? Make some.",
+  "Locked out of luck.",
+  -- shake time
+  "Shake it off. Shake time off.",
+  "Shake, rattle, and clear.",
+  "Shake what your garbage gave you.",
+  "Shake time, fake time.",
+  -- shogun
+  "Shogun: chains with honor.",
+  "Tier chain, never tear change.",
+  -- slide
+  "Slide into your opponent's garbage.",
+  "Slide right, swap left.",
+  "Slide to win.",
+  -- stealth
+  "Stealth swap, loud impact.",
+  "Now you see the panel, now you don't.",
+  "Stealth chain, no shame.",
+  "Two spaces. One vibe.",
+  -- stop time
+  "Stop time, smell the panels.",
+  "Stop time is god mode lite.",
+  "Time stops for combos.",
+  -- tier
+  "Top tier, top fear.",
+  "Build tiers, not fears.",
+  "Tier and present danger.",
+  "Tiers of joy.",
+  -- time delay
+  "Time delays favor the patient.",
+  "Lag is just slow strategy.",
+  "Time delay, chain replay.",
+  -- topped out
+  "Topped out? Top OFF first.",
+  "Don't get topped out. Get topped in.",
+  "Topped out is a state of mind.",
+  -- tornado
+  "Tornado warning: chains incoming.",
+  "Eye of the tornado, peace in the panels.",
+  "There's no place like combo.",
+  -- tower
+  "Towers fall. Stacks rise.",
+  "A tower a day keeps the garbage away.",
+  "Towers above, garbage beneath.",
+  "The Tower of Panel.",
+  -- transition
+  "Mind the transition.",
+  "Transition clear: the gentleman's chain.",
+  -- general (puns)
+  "Panel-mony in motion.",
+  "Stack to the future.",
+  "May the swaps be with you.",
+  "Live, laugh, panel.",
+  "Carpe panel.",
+  "Stop and smell the chains.",
+  "Speak softly, carry a big chain.",
+  "Easy come, easy combo.",
+  "Don't panel-ic.",
+  "Keep your friends close, your garbage closer.",
+  "Panel, set, match.",
+  "Stack-tical genius.",
+  "Better swap than sorry.",
+  "Mind over panels.",
+  "Chain of thought, chain of panels.",
+  "Panel pals, garbage rivals.",
+  "Panel up. Swap forward.",
+  "Combo-pendium of wisdom.",
+  "Practice makes panel.",
+  "It's a panel-demic.",
+}
+
+-- Builds a fresh shuffled queue of flavor quotes. Drained one-per-player by
+-- pickQuoteFor; refills from a re-shuffle if exhausted (more players than
+-- quotes — fallback only).
+local function newShuffledQuoteQueue()
+  local queue = {}
+  for _, q in ipairs(FLAVOR_QUOTES) do queue[#queue + 1] = q end
+  for i = #queue, 2, -1 do
+    local j = math.random(i)
+    queue[i], queue[j] = queue[j], queue[i]
+  end
+  return queue
+end
 
 -- The character select screen scene
 ---@class CharacterSelect : Scene
 ---@field backgroundImg table
 ---@field players Player[]
 ---@field battleRoom BattleRoom
+---@field refreshRoster fun(self: CharacterSelect)? duck-typed in subclasses (open-FFA drop-in)
+---@field lastScore any? set in CharacterSelectVsSelf to display the last-match score
+---@field record any? set in CharacterSelectVsSelf to display the personal record
 local CharacterSelect = class(
 ---@param self CharacterSelect
 function(self, sceneParams)
@@ -33,6 +211,17 @@ end, Scene)
 function CharacterSelect:customLoad()
 end
 
+---@param playerIndex integer?
+---@return love.Texture
+local function getPlayerNumberIcon(playerIndex)
+  playerIndex = playerIndex or 1
+  local icon = themes[config.theme]:getPlayerNumberIcon(playerIndex)
+  -- Fallback: if icon is nil or theme has no 3P icon, return player 1 icon
+  if not icon and playerIndex > 1 then
+    icon = themes[config.theme]:getPlayerNumberIcon(1)
+  end
+  return icon
+end
 -- updates specific to the child scene
 function CharacterSelect:customUpdate(sceneParams)
   -- error("The function customUpdate needs to be implemented on the scene")
@@ -42,10 +231,15 @@ function CharacterSelect:customDraw()
 
 end
 
+function CharacterSelect:refresh()
+end
+
 -- end abstract functions
 
-function CharacterSelect:load()
-  -- display order is driven by locality
+-- Re-sorts self.players to match battleRoom.players, putting the local player first.
+-- Called once during load() and again whenever the roster changes (open FFA drop-in).
+function CharacterSelect:syncPlayersFromBattleRoom()
+  self.players = shallowcpy(self.battleRoom.players)
   table.sort(self.players, function(a, b)
     if a.isLocal == b.isLocal then
       return a.playerNumber < b.playerNumber
@@ -53,13 +247,22 @@ function CharacterSelect:load()
       return a.isLocal
     end
   end)
+end
+
+function CharacterSelect:load()
+  self:syncPlayersFromBattleRoom()
 
   self.ui = {}
   self.ui.cursors = {}
   self.ui.characterIcons = {}
   self.ui.playerInfos = {}
+  -- Per-scene-mount: fresh shuffled queue of flavor quotes, plus a map so
+  -- mid-session drop-ins reuse the same quote across re-renders. No two
+  -- players in this room get the same quote until the queue is exhausted.
+  self._quoteQueue = newShuffledQuoteQueue()
+  self._quoteByPlayerKey = {}
   self:customLoad()
-  
+
   self:createInputDeviceOverlay()
 
   self:setChangeInputButtonVisibility(false)
@@ -73,6 +276,28 @@ function CharacterSelect:load()
       player:connectSignal("levelDataChanged", self, self.onLevelDataChanged)
       self:onLevelDataChanged(player.settings.levelData, player)
     end
+  end
+
+  -- Open FFA / drop-in modes need to re-render when the roster changes.
+  -- Child scenes implement refreshRoster() to rebuild their per-player widgets.
+  if self.battleRoom and self.battleRoom.connectSignal then
+    self.battleRoom:connectSignal("rosterChanged", self, self.onRosterChanged)
+  end
+end
+
+function CharacterSelect:onRosterChanged()
+  self:syncPlayersFromBattleRoom()
+
+  -- Re-attach levelDataChanged on any newly added players so their styles stay in sync.
+  for _, player in ipairs(self.players) do
+    if player:isHuman() and not player._charSelectLevelHooked then
+      player:connectSignal("levelDataChanged", self, self.onLevelDataChanged)
+      player._charSelectLevelHooked = true
+    end
+  end
+
+  if self.refreshRoster then
+    self:refreshRoster()
   end
 end
 
@@ -105,18 +330,56 @@ function CharacterSelect:initializeFromLocalPlayerSettings(player)
   player:setLevelData(LevelPresets.getModern(player.settings.level))
 end
 
+-- Shared portrait backdrop: a dim overlay so the busy game background doesn't
+-- fight the foreground UI. Add it FIRST (before the grid) so it sits behind all
+-- scene content. No-op in landscape. Used by every portrait character-select
+-- scene so they share one consistent look.
+function CharacterSelect:addPortraitBackdrop()
+  if not require("client.src.system").isPortraitMode() then return end
+  local dim = ui.UiElement({x = 0, y = 0, width = consts.CANVAS_WIDTH, height = consts.CANVAS_HEIGHT})
+  dim.drawSelf = function(elem)
+    GraphicsUtil.setColor(0, 0, 0, 0.55)
+    GraphicsUtil.drawRectangle("fill", elem.x, elem.y, elem.width, elem.height)
+    GraphicsUtil.setColor(1, 1, 1, 1)
+  end
+  self.uiRoot:addChild(dim)
+end
+
 ---@param player Player
 ---@return UiElement playerIcon
-function CharacterSelect:createPlayerIcon(player)
+function CharacterSelect:createPlayerIcon(player, opts)
+  -- opts.hideName / opts.hideNumber suppress the name-above-icon and the 1P/2P
+  -- corner badge (the portrait roster shows the name in the card already).
+  opts = opts or {}
   local playerIcon = ui.UiElement({hFill = true, vFill = true})
 
+  local teamBorderColor = self:teamBorderColorForPlayer(player)
   local selectedCharacterIcon = ui.ImageContainer({
     hFill = true,
     vFill = true,
     image = characters[player.settings.selectedCharacterId].images.icon,
     drawBorders = true,
-    outlineColor = {1, 1, 1, 1}
+    outlineColor = teamBorderColor or {1, 1, 1, 1}
   })
+
+  -- In shared team modes thicken the border so the team affiliation reads at a
+  -- glance. ImageContainer normally paints a 1px line — replace its border
+  -- pass with multiple stacked rectangles to get a 4px team-colored frame.
+  if teamBorderColor then
+    local BORDER_THICKNESS = 4
+    selectedCharacterIcon.drawSelf = function(elem)
+      if elem.image then
+        GraphicsUtil.draw(elem.image, elem.x, elem.y, 0, elem.scale or 1, elem.scale or 1)
+      end
+      for w = 0, BORDER_THICKNESS - 1 do
+        GraphicsUtil.drawRectangle("line",
+          elem.x + w, elem.y + w,
+          elem.width - 2 * w, elem.height - 2 * w,
+          teamBorderColor[1], teamBorderColor[2], teamBorderColor[3], teamBorderColor[4] or 1)
+      end
+      GraphicsUtil.setColor(1, 1, 1, 1)
+    end
+  end
 
    -- character image
    selectedCharacterIcon.onCharacterChanged = function(selfElement, characterId)
@@ -145,25 +408,30 @@ function CharacterSelect:createPlayerIcon(player)
   end
 
   -- player number icon
-  local playerIndex = tableUtils.indexOf(self.players, player)
-  local playerNumberIcon = ui.ImageContainer({
-    image = themes[config.theme].images.IMG_players[playerIndex],
-    hAlign = "left",
-    vAlign = "bottom",
-    x = 2,
-    y = -2,
-    scale = 3
-  })
-  playerIcon:addChild(playerNumberIcon)
+  if not opts.hideNumber then
+    local playerIndex = tableUtils.indexOf(self.players, player)
+    local playerNumberIcon = ui.ImageContainer({
+      image = getPlayerNumberIcon(playerIndex),
+      hAlign = "left",
+      vAlign = "bottom",
+      x = 2,
+      y = -2,
+      scale = 3
+    })
+    playerIcon:addChild(playerNumberIcon)
+  end
 
-  -- player name
-  local playerName = ui.Label({
-    text = player.name,
-    translate = false,
-    hAlign = "center",
-    vAlign = "top"
-  })
-  playerIcon:addChild(playerName)
+  -- player name above icon; wins shown via the adjacent info card (every
+  -- player gets one in CharacterSelect2p, regardless of player count).
+  if not opts.hideName then
+    local playerName = ui.Label({
+      text = player.name,
+      translate = false,
+      hAlign = "center",
+      vAlign = "top",
+    })
+    playerIcon:addChild(playerName)
+  end
 
   -- load icon
   local loadIcon = ui.ImageContainer({
@@ -210,14 +478,39 @@ function CharacterSelect:createReadyButton()
     outlineColor = {1, 1, 1, 1}
   })
 
+  local scene = self
+
   -- assign player generic callback
   readyButton.onClick = function(self, inputSource, holdTime)
+    -- Dead local player came back to the waiting room while teammates are
+    -- still fighting. The room's match is still alive on BattleRoom — clicking
+    -- ready here means "take me back to watch", not "start a new match".
+    -- Push a fresh game scene that renders the in-progress match; the dead
+    -- player can use the spectator left/right arrows to cycle focus.
+    if GAME.battleRoom and GAME.battleRoom.match then
+      GAME.theme:playValidationSfx()
+      local gameScene = scene.battleRoom:createScene(GAME.battleRoom.match)
+      if gameScene then
+        gameScene:load()
+        GAME.navigationStack:push(gameScene)
+      end
+      return
+    end
+
+    -- Voided rooms (someone left mid-room) can't start a new match — server's
+    -- Room:start_match refuses them. Swallow the click on the client side too so
+    -- we don't send a pointless menu_state update.
+    if GAME.battleRoom and GAME.battleRoom.isVoided and GAME.battleRoom:isVoided() then
+      GAME.theme:playCancelSfx()
+      return
+    end
     local player
     if inputSource and inputSource.player then
       player = inputSource.player
     else
       player = GAME.localPlayer
     end
+    if not player then return end
     player:setWantsReady(not player.settings.wantsReady)
     GAME.theme:playValidationSfx()
   end
@@ -262,6 +555,7 @@ function CharacterSelect:createStageCarousel(player, width)
 
   stageCarousel.onPassengerUpdateCallback = function(carousel, selectedPassenger)
     player:setStage(selectedPassenger.id)
+    player:refreshStage()
   end
 
   stageCarousel:setPassengerById(player.settings.selectedStageId)
@@ -272,7 +566,7 @@ function CharacterSelect:createStageCarousel(player, width)
   -- player number icon
   local playerIndex = tableUtils.indexOf(self.players, player)
   local playerNumberIcon = ui.ImageContainer({
-    image = themes[config.theme].images.IMG_players[playerIndex],
+    image = getPlayerNumberIcon(playerIndex),
     scale = 2,
   })
 
@@ -421,6 +715,7 @@ function CharacterSelect:getCharacterButtons()
       else
         return
       end
+      if not player then return end
 
       if character then
         if character:canSuperSelect() and holdTime > consts.SUPER_SELECTION_START + consts.SUPER_SELECTION_DURATION then
@@ -438,6 +733,7 @@ function CharacterSelect:getCharacterButtons()
       end
 
       player:setCharacter(selfElement.characterId)
+      player:refreshCharacter()
       player.cursor:updatePosition(9, 2, true)
     end
 
@@ -547,8 +843,18 @@ end
 
 function CharacterSelect:createPageTurnButtons(pagedUniGrid)
   local x, y = pagedUniGrid:getScreenPos()
-  pagedUniGrid.pageTurnButtons.left.x = x - pagedUniGrid.unitSize
-  pagedUniGrid.pageTurnButtons.right.x = x + pagedUniGrid.width + pagedUniGrid.unitSize / 2
+  if require("client.src.system").isPortraitMode() then
+    -- portrait: the character row is nearly full width, so the default outside-
+    -- the-grid positions fall off-screen. Center the < > buttons in the side
+    -- margins so they're fully visible and pulled in toward the row.
+    local bw = pagedUniGrid.pageTurnButtons.left.width
+    local gridRight = x + pagedUniGrid.width
+    pagedUniGrid.pageTurnButtons.left.x = math.floor((x - bw) / 2)
+    pagedUniGrid.pageTurnButtons.right.x = math.floor(gridRight + (consts.CANVAS_WIDTH - gridRight - bw) / 2)
+  else
+    pagedUniGrid.pageTurnButtons.left.x = x - pagedUniGrid.unitSize
+    pagedUniGrid.pageTurnButtons.right.x = x + pagedUniGrid.width + pagedUniGrid.unitSize / 2
+  end
   pagedUniGrid.pageTurnButtons.left.y = y + pagedUniGrid.height / 2 - pagedUniGrid.unitSize / 4
   pagedUniGrid.pageTurnButtons.right.y = y + pagedUniGrid.height / 2 - pagedUniGrid.unitSize / 4
 
@@ -623,7 +929,7 @@ function CharacterSelect:createPanelCarousel(player, height)
   -- player number icon
   local playerIndex = tableUtils.indexOf(self.players, player)
   local playerNumberIcon = ui.ImageContainer({
-    image = themes[config.theme].images.IMG_players[playerIndex],
+    image = getPlayerNumberIcon(playerIndex),
     hAlign = "left",
     vAlign = "center",
     scale = 2,
@@ -716,7 +1022,7 @@ function CharacterSelect:createLevelSlider(player, imageWidth, height)
   -- player number icon
   local playerIndex = tableUtils.indexOf(self.players, player)
   local playerNumberIcon = ui.ImageContainer({
-    image = themes[config.theme].images.IMG_players[playerIndex],
+    image = getPlayerNumberIcon(playerIndex),
     hAlign = "left",
     vAlign = "center",
     scale = 2,
@@ -737,7 +1043,7 @@ function CharacterSelect:createRankedSelection(player, width)
   -- player number icon
   local playerIndex = tableUtils.indexOf(self.players, player)
   local playerNumberIcon = ui.ImageContainer({
-    image = themes[config.theme].images.IMG_players[playerIndex],
+    image = getPlayerNumberIcon(playerIndex),
     scale = 2,
     vAlign = "center"
   })
@@ -778,7 +1084,7 @@ function CharacterSelect:createStyleSelection(player, width)
   -- player number icon
   local playerIndex = tableUtils.indexOf(self.players, player)
   local playerNumberIcon = ui.ImageContainer({
-    image = themes[config.theme].images.IMG_players[playerIndex],
+    image = getPlayerNumberIcon(playerIndex),
     scale = 2,
     vAlign = "center"
   })
@@ -818,6 +1124,41 @@ function CharacterSelect:createStyleSelection(player, width)
   return container, styleSelector
 end
 
+---@param player Player
+---@param width number
+---@return StackPanel noRaiseSelectionContainer
+---@return BoolSelector noRaiseSelector
+function CharacterSelect:createNoRaiseSelection(player, width)
+  local playerIndex = tableUtils.indexOf(self.players, player)
+  local playerNumberIcon = ui.ImageContainer({
+    image = getPlayerNumberIcon(playerIndex),
+    scale = 2,
+    vAlign = "center"
+  })
+
+  local noRaiseSelector = ui.BoolSelector({
+    startValue = player.settings.endlessNoRaise == true,
+    isEnabled = player.isLocal
+  })
+
+  ui.Focusable(noRaiseSelector)
+
+  local container = ui.StackPanel({
+    alignment = "left",
+    height = noRaiseSelector.height,
+    hAlign = "center",
+    vAlign = "center",
+  })
+  container.playerNumberIcon = playerNumberIcon
+  container.noRaiseSelector = noRaiseSelector
+  container:addElement(playerNumberIcon)
+  container:addElement(ui.UiElement({width = 8, height = 8}))
+  container:addElement(noRaiseSelector)
+  container:addElement(ui.UiElement({width = 8, height = 8}))
+
+  return container, noRaiseSelector
+end
+
 function CharacterSelect:createRecordsBox(lastText)
   local stackPanel = ui.StackPanel({alignment = "top", hFill = true, vAlign = "center"})
 
@@ -854,78 +1195,256 @@ function CharacterSelect:createRecordsBox(lastText)
   return stackPanel
 end
 
-function CharacterSelect:createPlayerInfo(player)
+---@param player MatchParticipant
+---@return string
+function CharacterSelect:pickQuoteFor(player)
+  local key = player.publicId or player.playerNumber or player.name or tostring(player)
+  if self._quoteByPlayerKey[key] then
+    return self._quoteByPlayerKey[key]
+  end
+  if #self._quoteQueue == 0 then
+    self._quoteQueue = newShuffledQuoteQueue()
+  end
+  local quote = table.remove(self._quoteQueue)
+  self._quoteByPlayerKey[key] = quote
+  return quote
+end
+
+function CharacterSelect:createPlayerInfo(player, labelX)
+  labelX = labelX or 4
   local stackPanel = ui.StackPanel({alignment = "top", hFill = true, vAlign = "top"})
 
-  stackPanel.leagueLabel = ui.Label({
-    x = 4,
-    text = loc("ss_rating") .. " " .. ((player.league) or "none"),
-    translate = false
-  })
-  stackPanel.leagueLabel.updateLabel = function(self, league)
-    self:setText(loc("ss_rating") .. " " .. (league or "none"))
+  -- Host marker: shown above all other player info so the room owner is
+  -- immediately identifiable. Stays in place across roster changes — the
+  -- ownerId is fixed for the lifetime of the room (set in addToRoom).
+  local ownerId = self.battleRoom and self.battleRoom.ownerId
+  local isHost = ownerId ~= nil and player.publicId == ownerId
+  if isHost then
+    stackPanel.hostLabel = ui.Label({
+      x = labelX,
+      text = "Host",
+      translate = false
+    })
+    stackPanel:addElement(stackPanel.hostLabel)
   end
 
-  stackPanel.ratingLabel = ui.Label({
-    x = 4,
-    text = player.rating or "",
+  stackPanel.nameLabel = ui.Label({
+    x = labelX,
+    text = player.name or "",
     translate = false
   })
-  stackPanel.ratingLabel.updateLabel = function(self, rating, ratingDiff)
-    if ratingDiff > 0 then
-      self:setText(tostring(rating) .. " (+" .. ratingDiff .. ")", nil, false)
-    elseif ratingDiff < 0 then
-      self:setText(tostring(rating) .. " (" .. ratingDiff .. ")", nil, false)
-    else
-      self:setText(tostring(rating), nil, false)
+
+  -- Mode flags drive every conditional below: rating is hidden in team / FFA
+  -- (individual ELO doesn't track meaningfully there), wins/winrate are also
+  -- hidden in shared-team mode, and ranked-only sub-rows gate on showExpected.
+  local isTeamGame = TeamUtils.isSharedTeamMode(self.battleRoom.mode)
+  local isFFA = TeamUtils.isFFA(self.battleRoom.mode)
+  local showRating = not isTeamGame and not isFFA
+  local showExpected = self.battleRoom.ranked and not isTeamGame
+
+  if showRating then
+    stackPanel.ratingLabel = ui.Label({
+      x = labelX,
+      text = player.rating or "",
+      translate = false
+    })
+    stackPanel.ratingLabel.updateLabel = function(self, rating, ratingDiff)
+      if ratingDiff > 0 then
+        self:setText(tostring(rating) .. " (+" .. ratingDiff .. ")", nil, false)
+      elseif ratingDiff < 0 then
+        self:setText(tostring(rating) .. " (" .. ratingDiff .. ")", nil, false)
+      else
+        self:setText(tostring(rating), nil, false)
+      end
     end
   end
 
-  stackPanel.winsLabel = ui.Label({
-    x = 4,
-    text = loc("ss_wins") .. " " .. player:getWinCountForDisplay(),
+  -- Wins / winrate per-room stats are unreliable for shared-team modes
+  -- (team_win_counts isn't reflected back into player.wins), so hide them
+  -- there. FFA and 1v1 still get the existing block.
+  --
+  -- Stat labels are built upfront so signal wiring stays simple, but they are
+  -- NOT mounted to the panel until this participant's first match completes —
+  -- otherwise their empty placeholder rows still claim StackPanel space and
+  -- shove the quote down. The placementChanged callback inserts them above
+  -- the placement row on the same frame the quote disappears.
+
+  if not isTeamGame then
+    stackPanel.winsLabel = ui.Label({
+      x = labelX,
+      text = loc("ss_wins") .. " " .. player:getWinCountForDisplay(),
+      translate = false
+    })
+    stackPanel.winsLabel.updateLabel = function(self, winCount)
+      self:setText(loc("ss_wins") .. " " .. winCount, nil, false)
+    end
+
+    if showExpected then
+      stackPanel.winrateLabel = ui.Label({
+        x = labelX,
+        text = "ss_winrate"
+      })
+
+      stackPanel.winrateValueLabel = ui.Label({
+        x = labelX,
+        text = "  " .. loc("ss_current_rating") .. " " .. tostring(player.winrate) .. "%",
+        translate = false
+      })
+      stackPanel.winrateValueLabel.updateLabel = function(self, winrate)
+        self:setText("  " .. loc("ss_current_rating") .. tostring(winrate) .. "%", nil, false)
+      end
+
+      stackPanel.winrateExpectedLabel = ui.Label({
+        x = labelX,
+        text = loc("ss_expected_rating") .. " " .. player.expectedWinrate .. "%",
+        translate = false
+      })
+      stackPanel.winrateExpectedLabel.updateLabel = function(self, expectedWinrate)
+        self:setText("  " .. loc("ss_expected_rating") .. tostring(expectedWinrate) .. "%", nil, false)
+      end
+    else
+      stackPanel.winrateValueLabel = ui.Label({
+        x = labelX,
+        text = loc("ss_winrate") .. " " .. tostring(player.winrate) .. "%",
+        translate = false
+      })
+      stackPanel.winrateValueLabel.updateLabel = function(self, winrate)
+        self:setText(loc("ss_winrate") .. " " .. tostring(winrate) .. "%", nil, false)
+      end
+    end
+  end
+
+  -- Previous-match summary. Labels are always created — their text is updated
+  -- via placementChanged because CharacterSelect mounts BEFORE the first match
+  -- (when lastPlacement is still nil), and the GameBase pop on match-end
+  -- doesn't re-run :load(). Without the signal, the labels would stay blank
+  -- forever.
+  local function formatMatchOut(outClock)
+    if not outClock or outClock <= 0 then return "" end
+    local totalSeconds = math.floor(outClock / 60)
+    return string.format("Out: %d:%02d", math.floor(totalSeconds / 60), totalSeconds % 60)
+  end
+  -- Quotes are wrapped in literal " marks and wrap to fit the info-card column.
+  -- iconRow.unitSize shrinks for high player counts (8p → 75, 12p → 50), so we
+  -- pull the wrap width from there; the label auto-grows vertically to fit.
+  local flavor = '"' .. self:pickQuoteFor(player) .. '"'
+  local cardWidth = (self.ui and self.ui.iconRow and self.ui.iconRow.unitSize) or 100
+  local QUOTE_WRAP_PX = math.max(60, cardWidth - 8)
+  local function placementText(placement)
+    return placement and ("Position: " .. tostring(placement)) or flavor
+  end
+
+  stackPanel.placementLabel = ui.Label({
+    x = labelX,
+    text = placementText(player.lastPlacement),
+    translate = false,
+    wrapWidth = QUOTE_WRAP_PX,
+  })
+  stackPanel.matchOutLabel = ui.Label({
+    x = labelX,
+    text = formatMatchOut(player.lastMatchOutClock),
     translate = false
   })
-  stackPanel.winsLabel.updateLabel = function(self, winCount)
-    self:setText(loc("ss_wins") .. " " .. winCount, nil, false)
+  -- Lazy mount: insert each stat label just above placementLabel. Each
+  -- insertion pushes placementLabel down by one, so we recompute its index
+  -- each time. Guarded by _statsMounted so re-fires (next match's
+  -- placementChanged) don't re-insert duplicates.
+  local function mountStatsAbovePlacement()
+    if stackPanel._statsMounted then return end
+    stackPanel._statsMounted = true
+    local function insertBeforePlacement(label)
+      if not label then return end
+      local idx = tableUtils.indexOf(stackPanel.children, stackPanel.placementLabel)
+      stackPanel:insertElementAtIndex(label, idx)
+    end
+    insertBeforePlacement(stackPanel.winsLabel)
+    insertBeforePlacement(stackPanel.winrateLabel)
+    insertBeforePlacement(stackPanel.winrateValueLabel)
+    insertBeforePlacement(stackPanel.winrateExpectedLabel)
   end
 
-  stackPanel.winrateLabel = ui.Label({
-    x = 4,
-    text = "ss_winrate"
-  })
-
-  stackPanel.winrateValueLabel = ui.Label({
-    x = 4,
-    text = "  " .. loc("ss_current_rating") .. " " .. tostring(player.winrate) .. "%",
-    translate = false
-  })
-  stackPanel.winrateValueLabel.updateLabel = function(self, winrate)
-    self:setText("  " .. loc("ss_current_rating") .. tostring(winrate) .. "%", nil, false)
+  -- Pre-first-match the nameLabel rides UNDER the quote as a "~ Name"
+  -- attribution; once placement is known it slides back to its normal
+  -- top-of-card slot. setText switches the prefix; we relocate via
+  -- remove + insertElementAtIndex.
+  local function setNameAttributed(attributed)
+    local txt = player.name or ""
+    stackPanel.nameLabel:setText(attributed and ("~ " .. txt) or txt, nil, false)
+  end
+  local function promoteNameToTop()
+    if stackPanel._namePromoted then return end
+    stackPanel._namePromoted = true
+    stackPanel:remove(stackPanel.nameLabel)
+    setNameAttributed(false)
+    local topIdx = 1
+    if stackPanel.hostLabel then topIdx = topIdx + 1 end
+    if stackPanel.bootButton then topIdx = topIdx + 1 end
+    stackPanel:insertElementAtIndex(stackPanel.nameLabel, topIdx)
   end
 
-  stackPanel.winrateExpectedLabel = ui.Label({
-    x = 4,
-    text = ""
-  })
-  if self.battleRoom.ranked then
-    stackPanel.winrateExpectedLabel:setText(loc("ss_expected_rating") .. " " .. player.expectedWinrate .. "%")
-  end
-  stackPanel.winrateExpectedLabel.updateLabel = function(self, expectedWinrate)
-    self:setText("  " .. loc("ss_expected_rating") .. tostring(expectedWinrate) .. "%", nil, false)
+  -- StackPanel positions children by accumulating `pixelsTaken` at addElement
+  -- time and never reconciles when a child's height changes later. When the
+  -- placementLabel transitions from a multi-line wrapped quote to a single-
+  -- line "Position: N", its height shrinks but matchOutLabel stays parked at
+  -- the original y — visible as a big gap between Position and Out. Walk the
+  -- children once and re-stack them based on current heights.
+  local function relayoutStack()
+    local y = 0
+    for _, child in ipairs(stackPanel.children) do
+      if child.isVisible ~= false then
+        child.y = y
+        y = y + (child.height or 0)
+      end
+    end
+    stackPanel.pixelsTaken = y
+    stackPanel.height = y
   end
 
-  player:connectSignal("leagueChanged", stackPanel.leagueLabel, stackPanel.leagueLabel.updateLabel)
-  player:connectSignal("ratingChanged", stackPanel.ratingLabel, stackPanel.ratingLabel.updateLabel)
-  player:connectSignal("winsChanged", stackPanel.winsLabel, stackPanel.winsLabel.updateLabel)
-  player:connectSignal("winrateChanged", stackPanel.winrateValueLabel, stackPanel.winrateValueLabel.updateLabel)
-  player:connectSignal("expectedWinrateChanged", stackPanel.winrateExpectedLabel, stackPanel.winrateExpectedLabel.updateLabel)
+  stackPanel.placementLabel.updateLabel = function(self, placement, outClock)
+    self:setText(placementText(placement), nil, false)
+    stackPanel.matchOutLabel:setText(formatMatchOut(outClock), nil, false)
+    if placement then
+      promoteNameToTop()
+      mountStatsAbovePlacement()
+    end
+    relayoutStack()
+  end
 
-  stackPanel:addElement(stackPanel.leagueLabel)
-  stackPanel:addElement(stackPanel.ratingLabel)
-  stackPanel:addElement(stackPanel.winsLabel)
-  stackPanel:addElement(stackPanel.winrateLabel)
-  stackPanel:addElement(stackPanel.winrateValueLabel)
+  if stackPanel.ratingLabel then
+    player:connectSignal("ratingChanged", stackPanel.ratingLabel, stackPanel.ratingLabel.updateLabel)
+  end
+  if stackPanel.winsLabel then
+    player:connectSignal("winsChanged", stackPanel.winsLabel, stackPanel.winsLabel.updateLabel)
+  end
+  if stackPanel.winrateValueLabel then
+    player:connectSignal("winrateChanged", stackPanel.winrateValueLabel, stackPanel.winrateValueLabel.updateLabel)
+  end
+  if stackPanel.winrateExpectedLabel then
+    player:connectSignal("expectedWinrateChanged", stackPanel.winrateExpectedLabel, stackPanel.winrateExpectedLabel.updateLabel)
+  end
+  player:connectSignal("placementChanged", stackPanel.placementLabel, stackPanel.placementLabel.updateLabel)
+
+  if player.lastPlacement then
+    -- Returning to a session where this player already has placement info:
+    -- name at top (no tilde), stats above placement, position+match-out below.
+    stackPanel._namePromoted = true
+    stackPanel:addElement(stackPanel.nameLabel)
+    if stackPanel.ratingLabel then
+      stackPanel:addElement(stackPanel.ratingLabel)
+    end
+    stackPanel:addElement(stackPanel.placementLabel)
+    stackPanel:addElement(stackPanel.matchOutLabel)
+    mountStatsAbovePlacement()
+  else
+    -- Pre-first-match: rating, quote, "~ Name" as attribution, (empty matchOut).
+    setNameAttributed(true)
+    if stackPanel.ratingLabel then
+      stackPanel:addElement(stackPanel.ratingLabel)
+    end
+    stackPanel:addElement(stackPanel.placementLabel)
+    stackPanel:addElement(stackPanel.nameLabel)
+    stackPanel:addElement(stackPanel.matchOutLabel)
+  end
 
   return stackPanel
 end
@@ -1076,10 +1595,110 @@ end
 
 function CharacterSelect:drawSelf()
   self.backgroundImg:draw()
+  self:drawTeamBannerHeader()
   self:customDraw()
+  self:drawWaitingForPlayersBanner()
+  self:drawVoidedRoomBanner()
+  self:drawLeaveBlockedBanner()
+end
+
+-- Dynamic-roster modes (open FFA) need a hint that the match is gated on more
+-- players showing up — otherwise readying up just silently does nothing.
+function CharacterSelect:drawWaitingForPlayersBanner()
+  local mode = self.battleRoom and self.battleRoom.mode
+  if not (mode and mode.minPlayers) then return end
+  local current = #self.battleRoom.players
+  local minPlayers = mode.minPlayers
+  if current >= minPlayers then return end
+
+  local GraphicsUtil = require("client.src.graphics.graphics_util")
+  local consts = require("common.engine.consts")
+  local missing = minPlayers - current
+  local text = string.format("Waiting for %d more %s to start (min %d)",
+    missing, (missing == 1) and "player" or "players", minPlayers)
+  local bannerY = 80
+  GraphicsUtil.printf(text, 0, bannerY + 2, consts.CANVAS_WIDTH, "center", {0.1, 0.05, 0.15, 0.85}, nil, 24)
+  GraphicsUtil.printf(text, 0, bannerY,     consts.CANVAS_WIDTH, "center", {1, 0.9, 0.5, 1},      nil, 24)
+end
+
+-- Draws a centered "<reason>" banner over CharacterSelect when the server has told
+-- us a player left/disconnected. Voided rooms can't start a new match — this gives
+-- remaining players a clear cue to leave when they're done looking around.
+function CharacterSelect:drawVoidedRoomBanner()
+  if not (self.battleRoom and self.battleRoom.isVoided and self.battleRoom:isVoided()) then
+    return
+  end
+  local GraphicsUtil = require("client.src.graphics.graphics_util")
+  local consts = require("common.engine.consts")
+  local text = (self.battleRoom.voidReason or "A player left")
+    .. " — game over. Press leave to return to lobby."
+  local bannerY = math.floor(consts.CANVAS_HEIGHT / 2) - 18
+  GraphicsUtil.drawRectangle("fill", 0, bannerY, consts.CANVAS_WIDTH, 36, 0, 0, 0, 0.7)
+  GraphicsUtil.printf(text, 0, bannerY + 10, consts.CANVAS_WIDTH, "center", {1, 0.85, 0.4, 1})
+end
+
+-- Brief banner shown when leave is gated because the local player is dead
+-- and teammates' match is still resolving server-side.
+function CharacterSelect:drawLeaveBlockedBanner()
+  if not self.leaveBlockedUntil then return end
+  local now = love.timer.getTime()
+  if now >= self.leaveBlockedUntil then
+    self.leaveBlockedUntil = nil
+    return
+  end
+  local GraphicsUtil = require("client.src.graphics.graphics_util")
+  local consts = require("common.engine.consts")
+  local text = "Wait for the match to end before leaving."
+  local bannerY = math.floor(consts.CANVAS_HEIGHT / 2) + 24
+  GraphicsUtil.drawRectangle("fill", 0, bannerY, consts.CANVAS_WIDTH, 36, 0, 0, 0, 0.7)
+  GraphicsUtil.printf(text, 0, bannerY + 10, consts.CANVAS_WIDTH, "center", {1, 0.85, 0.4, 1})
+end
+
+-- Top-of-screen pink/purple banner pair (same component as in-game).
+function CharacterSelect:drawTeamBannerHeader()
+  if not (self.battleRoom and self.battleRoom.mode) then return end
+  local TeamBannerHeader = require("client.src.graphics.TeamBannerHeader")
+  local canvasWidth = GAME.globalCanvas:getWidth()
+  TeamBannerHeader.draw(self.battleRoom.mode,
+                        self.battleRoom.players,
+                        self.battleRoom.teamWins,
+                        canvasWidth)
+  TeamBannerHeader.drawGarbageModeBelowBanner(self.battleRoom.mode, canvasWidth)
+end
+
+-- Per-player thick team-colored border is drawn from createPlayerIcon via
+-- ImageContainer.drawSelf override. No canvas-wide bands here anymore.
+
+-- Returns the RGBA color this player's character icon should be outlined in,
+-- or nil for non-shared-team modes (FFA, solo, 2P VS — keep the default border).
+function CharacterSelect:teamBorderColorForPlayer(player)
+  if not (self.battleRoom and self.battleRoom.mode) then return nil end
+  local TeamBannerHeader = require("client.src.graphics.TeamBannerHeader")
+  if not TeamBannerHeader.isSharedTeamMode(self.battleRoom.mode) then return nil end
+
+  -- Use canonical server slot (playerNumber) for team mapping. Dense list
+  local teamIndex = TeamUtils.teamIndexForPlayer(self.battleRoom, player)
+  return teamIndex and TeamBannerHeader.colors[teamIndex] or nil
 end
 
 function CharacterSelect:leave()
+  -- Dead-local mid-match: server keeps the slot in pendingLeaverRemovals until
+  -- match end, so the lobby keeps re-pinning us back in the room — the client
+  -- pops to Lobby but the next lobbyStateV2 broadcast undoes that. Block the
+  -- leave with a banner and let the match wrap up.
+  if self.battleRoom and self.battleRoom.match
+      and self.battleRoom.match.isLocalPlayerEliminated
+      and self.battleRoom.match:isLocalPlayerEliminated() then
+    self.leaveBlockedUntil = love.timer.getTime() + 3
+    return
+  end
+
+  -- Explicit user-initiated leave: announce to the server first so the room
+  -- knows we're gone, then tear down local match state on scene unmount.
+  -- BattleRoom:shutdown is local-only; it doesn't talk to the server.
+  if GAME.netClient and GAME.netClient:isConnected() then
+    GAME.netClient:leaveRoom()
+  end
   GAME.navigationStack:pop(nil,
     function()
       if self.battleRoom then

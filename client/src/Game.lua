@@ -70,6 +70,7 @@ end
 ---@field connected_server_ip string?
 ---@field connected_server_port integer?
 ---@field localPlayer Player?
+---@field uiRoot UiElement root UI element scaled to the canvas (drawn last each frame)
 ---@overload fun(): PanelAttack
 local Game = class(
   function(self)
@@ -129,18 +130,11 @@ function Game:load()
   DebugSettings.init()
   PuzzleLibrary.cleanupDefaultPuzzles(consts.PUZZLES_SAVE_DIRECTORY)
 
-  -- move to constructor
-  self.updater = GAME_UPDATER or nil
-  if self.updater then
-    logger.debug("Launching game with updater")
-    local success = pcall(self.updater.init, self.updater)
-    if not success then
-      logger.debug("updater:init failed")
-      self.updater = nil
-    end
-  else
-    logger.debug("Launching game without updater")
-  end
+  -- Adopt the updater the shell injects (GAME_UPDATER global); nil in plain
+  -- source/dev runs. Points at our own release stream, never upstream.
+  self.updater = GAME_UPDATER
+  logger.info("Panel Attack client build " .. consts.BUILD_VERSION
+    .. " (engine " .. consts.ENGINE_VERSION .. ")")
 
   inputManager:load()
 
@@ -199,40 +193,28 @@ function Game:writeReleaseStreamDefinition()
       releaseStreams =
       {
         {
-          name = "stable",
-          versioningType = "timestamp",
+          name = "team",
+          versioningType = "build",
           serverEndPoint = {
-            type = "filesystem",
-            url = "https://panelattack.com/downloads/updates/stable",
-            prefix = "panel-"
-          }
-        },
-        {
-          name = "beta",
-          versioningType = "timestamp",
-          serverEndPoint = {
-            type = "filesystem",
-            url = "https://panelattack.com/downloads/updates/beta",
-            prefix = "panel-beta-"
+            type = "github",
+            repository = "briankeegan/panel-game", -- our fork; updater reads build-<BUILD_VERSION> tags
+            prefix = "build-"
           }
         }
       },
-      default = "stable"
+      default = "team"
     }
 
     -- this will only start to be active on next startup
     love.filesystem.write("releaseStreams.json", json.encode(releaseStreamDefinition))
 
-    -- this is for the assumption that a release stream is being retired
-    -- comment in / out as fit depending on release
-    local retiredReleaseNames = {"canary"}
-
-    if tableUtils.contains(retiredReleaseNames, self.updater.activeReleaseStream.name) then
-      local launchDefinition =
-      {
+    -- This is a standalone game with a single self-hosted stream. It must never
+    -- point at any upstream stream, so if the active stream ever drifts off
+    -- "team" for any reason, snap it straight back.
+    if self.updater.activeReleaseStream.name ~= releaseStreamDefinition.default then
+      love.filesystem.write("updater/launch.json", json.encode({
         activeReleaseStream = releaseStreamDefinition.default
-      }
-      love.filesystem.write("updater/launch.json", json.encode(launchDefinition))
+      }))
     end
   end
 end
@@ -268,7 +250,7 @@ function Game:setupRoutine()
   self:writeReleaseStreamDefinition()
 
   self:initializeLocalPlayer()
-  ModController:loadModFor(characters[GAME.localPlayer.settings.characterId], GAME.localPlayer, true)
+  ModController:loadCharacterIdFor(GAME.localPlayer, GAME.localPlayer.settings.characterId, true)
 
   self:initializeDebugOverlay()
 end
@@ -281,6 +263,11 @@ function Game:initializeLocalPlayer()
   self.localPlayer:connectSignal("selectedStageIdChanged", config, function(config, newId) config.stage = newId end)
   self.localPlayer:connectSignal("panelIdChanged", config, function(config, newId) config.panels = newId end)
   self.localPlayer:connectSignal("inputMethodChanged", config, function(config, inputMethod) config.inputMethod = inputMethod end)
+  -- Remember the claimed input device so it's auto-restored next launch. Only save
+  -- on a real config; teardown fires this with nil, and we want to keep the choice.
+  self.localPlayer:connectSignal("inputConfigurationChanged", config, function(config, inputConfig)
+    if inputConfig then config.inputConfigurationId = inputConfig.id end
+  end)
   --self.localPlayer:connectSignal("startingSpeedChanged", config, function(config, speed) config.endless_speed = speed end)
   self.localPlayer:connectSignal("difficultyChanged", config, function(config, difficulty) config.endless_difficulty = difficulty end)
   self.localPlayer:connectSignal("levelChanged", config, function(config, level) config.level = level end)
@@ -396,7 +383,7 @@ function Game:update(dt)
     self.battleRoom:update(dt)
   end
   prof.pop("battleRoom update")
-  self.netClient:update()
+  self.netClient:update(dt)
 
   handleShortcuts()
 
@@ -461,7 +448,10 @@ function Game.errorData(errorString, traceBack)
   if GAME.updater then
     buildVersion = GAME.updater.activeReleaseStream.name .. " " .. GAME.updater.activeVersion.version
   else
-    buildVersion = "Unknown"
+    -- Unofficial build: no updater. Use the consts.BUILD_VERSION constant
+    -- (bumped by deploy.sh) so crash reports show which build the player
+    -- was actually running instead of just "Unknown".
+    buildVersion = consts.BUILD_VERSION or "Unknown"
   end
 
   local name, version, vendor, device = love.graphics.getRendererInfo()
@@ -666,7 +656,7 @@ function Game:transform_coordinates(x, y)
 end
 
 
-function Game:drawLoadingString(loadingString) 
+function Game:drawLoadingString(loadingString)
   local textMaxWidth = 300
   local textHeight = 40
   local x = 0
@@ -674,6 +664,19 @@ function Game:drawLoadingString(loadingString)
   local backgroundPadding = 10
   GraphicsUtil.drawRectangle("fill", consts.CANVAS_WIDTH / 2 - (textMaxWidth / 2) , y - backgroundPadding, textMaxWidth, textHeight, 0, 0, 0, 0.5)
   GraphicsUtil.printf(loadingString, x, y, consts.CANVAS_WIDTH, "center", nil, nil, 10)
+end
+
+-- Draw a loading string to the screen and present it immediately, so it's visible
+-- DURING a following blocking operation (e.g. force-loading mods at match start)
+-- instead of showing a frozen frame. Mirrors the normal canvas->screen draw path.
+function Game:presentLoadingString(loadingString)
+  love.graphics.setCanvas({self.globalCanvas, stencil = true})
+  love.graphics.clear()
+  self:drawLoadingString(loadingString)
+  love.graphics.setCanvas()
+  love.graphics.draw(self.globalCanvas, self.canvasX, self.canvasY, 0, self.canvasXScale, self.canvasYScale,
+    self.globalCanvas:getWidth() / 2, self.globalCanvas:getHeight() / 2)
+  love.graphics.present()
 end
 
 function Game:setLanguage(lang_code)

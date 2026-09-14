@@ -11,6 +11,7 @@ local tableUtils = require("common.lib.tableUtils")
 local GameModes = require("common.data.GameModes")
 local TouchInputController = require("client.src.TouchInputController")
 local TouchInputDetector = require("client.src.TouchInputDetector")
+local PanelCellRender = require("client.src.graphics.PanelCellRender")
 local logger = require("common.lib.logger")
 require("client.src.analytics")
 local KeyDataEncoding = require("common.data.KeyDataEncoding")
@@ -127,20 +128,50 @@ end
 
 function PlayerStack:onGameOver(engine)
   SoundController:playSfx(themes[config.theme].sounds.game_over)
+  -- Defer panel flip — let in-flight pop animations drain before we visually
+  -- "kill" the stack. The visual flip happens in runGameOver once pop_q is empty.
+  self._pendingVisualDeath = true
+  -- Notify the server immediately. Online loose-sync: the local stack's clock
+  -- never rewinds (only view-stacks do, driven by remote inputs), so there's no
+  -- rollback window to wait out.
+  --
+  -- The previous design deferred this through _pendingEliminationClock with a
+  -- 60-frame gate in runGameOver — but that gate could never be satisfied once
+  -- Match:hasEnded() flipped on the same tick (e.g. FFA dying last-but-one,
+  -- TEAMS_ACTIVE=1). ClientMatch:run then early-returns, engine.clock freezes,
+  -- and the deferred notify never fires — D never reaches the server — match
+  -- stuck forever. This was the 3p FFA Koozie/Bevy/Lala stuck-match bug.
+  self:notifyServerStackEliminated()
+end
 
-  if self.canvas then
-    local popsize = "small"
-    local panels = engine.panels
-    for row = 1, #panels do
-      for col = 1, engine.width do
-        local panel = panels[row][col]
-        panel.state = "dead"
-        if row == #panels then
-          self:enqueue_popfx(col, row, popsize)
-        end
-      end
+-- Flips all panels to dead state and spawns the death pop effects.
+-- Called from runGameOver() once in-flight animations have drained.
+function PlayerStack:applyVisualDeath()
+  self._pendingVisualDeath = nil
+  -- Flip EVERY panel to the dead state. This must run regardless of self.canvas:
+  -- remotely-simulated opponents and the stacks a broadcaster captures for
+  -- spectators have canvas=nil, and the dead state is exactly what the renderer
+  -- and the spectate snapshot read. Gating it on canvas hid the death animation
+  -- on every board except the dying player's own client.
+  local panels = self.engine.panels
+  for row = 1, #panels do
+    for col = 1, self.engine.width do
+      panels[row][col].state = "dead"
     end
   end
+
+  -- The pop-effect particles are purely cosmetic — only enqueue for stacks
+  -- that actually draw a canvas.
+  if self.canvas then
+    local topRow = #panels
+    for col = 1, self.engine.width do
+      self:enqueue_popfx(col, topRow, "small")
+    end
+  end
+end
+
+-- Default no-op; overridden in client/src/network/PlayerStack.lua for network play.
+function PlayerStack:notifyServerStackEliminated()
 end
 
 ---@param panel Panel
@@ -257,6 +288,19 @@ function PlayerStack:onRollback(engine)
   --prof.push("rollback copy analytics")
   self.analytic:rollbackToFrame(self.clock)
   --prof.pop("rollback copy analytics")
+
+  -- If rollback restored us to a pre-death state, cancel the deferred visual flip.
+  -- The server-notify already fired in onGameOver; in online loose-sync the local
+  -- stack's clock never rolls back past its own death (only view-stacks do), so
+  -- the notify is authoritative once sent.
+  if engine.game_over_clock <= 0 then
+    self._pendingVisualDeath = nil
+  end
+
+  -- Touch selection is client-side per-cell state the rollback can't restore.
+  if self.touchInputController then
+    self.touchInputController:onRollback()
+  end
 end
 
 function PlayerStack:onRollbackSaved(frame)
@@ -298,7 +342,14 @@ function PlayerStack:rewindToFrame(frame)
   self.engine:rewindToFrame(frame)
 end
 
-function PlayerStack:runGameOver()
+-- Called each frame for dead stacks (and each frame once the whole match ends).
+-- matchClock is Match.clock, which keeps advancing even after this stack stopped running.
+function PlayerStack:runGameOver(matchClock)
+  -- flip panels to dead once pre-death pop effects have drained
+  if self._pendingVisualDeath and self.pop_q:len() == 0 then
+    self:applyVisualDeath()
+  end
+
   self:update_popfxs()
   self:update_cards()
 end
@@ -908,27 +959,67 @@ function PlayerStack:drawDebugPanels(shakeOffset)
   end
 end
 
--- Renders the player's stack on screen
 ---@param matchEnded boolean?
----@param xOffset integer? provides an additional x offset e.g. from translation as scissors only operates in screen/canvas coordinates
----@param yOffset integer? provides an additional y offset e.g. from translation as scissors only operates in screen/canvas coordinates
-function PlayerStack:render(matchEnded, xOffset, yOffset)
+---@param xOffset integer?
+---@param yOffset integer?
+---@param alpha number? sub-tick render interp alpha [0,1]; nil = no interp
+function PlayerStack:render(matchEnded, xOffset, yOffset, alpha)
   prof.push("Stack:render")
   if self.canvas == nil then
     return
   end
 
+  -- Render-interp is for non-local view stacks only (applyRenderInterp
+  -- early-returns when is_local). Skipping the call entirely for local
+  -- saves a method-call + table-construction roundtrip per draw — a
+  -- small but free win on a hot path that fires every love.draw.
+  local interpSaved
+  if not self.is_local then
+    interpSaved = self.engine:applyRenderInterp(alpha)
+  end
+
   self:setDrawArea(xOffset, yOffset)
   self:drawCharacter()
-  local garbageCharacter
-  local metalPanelSet
-
-  if not self.garbageSource then
-    garbageCharacter = self.character
-    metalPanelSet = panels[self.panels_dir]
-  else
-    garbageCharacter = self.garbageSource.character
-    metalPanelSet = panels[self.garbageSource.panels_dir]
+  -- Each garbage cell carries panel.senderId (set in Stack:dropGarbage from
+  -- the receiveGarbage senderId arg). The renderer looks up the sender's
+  -- ClientStack from the active match and uses ITS character/panels mod for
+  -- the block's face/flash/composition art. Falls back to self when senderId
+  -- isn't present (single-player, replay before threading, etc.).
+  -- Resolve against the match that OWNS this stack (set at ClientMatch setup),
+  -- NOT the global GAME.battleRoom.match: onMatchEnded nils that global at match
+  -- end while the dead board is still rendered, which made garbage blocks revert
+  -- from the thrower's theme to the board owner's. Fall back to the global only
+  -- for stacks not built through a ClientMatch (no garbage senders there anyway).
+  local match = self.match or (GAME and GAME.battleRoom and GAME.battleRoom.match)
+  local fallbackCharacter = self.character
+  local fallbackPanelSet  = panels[self.panels_dir]
+  local function senderStack(panel)
+    if not (panel.senderId and match and match.stacks) then return nil end
+    return match.stacks[panel.senderId]
+  end
+  local garbageCharacter = function(panel)
+    local s = senderStack(panel)
+    return (s and s.character) or fallbackCharacter
+  end
+  -- drawPanels uses one metalPanelSet for the whole stack. Pick from the
+  -- first garbage cell with a senderId; fall back to own. Metal panels are
+  -- visually less divergent than character art across mods, so this is fine.
+  local metalPanelSet = fallbackPanelSet
+  for row = 1, self.engine.height + 1 do
+    local r = self.engine.panels[row]
+    if r then
+      for col = 1, self.engine.width do
+        local p = r[col]
+        if p and p.isGarbage and p.senderId then
+          local s = match and match.stacks and match.stacks[p.senderId]
+          if s and s.panels_dir and panels[s.panels_dir] then
+            metalPanelSet = panels[s.panels_dir]
+          end
+          break
+        end
+      end
+      if metalPanelSet ~= fallbackPanelSet then break end
+    end
   end
 
   local shakeOffset = self:currentShakeOffset() / self.gfxScale
@@ -945,6 +1036,10 @@ function PlayerStack:render(matchEnded, xOffset, yOffset)
 
   self:drawDebugPanels(shakeOffset)
   self:drawDebug()
+
+  if interpSaved then
+    self.engine:restoreRenderInterp(interpSaved)
+  end
   prof.pop("Stack:render")
 end
 
@@ -957,8 +1052,9 @@ function PlayerStack:drawRating()
   end
 
   if rating then
-    self:drawLabel(self.assets.rating, self.theme.ratingLabel_Pos, self.theme.ratingLabel_Scale, true)
-    self:drawNumber(rating, self.theme.rating_Pos, self.theme.rating_Scale, true)
+    local useLegacyOffsets = true
+    self:drawLabel(self.assets.rating, self.theme.ratingLabel_Pos, self.theme.ratingLabel_Scale, useLegacyOffsets)
+    self:drawNumber(rating, self.theme.rating_Pos, self.theme.rating_Scale, useLegacyOffsets)
   end
 end
 
@@ -988,6 +1084,8 @@ function PlayerStack:render_cursor(shake, matchEnded)
 
   if self:game_ended() or matchEnded then
     GraphicsUtil.setColor(1, 1, 1, 0.3)
+  else
+    GraphicsUtil.setColor(1, 1, 1, 1)
   end
 
   if self.inputMethod == "touch" then
@@ -1084,14 +1182,13 @@ function PlayerStack:drawSpeed()
 end
 
 function PlayerStack:drawLevel()
-  if self.level then
-    self:drawLabel(self.assets.level, self.theme.levelLabel_Pos, self.theme.levelLabel_Scale)
-
-    local x = self:elementOriginXWithOffset(self.theme.level_Pos, false)
-    local y = self:elementOriginYWithOffset(self.theme.level_Pos, false)
-    local levelAtlas = self.assets.levelAtlas
-    GraphicsUtil.drawQuad(levelAtlas.image, levelAtlas.quads[self.level], x, y, 0, 28 / levelAtlas.charWidth * self.theme.level_Scale, 26 / levelAtlas.charHeight * self.theme.level_Scale, 0, 0, self.multiplication)
-  end
+  if not self.level then return end
+  self:drawLabel(self.assets.level, self.theme.levelLabel_Pos, self.theme.levelLabel_Scale)
+  local x = self:elementOriginXWithOffset(self.theme.level_Pos, false)
+  local y = self:elementOriginYWithOffset(self.theme.level_Pos, false)
+  local levelAtlas = self.assets.levelAtlas
+  local scaleRatio = self.gfxScale / ClientStack.NORMAL_GFX_SCALE
+  GraphicsUtil.drawQuad(levelAtlas.image, levelAtlas.quads[self.level], x, y, 0, 28 / levelAtlas.charWidth * self.theme.level_Scale * scaleRatio, 26 / levelAtlas.charHeight * self.theme.level_Scale * scaleRatio, 0, 0, self.multiplication)
 end
 
 function PlayerStack:drawAnalyticData()
@@ -1099,15 +1196,15 @@ function PlayerStack:drawAnalyticData()
     return
   end
 
+  -- Position is hardcoded for Player 1; minis go through withPanelTransform
+  -- which puts them in Player-1 coordinate space and then scales/translates
+  -- the result onto each mini's actual screen location.
   local analytic = self.analytic
   local backgroundPadding = 18
   local paddingToAnalytics = 16
   local width = 160
   local height = 600
   local x = paddingToAnalytics + backgroundPadding
-  if self.renderIndex == 2 then
-    x = consts.CANVAS_WIDTH - paddingToAnalytics - width + backgroundPadding
-  end
   local y = self.frameOriginY * self.gfxScale + backgroundPadding
 
   local iconToTextSpacing = 30
@@ -1226,12 +1323,6 @@ function PlayerStack:drawMoveCount()
   self:drawNumber(moveNumber, themes[config.theme].move_Pos, themes[config.theme].move_Scale, true)
 end
 
-local function shouldFlashForFrame(frame)
-  local flashFrames = 1
-  flashFrames = 2 -- add config
-  return frame % (flashFrames * 2) < flashFrames
-end
-
 ---@param garbageCharacter Character
 ---@param metalPanelSet Panels
 function PlayerStack:drawPanels(garbageCharacter, metalPanelSet, shakeOffset)
@@ -1241,6 +1332,7 @@ function PlayerStack:drawPanels(garbageCharacter, metalPanelSet, shakeOffset)
 
   local metall_w, metall_h = metalPanelSet.images.metals.left:getDimensions()
   local metalr_w, metalr_h = metalPanelSet.images.metals.right:getDimensions()
+  local FLASH = self.engine.levelData.frameConstants.FLASH
 
   -- Draw all the panels
   for row = 0, self.engine.height do
@@ -1249,67 +1341,10 @@ function PlayerStack:drawPanels(garbageCharacter, metalPanelSet, shakeOffset)
       local draw_x = 4 + (col - 1) * 16
       local draw_y = 4 + (11 - (row)) * 16 + self.engine.displacement - shakeOffset
       if panel.color ~= 0 and panel.state ~= "popped" then
-        if panel.isGarbage then
-
-          -- this is the bottom right corner panel, meaning the first that will reappear when popping
-          if panel.x_offset == (panel.width - 1) and panel.y_offset == 0 then
-            -- we only need to draw the block if it is not matched 
-            -- or if the bottom right panel already started popping
-            if panel.state ~= "matched" or panel.timer <= panel.pop_time then
-              if panel.metal then
-                metalPanelSet:drawMetalGarbage(draw_x, draw_y, panel.width, self.gfxScale)
-              else
-                -- any chain where the face is situated above row 12 is going to look the same so there is no need to render it accurately
-                -- filler sprites at the bottom of the garbage alternate in a sequence of 4 so we can use a block with the same pattern
-                local drawHeight = math.min(panel.height, 28 + panel.height % 4)
-                -- need the top left offset for this one
-                local garbageX = draw_x - (panel.width - 1) * 16
-                local garbageY = draw_y - (drawHeight - 1) * 16
-
----@diagnostic disable-next-line: param-type-mismatch
-                garbageCharacter:drawGarbage(garbageX, garbageY, panel.width, drawHeight, self.gfxScale)
-              end
-            end
-          end
-
-          if panel.state == "matched" then
-            local flash_time = panel.initial_time - panel.timer
-            if flash_time >= self.engine.levelData.frameConstants.FLASH then
-              if panel.timer > panel.pop_time then
-                if panel.metal then
-                  drawGfxScaled(self, metalPanelSet.images.metals.left, draw_x, draw_y, 0, 8 / metall_w, 16 / metall_h)
-                  drawGfxScaled(self, metalPanelSet.images.metals.right, draw_x + 8, draw_y, 0, 8 / metalr_w, 16 / metalr_h)
-                else
-                  local popped_w, popped_h = garbageCharacter.images.pop:getDimensions()
-                  drawGfxScaled(self, garbageCharacter.images.pop, draw_x, draw_y, 0, 16 / popped_w, 16 / popped_h)
-                end
-              elseif panel.y_offset == -1 then
-                panelSet:addToDraw(panel, draw_x, draw_y, self.gfxScale, self.danger_col, self.danger_timer, self.engine.stop_time)
-              end
-            else
-              if shouldFlashForFrame(flash_time) == false then
-                if panel.metal then
-                  drawGfxScaled(self, metalPanelSet.images.metals.left, draw_x, draw_y, 0, 8 / metall_w, 16 / metall_h)
-                  drawGfxScaled(self, metalPanelSet.images.metals.right, draw_x + 8, draw_y, 0, 8 / metalr_w, 16 / metalr_h)
-                else
-                  local popped_w, popped_h = garbageCharacter.images.pop:getDimensions()
-                  drawGfxScaled(self, garbageCharacter.images.pop, draw_x, draw_y, 0, 16 / popped_w, 16 / popped_h)
-                end
-              else
-                local flashImage
-                if panel.metal then
-                  flashImage = metalPanelSet.images.metals.flash
-                else
-                  flashImage = garbageCharacter.images.flash
-                end
-                local flashed_w, flashed_h = flashImage:getDimensions()
-                drawGfxScaled(self, flashImage, draw_x, draw_y, 0, 16 / flashed_w, 16 / flashed_h)
-              end
-            end
-          end
-        else
-          panelSet:addToDraw(panel, draw_x, draw_y, self.gfxScale, self.danger_col, self.danger_timer, self.engine.stop_time)
-        end
+        PanelCellRender.drawPanelCell(panel, draw_x, draw_y, self.gfxScale,
+          garbageCharacter, metalPanelSet, panelSet,
+          self.danger_col, self.danger_timer, self.engine.stop_time, FLASH,
+          metall_w, metall_h, metalr_w, metalr_h)
       end
     end
   end
@@ -1342,7 +1377,7 @@ function PlayerStack:playSfx()
       -- I have no idea why this makes a distinction for vs, like what?
       -- On scouring historical chats it seems like cursor move sounds did not play during swap sounds ONLY in vs in TA
       -- people suspected a lack in sound channels in TA; might just be sensible to overall keep the amount of SFX low
-      if not (self.stackInteraction ~= GameModes.StackInteractions.NONE and themes[config.theme].sounds.swap:isPlaying()) and not self.engine.do_countdown then
+      if not (self.stackInteraction ~= GameModes.StackInteractions.NONE and themes[config.theme].sounds.swap:isPlaying()) and not self.engine.in_countdown then
         SoundController:playSfx(themes[config.theme].sounds.cur_move)
       end
       self.sfxCursorMove = false

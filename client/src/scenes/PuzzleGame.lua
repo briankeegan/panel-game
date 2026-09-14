@@ -11,6 +11,10 @@ local PuzzleHelpDisplay = require("client.src.ui.PuzzleHelpDisplay")
 local PuzzleSetIterator = require("client.src.PuzzleSetIterator")
 local PuzzleSet = require("client.src.PuzzleSet")
 local MultibarElement = require("client.src.ui.MultibarElement")
+local system = require("client.src.system")
+local ui = require("client.src.ui")
+local TouchInputController = require("client.src.TouchInputController")
+local TouchInputDetector = require("client.src.TouchInputDetector")
 
 -- Scene for a puzzle mode instance of the game
 ---@class PuzzleGame : GameBase
@@ -46,9 +50,11 @@ local PuzzleGame = class(
     if sceneParams.queuedSolutionInputs then
       self.queuedInputs = sceneParams.queuedSolutionInputs
       self.hintUsed = sceneParams.hintWasUsed or false
+      self.solveUsed = sceneParams.solveWasUsed or false
       -- Clear from battleRoom parameters so it doesn't persist
       GAME.battleRoom.sceneParameters.queuedSolutionInputs = nil
       GAME.battleRoom.sceneParameters.hintWasUsed = nil
+      GAME.battleRoom.sceneParameters.solveWasUsed = nil
     end
 
     local indices = deepcpy(self.puzzleSetIterator:currentPuzzle())
@@ -61,7 +67,7 @@ local PuzzleGame = class(
       width = 0,
       height = 0,
       x = 0,
-      y = 18,
+      y = system.isPortraitMode() and 6 or 18,
       hAlign = "center",
       vAlign = "top"
     })
@@ -116,6 +122,36 @@ function PuzzleGame:customLoad()
   assert(playerStack, "PuzzleGame requires an associated player stack")
   self.playerStack = playerStack
 
+  -- Solution/hint playback feeds recorded inputs straight to the engine. In touch
+  -- mode the touch controller ALSO feeds live input each frame and corrupts the
+  -- playback (it "tries then fails"). Run playback in controller mode; normal play
+  -- stays touch on mobile.
+  if #self.queuedInputs > 0 then
+    -- Solution/hint playback. The stack is built as a real CONTROLLER stack
+    -- (playPuzzleSolution assigns a config before the reset), so its send_controls
+    -- poll reads the empty config => one idle input per frame -- exactly the legacy
+    -- desktop cadence the recorded solution was authored against. Keep that poll;
+    -- only a TOUCH-built stack's poll corrupts playback (it feeds live touch input).
+    playerStack.engine.inputMethod = "controller"
+    -- Clean, edge-detected replay so the cursor lands exactly where the solution
+    -- intends: no poll (poll idles split a held key into two presses) and no DAS
+    -- auto-repeat (turns a held key into an extra move). Either makes the swap miss.
+    playerStack.send_controls = false
+    playerStack.engine.cur_wait_time = 99999
+    self.isSolvePlayback = true
+  elseif system.isPortraitMode() then
+    self.player:setInputMethod("touch")
+    playerStack.engine.inputMethod = "touch"
+    playerStack.inputMethod = "touch"
+    -- Touch controller + detector (which generate swaps) are only built in the
+    -- PlayerStack constructor when inputMethod is already "touch"; build them here
+    -- if a stack came up as controller, else the cursor shows but never swaps.
+    if not playerStack.touchInputDetector then
+      playerStack.touchInputController = TouchInputController(playerStack.engine)
+      playerStack.touchInputDetector = TouchInputDetector(playerStack)
+    end
+  end
+
   -- Restore level if it was temporarily changed for solution playback
   if GAME.battleRoom.sceneParameters.restoreLevelAfterCreation then
     local restoreLevel = GAME.battleRoom.sceneParameters.restoreLevelAfterCreation
@@ -130,8 +166,17 @@ function PuzzleGame:customLoad()
   
   local stack = playerStack
 
-  stack:moveToCenterPosition()
-  
+  if system.isPortraitMode() then
+    -- IDENTICAL board position to the regular PortraitGame (centered + bottom-
+    -- anchored) so swiping feels the same; buttons go on the right where raise is.
+    stack.gfxScale = 5
+    local frameX = (GAME.globalCanvas:getWidth() / 2 - stack:canvasWidth() / 2)
+    local frameY = (GAME.globalCanvas:getHeight() - stack:canvasHeight())
+    stack:moveToPosition(frameX, frameY)
+  else
+    stack:moveToCenterPosition()
+  end
+
   local framePos = themes[config.theme].healthbar_frame_Pos
   local frameScale = themes[config.theme].healthbar_frame_Scale * (stack.gfxScale / 3)
   
@@ -180,20 +225,23 @@ function PuzzleGame:customLoad()
     local stack = activeStack
     local stackWidth = stack.baseWidth + stack.panelOriginXOffset
     local stackRightEdge = stack.frameOriginX * stack.gfxScale + (stackWidth * stack.gfxScale)
-    
+    local portrait = system.isPortraitMode()
+
+    -- portrait: board fills the screen, so the side-by-side displays move up top
+    -- (objective) and down low (help); landscape keeps the original right-of-board.
     self.puzzleGoalDisplay = PuzzleGoalDisplay({
-      x = stackRightEdge + 2,
-      y = 358,
+      x = portrait and 12 or (stackRightEdge + 2),
+      y = portrait and 50 or 358,
       width = 0,
       height = 0,
       puzzle = currentPuzzle,
       stack = stack.engine
     })
     self.uiRoot:addChild(self.puzzleGoalDisplay)
-    
+
     self.puzzleHelpDisplay = PuzzleHelpDisplay({
-      x = stackRightEdge + 2,
-      y = 490,
+      x = portrait and 12 or (stackRightEdge + 2),
+      y = portrait and (consts.CANVAS_HEIGHT - 210) or 490,
       width = 0,
       height = 0,
       puzzle = currentPuzzle,
@@ -201,9 +249,61 @@ function PuzzleGame:customLoad()
     })
     self.uiRoot:addChild(self.puzzleHelpDisplay)
 
+    -- portrait: the Hint/Solve buttons replace the "Press Taunt Down" help text, so
+    -- hide the display's visuals (the buttons still drive its logic).
+    if portrait then
+      self.puzzleHelpDisplay:setVisibility(false)
+    end
+
     -- If solution is playing (non-move puzzle with hint used), show the hint state
     if self.hintUsed and currentPuzzle.puzzleType ~= "moves" then
       self.puzzleHelpDisplay:transitionToState("hint_shown")
+    end
+
+    -- portrait: bottom button row (touch can't press Taunt Down). Reset is always
+    -- available; Hint/Solve appear when the puzzle has a solution (move puzzles get
+    -- both, others just Solve).
+    if portrait then
+      local buttons = {}
+      buttons[#buttons + 1] = {text = "Reset", fn = function() self:resetPuzzle() end}
+      if self.puzzleHelpDisplay:hasSolution() then
+        if self.puzzleHelpDisplay.hintHelper:isMovePuzzle() then
+          buttons[#buttons + 1] = {text = "Hint", fn = function()
+            self.puzzleHelpDisplay:onTauntUp()
+            self.puzzleHelpDisplay:onTauntDown()
+          end}
+        end
+        buttons[#buttons + 1] = {text = "Solve", fn = function()
+          self.puzzleHelpDisplay:playSolution()
+        end}
+      end
+
+      -- stack the buttons vertically on the right (where the raise lives in the
+      -- regular game), so the board position/swipe area is identical. Last button
+      -- (Solve) sits at the bottom for easy reach.
+      local bw, bh, gap = 96, 72, 10
+      local bx = consts.CANVAS_WIDTH - bw - 6
+      for i, b in ipairs(buttons) do
+        local btn = ui.TextButton({
+          label = ui.Label({text = b.text, translate = false, fontSize = 24}),
+          x = bx,
+          vAlign = "bottom",
+          y = -8 - (#buttons - i) * (bh + gap),
+          width = bw,
+          height = bh,
+          onClick = b.fn
+        })
+        self.uiRoot:addChild(btn)
+      end
+
+      -- reusable stats overlay: swaps used / allowed, on top of the board
+      local PortraitStatsOverlay = require("client.src.ui.PortraitStatsOverlay")
+      self.statsOverlay = PortraitStatsOverlay({
+        stack = self.playerStack,
+        puzzleMode = true,
+        swapsAllowed = currentPuzzle.moves
+      })
+      self.uiRoot:addChild(self.statsOverlay)
     end
   end
 end
@@ -329,7 +429,7 @@ function PuzzleGame:recordPuzzleSolution()
       -- Navigate to the target puzzle set using the adjusted path
       local targetPuzzleSet = sourceRootPuzzleSet
       for _, index in ipairs(adjustedPath) do
-        if targetPuzzleSet.puzzleSets and targetPuzzleSet.puzzleSets[index] then
+        if targetPuzzleSet and targetPuzzleSet.puzzleSets and targetPuzzleSet.puzzleSets[index] then
           targetPuzzleSet = targetPuzzleSet.puzzleSets[index]
         end
       end
@@ -364,8 +464,11 @@ function PuzzleGame:customGameOverSetup()
     self:savePuzzleRecordResult(not self.hintUsed)
     self:recordPuzzleSolution()
 
-    -- If hint/solution was used, stay on the same puzzle; otherwise advance to next
-    local puzzleIndices = PuzzleGame.setupNextPuzzle(GAME.battleRoom, self.puzzleSetIterator, self.puzzleSet, not self.hintUsed)
+    -- Beta rule: a clean clear advances, a Hint stays put so you can do it yourself.
+    -- Solve completes the puzzle, so it advances too (solveUsed) -- it just doesn't
+    -- count as beaten (savePuzzleRecordResult above uses hintUsed, which Solve sets).
+    local advance = (not self.hintUsed) or self.solveUsed
+    local puzzleIndices = PuzzleGame.setupNextPuzzle(GAME.battleRoom, self.puzzleSetIterator, self.puzzleSet, advance)
     if puzzleIndices then
     else
       self.puzzleSetIterator = nil
@@ -410,14 +513,19 @@ function PuzzleGame:trackSwapInput()
 end
 
 function PuzzleGame:feedQueuedInput()
-  if #self.queuedInputs > 0 and self.inputQueueIndex <= #self.queuedInputs then
-    local playerStack = self.playerStack
-    if playerStack then
-      local stack = playerStack.engine
-      local input = self.queuedInputs[self.inputQueueIndex]
-      stack:receiveConfirmedInput(input)
-      self.inputQueueIndex = self.inputQueueIndex + 1
-    end
+  if #self.queuedInputs == 0 then return end
+  local playerStack = self.playerStack
+  if not playerStack then return end
+  local stack = playerStack.engine
+  if self.inputQueueIndex <= #self.queuedInputs then
+    stack:receiveConfirmedInput(self.queuedInputs[self.inputQueueIndex])
+    self.inputQueueIndex = self.inputQueueIndex + 1
+  elseif self.isSolvePlayback and self.match and not self.match.ended then
+    -- Solve playback only: after the recorded inputs run out, keep the engine advancing
+    -- with idle frames so the final swap + clear resolve (send_controls is disabled here,
+    -- so nothing else drives it). NOT for move-puzzle Hint -- that keeps its live poll and
+    -- hands control straight back to the player, so it must not be fed idle forever.
+    stack:receiveConfirmedInput(KeyDataEncoding.idle)
   end
 end
 
@@ -531,19 +639,30 @@ function PuzzleGame:playPuzzleSolution(solutionInputs)
   local currentPuzzle = self:getCurrentPuzzle()
   local isMovePuzzle = currentPuzzle and currentPuzzle.puzzleType == "moves"
 
-  -- Store solution inputs for the new scene to pick up
+  -- Build the playback stack as a real CONTROLLER stack, like legacy desktop: the
+  -- recorded solution drives a 2-cell controller cursor with a per-frame idle poll,
+  -- not the touch single-cell cursor. Assign a controller config before the reset so
+  -- the rebuilt stack comes up in controller mode; normal play flips back to touch in
+  -- customLoad. Without this the swap lands off and the puzzle never clears.
+  if GAME.input and GAME.input.inputConfigurations and GAME.input.inputConfigurations[1] then
+    GAME.localPlayer:setInputMethod("controller")
+    GAME.localPlayer:restrictInputs(GAME.input.inputConfigurations[1])
+  end
+
+  -- Reset to a fresh initial board, then the new scene replays the solution from the
+  -- start (the solution is absolute, so it must run from a reset board).
   GAME.battleRoom.sceneParameters.queuedSolutionInputs = procat(solutionInputs)
   GAME.battleRoom.sceneParameters.hintWasUsed = true
+  -- Solve completes the puzzle: advance past it (but hintWasUsed keeps it un-beaten).
+  GAME.battleRoom.sceneParameters.solveWasUsed = true
 
-  -- For non-move puzzles, temporarily set to level 10 for faster panels
-  -- Store the original level to restore after match is created
+  -- For non-move puzzles, temporarily bump to level 10 for faster panels
   if not isMovePuzzle then
     GAME.battleRoom.sceneParameters.restoreLevelAfterCreation = config.puzzle_level
     GAME.localPlayer:setLevel(10)
     GAME.localPlayer:setLevelData(LevelPresets.getModern(10))
   end
 
-  -- Reset puzzle (creates new scene via resetPuzzle)
   self:resetPuzzle()
 
   return true

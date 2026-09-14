@@ -331,6 +331,26 @@ function GarbageQueue:processStagedGarbageForClock(clock)
     if garbage.isChain then
       ---@cast garbage ChainGarbage
       if not garbage.finalized or garbage.frameEarned + STAGING_DURATION > clock then
+        -- Unfinalized chains block all lower-priority garbage from shipping.
+        -- Normally chains finalize within a few seconds. After 10s stuck, the
+        -- alternative is permanent inability to send garbage — self-heal by
+        -- force-finalizing so the pipeline can drain. Next tick re-enters the
+        -- loop, finds finalized=true, and pops normally.
+        if not garbage.finalized
+           and garbage.frameEarned and clock
+           and (clock - garbage.frameEarned) > 600 then
+          if not self._stuckChainWarned then
+            logger.warn(string.format(
+              "GarbageQueue: unfinalized chain stuck for %d frames — force-finalizing to unjam outgoing pipeline (frameEarned=%d, clock=%d)",
+              clock - garbage.frameEarned, garbage.frameEarned, clock))
+            self._stuckChainWarned = true
+          end
+          garbage.finalized = true
+          garbage.finalizedClock = clock
+          if self.currentChain == garbage then
+            self.currentChain = nil
+          end
+        end
         break
       else
         if not poppedGarbage then
@@ -351,6 +371,9 @@ function GarbageQueue:processStagedGarbageForClock(clock)
   end
 
   if poppedGarbage then
+    -- Cleared a popable backlog — drop the stuck-chain warn latch so a
+    -- future stuck state warns again.
+    self._stuckChainWarned = nil
     local deliveryTime = clock + GARBAGE_DELAY_LAND_TIME
     self.garbageInTransit[deliveryTime] = poppedGarbage
     Queue.push(self.transitTimers, deliveryTime)

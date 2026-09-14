@@ -5,6 +5,14 @@ local class = require("common.lib.class")
 local TOUCH_SWAP_COOLDOWN = 5  -- default number of cooldown frames between touch-input swaps, applied after the first 2 swaps after a touch is initiated, to prevent excessive or accidental stealths
 
 -- An object that manages touches on the screen and translates them to swaps on a stack
+---@class TouchInputController
+---@field stack Stack actually the *engine* Stack (see PlayerStack ctor: `TouchInputController(self.engine)`), not the ClientStack wrapper
+---@field touchTargetColumn integer
+---@field lingeringTouchCursor { row: integer, col: integer }
+---@field swapsThisTouch integer
+---@field touchSwapCooldownTimer integer
+---@field handleTouch fun(self, touchedCell: { row: integer, col: integer }, previousTouchedCell: { row: integer, col: integer }): integer, integer
+---@field debugString fun(self): string
 local TouchInputController =
   class(
   function(self, stack)
@@ -39,6 +47,14 @@ function TouchInputController:clearSelection()
   self:clearLingeringTouch()
   self.swapsThisTouch = 0
   self.touchSwapCooldownTimer = 0
+end
+
+-- Drop all per-cell touch state. The engine rollback can't restore it, so a
+-- scrub-rewind would otherwise leave a lingering cursor pointing at a stale
+-- (since-risen) cell and block swaps there.
+function TouchInputController:onRollback()
+  self:clearSelection()
+  self.touchTargetColumn = 0
 end
 
 -- Given the current touch state, returns the new row and column of the cursor

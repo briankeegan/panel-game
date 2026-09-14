@@ -159,6 +159,11 @@ function ChallengeModePlayerStack:setGarbageTarget(garbageTarget)
   ClientStack.setGarbageTarget(self, garbageTarget)
 end
 
+---@param garbageTargets GarbageTarget[]
+function ChallengeModePlayerStack:setGarbageTargets(garbageTargets)
+  ClientStack.setGarbageTargets(self, garbageTargets)
+end
+
 function ChallengeModePlayerStack:drawScore()
   -- no fake score for simulated stacks yet
   -- could be fun for fake 1p time attack vs later on, lol
@@ -208,7 +213,7 @@ function ChallengeModePlayerStack:drawDebug()
     GraphicsUtil.printf("Clock " .. self.engine.clock, drawX, drawY)
 
     drawY = drawY + padding
-    GraphicsUtil.printf("P" .. self.renderIndex .. " Ended?: " .. tostring(self.engine:game_ended()), drawX, drawY)
+    GraphicsUtil.printf("P" .. self.layoutSlot .. " Ended?: " .. tostring(self.engine:game_ended()), drawX, drawY)
   end
 end
 

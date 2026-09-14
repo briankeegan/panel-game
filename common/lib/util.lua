@@ -173,7 +173,7 @@ end
 -- split the input string on some separator, returns table
 ---@param inputstr string
 ---@param sep string?
----@return string[]?
+---@return string[]
 function util.split(inputstr, sep)
   sep = sep or "%s"
   local t = {}
@@ -183,6 +183,7 @@ function util.split(inputstr, sep)
       return t
     end
   end
+  return t
 end
 
 -- Remove white space from the ends of a string
@@ -259,7 +260,7 @@ function util.addToCPath(path)
   --  luaopen_socket_core
   -- meaning it has to be required as "socket.core", otherwise it cannot be opened
   local cPathDirs = util.split(package.cpath, ";")
-  local fileExtension = string.sub(cPathDirs[1], -4)
+  local fileExtension = string.sub(cPathDirs[1] or "", -4)
   if fileExtension == "?.so" then
     path = path:gsub("%?%?", "?.so")
   else

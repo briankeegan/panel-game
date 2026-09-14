@@ -4,6 +4,7 @@ local MessageListener = require("client.src.network.MessageListener")
 local ServerMessages = require("client.src.network.ServerMessages")
 local ClientMessages = require("common.network.ClientProtocol")
 local tableUtils = require("common.lib.tableUtils")
+local socket = require("common.lib.socket")
 local NetworkProtocol = require("common.network.NetworkProtocol")
 local logger = require("common.lib.logger")
 local Signal = require("common.lib.signal")
@@ -12,24 +13,209 @@ local SoundController = require("client.src.music.SoundController")
 local GameCatchUp = require("client.src.scenes.GameCatchUp")
 local GameBase = require("client.src.scenes.GameBase")
 local LoginRoutine = require("client.src.network.LoginRoutine")
+local save = require("client.src.save")
+local TraceWriter = require("client.src.network.TraceWriter")
 local MessageTransition = require("client.src.scenes.Transitions.MessageTransition")
 local LevelData = require("common.data.LevelData")
 local GameModes = require("common.data.GameModes")
+local TeamUtils = require("common.data.TeamUtils")
 
 ---@enum NetClientStates
 local states = { OFFLINE = 1, LOGIN = 2, ONLINE = 3, ROOM = 4, INGAME = 5 }
+local getSceneFromRoom
+local spectate2pVsOnlineMatch
+local isRoomReadyForWaitingRoom
+local _scheduleLobbyReconnect
+local _driveLobbyReconnect
 
 -- Most functions of NetClient are private as they only should get triggered via incoming server messages
 --  that get automatically processed via NetClient:update
+
+-- Cross-cutting helpers. Defined early so every later local function can
+-- reference them — Lua resolves local-name references against the lexical
+-- scope at parse time, so forward references silently resolve to a global
+-- (nil) instead of the local declared later in the file.
+
+-- One place to clear all per-match input/visual state. Used at every match
+-- boundary (start, end, abort, leave, state-transition out of INGAME) to
+-- make sure stale input echoes / garbage / death events from a prior match
+-- don't bleed into the next one. Safe to call when defers are already nil.
+local function _clearMatchInputState(self)
+  self.gameplayClient:dropOldInputMessages()
+  self.spectateClient:dropOldInputMessages()
+  self._deferredInputMsgs = nil
+  self._deferredGarbageMsgs = nil
+  self._deferredDeathMsgs = nil
+  -- Drop any unflushed outbound D/G — match is over, these no longer apply.
+  -- Stale resend into a fresh match would mis-eliminate a slot or land
+  -- garbage on a freshly-mapped player.
+  self._pendingDeathSends = nil
+  self._pendingGarbageSends = nil
+  self._pendingDeathDeferWarned = nil
+  self._pendingGarbageDeferWarned = nil
+  self._spectateBaselineMs = nil
+  self._spectateStallWarned = nil
+end
+
+-- One place to send a gameplay-channel fire-and-forget message (inputs / R).
+-- These bypass the JSON Request/Response handshake — they're unacked frames.
+-- For inputs the next tick re-sends an updated delta, so a missed write self-
+-- heals. Event-driven messages (G, D) MUST go through the queue+retry path
+-- below — a missed write there is a permanent loss.
+local function _sendGameplay(self, prefix, body)
+  if not self:isConnected() then return end
+  self.gameplayClient:send(NetworkProtocol.markedMessageForTypeAndBody(prefix, body))
+end
+
+-- Drain a pending-sends queue once. Returns the new queue value to assign
+-- back to the field (nil if everything went out, the original queue if a
+-- disconnect blocked the flush — caller retries on the next tick).
+--
+-- For event-driven messages (G, D) where a missed write is permanent loss.
+-- A one-shot warn fires the first tick a flush gets blocked, and a matching
+-- info fires when it resumes — so a brief socket flap is bracketed in the
+-- log without spamming every tick of the disconnect.
+---@param self NetClient
+---@param queue table[]? array of unsent payloads (each a parsed body table)
+---@param prefix string single-char message-type prefix
+---@param deferLabel string human-readable name for the warn/info pair
+---@param warnedFlag string field on `self` used as the one-shot dedupe flag
+---@return table[]? newQueue
+local function _drainPendingSends(self, queue, prefix, deferLabel, warnedFlag)
+  if not queue or #queue == 0 then return nil end
+  if not self:isConnected() then
+    if not self[warnedFlag] then
+      logger.warn(string.format(
+        "%s send deferred: %d pending (gameplay socket not connected)",
+        deferLabel, #queue))
+      self[warnedFlag] = true
+    end
+    return queue
+  end
+  if self[warnedFlag] then
+    logger.info(string.format(
+      "%s send resumed: flushing %d deferred", deferLabel, #queue))
+    self[warnedFlag] = false
+  end
+  for _, body in ipairs(queue) do
+    self.gameplayClient:send(NetworkProtocol.markedMessageForTypeAndBody(prefix, json.encode(body)))
+  end
+  return nil
+end
+
+-- One place to send a JSON request over the lobby socket. Returns the Response
+-- (nil if not connected) so callers can wire it up to pendingResponses.
+local function _sendLobby(self, request)
+  if not self:isConnected() then return nil end
+  return self.lobbyClient:sendRequest(request)
+end
+
+-- Process incoming on a non-critical side socket (lobby or spectate). If it
+-- drops, log + reset + emit channelDegraded so the UI can surface it. Side
+-- channels are isolation/perf wins, never required for play to continue.
+-- For the lobby socket we also schedule an auto-reconnect; spectate is
+-- harmless when degraded (opponent visuals freeze, gameplay continues).
+local function _processSideSocket(self, client, channelName)
+  if client:isConnected() and not client:processIncomingMessages() then
+    logger.warn(channelName .. " socket dropped; resetting. Other channels unaffected.")
+    client:resetNetwork()
+    self:emitSignal("channelDegraded", channelName)
+    if channelName == "Lobby" and self.state ~= states.OFFLINE then
+      _scheduleLobbyReconnect(self)
+    end
+  end
+end
+
+-- Schedule a fresh lobby-reconnect cycle. Idempotent — if one is already
+-- queued or running, this is a no-op. Backoff doubles per failure up to
+-- LOBBY_RECONNECT_MAX_BACKOFF; success clears the state entirely.
+local LOBBY_RECONNECT_BASE_BACKOFF = 1.0
+local LOBBY_RECONNECT_MAX_BACKOFF = 30.0
+
+_scheduleLobbyReconnect = function(self)
+  if self._lobbyReconnect and (self._lobbyReconnect.routine or self._lobbyReconnect.pending) then
+    return
+  end
+  self._lobbyReconnect = self._lobbyReconnect or { backoff = LOBBY_RECONNECT_BASE_BACKOFF }
+  self._lobbyReconnect.pending = true
+  self._lobbyReconnect.nextAttemptAt = love.timer.getTime() + self._lobbyReconnect.backoff
+  logger.info(string.format("Lobby auto-reconnect scheduled in %.1fs (attempt #%d)",
+    self._lobbyReconnect.backoff, (self._lobbyReconnect.attempts or 0) + 1))
+end
+
+-- Drive the in-flight reconnect coroutine, or start a new one once the
+-- scheduled backoff has elapsed. Called every update() tick after the
+-- side-socket processing — cheap when nothing is pending.
+_driveLobbyReconnect = function(self)
+  local state = self._lobbyReconnect
+  if not state then return end
+  if not self.gameplayClient:isConnected() then
+    -- Gameplay is gone too; the full disconnect path will clear this.
+    self._lobbyReconnect = nil
+    return
+  end
+
+  if state.routine then
+    if coroutine.status(state.routine) == "dead" then
+      state.routine = nil
+      if state.result and state.result.loggedIn then
+        logger.info("Lobby auto-reconnect succeeded")
+        self._lobbyReconnect = nil
+        self:emitSignal("lobbyReconnected")
+      else
+        state.attempts = (state.attempts or 0) + 1
+        state.backoff = math.min(LOBBY_RECONNECT_MAX_BACKOFF, (state.backoff or LOBBY_RECONNECT_BASE_BACKOFF) * 2)
+        logger.warn(string.format("Lobby auto-reconnect failed (%s); retry in %.1fs",
+          tostring(state.result and state.result.message or "no result"), state.backoff))
+        state.pending = true
+        state.nextAttemptAt = love.timer.getTime() + state.backoff
+      end
+    else
+      local ok, ret = coroutine.resume(state.routine)
+      if not ok then
+        logger.warn("Lobby auto-reconnect coroutine errored: " .. tostring(ret))
+        state.routine = nil
+        state.result = { loggedIn = false, message = tostring(ret) }
+      elseif coroutine.status(state.routine) == "dead" and type(ret) == "table" then
+        state.result = ret
+      end
+    end
+    return
+  end
+
+  if not state.pending then return end
+  if love.timer.getTime() < (state.nextAttemptAt or 0) then return end
+
+  local ip = GAME.connected_server_ip
+  local port = (GAME.connected_server_port or 49569) + 1
+  if not ip then
+    self._lobbyReconnect = nil
+    return
+  end
+  local userId = save.read_user_id_file(ip)
+  if not userId then
+    logger.warn("Lobby auto-reconnect: no stored user_id for " .. tostring(ip) .. "; giving up")
+    self._lobbyReconnect = nil
+    return
+  end
+
+  state.pending = false
+  state.routine = coroutine.create(function()
+    return LoginRoutine.claimSession(self.lobbyClient, ip, port, userId, config.name)
+  end)
+end
 
 local function resetLobbyData(self)
   ---@class PersonalizedLobbyDataV2
   self.lobbyDataV2 = {
     ---@type table<PublicPlayerID, LobbyPlayerV2>
     players = {},
-    ---@type table<PublicPlayerID, table<GameModeID, boolean>>
+    -- Inner keys are either GameModeID strings ("TWO_PLAYER_VS") for direct
+    -- challenges or room-invite strings ("room_<roomNumber>_<slotNumber>")
+    -- for slot-specific invites. Typed as `string` to cover both.
+    ---@type table<PublicPlayerID, table<string, boolean>>
     outgoingChallenges = {},
-    ---@type table<PublicPlayerID, table<GameModeID, boolean>>
+    ---@type table<PublicPlayerID, table<string, boolean>>
     incomingChallenges = {},
     ---@type table<roomNumber, LobbyRoomV2>
     rooms = {}
@@ -43,33 +229,169 @@ local function updateLobbyStateV2(self, lobbyStateV2Message)
   if lobbyStateV2.players then
     self.lobbyDataV2.players = lobbyStateV2.players
   end
+  self.lobbyDataV2.rooms = lobbyStateV2.rooms or {}
+  local localId = GAME.localPlayer and GAME.localPlayer.publicId
+  local localRoomNumber = localId and self.lobbyDataV2.players[localId] and self.lobbyDataV2.players[localId].roomNumber
+
+  local function isRoomInviteKey(key)
+    return type(key) == "string" and key:match("^room_%d+_%d+$") ~= nil
+  end
+
+  local function isInviteSlotStillOpen(inviteKey)
+    if type(inviteKey) ~= "string" then
+      return false
+    end
+
+    local roomNumberStr, slotNumberStr = inviteKey:match("^room_(%d+)_(%d+)$")
+    if not roomNumberStr or not slotNumberStr then
+      return false
+    end
+
+    local room = self.lobbyDataV2.rooms[tonumber(roomNumberStr)]
+    local slotNumber = tonumber(slotNumberStr)
+    if not room or not room.openSlots or not slotNumber then
+      return false
+    end
+
+    for _, openSlot in ipairs(room.openSlots) do
+      if tonumber(openSlot) == slotNumber then
+        return true
+      end
+    end
+
+    return false
+  end
+
+  local function isInviteObsoleteForJoinedPlayer(targetPlayerId, inviteKey)
+    if type(inviteKey) ~= "string" then
+      return false
+    end
+    local roomNumberStr, slotNumberStr = inviteKey:match("^room_(%d+)_(%d+)$")
+    if not roomNumberStr or not slotNumberStr then
+      return false
+    end
+
+    local targetRoomNumber = self.lobbyDataV2.players[targetPlayerId] and self.lobbyDataV2.players[targetPlayerId].roomNumber
+    local inviteRoomNumber = tonumber(roomNumberStr)
+    local inviteSlotNumber = tonumber(slotNumberStr)
+    local room = inviteRoomNumber and self.lobbyDataV2.rooms[inviteRoomNumber]
+    local slotStillOpen = false
+    if room and room.openSlots and inviteSlotNumber then
+      for _, openSlot in ipairs(room.openSlots) do
+        if tonumber(openSlot) == inviteSlotNumber then
+          slotStillOpen = true
+          break
+        end
+      end
+    end
+
+    -- Only clear when the target is already in the local player's room.
+    -- Also keep other slot invites intact; only remove this key when its slot is no longer open.
+    return targetRoomNumber ~= nil
+      and localRoomNumber ~= nil
+      and targetRoomNumber == localRoomNumber
+      and inviteRoomNumber == localRoomNumber
+      and not slotStillOpen
+  end
 
   -- if a player we challenged is not in lobby data or is in a room, they cannot accept our challenge anymore
-  for publicId, player in pairs(self.lobbyDataV2.outgoingChallenges) do
+  for publicId, playerChallenges in pairs(self.lobbyDataV2.outgoingChallenges) do
+    local roomNumber = self.lobbyDataV2.players[publicId] and self.lobbyDataV2.players[publicId].roomNumber
     if not self.lobbyDataV2.players[publicId] then
       self.lobbyDataV2.outgoingChallenges[publicId] = nil
-    elseif self.lobbyDataV2.players[publicId].roomNumber then
-      self.lobbyDataV2.outgoingChallenges[publicId] = nil
+    else
+      for challengeKey, active in pairs(playerChallenges) do
+        if isRoomInviteKey(challengeKey) then
+          -- Remove stale slot-specific invites when their slot closes, while preserving
+          -- other slot invites for the same room/player.
+          local roomNumberStr, slotNumberStr = challengeKey:match("^room_(%d+)_(%d+)$")
+          local roomNum = tonumber(roomNumberStr)
+          local room = roomNum and self.lobbyDataV2.rooms[roomNum]
+          local roomIsFull = room and room.openSlots and #room.openSlots == 0
+          local slotStillOpen = isInviteSlotStillOpen(challengeKey)
+          local shouldClearForClosedSlot = room and (not slotStillOpen)
+          
+          if roomIsFull or shouldClearForClosedSlot or isInviteObsoleteForJoinedPlayer(publicId, challengeKey) then
+            playerChallenges[challengeKey] = nil
+          end
+        elseif roomNumber and not isRoomInviteKey(challengeKey) then
+          playerChallenges[challengeKey] = nil
+        end
+      end
     end
   end
 
   -- if a player that challenged us is not in lobby data or is in a room, we cannot accept their challenge anymore
-  for publicId, player in pairs(self.lobbyDataV2.incomingChallenges) do
+  for publicId, playerChallenges in pairs(self.lobbyDataV2.incomingChallenges) do
+    local roomNumber = self.lobbyDataV2.players[publicId] and self.lobbyDataV2.players[publicId].roomNumber
     if not self.lobbyDataV2.players[publicId] then
       self.lobbyDataV2.incomingChallenges[publicId] = nil
-    elseif self.lobbyDataV2.players[publicId].roomNumber then
-      self.lobbyDataV2.incomingChallenges[publicId] = nil
+    else
+      for challengeKey, active in pairs(playerChallenges) do
+        if isRoomInviteKey(challengeKey) then
+          -- Remove stale slot-specific invites when their slot closes, while preserving
+          -- other slot invites for the same room/player.
+          local roomNumberStr, slotNumberStr = challengeKey:match("^room_(%d+)_(%d+)$")
+          local roomNum = tonumber(roomNumberStr)
+          local room = roomNum and self.lobbyDataV2.rooms[roomNum]
+          local roomIsFull = room and room.openSlots and #room.openSlots == 0
+          local slotStillOpen = isInviteSlotStillOpen(challengeKey)
+          local shouldClearForClosedSlot = room and (not slotStillOpen)
+          
+          if roomIsFull or shouldClearForClosedSlot or isInviteObsoleteForJoinedPlayer(publicId, challengeKey) then
+            playerChallenges[challengeKey] = nil
+          end
+        elseif roomNumber and not isRoomInviteKey(challengeKey) then
+          playerChallenges[challengeKey] = nil
+        end
+      end
     end
   end
 
-  self.lobbyDataV2.rooms = lobbyStateV2.rooms
+  -- Fallback transition: if the local player's room is now full, leave lobby and enter room scene.
+  -- This mirrors PvP behavior even if a playerJoinedRoom message was missed or processed out-of-order.
+  local localId = GAME.localPlayer and GAME.localPlayer.publicId
+  local localRoomNumber = (self.room and self.room.roomNumber)
+    or (localId and self.lobbyDataV2.players[localId] and self.lobbyDataV2.players[localId].roomNumber)
+  local localLobbyRoom = localRoomNumber and self.lobbyDataV2.rooms[localRoomNumber]
+  -- "Full" here means every seat is held by a present player. A held slot
+  -- (reserved for a leaver) counts as empty even though openSlots is empty,
+  -- so the fallback below must not treat openSlots==0 as full when heldSlots
+  -- still has entries — otherwise we'd hard-skip the lobby and push the room
+  -- scene with an absent player.
+  local heldCount = (localLobbyRoom and localLobbyRoom.heldSlots and #localLobbyRoom.heldSlots) or 0
+  local roomIsFull = localLobbyRoom and (
+    (localLobbyRoom.maxPlayers and localLobbyRoom.players and #localLobbyRoom.players >= localLobbyRoom.maxPlayers)
+    or (localLobbyRoom.openSlots and #localLobbyRoom.openSlots == 0 and heldCount == 0)
+  )
+  -- Fallback: anyone in a room that meets the waiting-room threshold should
+  -- be in the room scene, not the lobby. Catches missed playerJoinedRoom /
+  -- playerLeftRoom events and out-of-order delivery.
+  local readyForWaiting = self.room and isRoomReadyForWaitingRoom(self.room)
+  if self.room and (roomIsFull or readyForWaiting) and self.state == states.ONLINE then
+    local roomScene = getSceneFromRoom(self.room)
+    if roomScene then
+      GAME.navigationStack:push(roomScene)
+      self.state = states.ROOM
+    end
+  end
 
   self:emitSignal("lobbyStateV2Update", self.lobbyDataV2)
 end
 
 ---@param room BattleRoom
-local function getSceneFromRoom(room)
-  -- this is so hacky oh my god
+getSceneFromRoom = function(room)
+  local mode = room.mode or {}
+  -- FFA (playersPerTeam == 1): every player is their own team, route straight
+  -- to the multi-slot character select without a teamCount gate.
+  if mode.playersPerTeam == 1 then
+    return CharacterSelect2p({battleRoom = room})
+  end
+  -- Open team modes: teamCount >= 2 with playersPerTeam > 1 (or asymmetric table).
+  if mode.teamCount and mode.teamCount >= 2 and mode.playersPerTeam and ((type(mode.playersPerTeam) == "number" and mode.playersPerTeam > 1) or type(mode.playersPerTeam) == "table") then
+    return CharacterSelect2p({battleRoom = room})
+  end
+  -- Fallbacks for other modes
   if room.mode.name == "VS" or room.mode.name == "2p_timeattack" then
     return CharacterSelect2p({battleRoom = room})
   elseif room.mode.name == "endless" then
@@ -81,15 +403,150 @@ local function getSceneFromRoom(room)
   end
 end
 
--- starts a 2p vs online match
+-- Decide whether a (multiplayer) room has enough players to leave the lobby
+-- and enter the waiting room.
+--
+--  * Fixed-roster rooms (min == max, e.g. invite-only): wait for the full slate.
+--  * Dynamic-roster FFA (playersPerTeam == 1, e.g. open_ffa / "open" 7p_ffa):
+--    transition once playerCount >= minPlayers.
+--  * Dynamic-roster team rooms (playersPerTeam > 1 or table): transition once
+--    every team has at least one player. Slots are assigned in arrival order
+--    using `playersPerTeam`, so for symmetric brackets (2v2) this naturally
+--    requires the first joiner on the second team; for asymmetric brackets
+--    (1v3) it can fire as early as the second join.
+---@param room BattleRoom
+---@return boolean
+isRoomReadyForWaitingRoom = function(room)
+  local mode = room and room.mode
+  if not mode then return false end
+  local playerCount = #room.players
+  local maxPlayers = mode.playerCount or mode.maxPlayers or 2
+  local minPlayers = mode.minPlayers or maxPlayers
+
+  -- Fixed-roster room.
+  if minPlayers >= maxPlayers then
+    return playerCount >= maxPlayers
+  end
+
+  local playersPerTeam = mode.playersPerTeam
+  local isTeamMode = playersPerTeam ~= nil and (
+    (type(playersPerTeam) == "number" and playersPerTeam > 1) or
+    type(playersPerTeam) == "table"
+  )
+
+  if isTeamMode then
+    local teamCount = mode.teamCount or 2
+    local seen = {}
+    local covered = 0
+    for _, p in ipairs(room.players) do
+      local teamIdx = TeamUtils.teamIndexForPlayer(mode, p)
+      if teamIdx and not seen[teamIdx] then
+        seen[teamIdx] = true
+        covered = covered + 1
+      end
+    end
+    return covered >= teamCount
+  end
+
+  -- Dynamic-roster FFA.
+  return playerCount >= minPlayers
+end
+
+-- starts a 2p vs online match (or joins a team room)
 local function start2pVsOnlineMatch(self, createRoomMessage)
-  resetLobbyData(self)
+  -- Pending-promotion transition: we were watching the match as a queued
+  -- joiner; addToRoom means the previous match ended and we've been promoted.
+  -- Tear down the spectator-side state + pop the catch-up scene before
+  -- building the player-side BattleRoom and pushing CharacterSelect.
+  if self.room and self.room.pendingPromotion then
+    _clearMatchInputState(self)
+    if self.room.match then
+      self.room.match:disconnectSignal("matchEnded", self.room)
+      self.room.match:abort()
+      self.room.match:deinit()
+    end
+    if self.room.shutdown then self.room:shutdown() end
+    GAME.navigationStack:popToName("Lobby")
+  end
+
   GAME.battleRoom = BattleRoom.createFromServerMessage(createRoomMessage)
   self.room = GAME.battleRoom
+  self:registerPlayerUpdates(self.room)
+
+  TraceWriter.beginMatch(self.room and self.room.roomNumber or 0, os.time())
   love.window.requestAttention()
   SoundController:playSfx(themes[config.theme].sounds.notification)
-  GAME.navigationStack:push(getSceneFromRoom(self.room))
-  self.state = states.ROOM
+
+  -- Mid-match resume: BattleRoom already built the in-progress match from
+  -- the partial replay. Go straight to the game scene instead of CharacterSelect.
+  if self.room.state == BattleRoom.states.MatchInProgress and self.room.match then
+    resetLobbyData(self)
+    local gameScene = self.room:createScene(self.room.match)
+    if gameScene then
+      GAME.navigationStack:push(gameScene)
+      self:setState(states.INGAME)
+      return
+    end
+  end
+
+  local function tryEnterWaitingRoom()
+    local playerCount = #self.room.players
+    local maxPlayers = self.room.mode.playerCount or self.room.mode.maxPlayers or 2
+    local hasHeldSlots = self.room.heldSlots and #self.room.heldSlots > 0
+    if not isRoomReadyForWaitingRoom(self.room) and not hasHeldSlots then
+      -- Stay in lobby - room will show in lobby list with open slots
+      logger.info("Joined partial room " .. (self.room.roomNumber or "?") .. " (" .. playerCount .. "/" .. maxPlayers .. " players). Staying in lobby.")
+      self.state = states.ONLINE
+      if self.lobbyDataV2 and self.room.roomNumber then
+        local roomNumber = self.room.roomNumber
+        assert(roomNumber)
+        local playerIds = {}
+        local playerSlots = {}
+        local occupied = {}
+        for i, player in ipairs(self.room.players) do
+          playerIds[i] = player.publicId
+          local slot = TeamUtils.slotOf(player, i)
+          playerSlots[i] = slot
+          occupied[slot] = true
+        end
+        local openSlots = {}
+        for slot = 1, maxPlayers do
+          if not occupied[slot] then
+            openSlots[#openSlots + 1] = slot
+          end
+        end
+        self.lobbyDataV2.rooms[roomNumber] = {
+          roomNumber = roomNumber,
+          players = playerIds,
+          playerSlots = playerSlots,
+          spectators = {},
+          state = "waiting",
+          wins = {},
+          gameModeId = self.room.mode.name,
+          maxPlayers = maxPlayers,
+          openSlots = openSlots,
+          heldSlots = {},
+        }
+        local localId = GAME.localPlayer.publicId
+        if self.lobbyDataV2.players[localId] then
+          self.lobbyDataV2.players[localId].roomNumber = roomNumber
+        end
+        self:emitSignal("lobbyStateV2Update", self.lobbyDataV2)
+      end
+      return
+    end
+    -- Min players reached (or fixed-roster room filled) - navigate to game scene.
+    resetLobbyData(self)
+    local roomScene = getSceneFromRoom(self.room)
+    if roomScene then
+      GAME.navigationStack:push(roomScene)
+    else
+      logger.warn("No room scene available for mode '" .. tostring(self.room.mode and self.room.mode.name) .. "'. Staying in current scene.")
+    end
+    self.state = states.ROOM
+  end
+
+  tryEnterWaitingRoom()
 end
 
 local function processSpectatorListMessage(self, message)
@@ -98,27 +555,86 @@ local function processSpectatorListMessage(self, message)
   end
 end
 
+local function processPauseNotification(self, message)
+  if not (self.room and self.room.match) then return end
+  local body = message.pauseNotification
+  if type(body) ~= "table" then return end
+  -- Spectators receive the same pauseNotification and apply it. Scrub-eligible
+  -- modes (endless / vsSelf) set renderDuringPause at match construction so
+  -- the playfield keeps rendering under the overlay — no spec black screen.
+  -- draw_pause already has a spec-only branch (dim instead of pause menu).
+  self.room.match.isPaused = body.paused and true or false
+end
+
+---Open-FFA mid-match join: server queued us for promotion at the next match
+---end, and sent the in-progress match data so we can watch while we wait.
+---Renders the spectator view; transitions to player view when addToRoom lands.
+local function processJoinQueuedMessage(self, message)
+  logger.info("Join queued for room " .. tostring(message.roomNumber) .. " (match in progress); watching while queued")
+  spectate2pVsOnlineMatch(self, message)
+  self:emitSignal("joinQueued", message.roomNumber)
+end
+
+-- Forward declaration; defined below where the death-drain helpers are in scope.
+local _flushPendingDeaths
+
 ---@param self NetClient
 local function processGameResultMessage(self, message)
   -- receiving a gameResult message means that both players have reported their game results to the server
   -- that means from here on it is expected to receive no further input messages from either player
   -- if we went game over first, the opponent will notice later and keep sending inputs until we went game over on their end too
   -- these extra messages will remain unprocessed in the queue and need to be cleared up so they don't get applied the next match
-  self.tcpClient:dropOldInputMessages()
+
+  -- Apply every still-pending death NOW, ignoring the per-frame visual budget,
+  -- BEFORE clearing the queues. Once a player dies the server stops relaying
+  -- their inputs, so on every other client the death EVENT is the only thing
+  -- that transitions that stack to game-over (animation + OUT/death-time marker
+  -- + pops). A burst of end-of-match deaths can defer some past the budget; if
+  -- we cleared without flushing they'd never render. applyDeathEvent is
+  -- idempotent, so re-touching an already-applied death is safe.
+  _flushPendingDeaths(self)
+  _clearMatchInputState(self)
 
   if not self.room then
     return
   end
 
+  -- Tell the match the server has authoritatively confirmed end. With the
+  -- hasEnded-display-only architecture the engine keeps ticking on local
+  -- match-end conditions until this signal arrives (or an abort fires).
+  if self.room.match and self.room.match.serverConfirmedEnd then
+    self.room.match:serverConfirmedEnd()
+    if self.room.match.setServerOutcome then
+      self.room.match:setServerOutcome({
+        winnerTeamIndex = message.winnerTeamIndex,
+        winnerIndex = message.winnerIndex,
+      })
+    end
+    -- Anchor the match-end overlay to the wall-clock moment derived from
+    -- (matchStartLocalMs + endTick/60). All clients share matchStartLocalMs
+    -- via the existing startInMs path, so they all fire the overlay at the
+    -- same wall-clock instant regardless of gameResult delivery jitter.
+    if self.room.match.setServerEndTick then
+      self.room.match:setServerEndTick(message.endTick)
+    end
+  end
+
   for _, roomPlayer in ipairs(self.room.players) do
     local messagePlayer = message.gameResult[roomPlayer.playerNumber]
-    roomPlayer:setWinCount(messagePlayer.winCount)
+    if messagePlayer then
+      roomPlayer:setWinCount(messagePlayer.winCount)
+      roomPlayer:setPlacement(messagePlayer.placement)
 
-    if messagePlayer.ratingInfo then
-      local ratingInfo = messagePlayer.ratingInfo
-      roomPlayer:setRating(ratingInfo.placement_match_progress or ratingInfo.new)
-      roomPlayer:setLeague(ratingInfo.league)
+      if messagePlayer.ratingInfo then
+        local ratingInfo = messagePlayer.ratingInfo
+        roomPlayer:setRating(ratingInfo.placement_match_progress or ratingInfo.new)
+        roomPlayer:setLeague(ratingInfo.league)
+      end
     end
+  end
+
+  if message.teamWins then
+    self.room:setTeamWins(message.teamWins)
   end
 
   self.room:updateWinrates()
@@ -127,28 +643,52 @@ local function processGameResultMessage(self, message)
 end
 
 local function processLeaveRoomMessage(self, message)
+  local transition
   if self.room then
-    local transition
     if self.room.match then
-      -- we're ending the game via an abort so we don't want to enter the standard onMatchEnd callback
       self.room.match:disconnectSignal("matchEnded", self.room)
-      -- instead we actively abort the match ourselves
       self.room.match:abort()
       self.room.match:deinit()
-
       if message.reason then
-        -- the server sends a reason for leaveRoom only if a player (not a spectator) in the room leaves/crashes/disconnects
-        -- the other player and spectators should be informed why the room is being closed
         transition = MessageTransition(love.timer.getTime(), 5, message.reason, false)
       end
     end
-
-    -- and then shutdown the room
     self.room:shutdown()
     self.room = nil
+    GAME.battleRoom = nil
+    TraceWriter.endMatch()
+  end
 
-    self.state = states.ONLINE
+  -- Always clear stale lobbyData entry + transition out of room state, even if
+  -- self.room was already nil (e.g., shutdown ran ahead of the ACK). Otherwise
+  -- the "Leave game" button stays armed because lobbyDataV2 still shows us in
+  -- the room — exactly the stuck state we just fixed.
+  if self.lobbyDataV2 then
+    local localId = GAME.localPlayer and GAME.localPlayer.publicId
+    if localId and self.lobbyDataV2.players[localId] then
+      self.lobbyDataV2.players[localId].roomNumber = nil
+    end
+    self:emitSignal("lobbyStateV2Update", self.lobbyDataV2)
+  end
+
+  if self.state == states.INGAME or self.state == states.ROOM then
+    self:setState(states.ONLINE)
     GAME.navigationStack:popToName("Lobby", transition)
+  end
+
+  -- Patch: Always reset and send fresh settings after leaving a room
+  if GAME and GAME.localPlayer then
+    -- Reset any local ready/loaded state to default (unready, not loaded)
+    if GAME.localPlayer.setWantsReady then
+      GAME.localPlayer:setWantsReady(false)
+    end
+    if GAME.localPlayer.setHasLoaded then
+      GAME.localPlayer:setHasLoaded(false)
+    end
+    -- Immediately send a fresh settingsUpdate to the server
+    if self.sendPlayerSettings then
+      self:sendPlayerSettings(GAME.localPlayer)
+    end
   end
 end
 
@@ -157,23 +697,54 @@ local function processTauntMessage(self, message)
     return
   end
 
-  local characterId = tableUtils.first(self.room.players, function(player)
-    return player.playerNumber == message.player_number
-  end).settings.characterId
-  characters[characterId]:playTaunt(message.type, message.index)
+  -- player.playerNumber is the lobby seatId; wire's player_number is stackIndex
+  -- during a match. Prefer the seatId field which the server stamps explicitly.
+  local senderKey = message.seatId or message.player_number
+  local sender = tableUtils.first(self.room.players, function(player)
+    return player.playerNumber == senderKey
+  end)
+  if not sender or not sender.settings or not sender.settings.characterId then
+    logger.warn("taunt: no player at seatId/player_number=" .. tostring(senderKey) .. " (left mid-match?)")
+    return
+  end
+  characters[sender.settings.characterId]:playTaunt(message.type, message.index)
 end
 
 ---@param self NetClient
 ---@param message { replay: ReplayV3, [string]: any }
 local function processMatchStartMessage(self, message)
+  -- Observability for the silent match-start drop class: a received match_start
+  -- that never becomes a running match leaves the client stuck in CharacterSelect
+  -- as a network no-op until the server's silent-death watchdog evicts it at
+  -- frame 1. None of the bail paths below logged, so the failure was invisible.
+  logger.info(string.format("match_start received: netState=%s room=%s players=%s",
+    tostring(self.state), self.room and "present" or "MISSING",
+    self.room and tostring(#self.room.players) or "?"))
   if not self.room then
+    logger.warn("match_start DROPPED: no self.room — client/server room state desynced; this client will NOT enter the match")
     return
   end
 
+  -- Client-driven solo (vsSelf, endless): the local player is the source of
+  -- truth for level/levelData/inputMethod — server is just echoing back what
+  -- we sent. Skip the sync loop so a stale server payload (settings changed
+  -- between requestRoom and match_start) can't overwrite local with old
+  -- values. Touch input claim doesn't apply either — no second player to
+  -- contend with. Time Attack stays server-gated (leaderboard validation).
+  local modeName = self.room.mode and self.room.mode.name
+  local isClientDrivenSolo = (modeName == "vsSelf" or modeName == "endless")
+      and #self.room.players == 1 and self.room.players[1].isLocal
+
+  -- player.playerNumber is the lobby seatId; the replay is stackIndex-keyed.
+  -- Match via metadata.seatId (preferred) or stackIndex (legacy replays).
   for j, player in ipairs(self.room.players) do
+    local matchedStackIdx = nil
     for i, metadata in ipairs(message.replay.metadata.stacks) do
-      if player.playerNumber == metadata.stackIndex then
-        if player.human then
+      ---@cast metadata StackMetadata
+      local key = metadata.seatId or metadata.stackIndex
+      if player.playerNumber == key then
+        matchedStackIdx = i
+        if player.human and not isClientDrivenSolo then
           ---@cast metadata StackMetadata
           if metadata.level and metadata.level ~= player.settings.level then
             player:setLevel(metadata.level)
@@ -182,23 +753,37 @@ local function processMatchStartMessage(self, message)
       end
     end
 
+    -- Observability: a local human that matches no stack gets no input binding
+    -- below and will send no input all match — the silent slot-mismatch path.
+    if player.isLocal and player.human and not matchedStackIdx and not isClientDrivenSolo then
+      local seatIds = {}
+      for _, m in ipairs(message.replay.metadata.stacks) do
+        seatIds[#seatIds + 1] = tostring(m.seatId or m.stackIndex)
+      end
+      logger.warn(string.format(
+        "match_start: local player %s (playerNumber=%s) matched NO replay stack (available seats: %s) — input won't bind; this client will send no input",
+        tostring(player.name), tostring(player.playerNumber), table.concat(seatIds, ",")))
+    end
+
     for i, stackSettings in ipairs(message.replay.stacks) do
-      if player.playerNumber == i then
+      if matchedStackIdx == i then
         if player.human then
           ---@cast stackSettings ReplayStack
-          if LevelData.validate(stackSettings.levelData) and not LevelData.__eq(stackSettings.levelData, player.settings.levelData) then
-            setmetatable(stackSettings.levelData, LevelData)
-            player:setLevelData(stackSettings.levelData)
-          end
+          if not isClientDrivenSolo then
+            if LevelData.validate(stackSettings.levelData) and not LevelData.__eq(stackSettings.levelData, player.settings.levelData) then
+              setmetatable(stackSettings.levelData, LevelData)
+              player:setLevelData(stackSettings.levelData)
+            end
 
-          if stackSettings.inputMethod ~= player.settings.inputMethod then
-            -- since only one player can claim touch, touch is unclaimed every time we return to character select
-            -- this also means they will send controller as their input method until they ready up
-            -- if the remote touch player readies up AFTER the local client, we never get informed about the change in input method
-            -- besides for the match start message itself
-            -- likewise if the local player readies up with touch and then unreadies their inputMethod will flip back to controller so we even have to overwrite the local player setting
-            -- so it's very important to set this here
-            player:setInputMethod(stackSettings.inputMethod)
+            if stackSettings.inputMethod ~= player.settings.inputMethod then
+              -- since only one player can claim touch, touch is unclaimed every time we return to character select
+              -- this also means they will send controller as their input method until they ready up
+              -- if the remote touch player readies up AFTER the local client, we never get informed about the change in input method
+              -- besides for the match start message itself
+              -- likewise if the local player readies up with touch and then unreadies their inputMethod will flip back to controller so we even have to overwrite the local player setting
+              -- so it's very important to set this here
+              player:setInputMethod(stackSettings.inputMethod)
+            end
           end
 
           if player.isLocal then
@@ -237,11 +822,40 @@ local function processMatchStartMessage(self, message)
     -- although the most important thing is replacing the on-going transition but startMatch already does that as a default
   end
 
-  self.tcpClient:dropOldInputMessages()
+  _clearMatchInputState(self)
   local match = self.room:startMatch(message.replay)
   self:setState(states.INGAME)
+  logger.info(string.format("match_start: entered match (state=INGAME, hasLocalPlayer=%s, stacks=%s)",
+    tostring(match:hasLocalPlayer()), tostring(match.stacks and #match.stacks or "?")))
   if match.supportsPause and match:hasLocalPlayer() then
     match:connectSignal("pauseChanged", self, self.sendPauseToggle)
+  end
+  -- Schedule local start moment. GameBase:runGame holds engine ticks until then.
+  -- Client-driven solo (isClientDrivenSolo declared at top of function) opts out:
+  -- no remote stacks to synchronize with.
+  --
+  -- Prefer server-stamped startInMs (a per-client countdown-from-receive that
+  -- already accounts for our own RTT — schedule wall-now + startInMs and we
+  -- converge with everyone else on the same instant, no offset math needed).
+  -- Fall back to the legacy offset-translation path for old servers that only
+  -- send absolute startAtMs.
+  if not isClientDrivenSolo then
+    local nowMs = math.floor(socket.gettime() * 1000)
+    if message.startInMs then
+      match.scheduledStartLocalMs = nowMs + message.startInMs
+      logger.info("matchStart: scheduled in " .. message.startInMs .. "ms (server-stamped startInMs)")
+    elseif message.startAtMs then
+      local offsetMs
+      for _, client in ipairs(self.clients or {}) do
+        local s = client.serverOffsetMs
+        if s and (not offsetMs or s > offsetMs) then offsetMs = s end
+      end
+      if offsetMs then
+        match.scheduledStartLocalMs = message.startAtMs - offsetMs
+        local holdMs = match.scheduledStartLocalMs - nowMs
+        logger.info("matchStart: scheduled in " .. holdMs .. "ms (legacy offset path, offset=" .. offsetMs .. ")")
+      end
+    end
   end
 end
 
@@ -262,6 +876,86 @@ local function processRankedStatusMessage(self, message)
   self.room:updateRankedStatus(rankedStatus, comments)
 end
 
+---@param self NetClient
+local function processPlayerJoinedRoom(self, message)
+  if not self.room then
+    return
+  end
+
+  -- A new player joined the room - create a Player and add them to the BattleRoom
+  local playerData = message.playerJoinedRoom
+  if playerData then
+    local existingPlayer = tableUtils.first(self.room.players, function(p)
+      return p.publicId == playerData.publicId
+    end)
+    if existingPlayer then
+      if playerData.settings then
+        existingPlayer:updateSettings(playerData.settings)
+      end
+    else
+      local Player = require("client.src.Player")
+      local player = Player(playerData.name, playerData.publicId, false)
+      TeamUtils.assignSeatIdentity(player, playerData.playerNumber)
+      if playerData.settings then
+        player:updateSettings(playerData.settings)
+      end
+      self.room:addPlayer(player)
+    end
+    -- If this joiner was the holder of a reserved seat, release it locally so
+    -- the in-room view stops showing "waiting for <name>". The server clears
+    -- the reservation on join too; this just mirrors that state without
+    -- waiting for the next lobbyStateV2 snapshot.
+    if self.room.heldSlots and playerData.publicId then
+      for i = #self.room.heldSlots, 1, -1 do
+        if self.room.heldSlots[i].publicId == playerData.publicId then
+          table.remove(self.room.heldSlots, i)
+        end
+      end
+    end
+    self:registerPlayerUpdates(self.room)
+    love.window.requestAttention()
+    SoundController:playSfx(themes[config.theme].sounds.notification)
+
+    -- Immediately check if the room is now ready for the waiting room (e.g., one player per team)
+    -- and trigger the transition for all clients, including the host.
+    local alreadyInRoom = self.state == states.ROOM or self.state == states.INGAME
+    if isRoomReadyForWaitingRoom(self.room) and not alreadyInRoom then
+      logger.info("[playerJoin] Room " .. (self.room.roomNumber or "?") .. " ready for waiting room (" .. #self.room.players .. " player(s)). Navigating to game scene.")
+      local roomScene = getSceneFromRoom(self.room)
+      if roomScene then
+        GAME.navigationStack:push(roomScene)
+      else
+        logger.warn("[playerJoin] No room scene available for mode '" .. tostring(self.room.mode and self.room.mode.name) .. "'.")
+      end
+      self.state = states.ROOM
+    end
+  end
+end
+
+---@param self NetClient
+local function processPlayerLeftRoom(self, message)
+  if not self.room then
+    return
+  end
+
+  local data = message.playerLeftRoom
+  if not data or not data.publicId then
+    return
+  end
+
+  -- Remove the leaver from the local room view. Only void the room when the
+  -- server says so (mid-game abort); no voidReason means the room stays open
+  -- and the leaver can rejoin from the lobby.
+  self.room:removePlayerByPublicId(data.publicId)
+  if data.voidReason then
+    self.room:setVoided(data.voidReason)
+  end
+  -- Refresh held-slot snapshot so the room view can show "waiting for <name>"
+  -- on the seat just vacated (fixed-roster rooms) or leave it empty for fcfs
+  -- (open-FFA). Server sends an empty array for the latter.
+  self.room.heldSlots = data.heldSlots or {}
+end
+
 local function processMenuStateMessage(player, message)
   local menuState = message.menu_state
   if menuState.playerNumber then
@@ -276,13 +970,161 @@ local function processMenuStateMessage(player, message)
   end
 end
 
+-- Drain a prefix from BOTH the gameplay and spectate queues. Same
+-- message type can arrive on either socket depending on the recipient
+-- context (gameplay = data targeting you; spectate = opponent visuals).
+-- Order: gameplay first so your-critical events apply before bulk visuals.
+local function _drainBoth(self, prefix)
+  local out = {}
+  for _, m in ipairs(self.gameplayClient.receivedMessageQueue:pop_all_with(prefix)) do
+    out[#out+1] = m
+  end
+  for _, m in ipairs(self.spectateClient.receivedMessageQueue:pop_all_with(prefix)) do
+    out[#out+1] = m
+  end
+  return out
+end
+
+-- Per-tick wall-clock budget for visual-only message work. Local-gameplay
+-- messages (garbage targeting you) bypass this and always apply.
+local VISUAL_MESSAGE_BUDGET_MS = 4
+
+local function _localSlot(self)
+  if not self.room or not self.room.match or not self.room.match.stacks then return nil end
+  for i, stack in ipairs(self.room.match.stacks) do
+    if stack and stack.is_local then return i end
+  end
+  return nil
+end
+
+-- Drains deferred FIFO then fresh under the budget; always applies at least one.
+local function _drainBudgeted(self, deferKey, fresh, applyFn)
+  self[deferKey] = self[deferKey] or {}
+  local deferred = self[deferKey]
+  local startMs = socket.gettime() * 1000
+  local applied = 0
+
+  while #deferred > 0 do
+    if applied > 0 and (socket.gettime() * 1000 - startMs) > VISUAL_MESSAGE_BUDGET_MS then break end
+    applyFn(table.remove(deferred, 1))
+    applied = applied + 1
+  end
+
+  for _, msg in ipairs(fresh) do
+    if applied > 0 and (socket.gettime() * 1000 - startMs) > VISUAL_MESSAGE_BUDGET_MS then
+      deferred[#deferred + 1] = msg
+    else
+      applyFn(msg)
+      applied = applied + 1
+    end
+  end
+end
+
 local function processInputMessages(self)
-  local messages = self.tcpClient.receivedMessageQueue:pop_all_with(NetworkProtocol.serverMessageTypes.opponentInput.prefix, NetworkProtocol.serverMessageTypes.secondOpponentInput.prefix)
-  if self.room and self.room.match then
-    for _, msg in ipairs(messages) do
-      for type, data in pairs(msg) do
-        self.room.match:receiveInput(type, data)
-      end
+  local inputPrefix = NetworkProtocol.serverMessageTypes.input.prefix
+  local messages = _drainBoth(self, inputPrefix)
+  if not (self.room and self.room.match) then return end
+  -- Snapshot pipeline owns remote visuals; remote engines don't tick
+  -- under displayHistoryEnabled (Match:shouldRun skips them). Draining I
+  -- messages into confirmedInput buffers nobody reads is pure waste.
+  -- Skip the whole drain so the network thread doesn't even decode them.
+  -- Garbage and death delivery are independent of this path — G/D events
+  -- go via their own queues + applyGarbageEvent / applyDeathEvent.
+  if self.room.displayHistoryEnabled then return end
+  -- All I are visual: server never echoes your own inputs. body.playerNumber
+  -- on the wire is the engine-side stackIndex (server compacted at match
+  -- start), NOT a lobby seatId — pass straight through.
+  _drainBudgeted(self, "_deferredInputMsgs", messages, function(msg)
+    local body = msg[inputPrefix]
+    if body then self.room.match:receiveInput(body.playerNumber, body.input) end
+  end)
+end
+
+---@param self NetClient
+local function processGarbageEvents(self)
+  local prefix = NetworkProtocol.serverMessageTypes.garbageEvent.prefix
+  local messages = _drainBoth(self, prefix)
+  if not (self.room and self.room.match) then return end
+  -- G targeting local stack bypasses budget; rest is visual.
+  local localSlot = _localSlot(self)
+  local visual = {}
+  for _, msg in ipairs(messages) do
+    local body = msg[prefix]
+    if not body then
+      -- skip malformed
+    elseif localSlot and body.recipients and tableUtils.contains(body.recipients, localSlot) then
+      self.room.match:applyGarbageEvent(body)
+    else
+      visual[#visual + 1] = msg
+    end
+  end
+
+  _drainBudgeted(self, "_deferredGarbageMsgs", visual, function(msg)
+    local body = msg[prefix]
+    if body then self.room.match:applyGarbageEvent(body) end
+  end)
+end
+
+---@param self NetClient
+local function processDeathEvents(self)
+  local prefix = NetworkProtocol.serverMessageTypes.deathEvent.prefix
+  local messages = _drainBoth(self, prefix)
+  if not (self.room and self.room.match) then return end
+  -- All D are visual: applyDeathEvent early-returns for is_local.
+  _drainBudgeted(self, "_deferredDeathMsgs", messages, function(msg)
+    local body = msg[prefix]
+    if body then self.room.match:applyDeathEvent(body) end
+  end)
+end
+
+-- Body for the forward-declared _flushPendingDeaths: apply ALL pending death
+-- events (parked + fresh) ignoring the per-frame budget. See the callsite in
+-- processGameResultMessage for why this runs at authoritative match end.
+function _flushPendingDeaths(self)
+  if not (self.room and self.room.match) then return end
+  local prefix = NetworkProtocol.serverMessageTypes.deathEvent.prefix
+  -- deferred (parked from earlier frames, FIFO) first, then any fresh ones.
+  for _, msg in ipairs(self._deferredDeathMsgs or {}) do
+    local body = msg[prefix]
+    if body then self.room.match:applyDeathEvent(body) end
+  end
+  for _, msg in ipairs(_drainBoth(self, prefix)) do
+    local body = msg[prefix]
+    if body then self.room.match:applyDeathEvent(body) end
+  end
+  self._deferredDeathMsgs = nil
+end
+
+---@param self NetClient
+local function processRewindEvents(self)
+  local prefix = NetworkProtocol.serverMessageTypes.rewindEvent.prefix
+  local messages = _drainBoth(self, prefix)
+  if not (self.room and self.room.match) then return end
+  for _, msg in ipairs(messages) do
+    local body = msg[prefix]
+    if body and type(body.senderFrame) == "number" then
+      self.room.match:applyRewindEvent(body)
+    end
+  end
+end
+
+---Display-history replication inbound (Phase B). Drains incoming `Y`
+---batches and hands them to BattleRoom (NOT ClientMatch — prime directive
+---forbids touching ClientMatch). BattleRoom owns the per-room
+---DisplayClientStacks dict and routes each batch by `from` playerID.
+---When the receiving room has displayHistoryEnabled=false, no `Y`
+---traffic exists in the first place, so this drain is a no-op for the
+---default production case.
+---@param self NetClient
+local function processDisplayEvents(self)
+  local prefix = NetworkProtocol.serverMessageTypes.displayEvent.prefix
+  local messages = _drainBoth(self, prefix)
+  if not self.room then return end
+  if not self.room.applyDisplayEventBatch then return end
+  for _, msg in ipairs(messages) do
+    local body = msg[prefix]
+    if body then
+      pcall(self.room.applyDisplayEventBatch, self.room, body)
     end
   end
 end
@@ -292,7 +1134,17 @@ local function processChallengeUpdate(self, challengeUpdateMessage)
   if challengeUpdateMessage.challengeUpdate then
     local challengeUpdate = challengeUpdateMessage.challengeUpdate
     local challenges = self.lobbyDataV2.incomingChallenges[challengeUpdate.senderId] or {}
-    challenges[challengeUpdate.gameModeId] = challengeUpdate.challengeActive
+    -- Use slot-specific key for room invites so each slot tracks independently
+    local key = challengeUpdate.roomNumber
+      and ("room_" .. challengeUpdate.roomNumber .. "_" .. (challengeUpdate.slotNumber or 0))
+      or challengeUpdate.gameModeId
+    logger.info(string.format("Received challengeUpdate from %s: key=%s, active=%s, room=%s, slot=%s",
+      tostring(challengeUpdate.senderId),
+      tostring(key),
+      tostring(challengeUpdate.challengeActive),
+      tostring(challengeUpdate.roomNumber),
+      tostring(challengeUpdate.slotNumber)))
+    challenges[key] = challengeUpdate.challengeActive
     self.lobbyDataV2.incomingChallenges[challengeUpdate.senderId] = challenges
     if challengeUpdate.challengeActive then
       love.window.requestAttention()
@@ -303,29 +1155,43 @@ local function processChallengeUpdate(self, challengeUpdateMessage)
 end
 
 -- starts to spectate a 2p vs online match
-local function spectate2pVsOnlineMatch(self, spectateRequestGrantedMessage)
+spectate2pVsOnlineMatch = function(self, spectateRequestGrantedMessage)
   resetLobbyData(self)
   GAME.battleRoom = BattleRoom.createFromServerMessage(spectateRequestGrantedMessage)
   self.room = GAME.battleRoom
+  self:registerPlayerUpdates(self.room)
+  local roomScene = getSceneFromRoom(self.room)
   if GAME.battleRoom.match then
+    -- Clear any defer queues left over from a previous match (e.g., your own
+    -- match where TCP dropped without a clean gameResult/gameAbort). Slot
+    -- indices are per-match; stale events would apply to wrong stacks.
+    _clearMatchInputState(self)
     self.state = states.INGAME
     local vsScene = GameBase({match = GAME.battleRoom.match})
     vsScene:load()
     local catchUp = GameCatchUp(vsScene)
     -- need to push character select, otherwise the pop on match end will return to lobby
     -- directly add to the stack so it isn't getting displayed
-    GAME.navigationStack.scenes[#GAME.navigationStack.scenes+1] = getSceneFromRoom(self.room)
+    if roomScene then
+      GAME.navigationStack.scenes[#GAME.navigationStack.scenes+1] = roomScene
+    else
+      logger.warn("No room scene available for spectator mode '" .. tostring(self.room.mode and self.room.mode.name) .. "'.")
+    end
     GAME.navigationStack:push(catchUp)
   else
     self.state = states.ROOM
-    GAME.navigationStack:push(getSceneFromRoom(self.room))
+    if roomScene then
+      GAME.navigationStack:push(roomScene)
+    else
+      logger.warn("No room scene available for spectator mode '" .. tostring(self.room.mode and self.room.mode.name) .. "'. Staying in current scene.")
+    end
   end
 end
 
 ---@param self NetClient
 local function handleGameAbort(self, gameAbortMessage)
   if self.room and self.room.match and self.state == states.INGAME then
-    self.tcpClient:dropOldInputMessages()
+    _clearMatchInputState(self)
     -- we're ending the game via an abort so we don't want to enter the standard onMatchEnd callback
     self.room.match:disconnectSignal("matchEnded", self.room)
     -- instead we actively abort the match ourselves
@@ -355,6 +1221,9 @@ local function createListeners(self)
   -- messageListener holds *all* available listeners
   local messageListeners = {}
   messageListeners.create_room = createListener(self, "create_room", start2pVsOnlineMatch)
+  messageListeners.addToRoom = createListener(self, "addToRoom", start2pVsOnlineMatch)
+  messageListeners.playerJoinedRoom = createListener(self, "playerJoinedRoom", processPlayerJoinedRoom)
+  messageListeners.playerLeftRoom = createListener(self, "playerLeftRoom", processPlayerLeftRoom)
   messageListeners.lobbyStateV2 = createListener(self, "lobbyStateV2", updateLobbyStateV2)
   messageListeners.challengeUpdate = createListener(self, "challengeUpdate", processChallengeUpdate)
   messageListeners.menu_state = createListener(self, "menu_state", processMenuStateMessage)
@@ -364,14 +1233,24 @@ local function createListeners(self)
   messageListeners.taunt = createListener(self, "taunt", processTauntMessage)
   messageListeners.gameResult = createListener(self, "gameResult", processGameResultMessage)
   messageListeners.spectators = createListener(self, "spectators", processSpectatorListMessage)
+  messageListeners.pauseNotification = createListener(self, "pauseNotification", processPauseNotification)
   messageListeners.gameAbort = createListener(self, "gameAbort", handleGameAbort)
+  messageListeners.joinQueued = createListener(self, "joinQueued", processJoinQueuedMessage)
+  -- Handles both explicit Spectate and the server's join->pending-promote conversion.
+  messageListeners.spectate_request_granted = createListener(self, "spectate_request_granted", function(self, msg)
+    self.pendingResponses.spectateResponse = nil
+    spectate2pVsOnlineMatch(self, msg)
+  end)
 
   return messageListeners
 end
 
 ---@class NetClient : Signal
----@field tcpClient TcpClient
----@field leaderboard table
+---@field gameplayClient TcpClient
+---@field lobbyClient TcpClient
+---@field spectateClient TcpClient
+---@field clients TcpClient[] all three TCP clients in one list for iteration
+---@field leaderboard table?
 ---@field pendingResponses table
 ---@field state NetClientStates
 ---@field lobbyListeners table
@@ -383,8 +1262,58 @@ end
 ---@field serverTimeDelta integer in seconds
 ---@overload fun(): NetClient
 local NetClient = class(function(self)
-  self.tcpClient = TcpClient()
+  -- Triple-socket split (three independent TCP connections via one shared class):
+  --   gameplayClient → YOUR critical traffic (outgoing I, incoming G targeting you, K)
+  --   spectateClient → opponents' I/G/D (rendering their boards) — bulky, isolated
+  --   lobbyClient    → J (lobby/room/chat/replays/settings)
+  -- Independent sockets, independent failure. Gameplay drop = full disconnect.
+  -- Spectate drop = opponents' boards freeze for that player but their own
+  -- game continues. Lobby drop = silent reconnect.
+  self.gameplayClient = TcpClient({name = "gameplay", defaultPort = 49569})
+  self.lobbyClient    = TcpClient({name = "lobby",    defaultPort = 49570})
+  self.spectateClient = TcpClient({name = "spectate", defaultPort = 49571})
+  -- For ops that need every client (reset/updateNetwork/lag config).
+  -- Named fields stay for ops that target a specific channel.
+  self.clients = { self.gameplayClient, self.lobbyClient, self.spectateClient }
   self.leaderboard = nil
+
+  -- All `PA_NETWORK_*` knobs are dev/testing only. Production never sets these,
+  -- so delayedProcessing stays off and every helper in TcpClient short-circuits.
+  local lagMs = tonumber(os.getenv("PA_NETWORK_LAG_MS"))
+  local lagMinMs = tonumber(os.getenv("PA_NETWORK_LAG_MIN_MS")) or lagMs
+  local lagMaxMs = tonumber(os.getenv("PA_NETWORK_LAG_MAX_MS")) or lagMs
+  local lossPct = tonumber(os.getenv("PA_NETWORK_LOSS_PCT"))
+  local rtoMs = tonumber(os.getenv("PA_NETWORK_RTO_MS")) or 250
+  local stallHz = tonumber(os.getenv("PA_NETWORK_STALL_HZ"))
+  local stallMs = tonumber(os.getenv("PA_NETWORK_STALL_MS")) or 300
+  local burstMs = tonumber(os.getenv("PA_NETWORK_BURST_MS")) or 500
+  local bandwidthKbps = tonumber(os.getenv("PA_NETWORK_BANDWIDTH_KBPS"))
+
+  if lagMinMs and lagMinMs > 0 then
+    local sMin = lagMinMs / 1000
+    local sMax = (lagMaxMs or lagMinMs) / 1000
+    for _, client in ipairs(self.clients) do
+      client:activateDelayedProcessing()
+      client:setNetworkLag(sMin, sMax, sMin, sMax)
+      if lossPct and lossPct > 0 then
+        client:setLossParams(lossPct, rtoMs / 1000)
+      end
+      if stallHz and stallHz > 0 then
+        client:setStallParams(stallHz, stallMs / 1000)
+      end
+      if burstMs and burstMs > 0 then
+        client:setBurstSeconds(burstMs / 1000)
+      end
+      if bandwidthKbps and bandwidthKbps > 0 then
+        client:setBandwidthBytesPerSec(bandwidthKbps * 1024 / 8)
+      end
+    end
+    logger.info(string.format(
+      "Simulating network: lag=%d-%dms loss=%s%% stall=%s@%sms burst=%sms bw=%sKbps",
+      lagMinMs, lagMaxMs or lagMinMs,
+      tostring(lossPct or 0), tostring(stallHz or 0), tostring(stallMs),
+      tostring(burstMs), tostring(bandwidthKbps or 0)))
+  end
   self.pendingResponses = {}
   self.state = states.OFFLINE
   self.serverTimeDelta = 0
@@ -398,7 +1327,12 @@ local NetClient = class(function(self)
     players = messageListeners.players,
     lobbyStateV2 = messageListeners.lobbyStateV2,
     create_room = messageListeners.create_room,
+    addToRoom = messageListeners.addToRoom,
+    playerJoinedRoom = messageListeners.playerJoinedRoom,
     challengeUpdate = messageListeners.challengeUpdate,
+    leave_room = messageListeners.leave_room,
+    joinQueued = messageListeners.joinQueued,
+    spectate_request_granted = messageListeners.spectate_request_granted,
   }
 
   -- all listeners running while in a room but not in a match
@@ -408,6 +1342,13 @@ local NetClient = class(function(self)
     match_start = messageListeners.match_start,
     spectators = messageListeners.spectators,
     gameResult = messageListeners.gameResult,
+    playerJoinedRoom = messageListeners.playerJoinedRoom,
+    playerLeftRoom = messageListeners.playerLeftRoom,
+    -- A pending joiner's watched match may end locally before the server's
+    -- addToRoom promotion arrives, leaving the client in ROOM state on the
+    -- spectator CharacterSelect. addToRoom must fire here too so the client
+    -- tears down the spectator room and enters the real player room.
+    addToRoom = messageListeners.addToRoom,
   }
 
   -- all listeners running while in a match
@@ -417,8 +1358,15 @@ local NetClient = class(function(self)
     -- for spectators catching up to an ongoing match, a match_start acts as a cancel
     match_start = messageListeners.match_start,
     spectators = messageListeners.spectators,
+    pauseNotification = messageListeners.pauseNotification,
     gameResult = messageListeners.gameResult,
     gameAbort = messageListeners.gameAbort,
+    playerLeftRoom = messageListeners.playerLeftRoom,
+    -- A pending joiner is in INGAME state while watching the match they queued
+    -- for. When the match ends the server sends addToRoom to promote them.
+    -- Without this entry the message is silently dropped, leaving the client
+    -- in the spectator room instead of transitioning to the real player room.
+    addToRoom = messageListeners.addToRoom,
   }
 
   self.messageListeners = messageListeners
@@ -432,53 +1380,245 @@ local NetClient = class(function(self)
   -- only fires for unintended disconnects
   self:createSignal("clientDisconnected")
   self:createSignal("loginFinished")
+  -- emitted with (channelName) when a side socket (lobby/spectate) drops
+  self:createSignal("channelDegraded")
+  -- emitted when the lobby socket reconnects after a drop
+  self:createSignal("lobbyReconnected")
+  -- emitted with (roomNumber) when server queues a mid-match join
+  self:createSignal("joinQueued")
 end)
 
 NetClient.STATES = states
 
-function NetClient:leaveRoom()
-  if self:isConnected() and self.room then
-    self.tcpClient:dropOldInputMessages()
-    self.tcpClient:sendRequest(ClientMessages.leaveRoom())
+-- Lobby-side check: if the local player holds a slot in a room and that room
+-- is ready for the waiting room, push the room scene. Reuses the existing
+-- isRoomReadyForWaitingRoom / getSceneFromRoom helpers.
+function NetClient:maybeEnterRoomFromLobby()
+  if self.state ~= states.ONLINE then return false end
+  if not self.room then return false end
+  if not isRoomReadyForWaitingRoom(self.room) then return false end
 
+  local roomScene = getSceneFromRoom(self.room)
+  if not roomScene then return false end
+
+  logger.info("[Lobby] room ready for waiting room; pushing scene.")
+  GAME.navigationStack:push(roomScene)
+  self.state = states.ROOM
+  return true
+end
+
+---Send a host-only request to evict another player from an open-room session.
+---Server validates and bounces the target via the standard leaveRoom path —
+---the target's client transitions back to the lobby (no ban, can rejoin).
+---No-op if we're not in a room or not connected.
+---@param publicId integer the publicId of the player to kick
+function NetClient:kickPlayer(publicId)
+  if not (self:isConnected() and self.room and publicId) then
+    return
+  end
+  _sendLobby(self, ClientMessages.kickPlayer(publicId))
+end
+
+function NetClient:leaveRoom()
+  -- Trust the lobby's view too: if lobbyDataV2 says we're in a room but
+  -- self.room is nil (state-divergence from a half-completed prior leave or
+  -- a partial-join + disconnect), the "Leave game" button on Lobby still
+  -- needs to send the request so the server can clean its side.
+  local localId = GAME.localPlayer and GAME.localPlayer.publicId
+  local lobbySaysInRoom = self.lobbyDataV2 and self.lobbyDataV2.players
+      and localId and self.lobbyDataV2.players[localId]
+      and self.lobbyDataV2.players[localId].roomNumber ~= nil
+  if self:isConnected() and (self.room or lobbySaysInRoom) then
+    _clearMatchInputState(self)
+    _sendLobby(self, ClientMessages.leaveRoom())
     -- the server sends us back the confirmation that we left the room
     -- so we reenter ONLINE state via processLeaveRoomMessage, not here
+  elseif self.room then
+    -- Connection lost but we're still in a room locally - clean up
+    logger.info("Cleaning up room locally (disconnected)")
+    local roomNumber = self.room.roomNumber
+    self.room:shutdown()
+    self.room = nil
+    GAME.battleRoom = nil
+
+    -- Update local lobby data
+    if self.lobbyDataV2 and roomNumber then
+      self.lobbyDataV2.rooms[roomNumber] = nil
+      local localId = GAME.localPlayer.publicId
+      if self.lobbyDataV2.players[localId] then
+        self.lobbyDataV2.players[localId].roomNumber = nil
+      end
+      self:emitSignal("lobbyStateV2Update", self.lobbyDataV2)
+    end
   end
 end
 
 function NetClient:reportLocalGameResult(winners)
-  if #winners == 2 then
-    -- we need to translate the result for the server to understand it
-    -- two winners means a draw which the server thinks of as 0
-    self.tcpClient:sendRequest(ClientMessages.reportLocalGameResult(0))
-  elseif #winners == 1 then
-    self.tcpClient:sendRequest(ClientMessages.reportLocalGameResult(winners[1].playerNumber))
+  winners = winners or {}
+  if #winners == 0 then
+    return  -- aborted match, handled separately via sendMatchAbort
+  end
+
+  local gameMode = self.room and self.room.mode
+  local isTeamGame = gameMode and gameMode.teamCount
+
+  if isTeamGame and gameMode and self.room then
+    local totalPlayers = gameMode.playerCount or #self.room.players
+    if #winners >= totalPlayers then
+      -- all players tied (everyone died simultaneously)
+      _sendLobby(self, ClientMessages.reportLocalGameResult(0))
+    else
+      -- "Did MY TEAM win" — not "is my own stack in the winners list". A teammate
+      -- who died is still on the winning team if their teammate finished off the
+      -- enemies. Without this, the dead teammate would report 2 (lost) while the
+      -- alive teammate reports 1 (won), the server would see the team disagree, and
+      -- the whole match would resolve as a tie instead of a team win.
+      local localTeamWon = false
+      local match = self.room.match
+      if match and match.engine and match.engine.teams then
+        local winningTeam = match.engine:getWinningTeam()
+        if winningTeam then
+          for _, player in ipairs(match.players) do
+            if player.isLocal then
+              local localTeamIndex = TeamUtils.teamIndexForPlayer(match, player)
+              if localTeamIndex == winningTeam.id then
+                localTeamWon = true
+              end
+              break
+            end
+          end
+        end
+      end
+      _sendLobby(self, ClientMessages.reportLocalGameResult(localTeamWon and 1 or 2))
+    end
+  else
+    -- non-team: report winner's player number, or 0 for any tie
+    if #winners >= 2 then
+      _sendLobby(self, ClientMessages.reportLocalGameResult(0))
+    else
+      _sendLobby(self, ClientMessages.reportLocalGameResult(winners[1].playerNumber))
+    end
   end
 end
 
 function NetClient:sendTauntUp(index)
-  if self:isConnected() then
-    self.tcpClient:sendRequest(ClientMessages.sendTaunt("up", index))
-  end
+  _sendLobby(self, ClientMessages.sendTaunt("up", index))
 end
 
 function NetClient:sendTauntDown(index)
-  if self:isConnected() then
-    self.tcpClient:sendRequest(ClientMessages.sendTaunt("down", index))
-  end
+  _sendLobby(self, ClientMessages.sendTaunt("down", index))
 end
 
 function NetClient:sendInput(input)
-  if self:isConnected() then
-    local message = NetworkProtocol.markedMessageForTypeAndBody(NetworkProtocol.clientMessageTypes.playerInput.prefix, input)
-    self.tcpClient:send(message)
+  _sendGameplay(self, NetworkProtocol.clientMessageTypes.playerInput.prefix, input)
+end
+
+---Display-history replication: ship a batch of frame-stamped display events
+---from the local engine to other room members. Parallel system — these
+---events feed the optional DisplayClientStack renderer; the existing
+---input-replication path is untouched. Best-effort (no queue+retry): a
+---missed batch just means the receiver's display-stack falls behind for a
+---few frames until the next batch arrives. Old view-stacks always have
+---fallback input data, so display dropouts are display-only.
+---@param batch table { from = playerID, events = {...} }
+function NetClient:sendDisplayEvents(batch)
+  local ffiGuard = require("client.src.network.DisplaySnapshotFFI")
+  local util = require("client.src.network.DisplaySnapshotUtil")
+  local payload
+  if ffiGuard.FFI_SUPPORTED and batch and batch.from and batch.snapshot then
+    payload = util.pack_snapshot(batch.from, batch.snapshot)
   end
+  if not payload then
+    payload = json.encode(batch)
+  end
+  _sendGameplay(self, NetworkProtocol.clientMessageTypes.displayEvent.prefix, payload)
+
+  -- Bandwidth telemetry: per-second log of total bytes shipped via the
+  -- display-event channel. Grep logs/client.log for `[SPECTATE-BW]`.
+  self._spectateBwBytes = (self._spectateBwBytes or 0) + #payload
+  self._spectateBwSends = (self._spectateBwSends or 0) + 1
+  local nowMs = math.floor(love.timer.getTime() * 1000)
+  self._spectateBwLogAtMs = self._spectateBwLogAtMs or nowMs
+  if nowMs - self._spectateBwLogAtMs >= 1000 then
+    local elapsedS = (nowMs - self._spectateBwLogAtMs) / 1000
+    logger.info(string.format("[SPECTATE-BW] %.1f KB/s, %d sends/s, avg %d B/send",
+      (self._spectateBwBytes / 1024) / elapsedS,
+      math.floor(self._spectateBwSends / elapsedS + 0.5),
+      math.floor(self._spectateBwBytes / self._spectateBwSends)))
+    self._spectateBwBytes = 0
+    self._spectateBwSends = 0
+    self._spectateBwLogAtMs = nowMs
+  end
+end
+
+---Drain and discard any pending `Y` (display-event) messages from both
+---inbound queues. Called by BattleRoom:startMatch right before rebuilding
+---_displayStacks so trailing stale snapshots from the previous match
+---don't briefly paint over the new match's fresh stacks.
+function NetClient:flushDisplayEvents()
+  local prefix = NetworkProtocol.serverMessageTypes.displayEvent.prefix
+  _drainBoth(self, prefix)
+end
+
+---Loose-sync: send a GarbageEvent from the local sim.
+---@param body table parsed event payload
+---
+---GarbageEvent is event-driven — fired on combos/chains, not re-sent next
+---tick like inputs. A missed write during a socket flap is permanent loss
+---of damage, so we queue + retry. Cleared on match end via
+---_clearMatchInputState so a stale G can't land on a freshly-mapped slot
+---in the next match.
+function NetClient:sendGarbageEvent(body)
+  self._pendingGarbageSends = self._pendingGarbageSends or {}
+  self._pendingGarbageSends[#self._pendingGarbageSends + 1] = body
+  self:_flushPendingGarbageSends()
+end
+
+---Loose-sync: send a DeathEvent from the local sim.
+---@param body table parsed event payload
+---
+---DeathEvent is THE load-bearing message of a match — without it the server
+---never marks the player eliminated, `livingTeams` never resolves, and the
+---survivors stall. Don't fire-and-forget: queue it AND try to send. The
+---per-tick flush in update() will keep retrying as long as we're still in
+---the match. Cleared on match end via _clearMatchInputState so a stale D
+---can't bleed into the next match.
+function NetClient:sendDeathEvent(body)
+  self._pendingDeathSends = self._pendingDeathSends or {}
+  self._pendingDeathSends[#self._pendingDeathSends + 1] = body
+  self:_flushPendingDeathSends()
+end
+
+---Try to flush queued GarbageEvents. Idempotent.
+function NetClient:_flushPendingGarbageSends()
+  self._pendingGarbageSends = _drainPendingSends(
+    self, self._pendingGarbageSends,
+    NetworkProtocol.clientMessageTypes.garbageEvent.prefix,
+    "GarbageEvent", "_pendingGarbageDeferWarned")
+end
+
+---Try to flush queued DeathEvents. Idempotent — anything we successfully
+---hand to the socket stays handed; anything that can't go now stays queued
+---for the next tick. We don't get application-level acks (TCP is the
+---delivery contract), but if the socket dies mid-send the disconnect path
+---will see it and we won't be wasting cycles re-sending into nothing.
+function NetClient:_flushPendingDeathSends()
+  self._pendingDeathSends = _drainPendingSends(
+    self, self._pendingDeathSends,
+    NetworkProtocol.clientMessageTypes.deathEvent.prefix,
+    "DeathEvent", "_pendingDeathDeferWarned")
+end
+
+---Pause-mode rewind committed; tell the server to truncate its input record.
+---@param body table {senderFrame: integer}
+function NetClient:sendRewindEvent(body)
+  _sendGameplay(self, NetworkProtocol.clientMessageTypes.rewindEvent.prefix, json.encode(body))
 end
 
 ---@param clientMatch ClientMatch
 function NetClient:sendPauseToggle(clientMatch)
-  if self:isConnected() and self.room and self.room.roomNumber then
-    self.tcpClient:sendRequest(ClientMessages.sendPauseToggle(self.room.roomNumber, clientMatch.isPaused))
+  if self.room and self.room.roomNumber then
+    _sendLobby(self, ClientMessages.sendPauseToggle(self.room.roomNumber, clientMatch.isPaused))
   end
 end
 
@@ -486,7 +1626,7 @@ end
 function NetClient:requestLeaderboard(gameModeId)
   if not self.pendingResponses.leaderboardUpdate then
     gameModeId = gameModeId or GameModes.IDs.TWO_PLAYER_VS
-    self.pendingResponses.leaderboardUpdate = self.tcpClient:sendRequest(ClientMessages.requestLeaderboard(gameModeId))
+    self.pendingResponses.leaderboardUpdate = _sendLobby(self, ClientMessages.requestLeaderboard(gameModeId))
   end
 end
 
@@ -494,14 +1634,52 @@ end
 ---@param gameModeId GameModeID
 function NetClient:challengePlayerById(opponentId, gameModeId)
   self.lobbyDataV2.outgoingChallenges[opponentId] = self.lobbyDataV2.outgoingChallenges[opponentId] or {}
-  self.tcpClient:sendRequest(ClientMessages.updateChallengeStatus(GAME.localPlayer.publicId, opponentId, gameModeId, true))
+  _sendLobby(self, ClientMessages.updateChallengeStatus(GAME.localPlayer.publicId, opponentId, gameModeId, true))
   self.lobbyDataV2.outgoingChallenges[opponentId][gameModeId] = true
+  self:emitSignal("lobbyStateV2Update", self.lobbyDataV2)
+end
+
+---@param roomNumber integer
+---@return GameModeID?
+local function getRoomGameModeId(roomNumber)
+  local lobbyRoom = GAME.netClient
+    and GAME.netClient.lobbyDataV2
+    and GAME.netClient.lobbyDataV2.rooms
+    and GAME.netClient.lobbyDataV2.rooms[roomNumber]
+  return lobbyRoom and lobbyRoom.gameModeId or nil
+end
+
+---@param opponentId PublicPlayerID
+---@param roomNumber integer
+---@param slotNumber integer
+---@param gameModeId GameModeID?
+function NetClient:invitePlayerToRoom(opponentId, roomNumber, slotNumber, gameModeId)
+  gameModeId = gameModeId or getRoomGameModeId(roomNumber) or GameModes.IDs.TWO_PLAYER_VS
+  local inviteKey = "room_" .. roomNumber .. "_" .. slotNumber
+  logger.info(string.format("Sending invite to player %s for room %d slot %d (key=%s)", tostring(opponentId), roomNumber, slotNumber, inviteKey))
+  self.lobbyDataV2.outgoingChallenges[opponentId] = self.lobbyDataV2.outgoingChallenges[opponentId] or {}
+  _sendLobby(self, ClientMessages.updateChallengeStatus(GAME.localPlayer.publicId, opponentId, gameModeId, true, roomNumber, slotNumber))
+  self.lobbyDataV2.outgoingChallenges[opponentId][inviteKey] = true
+  logger.info(string.format("outgoingChallenges after invite: %s", json.encode(self.lobbyDataV2.outgoingChallenges)))
+  self:emitSignal("lobbyStateV2Update", self.lobbyDataV2)
+end
+
+---@param opponentId PublicPlayerID
+---@param roomNumber integer
+---@param slotNumber integer
+---@param gameModeId GameModeID?
+function NetClient:withdrawRoomInvite(opponentId, roomNumber, slotNumber, gameModeId)
+  gameModeId = gameModeId or getRoomGameModeId(roomNumber) or GameModes.IDs.TWO_PLAYER_VS
+  local inviteKey = "room_" .. roomNumber .. "_" .. slotNumber
+  self.lobbyDataV2.outgoingChallenges[opponentId] = self.lobbyDataV2.outgoingChallenges[opponentId] or {}
+  _sendLobby(self, ClientMessages.updateChallengeStatus(GAME.localPlayer.publicId, opponentId, gameModeId, false, roomNumber, slotNumber))
+  self.lobbyDataV2.outgoingChallenges[opponentId][inviteKey] = false
   self:emitSignal("lobbyStateV2Update", self.lobbyDataV2)
 end
 
 function NetClient:withdrawChallengeForId(opponentId, gameModeId)
   if self.lobbyDataV2.outgoingChallenges[opponentId] then
-    self.tcpClient:sendRequest(ClientMessages.updateChallengeStatus(GAME.localPlayer.publicId, opponentId, gameModeId, false))
+    _sendLobby(self, ClientMessages.updateChallengeStatus(GAME.localPlayer.publicId, opponentId, gameModeId, false))
     self.lobbyDataV2.outgoingChallenges[opponentId] = self.lobbyDataV2.outgoingChallenges[opponentId] or {}
     self.lobbyDataV2.outgoingChallenges[opponentId][gameModeId] = false
     self:emitSignal("lobbyStateV2Update", self.lobbyDataV2)
@@ -510,50 +1688,85 @@ end
 
 function NetClient:requestSpectate(roomNumber)
   if not self.pendingResponses.spectateResponse then
-    self.pendingResponses.spectateResponse = self.tcpClient:sendRequest(ClientMessages.requestSpectate(config.name, roomNumber))
+    self.pendingResponses.spectateResponse = _sendLobby(self, ClientMessages.requestSpectate(config.name, roomNumber))
   end
 end
 
----@param gameMode GameMode
-function NetClient:requestRoom(gameMode)
+---@param roomNumber integer
+---@param slotNumber integer
+function NetClient:requestJoinRoom(roomNumber, slotNumber)
+  logger.info("Sending joinRoomRequest for room " .. tostring(roomNumber) .. " slot " .. tostring(slotNumber))
+  _sendLobby(self, ClientMessages.requestJoinRoom(roomNumber, slotNumber))
+end
+
+---@param gameMode GameMode|GameModeID|string
+---@param latencyTolerance ("strict"|"normal"|"relaxed")?
+---@param openRoom boolean? whether this room should accept direct joiners (no invite handshake)
+---@param gameMode GameMode | string
+---@param latencyTolerance string?
+---@param openRoom boolean?
+---@param displayHistoryEnabled boolean? per-room flag for the parallel display-history viewer
+function NetClient:requestRoom(gameMode, latencyTolerance, openRoom, displayHistoryEnabled)
   if self:isConnected() then
-    self.tcpClient:sendRequest(ClientMessages.sendRoomRequest(gameMode))
+    if type(gameMode) == "string" then
+      local ok, resolvedGameMode = pcall(GameModes.getPreset, gameMode)
+      if ok then
+        gameMode = resolvedGameMode
+      else
+        logger.error("Refusing room request for unknown game mode id: " .. tostring(gameMode))
+        return
+      end
+    end
+
+    if type(gameMode) ~= "table" or type(gameMode.getGameModeJSONData) ~= "function" then
+      logger.error("Refusing room request with invalid game mode payload")
+      return
+    end
+
+    -- Platform guard: only allow displayHistoryEnabled if FFI is supported
+    local ffiGuard = require("client.src.network.DisplaySnapshotFFI")
+    local dhEnabled = displayHistoryEnabled and ffiGuard.FFI_SUPPORTED
+    _sendLobby(self, ClientMessages.sendRoomRequest(gameMode, latencyTolerance, openRoom, dhEnabled))
   end
 end
 
 function NetClient:sendMatchAbort()
   if self:isConnected() then
-    self.tcpClient:sendRequest(ClientMessages.sendMatchAbort())
+    _sendLobby(self, ClientMessages.sendMatchAbort())
     self:setState(states.ROOM)
   end
 end
 
 function sendPlayerSettings(player)
-  GAME.netClient.tcpClient:sendRequest(ClientMessages.sendPlayerSettings(ServerMessages.toServerMenuState(player)))
+  _sendLobby(GAME.netClient, ClientMessages.sendPlayerSettings(ServerMessages.toServerMenuState(player)))
 end
 
 function NetClient:sendPlayerSettings(player)
-  self.tcpClient:sendRequest(ClientMessages.sendPlayerSettings(ServerMessages.toServerMenuState(player)))
+  _sendLobby(self, ClientMessages.sendPlayerSettings(ServerMessages.toServerMenuState(player)))
 end
 
 function NetClient:registerPlayerUpdates(room)
   local listener = MessageListener("menu_state")
   for _, player in ipairs(room.players) do
     if player.isLocal then
-      -- seems a bit silly to subscribe a player to itself but it works and the player doesn't have to become part of the closure
-      player:connectSignal("characterIdChanged", player, sendPlayerSettings)
-      player:connectSignal("selectedCharacterIdChanged", player, sendPlayerSettings)
-      player:connectSignal("stageIdChanged", player, sendPlayerSettings)
-      player:connectSignal("selectedStageIdChanged", player, sendPlayerSettings)
-      player:connectSignal("panelIdChanged", player, sendPlayerSettings)
-      player:connectSignal("wantsRankedChanged", player, sendPlayerSettings)
-      player:connectSignal("wantsReadyChanged", player, sendPlayerSettings)
-      player:connectSignal("difficultyChanged", player, sendPlayerSettings)
-      player:connectSignal("startingSpeedChanged", player, sendPlayerSettings)
-      player:connectSignal("levelChanged", player, sendPlayerSettings)
-      player:connectSignal("levelDataChanged", player, sendPlayerSettings)
-      player:connectSignal("inputMethodChanged", player, sendPlayerSettings)
-      player:connectSignal("hasLoadedChanged", player, sendPlayerSettings)
+      if not player._netClientSettingsHooked then
+        -- seems a bit silly to subscribe a player to itself but it works and the player doesn't have to become part of the closure
+        player:connectSignal("characterIdChanged", player, sendPlayerSettings)
+        player:connectSignal("selectedCharacterIdChanged", player, sendPlayerSettings)
+        player:connectSignal("stageIdChanged", player, sendPlayerSettings)
+        player:connectSignal("selectedStageIdChanged", player, sendPlayerSettings)
+        player:connectSignal("panelIdChanged", player, sendPlayerSettings)
+        player:connectSignal("wantsRankedChanged", player, sendPlayerSettings)
+        player:connectSignal("wantsReadyChanged", player, sendPlayerSettings)
+        player:connectSignal("difficultyChanged", player, sendPlayerSettings)
+        player:connectSignal("startingSpeedChanged", player, sendPlayerSettings)
+        player:connectSignal("levelChanged", player, sendPlayerSettings)
+        player:connectSignal("levelDataChanged", player, sendPlayerSettings)
+        player:connectSignal("inputMethodChanged", player, sendPlayerSettings)
+        player:connectSignal("hasLoadedChanged", player, sendPlayerSettings)
+        player:connectSignal("endlessNoRaiseChanged", player, sendPlayerSettings)
+        player._netClientSettingsHooked = true
+      end
     else
       listener:subscribe(player, processMenuStateMessage)
     end
@@ -566,27 +1779,32 @@ end
 ---@param server string
 ---@param port integer
 function NetClient:sendErrorReport(errorData, server, port)
-  if not self:isConnected() then
-    self.tcpClient:connectToServer(server, port)
-  end
-  self.tcpClient:sendRequest(ClientMessages.sendErrorReport(errorData))
-  self.tcpClient:resetNetwork()
-  self:setState(states.OFFLINE)
+  logger.warn("sendErrorReport blocked in unofficial build; no report sent")
 end
 
 function NetClient:isConnected()
-  return self.tcpClient:isConnected()
+  -- Gameplay socket is the critical one. Lobby socket independently up/down
+  -- doesn't change "are we logged in and playing?"
+  return self.gameplayClient:isConnected()
 end
 
 function NetClient:login(ip, port)
   if not self:isConnected() then
-    self.loginRoutine = LoginRoutine(self.tcpClient, ip, port)
+    local gameplayPort = port
+    -- Port convention: SERVER_PORT (gameplay), SERVER_PORT+1 (lobby),
+    -- SERVER_PORT+2 (spectate). Mirrors server_globals on the server.
+    local lobbyPort = (port or 49569) + 1
+    local spectatePort = (port or 49569) + 2
+    self.loginRoutine = LoginRoutine(
+      self.gameplayClient, ip, gameplayPort,
+      self.lobbyClient, lobbyPort,
+      self.spectateClient, spectatePort)
     self:setState(states.LOGIN)
   end
 end
 
 function NetClient:logout()
-  self.tcpClient:sendRequest(ClientMessages.logout())
+  _sendLobby(self, ClientMessages.logout())
   -- we want to give the message a chance to actually be sent to the network before we free the socket
   -- otherwise the socket might get cleared before that and the server will only disconnect the player after a delay (which means they still get shown in lobby for ~10s)
   -- it would be more reliable to only actually reset the socket after a server confirmation so there is no delay (however small)
@@ -598,20 +1816,40 @@ end
 ---@param voluntary boolean if the disconnect happened through player intent or not
 function NetClient:disconnect(voluntary)
   self.room = nil
-  self.tcpClient:resetNetwork()
+  self._lobbyReconnect = nil
+  -- Reset all three sockets — full session teardown.
+  for _, client in ipairs(self.clients) do client:resetNetwork() end
   self:setState(states.OFFLINE)
   resetLobbyData(self)
+  -- Drop any Response objects still awaiting a server reply. Without this,
+  -- orphaned entries (e.g. spectateResponse from a pre-disconnect request)
+  -- linger until next login overwrites the slot.
+  self.pendingResponses = {}
+  _clearMatchInputState(self)
   GAME.localPlayer:disconnectSubscriber(GAME.netClient)
   -- this is because the online updates are currently subscribed to the player itself
   -- that should probably get changed because while mildly convenient it is unexpected for the interaction
   GAME.localPlayer:disconnectSubscriber(GAME.localPlayer)
+  -- Clear the "already hooked" flag so registerPlayerUpdates re-attaches signals on
+  -- the next connection. Without this, after a disconnect+reconnect, ready/loaded
+  -- changes fire locally but never reach the server: the subscriptions are gone but
+  -- the flag still marks the player as hooked, so registration skips the re-attach.
+  GAME.localPlayer._netClientSettingsHooked = nil
   self:emitSignal("clientDisconnected", voluntary)
 end
 
-function NetClient:update()
+function NetClient:update(dt)
   if self.state == states.OFFLINE then
     return
   end
+
+  -- Drain the simulated-lag queues (PA_NETWORK_LAG_MS). When delayedProcessing
+  -- is on, send() pushes to sendNetworkQueue and processIncomingMessages
+  -- pushes to receiveNetworkQueue with a delay; updateNetwork is what actually
+  -- flushes them once their delay has elapsed. Without this call, sends never
+  -- reach the socket and the 5s Response timeout fires on the first H message.
+  dt = dt or 0
+  for _, client in ipairs(self.clients) do client:updateNetwork(dt) end
 
   if self.state == states.LOGIN then
     local done, result = self.loginRoutine:progress()
@@ -636,16 +1874,24 @@ function NetClient:update()
     end
   end
 
-  if not self.tcpClient:processIncomingMessages() then
+  -- Process incoming on all three sockets.
+  --   Gameplay drop  = full disconnect (your critical channel).
+  --   Spectate drop  = silent reset; opponent boards freeze visually but
+  --                    your own gameplay continues uninterrupted.
+  --   Lobby drop     = silent reset; JSON falls back to gameplay temporarily.
+  if not self.gameplayClient:processIncomingMessages() then
     self:disconnect(false)
     return
   end
+  _processSideSocket(self, self.spectateClient, "Spectate")
+  _processSideSocket(self, self.lobbyClient, "Lobby")
+  _driveLobbyReconnect(self)
 
   if self.state == states.ONLINE then
     for _, listener in pairs(self.lobbyListeners) do
       listener:listen()
     end
-    self.tcpClient:dropOldInputMessages()
+    _clearMatchInputState(self)
     if self.pendingResponses.leaderboardUpdate then
       local status, value = self.pendingResponses.leaderboardUpdate:tryGetValue()
       if status == "timeout" then
@@ -671,8 +1917,45 @@ function NetClient:update()
     for _, listener in pairs(self.roomListeners) do
       listener:listen()
     end
+    -- Display-history `Y` messages keep flowing past matchEnded — the
+    -- sender's capture stays alive through runGameOver to ship the
+    -- death-animation tail. Drain them in ROOM state too so the
+    -- DisplayClientStack receives the post-match snapshots instead of
+    -- freezing at the last pre-matchEnded frame. applyDisplayEventBatch
+    -- is a no-op when _displayStacks is nil, so this is safe.
+    processDisplayEvents(self)
   elseif self.state == states.INGAME then
     processInputMessages(self)
+    processGarbageEvents(self)
+    processDeathEvents(self)
+    processRewindEvents(self)
+    processDisplayEvents(self)
+
+    -- Spectate-channel silence watchdog. Opponent I events arrive on
+    -- spectate every few hundred ms in any active match. >5s of silence
+    -- with the socket still "connected" is a stuck TCP — force-close so
+    -- server-side falls back to gameplay channel via _spectateConnection.
+    if self.gameplayClient:isConnected() and self.spectateClient:isConnected() then
+      local nowMs = math.floor(love.timer.getTime() * 1000)
+      self._spectateBaselineMs = self._spectateBaselineMs or nowMs
+      local lastSpectateMs = self.spectateClient.lastRecvMs or self._spectateBaselineMs
+      if (nowMs - lastSpectateMs) > 5000 and not self._spectateStallWarned then
+        self._spectateStallWarned = true
+        logger.warn(string.format(
+          "Spectate channel silent for %dms during active match — resetting to force fallback",
+          nowMs - lastSpectateMs))
+        self.spectateClient:resetNetwork()
+        self:emitSignal("channelDegraded", "Spectate")
+      end
+    end
+
+    -- Retry any DeathEvent / GarbageEvent that couldn't flush earlier
+    -- (gameplay socket mid-flap mid-match). DeathEvent is what unblocks
+    -- match-end on the server; GarbageEvents are individually small but
+    -- collectively are the damage the local player dealt — losing them
+    -- silently makes the player look like they did less than they did.
+    self:_flushPendingDeathSends()
+    self:_flushPendingGarbageSends()
 
     for _, listener in pairs(self.matchListeners) do
       listener:listen()
@@ -683,6 +1966,15 @@ end
 ---@param state NetClientStates
 function NetClient:setState(state)
   logger.debug("Setting netclient state to " .. state)
+  -- Whenever we leave INGAME (cleanly, abort, disconnect, anything), drop the
+  -- budgeted defer queues. Slot indices are per-match; messages held over from
+  -- a previous match would apply to stacks they weren't meant for — including
+  -- potentially the local stack if slot mappings overlap. Belt-and-suspenders
+  -- against every transition path; the per-handler clears stay as defense-in-
+  -- depth at the explicit match-end / spectate sites.
+  if self.state == states.INGAME and state ~= states.INGAME then
+    _clearMatchInputState(self)
+  end
   self.state = state
 end
 

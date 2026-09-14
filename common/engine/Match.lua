@@ -12,11 +12,20 @@ local LegacyPanelSource = require("common.compatibility.LegacyPanelSource")
 local InputCompression = require("common.data.InputCompression")
 local ReplayV3 = require("common.data.ReplayV3")
 local MatchRules = require("common.data.MatchRules")
+local TeamUtils = require("common.data.TeamUtils")
+local GarbageDelivery = require("common.engine.GarbageDelivery")
 
 ---@class Match
----@field stacks (Stack | SimulatedStack)[] The stacks to run as part of the match
+---@field stacks (Stack | SimulatedStack)[] The stacks to run as part of the match.
+---  INVARIANT: dense 1..N array. Server compacts player_number at match start
+---  (`Room:start_match`) so client and server agree on `stacks[i].player_number == i`.
+---  Many simulation/replay/rollback sites use ipairs and `runs[i]` lookups that
+---  depend on this. If you ever skip compaction, expect silent breakage.
 ---@field garbageTargets table<integer, table<integer, Stack>> assignments by index where each stack's garbage is directed
 ---@field garbageSources table<Stack, table<integer, Stack>> assignments by index where each stack's incoming garbage comes from
+---@field teams Team[]? Array of teams for team-based game modes
+---@field garbageMode string? Garbage distribution mode: "all" (hits all enemies) or "shared" (round-robin)
+---@field teamGarbageState table<integer, table>? Round-robin state for shared garbage mode, indexed by team
 ---@field engineVersion string
 ---@field rules MatchRules
 ---@field doCountdown boolean if a countdown is performed at the start of the match; mirror of rules.doCountdown for easier access
@@ -33,6 +42,18 @@ local MatchRules = require("common.data.MatchRules")
 ---@field aborted boolean the game stopped in the middle because of crash, desync, game leave, online player left, etc.
 ---@field desyncError boolean? the match stopped because the other stack became too out of sync
 ---@field debug MatchDebugConfig internal debug configuration that defaults to non-debug values
+---@field fromReplay boolean? true when the Match was constructed via createFromReplay
+---@field stackInteraction StackInteractions? mirror of rules.stackInteraction, set during initialization
+---@field pauseNonLocalSimulation boolean? when true, Match:shouldRun returns false for non-local stacks (engine doesn't tick them) and Match:updateClock skips them. Set by the rendering layer when it owns remote-visual rendering through some non-input-replication path. Engine doesn't know or care which.
+---@field _gSentEvents integer? per-match garbage-event accounting: count of G messages we sent
+---@field _gSentPieces integer? per-match garbage-event accounting: count of pieces we sent (sum of piece counts in our G events)
+---@field _gAppliedEvents integer? per-match accounting: count of G messages we applied locally
+---@field _gAppliedPieces integer? per-match accounting: count of pieces we applied locally
+---@field _gDroppedEvents integer? per-match accounting: count of G messages dropped (no recipient stack)
+---@field _gDroppedPieces integer? per-match accounting: count of pieces dropped
+---@field _gSkippedFrozenEvents integer? per-match accounting: G messages skipped because the recipient stack is a snapshot-driven frozen remote
+---@field _gSkippedFrozenPieces integer? per-match accounting: pieces skipped (frozen-remote recipient)
+---@field garbageDelivery GarbageDelivery per-tick garbage shipping + cross-stack distribution module (see common/engine/GarbageDelivery.lua)
 
 ---@class MatchDebugConfig
 ---@field vsFramesBehind integer
@@ -73,6 +94,8 @@ function(self, panelSource, matchRules)
   self.debug = {
     vsFramesBehind = 0
   }
+
+  self.garbageDelivery = GarbageDelivery.new(self)
 end
 )
 
@@ -236,9 +259,47 @@ function Match:debugCheckDivergence()
   self.savedStackP2 = nil
 end
 
+---Called by the scene layer (GameBase) before invoking Match:run, to inform
+---the engine how many wall-clock frames the local engine is behind. Used to
+---tighten remote view-stacks' per-cycle iteration cap when local is racing
+---to catch up — so heavy remote catch-up work doesn't starve the local
+---engine's CPU budget. Safe to leave unset (nil = treat as 0).
+---@param frames integer
+function Match:setLocalWallClockDeficit(frames)
+  self._wallClockDeficitFrames = frames
+end
+
+-- Fractional [0,1] from prev tick to current. Remote view-stack renders lerp by this.
+---@param alpha number
+function Match:setRenderInterpAlpha(alpha)
+  if alpha < 0 then alpha = 0 end
+  if alpha > 1 then alpha = 1 end
+  self.renderInterpAlpha = alpha
+end
+
 ---@return integer[] runsPerStack
 function Match:run()
   local startTime = love.timer.getTime()
+
+  -- Local-prioritized hysteresis: when local is >= 2 frames behind
+  -- wall-clock AND was also behind on the previous Match:run, tighten the
+  -- remote view-stacks' per-cycle iteration cap. This keeps heavy remote
+  -- catch-up from stealing CPU from the local engine under load.
+  -- Hysteresis prevents flapping on a single slow frame. Remotes still
+  -- get to catch up over many cycles via their existing SmoothDamp accum,
+  -- just one tick at a time when this flag is set.
+  local deficit = self._wallClockDeficitFrames or 0
+  local last = self._lastWallClockDeficitFrames or 0
+  self._remoteCapTight = (deficit >= 2) and (last >= 2)
+  self._lastWallClockDeficitFrames = deficit
+
+  -- Refresh the cached gameOverClock so Match:shouldRun (per-stack-per-tick
+  -- below) has a current value. Previously this was a side effect of
+  -- Match:hasEnded() being called every tick from ClientMatch:run; now
+  -- it's explicit. evaluateEndConditions is pure, so calling it here
+  -- mutates nothing other than the self.gameOverClock cache that
+  -- updateMatchEndState writes when result.gameOverClock is defined.
+  self:updateMatchEndState()
 
   self:padRewindDataIfNeeded()
 
@@ -250,16 +311,16 @@ function Match:run()
 
   local runsSoFar = 0
   while tableUtils.contains(runs, runsSoFar) do
+    self.garbageDelivery:tickPreSim()
     for i, stack in ipairs(self.stacks) do
       if stack and self:shouldRun(stack, runsSoFar) then
-        self:pushGarbageTo(stack)
         stack:run()
-
         runs[i] = runs[i] + 1
       end
     end
 
     self:updateClock()
+    self.garbageDelivery:tickPostSim()
 
     -- Since the stacks can affect each other, don't save rollback until after all have run
     for i, stack in ipairs(self.stacks) do
@@ -276,13 +337,6 @@ function Match:run()
     runsSoFar = runsSoFar + 1
   end
 
-  -- for i = 1, #self.players do
-  --   local stack = self.players[i].stack
-  --   if stack and stack.is_local not stack:game_ended() then
-  --     assert(#stack.confirmedInput == stack.clock, "Local games should always simulate all inputs")
-  --   end
-  -- end
-
   local endTime = love.timer.getTime()
   local timeDifference = endTime - startTime
   self.timeSpentRunning = self.timeSpentRunning + timeDifference
@@ -291,31 +345,6 @@ function Match:run()
   return runs
 end
 
----@param stack BaseStack
-function Match:pushGarbageTo(stack)
-  -- check if anyone wants to push garbage into the stack's queue
-  for _, st in ipairs(self.garbageSources[stack]) do
-    local oldestTransitTime = st:getOldestFinishedGarbageTransitTime()
-    if oldestTransitTime and ((not st.outgoingGarbage.illegalStuffIsAllowed) or (#stack.incomingGarbage.stagedGarbage < 72)) then
-      if stack.stopWatch > oldestTransitTime then
-        -- recipient went past the frame it was supposed to receive the garbage -> rollback to that frame
-        -- hypothetically, IF the receiving stack's garbage target was different than the sender forcing the rollback here
-        --  it may be necessary to perform extra steps to ensure the recipient of the stack getting rolled back is getting correct garbage
-        --  which may even include another rollback
-        if not self:rollbackToStopWatch(stack, oldestTransitTime) and not stack.incomingGarbage.illegalStuffIsAllowed then
-          -- if we can't rollback, it's a desync
-          self.desyncError = true
-          self:abort()
-        end
-      end
-      local garbageDelivery = st:getReadyGarbageAt(stack.stopWatch)
-      if garbageDelivery then
-        --logger.debug("Pushing garbage delivery to incoming garbage queue: " .. table_to_string(garbageDelivery))
-        stack:receiveGarbage(garbageDelivery)
-      end
-    end
-  end
-end
 
 ---@param stack BaseStack
 ---@return boolean
@@ -336,26 +365,6 @@ function Match:shouldSaveRollback(stack)
 
     return false
   end
-end
-
--- attempt to rollback the specified stack to the specified stopWatch
----@param stack BaseStack
----@param stopWatch integer
----@return boolean success
-function Match:rollbackToStopWatch(stack, stopWatch)
-  return self:rollbackToFrame(stack, stopWatch + (stack.clock - stack.stopWatch))
-end
-
--- attempt to rollback the specified stack to the specified frame
----@param stack BaseStack
----@param clock integer
----@return boolean success
-function Match:rollbackToFrame(stack, clock)
-  if stack:rollbackToFrame(clock) then
-    return true
-  end
-
-  return false
 end
 
 -- rewind is ONLY to be used for replay playback as it relies on all stacks being at the same clock time
@@ -383,7 +392,14 @@ end
 -- also triggers the danger music from time running out if a timeLimit was set
 function Match:updateClock()
   for i, stack in ipairs(self.stacks) do
-    if stack.clock > self.clock then
+    -- Skip non-local stacks when their simulation is paused: their
+    -- clock is either stale (no input replication) or mirrored from
+    -- some external source — neither represents real match progress
+    -- and would contaminate the local match's time-limit / danger-
+    -- music clock.
+    if self.pauseNonLocalSimulation and not stack.is_local then
+      -- skip
+    elseif stack.clock > self.clock then
       self.clock = stack.clock
     end
   end
@@ -413,6 +429,15 @@ function Match:start()
     -- always need clock 0 as a base for rollback
     stack:saveForRollback()
   end
+  -- One-shot offset audit. If OUT-time displays are wrong post-fix it's likely
+  -- because two clients disagreed on rules.doCountdown — this lets us see the
+  -- per-stack offset every client picked at match start.
+  local parts = {}
+  for i, stack in ipairs(self.stacks) do
+    parts[#parts+1] = string.format("s%d=%s", i, tostring(stack.countdownOffsetFrames))
+  end
+  logger.info(string.format("Match:start doCountdown=%s offsets[%s]",
+    tostring(self.doCountdown), table.concat(parts, " ")))
 end
 
 ---@return ReplayV3
@@ -477,6 +502,9 @@ function Match.createFromReplay(replay)
   end
 
   local match = Match(panelSource, replay.rules)
+  -- Online live matches reuse this constructor (server matchStart is replay-shaped).
+  -- True only for actually-completed replays; unconditional true silently kills G-ship.
+  match.fromReplay = (replay.metadata and replay.metadata.completed) and true or false
 
   for i, replayStack in ipairs(replay.stacks) do
     local stack
@@ -495,12 +523,30 @@ function Match.createFromReplay(replay)
 
   for _, garbageFlow in ipairs(replay.garbageFlows) do
     local senderStack = match.stacks[garbageFlow.source]
-    for _, recipientIndex in ipairs(garbageFlow.recipients) do
-      local recipientStack = match.stacks[recipientIndex]
-      table.insert(match.garbageTargets[garbageFlow.source], recipientStack)
-      table.insert(match.garbageSources[recipientStack], match.stacks[garbageFlow.source])
-      recipientStack.incomingGarbage.illegalStuffIsAllowed = senderStack.outgoingGarbage.illegalStuffIsAllowed
-      recipientStack.incomingGarbage.treatMetalAsCombo = senderStack.outgoingGarbage.treatMetalAsCombo
+    local sourceTargets = match.garbageTargets[garbageFlow.source]
+    -- Skip flows whose source has no stack (replay shape disagrees with stack
+    -- count, e.g. a server bug yielded a flow pointing at a missing player).
+    -- Hard-crashing the client just because one flow is malformed strands the
+    -- match — log loudly and continue so the rest of the replay still loads.
+    if senderStack and sourceTargets then
+      for _, recipientIndex in ipairs(garbageFlow.recipients) do
+        local recipientStack = match.stacks[recipientIndex]
+        local recipientSources = recipientStack and match.garbageSources[recipientStack]
+        if recipientStack and recipientSources then
+          table.insert(sourceTargets, recipientStack)
+          table.insert(recipientSources, senderStack)
+          recipientStack.incomingGarbage.illegalStuffIsAllowed = senderStack.outgoingGarbage.illegalStuffIsAllowed
+          recipientStack.incomingGarbage.treatMetalAsCombo = senderStack.outgoingGarbage.treatMetalAsCombo
+        else
+          logger.warn(string.format(
+            "Match.createFromReplay: skipping garbage flow %d->%d (recipient stack missing in replay with %d stacks)",
+            garbageFlow.source, recipientIndex, #match.stacks))
+        end
+      end
+    else
+      logger.warn(string.format(
+        "Match.createFromReplay: skipping garbage flow from source %d (source stack missing in replay with %d stacks)",
+        garbageFlow.source, #match.stacks))
     end
   end
 
@@ -516,70 +562,185 @@ function Match:abort()
   self:handleMatchEnd()
 end
 
----@return boolean
-function Match:hasEnded()
+---Pure evaluation of match-end conditions. NO mutations — safe to call
+---repeatedly. Returns the gameOverClock so callers (Match:shouldRun,
+---winners computation) can cache it explicitly instead of relying on
+---hidden side effects.
+---
+---Does NOT include desync detection — that's a separate, explicit call
+---via Match:checkDesync() since it both detects and recovers (sets
+---aborted/desyncError).
+---@return {ended: boolean, gameOverClock: integer?, reason: string?}
+function Match:evaluateEndConditions()
+  -- self.ended is only set true by Match:abort(); the natural-finalize path
+  -- in ClientMatch:run does NOT flip the engine's self.ended (only
+  -- ClientMatch.ended), so this branch effectively covers aborted matches
+  -- and the inline aborted block below is redundant but harmless. Kept as
+  -- the short-circuit for any future caller that wants to set self.ended
+  -- on the engine to indicate finalized state.
   if self.ended then
-    return true
+    return { ended = true, reason = "finalized" }
   end
 
   if self.aborted then
-    self.ended = true
-    return true
+    return { ended = true, reason = "aborted" }
+  end
+
+  -- Loose-sync: in a live match, a remote stack with game_over_clock set
+  -- counts as "done" even if its sim clock hasn't caught up. The dead
+  -- opponent stops sending inputs after their DeathEvent, so the view-stack
+  -- on the survivor's machine is permanently pinned below game_over_clock —
+  -- stack:game_ended() (which requires clock >= game_over_clock) stays false
+  -- without this bypass, and the match never ends.
+  local liveMatch = not self.fromReplay
+  local function isDone(stack)
+    if liveMatch and stack.game_over_clock and stack.game_over_clock > 0 then
+      return true
+    end
+    return stack:game_ended()
   end
 
   local aliveCount = 0
   -- dead is more like done as the stack could also have ended by fulfilling a win condition
   local deadCount = 0
   for i = 1, #self.stacks do
-    if self.stacks[i]:game_ended() then
+    if isDone(self.stacks[i]) then
       deadCount = deadCount + 1
     else
       aliveCount = aliveCount + 1
     end
   end
 
+  local function minGameOverClock()
+    local goc = math.huge
+    for _, stack in ipairs(self.stacks) do
+      if stack.game_over_clock and stack.game_over_clock > 0 then
+        goc = math.min(stack.game_over_clock, goc)
+      end
+    end
+    return goc
+  end
+
   if self.rules.matchEndConditions[MatchRules.MatchEndConditions.STACKS_ACTIVE] then
     if aliveCount <= self.rules.matchEndConditions[MatchRules.MatchEndConditions.STACKS_ACTIVE] then
-      local gameOverClock = math.huge
-      for _, stack in ipairs(self.stacks) do
-        if stack.game_over_clock > 0 then
-          gameOverClock = math.min(stack.game_over_clock, gameOverClock)
+      local gameOverClock = minGameOverClock()
+      -- Strict (replays / offline): every stack must have run past
+      -- gameOverClock so we know nobody else also died on the next frame.
+      -- Live: isDone() accepts stacks with game_over_clock set without
+      -- requiring clock catchup (see comment above).
+      if tableUtils.trueForAll(self.stacks, function(stack)
+        if isDone(stack) then return true end
+        return stack.clock and stack.clock > gameOverClock
+      end) then
+        return { ended = true, gameOverClock = gameOverClock, reason = "stacks_active" }
+      end
+    end
+  end
+
+  -- Team-based end condition: match ends when only 1 team remains active.
+  -- Compute team-aliveness inline using isDone() instead of delegating to
+  -- TeamUtils.countActiveTeams — the TeamUtils path uses stack:game_ended()
+  -- directly, which returns false in live loose-sync for a dead remote stack
+  -- whose clock is pinned below its game_over_clock (the remote stops sending
+  -- inputs after the DeathEvent). Without isDone() here, FFA/team matches
+  -- never end when a remote player dies.
+  if self.rules.matchEndConditions[MatchRules.MatchEndConditions.TEAMS_ACTIVE] and self.teams then
+    local activeTeamCount = 0
+    for _, team in ipairs(self.teams) do
+      local teamAlive = false
+      for _, playerIndex in ipairs(team.playerIndices) do
+        local stack = self.stacks[playerIndex]
+        if stack and not isDone(stack) then
+          teamAlive = true
+          break
         end
       end
-      self.gameOverClock = gameOverClock
+      if teamAlive then activeTeamCount = activeTeamCount + 1 end
+    end
+    if activeTeamCount <= self.rules.matchEndConditions[MatchRules.MatchEndConditions.TEAMS_ACTIVE] then
+      local gameOverClock = minGameOverClock()
       -- make sure everyone has run to the currently known game over clock
-      -- because if they haven't they might still go gameover before that time
-      -- > instead of >= because game over clock is set to the frame it was running when it died but increments only at the end of the frame
-      -- so a stack running to gameOverClock won't have found out it's dying on the next frame
-      if tableUtils.trueForAll(self.stacks, function(stack) return stack.clock and stack.clock > gameOverClock end) then
-        self.ended = true
-        return true
+      -- dead stacks are considered "past" their game over clock (they won't run anymore)
+      if tableUtils.trueForAll(self.stacks, function(stack)
+        return isDone(stack) or (stack.clock and stack.clock > gameOverClock)
+      end) then
+        return { ended = true, gameOverClock = gameOverClock, reason = "teams_active" }
       end
     end
   end
 
   if deadCount == #self.stacks then
-    -- everyone died, match is over!
-    self.ended = true
-    return true
+    return { ended = true, reason = "all_dead" }
   end
 
   if self.timeLimit then
     if tableUtils.trueForAll(self.stacks, function(stack) return stack.stopWatch and stack.stopWatch >= self.timeLimit end) then
-      self.ended = true
-      return true
+      return { ended = true, reason = "time_limit" }
     end
   end
 
+  return { ended = false }
+end
+
+---Display-only: has this match locally appeared to end? Read-only —
+---safe to call from any code path that just wants to know "should I show
+---the result UI?" Does NOT drive engine state.
+---
+---Authoritative finalize gating lives in ClientMatch:shouldFinalize.
+---@return boolean
+function Match:isLocallyEnded()
+  return self.ended or self:evaluateEndConditions().ended
+end
+
+---Explicit desync check. If a desync is detected this call MUTATES
+---self.aborted and self.desyncError. Used to live inside hasEnded as a
+---hidden side effect of "is the match over?" — now it's an opt-in check
+---that callers run when they want recovery, not on every read.
+---@return boolean true if desync was newly detected this call
+function Match:checkDesync()
+  if self.aborted then return false end
   if self:isIrrecoverablyDesynced() then
     logger.info("Match irrecoverably desynced")
-    self.ended = true
     self.aborted = true
     self.desyncError = true
     return true
   end
-
   return false
+end
+
+---Side-effectful wrapper around evaluateEndConditions: caches gameOverClock
+---on self so Match:shouldRun (per-stack-per-tick) can use it without
+---recomputing. Callers that need both the result AND the cache use this;
+---callers that just want a read use evaluateEndConditions directly.
+---
+---Fast-path gate: while every stack is still alive (game_over_clock == 0),
+---no time-limit is active, and the match is neither aborted nor finalized,
+---evaluateEndConditions cannot fire any end-condition. Skipping the full
+---walk in that case reclaims love.update budget — this runs once per
+---Match:run iter, so under multi-iter catch-up it was N walks per
+---love.update for a result that's always { ended = false }.
+---@return {ended: boolean, gameOverClock: integer?, reason: string?}
+function Match:updateMatchEndState()
+  if not (self.ended or self.aborted)
+      and self.gameOverClock == nil
+      and self.timeLimit == nil then
+    local anyDead = false
+    for i = 1, #self.stacks do
+      local s = self.stacks[i]
+      if s and s.game_over_clock and s.game_over_clock > 0 then
+        anyDead = true
+        break
+      end
+    end
+    if not anyDead then
+      return { ended = false }
+    end
+  end
+  local result = self:evaluateEndConditions()
+  if result.gameOverClock then
+    self.gameOverClock = result.gameOverClock
+  end
+  return result
 end
 
 function Match:handleMatchEnd()
@@ -592,14 +753,19 @@ end
 
 ---@return boolean
 function Match:isIrrecoverablyDesynced()
-  for target, sourceArray in pairs(self.garbageSources) do
-    for i, source in ipairs(sourceArray) do
-      if source.clock + MAX_LAG < target.clock then
-        return true
-      end
-    end
-  end
-
+  -- Loose-sync: comparing clocks across stacks is not a meaningful health
+  -- check. Each stack ticks at its own rate:
+  --   * local-authoritative stack: advances at the client's love.update rate
+  --   * view stack: advances as inputs arrive over the network
+  -- If the two clients run at different tick rates (different machines /
+  -- vsync / FPS cap), clocks diverge by hundreds of frames per minute even
+  -- on localhost. That divergence is normal, not a desync. Real connection
+  -- failures are handled by the server's connection watchdog; bursty input
+  -- arrival is absorbed by Stack:shouldRun's catch-up branches.
+  --
+  -- Returning false here unconditionally so the lockstep-era abort path
+  -- never fires in loose-sync matches. The function is kept as a callable
+  -- stub for any remaining callers and for future telemetry to slot in.
   return false
 end
 
@@ -614,6 +780,13 @@ end
 ---@param runsSoFar integer
 ---@return boolean
 function Match:shouldRun(stack, runsSoFar)
+  -- Skip non-local stacks when their simulation is paused. The reason
+  -- for the pause is the caller's concern (rendering layer drives
+  -- visuals through some external path); the engine just respects the
+  -- flag. Local stack always ticks regardless.
+  if self.pauseNonLocalSimulation and not stack.is_local then
+    return false
+  end
   -- check the match specific conditions in match
   if not stack:game_ended() then
     if self.timeLimit then
@@ -623,8 +796,14 @@ function Match:shouldRun(stack, runsSoFar)
         return false
       end
     else
-      -- gameOverClock is set in Match:hasEnded when there is only 1 alive in LAST_ALIVE modes
-      if self.gameOverClock and self.gameOverClock < stack.clock then
+      -- Only cut off surviving stacks AFTER the match has authoritatively ended
+      -- (self.ended set by handleMatchEnd → server's gameResult or aborted).
+      -- Without the self.ended gate, the LOCAL evaluateEndConditions caches a
+      -- gameOverClock the moment the local engine sees teams_active=1, which
+      -- freezes the survivor BEFORE the server confirms — a 3p FFA stuck-match
+      -- bug where the last-alive player's stack stopped ticking and the
+      -- server idle-timed them out.
+      if self.ended and self.gameOverClock and self.gameOverClock < stack.clock then
         return false
       end
     end
@@ -641,12 +820,7 @@ function Match:shouldRun(stack, runsSoFar)
   end
 
   -- and then the stack specific conditions in stack
-  return stack:shouldRun(runsSoFar)
-end
-
-function Match:setCountdown(doCountdown)
-  self.doCountdown = doCountdown
-  self.rules.doCountdown = doCountdown
+  return stack:shouldRun(runsSoFar, self._remoteCapTight)
 end
 
 function Match:setAlwaysSaveRollbacks(save)
@@ -721,12 +895,32 @@ function Match:addTarget(source, target)
 
   local index = tableUtils.indexOf(self.stacks, source)
 
-  if not tableUtils.contains(self.garbageTargets[index], target) then
-    table.insert(self.garbageTargets[index], target)
+  -- Reference equality only. tableUtils.contains uses deep_content_equal which
+  -- recurses through every field of the stack — and stacks hold circular refs
+  -- to other stacks via garbageTarget/garbageTargets, so deep equality blows
+  -- the call stack as soon as a target list has 2+ entries (common in FFA).
+  local targets = self.garbageTargets[index]
+  local alreadyTarget = false
+  for i = 1, #targets do
+    if targets[i] == target then
+      alreadyTarget = true
+      break
+    end
+  end
+  if not alreadyTarget then
+    table.insert(targets, target)
   end
 
-  if not tableUtils.contains(self.garbageSources[target], source) then
-    table.insert(self.garbageSources[target], source)
+  local sources = self.garbageSources[target]
+  local alreadySource = false
+  for i = 1, #sources do
+    if sources[i] == source then
+      alreadySource = true
+      break
+    end
+  end
+  if not alreadySource then
+    table.insert(sources, source)
   end
 end
 
@@ -743,6 +937,135 @@ function Match:padRewindDataIfNeeded()
       end
     end
   end
+end
+
+-- Team-related methods
+
+--- Sets the teams for this match
+---@param teams Team[]
+function Match:setTeams(teams)
+  self.teams = teams
+end
+
+--- Sets the garbage distribution mode
+---@param mode string "all" or "shared"
+function Match:setGarbageMode(mode)
+  self.garbageMode = mode
+end
+
+--- Sets up garbage targets based on team configuration and garbage mode
+--- Must be called after setTeams and setGarbageMode, and after stacks are created
+function Match:setupTeamGarbageTargets()
+  if not self.teams then
+    return
+  end
+
+  -- Initialize garbage targets for each stack
+  for i = 1, #self.stacks do
+    self.garbageTargets[i] = {}
+    self.garbageSources[self.stacks[i]] = {}
+  end
+
+  -- Catch silent-zero-emit (garbageTargets stays empty for unknown modes).
+  if self.garbageMode ~= "all" and self.garbageMode ~= "shared" then
+    logger.warn(string.format(
+      "Match:setupTeamGarbageTargets: unrecognized garbageMode '%s' — no garbage will flow this match (expected 'all' or 'shared')",
+      tostring(self.garbageMode)))
+  end
+
+  if self.garbageMode == "all" then
+    -- "All" mode: each player sends garbage to ALL enemies
+    for i, stack in ipairs(self.stacks) do
+      local enemyIndices = TeamUtils.getEnemyPlayerIndices(self.teams, i)
+      for _, enemyIndex in ipairs(enemyIndices) do
+        local enemyStack = self.stacks[enemyIndex]
+        if enemyStack then
+          self:addTarget(stack, enemyStack)
+        end
+      end
+    end
+  elseif self.garbageMode == "shared" then
+    -- "Shared" mode: round-robin TARGETING. Senders with multiple enemies pick one
+    -- enemy per attack instead of hitting all of them. Rotation is tracked per
+    -- sender, so each player cycles independently through their living enemies.
+    --
+    -- Note: this only changes targeting, not output rate. Team members each retain
+    -- their full per-player attack rate. For symmetric 2v2 that produces a balanced
+    -- game (both teams have multi-target senders); for asymmetric 1v2 the solo will
+    -- effectively deal 1× per tick while taking 2× from the team, since team members
+    -- only have one enemy and bypass distributeGarbageToTargets entirely.
+    self.teamGarbageState = {}
+    for i = 1, #self.stacks do
+      local enemyIndices = TeamUtils.getEnemyPlayerIndices(self.teams, i)
+      self.teamGarbageState[i] = {
+        currentTargetIndex = 1,
+        enemyIndices = enemyIndices
+      }
+    end
+
+    -- Set up the same target list as "all" mode here; the actual single-target
+    -- selection happens at delivery time in Match:distributeGarbageToTargets.
+    for i, stack in ipairs(self.stacks) do
+      local enemyIndices = TeamUtils.getEnemyPlayerIndices(self.teams, i)
+      for _, enemyIndex in ipairs(enemyIndices) do
+        local enemyStack = self.stacks[enemyIndex]
+        if enemyStack then
+          self:addTarget(stack, enemyStack)
+        end
+      end
+    end
+  end
+
+  -- One-line match-start summary so post-mortem log grep can answer "what
+  -- garbage routing was in effect" without hunting GameMode + Team data.
+  local teamShape = {}
+  for _, team in ipairs(self.teams) do
+    teamShape[#teamShape + 1] = "{" .. table.concat(team.playerIndices, ",") .. "}"
+  end
+  logger.info(string.format(
+    "Match garbage routing: mode=%s stacks=%d teams=%d shape=%s",
+    tostring(self.garbageMode), #self.stacks, #self.teams,
+    table.concat(teamShape, " vs ")))
+end
+
+--- Returns the winning team (if any)
+--- Returns nil if no winner yet, or if it's a draw
+---@return Team|nil
+function Match:getWinningTeam()
+  if not self.teams then
+    return nil
+  end
+  -- Use the same isDone() semantics as hasEnded: in live loose-sync, a dead
+  -- remote stack has its game_over_clock set but stack.clock is pinned below
+  -- it (the remote stopped sending inputs after the DeathEvent). Calling
+  -- TeamUtils.getWinningTeam directly uses stack:game_ended() which stays
+  -- false in that pinned state — so the dead remote team looks alive,
+  -- multiple teams count as active, and the function returns nil (no
+  -- winner). This breaks the survivor's "did my team win" report to the
+  -- server (NetClient sends localGameResult=2/loss instead of 1/win).
+  local liveMatch = not self.fromReplay
+  local activeTeams = {}
+  for _, team in ipairs(self.teams) do
+    local teamAlive = false
+    for _, playerIndex in ipairs(team.playerIndices) do
+      local stack = self.stacks[playerIndex]
+      if stack then
+        local done = (liveMatch and stack.game_over_clock and stack.game_over_clock > 0)
+          or stack:game_ended()
+        if not done then
+          teamAlive = true
+          break
+        end
+      end
+    end
+    if teamAlive then
+      activeTeams[#activeTeams + 1] = team
+    end
+  end
+  if #activeTeams == 1 then
+    return activeTeams[1]
+  end
+  return nil
 end
 
 return Match

@@ -19,7 +19,7 @@ require("client.src.input.JoystickProvider")
 --   inputConfigurations: raw key inputs mapped to internal aliases for that configuration
 --   base (top level): the union of all inputConfigurations not already claimed by a player
 --   mouse: all mouse buttons and the position of the mouse
----@class InputManager
+---@class InputManager : Signal
 local inputManager = {
   isDown = {},
   isPressed = {},
@@ -476,9 +476,9 @@ local previousVersionFilename = "keysV2.json"
 function inputManager:hasKeyFile()
   local filename = nil
   local migrateInputs = false
-  if FileUtils.exists(currentVersionFilename) then
+  if FileUtils.existsScoped(currentVersionFilename) then
     filename = currentVersionFilename
-  elseif FileUtils.exists(previousVersionFilename) then
+  elseif FileUtils.existsScoped(previousVersionFilename) then
     filename = previousVersionFilename
     migrateInputs = true
   end
@@ -496,7 +496,7 @@ function inputManager:load()
     return inputManager.inputConfigurations
   end
 
-  local inputConfigs = FileUtils.readJsonFile(filename)
+  local inputConfigs = FileUtils.readScoped(filename)
 
   if migrateInputs then
     -- migrate old input configs

@@ -26,8 +26,11 @@ local function basicTest()
   local room, p1, p2, gameCatcher = getRoom()
   for i, player in ipairs(room.players) do
     assert(player.state == "character select")
-    local firstMsg = player.connection.outgoingMessageQueue:pop()
-    assert(firstMsg.messageText.type == "createRoom", "Expected create_room message")
+    -- Note: createRoom is emitted by Server:create_room, not Room() directly.
+    -- This test constructs Room directly, so no createRoom is in the queue.
+    -- We still drain initialization messages so subsequent assertions start
+    -- from a clean queue.
+    player.connection.outgoingMessageQueue:clear()
   end
   p1:updateSettings({wants_ready = true, loaded = false, ready = false})
   p2:updateSettings({wants_ready = false, loaded = true, ready = false})
@@ -60,7 +63,10 @@ local function basicTest()
     room:broadcastInput("A", p2)
   end
 
-  room:handleGameOverOutcome({outcome = 1}, p2)
+  -- TwoPlayerVersus is on the team pipeline (teamCount=2, playersPerTeam=1),
+  -- so outcome semantics are "did MY team win" (1) or lose (2), not the
+  -- winner's player number. p2 (team 2) lost, p1 (team 1) won.
+  room:handleGameOverOutcome({outcome = 2}, p2)
 
   -- winner usually sends a few more inputs until they get the messages from the other play that the match is over
   room:broadcastInput("A", p1)
@@ -95,23 +101,13 @@ local function basicTest()
   end
 end
 
--- p1 aborts after getting significantly ahead
-local function abortTest1()
-  local room, p1, p2, gameCatcher = getRoom()
-  room:start_match()
-  for i = 1, 120 do
-    -- simulate inputs
-    room:broadcastInput("A", p1)
-  end
-  p2.connection.outgoingMessageQueue:clear()
-  room:handleGameAbort(p1)
-  assert(room.game == nil)
-
-  local game = gameCatcher.game
-  assert(game.complete ~= true)
-  local message = p2.connection.outgoingMessageQueue:pop().messageText
-  assert(message.type == "gameAbort" and message.content.source == ServerTesting.players[1].name)
-end
+-- abortTest1 removed in the loose-sync rewrite.
+-- It exercised the OLD "legitimate latency abort" path (large input gap →
+-- handlePlayerDisconnect → game ends immediately) which Step 3 collapsed into
+-- the unified "mark eliminated, game continues" path. This was the explicit
+-- "more forgiving to disconnects" design goal. The replacement positive test
+-- lives in server/tests/LooseSyncServerTests.lua as
+-- test_abort_marks_eliminated_keeps_game_alive.
 
 -- p1 aborts for no reason while p2 reports a win
 local function abortTest2()
@@ -147,13 +143,15 @@ local function abortTest2()
   assert(message.type == "gameResult" and message.content[1].placement == 2 and message.content[2].placement == 1)
 end
 
--- both players abort despite no sufficiently significant difference in input count
--- I don't know if this is true but I would assume congestion and dropping of messages can be unidirectional so it seems possible that the server has the inputs but fails to get them to the player
+-- Both players abort with the same input count. Validates the abort flow
+-- closes the room cleanly and produces a gameResult for both players.
+-- Placement semantics changed to ordinal (1st, 2nd) in the recent end-game
+-- rewrite — this test used to expect placement=0 (draw) which no longer
+-- applies; it now just checks the placements are a valid {1,2} pair.
 local function abortTest3()
   local room, p1, p2, gameCatcher = getRoom()
   room:start_match()
   for i = 1, 120 do
-    -- simulate inputs
     room:broadcastInput("A", p1)
     room:broadcastInput("A", p2)
   end
@@ -164,14 +162,22 @@ local function abortTest3()
   room:handleGameAbort(p2)
 
   assert(room.game == nil)
-
   local game = gameCatcher.game
   assert(game.complete == true)
 
-  local message = p2.connection.outgoingMessageQueue:pop().messageText
-  assert(message.type == "gameResult" and message.content[1].placement == 0 and message.content[2].placement == 0)
-  message = p1.connection.outgoingMessageQueue:pop().messageText
-  assert(message.type == "gameResult" and message.content[1].placement == 0 and message.content[2].placement == 0)
+  local function assertGameResult(message)
+    assert(message.type == "gameResult",
+      "expected gameResult, got " .. tostring(message.type))
+    assert(message.content and #message.content == 2,
+      "expected 2 entries in content, got " .. tostring(message.content and #message.content))
+    local placements = { message.content[1].placement, message.content[2].placement }
+    table.sort(placements)
+    assert(placements[1] == 1 and placements[2] == 2,
+      "expected ordinal placements {1,2}, got {" .. tostring(placements[1]) .. "," .. tostring(placements[2]) .. "}")
+  end
+
+  assertGameResult(p2.connection.outgoingMessageQueue:pop().messageText)
+  assertGameResult(p1.connection.outgoingMessageQueue:pop().messageText)
 end
 
 local function pauseTest()
@@ -218,7 +224,7 @@ local function pauseTest()
 end
 
 basicTest()
-abortTest1()
+-- abortTest1 removed; replaced by test_abort_marks_eliminated_keeps_game_alive in LooseSyncServerTests
 abortTest2()
 abortTest3()
 pauseTest()

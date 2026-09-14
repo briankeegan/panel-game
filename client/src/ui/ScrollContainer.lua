@@ -6,6 +6,8 @@ local GraphicsUtil = require("client.src.graphics.graphics_util")
 
 ---@class ScrollContainerOptions : UiElementOptions
 ---@field scrollOrientation ("vertical" | "horizontal" | nil)
+---@field childGap integer? gap (px) between rendered children — defaulted by ScrollMenu
+---@field padding integer? outer padding (px) before the first child — defaulted by ScrollMenu
 
 ---@class ScrollContainer : UiElement
 ---@field scrollOrientation string "vertical" or "horizontal"
@@ -108,14 +110,15 @@ function ScrollContainer:draw()
   if self.isVisible then
     self:drawDebugOutline()
     -- make a stencil according to width/height
+    local pad = 6  -- extra pixels so rounded button borders aren't clipped
     if loveMajor >= 12 then
       love.graphics.setStencilMode("draw", 1)
-      love.graphics.rectangle("fill", self.x, self.y, self.width, self.height)
+      love.graphics.rectangle("fill", self.x - pad, self.y - pad, self.width + pad * 2, self.height + pad * 2)
       love.graphics.setStencilMode("test", 1)
     else
       -- the scrollcontainer props could theoretically change every frame so we need to recreate the closure every time
       local stencilFunction = function()
-        love.graphics.rectangle("fill", self.x, self.y, self.width, self.height)
+        love.graphics.rectangle("fill", self.x - pad, self.y - pad, self.width + pad * 2, self.height + pad * 2)
       end
       love.graphics.stencil(stencilFunction, "replace", 1)
       love.graphics.setStencilTest("greater", 0)

@@ -1,3 +1,15 @@
+## 🎮 Download & Play
+
+**Just want to play?** Download the launcher for your OS from the **[launcher release](https://github.com/briankeegan/panel-game/releases/tag/launcher)** — get it once and it auto-updates the game on every launch.
+
+> https://github.com/briankeegan/panel-game/releases/tag/launcher
+
+- **Windows** → `unofficial-panel-attack-ffa-and-team-windows.zip`
+- **macOS** → `unofficial-panel-attack-ffa-and-team-macos.zip` (if Gatekeeper complains, right-click the app → **Open**)
+- **Linux** → `unofficial-panel-attack-ffa-and-team-linux.zip`
+
+---
+
 # Panel Attack Development
 
 ## Development Setup

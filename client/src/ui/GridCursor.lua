@@ -21,6 +21,9 @@ local GridCursor = class(function(self, options)
   self.player = options.player
   self.player.cursor = self
   self.frameImages = options.frameImages or themes[config.theme]:getGridCursor(self.player.playerNumber)
+  if not (self.frameImages and self.frameImages[1]) then
+    self.frameImages = themes[config.theme]:getGridCursor(1)
+  end
   self.imageWidth, self.imageHeight = self.frameImages[1]:getDimensions()
   self.quads = {}
   self.quads.left = love.graphics.newQuad(0, 0, self.imageWidth / 2, self.imageHeight, self.imageWidth, self.imageHeight)
@@ -148,6 +151,10 @@ function GridCursor:setRapidBlinking(rapid)
 end
 
 function GridCursor:drawSelf()
+  -- touch: don't draw the keyboard-cursor frame. It highlights a different cell
+  -- per scene (looks like an inconsistent border on one card) and isn't needed
+  -- when you tap directly. Navigation still works; only the frame is hidden.
+  if require("client.src.system").isPortraitMode() then return end
   if self.target then
     self.drawClock = self.drawClock + 1
     local cursorFrame

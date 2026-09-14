@@ -11,8 +11,34 @@ else
 end
 
 local logger = {
-  messageBuffer = RingBuffer(2048)
+  messageBuffer = RingBuffer(2048),
+  logFile = nil
 }
+
+if love then
+  local sourceDir = love.filesystem.getSourceBaseDirectory()
+  -- Per-identity log file. run_client.sh sets a distinct LOVE_IDENTITY per
+  -- local player; a single shared client.log meant every client truncated and
+  -- interleaved into it, leaving the multi-client sessions unreadable. This
+  -- io.open(...,"w") + per-line flush (below) is the reliable channel — the
+  -- save-dir debug.log can silently no-op depending on the love version's
+  -- newFile open semantics. Default identity keeps the documented client.log.
+  local identity = (love.filesystem.getIdentity and love.filesystem.getIdentity()) or "Unofficial Panel Attack FFA & Team"
+  local suffix = identity:gsub("Unofficial Panel Attack FFA & Team", ""):gsub("^%s+", ""):gsub("%s+", "-")
+  local logName = (suffix == "") and "client.log" or ("client-" .. suffix .. ".log")
+  local logPath = sourceDir .. "/logs/" .. logName
+  logger.logFile = io.open(logPath, "w")
+
+  -- Per-identity live debug.log under love.filesystem (Application Support/
+  -- LOVE/<identity>/debug.log). main.lua only flushes the buffer at quit
+  -- time, so without this you can't tail a running session. setBuffer("none")
+  -- writes through immediately on each :write.
+  local ok, file = pcall(love.filesystem.newFile, "debug.log", "w")
+  if ok and file then
+    pcall(function() file:setBuffer("none") end)
+    logger.loveLogFile = file
+  end
+end
 
 ---@enum LogLevel
 logger.levels = {
@@ -76,7 +102,13 @@ function direct_log(prefix, msg)
   print(message)
   logger.messageBuffer:push(message)
   if not SERVER_MODE then
-    -- the space in the string below is on purpose
+    if logger.logFile then
+      logger.logFile:write(message .. "\n")
+      logger.logFile:flush()
+    end
+    if logger.loveLogFile then
+      pcall(function() logger.loveLogFile:write(message .. "\n") end)
+    end
     if prefix == "ERROR" or prefix == " WARN" then
       love.filesystem.append("warnings.txt", message .. "\n")
     end

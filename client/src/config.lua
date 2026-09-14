@@ -52,6 +52,9 @@ require("client.src.globals")
 ---@field windowX number?
 ---@field windowY number?
 ---@field discordCommunityShown boolean
+---@field lobbyTeamPrefs { type: string, playerCount: integer, composition: string, garbage: string, latency: string, spectateView: string }
+---@field lobbyFfaPrefs  { type: string, playerCount: integer, garbage: string, latency: string, spectateView: string }
+---@field max_lag_frames integer? developer override for the desync-tolerance window (defaults to 230 when absent)
 config = {
     -- The last used engine version
     version                       = consts.ENGINE_VERSION,
@@ -68,6 +71,9 @@ config = {
     -- Last choice for ranked and input method
     ranked                        = true,
     inputMethod                   = "controller",
+    -- Last input device the local player claimed (InputConfiguration.id, e.g.
+    -- "config_1" or "touch") so it's auto-restored instead of re-picked each launch
+    inputConfigurationId          = nil,
 
     use_music_from                = "either",
 
@@ -89,7 +95,7 @@ config = {
     master_volume                 = 50,
     SFX_volume                    = 50,
     music_volume                  = 50,
-    enableMenuMusic               = true,
+    enableMenuMusic               = false,
     -- Debug settings persisted separately
     debug                         = DebugSettings.getDefaultConfigValues(),
 
@@ -118,8 +124,31 @@ config = {
     -- Tracks if the default panels have been copied over yet
     defaultPanelsCopied           = false,
 
+    -- Lobby create-room form prefs, kept separate per flavor so picking
+    -- a team composition once doesn't perturb the FFA defaults (and vice
+    -- versa). Each field is independently validated on read; an unknown
+    -- value falls back to the default rather than rejecting the whole blob.
+    lobbyTeamPrefs                = {
+      type         = "open",    -- "invite" | "open"
+      playerCount  = 6,         -- 3 | 4 | 5 | 6 | 7
+      composition  = "3 vs 3",  -- label from Lobby.TEAM_DIVISIONS[playerCount]
+      garbage      = "shared",  -- "all" (broadcast) | "shared" (round robin)
+      latency      = "normal",  -- "strict" | "normal" | "relaxed"
+      spectateView = "new",     -- "old" (input-replication) | "new" (display-history). Per-client choice for how OTHER players' boards are rendered to you.
+    },
+    lobbyFfaPrefs                 = {
+      type         = "open",
+      playerCount  = 7,         -- 3 | 4 | 5 | 7
+      garbage      = "all",
+      latency      = "normal",
+      spectateView = "new",     -- per-client; see lobbyTeamPrefs.spectateView
+    },
+
     -- True if we immediately want to maximize the screen on startup
     maximizeOnStartup             = true,
+    -- Mobile only: render the game in portrait. Defaults on for phones; can be
+    -- turned off in Options (the toggle only shows on mobile). Ignored on desktop.
+    portraitMode                  = true,
     gameScaleType                 = "auto",
     gameScaleFixedValue           = 2,
 
@@ -140,13 +169,40 @@ config = {
       function()
         local encoded = json.encode(config)
         ---@cast encoded string
-        love.filesystem.write("conf.json", encoded)
+        fileUtils.writeScoped("conf.json", encoded)
       end
     )
   end
 
   local use_music_from_values = {stage = true, often_stage = true, either = true, often_characters = true, characters = true}
   local save_replays_values = {["with my name"] = true, anonymously = true, ["not at all"] = true}
+  local lobby_type_values = { invite = true, open = true }
+  local lobby_garbage_values = { all = true, shared = true }
+  local lobby_latency_values = { strict = true, normal = true, relaxed = true }
+  local lobby_team_player_count_values = { [3] = true, [4] = true, [5] = true, [6] = true, [7] = true }
+  local lobby_ffa_player_count_values = { [3] = true, [4] = true, [5] = true, [7] = true }
+
+  local function loadLobbyPrefs(defaults, raw, playerCountAllowed)
+    if type(raw) ~= "table" then return defaults end
+    local out = {}
+    for k, v in pairs(defaults) do out[k] = v end
+    if type(raw.type) == "string" and lobby_type_values[raw.type] then
+      out.type = raw.type
+    end
+    if type(raw.playerCount) == "number" and playerCountAllowed[raw.playerCount] then
+      out.playerCount = raw.playerCount
+    end
+    if type(raw.composition) == "string" then
+      out.composition = raw.composition  -- validated lazily against TEAM_DIVISIONS at use site
+    end
+    if type(raw.garbage) == "string" and lobby_garbage_values[raw.garbage] then
+      out.garbage = raw.garbage
+    end
+    if type(raw.latency) == "string" and lobby_latency_values[raw.latency] then
+      out.latency = raw.latency
+    end
+    return out
+  end
 
   -- reads the "conf.json" file and overwrites the values into the passed in table
   function readConfigFile(configTable)
@@ -155,7 +211,7 @@ config = {
         -- config current values are defined in globals.lua,
         -- we consider those values are currently in config
 
-        local read_data = fileUtils.readJsonFile("conf.json")
+        local read_data = fileUtils.readScoped("conf.json")
 
         if read_data then
           -- do stuff using read_data.version for retrocompatibility here
@@ -184,6 +240,10 @@ config = {
 
           if type(read_data.inputMethod) == "string" then
             configTable.inputMethod = read_data.inputMethod
+          end
+
+          if type(read_data.inputConfigurationId) == "string" then
+            configTable.inputConfigurationId = read_data.inputConfigurationId
           end
 
           if type(read_data.use_music_from) == "string" and use_music_from_values[read_data.use_music_from] then
@@ -259,6 +319,14 @@ config = {
             configTable.defaultPanelsCopied = read_data.defaultPanelsCopied
           end
 
+          configTable.lobbyTeamPrefs = loadLobbyPrefs(
+            configTable.lobbyTeamPrefs, read_data.lobbyTeamPrefs, lobby_team_player_count_values)
+          configTable.lobbyFfaPrefs = loadLobbyPrefs(
+            configTable.lobbyFfaPrefs, read_data.lobbyFfaPrefs, lobby_ffa_player_count_values)
+
+          if type(read_data.portraitMode) == "boolean" then
+            configTable.portraitMode = read_data.portraitMode
+          end
           if type(read_data.maximizeOnStartup) == "boolean" then
             configTable.maximizeOnStartup = read_data.maximizeOnStartup
           end

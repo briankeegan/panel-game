@@ -5,6 +5,24 @@ local GameModes = require("common.data.GameModes")
 -- we don't want to test the persistence part here, do that explicitly elsewhere instead
 local MockPersistence = require("server.tests.MockPersistence")
 local ServerTesting = require("server.tests.ServerTesting")
+local logger = require("common.lib.logger")
+
+-- Run fn() with logger.error captured silently. Returns the captured
+-- messages as an array. Tests that exercise an error path use this so the
+-- expected logger.error doesn't print to stdout (where it gets mistaken
+-- for a real test failure when scanning output) and gets turned into a
+-- positive assertion instead.
+local function captureLoggerErrors(fn)
+  local original = logger.error
+  local captured = {}
+  logger.error = function(msg)
+    captured[#captured + 1] = tostring(msg)
+  end
+  local ok, err = pcall(fn)
+  logger.error = original
+  if not ok then error(err) end
+  return captured
+end
 
 local leaderboard = Leaderboard(GameModes.getPreset(GameModes.IDs.TWO_PLAYER_VS), MockPersistence)
 leaderboard.consts.PLACEMENT_MATCH_COUNT_REQUIREMENT = 2
@@ -26,6 +44,13 @@ local p3 = ServerTesting.players[3]
 local p4 = ServerTesting.players[4]
 local p5 = ServerTesting.players[5]
 local p6 = ServerTesting.players[6]
+
+-- Fixtures skip the Room flow that assigns player_number; assign in array
+-- order here so ServerGame's slot==index invariant assert is satisfied.
+local function makeGame(players)
+  for i, p in ipairs(players) do p.player_number = i end
+  return ServerGame(players)
+end
 
 assert(leaderboard.players[p2.userId].rating == 1732)
 assert(leaderboard.players[p2.userId].placement_done)
@@ -68,7 +93,7 @@ local function testRankedApproved()
 end
 
 local function testSimpleGameProcessing()
-  local game = ServerGame({p2, p3})
+  local game = makeGame({p2, p3})
   game.winnerId = p2.publicPlayerID
 
   local ratingChanges = leaderboard:processGameResult(game)
@@ -84,23 +109,29 @@ local function testSimpleGameProcessing()
 end
 
 local function testImpossibleGameProcessing()
-  local game = ServerGame({p1, p4})
+  local game = makeGame({p1, p4})
   game.winnerId = p1.publicPlayerID
 
   local ratingChanges = leaderboard:processGameResult(game)
 
   assert(#ratingChanges == 0)
 
-  game = ServerGame({p1})
+  game = makeGame({p1})
   game.winnerId = p1.publicPlayerID
 
-  ratingChanges = leaderboard:processGameResult(game)
-
+  -- A single-player game can't be processed by a 2-player leaderboard;
+  -- the production code logs the rejection and returns no rating changes.
+  -- Capture the log so the test output stays clean, then assert it fired.
+  local errs = captureLoggerErrors(function()
+    ratingChanges = leaderboard:processGameResult(game)
+  end)
+  assert(#errs == 1 and errs[1]:find("only made to process results"),
+    "expected one player-count rejection log, got: " .. table.concat(errs, " | "))
   assert(#ratingChanges == 0)
 end
 
 local function testPlacementGameProcessing()
-  local game = ServerGame({p4, p5})
+  local game = makeGame({p4, p5})
   game.winnerId = p5.publicPlayerID
 
   local ratingChanges = leaderboard:processGameResult(game)

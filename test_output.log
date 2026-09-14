@@ -1,0 +1,125 @@
+]2;eval "$(luarocks path --local --lua-version 5.1)"]1;]2;set -o pipefail]1;]2;cd "$(dirname "$0")"]1;]2;luajit serverTestRunner.lua "$@"]1;05/15/26 12:44:10.440  INFO:=== running server tests (headless; MockPersistence, no port bound) ===
+05/15/26 12:44:10.506  INFO:0 players loaded
+05/15/26 12:44:10.506  WARN:Login failure: Player tried to create a new user with an already taken name: Jerry
+05/15/26 12:44:10.506  WARN:Login failure: Bob specified an invalid user ID
+05/15/26 12:44:10.506  WARN:Login failure: Player (2) tried to use already taken name: Jerry
+05/15/26 12:44:10.508  INFO:test_beginSession_opens_file_path
+05/15/26 12:44:10.508  INFO:test_endSession_drops_state
+05/15/26 12:44:10.510  INFO:test_recv_send_localEvent_round_trip_to_disk
+05/15/26 12:44:10.514  INFO:test_per_publicId_isolation
+05/15/26 12:44:10.519  INFO:test_recv_with_no_active_session_is_noop
+05/15/26 12:44:10.519  INFO:test_nil_publicId_is_noop
+05/15/26 12:44:10.519  INFO:test_beginSession_idempotent
+05/15/26 12:44:10.520  INFO:test_no_throw_on_unencodable_body
+05/15/26 12:44:10.521  WARN:[ServerTrace] encode failed: reference cycle
+05/15/26 12:44:10.523  INFO:test_flush_no_throw_when_no_session
+05/15/26 12:44:10.523  INFO:All TraceWriterTests passed!
+05/15/26 12:44:10.526  INFO:test_identical_streams_report_clean
+05/15/26 12:44:10.526  INFO:test_recv_entries_ignored_by_default
+05/15/26 12:44:10.526  INFO:test_body_value_diff_recorded
+05/15/26 12:44:10.526  INFO:test_body_type_diff_recorded
+05/15/26 12:44:10.526  INFO:test_left_has_extra_event
+05/15/26 12:44:10.526  INFO:test_right_has_extra_event
+05/15/26 12:44:10.526  INFO:test_buckets_isolate_publicIds
+05/15/26 12:44:10.527  INFO:test_buckets_isolate_prefixes
+05/15/26 12:44:10.527  INFO:test_intra_bucket_order_by_ts
+05/15/26 12:44:10.527  INFO:test_dirFilter_override_to_recv
+05/15/26 12:44:10.527  INFO:test_client_send_and_server_recv_match_at_wire_layer
+05/15/26 12:44:10.528  INFO:All TraceDiffTests passed!
+05/15/26 12:44:10.544  INFO:6 players loaded
+05/15/26 12:44:10.545  WARN:1 Login from Bob with ip: 170.46.23.4 publicPlayerID: 4
+05/15/26 12:44:10.555  INFO:6 players loaded
+05/15/26 12:44:10.556  WARN:2 Login from Alice with ip: 170.46.23.4 publicPlayerID: 5
+05/15/26 12:44:10.559  WARN:3 Login from Ben with ip: 170.46.23.4 publicPlayerID: 8
+05/15/26 12:44:10.561  WARN:1 Login from Bob with ip: 170.46.23.4 publicPlayerID: 4
+05/15/26 12:44:10.569  INFO:Setting room to 1 for player Ben
+05/15/26 12:44:10.569  INFO:Setting room to 1 for player Alice
+05/15/26 12:44:10.584  INFO:6 players loaded
+05/15/26 12:44:10.585  WARN:2 Login from Alice with ip: 170.46.23.4 publicPlayerID: 5
+05/15/26 12:44:10.585  WARN:3 Login from Ben with ip: 170.46.23.4 publicPlayerID: 8
+05/15/26 12:44:10.586  WARN:1 Login from Bob with ip: 170.46.23.4 publicPlayerID: 4
+05/15/26 12:44:10.590  INFO:Setting room to 1 for player Ben
+05/15/26 12:44:10.590  INFO:Setting room to 1 for player Alice
+05/15/26 12:44:10.602  INFO:6 players loaded
+05/15/26 12:44:10.603  WARN:2 Login from Alice with ip: 170.46.23.4 publicPlayerID: 5
+05/15/26 12:44:10.604  WARN:3 Login from Ben with ip: 170.46.23.4 publicPlayerID: 8
+05/15/26 12:44:10.605  WARN:1 Login from Bob with ip: 170.46.23.4 publicPlayerID: 4
+05/15/26 12:44:10.610  INFO:Setting room to 1 for player Ben
+05/15/26 12:44:10.611  INFO:Setting room to 1 for player Alice
+05/15/26 12:44:10.616  INFO:Room 1 readiness after Alice update: slot1:Ben[wantsReady=false loaded=nil ready=false isReady=false] slot2:Alice[wantsReady=true loaded=true ready=true isReady=true]
+05/15/26 12:44:10.617  INFO:Room 1 readiness after Ben update: slot1:Ben[wantsReady=true loaded=true ready=true isReady=true] slot2:Alice[wantsReady=true loaded=true ready=true isReady=true]
+05/15/26 12:44:10.617  INFO:Starting match 1 for 1 Ben vs Alice
+05/15/26 12:44:10.636  INFO:1 Ben vs Alice match 1 ended with winner 2
+05/15/26 12:44:10.640  INFO:Room 1 readiness after Alice update: slot1:Ben[wantsReady=false loaded=true ready=false isReady=false] slot2:Alice[wantsReady=true loaded=true ready=true isReady=true]
+05/15/26 12:44:10.644  INFO:Room 1 readiness after Ben update: slot1:Ben[wantsReady=true loaded=true ready=true isReady=true] slot2:Alice[wantsReady=true loaded=true ready=true isReady=true]
+05/15/26 12:44:10.644  INFO:Starting match 2 for 1 Ben vs Alice
+05/15/26 12:44:10.652  INFO:1: voiding room (Ben left)
+05/15/26 12:44:10.652  INFO:1: Ben disconnected while alive — synthesizing DeathEvent at frame 1
+05/15/26 12:44:10.661  INFO:Clearing room 1 for player Ben
+05/15/26 12:44:10.668  INFO:6 players loaded
+05/15/26 12:44:10.669  WARN:1 Login from Bob with ip: 170.46.23.4 publicPlayerID: 4
+05/15/26 12:44:10.670  WARN:2 Login from Alice with ip: 170.46.23.4 publicPlayerID: 5
+05/15/26 12:44:10.671  WARN:3 Login from Ben with ip: 170.46.23.4 publicPlayerID: 8
+05/15/26 12:44:10.675  INFO:Setting room to 1 for player Ben
+05/15/26 12:44:10.675  INFO:Setting room to 1 for player Alice
+05/15/26 12:44:10.688  INFO:Room 1 readiness after Alice update: slot1:Ben[wantsReady=false loaded=nil ready=false isReady=false] slot2:Alice[wantsReady=true loaded=true ready=true isReady=true]
+05/15/26 12:44:10.689  INFO:Room 1 readiness after Ben update: slot1:Ben[wantsReady=true loaded=true ready=true isReady=true] slot2:Alice[wantsReady=true loaded=true ready=true isReady=true]
+05/15/26 12:44:10.689  INFO:Starting match 1 for 1 Ben vs Alice
+05/15/26 12:44:10.696  INFO:Closing gameplay connection 3 to Ben
+05/15/26 12:44:10.696  INFO:Gameplay socket dropped for Ben but room slot preserved; awaiting reconnect.
+05/15/26 12:44:10.702  INFO:6 players loaded
+05/15/26 12:44:10.702  WARN:1 Login from Bob with ip: 170.46.23.4 publicPlayerID: 4
+05/15/26 12:44:10.703  WARN:2 Login from Alice with ip: 170.46.23.4 publicPlayerID: 5
+05/15/26 12:44:10.704  WARN:3 Login from Ben with ip: 170.46.23.4 publicPlayerID: 8
+05/15/26 12:44:10.706  WARN:4 Login from Jerry with ip: 170.46.23.4 publicPlayerID: 24
+05/15/26 12:44:10.711  INFO:Setting room to 1 for player Jerry
+05/15/26 12:44:10.711  INFO:Setting room to 1 for player Ben
+05/15/26 12:44:10.725  WARN:5 Login from Berta with ip: 170.46.23.4 publicPlayerID: 38
+05/15/26 12:44:10.732  INFO:6 players loaded
+05/15/26 12:44:10.732  WARN:1 Login from Bob with ip: 170.46.23.4 publicPlayerID: 4
+05/15/26 12:44:10.733  WARN:2 Login from Alice with ip: 170.46.23.4 publicPlayerID: 5
+05/15/26 12:44:10.736  WARN:roomRequest received from Bob state=lobby mode=vsSelf latency=nil
+05/15/26 12:44:10.736  INFO:Setting room to 1 for player Bob
+05/15/26 12:44:10.742  INFO:Room 1 readiness after Bob update: slot1:Bob[wantsReady=true loaded=true ready=true isReady=true]
+05/15/26 12:44:10.743  INFO:Starting match 1 for 1 Bob
+05/15/26 12:44:10.761  INFO:6 players loaded
+05/15/26 12:44:10.761  WARN:1 Login from Bob with ip: 170.46.23.4 publicPlayerID: 4
+05/15/26 12:44:10.763  WARN:roomRequest received from Bob state=lobby mode=vsSelf latency=nil
+05/15/26 12:44:10.763  INFO:Setting room to 1 for player Bob
+05/15/26 12:44:10.766  WARN:Player Bob tried to spectate while being in room 1
+05/15/26 12:44:10.775  INFO:6 players loaded
+05/15/26 12:44:10.775  WARN:2 Login from Alice with ip: 170.46.23.4 publicPlayerID: 5
+05/15/26 12:44:10.776  WARN:3 Login from Ben with ip: 170.46.23.4 publicPlayerID: 8
+05/15/26 12:44:10.776  WARN:Ignored player.state write for Alice (state is derived)
+05/15/26 12:44:10.776  WARN:Ignored player.state write for Ben (state is derived)
+05/15/26 12:44:10.778  WARN:roomRequest received from Alice state=lobby mode=three_player_vs_all latency=nil
+05/15/26 12:44:10.778  INFO:Setting room to 1 for player Alice
+05/15/26 12:44:10.783  INFO:Setting room to 1 for player Ben
+05/15/26 12:44:10.785  INFO:Player Ben joined room 1 as player 2
+05/15/26 12:44:10.787  INFO:Player Ben joined room 1 as player 2
+05/15/26 12:44:10.793  INFO:6 players loaded
+05/15/26 12:44:10.793  WARN:2 Login from Alice with ip: 170.46.23.4 publicPlayerID: 5
+05/15/26 12:44:10.794  WARN:1 Login from Bob with ip: 170.46.23.4 publicPlayerID: 4
+05/15/26 12:44:10.795  WARN:roomRequest received from Alice state=lobby mode=three_player_vs_all latency=nil
+05/15/26 12:44:10.796  INFO:Setting room to 1 for player Alice
+05/15/26 12:44:10.805  INFO:6 players loaded
+05/15/26 12:44:10.805  WARN:2 Login from Alice with ip: 170.46.23.4 publicPlayerID: 5
+05/15/26 12:44:10.806  WARN:1 Login from Bob with ip: 170.46.23.4 publicPlayerID: 4
+05/15/26 12:44:10.808  WARN:roomRequest received from Alice state=lobby mode=three_player_vs_all latency=nil
+05/15/26 12:44:10.808  INFO:Setting room to 1 for player Alice
+05/15/26 12:44:10.812  INFO:Received joinRoomRequest from Bob for room 1 slot 2
+05/15/26 12:44:10.812  INFO:Setting room to 1 for player Bob
+05/15/26 12:44:10.814  INFO:Player Bob joined room 1 as player 2
+05/15/26 12:44:10.815  INFO:Player Bob joined room 1 as player 2
+05/15/26 12:44:10.821  INFO:6 players loaded
+05/15/26 12:44:10.822  WARN:2 Login from Alice with ip: 170.46.23.4 publicPlayerID: 5
+05/15/26 12:44:10.825  WARN:roomRequest received from Alice state=lobby mode=three_player_vs_all latency=nil
+05/15/26 12:44:10.825  INFO:Setting room to 1 for player Alice
+luajit: ./server/tests/ServerTests.lua:670: parseMessage introduced new top-level key 'endless_no_raise' for wire shape with type=nil
+stack traceback:
+	[C]: in function 'assert'
+	./server/tests/ServerTests.lua:670: in function 'testParseMessage_doesNotRenameTopLevelKeys'
+	./server/tests/ServerTests.lua:849: in main chunk
+	[C]: in function 'require'
+	serverTestRunner.lua:32: in main chunk
+	[C]: at 0x0107cc09eb

@@ -46,6 +46,14 @@ local Slider = class(
     -- pixels per value change
     self.tickLength = options.tickLength or 1
     self.tickAmount = options.tickAmount or 1
+    -- portrait: the default tickLength makes a tiny unusable bar on a phone. Derive
+    -- a tickLength so the slider spans a usable width regardless of its range.
+    if require("client.src.system").isPortraitMode() then
+      local ticks = (self.max - self.min) / self.tickAmount
+      if ticks > 0 then
+        self.tickLength = math.max(self.tickLength, math.ceil(460 / ticks))
+      end
+    end
     self.onValueChange = options.onValueChange or function() end
     local value = options.value or math.floor((self.max - self.min) / 2)
     self.value = self:getBoundedValue(value) -- don't use set value as not everything is setup yet

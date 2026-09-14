@@ -33,6 +33,24 @@ function ClientProtocol.requestLogin(userId, name, level, inputMethod, panels, b
   }
 end
 
+-- Minimal login for follow-on sockets (lobby, spectate). The server's login
+-- fast-path attaches the new connection to the already-existing Player when
+-- user_id is known; no settings/level/etc. are needed for that path.
+-- Skips the version-check round-trip too — gameplay already verified.
+function ClientProtocol.requestSessionClaim(userId, name)
+  local message = {
+    login_request = true,
+    user_id = userId,
+    engine_version = consts.ENGINE_VERSION,
+    name = name,
+  }
+  return {
+    messageType = msgTypes.jsonMessage,
+    messageText = message,
+    responseTypes = {"login_successful", "login_denied"}
+  }
+end
+
 function ClientProtocol.logout()
   local logoutMessage = {logout = true}
 
@@ -57,7 +75,10 @@ end
 ---@param senderId PublicPlayerID
 ---@param receiverId PublicPlayerID
 ---@param gameModeId GameModeID
-function ClientProtocol.updateChallengeStatus(senderId, receiverId, gameModeId, challengeActive)
+---@param challengeActive boolean
+---@param roomNumber integer? optional room number for team room invites
+---@param slotNumber integer? optional slot number (player index) for team room invites
+function ClientProtocol.updateChallengeStatus(senderId, receiverId, gameModeId, challengeActive, roomNumber, slotNumber)
   local playerChallengeV2Message =
   {
     challengeUpdate =
@@ -66,12 +87,31 @@ function ClientProtocol.updateChallengeStatus(senderId, receiverId, gameModeId, 
       receiverId = receiverId,
       gameModeId = gameModeId,
       challengeActive = challengeActive,
+      roomNumber = roomNumber,
+      slotNumber = slotNumber,
     }
   }
 
   return {
     messageType = msgTypes.jsonMessage,
     messageText = playerChallengeV2Message,
+  }
+end
+
+--- Request to join an existing room at a specific slot
+---@param roomNumber integer
+---@param slotNumber integer the player index to join as
+function ClientProtocol.requestJoinRoom(roomNumber, slotNumber)
+  local joinRoomMessage = {
+    joinRoomRequest = {
+      roomNumber = roomNumber,
+      slotNumber = slotNumber,
+    }
+  }
+
+  return {
+    messageType = msgTypes.jsonMessage,
+    messageText = joinRoomMessage,
   }
 end
 
@@ -117,6 +157,19 @@ function ClientProtocol.leaveRoom()
   }
 end
 
+---Host-only request to evict another player from an open-room session.
+---Server validates the sender is the room owner and the room is openRoom;
+---rejects otherwise. The target is bounced via the standard leaveRoom path
+---(server sends them a leaveRoom message) — they can rejoin immediately.
+---@param publicId PublicPlayerID
+function ClientProtocol.kickPlayer(publicId)
+  local kickMessage = {kick_player = true, publicId = publicId}
+  return {
+    messageType = msgTypes.jsonMessage,
+    messageText = kickMessage,
+  }
+end
+
 function ClientProtocol.reportLocalGameResult(outcome)
   local gameResultMessage = {game_over = true, outcome = outcome}
   return {
@@ -143,12 +196,23 @@ function ClientProtocol.sendTaunt(direction, index)
 end
 
 ---@param gameMode GameMode
-function ClientProtocol.sendRoomRequest(gameMode)
+---@param latencyTolerance ("strict"|"normal"|"relaxed")? optional room abort-latency tolerance
+---@param openRoom boolean? true if the room should accept direct joiners (no invite handshake).
+---  Independent of min/max roster — an Open Team 2v2 has min==max==4 (team structure is fixed)
+---  but should still accept drop-in joiners. The lobby uses this flag to choose join vs invite buttons.
+---@param displayHistoryEnabled boolean? per-room: when true, every client in the room runs the
+---  parallel display-history viewer (DISPLAY_HISTORY_PLAN.md). Optional / defaults to false.
+function ClientProtocol.sendRoomRequest(gameMode, latencyTolerance, openRoom, displayHistoryEnabled)
   local gameModeData = gameMode:getGameModeJSONData()
   local roomRequestMessage = {
     recipient = "server",
     type = "roomRequest",
-    content = { gameMode = gameModeData }
+    content = {
+      gameMode = gameModeData,
+      latencyTolerance = latencyTolerance,
+      openRoom = openRoom and true or false,
+      displayHistoryEnabled = displayHistoryEnabled and true or false,
+    }
   }
   return {
     messageType = msgTypes.jsonMessage,
@@ -166,6 +230,62 @@ function ClientProtocol.sendMatchAbort(roomNumber)
   return {
     messageType = msgTypes.jsonMessage,
     messageText = matchAbortMessage
+  }
+end
+
+---Loose-sync: send a GarbageEvent — sender's local sim has resolved garbage
+---for one or more remote targets. Body is wrapped as a marked G-prefix message,
+---not a JSON envelope.
+---@param body table parsed payload (will be JSON-encoded on send)
+function ClientProtocol.sendGarbageEvent(body)
+  return {
+    messageType = msgTypes.garbageEvent,
+    messageText = body,
+  }
+end
+
+---Loose-sync: send a DeathEvent — sender's local sim has reached game over.
+---@param body table parsed payload (will be JSON-encoded on send)
+function ClientProtocol.sendDeathEvent(body)
+  return {
+    messageType = msgTypes.deathEvent,
+    messageText = body,
+  }
+end
+
+---Pause-mode rewind committed locally; the server should truncate its input
+---record + clear elimination/outcome state for the sender at `senderFrame`.
+---@param body table {senderFrame: integer}
+function ClientProtocol.sendRewindEvent(body)
+  return {
+    messageType = msgTypes.rewindEvent,
+    messageText = body,
+  }
+end
+
+---Crash-replay nomination. Sent on next quiescent moment (post-login
+---or lobby return) per docs/CRASH_REPLAY_PLAN.md. Carries the gameKey
+---+ trace metadata only — the actual JSONL trace file ships separately
+---via the (forthcoming) traceFile message in response to the server's
+---requestTrace.
+---@param gameKey {roomNumber: integer, gameId: integer, startTs: integer}
+---@param reason string e.g. "client_crash", "user_reported"
+---@param traceHash string? short fingerprint used by the server to dedup
+---@param traceFragment string? short error excerpt for forensic context
+---@param clientMeta table? engineVersion / os / loveVersion / branch
+function ClientProtocol.flagGame(gameKey, reason, traceHash, traceFragment, clientMeta)
+  return {
+    messageType = msgTypes.jsonMessage,
+    messageText = {
+      flagGame = {
+        gameKey       = gameKey,
+        reason        = reason,
+        traceHash     = traceHash,
+        traceFragment = traceFragment,
+        clientMeta    = clientMeta,
+        schemaVer     = 1,
+      },
+    },
   }
 end
 

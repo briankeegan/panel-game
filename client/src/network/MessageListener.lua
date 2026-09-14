@@ -12,11 +12,16 @@ end)
 -- listens for messages with the specified header
 -- passes any messages caught to the registered events
 function MessageListener:listen()
-  messages = GAME.netClient.tcpClient.receivedMessageQueue:pop_all_with(self.messageHeader)
-  for i = 1, #messages do
-    local message = messages[i]
-    for subscriber, callback in pairs(self.subscriptionList) do
-      callback(subscriber, message)
+  -- Drain JSON messages from ALL three sockets. Shared-auth means each
+  -- socket's login response lands in its own queue. In steady state J only
+  -- arrives on lobby (Player:sendJson routes to lobbyConnection), but
+  -- gameplay/spectate may carry J during the login window.
+  local nc = GAME.netClient
+  for _, client in ipairs(nc.clients) do
+    for _, message in ipairs(client.receivedMessageQueue:pop_all_with(self.messageHeader)) do
+      for subscriber, callback in pairs(self.subscriptionList) do
+        callback(subscriber, message)
+      end
     end
   end
 end

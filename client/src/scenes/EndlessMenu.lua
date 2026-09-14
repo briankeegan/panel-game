@@ -1,4 +1,5 @@
 local CharacterSelect = require("client.src.scenes.CharacterSelect")
+local system = require("client.src.system")
 local class = require("common.lib.class")
 local GameModes = require("common.data.GameModes")
 local LevelPresets = require("common.data.LevelPresets")
@@ -23,8 +24,19 @@ end
 function EndlessMenu:loadUserInterface()
   local player = self.battleRoom.players[1]
 
-  local unitSize = 100
-  self.ui.grid = ui.Grid({unitSize = unitSize, gridWidth = 9, gridHeight = 6, unitMargin = 8, hAlign = "center", vAlign = "center"})
+  self:addPortraitBackdrop()
+  local pm = system.isPortraitMode()
+  local unitSize, gridW, gridH = 100, 9, 6
+  -- portrait: a tall, narrow grid. Settings stack vertically (one/two per row),
+  -- the character grid shrinks (fewer per page) with page arrows, actions pin to
+  -- the bottom. Landscape (else) is exactly as before.
+  if pm then
+    -- size the unit so the grid fills the screen height — keeps controls big and
+    -- puts the bottom action row at a consistent y (no "content sits too low" gap)
+    gridW, gridH = 4, 10
+    unitSize = math.floor(1240 / gridH)
+  end
+  self.ui.grid = ui.Grid({unitSize = unitSize, gridWidth = gridW, gridHeight = gridH, unitMargin = 8, hAlign = "center", vAlign = "center"})
   self.uiRoot:addChild(self.ui.grid)
 
   self.ui.characterIcons[1] = self:createPlayerIcon(player)
@@ -33,26 +45,69 @@ function EndlessMenu:loadUserInterface()
   self.ui.recordBox = self:createRecordsBox("Last Score")
   self.ui.recordBox:setVisibility(player.settings.style == GameModes.Styles.CLASSIC)
   self:refresh()
-  self.ui.grid:createElementAt(2, 1, 2, 1, "recordBox", self.ui.recordBox, nil, true)
+  self.ui.grid:createElementAt(2, 1, pm and 3 or 2, 1, "recordBox", self.ui.recordBox, nil, true)
+
+  if self.battleRoom and self.battleRoom.online then
+    self.ui.pauseWarning = ui.Label({
+      text = "Pausing mid-game forfeits your score.\nWhile paused, use ← / → to rewind or advance.",
+      translate = false,
+      hAlign = "center",
+      vAlign = "center"
+    })
+    if pm then
+      self.ui.grid:createElementAt(1, 7, 4, 1, "pauseWarning", self.ui.pauseWarning)
+    else
+      self.ui.grid:createElementAt(4, 1, 6, 1, "pauseWarning", self.ui.pauseWarning)
+    end
+  end
 
   self.ui.panelSelection = ui.MultiPlayerSelectionWrapper({hFill = true, alignment = "top", hAlign = "center", vAlign = "top"})
   self.ui.panelSelection:setTitle("panels")
   local panelCarousel = self:createPanelCarousel(player, self.ui.grid.unitSize - self.ui.grid.unitMargin * 2 - self.ui.panelSelection.height)
   self.ui.panelSelection:addElement(panelCarousel, player)
-  self.ui.grid:createElementAt(1, 2, 2, 1, "panelSelection", self.ui.panelSelection, nil, true)
+  if pm then
+    self.ui.grid:createElementAt(1, 2, 4, 1, "panelSelection", self.ui.panelSelection, nil, true)
+  else
+    self.ui.grid:createElementAt(1, 2, 2, 1, "panelSelection", self.ui.panelSelection, nil, true)
+  end
 
-  local stageCarousel = self:createStageCarousel(player, self.ui.grid.unitSize * 2 - self.ui.grid.unitMargin * 2)
+  -- portrait: full-width stage so the < > arrows have room (else they squeeze
+  -- into a ~109px box and disappear)
+  local stageCarousel = self:createStageCarousel(player, (pm and self.ui.grid.unitSize * 4 or self.ui.grid.unitSize) - self.ui.grid.unitMargin * 2)
   self.ui.stageSelection = ui.MultiPlayerSelectionWrapper({vFill = true, alignment = "left", hAlign = "center", vAlign = "center"})
   self.ui.stageSelection:setTitle("stage")
   self.ui.stageSelection:addElement(stageCarousel, player)
-  self.ui.grid:createElementAt(3, 2, 2, 1, "stageSelection", self.ui.stageSelection, nil, true)
+  if pm then
+    self.ui.grid:createElementAt(1, 3, 4, 1, "stageSelection", self.ui.stageSelection, nil, true)
+  else
+    self.ui.grid:createElementAt(3, 2, 1, 1, "stageSelection", self.ui.stageSelection, nil, true)
+  end
 
   self.ui.styleSelection = ui.MultiPlayerSelectionWrapper({vFill = true, alignment = "left", hAlign = "center", vAlign = "center"})
   self.ui.styleSelection:setTitle("endless_modern")
   local styleContainer, styleSelector = self:createStyleSelection(player, unitSize)
   self.ui.styleSelection:addElement(styleContainer, player)
 
-  self.ui.grid:createElementAt(5, 2, 1, 1, "styleSelection", self.ui.styleSelection, nil, true)
+  if pm then
+    self.ui.grid:createElementAt(1, 4, 2, 1, "styleSelection", self.ui.styleSelection, nil, true)
+  else
+    self.ui.grid:createElementAt(4, 2, 1, 1, "styleSelection", self.ui.styleSelection, nil, true)
+  end
+
+  self.ui.noRaiseSelection = ui.MultiPlayerSelectionWrapper({vFill = true, alignment = "left", hAlign = "center", vAlign = "center"})
+  self.ui.noRaiseSelection:setTitle("endless_no_raise")
+  local noRaiseContainer, noRaiseSelector = self:createNoRaiseSelection(player, unitSize)
+  self.ui.noRaiseSelection:addElement(noRaiseContainer, player)
+  if pm then
+    self.ui.grid:createElementAt(3, 4, 2, 1, "noRaiseSelection", self.ui.noRaiseSelection, nil, true)
+  else
+    self.ui.grid:createElementAt(5, 2, 1, 1, "noRaiseSelection", self.ui.noRaiseSelection, nil, true)
+  end
+
+  noRaiseSelector.onValueChange = function(boolSelector, value)
+    GAME.theme:playValidationSfx()
+    player:setEndlessNoRaise(value)
+  end
 
   self.ui.speedSelection = ui.MultiPlayerSelectionWrapper({
     hFill = true,
@@ -77,7 +132,7 @@ function EndlessMenu:loadUserInterface()
 
   self.ui.levelSelection = ui.MultiPlayerSelectionWrapper({hFill = true, alignment = "top", hAlign = "center", vAlign = "top"})
   self.ui.levelSelection:setTitle("level")
-  local levelSlider = self:createLevelSlider(player, 20, self.ui.grid.unitSize - self.ui.grid.unitMargin * 2 - self.ui.levelSelection.height)
+  local levelSlider = self:createLevelSlider(player, pm and 40 or 20, self.ui.grid.unitSize - self.ui.grid.unitMargin * 2 - self.ui.levelSelection.height)
   self.ui.levelSelection:addElement(levelSlider, player)
 
   styleSelector.onValueChange = function(boolSelector, value)
@@ -92,23 +147,47 @@ function EndlessMenu:loadUserInterface()
   end
 
   self.ui.readyButton = self:createReadyButton()
-  self.ui.grid:createElementAt(9, 2, 1, 1, "readyButton", self.ui.readyButton)
+  if pm then
+    self.ui.grid:createElementAt(3, 10, 2, 1, "readyButton", self.ui.readyButton)
+  else
+    self.ui.grid:createElementAt(9, 2, 1, 1, "readyButton", self.ui.readyButton)
+  end
 
   local characterButtons = self:getCharacterButtons()
+  -- portrait: max 4 characters per page (1 row of 4, bigger), page arrows for
+  -- left/right; landscape keeps the wide 9x3 grid.
   local characterGridWidth, characterGridHeight = 9, 3
+  if pm then characterGridWidth, characterGridHeight = 4, 1 end
   self.ui.characterGrid = self:createCharacterGrid(characterButtons, self.ui.grid, characterGridWidth, characterGridHeight)
-  self.ui.grid:createElementAt(1, 3, characterGridWidth, characterGridHeight, "characterSelection", self.ui.characterGrid, true)
+  if pm then
+    self.ui.grid:createElementAt(1, 8, characterGridWidth, characterGridHeight, "characterSelection", self.ui.characterGrid, true)
+  else
+    self.ui.grid:createElementAt(1, 3, characterGridWidth, characterGridHeight, "characterSelection", self.ui.characterGrid, true)
+  end
 
   self.ui.pageIndicator = self:createPageIndicator(self.ui.characterGrid)
-  self.ui.grid:createElementAt(5, 6, 1, 1, "pageIndicator", self.ui.pageIndicator)
+  if pm then
+    self.ui.grid:createElementAt(2, 9, 1, 1, "pageIndicator", self.ui.pageIndicator)
+  else
+    self.ui.grid:createElementAt(5, 6, 1, 1, "pageIndicator", self.ui.pageIndicator)
+  end
 
   self.ui.pageTurnButtons = self:createPageTurnButtons(self.ui.characterGrid)
 
   self.ui.changeInputButton = self:createChangeInputButton()
-  self.ui.grid:createElementAt(8, 6, 1, 1, "changeInputButton", self.ui.changeInputButton)
+  -- portrait: hide Change Input Device (touch only; no device switching on phone)
+  if pm then
+    self.ui.changeInputButton:setVisibility(false)
+  else
+    self.ui.grid:createElementAt(8, 6, 1, 1, "changeInputButton", self.ui.changeInputButton)
+  end
 
   self.ui.leaveButton = self:createLeaveButton()
-  self.ui.grid:createElementAt(9, 6, 1, 1, "leaveButton", self.ui.leaveButton)
+  if pm then
+    self.ui.grid:createElementAt(1, 10, 2, 1, "leaveButton", self.ui.leaveButton)
+  else
+    self.ui.grid:createElementAt(9, 6, 1, 1, "leaveButton", self.ui.leaveButton)
+  end
 
   self.ui.cursors[1] = self:createCursor(self.ui.grid, player)
   self.ui.cursors[1].raise1Callback = function()
@@ -123,15 +202,30 @@ function EndlessMenu:loadUserInterface()
 end
 
 function EndlessMenu:onStyleChanged(style, player)
-  if style == GameModes.Styles.MODERN then
-    self.ui.grid:removeElementsIn(6, 2, 3, 1)
-    self.ui.grid:createElementAt(6, 2, 3, 1, "levelSelection", self.ui.levelSelection, nil, true)
-    self.ui.recordBox:setVisibility(false)
+  -- The speed/difficulty/level controls swap with style.
+  -- Portrait: Speed/Level full-width on row 5, Difficulty full-width on row 6.
+  -- Landscape: original (6,2) area.
+  if system.isPortraitMode() then
+    self.ui.grid:removeElementsIn(1, 5, 4, 2)
+    if style == GameModes.Styles.MODERN then
+      self.ui.grid:createElementAt(1, 5, 4, 1, "levelSelection", self.ui.levelSelection, nil, true)
+      if self.ui.recordBox then self.ui.recordBox:setVisibility(false) end
+    else
+      self.ui.grid:createElementAt(1, 5, 4, 1, "speedSelection", self.ui.speedSelection, nil, true)
+      self.ui.grid:createElementAt(1, 6, 4, 1, "difficultySelection", self.ui.difficultySelection, nil, true)
+      if self.ui.recordBox then self.ui.recordBox:setVisibility(true) end
+    end
   else
-    self.ui.grid:removeElementsIn(6, 2, 3, 1)
-    self.ui.grid:createElementAt(6, 2, 2, 1, "speedSelection", self.ui.speedSelection, nil, true)
-    self.ui.grid:createElementAt(8, 2, 1, 1, "difficultySelection", self.ui.difficultySelection, nil, true)
-    self.ui.recordBox:setVisibility(true)
+    if style == GameModes.Styles.MODERN then
+      self.ui.grid:removeElementsIn(6, 2, 3, 1)
+      self.ui.grid:createElementAt(6, 2, 3, 1, "levelSelection", self.ui.levelSelection, nil, true)
+      if self.ui.recordBox then self.ui.recordBox:setVisibility(false) end
+    else
+      self.ui.grid:removeElementsIn(6, 2, 3, 1)
+      self.ui.grid:createElementAt(6, 2, 2, 1, "speedSelection", self.ui.speedSelection, nil, true)
+      self.ui.grid:createElementAt(8, 2, 1, 1, "difficultySelection", self.ui.difficultySelection, nil, true)
+      if self.ui.recordBox then self.ui.recordBox:setVisibility(true) end
+    end
   end
 end
 
@@ -144,14 +238,14 @@ function EndlessMenu:initializeFromLocalPlayerSettings(player)
 end
 
 function EndlessMenu:refresh()
-  if self.battleRoom then
-    local difficulty = self.battleRoom.players[1].settings.difficulty
-    self.lastScore = GAME.scores:lastEndlessForLevel(difficulty)
-    self.record = GAME.scores:recordEndlessForLevel(difficulty)
-    if self.ui.recordBox then
-      self.ui.recordBox:setLastResult(self.lastScore)
-      self.ui.recordBox:setRecord(self.record)
-    end
+  local player = self.battleRoom and self.battleRoom.players and self.battleRoom.players[1]
+  if not (player and player.settings) then return end
+  local difficulty = player.settings.difficulty
+  self.lastScore = GAME.scores:lastEndlessForLevel(difficulty)
+  self.record = GAME.scores:recordEndlessForLevel(difficulty)
+  if self.ui.recordBox then
+    self.ui.recordBox:setLastResult(self.lastScore)
+    self.ui.recordBox:setRecord(self.record)
   end
 end
 

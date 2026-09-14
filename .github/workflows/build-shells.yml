@@ -323,14 +323,27 @@ jobs:
           echo 'app.name=Unofficial Panel Attack FFA &amp; Team' >> gradle.properties
           sed -i "s|^app.version_name=.*|app.version_name=$VER|" gradle.properties
           sed -i "s|^app.version_code=.*|app.version_code=$VCODE|" gradle.properties
-          # Lock the device to PORTRAIT (love-android defaults to landscape, which made
-          # the portrait game render sideways). Mobile defaults to portrait mode.
-          sed -i 's|^app.orientation=.*|app.orientation=sensorPortrait|' gradle.properties
+          # Neutral starting orientation (love-android defaults to landscape, which made
+          # the portrait game render sideways). GameActivityOrientation.java.inc overrides
+          # this at runtime from config.portraitMode before the first frame, so this is
+          # just the fallback if that patch somehow doesn't apply.
+          sed -i 's|^app.orientation=.*|app.orientation=unspecified|' gradle.properties
           grep -E '^app\.(name|application_id|version|orientation)' gradle.properties
           # launcher icon is android:icon="@drawable/love" -> overwrite each density
           for d in drawable-mdpi drawable-hdpi drawable-xhdpi drawable-xxhdpi drawable-xxxhdpi; do
             cp "$GITHUB_WORKSPACE/updater-shell/icon.png" "app/src/main/res/$d/love.png"
           done
+
+      - name: Patch orientation from config.portraitMode (android-shell-patches/)
+        run: python3 android-shell-patches/patch_orientation.py
+
+      - name: Install stable debug keystore (android-shell-patches/debug.keystore)
+        run: |
+          # Without this, Gradle auto-generates a fresh debug key every CI run, so
+          # Android refuses to install a new build over an old one (signature
+          # mismatch) -- forcing an uninstall (and local-data wipe) on every update.
+          mkdir -p ~/.android
+          cp android-shell-patches/debug.keystore ~/.android/debug.keystore
 
       - name: Build the updater-shell boot .love (with embedded offline base)
         env:
@@ -355,9 +368,8 @@ jobs:
       - name: Build APK
         run: |
           cd la && chmod +x gradlew
-          # Debug variant = auto-signed + sideload-installable. TODO: stable release
-          # keystore via secret (debug key differs per run -> APK in-place updates
-          # would need reinstall; game updates come via downloaded .love regardless).
+          # Debug variant = sideload-installable, signed with the stable keystore
+          # installed above, so this and every future build install in place.
           ./gradlew --no-daemon assembleEmbedNoRecordDebug
 
       - name: Collect APK

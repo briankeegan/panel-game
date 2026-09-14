@@ -5,21 +5,22 @@ love-android has no vendored source in this repo — `build-shells.yml`'s
 reconfigures it via `gradle.properties` text swaps (rebrand step) plus
 whatever gets inserted from here.
 
-`GameActivityOrientation.java.inc` is spliced into the freshly-cloned
-`GameActivity.java`'s `onCreate()`, right after the `super.onCreate(savedInstanceState);`
-call, by the "Patch orientation from config.portraitMode" step in
+`GameActivityOrientation.java.inc` is a whole `attachBaseContext()` method
+override, inserted into the freshly-cloned `GameActivity.java` right before
+its `onCreate()`, by the "Patch orientation from config.portraitMode" step in
 `package-android`. It makes the installed app's screen orientation follow
 the in-game Mobile View toggle (`config.portraitMode`) instead of the static
 `sensorPortrait` lock in `gradle.properties`.
 
-It's inserted AFTER `super.onCreate()`, not before: love-android/SDL sets up
-its rendering surface inside `super.onCreate()` for whatever orientation is
-current at that moment. An earlier version of this patch requested the
-orientation change *before* `super.onCreate()`, which crashed the native
-renderer (a black screen, no Lua error -- below what Lua's own error screen
-can see). After `super.onCreate()`, it's a normal runtime orientation
-change -- the same path already exercised whenever a user physically
-rotates their phone in any Android app.
+It lives in `attachBaseContext()`, not `onCreate()`: `attachBaseContext()` is
+the earliest point in the Activity lifecycle, running before the window and
+theme are created at all. Two earlier versions of this patch requested the
+orientation change from inside `onCreate()` itself instead -- once before
+`super.onCreate()`, once after -- and both crashed the native renderer to a
+black screen (no Lua error, since it's below what Lua's own error screen can
+see): by the time `onCreate()` runs, window/surface setup for the OLD
+orientation is already underway, so changing it there means the engine's
+surface and the actual window disagree.
 
 If love-android's `GameActivity.java` changes upstream and that anchor line
 moves or disappears, the patch step will fail loudly (it asserts the anchor

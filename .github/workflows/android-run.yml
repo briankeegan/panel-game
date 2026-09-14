@@ -45,10 +45,14 @@ jobs:
             # android-shell-patches/GameActivityOrientation.java.inc and the Lua
             # save directory (t.externalstorage=true -> getExternalFilesDir).
             adb root || true
-            adb shell mkdir -p "/sdcard/Android/data/$PKG/files/save/Panel Attack"
+            # adb shell re-parses its argument on the DEVICE's own shell, so the
+            # space in "Panel Attack" needs its own quoting layer (single quotes
+            # inside the double-quoted adb shell argument) or it splits into two
+            # words there and mkdir tries to create a bogus top-level "Attack" dir.
+            adb shell "mkdir -p '/sdcard/Android/data/$PKG/files/save/Panel Attack'"
             printf '{"portraitMode":false}' > /tmp/conf.json
             adb push /tmp/conf.json "/sdcard/Android/data/$PKG/files/save/Panel Attack/conf.json"
-            echo "::warning title=SEEDED_CONF::$(adb shell cat "/sdcard/Android/data/$PKG/files/save/Panel Attack/conf.json")"
+            echo "::warning title=SEEDED_CONF::$(adb shell "cat '/sdcard/Android/data/$PKG/files/save/Panel Attack/conf.json'")"
             adb logcat -c
             # stream ALL logcat to a file in the background so nothing is lost even if
             # a foreground adb call flakes; hardcode PKG (pm path hung the emulator).

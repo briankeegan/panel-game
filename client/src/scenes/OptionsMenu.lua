@@ -14,6 +14,7 @@ local GraphicsUtil = require("client.src.graphics.graphics_util")
 local util = require("common.lib.util")
 local ModManagement = require("client.src.scenes.ModManagement")
 local system = require("client.src.system")
+local DebugSettings = require("client.src.debug.DebugSettings")
 local JsonSafePrecision = require("common.data.JsonSafePrecision")
 local logger = require("common.lib.logger")
 
@@ -293,6 +294,11 @@ function OptionsMenu:loadGeneralMenu()
     end)),
     ui.MenuItem.createToggleButtonGroupMenuItem("op_replay_public", nil, nil, publicReplayButtonGroup),
   }
+
+  if system.isMobileOS() or DebugSettings.simulateMobileOS() then
+    generalMenuOptions[#generalMenuOptions + 1] =
+      ui.MenuItem.createToggleButtonGroupMenuItem("op_portrait_mode", nil, nil, createToggleButtonGroup("portraitMode"))
+  end
 
   if releaseStreamSelection then
     generalMenuOptions[#generalMenuOptions+1] = ui.MenuItem.createToggleButtonGroupMenuItem("Release Stream", nil, false, releaseStreamSelection)

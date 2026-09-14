@@ -35,6 +35,7 @@ require("client.src.globals")
 ---@field enable_analytics boolean
 ---@field save_replays_publicly ("not at all" | "anonymously" | "with my name")
 ---@field portrait_darkness number
+---@field portraitMode boolean
 ---@field popfx boolean
 ---@field shakeIntensity number
 ---@field cardfx_scale number
@@ -105,6 +106,10 @@ config = {
     save_replays_publicly         = "with my name",
     -- Darkness of the background portrait
     portrait_darkness             = 70,
+    -- Whether to use the phone-style portrait/touch layout on mobile OSes.
+    -- When turned off, the game behaves exactly like the desktop version (landscape layout, no touch overlay)
+    -- even while running on a mobile OS, e.g. when the device is connected to an external monitor.
+    portraitMode                  = true,
     -- Whether to show the popfx from panels
     popfx                         = true,
     -- Multiplier for the intensity of the shake animation when garbage falls
@@ -239,6 +244,9 @@ config = {
           end
           if type(read_data.portrait_darkness) == "number" then
             configTable.portrait_darkness = util.bound(0, read_data.portrait_darkness, 100)
+          end
+          if type(read_data.portraitMode) == "boolean" then
+            configTable.portraitMode = read_data.portraitMode
           end
           if type(read_data.popfx) == "boolean" then
             configTable.popfx = read_data.popfx

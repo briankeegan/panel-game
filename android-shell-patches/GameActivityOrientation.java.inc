@@ -32,6 +32,32 @@
             setRequestedOrientation(wantPortrait
                 ? android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
                 : android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
+            // setRequestedOrientation() is synchronous at the API-call level, but the
+            // actual display/configuration change it triggers is NOT -- there's a
+            // documented gap between "requested" and "settled". Calling it as early
+            // as possible (this method, not onCreate()) only reduces the odds of the
+            // native engine's boot landing in that gap, it doesn't remove the race:
+            // two earlier attempts at "call it earlier" still crashed to a black
+            // screen at different, inconsistent points during boot -- the signature
+            // of a race, not a fixed ordering bug. So block here, polling the actual
+            // configuration, until the requested orientation has genuinely taken
+            // effect (or a bounded timeout elapses) before returning -- nothing else
+            // in the Activity/engine boot can proceed while this method is running,
+            // so this guarantees the window gets created fresh into the already-
+            // settled orientation instead of racing a live transition mid-boot.
+            int wantOrientation = wantPortrait
+                ? android.content.res.Configuration.ORIENTATION_PORTRAIT
+                : android.content.res.Configuration.ORIENTATION_LANDSCAPE;
+            long deadline = System.currentTimeMillis() + 2000;
+            while (getResources().getConfiguration().orientation != wantOrientation
+                    && System.currentTimeMillis() < deadline) {
+                try {
+                    Thread.sleep(16);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
         } catch (Exception e) {
             Log.d("GameActivity", "Could not read portraitMode from conf.json: " + e.getMessage());
         }

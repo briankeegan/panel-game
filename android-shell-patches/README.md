@@ -18,9 +18,20 @@ theme are created at all. Two earlier versions of this patch requested the
 orientation change from inside `onCreate()` itself instead -- once before
 `super.onCreate()`, once after -- and both crashed the native renderer to a
 black screen (no Lua error, since it's below what Lua's own error screen can
-see): by the time `onCreate()` runs, window/surface setup for the OLD
-orientation is already underway, so changing it there means the engine's
-surface and the actual window disagree.
+see), at inconsistent, differing points during boot each time.
+
+That inconsistency is the signature of a race, not an ordering bug:
+`setRequestedOrientation()` is synchronous at the API-call level, but the
+actual display/configuration change it triggers is NOT -- Android resolves
+it asynchronously afterward. Calling it earlier only narrows the window
+where the native engine's boot can land mid-transition, it doesn't close it.
+So after requesting the orientation, this patch also **blocks**, polling
+`getResources().getConfiguration().orientation` until it actually matches
+the request (bounded to a 2s timeout, so it can't hang forever if something
+prevents the change). Nothing else in the Activity/engine boot can proceed
+while `attachBaseContext()` is still running, so this guarantees the window
+gets created fresh into the already-settled orientation, rather than racing
+a live transition mid-boot.
 
 If love-android's `GameActivity.java` changes upstream and that anchor line
 moves or disappears, the patch step will fail loudly (it asserts the anchor

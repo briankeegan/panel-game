@@ -893,3 +893,15 @@ function Stack:clearChainingFlags()
     end
   end
 end
+-- PAYOUT TABLES, EXPOSED — read by bot/PanelEval.lua (scoreEarned, garbageSent).
+--
+-- The bot's evaluator scores a candidate move in the game's OWN currencies:
+-- the points a cascade is worth and the garbage it sends. Those are these
+-- three tables. A bot that re-types them is a second copy of a rule that
+-- already exists here, and the copy goes stale silently — the score still
+-- moves, so the bot still looks like it is working while it is optimising a
+-- payout the game does not pay. Exposed read-only by convention; nothing
+-- here mutates them.
+Stack.SCORE_COMBO_TA = SCORE_COMBO_TA
+Stack.SCORE_CHAIN_TA = SCORE_CHAIN_TA
+Stack.COMBO_GARBAGE = COMBO_GARBAGE

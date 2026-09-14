@@ -13,12 +13,11 @@ local BlackFadeTransition = require("client.src.scenes.Transitions.BlackFadeTran
 local Easings = require("client.src.Easings")
 local system = require("client.src.system")
 local GeneratorSource = require("common.engine.GeneratorSource")
-local DebugSettings = require("client.src.debug.DebugSettings")
 local DisplayEventCapture = require("client.src.network.DisplayEventCapture")
 local DisplayClientStack = require("client.src.network.DisplayClientStack")
 
 -- After createFromReplay, force match.doCountdown from the live wire-shipped
--- gameMode rather than trusting replay.rules — closes a drift window where a
+-- gameMode rather than trusting replay.rules -- closes a drift window where a
 -- rejoiner/spectator's replay snapshot disagrees with the live room and stacks
 -- end up with the wrong countdownOffsetFrames (off-by-3sec OUT-time bug).
 local function _pinDoCountdownFromLiveGameMode(match, gameMode)
@@ -90,7 +89,7 @@ function(self, mode, gameScene)
   self.voided = false
   self.voidReason = nil
 
-  -- Held slots — seats reserved for a specific leaver to rejoin (fixed-roster
+  -- Held slots -- seats reserved for a specific leaver to rejoin (fixed-roster
   -- invite rooms only; always empty for open FFA). Updated from addToRoom and
   -- playerLeftRoom payloads. Character-select scenes can render these as
   -- "waiting for <name>" rows.
@@ -239,7 +238,7 @@ function BattleRoom.createFromServerMessage(message)
     -- localPlayerNumber. Older servers (or replay/spectate payloads that don't
     -- have a recipient) omit it; fall back to the historical
     -- publicId-then-name heuristic in that case. The heuristic raced login
-    -- completion and broke for renamed accounts — the field eliminates that
+    -- completion and broke for renamed accounts -- the field eliminates that
     -- whole class of "stuck on Loading because we orphaned ourselves" bugs.
     local serverLocalPlayerNumber = message.localPlayerNumber
     for i = 1, #payloadPlayers do
@@ -337,7 +336,7 @@ end
 
 ---Removes a player from the local room view by publicId. Used when the server
 ---broadcasts playerLeftRoom (someone left/disconnected mid-room). Doesn't tear
----down the room — remaining players keep the room visible until they manually leave.
+---down the room -- remaining players keep the room visible until they manually leave.
 ---@param publicId integer
 function BattleRoom:removePlayerByPublicId(publicId)
   for i = #self.players, 1, -1 do
@@ -385,7 +384,7 @@ function BattleRoom:updateWinrates()
   -- matchesPlayed increments in BattleRoom:onMatchEnded, which fires from the
   -- engine's matchEnded signal AFTER NetClient:processGameResult has already
   -- called setWinCount + updateWinrates for the just-finished match. Using
-  -- matchesPlayed alone would lag by one — so a player with 2 wins after 2
+  -- matchesPlayed alone would lag by one -- so a player with 2 wins after 2
   -- matches would brief-render as 200% (2 / 1) before the lag closes.
   -- max(matchesPlayed, totalGames) papers over the gap: totalGames sums the
   -- now-current per-player win counts, which equals matchesPlayed in a non-
@@ -486,13 +485,13 @@ function BattleRoom:addPlayer(player)
   -- (manifests as a "Position: 4 / Out: 0:10" panel on the local player's
   -- card when they walk into a fresh waiting room). Remote players come
   -- in as fresh constructions per addToRoom and don't have this problem.
-  -- Clear ONLY the stale fields — don't call clearPerMatchState, since
+  -- Clear ONLY the stale fields -- don't call clearPerMatchState, since
   -- spectator/mid-match-reconnect paths build the match (attaching a
   -- stack to GAME.localPlayer) BEFORE addPlayer, so we'd nil that here.
   player.lastPlacement = nil
   player.lastMatchOutClock = nil
 
-  -- Dedupe by publicId — addToRoom timing vs. login timing can cause the
+  -- Dedupe by publicId -- addToRoom timing vs. login timing can cause the
   -- local user to be created twice in self.players: once as a fresh remote-
   -- flagged Player (when GAME.localPlayer.publicId is still -1 at addToRoom
   -- time and config.name doesn't match the server's name for this account)
@@ -521,7 +520,7 @@ function BattleRoom:addPlayer(player)
   -- battleRoom.players[i] with engine.stacks[i] positionally. Appending in
   -- join order would mis-pair when a player joins a low-seat after a
   -- high-seat is already filled (e.g. Bev at seat 3 joined before Amber at
-  -- seat 2) — producing wrong team membership and wrong garbage routing.
+  -- seat 2) -- producing wrong team membership and wrong garbage routing.
   local pos = #self.players + 1
   for i = 1, #self.players do
     if self.players[i].playerNumber > player.playerNumber then
@@ -630,12 +629,12 @@ end
 function BattleRoom:startMatch(replay)
   local match
   -- Client-driven solo (vsSelf, endless): always build the match locally, even
-  -- when the server handed us a replay. The local sim owns its own engine —
+  -- when the server handed us a replay. The local sim owns its own engine --
   -- server can't drive panel seeds, garbage flows, fromReplay flag flipping
   -- hasEnded, or pendingHistoricalGarbage onto a game with no remote inputs to
   -- wait for. We do adopt the server's seed when present so spectators (who
   -- build from the server's replay) generate matching panels; everything else
-  -- local-side. Scope: vsSelf + endless only — Time Attack stays server-gated
+  -- local-side. Scope: vsSelf + endless only -- Time Attack stays server-gated
   -- because its leaderboard depends on server-validated timing.
   local modeName = self.mode and self.mode.name
   local isClientDrivenSolo = (modeName == "vsSelf" or modeName == "endless")
@@ -711,7 +710,7 @@ function BattleRoom:_setupDisplayPipeline(match)
     -- Garbage-arrival log (additive): server-confirmed G events recorded for
     -- the "play from here" fork. Never consumed by normal playback (the saved
     -- replay is `completed`, which gates crossPlayerEvents out of the spectator
-    -- drain) — only the takeover reads it. See ClientMatch:applyGarbageEvent.
+    -- drain) -- only the takeover reads it. See ClientMatch:applyGarbageEvent.
     self._replayGarbageEvents = {}
     self._displayCaptures = {}
     self._displayStacks   = {}
@@ -731,7 +730,7 @@ function BattleRoom:_setupDisplayPipeline(match)
         end
       end
     end
-    -- Captures are NOT stopped on matchEnded — the death-animation tail keeps
+    -- Captures are NOT stopped on matchEnded -- the death-animation tail keeps
     -- ticking via runGameOver and we want it shipped too.
   end
 end
@@ -747,7 +746,7 @@ function BattleRoom:_setupInputPath(match)
 end
 
 ---Stop the DisplayEventCaptures. Called at new-match start (before rebuild)
----and at BattleRoom:shutdown. NOT fired on matchEnded — the engine keeps
+---and at BattleRoom:shutdown. NOT fired on matchEnded -- the engine keeps
 ---ticking through runGameOver and we want the death-animation tail
 ---shipped to receivers in real time.
 function BattleRoom:_stopDisplayCaptures()
@@ -814,7 +813,7 @@ end
 ----------------------------------------------------------------------
 -- Per-concern render paths. Each one knows exactly one job; the
 -- orchestrator just calls them in order. No `if hasX then drawX`
--- inside the loop body — every gate lives at the top of its own
+-- inside the loop body -- every gate lives at the top of its own
 -- function, not inline with peers.
 ----------------------------------------------------------------------
 
@@ -855,7 +854,7 @@ local function _renderTelegraphs(viewStack, Telegraph)
   end
 end
 
--- Lookup table: stack → its DisplayClientStack. nil → no display
+-- Lookup table: stack -> its DisplayClientStack. nil -> no display
 -- pipeline for this stack on this client; caller skips it entirely.
 local function _displayStackForStack(self, stack)
   local player = stack.player
@@ -890,8 +889,8 @@ function BattleRoom:createScene(match)
     end
   end
   
-  -- for touch android players load a different scene
-  if (system.isMobileOS() or DebugSettings.simulateMobileOS()) and self.gameScene.name ~= "PuzzleGame" and
+  -- for touch android players load a different scene, unless the user turned Mobile View off
+  if system.isPortraitMode() and self.gameScene.name ~= "PuzzleGame" and
   --but only if they are the only local player cause for 2p vs local using portrait mode would be bad
       tableUtils.count(self.players, function(p) return p.isLocal and p.human end) == 1 then
     for _, player in ipairs(self.players) do
@@ -911,7 +910,7 @@ function BattleRoom:startLoadingNewAssets()
       -- If characterId/stageId isn't a concrete known mod, resolve via the
       -- player's selectedCharacterId/selectedStageId (defaults to the random
       -- sentinel) so refresh* picks ONCE and sticks. Going straight to
-      -- ModController with an empty/invalid id re-randomizes every frame —
+      -- ModController with an empty/invalid id re-randomizes every frame --
       -- mod-loader churns, allAssetsLoaded flaps, ready handshake never settles.
       if not characters[player.settings.characterId] then
         player:refreshCharacter()
@@ -1007,7 +1006,7 @@ function BattleRoom:update(dt)
   -- Drive display-history captures every frame, regardless of match state.
   -- Stack:shouldRun returns false once game_ended, so engine.finishedRun
   -- stops firing post-death. Without an external heartbeat the snapshot
-  -- stream goes silent at the most visually-interesting moment — the
+  -- stream goes silent at the most visually-interesting moment -- the
   -- post-death panel transitions (state="dead") set by applyVisualDeath
   -- in PlayerStack:runGameOver never reach the wire. _maybeSend is still
   -- wall-clock gated internally so this isn't a 60Hz force-send.
@@ -1039,12 +1038,12 @@ function BattleRoom:update(dt)
 end
 
 -- Tear down local match state (signals, match object, GAME.battleRoom). Does
--- NOT send leave_room to the server — that's an explicit user action and goes
+-- NOT send leave_room to the server -- that's an explicit user action and goes
 -- through NetClient:leaveRoom directly (Lobby buttons, CharacterSelect's leave
 -- option, etc.). Crashes, match-end aborts, scene transitions all use this
 -- path and must NOT boot the player from the room.
 function BattleRoom:shutdown()
-  -- Stop the display-history captures BEFORE deiniting the match — the
+  -- Stop the display-history captures BEFORE deiniting the match -- the
   -- captures hold signal subscriptions on engine.finishedRun and we want
   -- to ship one final terminal snapshot before the engine goes away.
   self:_stopDisplayCaptures()
@@ -1086,7 +1085,7 @@ function BattleRoom:onMatchEnded(match)
     -- apply wins and possibly statistical data up for collection
     if #winners == 1 then
       -- character can legitimately be nil if its mod isn't loaded (see
-      -- ClientStack.lua:60 — characters[args.characterId] is a lookup).
+      -- ClientStack.lua:60 -- characters[args.characterId] is a lookup).
       -- The winner's stack itself is guaranteed by ClientMatch:getWinners.
       if winners[1].stack.character then
         winners[1].stack.character:playWinSfx()
@@ -1168,7 +1167,7 @@ end
 
 function BattleRoom:onDisconnect()
   -- Stay in scene; exit only on explicit user leave or server leaveRoom/gameResult.
-  logger.info("BattleRoom:onDisconnect — staying in scene; local engine continues.")
+  logger.info("BattleRoom:onDisconnect -- staying in scene; local engine continues.")
 end
 
 function BattleRoom:hasLocalPlayer()

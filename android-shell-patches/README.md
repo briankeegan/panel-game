@@ -3,39 +3,33 @@
 love-android has no vendored source in this repo — `build-shells.yml`'s
 `package-android` job clones it fresh from upstream on every run and only
 reconfigures it via `gradle.properties` text swaps (rebrand step) plus
-whatever gets inserted from here.
+whatever gets installed from here.
 
-`GameActivityOrientation.java.inc` is a whole `attachBaseContext()` method
-override, inserted into the freshly-cloned `GameActivity.java` right before
-its `onCreate()`, by the "Patch orientation from config.portraitMode" step in
-`package-android`. It makes the installed app's screen orientation follow
-the in-game Mobile View toggle (`config.portraitMode`) instead of the static
-`sensorPortrait` lock in `gradle.properties`.
+## Orientation (not handled here anymore)
 
-It lives in `attachBaseContext()`, not `onCreate()`: `attachBaseContext()` is
-the earliest point in the Activity lifecycle, running before the window and
-theme are created at all. Two earlier versions of this patch requested the
-orientation change from inside `onCreate()` itself instead -- once before
-`super.onCreate()`, once after -- and both crashed the native renderer to a
-black screen (no Lua error, since it's below what Lua's own error screen can
-see), at inconsistent, differing points during boot each time.
+Earlier versions of this directory patched `GameActivity.java` to force
+screen orientation from `config.portraitMode` via
+`setRequestedOrientation()` in `attachBaseContext()`. That was removed: it
+raced love-android's own native orientation logic and produced an
+intermittent black screen on restart (sometimes the Java-side request won,
+sometimes the native one did, depending on boot timing).
 
-That inconsistency is the signature of a race, not an ordering bug:
-`setRequestedOrientation()` is synchronous at the API-call level, but the
-actual display/configuration change it triggers is NOT -- Android resolves
-it asynchronously afterward. Calling it earlier only narrows the window
-where the native engine's boot can land mid-transition, it doesn't close it.
-So after requesting the orientation, this patch also **blocks**, polling
-`getResources().getConfiguration().orientation` until it actually matches
-the request (bounded to a 2s timeout, so it can't hang forever if something
-prevents the change). Nothing else in the Activity/engine boot can proceed
-while `attachBaseContext()` is still running, so this guarantees the window
-gets created fresh into the already-settled orientation, rather than racing
-a live transition mid-boot.
+love-android has no direct "set orientation" API of its own — internally,
+`SDLActivity.setOrientationBis()` decides portrait vs. landscape purely from
+whether `t.window.width`/`t.window.height` (from `conf.lua`) is a wide or a
+tall rectangle, and calls `setRequestedOrientation()` itself, natively, when
+it creates the window. The fix now lives entirely in `conf.lua` at the repo
+root: it overrides `config.windowWidth`/`config.windowHeight` from
+`config.portraitMode` on every boot (mobile only), before love reads them,
+so love-android's own orientation request is the single source of truth
+instead of two independent things calling `setRequestedOrientation()`.
+`gradle.properties`' `app.orientation` is still set to `unspecified` here
+(rebrand step) so the manifest doesn't statically lock orientation and
+fight that native request either.
 
-If love-android's `GameActivity.java` changes upstream and that anchor line
-moves or disappears, the patch step will fail loudly (it asserts the anchor
-is present) rather than silently no-op.
+Because the fix lives in `conf.lua`, it ships in the Lua-only `.love`
+hot-update (`unofficial-team-release.yml`) — no APK rebuild or reinstall
+needed to pick it up.
 
 ## debug.keystore
 

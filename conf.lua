@@ -3,6 +3,7 @@
 require("client.src.config")
 -- Require developer here as this is basically the first thing to load in love 2D
 require("client.src.developer")
+local consts = require("common.engine.consts")
 
 -- Intentional override
 ---@diagnostic disable-next-line: duplicate-set-field
@@ -16,6 +17,28 @@ function love.conf(t)
   readConfigFile(config)
   if os.getenv("PLAYER_NAME") then
     config.name = os.getenv("PLAYER_NAME")
+  end
+
+  -- love-android has no direct "set orientation" flag: SDLActivity decides portrait vs.
+  -- landscape purely from whether t.window.width/height (set below from these) is a wide
+  -- or a tall rectangle, native-side, when it creates the window. config.windowWidth/Height
+  -- are otherwise a persisted DESKTOP window size (see the read_data.windowWidth/windowHeight
+  -- restore in client/src/config.lua) -- on mobile that's stale data from whatever orientation
+  -- the app happened to close in, not a signal of user intent. Overriding it fresh from
+  -- portraitMode on every boot makes LÖVE's own native orientation request the single source
+  -- of truth, instead of a second, independent piece of code also calling
+  -- setRequestedOrientation() and racing it (which is what android-shell-patches/ used to do,
+  -- and why turning Mobile View off only worked intermittently -- see git history).
+  if love.system and love.system.getOS then
+    local osName = love.system.getOS()
+    local isMobileLike = osName == "Android" or osName == "iOS" or os.getenv("PA_SIMULATE_MOBILE") == "1"
+    if isMobileLike then
+      if config.portraitMode == false then
+        config.windowWidth, config.windowHeight = consts.CANVAS_HEIGHT, consts.CANVAS_WIDTH
+      else
+        config.windowWidth, config.windowHeight = consts.CANVAS_WIDTH, consts.CANVAS_HEIGHT
+      end
+    end
   end
 
   -- t.identity is the canonical conf-time path; setIdentity above sets the

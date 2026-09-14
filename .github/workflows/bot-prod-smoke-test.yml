@@ -22,6 +22,7 @@ on:
         options:
           - prod-vs          # bot-vs-bot matches on the live server
           - large-garbage    # offline survival vs the "large_garbage" training preset (6x12 blocks); no server contact
+          - lobby            # park ONE bot in the live lobby so a human can challenge it
       matches:
         description: 'prod-vs: number of matches (~2.5 min worst-case each). large-garbage: number of seeds.'
         required: false
@@ -38,6 +39,22 @@ on:
         description: 'Bot difficulty/level (1-10ish)'
         required: false
         default: 'hard'
+      bot_name:
+        description: 'lobby: name in the lobby. The run number is appended so it is unique; 16 chars total is the server limit.'
+        required: false
+        default: 'Swapsy'
+      brain:
+        description: 'lobby: which brain. weighted = the trained evaluator; heuristic = the shape-catalog bot.'
+        required: false
+        default: 'weighted'
+        type: choice
+        options:
+          - weighted
+          - heuristic
+      minutes:
+        description: 'lobby: how long to stay in the lobby before the bot leaves.'
+        required: false
+        default: '120'
 
 jobs:
   bot-vs-bot:
@@ -104,3 +121,78 @@ jobs:
       - name: Fail if the smoke test failed
         if: steps.smoke.outcome == 'failure' || steps.largegarbage.outcome == 'failure'
         run: exit 1
+
+  # PARK A BOT IN THE LIVE LOBBY SO A HUMAN CAN PLAY IT.
+  #
+  # This exists because a GitHub runner can reach the server and a cloud dev
+  # sandbox cannot — the sandbox only has an HTTPS proxy outbound, so raw TCP
+  # on 49569 times out. The runner is the deploy path, and the same one the
+  # prod-vs mode above already uses.
+  #
+  # playBot.lua idles in the lobby and AUTO-ACCEPTS any challenge, rematching
+  # until it is stopped. It is bounded by `timeout` rather than left to the job
+  # limit so the bot leaves on a schedule you chose instead of whenever the
+  # runner gives out.
+  #
+  # THE NAME GETS THE RUN NUMBER APPENDED, AND THAT IS NOT DECORATION. The
+  # bot's account id is persisted to servers/<ip>/user_id.txt, which is
+  # gitignored — so every fresh runner has no identity and REGISTERS the name
+  # from scratch. Dispatch twice with the same fixed name and the second login
+  # is denied by the server's name-already-taken guard, and playBot exits with
+  # "login failed" having done nothing. The run number makes each dispatch a
+  # new account. Truncated to the server's 16-character limit.
+  lobby:
+    name: Park a bot in the live lobby
+    if: inputs.mode == 'lobby'
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install luajit + luarocks
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y luajit luarocks liblua5.1-0-dev build-essential unzip libreadline-dev
+
+      - name: Install lua rocks (luasocket, luafilesystem, luautf8)
+        run: |
+          luarocks install --local luasocket --lua-version 5.1
+          luarocks install --local luafilesystem --lua-version 5.1
+          luarocks install --local luautf8 --lua-version 5.1
+
+      - name: Say what to look for in the lobby
+        id: whoami
+        run: |
+          name="${{ inputs.bot_name }}${{ github.run_number }}"
+          name="${name:0:16}"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          {
+            echo "## Challenge \`$name\` in the lobby"
+            echo ""
+            echo "- server: ${{ inputs.ip }}:${{ inputs.port }}"
+            echo "- brain: ${{ inputs.brain }}"
+            echo "- staying for ${{ inputs.minutes }} minutes, then it leaves"
+            echo ""
+            echo "It auto-accepts any challenge and rematches until it goes."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Sit in the lobby
+        env:
+          # The trained weight set. Ignored unless brain == weighted.
+          PA_SEARCH_PROFILE: bot/profiles/trained.json
+        run: |
+          eval "$(luarocks path --local --lua-version 5.1)"
+          set -o pipefail
+          # timeout exits 124 when it does its job, which is the expected
+          # ending here, not a failure.
+          timeout "${{ inputs.minutes }}m" \
+            luajit bot/playBot.lua "${{ inputs.ip }}" "${{ inputs.port }}" \
+              "${{ steps.whoami.outputs.name }}" "" "" "${{ inputs.brain }}" \
+            2>&1 | tee bot-lobby.log || [ $? -eq 124 ]
+
+      - name: Upload log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bot-lobby-log
+          path: bot-lobby.log

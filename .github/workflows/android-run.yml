@@ -39,6 +39,16 @@ jobs:
             echo "::warning title=APK_ABIS::$(unzip -l app.apk | grep -o 'lib/[^/]*' | sort -u | tr '\n' ' ')"
             adb install -r app.apk
             PKG=com.panelattack.ffateam
+            # Seed portraitMode=false BEFORE the first launch so this run exercises
+            # the "Mobile View off" boot path -- a fresh install otherwise defaults
+            # to portrait and never reaches it. Path must match
+            # android-shell-patches/GameActivityOrientation.java.inc and the Lua
+            # save directory (t.externalstorage=true -> getExternalFilesDir).
+            adb root || true
+            adb shell mkdir -p "/sdcard/Android/data/$PKG/files/save/Panel Attack"
+            printf '{"portraitMode":false}' > /tmp/conf.json
+            adb push /tmp/conf.json "/sdcard/Android/data/$PKG/files/save/Panel Attack/conf.json"
+            echo "::warning title=SEEDED_CONF::$(adb shell cat "/sdcard/Android/data/$PKG/files/save/Panel Attack/conf.json")"
             adb logcat -c
             # stream ALL logcat to a file in the background so nothing is lost even if
             # a foreground adb call flakes; hardcode PKG (pm path hung the emulator).
@@ -50,4 +60,5 @@ jobs:
             echo "::warning title=CRASH::$(adb logcat -d -b crash 2>/dev/null | tail -12 | tr '\n' '|' | cut -c1-1600)"
             echo "::warning title=FATAL::$(grep -aiE 'fatal|signal |sigsegv|abort|backtrace|dlopen|unsatisfiedlink|cannot load|java.lang' /tmp/full.log 2>/dev/null | tail -12 | tr '\n' '|' | cut -c1-1600)"
             echo "::warning title=LOVE::$(grep -aiE 'love|lua|sdl|liblove|https|updater|game.love|mount' /tmp/full.log 2>/dev/null | tail -15 | tr '\n' '|' | cut -c1-1600)"
+            echo "::warning title=ORIENT::$(grep -aiE 'GameActivity|onConfigurationChanged|surfaceChanged|surfaceCreated|surfaceDestroyed|orientation|onPause|onResume|onStop|onStart|onWindowFocusChanged' /tmp/full.log 2>/dev/null | tail -30 | tr '\n' '|' | cut -c1-1900)"
             exit 0

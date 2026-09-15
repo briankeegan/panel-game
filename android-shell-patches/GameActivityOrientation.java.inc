@@ -1,47 +1,62 @@
+    private boolean orientationLockApplied = false;
+
     @Override
-    public void setOrientationBis(int w, int h, boolean resizable, String hint) {
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
         // Panel Attack: lock orientation to the in-game Mobile View setting
-        // (config.portraitMode in conf.json), overriding SDL's own request. With
-        // t.window.resizable = true (needed for the desktop build) and no orientation
-        // hint set from conf.lua, SDL's own logic in this method always requests
-        // FULL_SENSOR -- free rotation on all 4 sides -- regardless of width/height.
-        // That's not a lock, just a correct *initial* boot orientation.
+        // (config.portraitMode in conf.json), applied here -- once the window has
+        // actually gained focus, meaning a live, working GL surface already exists --
+        // rather than during window/surface creation.
         //
-        // setOrientationBis() is explicitly marked overridable in SDLActivity and is
-        // the exact call site love-android's native engine already uses to request
-        // orientation when it creates the window -- so replacing the computed request
-        // here runs at the same point in the same, already-working call chain, instead
-        // of a second independent setRequestedOrientation() call racing it (which is
-        // what the previous attachBaseContext()-based version of this patch did, and
-        // why Mobile View only worked intermittently).
+        // Two earlier versions of this patch requested the orientation earlier
+        // (attachBaseContext(), then an override of SDLActivity's own
+        // setOrientationBis() call at window-creation time) and both produced a black
+        // screen whenever the requested orientation differed from the phone's current
+        // physical orientation at boot -- i.e. whenever Mobile View actually needed to
+        // change anything, which is the whole point of the feature. Forcing Android to
+        // rotate the display while SDL is still constructing the native window/GL
+        // surface is a known-fragile sequence (see love-android/SDL upstream reports of
+        // black screens and broken GL context around orientation and resume); forcing
+        // the same rotation once a frame is already live and focused is the same kind
+        // of change a user causes just by physically rotating their phone mid-game --
+        // an already-supported, non-crashing path (SDL requires configChanges to be
+        // declared for orientation, which it already is here, so the Activity survives
+        // and just gets onConfigurationChanged instead of being destroyed).
         //
-        // SENSOR_LANDSCAPE/SENSOR_PORTRAIT (not the plain, single-direction variants)
-        // lock the axis -- no portrait when off, no landscape when on -- while still
-        // following the sensor within that axis, so it doesn't assume which of the two
-        // landscape (or portrait) mounting directions a dock/mount uses.
-        boolean wantPortrait = true;
-        try {
-            File confFile = new File(getExternalFilesDir(null), "save/Panel Attack/conf.json");
-            if (confFile.exists()) {
-                StringBuilder sb = new StringBuilder();
-                java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(confFile));
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    sb.append(line);
+        // Trade-off: if the requested orientation differs from the phone's actual
+        // physical orientation at boot, the first frame or two can briefly appear in
+        // the "wrong" orientation before this rotates it -- a brief visible flip, not a
+        // black screen.
+        //
+        // Applied once (guarded by orientationLockApplied) since Mobile View is only
+        // meant to take effect on restart, matching the Lua-side default in
+        // client/src/config.lua if conf.json is unreadable.
+        if (hasFocus && !orientationLockApplied) {
+            orientationLockApplied = true;
+            boolean wantPortrait = true;
+            try {
+                File confFile = new File(getExternalFilesDir(null), "save/Panel Attack/conf.json");
+                if (confFile.exists()) {
+                    StringBuilder sb = new StringBuilder();
+                    java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(confFile));
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        sb.append(line);
+                    }
+                    reader.close();
+                    java.util.regex.Matcher m = java.util.regex.Pattern
+                        .compile("\"portraitMode\"\\s*:\\s*(true|false)")
+                        .matcher(sb.toString());
+                    if (m.find()) {
+                        wantPortrait = Boolean.parseBoolean(m.group(1));
+                    }
                 }
-                reader.close();
-                java.util.regex.Matcher m = java.util.regex.Pattern
-                    .compile("\"portraitMode\"\\s*:\\s*(true|false)")
-                    .matcher(sb.toString());
-                if (m.find()) {
-                    wantPortrait = Boolean.parseBoolean(m.group(1));
-                }
+            } catch (Exception e) {
+                Log.d("GameActivity", "Could not read portraitMode from conf.json: " + e.getMessage());
             }
-        } catch (Exception e) {
-            Log.d("GameActivity", "Could not read portraitMode from conf.json: " + e.getMessage());
+            setRequestedOrientation(wantPortrait
+                ? android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
+                : android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
         }
-        setRequestedOrientation(wantPortrait
-            ? android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
-            : android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
     }
 

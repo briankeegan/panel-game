@@ -7,36 +7,52 @@ whatever gets installed from here.
 
 ## Orientation lock
 
-`GameActivityOrientation.java.inc` overrides `setOrientationBis()`, inserted
-into the freshly-cloned `GameActivity.java` right before its `onCreate()`, by
-the "Patch orientation lock from config.portraitMode" step in
-`package-android`. It locks the installed app's screen orientation to the
+`GameActivityOrientation.java.inc` overrides `onWindowFocusChanged()`,
+inserted into the freshly-cloned `GameActivity.java` right before its
+`onCreate()`, by the "Patch orientation lock from config.portraitMode" step
+in `package-android`. It locks the installed app's screen orientation to the
 axis matching the in-game Mobile View toggle (`config.portraitMode` in
 conf.json): landscape-only when off, portrait-only when on (each still
 following the sensor within that axis — e.g. either landscape direction, or
 right-side-up/upside-down portrait — just never crossing into the other
-axis).
+axis). Applied once, the first time the window gains focus (guarded by a
+flag), since Mobile View is only meant to take effect on restart.
 
-`setOrientationBis(int w, int h, boolean resizable, String hint)` is
-love-android's own extension point for exactly this: it's explicitly marked
-`/** This can be overridden */` in `SDLActivity`, and it's the exact call
-site the native engine already uses to request orientation when it creates
-the window. Overriding it means our request replaces SDL's own computed one
-at that same, already-correctly-timed call site, instead of requesting
-orientation independently from a different point in the Activity lifecycle.
+This has gone through three approaches, in order, each fixing the failure
+mode of the one before:
 
-That distinction matters because of an earlier, different bug: with
-`t.window.resizable = true` (needed for the desktop build) and no
-orientation hint set from `conf.lua`, SDL's own logic in this method always
-requests `FULL_SENSOR` — free rotation on all 4 sides — regardless of
-`t.window.width`/`t.window.height`. An earlier version of this patch instead
-called `setRequestedOrientation()` on its own from `attachBaseContext()`,
-which raced that native `FULL_SENSOR` request from a separate point in the
-Activity lifecycle: sometimes the Java-side call won, sometimes the native
-one did, depending on boot timing — producing an intermittent black screen,
-and, even when it didn't crash, no actual *lock* (the app could still freely
-rotate once booted). Overriding `setOrientationBis()` instead avoids the
-race entirely by not introducing a second call site at all.
+1. **`attachBaseContext()`** calling `setRequestedOrientation()` directly.
+   This raced love-android's own native orientation request (see below) from
+   a separate point in the Activity lifecycle: sometimes the Java-side call
+   won, sometimes the native one did, depending on boot timing — an
+   intermittent black screen.
+2. **Overriding `setOrientationBis(int w, int h, boolean resizable, String
+   hint)`** — `SDLActivity`'s own extension point for orientation (explicitly
+   marked `/** This can be overridden */`), and the exact call site the
+   native engine already uses when it creates the window. This fixed the
+   race (there's only one call site now), but not the black screen: with
+   `t.window.resizable = true` (needed for the desktop build) and no
+   orientation hint from `conf.lua`, SDL's own logic here normally requests
+   `FULL_SENSOR`, so this call happens *during window/surface creation* —
+   and forcing Android to actually rotate the display at that exact moment,
+   while SDL is still constructing the native window/GL surface, is a
+   known-fragile sequence upstream (reports of black screens and broken GL
+   context around Android orientation/resume). It only reproduced the black
+   screen whenever the requested orientation actually differed from the
+   phone's physical orientation at boot — i.e. whenever Mobile View needed
+   to change anything, which is the whole point of the feature.
+3. **Overriding `onWindowFocusChanged()`** (current): applies the same
+   `setRequestedOrientation()` call, but only once the window has actually
+   gained focus — meaning a live, already-rendering GL surface exists.
+   Forcing a rotation at that point is the same kind of change a user causes
+   just by physically rotating their phone mid-game, which love-android
+   already supports without crashing (the manifest already declares
+   `configChanges` for orientation, so the Activity survives it via
+   `onConfigurationChanged` instead of being destroyed). Trade-off: if the
+   requested orientation differs from the phone's physical orientation at
+   boot, the first frame or two can briefly appear in the "wrong"
+   orientation before this rotates it — a brief visible flip, not a black
+   screen.
 
 If love-android's `GameActivity.java` changes upstream and the `onCreate()`
 anchor line moves or disappears, the patch step will fail loudly (it asserts

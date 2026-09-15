@@ -324,9 +324,9 @@ jobs:
           sed -i "s|^app.version_name=.*|app.version_name=$VER|" gradle.properties
           sed -i "s|^app.version_code=.*|app.version_code=$VCODE|" gradle.properties
           # Leave orientation unspecified at the manifest level: the
-          # setOrientationBis() override installed below requests the real,
-          # config.portraitMode-driven lock at runtime, before the first frame. This
-          # is just what shows for the instant before that override runs.
+          # onWindowFocusChanged() override installed below requests the real,
+          # config.portraitMode-driven lock at runtime, once the window is first
+          # focused. This is just what shows for the instant before that runs.
           sed -i 's|^app.orientation=.*|app.orientation=unspecified|' gradle.properties
           grep -E '^app\.(name|application_id|version|orientation)' gradle.properties
           # launcher icon is android:icon="@drawable/love" -> overwrite each density

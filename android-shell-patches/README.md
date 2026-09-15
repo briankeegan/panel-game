@@ -7,20 +7,19 @@ whatever gets installed from here.
 
 ## Orientation lock
 
-`GameActivityOrientation.java.inc` overrides `onWindowFocusChanged()`,
-inserted into the freshly-cloned `GameActivity.java` right before its
-`onCreate()`, by the "Patch orientation lock from config.portraitMode" step
-in `package-android`. It locks the installed app's screen orientation to the
-the in-game Mobile View toggle (`config.portraitMode` in conf.json): a single
-rigid landscape when off, a single rigid portrait when on — no response to
-the sensor at all (plain `SCREEN_ORIENTATION_PORTRAIT`/`LANDSCAPE`, not the
-`SENSOR_` variants, which still let Android flip to the 180-degree reverse
-orientation on rotation and re-trigger a resize/relayout; the target here is
-a phone in a fixed dock/mount, not one being held and turned by hand).
-Applied once, the first time the window gains focus (guarded by a flag),
-since Mobile View is only meant to take effect on restart.
+`GameActivityOrientation.java.inc` overrides `onWindowFocusChanged()` and
+`setOrientationBis()`, inserted into the freshly-cloned `GameActivity.java`
+right before its `onCreate()`, by the "Patch orientation lock from
+config.portraitMode" step in `package-android`. It locks the installed app's
+screen orientation to the in-game Mobile View toggle (`config.portraitMode`
+in conf.json): a single rigid landscape when off, a single rigid portrait
+when on — no response to the sensor at all (plain
+`SCREEN_ORIENTATION_PORTRAIT`/`LANDSCAPE`, not the `SENSOR_` variants, which
+still let Android flip to the 180-degree reverse orientation on rotation and
+re-trigger a resize/relayout; the target here is a phone in a fixed
+dock/mount, not one being held and turned by hand).
 
-This has gone through three approaches, in order, each fixing the failure
+This has gone through four approaches, in order, each fixing the failure
 mode of the one before:
 
 1. **`attachBaseContext()`** calling `setRequestedOrientation()` directly.
@@ -43,18 +42,33 @@ mode of the one before:
    screen whenever the requested orientation actually differed from the
    phone's physical orientation at boot — i.e. whenever Mobile View needed
    to change anything, which is the whole point of the feature.
-3. **Overriding `onWindowFocusChanged()`** (current): applies the same
-   `setRequestedOrientation()` call, but only once the window has actually
-   gained focus — meaning a live, already-rendering GL surface exists.
-   Forcing a rotation at that point is the same kind of change a user causes
-   just by physically rotating their phone mid-game, which love-android
-   already supports without crashing (the manifest already declares
-   `configChanges` for orientation, so the Activity survives it via
-   `onConfigurationChanged` instead of being destroyed). Trade-off: if the
-   requested orientation differs from the phone's physical orientation at
-   boot, the first frame or two can briefly appear in the "wrong"
-   orientation before this rotates it — a brief visible flip, not a black
-   screen.
+3. **Overriding `onWindowFocusChanged()`** only, applied once the first time
+   the window gains focus (guarded by a flag) — meaning a live,
+   already-rendering GL surface exists, so forcing a rotation there is the
+   same kind of change a user causes just by physically rotating their phone
+   mid-game, which love-android already supports without crashing (the
+   manifest already declares `configChanges` for orientation, so the
+   Activity survives it via `onConfigurationChanged` instead of being
+   destroyed). Trade-off: if the requested orientation differs from the
+   phone's physical orientation at boot, the first frame or two can briefly
+   appear in the "wrong" orientation before this rotates it — a brief
+   visible flip, not a black screen. Fixed the black screen, but not a
+   second bug: the lock only held until the *next* window-mode change.
+   `client/src/scenes/PortraitGame.lua` and similar call
+   `love.window.updateMode()`/`setMode()` during normal play (e.g. entering
+   or leaving a touch-mobile match layout), and each such call reaches SDL's
+   own `setOrientationBis()` again with `resizable=true` and no orientation
+   hint — SDL's own signal to request `FULL_SENSOR` — silently overwriting
+   the lock and reopening free rotation. Reported as "it still flips when I
+   turn it" even after the lock visibly worked at boot.
+4. **Also overriding `setOrientationBis()`** (current), but only once
+   `onWindowFocusChanged()` has fired at least once (tracked by
+   `bootFocusGained`): before that point it defers to SDL's own logic
+   (preserving the boot-safety of approach 3), but after it, every call —
+   however triggered, at any point in the session — gets its computed
+   orientation replaced with our own lock instead of being allowed through.
+   This makes the lock durable across scene transitions and window-mode
+   changes, not just a one-time application at boot.
 
 If love-android's `GameActivity.java` changes upstream and the `onCreate()`
 anchor line moves or disappears, the patch step will fail loudly (it asserts

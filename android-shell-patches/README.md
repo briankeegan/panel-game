@@ -7,20 +7,21 @@ whatever gets installed from here.
 
 ## Orientation lock
 
-`GameActivityOrientation.java.inc` overrides `onWindowFocusChanged()` and
-`setOrientationBis()`, inserted into the freshly-cloned `GameActivity.java`
-right before its `onCreate()`, by the "Patch orientation lock from
-config.portraitMode" step in `package-android`. It locks the installed app's
-screen orientation to the in-game Mobile View toggle (`config.portraitMode`
-in conf.json): a single rigid landscape when off, a single rigid portrait
-when on — no response to the sensor at all (plain
-`SCREEN_ORIENTATION_PORTRAIT`/`LANDSCAPE`, not the `SENSOR_` variants, which
-still let Android flip to the 180-degree reverse orientation on rotation and
-re-trigger a resize/relayout; the target here is a phone in a fixed
-dock/mount, not one being held and turned by hand).
+`GameActivityOrientation.java.inc` overrides `onWindowFocusChanged()`,
+inserted into the freshly-cloned `GameActivity.java` right before its
+`onCreate()`, by the "Patch orientation lock from config.portraitMode" step
+in `package-android`. It locks the installed app's screen orientation to the
+in-game Mobile View toggle (`config.portraitMode` in conf.json): a single
+rigid landscape when off, a single rigid portrait when on — no response to
+the sensor at all (plain `SCREEN_ORIENTATION_PORTRAIT`/`LANDSCAPE`, not the
+`SENSOR_` variants, which still let Android flip to the 180-degree reverse
+orientation on rotation and re-trigger a resize/relayout; the target here is
+a phone in a fixed dock/mount, not one being held and turned by hand).
+Applied once, the first time the window gains focus (guarded by a flag),
+since Mobile View is only meant to take effect on restart.
 
-This has gone through four approaches, in order, each fixing the failure
-mode of the one before:
+This has gone through five approaches, in order — most fixing the failure
+mode of the one before, the last one a rollback pending more information:
 
 1. **`attachBaseContext()`** calling `setRequestedOrientation()` directly.
    This raced love-android's own native orientation request (see below) from
@@ -61,14 +62,27 @@ mode of the one before:
    hint — SDL's own signal to request `FULL_SENSOR` — silently overwriting
    the lock and reopening free rotation. Reported as "it still flips when I
    turn it" even after the lock visibly worked at boot.
-4. **Also overriding `setOrientationBis()`** (current), but only once
-   `onWindowFocusChanged()` has fired at least once (tracked by
-   `bootFocusGained`): before that point it defers to SDL's own logic
+4. **Also overriding `setOrientationBis()`**, gated by the same
+   `bootFocusGained` flag: before first focus it deferred to SDL's own logic
    (preserving the boot-safety of approach 3), but after it, every call —
-   however triggered, at any point in the session — gets its computed
-   orientation replaced with our own lock instead of being allowed through.
-   This makes the lock durable across scene transitions and window-mode
-   changes, not just a one-time application at boot.
+   however triggered, at any point in the session — had its computed
+   orientation replaced with our own lock instead of being allowed through,
+   with the goal of surviving the `PortraitGame.lua` scene transitions above.
+   Made things worse: still didn't stop rotation, and introduced visible
+   corruption transitioning portrait↔landscape (something was now fighting
+   the repeated re-assertion, rather than being corrected by it) — meaning
+   the `updateMode()` theory in approach 3 was likely wrong about the actual
+   cause of "still flips when I turn it".
+5. **Reverted to approach 3** (current) pending more information. Two
+   consecutive approaches (3 and 4) both failed to actually stop rotation
+   despite requesting a plain, non-`SENSOR_` fixed orientation, which a
+   correctly-applied Activity-level lock should categorically prevent
+   regardless of any Lua-side code. That points at something outside any
+   Activity-level fix's reach: e.g. Samsung DeX or a similar
+   external-display/desktop mode, where the display pipeline may derive its
+   rendered orientation from the live sensor rather than from any given
+   app's requested orientation — the exact setup this feature targets
+   (phone connected to an external monitor).
 
 If love-android's `GameActivity.java` changes upstream and the `onCreate()`
 anchor line moves or disappears, the patch step will fail loudly (it asserts

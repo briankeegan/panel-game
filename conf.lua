@@ -46,6 +46,13 @@ function love.conf(t)
     else
       config.windowWidth, config.windowHeight = consts.CANVAS_WIDTH, consts.CANVAS_HEIGHT
     end
+    -- config.fullscreen defaults to false (a real desktop windowed/fullscreen
+    -- preference) and only becomes true once a player manually toggles it in
+    -- Options -- on mobile there's no meaningful "windowed" mode to prefer, so a
+    -- fresh install (or portraitMode's fixed windowWidth/height above landing on a
+    -- non-fullscreen-looking size) always needed a manual toggle just to fill the
+    -- screen. Always fullscreen on mobile instead.
+    config.fullscreen = true
   end
 
   -- t.identity is the canonical conf-time path; setIdentity above sets the

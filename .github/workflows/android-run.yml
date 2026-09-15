@@ -41,9 +41,9 @@ jobs:
             PKG=com.panelattack.ffateam
             # Seed portraitMode=false BEFORE the first launch so this run exercises
             # the "Mobile View off" boot path -- a fresh install otherwise defaults
-            # to portrait and never reaches it. Path must match
-            # android-shell-patches/GameActivityOrientation.java.inc and the Lua
-            # save directory (t.externalstorage=true -> getExternalFilesDir).
+            # to portrait and never reaches it. Path must match conf.lua's own
+            # portraitMode-driven orientation logic and the Lua save directory
+            # (t.externalstorage=true -> getExternalFilesDir).
             adb root || true
             # adb shell re-parses its argument on the DEVICE's own shell, so the
             # space in "Panel Attack" needs its own quoting layer (single quotes

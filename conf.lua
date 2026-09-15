@@ -21,23 +21,30 @@ function love.conf(t)
 
   -- love-android has no direct "set orientation" flag: SDLActivity decides portrait vs.
   -- landscape purely from whether t.window.width/height (set below from these) is a wide
-  -- or a tall rectangle, native-side, when it creates the window. config.windowWidth/Height
-  -- are otherwise a persisted DESKTOP window size (see the read_data.windowWidth/windowHeight
-  -- restore in client/src/config.lua) -- on mobile that's stale data from whatever orientation
-  -- the app happened to close in, not a signal of user intent. Overriding it fresh from
-  -- portraitMode on every boot makes LÖVE's own native orientation request the single source
-  -- of truth, instead of a second, independent piece of code also calling
-  -- setRequestedOrientation() and racing it (which is what android-shell-patches/ used to do,
-  -- and why turning Mobile View off only worked intermittently -- see git history).
+  -- or a tall rectangle, native-side, when it creates the window -- but ONLY when
+  -- t.window.resizable is false (see below); with it true, SDL ignores width/height for
+  -- this and always requests free rotation instead, correcting itself only after the
+  -- fact once something on the Java side asks it to stop. That correction is what
+  -- android-shell-patches/ used to do, and it always showed a brief flash of the wrong
+  -- orientation at boot (before the correction could run) -- inherent to correcting
+  -- after the window already exists, not a bug in that code. So isMobileLike is
+  -- computed once here and used for both: resizable is false on mobile (below) so SDL's
+  -- own boot-time orientation request is already correct from the start, and
+  -- config.windowWidth/Height (otherwise a persisted DESKTOP window size -- see the
+  -- read_data.windowWidth/windowHeight restore in client/src/config.lua, stale on mobile
+  -- since it reflects whatever orientation the app happened to close in, not user
+  -- intent) is overridden fresh from portraitMode on every boot so that request is
+  -- always right.
+  local isMobileLike = false
   if love.system and love.system.getOS then
     local osName = love.system.getOS()
-    local isMobileLike = osName == "Android" or osName == "iOS" or os.getenv("PA_SIMULATE_MOBILE") == "1"
-    if isMobileLike then
-      if config.portraitMode == false then
-        config.windowWidth, config.windowHeight = consts.CANVAS_HEIGHT, consts.CANVAS_WIDTH
-      else
-        config.windowWidth, config.windowHeight = consts.CANVAS_WIDTH, consts.CANVAS_HEIGHT
-      end
+    isMobileLike = osName == "Android" or osName == "iOS" or os.getenv("PA_SIMULATE_MOBILE") == "1"
+  end
+  if isMobileLike then
+    if config.portraitMode == false then
+      config.windowWidth, config.windowHeight = consts.CANVAS_HEIGHT, consts.CANVAS_WIDTH
+    else
+      config.windowWidth, config.windowHeight = consts.CANVAS_WIDTH, consts.CANVAS_HEIGHT
     end
   end
 
@@ -84,7 +91,11 @@ function love.conf(t)
   t.window.width = config.windowWidth            -- The window width (number)
   t.window.height = config.windowHeight          -- The window height (number)
   t.window.borderless = config.borderless  -- Remove all border visuals from the window (boolean)
-  t.window.resizable = true                -- Let the window be user-resizable (boolean)
+  -- Fixed (not resizable) on mobile: this is what makes SDL request the correct
+  -- orientation from config.windowWidth/Height (above) directly at boot, instead of
+  -- always requesting free rotation and correcting it after the fact -- see the comment
+  -- above. Desktop keeps user-resizable windows as before.
+  t.window.resizable = not isMobileLike    -- Let the window be user-resizable (boolean)
   t.window.minwidth = 1                    -- Minimum window width if the window is resizable (number)
   t.window.minheight = 1                   -- Minimum window height if the window is resizable (number)
   t.window.fullscreen = config.fullscreen  -- Enable fullscreen (boolean)

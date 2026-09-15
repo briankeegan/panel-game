@@ -5,92 +5,38 @@ love-android has no vendored source in this repo — `build-shells.yml`'s
 reconfigures it via `gradle.properties` text swaps (rebrand step) plus
 whatever gets installed from here.
 
-## Orientation lock
+## Orientation (not handled here anymore)
 
-`GameActivityOrientation.java.inc` overrides `onWindowFocusChanged()`,
-inserted into the freshly-cloned `GameActivity.java` right before its
-`onCreate()`, by the "Patch orientation lock from config.portraitMode" step
-in `package-android`. It locks the installed app's screen orientation to the
-in-game Mobile View toggle (`config.portraitMode` in conf.json): a single
-rigid landscape when off, a single rigid portrait when on — no response to
-the sensor at all (plain `SCREEN_ORIENTATION_PORTRAIT`/`LANDSCAPE`, not the
-`SENSOR_` variants, which still let Android flip to the 180-degree reverse
-orientation on rotation and re-trigger a resize/relayout; the target here is
-a phone in a fixed dock/mount, not one being held and turned by hand).
-Applied once, the first time the window gains focus (guarded by a flag),
-since Mobile View is only meant to take effect on restart.
+Four Java-level approaches were tried here in turn (`attachBaseContext()`
+calling `setRequestedOrientation()` directly; overriding `SDLActivity`'s own
+`setOrientationBis()` extension point; overriding `onWindowFocusChanged()`
+to apply the lock once real rendering had started, avoiding a boot-time
+black screen; and re-asserting that lock on every subsequent
+`setOrientationBis()` call to survive later window-mode changes). Each fixed
+a real failure mode of the one before it (a race producing an intermittent
+black screen; a black screen whenever forcing a live rotation collided with
+SDL still constructing the native window/GL surface), but every one of them
+shared a structural problem: they only correct the orientation *after*
+SDL's own window-creation code already requested something else (normally
+`FULL_SENSOR`, free rotation — with `t.window.resizable = true` and no
+orientation hint, that's what SDL's own logic here always computes,
+regardless of `t.window.width`/`t.window.height`). Correcting it after the
+fact always means a real, load-bearing window briefly exists in the wrong
+orientation first — visible at every boot as a flash of the wrong
+orientation before flipping to the right one, whatever Mobile View was set
+to. The last of the four also introduced its own visible corruption
+transitioning between orientations, for reasons never fully pinned down.
 
-This has gone through five approaches, in order — most fixing the failure
-mode of the one before, the last one a rollback pending more information:
-
-1. **`attachBaseContext()`** calling `setRequestedOrientation()` directly.
-   This raced love-android's own native orientation request (see below) from
-   a separate point in the Activity lifecycle: sometimes the Java-side call
-   won, sometimes the native one did, depending on boot timing — an
-   intermittent black screen.
-2. **Overriding `setOrientationBis(int w, int h, boolean resizable, String
-   hint)`** — `SDLActivity`'s own extension point for orientation (explicitly
-   marked `/** This can be overridden */`), and the exact call site the
-   native engine already uses when it creates the window. This fixed the
-   race (there's only one call site now), but not the black screen: with
-   `t.window.resizable = true` (needed for the desktop build) and no
-   orientation hint from `conf.lua`, SDL's own logic here normally requests
-   `FULL_SENSOR`, so this call happens *during window/surface creation* —
-   and forcing Android to actually rotate the display at that exact moment,
-   while SDL is still constructing the native window/GL surface, is a
-   known-fragile sequence upstream (reports of black screens and broken GL
-   context around Android orientation/resume). It only reproduced the black
-   screen whenever the requested orientation actually differed from the
-   phone's physical orientation at boot — i.e. whenever Mobile View needed
-   to change anything, which is the whole point of the feature.
-3. **Overriding `onWindowFocusChanged()`** only, applied once the first time
-   the window gains focus (guarded by a flag) — meaning a live,
-   already-rendering GL surface exists, so forcing a rotation there is the
-   same kind of change a user causes just by physically rotating their phone
-   mid-game, which love-android already supports without crashing (the
-   manifest already declares `configChanges` for orientation, so the
-   Activity survives it via `onConfigurationChanged` instead of being
-   destroyed). Trade-off: if the requested orientation differs from the
-   phone's physical orientation at boot, the first frame or two can briefly
-   appear in the "wrong" orientation before this rotates it — a brief
-   visible flip, not a black screen. Fixed the black screen, but not a
-   second bug: the lock only held until the *next* window-mode change.
-   `client/src/scenes/PortraitGame.lua` and similar call
-   `love.window.updateMode()`/`setMode()` during normal play (e.g. entering
-   or leaving a touch-mobile match layout), and each such call reaches SDL's
-   own `setOrientationBis()` again with `resizable=true` and no orientation
-   hint — SDL's own signal to request `FULL_SENSOR` — silently overwriting
-   the lock and reopening free rotation. Reported as "it still flips when I
-   turn it" even after the lock visibly worked at boot.
-4. **Also overriding `setOrientationBis()`**, gated by the same
-   `bootFocusGained` flag: before first focus it deferred to SDL's own logic
-   (preserving the boot-safety of approach 3), but after it, every call —
-   however triggered, at any point in the session — had its computed
-   orientation replaced with our own lock instead of being allowed through,
-   with the goal of surviving the `PortraitGame.lua` scene transitions above.
-   Made things worse: still didn't stop rotation, and introduced visible
-   corruption transitioning portrait↔landscape (something was now fighting
-   the repeated re-assertion, rather than being corrected by it) — meaning
-   the `updateMode()` theory in approach 3 was likely wrong about the actual
-   cause of "still flips when I turn it".
-5. **Reverted to approach 3** (current) pending more information. Two
-   consecutive approaches (3 and 4) both failed to actually stop rotation
-   despite requesting a plain, non-`SENSOR_` fixed orientation, which a
-   correctly-applied Activity-level lock should categorically prevent
-   regardless of any Lua-side code. That points at something outside any
-   Activity-level fix's reach: e.g. Samsung DeX or a similar
-   external-display/desktop mode, where the display pipeline may derive its
-   rendered orientation from the live sensor rather than from any given
-   app's requested orientation — the exact setup this feature targets
-   (phone connected to an external monitor).
-
-If love-android's `GameActivity.java` changes upstream and the `onCreate()`
-anchor line moves or disappears, the patch step will fail loudly (it asserts
-the anchor is present) rather than silently no-op.
-
-This lives in native Java, so unlike most of this repo's Lua changes, it
-needs a full APK rebuild (`build-shells-N` tag) to take effect — it does not
-ship through the Lua-only `.love` hot-update.
+Fixed properly now in `conf.lua` at the repo root instead: `t.window.width`/
+`t.window.height` there are already derived from `config.portraitMode`, and
+`t.window.resizable` is now `false` on mobile (`true` still on desktop, for
+user-resizable windows there). With `resizable` false, SDL's own
+window-creation logic in `setOrientationBis()` uses `t.window.width`/`height`
+directly (`w > h ? SENSOR_LANDSCAPE : SENSOR_PORTRAIT`) instead of ignoring
+them in favor of `FULL_SENSOR` — so the *first* native orientation request
+is already the correct one. No Java patch, no post-hoc correction, no boot
+flash, and because it's a `conf.lua`-only change it ships in the Lua-only
+`.love` hot-update — no APK rebuild needed.
 
 ## debug.keystore
 

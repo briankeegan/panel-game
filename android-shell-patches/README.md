@@ -11,12 +11,14 @@ whatever gets installed from here.
 inserted into the freshly-cloned `GameActivity.java` right before its
 `onCreate()`, by the "Patch orientation lock from config.portraitMode" step
 in `package-android`. It locks the installed app's screen orientation to the
-axis matching the in-game Mobile View toggle (`config.portraitMode` in
-conf.json): landscape-only when off, portrait-only when on (each still
-following the sensor within that axis — e.g. either landscape direction, or
-right-side-up/upside-down portrait — just never crossing into the other
-axis). Applied once, the first time the window gains focus (guarded by a
-flag), since Mobile View is only meant to take effect on restart.
+the in-game Mobile View toggle (`config.portraitMode` in conf.json): a single
+rigid landscape when off, a single rigid portrait when on — no response to
+the sensor at all (plain `SCREEN_ORIENTATION_PORTRAIT`/`LANDSCAPE`, not the
+`SENSOR_` variants, which still let Android flip to the 180-degree reverse
+orientation on rotation and re-trigger a resize/relayout; the target here is
+a phone in a fixed dock/mount, not one being held and turned by hand).
+Applied once, the first time the window gains focus (guarded by a flag),
+since Mobile View is only meant to take effect on restart.
 
 This has gone through three approaches, in order, each fixing the failure
 mode of the one before:

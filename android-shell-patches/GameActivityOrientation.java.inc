@@ -28,6 +28,15 @@
         // the "wrong" orientation before this rotates it -- a brief visible flip, not a
         // black screen.
         //
+        // Plain PORTRAIT/LANDSCAPE (not the SENSOR_ variants): the SENSOR_ variants
+        // still let Android flip between an orientation and its 180-degree reverse
+        // (e.g. landscape <-> reverse-landscape) whenever the sensor reports that
+        // rotation, which swaps which screen edge is "top" and re-triggers a resize/
+        // relayout -- exactly the "screen rearranges on rotation" this replaces. Panel
+        // Attack's target here is a phone in a fixed dock/mount, so a single, truly
+        // rigid direction with zero response to the sensor is what's wanted, not a
+        // 2-way flip.
+        //
         // Applied once (guarded by orientationLockApplied) since Mobile View is only
         // meant to take effect on restart, matching the Lua-side default in
         // client/src/config.lua if conf.json is unreadable.
@@ -55,8 +64,8 @@
                 Log.d("GameActivity", "Could not read portraitMode from conf.json: " + e.getMessage());
             }
             setRequestedOrientation(wantPortrait
-                ? android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
-                : android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
+                ? android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                : android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
         }
     }
 

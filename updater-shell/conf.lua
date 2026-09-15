@@ -19,8 +19,43 @@ function love.conf(t)
 
     t.window.title = "Unofficial Panel Attack FFA & Team - Updater" -- The window title (string)
     t.window.icon = "icon.png" -- Filepath to an image to use as the window's icon (string)
-    t.window.width = 800 -- The window width (number)
-    t.window.height = 600 -- The window height (number)
+
+    -- This updater screen is shown briefly on every launch, before the real game (with
+    -- its own conf.lua, already portraitMode-aware) takes over -- including on
+    -- Android, where its plain 800x600 default is an inherently landscape-shaped
+    -- window. Without this, that showed as a landscape flash before the real game
+    -- locked to the correct orientation, even with Mobile View already set to
+    -- portrait the whole time. Mirror the same check so this screen is already the
+    -- right shape and doesn't itself need to flip once the real game takes over.
+    local isMobileLike = false
+    if love.system and love.system.getOS then
+        local osName = love.system.getOS()
+        isMobileLike = osName == "Android" or osName == "iOS"
+    end
+    local wantPortrait = true
+    if isMobileLike then
+        -- Read conf.json directly rather than requiring the real game's config
+        -- module: this is a separate, minimal .love and shouldn't need the game's
+        -- full dependency chain just to check one setting. Needs the identity set
+        -- first -- love.filesystem doesn't point at the right save directory until
+        -- then (boot.lua's own setIdentity call, using this same t.identity, only
+        -- happens after love.conf returns).
+        love.filesystem.setIdentity(t.identity, t.appendidentity)
+        local contents = love.filesystem.read("conf.json")
+        if contents then
+            local match = contents:match('"portraitMode"%s*:%s*(%a+)')
+            if match == "false" then
+                wantPortrait = false
+            end
+        end
+    end
+
+    local windowWidth, windowHeight = 800, 600
+    if isMobileLike and wantPortrait then
+        windowWidth, windowHeight = 600, 800
+    end
+    t.window.width = windowWidth -- The window width (number)
+    t.window.height = windowHeight -- The window height (number)
     t.window.borderless = false -- Remove all border visuals from the window (boolean)
     t.window.resizable = false -- Let the window be user-resizable (boolean)
     t.window.minwidth = 1 -- Minimum window width if the window is resizable (number)

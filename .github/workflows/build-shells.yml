@@ -281,6 +281,13 @@ jobs:
           distribution: temurin
           java-version: '17'    # love-android 11.5a requires JDK 17
       - uses: android-actions/setup-android@v3
+        with:
+          # Google removed the legacy `tools` SDK package from the repository
+          # manifest; the action's own default ("tools platform-tools") now fails
+          # sdkmanager outright before anything else runs. Skip its default install
+          # entirely (still sets up ANDROID_HOME and accepts licenses) -- the next
+          # step already installs every package this job actually needs.
+          packages: ""
       - name: Install pinned NDK + cmake (love-android 11.5a)
         run: |
           yes | sdkmanager "platforms;android-34" "build-tools;34.0.0" \

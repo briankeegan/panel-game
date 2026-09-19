@@ -1,7 +1,7 @@
 {
-  "_comment": "PLAMP \u2014 the bot for briankeegan's Panel Attack server. GENERATED from a GameCreator training run, do not hand-tune. Weights are for bot/PanelEval.lua and are SHARES: every feature is divided by its own bound before weighting, so a weight is that feature's share of the decision. The divisors live in PanelEval.FEATURES and must match the JavaScript registry they were found under.",
+  "_comment": "PLAMP — the bot for briankeegan's Panel Attack server. GENERATED from a GameCreator training run, do not hand-tune. Weights are for bot/PanelEval.lua and are SHARES: every feature is divided by its own bound before weighting, so a weight is that feature's share of the decision. The divisors live in PanelEval.FEATURES and must match the JavaScript registry they were found under.",
   "source": "champion of 4 islands after 3000 updates | trained.pbt.pbt-norm-s120-s120.0919-012538.g03000.json",
-  "_switches": "A WEIGHT SET IS ONLY A BOT WHEN PAIRED WITH THE SWITCHES IT WAS FOUND UNDER. Found at depth 2, beam 0 (every candidate expanded), rise on, density off.",
+  "_switches": "A WEIGHT SET IS ONLY A BOT WHEN PAIRED WITH THE SWITCHES IT WAS FOUND UNDER. depth 2 (a candidate is worth the best of stopping there or any single reply), beam 0 (every candidate expanded), rise on, density off.",
   "_record": "11W 1L of 12 against the best committed peer; 3000 updates across 4 islands.",
   "_features": [
     "linksH",
@@ -15,6 +15,10 @@
     "garbageSent",
     "stopTimeEarned"
   ],
+  "depth": 2,
+  "beam": 0,
+  "rise": true,
+  "reaction": 12,
   "density": false,
   "weights": {
     "linksH": -21.2619,

@@ -32,11 +32,29 @@ trained on: **2683 against 679, +295%**.
 
 | file | what it does |
 |---|---|
-| `bot/PanelEval.lua` | the 22 features and `evaluate()`. One pure function each, returning a raw unsigned magnitude. |
+| `bot/PanelEval.lua` | the 26 features and `evaluate()`. One pure function each, returning a raw unsigned magnitude. |
 | `bot/EvalPlan.lua` | the lookahead. The **one** place BoardSim's grid dialect meets the evaluator's. |
 | `bot/EvalEarned.lua` | one resolve, translated into what the game pays: garbage out, stop time, score. |
-| `bot/WeightedBrain.lua` | the live `decide`. Same interface as every other brain. |
+| `bot/WeightedBrain.lua` | the live `decide`: the search, and the switches a weight set was found under. Same interface as every other brain. |
 | `bot/profiles/trained.json` | the weight set. Generated — do not hand-tune. |
+
+### A weight set is only a bot when paired with its switches
+
+The numbers in a profile describe play under a particular search, so the
+profile carries that search with them and `WeightedBrain` reads it from there:
+
+| switch | what it does |
+|---|---|
+| `depth` | 1 scores the board a move leaves. 2 makes a candidate worth the best of stopping there or any single reply. |
+| `beam` | how many candidates get the second ply. 0 expands every one — a beam over the *immediate* ranking is the wrong filter for a search whose point is finding the move that looks poor now. It never drops holding. |
+| `rise` | score each candidate one settle row later, plus the rows that actually land while the cursor walks and the bot counts out `reaction`. Off, a move is judged the frame its match finishes popping — hole open, cluster spent, panels that refill it never arriving — while holding is judged on a board that never moved, so the more a move cleared the worse it looked. |
+| `reaction` | frames between decisions. The stack rises for all of them whatever the bot does, so a hold is not free in time. |
+| `density` | counts made of panels become densities, so clearing stops subtracting tidiness it never lost. |
+
+Rise needs the clock: `BoardState` hands the brain `nextRow` (the dimmed row
+the engine has already dealt), `riseTimer`, `pixelFrames` and `displacement`.
+A state without them rises the one settle row and no more, which is the
+measurement half without the timing half.
 
 Sign lives in the registry and weight lives in the profile, so a feature never
 needs to know whether more of it is good. That means the same function can be
@@ -48,7 +66,10 @@ re-signed or re-weighted without being rewritten, and a test can assert a
 ## Running it
 
 ```sh
-# against a human, online
+# the shipped bot, on the server -- weights, cadence and switches together
+bot/plamp.sh [ip] [port] [name]
+
+# any other weight set, online
 PA_SEARCH_PROFILE=bot/profiles/trained.json \
   luajit bot/playBot.lua <ip> <port> PanelBot "" "" weighted
 
@@ -74,16 +95,25 @@ not reviewed.
 
 | gate | what it proves |
 |---|---|
-| `bot/tests/panelEvalVerify.lua` | every feature agrees with the JavaScript it was ported from, on 393 boards the shipped bot actually sat on at level 10. 8,646 values, all 22 features, zero mismatches. |
+| `bot/tests/panelEvalVerify.lua` | every feature agrees with the JavaScript it was ported from, on 393 boards the shipped bot actually sat on at level 10. 10,218 values, all 26 features. |
+| `bot/tests/decisionVerify.lua` | the brain plays the **move** the JavaScript plays, on 400 real boards with the shipped weight set at depth 2. Agreeing on every feature is not the same as playing the same game: choosing is a search, and hold-as-candidate-zero, tie-breaking, the beam and the second ply are four more places two implementations drift apart in silence. |
 | `bot/tests/comboPartitionVerify.lua` | BoardSim partitions a clear exactly as the real engine does. 4,443 swaps played on a real `Stack`, reading its own `matched` signal. |
 | `bot/tests/boardSimVerify.lua` | (pre-existing) the settled board after a swap matches the engine. 0/941. |
 
-The fixture is generated from the other side:
+Both fixtures are generated from the other side:
 
 ```sh
 # in the GameCreator checkout
-node games/the-game/ai/eval/export_reference.js
+node games/the-game/ai/eval/export_reference.js    # feature values
+node games/the-game/ai/eval/export_decisions.js    # the move played
 ```
+
+`decisionVerify` requires a match only where the two are looking at the same
+board, and decides that mechanically rather than by judgement. Past a garbage
+break they are not: LogicalBoard stops there, because the colours that row
+turns into come off an RNG it may not read, and says `truncated`; BoardSim is
+handed those colours by the engine it runs inside. Those boards are counted
+and reported, never asserted.
 
 Change a feature here and `panelEvalVerify` fails until the fixture is
 regenerated. **That is the point.** If the two implementations are meant to

@@ -105,6 +105,7 @@ for i = 1, #fixture.boards do
     plan = plan,
     travelFrames = row.travelFrames,
     displacement = row.displacement,
+    clock = row.clock,
     earned = row.earned,
   })
 

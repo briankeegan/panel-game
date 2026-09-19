@@ -9,6 +9,7 @@
 
 local PanelStateCodes = require("client.src.network.PanelStateCodes")
 local StackEventRecorder = require("bot.StackEventRecorder")
+local consts = require("common.engine.consts")
 
 local M = {}
 
@@ -56,7 +57,8 @@ end
 -- predict this exactly for the common case — the bottom row of a single garbage
 -- block — by assigning buffer rows to blocks bottom-to-top. Multi-block-same-frame
 -- ordering isn't reproducible from a snapshot, so reveals beyond the first row per
--- block are left unknown (BoardSim then reveals empty, not a fabricated color).
+-- block are left unknown (BoardSim then reveals an occupied-but-unmatchable cell,
+-- not a fabricated color).
 -- Returns reveal[r][c] = color int, only for bottom-row garbage cells we resolved.
 local function captureReveals(stack, rows, width)
   local src = stack.panelSource
@@ -153,9 +155,19 @@ function M.capture(stack)
     board[r] = outRow
   end
 
+  -- THE DIMMED ROW UNDER THE STACK. panels[0] is the row the engine has
+  -- already dealt and is drawing below the play field: a person plans around
+  -- it and so can a search, so it is captured rather than left to be guessed.
+  -- -1 is a cell whose colour is not knowable (garbage, or nothing there).
+  local nextRow = {}
+  for c = 1, width do
+    local p = panels[0] and panels[0][c]
+    nextRow[c] = (p and not p.isGarbage and p.color and p.color > 0) and p.color or -1
+  end
+
   return {
     schemaVersion = 1,
-    board = board, width = width, rows = rows,
+    board = board, width = width, rows = rows, nextRow = nextRow,
     -- cursor / geometry (raw)
     cur_row = stack.cur_row, cur_col = stack.cur_col, top_cur_row = stack.top_cur_row,
     height = stack.height,
@@ -238,6 +250,12 @@ function M.derive(cap)
     maxHealth = cap.maxHealth,                            -- full grace value (for health trend / fraction)
     toppedOut = cap.wasToppedOut or false,               -- DANGER signal: at the ceiling, the death timer is ticking
     riseTimer = cap.rise_timer,                           -- exact frames to next row commit
+    -- Frames per PIXEL of rise at this speed, and the row the next rise
+    -- brings in. Together with riseTimer and displacement they are the whole
+    -- rise clock, which is what a search needs to judge a candidate on the
+    -- board a moment from now rather than at the instant its match pops.
+    pixelFrames = consts.SPEED_TO_RISE_TIME[cap.speed],
+    nextRow = cap.nextRow,
     peakShake = cap.peak_shake_time,
     outgoing = cap.outgoing,                              -- our own pressure
     events = cap.events,                                  -- edges: chainEnded ("fire now"), etc.

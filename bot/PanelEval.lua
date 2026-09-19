@@ -195,6 +195,72 @@ local function links(input)
   return count
 end
 
+------------------------------------------------------------------- popSize
+-- FOR EVERY SWAP THE CURSOR COULD MAKE, HOW MANY PANELS WOULD POP, summed
+-- over the board.
+--
+-- Three is the minimum to pop, not the prize: a match is the union of every
+-- run of 3 or more through the swapped cell, row AND column, so an L or a T
+-- pops five -- and combo size is what feeds the combo garbage table and the
+-- combo score.
+--
+-- This is the Panel Attack half of the Puyo reference's consecutive colours.
+-- That game pops touching blobs of four, so its links term covers
+-- one-short-of-popping; this one pops three in a LINE and swaps sideways
+-- only, so what matters is whether the third panel is one move from its slot
+-- and how much comes with it.
+--
+-- Not matchPotential: no clone and no resolve, the immediate pop only, so it
+-- costs a run-length walk instead of a cascade. It obeys the engine --
+-- garbage and busy panels cannot be swapped, and a panel swapped out over a
+-- hole falls out of the row before anything can match it.
+local function popThrough(grid, W, H, r, c, seen)
+  local v = grid[r][c]
+  if v <= 0 then return 0 end
+  local added, lo, hi, k = 0
+  lo = c; while lo > 1 and grid[r][lo - 1] == v do lo = lo - 1 end
+  hi = c; while hi < W and grid[r][hi + 1] == v do hi = hi + 1 end
+  if hi - lo + 1 >= 3 then
+    for k = lo, hi do
+      local key = r * 100 + k
+      if not seen[key] then seen[key] = true; added = added + 1 end
+    end
+  end
+  lo = r; while lo > 1 and grid[lo - 1][c] == v do lo = lo - 1 end
+  hi = r; while hi < H and grid[hi + 1][c] == v do hi = hi + 1 end
+  if hi - lo + 1 >= 3 then
+    for k = lo, hi do
+      local key = k * 100 + c
+      if not seen[key] then seen[key] = true; added = added + 1 end
+    end
+  end
+  return added
+end
+
+local function popSize(input)
+  local board = input.board
+  local grid, W, H = board.grid, board.width, board.height
+  local total = 0
+  for r = 1, H do
+    for c = 1, W - 1 do
+      local a, b = grid[r][c], grid[r][c + 1]
+      -- a == b is a no-op, and it covers empty against empty
+      if a ~= b and a >= 0 and b >= 0 then
+        local aFalls = a > 0 and r > 1 and grid[r - 1][c + 1] == 0
+        local bFalls = b > 0 and r > 1 and grid[r - 1][c] == 0
+        if not (aFalls and bFalls) then
+          grid[r][c], grid[r][c + 1] = b, a
+          local seen = {}
+          if not bFalls then total = total + popThrough(grid, W, H, r, c, seen) end
+          if not aFalls then total = total + popThrough(grid, W, H, r, c + 1, seen) end
+          grid[r][c], grid[r][c + 1] = a, b
+        end
+      end
+    end
+  end
+  return total
+end
+
 ------------------------------------------------------------------ linksH / V
 -- links, SPLIT BY DIRECTION, and the two halves add up to links exactly.
 --
@@ -411,6 +477,36 @@ end
 
 local function chainLength(input) return input.earned.chainLength or 0 end
 local function stopTimeEarned(input) return input.earned.stopTimeEarned or 0 end
+
+-- WITHIN ONE ROW OF THE CEILING, OR ALREADY OVER IT. The engine's own flag
+-- wins outright: a candidate that settles lower is still a board whose stack
+-- is topped out now.
+local DANGER_ROWS = 1
+local function couldDie(input)
+  if input.clock.toppedOut then return true end
+  local board = input.board
+  local grid, W, H = board.grid, board.width, board.height
+  for r = H, math.max(1, H - DANGER_ROWS), -1 do
+    if grid[r] then
+      for c = 1, W do if grid[r][c] ~= 0 then return true end end
+    end
+  end
+  return false
+end
+
+-- THE STOP-TIME FRAMES THIS MOVE ACTUALLY BUYS: what it earned less the clock
+-- already running, floored at 0, and 0 unless the board could die.
+-- awardStopTime takes a MAX, so earning 90 under a 120 clock buys nothing,
+-- and 60 frames on a safe board buy nothing that matters. A weighted sum
+-- cannot multiply stop time by danger, so the conjunction lives inside the
+-- feature, as it does in flatTop.
+local function stopTimeGain(input)
+  local earned = input.earned.stopTimeEarned or 0
+  if earned <= 0 then return 0 end
+  local gain = earned - (input.clock.stopTime or 0)
+  if gain <= 0 then return 0 end
+  return couldDie(input) and gain or 0
+end
 local function brokeGarbage(input) return input.earned.brokeGarbage or 0 end
 local function garbageCleared(input) return input.earned.garbageCleared or 0 end
 
@@ -544,6 +640,7 @@ PanelEval.FEATURES = {
   { key = "staircase",        group = "board",  sign =  1, norm = 4, fn = staircase },
   { key = "staircaseReady",   group = "board",  sign =  1, norm = 4, fn = staircaseReady },
   { key = "flatTop",          group = "board",  sign = -1, norm = 12, fn = flatTop },
+  { key = "popSize",          group = "board",  sign =  1, norm = 36, fn = popSize, perPanel = true },
   { key = "linksH",           group = "board",  sign =  1, norm = 24, fn = linksH, perPanel = true },
   { key = "linksV",           group = "board",  sign =  1, norm = 24, fn = linksV, perPanel = true },
   { key = "links",            group = "board",  sign =  1, norm = 24, fn = links, perPanel = true },
@@ -559,6 +656,7 @@ PanelEval.FEATURES = {
   { key = "chainLength",      group = "earned", sign =  1, norm = 13, fn = chainLength },
   { key = "scoreEarned",      group = "earned", sign =  1, norm = 1000, fn = scoreEarned },
   { key = "stopTimeEarned",   group = "earned", sign =  1, norm = 100, fn = stopTimeEarned },
+  { key = "stopTimeGain",     group = "earned", sign =  1, norm = 100, fn = stopTimeGain },
   { key = "brokeGarbage",     group = "earned", sign =  1, norm = 72, fn = brokeGarbage },
   { key = "garbageCleared",   group = "earned", sign =  1, norm = 72, fn = garbageCleared },
   { key = "travelCost",       group = "move",   sign = -1, norm = 16, fn = travelCost },
@@ -591,6 +689,13 @@ function PanelEval.normalize(raw)
     cursor = raw.cursor,
     travelFrames = raw.travelFrames or 0,
     displacement = raw.displacement or 0,
+    -- WHAT TIME IT IS. The stop clock already running and whether the stack is
+    -- over the line -- per DECISION, not per candidate, except that a
+    -- candidate two moves out inherits whatever the first move banked.
+    clock = {
+      stopTime = (raw.clock and raw.clock.stopTime) or 0,
+      toppedOut = (raw.clock and raw.clock.toppedOut) or false,
+    },
     earned = {
       chainLength = earned.chainLength or 0,
       comboSizes = earned.comboSizes or {},

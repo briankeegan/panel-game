@@ -19,16 +19,17 @@ local port = tonumber(arg[2]) or 49569
 local name = arg[3] or "PanelBot"
 local cursorInterval = tonumber(arg[4]) -- frames between cursor moves/swaps; nil = full speed
 local reactionFrames = tonumber(arg[5]) -- reaction-cap frames; nil = full speed
-local brain = arg[6] or "heuristic"     -- "heuristic" | "search" | "expert"
+local brain = arg[6] or "heuristic"     -- "heuristic" | "search" | "expert" | "weighted"
 local cursorSpeed = (cursorInterval or reactionFrames)
   and { cursorMoveInterval = cursorInterval or 8, reactionFrames = reactionFrames or 3 } or nil
 
--- PA_SEARCH_PROFILE=bot/profiles/<player>.json conditions the search eval per
--- player (Phase B); ignored unless brain == "search".
+-- PA_SEARCH_PROFILE=bot/profiles/<file>.json names the weight set. For
+-- brain == "weighted" that is a bot/PanelEval.lua weight set (default
+-- bot/profiles/trained.json when unset).
 local bot = BotClient({
   ip = ip, port = port, name = name, cursorSpeed = cursorSpeed,
   brain = brain,
-  searchProfile = (brain == "search") and os.getenv("PA_SEARCH_PROFILE") or nil,
+  searchProfile = (brain == "search" or brain == "weighted") and os.getenv("PA_SEARCH_PROFILE") or nil,
 })
 
 if not bot:login() then print("login failed"); os.exit(1) end

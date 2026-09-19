@@ -1,0 +1,31 @@
+{
+  "_comment": "PLAMP \u2014 the bot for briankeegan's Panel Attack server. GENERATED from a GameCreator training run, do not hand-tune. Weights are for bot/PanelEval.lua and are SHARES: every feature is divided by its own bound before weighting, so a weight is that feature's share of the decision. The divisors live in PanelEval.FEATURES and must match the JavaScript registry they were found under.",
+  "source": "champion of 4 islands after 3000 updates | trained.pbt.pbt-norm-s120-s120.0919-012538.g03000.json",
+  "_switches": "A WEIGHT SET IS ONLY A BOT WHEN PAIRED WITH THE SWITCHES IT WAS FOUND UNDER. Found at depth 2, beam 0 (every candidate expanded), rise on, density off.",
+  "_record": "11W 1L of 12 against the best committed peer; 3000 updates across 4 islands.",
+  "_features": [
+    "linksH",
+    "linksV",
+    "colourVariance",
+    "edgePenalty",
+    "garbageOnBoard",
+    "maxHeight",
+    "fillRatio",
+    "garbageAdjacency",
+    "garbageSent",
+    "stopTimeEarned"
+  ],
+  "density": false,
+  "weights": {
+    "linksH": -21.2619,
+    "linksV": 29.6008,
+    "colourVariance": 147.4624,
+    "edgePenalty": 74.5465,
+    "garbageOnBoard": 14.37,
+    "maxHeight": 23.6884,
+    "fillRatio": 144.374,
+    "garbageAdjacency": -35.1362,
+    "garbageSent": -77.3842,
+    "stopTimeEarned": 12.1501
+  }
+}

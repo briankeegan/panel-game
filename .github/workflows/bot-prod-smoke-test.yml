@@ -22,6 +22,7 @@ on:
         options:
           - prod-vs          # bot-vs-bot matches on the live server
           - large-garbage    # offline survival vs the "large_garbage" training preset (6x12 blocks); no server contact
+          - live             # ONE bot, real name, sits in the lobby so a human can play it
       matches:
         description: 'prod-vs: number of matches (~2.5 min worst-case each). large-garbage: number of seeds.'
         required: false
@@ -38,12 +39,25 @@ on:
         description: 'Bot difficulty/level (1-10ish)'
         required: false
         default: 'hard'
+      profile:
+        description: 'live: weight set (bot/profiles/*.json)'
+        required: false
+        default: 'bot/profiles/beverly.json'
+      name:
+        description: 'live: account name, 16 chars max (server limit)'
+        required: false
+        default: 'Beverly'
+      hours:
+        description: 'live: how long to stay up, 1-5'
+        required: false
+        default: '5'
 
 jobs:
   bot-vs-bot:
     name: Bot vs bot on live server
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # Under the 6-hour hard cap so a `live` session stops on our timeout.
+    timeout-minutes: 355
     steps:
       - uses: actions/checkout@v4
 
@@ -83,6 +97,43 @@ jobs:
             2>&1 | tee bot-prod-smoke.log
         continue-on-error: true
 
+      # LIVE IS NOT THE SMOKE TEST. prod-vs logs in two throwaway accounts,
+      # puts them in a PRIVATE room against each other and leaves. This logs
+      # in ONE bot under a real name and keeps it up, so a human can find it
+      # in the lobby and play it.
+      #
+      # A job is capped at 6 hours, so it is a session rather than a service:
+      # re-run it, or run bot/beverly.sh on the server box under systemd for
+      # something permanent.
+      - name: Check the name and the weight set before connecting
+        if: inputs.mode == 'live'
+        run: |
+          set -eu
+          n='${{ inputs.name }}'
+          [ -n "$n" ] || { echo "name is empty"; exit 1; }
+          [ ${#n} -le 16 ] || { echo "name '$n' is ${#n} chars; the server limit is 16"; exit 1; }
+          [ -f '${{ inputs.profile }}' ] || { echo "no weight set at ${{ inputs.profile }}"; exit 1; }
+          eval "$(luarocks path --local --lua-version 5.1)"
+          luajit -e 'package.path="./?.lua;"..package.path; require("bot.headlessBoot");
+            local b=require("bot.WeightedBrain").new({profile="${{ inputs.profile }}"})
+            print(string.format("%s loads: depth %d beam %d rise %s reaction %d",
+              "${{ inputs.profile }}", b.depth, b.beam, tostring(b.rise), b.reaction))'
+
+      - name: Sit in the lobby
+        if: inputs.mode == 'live'
+        id: live
+        env:
+          PA_SEARCH_PROFILE: ${{ inputs.profile }}
+        run: |
+          eval "$(luarocks path --local --lua-version 5.1)"
+          secs=$(( ${{ inputs.hours }} * 3600 ))
+          echo "::notice::${{ inputs.name }} joining ${{ inputs.ip }}:${{ inputs.port }} for ${{ inputs.hours }}h"
+          set -o pipefail
+          # The bot runs until killed, so the timeout IS the stop condition:
+          # 124 from `timeout` is this working, not failing.
+          timeout "$secs" bot/plamp.sh '${{ inputs.ip }}' '${{ inputs.port }}' '${{ inputs.name }}' \
+            2>&1 | tee bot-prod-smoke.log || [ $? -eq 124 ]
+
       - name: Summary
         if: always()
         run: |
@@ -101,6 +152,6 @@ jobs:
           name: bot-prod-smoke-log
           path: bot-prod-smoke.log
 
-      - name: Fail if the smoke test failed
-        if: steps.smoke.outcome == 'failure' || steps.largegarbage.outcome == 'failure'
+      - name: Fail if the run failed
+        if: steps.smoke.outcome == 'failure' || steps.largegarbage.outcome == 'failure' || steps.live.outcome == 'failure'
         run: exit 1

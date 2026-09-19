@@ -1,0 +1,106 @@
+name: Bot on the live server
+
+# Puts one of our trained bots into the lobby of the real self-hosted server
+# and leaves it there, so a human can find it and play it. This sandbox
+# cannot reach 104.156.250.136:49569; a GitHub runner can, which is the same
+# route bot-prod-smoke-test.yml already uses.
+#
+# NOT the smoke test. That one logs in two throwaway accounts, puts them in a
+# PRIVATE room against each other and leaves. This logs in ONE bot under a
+# real name and keeps it up.
+#
+# IT ENDS WHEN THE JOB DOES. A GitHub job is capped at 6 hours, so this is a
+# session, not a service — re-run it to bring the bot back, or run
+# bot/beverly.sh on the server box under systemd for something permanent.
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: 'Weight set (bot/profiles/*.json)'
+        required: false
+        default: 'bot/profiles/beverly.json'
+      name:
+        description: 'Account name, 16 chars max (server limit)'
+        required: false
+        default: 'Beverly'
+      ip:
+        description: 'Server IP'
+        required: false
+        default: '104.156.250.136'
+      port:
+        description: 'Server port'
+        required: false
+        default: '49569'
+      hours:
+        description: 'How long to stay up, 1-6'
+        required: false
+        default: '6'
+
+permissions:
+  contents: read
+
+jobs:
+  play:
+    name: ${{ inputs.name }} on ${{ inputs.ip }}
+    runs-on: ubuntu-latest
+    # Under the 6-hour hard cap so the timeout is ours, not the runner's.
+    timeout-minutes: 355
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install luajit + luarocks
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y luajit luarocks liblua5.1-0-dev build-essential unzip libreadline-dev
+
+      - name: Install lua rocks (luasocket, luafilesystem, luautf8)
+        run: |
+          luarocks install --local luasocket --lua-version 5.1
+          luarocks install --local luafilesystem --lua-version 5.1
+          luarocks install --local luautf8 --lua-version 5.1
+
+      # A name the server will refuse, or a profile that is not there, both
+      # look like "the bot never showed up" three hours later. Checked here.
+      - name: Check the name and the weight set before connecting
+        run: |
+          set -eu
+          n='${{ inputs.name }}'
+          [ -n "$n" ] || { echo "name is empty"; exit 1; }
+          [ ${#n} -le 16 ] || { echo "name '$n' is ${#n} chars; the server limit is 16"; exit 1; }
+          [ -f '${{ inputs.profile }}' ] || { echo "no weight set at ${{ inputs.profile }}"; exit 1; }
+          eval "$(luarocks path --local --lua-version 5.1)"
+          luajit -e 'package.path="./?.lua;"..package.path; require("bot.headlessBoot");
+            local b=require("bot.WeightedBrain").new({profile="${{ inputs.profile }}"})
+            print(string.format("%s loads: depth %d beam %d rise %s reaction %d",
+              "${{ inputs.profile }}", b.depth, b.beam, tostring(b.rise), b.reaction))'
+
+      - name: Play
+        env:
+          PA_SEARCH_PROFILE: ${{ inputs.profile }}
+        run: |
+          eval "$(luarocks path --local --lua-version 5.1)"
+          secs=$(( ${{ inputs.hours }} * 3600 ))
+          echo "::notice::${{ inputs.name }} joining ${{ inputs.ip }}:${{ inputs.port }} for ${{ inputs.hours }}h"
+          set -o pipefail
+          # The bot runs until killed, so the timeout IS the stop condition;
+          # 124 from `timeout` is this working, not failing.
+          timeout "$secs" bot/plamp.sh '${{ inputs.ip }}' '${{ inputs.port }}' '${{ inputs.name }}' \
+            2>&1 | tee bot-live.log || [ $? -eq 124 ]
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## ${{ inputs.name }} — ${{ inputs.ip }}:${{ inputs.port }}"
+            echo ""
+            echo '```'
+            tail -n 40 bot-live.log 2>/dev/null || echo "(no log produced)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bot-live-log
+          path: bot-live.log

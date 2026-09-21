@@ -26,7 +26,8 @@
 -- cannot exist. Calling them garbage would be worse — garbageOnBoard and
 -- garbageAdjacency would read damage that is not there. "Occupies space, has no
 -- colour" is what they are, and that is what -1 means. They still count for
--- maxHeight, fillRatio and roughness, which ask only whether a cell is empty.
+-- maxHeight and roughness, which ask only whether a cell is empty. They do NOT
+-- count for material, which asks what can still be matched.
 --
 -- CACHED, AND THE CACHE CANNOT GO STALE SILENTLY. The lookahead pass is ~17
 -- clone+resolves; the four features that want it would otherwise run it four

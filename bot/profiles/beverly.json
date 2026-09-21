@@ -1,5 +1,5 @@
 {
-  "_comment": "BEVERLY — the bot for briankeegan's Panel Attack server. GENERATED from a GameCreator training run, do not hand-tune. Weights are for bot/PanelEval.lua and are SHARES: every feature is divided by its own bound before weighting, so a weight is that feature's share of the decision. The divisors live in PanelEval.FEATURES and must match the JavaScript registry they were found under.",
+  "_comment": "BEVERLY \u2014 the bot for briankeegan's Panel Attack server. GENERATED from a GameCreator training run, do not hand-tune. Weights are for bot/PanelEval.lua and are SHARES: every feature is divided by its own bound before weighting, so a weight is that feature's share of the decision. The divisors live in PanelEval.FEATURES and must match the JavaScript registry they were found under.",
   "source": "champion of 4 islands after 7000 updates | trained.pbt.pbt-norm-s115-s115.0919-150901.g07000.json",
   "_switches": "A WEIGHT SET IS ONLY A BOT WHEN PAIRED WITH THE SWITCHES IT WAS FOUND UNDER. depth 2 (a candidate is worth the best of stopping there or any single reply), beam 0 (every candidate expanded), rise on (each candidate scored one settle row later plus the rows that land while the cursor walks), reaction 12, density off.",
   "_record": "11W-0L-1D of 12 against s131-s131.0919-041315.g06000; 7000 updates across 4 islands.",
@@ -10,7 +10,6 @@
     "edgePenalty",
     "garbageOnBoard",
     "maxHeight",
-    "fillRatio",
     "garbageAdjacency",
     "garbageSent",
     "stopTimeEarned"
@@ -27,7 +26,6 @@
     "edgePenalty": 151.6689,
     "garbageOnBoard": 76.7578,
     "maxHeight": -2.6391,
-    "fillRatio": 156.1966,
     "garbageAdjacency": 2.4652,
     "garbageSent": -100.5726,
     "stopTimeEarned": 2.1743

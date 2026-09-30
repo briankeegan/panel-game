@@ -118,44 +118,15 @@ function BoardSim.touchableGrid(board, rows)
 end
 
 -- mark every cell in a 3+ horizontal/vertical run of one play-color
--- RESTING MASK: which cells are at rest RIGHT NOW -- no gap anywhere beneath
--- them in their column. The engine only matches panels that are at rest (a
--- panel that lost its support hovers, then falls, and cannot join a match while
--- it is in the air), and that distinction decides how a clear is PARTITIONED
--- into combos. See resolve() below for why that matters and what it cost.
-function BoardSim.restingMask(g, rows)
-  local rest = {}
-  for r = 1, rows do rest[r] = {} end
-  for c = 1, WIDTH do
-    local grounded = true
-    for r = 1, rows do
-      if not grounded then
-        rest[r][c] = false
-      elseif g[r][c] == 0 then
-        grounded = false; rest[r][c] = false
-      else
-        rest[r][c] = true
-      end
-    end
-  end
-  return rest
-end
-
--- findMatches(g, rows [, resting])
--- `resting` is an optional mask from restingMask: when given, a cell that is
--- not at rest is treated as non-matchable, which also BREAKS any run through
--- it -- the same thing the engine does by simply not having that panel in
--- place yet.
-function BoardSim.findMatches(g, rows, resting)
+function BoardSim.findMatches(g, rows)
   local hit, any = {}, false
   for r = 1, rows do
     local c = 1
     while c <= WIDTH do
       local col = g[r][c]
-      if isPlay(col) and (not resting or resting[r][c]) then
+      if isPlay(col) then
         local c2 = c
-        while c2 + 1 <= WIDTH and g[r][c2 + 1] == col
-          and (not resting or resting[r][c2 + 1]) do c2 = c2 + 1 end
+        while c2 + 1 <= WIDTH and g[r][c2 + 1] == col do c2 = c2 + 1 end
         if c2 - c + 1 >= 3 then for k = c, c2 do hit[(r - 1) * WIDTH + k] = true; any = true end end
         c = c2 + 1
       else c = c + 1 end
@@ -165,10 +136,9 @@ function BoardSim.findMatches(g, rows, resting)
     local r = 1
     while r <= rows do
       local col = g[r][c]
-      if isPlay(col) and (not resting or resting[r][c]) then
+      if isPlay(col) then
         local r2 = r
-        while r2 + 1 <= rows and g[r2 + 1][c] == col
-          and (not resting or resting[r2 + 1][c]) do r2 = r2 + 1 end
+        while r2 + 1 <= rows and g[r2 + 1][c] == col do r2 = r2 + 1 end
         if r2 - r + 1 >= 3 then for k = r, r2 do hit[(k - 1) * WIDTH + c] = true; any = true end end
         r = r2 + 1
       else r = r + 1 end
@@ -251,14 +221,7 @@ end
 -- gravity: play panels fall through empty space; each garbage block falls as a
 -- rigid unit (it can't tear) and rests on the highest obstruction beneath any of
 -- its columns. Iterates until nothing moves so blocks settle on falling panels.
--- applyGravity(g, rows [, marks])
--- `marks` is an optional parallel boolean grid that MOVES WITH THE PANELS. It
--- carries the engine's `chaining` flag so the flag stays attached to the panel
--- it belongs to as that panel falls. Gravity never SETS a mark -- which panels
--- are chaining is decided by resolve(), because it depends on WHY the gap
--- beneath a panel exists, and gravity cannot see that. Nothing else needs it,
--- and it is nil for every other caller.
-function BoardSim.applyGravity(g, rows, marks)
+function BoardSim.applyGravity(g, rows)
   local reveal = g.reveal
   -- fast path: no garbage -> one-pass per-column compact. The common case, and it
   -- avoids the per-iteration connected-component labeling that blew the search
@@ -277,7 +240,6 @@ function BoardSim.applyGravity(g, rows, marks)
           if write ~= r then
             g[write][c] = g[r][c]; g[r][c] = 0
             if reveal then reveal[write][c] = reveal[r][c]; reveal[r][c] = nil end
-            if marks then marks[write][c] = marks[r][c]; marks[r][c] = false end
           end
           write = write + 1
         end
@@ -294,7 +256,6 @@ function BoardSim.applyGravity(g, rows, marks)
         if fallsUnderGravity(g[r][c]) and g[r - 1][c] == 0 then
           g[r - 1][c] = g[r][c]; g[r][c] = 0
           if reveal then reveal[r - 1][c] = reveal[r][c]; reveal[r][c] = nil end
-          if marks then marks[r - 1][c] = marks[r][c]; marks[r][c] = false end
           moved = true
         end
       end
@@ -317,7 +278,6 @@ function BoardSim.applyGravity(g, rows, marks)
           local r, c = cell[1], cell[2]
           g[r - 1][c] = g[r][c]; g[r][c] = 0
           if reveal then reveal[r - 1][c] = reveal[r][c]; reveal[r][c] = nil end
-          if marks then marks[r - 1][c] = marks[r][c]; marks[r][c] = false end
         end
         moved = true
       end
@@ -333,16 +293,6 @@ end
 -- captured them (g.reveal), else empty — we don't fabricate colors, so a dig still
 -- frees space + lowers the stack but only chains through reveals whose colors we
 -- know. garbageCleared counts converted cells (the dig reward).
--- Returns chain, total, firstClear, garbageCleared, sizes.
---
--- `sizes` is PER-LINK: sizes[i] = how many panels the i'th link of the cascade
--- cleared, which is the engine's own COMBO SIZE for that link (checkMatches
--- takes the whole board's match list as the combo size, which is why an L of
--- five pays as a 5-combo and not as two 3s). Added for bot/PanelEval.lua, whose
--- scoreEarned and comboPotential are denominated per clear rather than per
--- cascade: a 5-chain of threes and one 15-panel clear have the same `total` and
--- are not the same attack. firstClear stays as it was and is now just sizes[1];
--- every existing caller ignores the new return.
 function BoardSim.resolve(g, rows, maxLinkCap)
   local reveal = g.reveal
   local chain, total, firstClear, garbageCleared = 0, 0, 0, 0
@@ -352,32 +302,9 @@ function BoardSim.resolve(g, rows, maxLinkCap)
   local sizes = {}
   BoardSim.applyGravity(g, rows)   -- SETTLE FIRST: a swap can empty a cell so the real match only forms after the panel above falls. The engine settles then matches; matching the un-fallen grid MISSED real clears (verified bot/tests/boardSimVerify.lua swap 2,3). No-op when already settled.
   while true do
-    local hit, any
-    if firstPass then
-      firstPass = false
-      hit, any = BoardSim.findMatches(g, rows, BoardSim.restingMask(g, rows))
-      if not any then
-        -- NO MARKS HERE, DELIBERATELY: this settle is the board reacting to the
-        -- SWAP, not to a clear. Nothing has popped yet, so nothing is chaining
-        -- -- the engine only propagates the flag down a column a clear emptied.
-        -- Marking these made a plain settle-then-match read as a 2-chain.
-        BoardSim.applyGravity(g, rows)
-        hit, any = BoardSim.findMatches(g, rows)
-      end
-    else
-      hit, any = BoardSim.findMatches(g, rows)
-    end
+    local hit, any = BoardSim.findMatches(g, rows)
     if not any then break end
     chain = chain + 1
-
-    local isChainLink = false
-    for r = 1, rows do
-      for c = 1, WIDTH do
-        if hit[(r - 1) * WIDTH + c] and chaining[r][c] then isChainLink = true end
-      end
-    end
-    -- Stack:incrementChainCounter -- the first link of a chain is an x2.
-    if isChainLink then counter = (counter == 0) and 2 or (counter + 1) end
 
     -- which garbage blocks are adjacent to a match this step
     local id, comps = labelGarbage(g, rows)
@@ -395,30 +322,9 @@ function BoardSim.resolve(g, rows, maxLinkCap)
 
     -- clear matched panels
     local n = 0
-    local clearedFrom = {}                    -- per column, the LOWEST row this round cleared
     for r = 1, rows do
       for c = 1, WIDTH do
-        if hit[(r - 1) * WIDTH + c] then
-          g[r][c] = 0; chaining[r][c] = false; n = n + 1
-          if not clearedFrom[c] then clearedFrom[c] = r end
-        end
-      end
-    end
-
-    -- WHICH PANELS BECOME CHAINING, AND WHY IT IS NOT "EVERYTHING THAT FELL".
-    -- The engine propagates the flag DOWN A COLUMN from a panel that popped
-    -- (Panel.lua enterHoverState: a panel entering hover inherits chaining from
-    -- the panel below it). So a panel is chaining exactly when the space it is
-    -- about to fall into was freed by THIS clear -- not when it was freed by
-    -- the swap itself, which is an ordinary settle and chains nothing. Marking
-    -- every panel gravity moved made a plain two-stage settle read as a
-    -- 2-chain on 23 of 393 real boards.
-    for c = 1, WIDTH do
-      local from = clearedFrom[c]
-      if from then
-        for r = from + 1, rows do
-          if g[r][c] ~= 0 then chaining[r][c] = true end
-        end
+        if hit[(r - 1) * WIDTH + c] then g[r][c] = 0; n = n + 1 end
       end
     end
 
@@ -437,10 +343,6 @@ function BoardSim.resolve(g, rows, maxLinkCap)
           -- stack got six cells shorter and that everything above it falls.
           g[r][c] = (reveal and reveal[r][c]) or RESOLVING
           if reveal then reveal[r][c] = nil end
-          -- A panel revealed by breaking garbage is CHAINING (Panel.lua's
-          -- matchedState.enterHoverState sets it unconditionally). This is how
-          -- a dig carries a chain on rather than ending it.
-          chaining[r][c] = true
           garbageCleared = garbageCleared + 1
         end
       end
@@ -449,7 +351,7 @@ function BoardSim.resolve(g, rows, maxLinkCap)
     total = total + n
     sizes[chain] = n
     if chain == 1 then firstClear = n end
-    BoardSim.applyGravity(g, rows, chaining)
+    BoardSim.applyGravity(g, rows)
     -- "DEEP-CHAIN PHANTOM" (2026-07): a prior investigation believed deep links (3+) diverge from the engine
     -- because it settles cascades wave-by-wave with hover while this instant-full-settles. DISPROVEN same
     -- session: that finding came from measuring the engine too early (a fixed frame budget shorter than a real
@@ -520,7 +422,6 @@ function BoardSim.digPlan(grid, rows, maxDepth)
   local function progress(g)
     local s = 0
     for r = math.max(1, lg - 2), math.min(rows, lg - 1) do
-      local byColor = {}
       for c = 1, WIDTH do
         local v = g[r][c]
         if isPlay(v) then
@@ -528,18 +429,6 @@ function BoardSim.digPlan(grid, rows, maxDepth)
           if r > 1 and g[r - 1][c] == v then s = s + 1 end              -- vertical pair
           -- a play cell directly under garbage is one step from a touching match
           for rr = r + 1, rows do if isGarbage(g[rr][c]) then s = s + 1; break elseif g[rr][c] ~= 0 then break end end
-          local t = byColor[v]; if t then t[#t + 1] = c else byColor[v] = { c } end
-        end
-      end
-      -- tightest-triple span: 3+ cells of one color in a contact row are a dig in progress, and every slide that
-      -- tightens the triple must STRICTLY raise progress -- the pair term alone can't see it, so the beam pruned
-      -- exactly the gather moves a spread dig needs (bot/tests/digPlanVerify.lua CASE 3: fives at c1/c4/c6, a
-      -- constructed 3-slide dig with no shortcut; digPlan returned nil before this term).
-      for _, cols in pairs(byColor) do
-        if #cols >= 3 then
-          local best = 99
-          for i = 1, #cols - 2 do local sp = cols[i + 2] - cols[i]; if sp < best then best = sp end end
-          s = s + (WIDTH - best) * 2
         end
       end
     end

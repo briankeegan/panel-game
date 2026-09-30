@@ -11,7 +11,7 @@
 --
 --   local link = require("bot.SurvivalLink").new({ port = 47777 })
 --   link:startMatch(stack)            -- once per match
---   local char = link:input(stack)    -- every frame, before it is run
+--   local char = link:input(stack, match.garbageSources[stack])   -- every frame, before it is run
 local socket = require("socket")
 local KeyDataEncoding = require("common.data.KeyDataEncoding")
 
@@ -35,7 +35,7 @@ local function enc(v, depth)
   if t == "string" then return (string.format("%q", v):gsub("\\\n", "\\n")) end
   if t == "table" then
     depth = depth or 0
-    if depth > 4 then return '"<deep>"' end
+    if depth > 6 then return '"<deep>"' end
     local n = #v
     local isArray = n > 0 or next(v) == nil
     if isArray then for k in pairs(v) do if type(k) ~= "number" or k < 1 or k > n or k % 1 ~= 0 then isArray = false; break end end end
@@ -72,7 +72,26 @@ local function garbageList(q)
   end
   return o
 end
-function SurvivalLink.dump(s)
+-- The garbage each source has sent and not yet delivered: what its
+-- telegraph shows (staged, oldest last) and what has left it (transit, by
+-- the stopWatch it lands on). Its colours are not in it.
+local function telegraph(sources)
+  local out = {}
+  for i, src in ipairs(sources or {}) do
+    local q = src.outgoingGarbage
+    local transit = {}
+    if q and q.transitTimers then
+      for k = q.transitTimers.first, q.transitTimers.last do
+        local t = q.transitTimers[k]
+        if t then transit[#transit + 1] = { at = t, garbage = garbageList(q.garbageInTransit[t] or {}) } end
+      end
+    end
+    out[i] = { stopWatch = src.stopWatch, staged = garbageList(q and q.stagedGarbage or {}), transit = transit }
+  end
+  return out
+end
+
+function SurvivalLink.dump(s, sources)
   local panels = {}
   for r = 0, #s.panels do
     local row = {}
@@ -91,6 +110,7 @@ function SurvivalLink.dump(s)
     incoming = { staged = garbageList(s.incomingGarbage.stagedGarbage) },
     swapStallingBackLog = backlog, garbageLandedThisFrame = landed,
     dropColumns = s.currentGarbageDropColumnIndexes,
+    telegraph = telegraph(sources),
   })
 end
 
@@ -154,11 +174,13 @@ end
 
 -- The key to press this frame. Before the countdown ends the bot holds
 -- still (the search plays only a stack in play).
-function SurvivalLink:input(stack)
+-- `sources` are the stacks sending this one garbage; their telegraphs go
+-- with the board.
+function SurvivalLink:input(stack, sources)
   local idle = KeyDataEncoding.base64encode[1]
   if stack.in_countdown or not stack.stopWatchIsRunning or stack:game_ended() then return idle end
   local clock = stack.clock
-  self:send('{"t":"f","state":' .. SurvivalLink.dump(stack) .. '}')
+  self:send('{"t":"f","state":' .. SurvivalLink.dump(stack, sources) .. '}')
   self.awaiting = (self.awaiting or 0) + 1
   self.frames = self.frames + 1
   -- Answers come in order; one for an earlier frame is stale.

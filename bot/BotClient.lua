@@ -415,7 +415,7 @@ function BotClient:tickMatch()
   if not stack:game_ended() then
     local char
     if self.survival then
-      char = self.survival:input(stack)
+      char = self.survival:input(stack, self.match.garbageSources[stack])
     elseif self.brain then
       local st = self.boardState.extract(stack)
       -- Only run the expensive per-move verify when the controller needs a NEW move; while it's mid-move (locked /

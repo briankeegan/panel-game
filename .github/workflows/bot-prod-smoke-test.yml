@@ -59,6 +59,10 @@ on:
         description: 'live: how long to stay up, 1-5'
         required: false
         default: '5'
+      upstream_ref:
+        description: 'server beta: upstream commit/tag/branch to run the bot on. Empty = the betaserver-live tag if it exists, else latest beta'
+        required: false
+        default: ''
 
 # `server: beta` plays UPSTREAM Panel Attack, whose protocol differs from the
 # fork's (lockstep: each client simulates both stacks from relayed inputs; no
@@ -67,6 +71,9 @@ on:
 env:
   UPSTREAM_REPO: https://github.com/panel-attack/panel-game.git
   UPSTREAM_REF: beta
+  # If whoever deploys the beta server moves this tag in the upstream repo to
+  # the deployed commit, runs use exactly that build (see the fetch step).
+  UPSTREAM_DEPLOYED_TAG: betaserver-live
   UPSTREAM_BOT_REF: claude/game-bot-creation-action-0e7emk
 
 jobs:
@@ -116,10 +123,18 @@ jobs:
             echo "BOT_PORT=${{ inputs.port }}" >> "$GITHUB_ENV"
           fi
 
-      # ALWAYS THE LATEST UPSTREAM. Nothing of upstream is vendored here: every
-      # run clones upstream beta as it is right now and drops this repo's bot/
-      # on top, so the bot's engine is the server's engine without anyone
-      # merging updates. bot/ touches nothing outside itself.
+      # THE SERVER'S OWN BUILD, AS NEAR AS CAN BE KNOWN. Nothing of upstream is
+      # vendored here: every run fetches upstream and drops this repo's bot/ on
+      # top, so the bot runs the server's engine without anyone merging
+      # updates. bot/ touches nothing outside itself.
+      #
+      # WHICH upstream: the server does not report its build (the version check
+      # answers only yes/no, the login carries no commit) and upstream has no
+      # deploy workflow to read it from, so, in order:
+      #   1. the upstream_ref input, if given -- an exact pin;
+      #   2. the UPSTREAM_DEPLOYED_TAG tag, if it exists -- moved on deploy;
+      #   3. the latest UPSTREAM_REF -- right whenever the server was deployed
+      #      from beta's head, which is the normal case.
       - name: Check out the upstream bot
         if: inputs.server == 'beta'
         uses: actions/checkout@v4
@@ -128,12 +143,23 @@ jobs:
           path: botsrc
           sparse-checkout: bot
 
-      - name: Fetch the latest upstream Panel Attack and add the bot
+      - name: Fetch upstream Panel Attack and add the bot
         if: inputs.server == 'beta'
+        env:
+          PIN: ${{ inputs.upstream_ref }}
         run: |
           set -eu
-          git clone --depth 1 --branch "$UPSTREAM_REF" "$UPSTREAM_REPO" upstream
-          echo "::notice::upstream $UPSTREAM_REF at $(git -C upstream log -1 --format='%h %s')"
+          if [ -n "$PIN" ]; then
+            ref="$PIN"; why="pinned by the upstream_ref input"
+          elif git ls-remote --exit-code --tags "$UPSTREAM_REPO" "refs/tags/$UPSTREAM_DEPLOYED_TAG" >/dev/null; then
+            ref="refs/tags/$UPSTREAM_DEPLOYED_TAG"; why="the $UPSTREAM_DEPLOYED_TAG tag (the last deploy)"
+          else
+            ref="$UPSTREAM_REF"; why="latest $UPSTREAM_REF (no $UPSTREAM_DEPLOYED_TAG tag; assuming the server runs it)"
+          fi
+          git init -q upstream
+          git -C upstream fetch -q --depth 1 "$UPSTREAM_REPO" "$ref"
+          git -C upstream checkout -q FETCH_HEAD
+          echo "::notice::bot runs on upstream $(git -C upstream log -1 --format='%h %s') -- $why"
           [ ! -e upstream/bot ] || { echo "upstream now has its own bot/ -- refusing to overwrite it"; exit 1; }
           cp -r botsrc/bot upstream/bot
 

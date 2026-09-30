@@ -174,8 +174,11 @@ here" is never the answer — check the workflows first.
   (`betaserver.panelattack.com:59569`, or the `ip`/`port` inputs if `ip` is
   changed from the fork default). Upstream's protocol is lockstep, so it is a
   different client: it lives in `bot/` on `claude/game-bot-creation-action-0e7emk`
-  (see its `bot/README.md`). Each run clones the latest upstream `beta` and
-  drops that `bot/` on top, so it always matches the server's engine.
+  (see its `bot/README.md`). Each run fetches upstream and drops that `bot/`
+  on top, so it runs the server's engine. The server does not report its
+  build, so the run uses the `upstream_ref` input if set, else upstream's
+  `betaserver-live` tag if it exists (move it to the deployed commit on each
+  deploy to make this exact), else the latest `beta`.
   Upstream assigns account ids itself, so the run commits a new name's id
   back to that branch; the next run logs back in.
 

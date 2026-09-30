@@ -171,8 +171,8 @@ here" is never the answer — check the workflows first.
   account instead of being denied as "already taken". Names registered
   before this existed hold a random id nobody kept — pick a new name.
 - **`server: beta` puts the bot on UPSTREAM Panel Attack**
-  (`betaserver.panelattack.com:59569`, or the `ip`/`port` inputs if `ip` is
-  changed from the fork default). Upstream's protocol is lockstep, so it is a
+  (`betaserver.panelattack.com:59569`; the `ip`/`port` inputs override
+  either server's address when not blank). Upstream's protocol is lockstep, so it is a
   different client: it lives in `bot/` on `claude/game-bot-creation-action-0e7emk`
   (see its `bot/README.md`). Each run fetches upstream and drops that `bot/`
   on top, so it runs the server's engine. The server does not report its

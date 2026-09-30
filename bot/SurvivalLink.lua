@@ -121,7 +121,7 @@ function SurvivalLink.new(opts)
   self.host = opts.host or "127.0.0.1"
   self.port = opts.port or tonumber(os.getenv("PA_SURVIVOR_PORT") or "") or 47777
   -- How long a frame waits for its answer before holding instead.
-  self.waitSec = opts.waitSec or 0.010
+  self.waitSec = opts.waitSec or tonumber(os.getenv("PA_SURVIVOR_WAIT") or "") or 0.010
   self.buffer = ""
   self.late = 0
   self.frames = 0
@@ -144,24 +144,19 @@ function SurvivalLink:send(line)
   if not ok then error("SurvivalLink: send failed: " .. tostring(err)) end
 end
 
--- The next reply line, or nil after `timeout` seconds.
+-- The next reply line, or nil after `timeout` seconds. A line read in part
+-- is kept for the next call.
 function SurvivalLink:receive(timeout)
-  local deadline = socket.gettime() + timeout
-  while true do
-    local nl = self.buffer:find("\n", 1, true)
-    if nl then
-      local line = self.buffer:sub(1, nl - 1)
-      self.buffer = self.buffer:sub(nl + 1)
-      return line
-    end
-    local left = deadline - socket.gettime()
-    if left <= 0 then return nil end
-    self.sock:settimeout(left)
-    local data, err, partial = self.sock:receive(8192)
-    local got = data or partial
-    if got and #got > 0 then self.buffer = self.buffer .. got
-    elseif err == "closed" then error("SurvivalLink: the survival bot closed the link") end
+  self.sock:settimeout(timeout)
+  local line, err, partial = self.sock:receive("*l")
+  if line then
+    line = self.buffer .. line
+    self.buffer = ""
+    return line
   end
+  self.buffer = self.buffer .. (partial or "")
+  if err == "closed" then error("SurvivalLink: the survival bot closed the link") end
+  return nil
 end
 
 function SurvivalLink:startMatch(stack)

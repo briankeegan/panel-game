@@ -23,6 +23,14 @@ on:
           - prod-vs          # bot-vs-bot matches on the live server
           - large-garbage    # offline survival vs the "large_garbage" training preset (6x12 blocks); no server contact
           - live             # ONE bot, real name, sits in the lobby so a human can play it
+      server:
+        description: 'live: which server -- fork (this repo, the ip/port below) or beta (upstream Panel Attack, betaserver.panelattack.com:59569, always on the latest upstream code)'
+        required: false
+        default: 'fork'
+        type: choice
+        options:
+          - fork
+          - beta
       matches:
         description: 'prod-vs: number of matches (~2.5 min worst-case each). large-garbage: number of seeds.'
         required: false
@@ -52,10 +60,23 @@ on:
         required: false
         default: '5'
 
+# `server: beta` plays UPSTREAM Panel Attack, whose protocol differs from the
+# fork's (lockstep: each client simulates both stacks from relayed inputs; no
+# garbage/death/display messages). Its bot lives in bot/ on this branch of
+# THIS repo, built to run on an unmodified upstream checkout:
+env:
+  UPSTREAM_REPO: https://github.com/panel-attack/panel-game.git
+  UPSTREAM_REF: beta
+  UPSTREAM_BOT_REF: claude/game-bot-creation-action-0e7emk
+
 jobs:
   bot-vs-bot:
     name: Bot vs bot on live server
     runs-on: ubuntu-latest
+    # `server: beta` commits a newly registered bot's account id back to
+    # UPSTREAM_BOT_REF so the name can be reused (see "Save the account id").
+    permissions:
+      contents: write
     # Under the 6-hour hard cap so a `live` session stops on our timeout.
     timeout-minutes: 355
     steps:
@@ -71,6 +92,50 @@ jobs:
           luarocks install --local luasocket --lua-version 5.1
           luarocks install --local luafilesystem --lua-version 5.1
           luarocks install --local luautf8 --lua-version 5.1
+
+      # Where the bot runs and what it connects to. fork: this checkout, the
+      # ip/port inputs. beta: a fresh upstream checkout (next step), upstream's
+      # beta server -- unless the ip input was changed from the fork default,
+      # which points a beta bot somewhere else (e.g. a test server).
+      - name: Pick the server
+        run: |
+          set -eu
+          if [ '${{ inputs.server }}' = beta ]; then
+            [ '${{ inputs.mode }}' = live ] || { echo "server: beta is only for mode: live"; exit 1; }
+            echo "BOT_DIR=$GITHUB_WORKSPACE/upstream" >> "$GITHUB_ENV"
+            if [ '${{ inputs.ip }}' = 104.156.250.136 ]; then
+              echo "BOT_HOST=betaserver.panelattack.com" >> "$GITHUB_ENV"
+              echo "BOT_PORT=59569" >> "$GITHUB_ENV"
+            else
+              echo "BOT_HOST=${{ inputs.ip }}" >> "$GITHUB_ENV"
+              echo "BOT_PORT=${{ inputs.port }}" >> "$GITHUB_ENV"
+            fi
+          else
+            echo "BOT_DIR=$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
+            echo "BOT_HOST=${{ inputs.ip }}" >> "$GITHUB_ENV"
+            echo "BOT_PORT=${{ inputs.port }}" >> "$GITHUB_ENV"
+          fi
+
+      # ALWAYS THE LATEST UPSTREAM. Nothing of upstream is vendored here: every
+      # run clones upstream beta as it is right now and drops this repo's bot/
+      # on top, so the bot's engine is the server's engine without anyone
+      # merging updates. bot/ touches nothing outside itself.
+      - name: Check out the upstream bot
+        if: inputs.server == 'beta'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.UPSTREAM_BOT_REF }}
+          path: botsrc
+          sparse-checkout: bot
+
+      - name: Fetch the latest upstream Panel Attack and add the bot
+        if: inputs.server == 'beta'
+        run: |
+          set -eu
+          git clone --depth 1 --branch "$UPSTREAM_REF" "$UPSTREAM_REPO" upstream
+          echo "::notice::upstream $UPSTREAM_REF at $(git -C upstream log -1 --format='%h %s')"
+          [ ! -e upstream/bot ] || { echo "upstream now has its own bot/ -- refusing to overwrite it"; exit 1; }
+          cp -r botsrc/bot upstream/bot
 
       - name: Run bot-vs-bot smoke test against the live server
         if: inputs.mode == 'prod-vs'
@@ -109,6 +174,7 @@ jobs:
         if: inputs.mode == 'live'
         run: |
           set -eu
+          cd "$BOT_DIR"
           n='${{ inputs.name }}'
           [ -n "$n" ] || { echo "name is empty"; exit 1; }
           [ ${#n} -le 16 ] || { echo "name '$n' is ${#n} chars; the server limit is 16"; exit 1; }
@@ -129,8 +195,11 @@ jobs:
       # Deliberately not secret: these are bot accounts, and anyone who
       # derives the id can log in as the bot, which is fine. Names registered
       # before this existed hold a random id nobody kept and cannot be reused.
+      # Fork only: upstream never accepts a client-chosen id (it always assigns
+      # one), so a beta bot keeps its name by saving the id it was given
+      # instead -- see "Save the account id".
       - name: Derive this name's account id
-        if: inputs.mode == 'live'
+        if: inputs.mode == 'live' && inputs.server != 'beta'
         env:
           BOT_NAME: ${{ inputs.name }}
           BOT_IP: ${{ inputs.ip }}
@@ -151,18 +220,43 @@ jobs:
         run: |
           eval "$(luarocks path --local --lua-version 5.1)"
           secs=$(( ${{ inputs.hours }} * 3600 ))
-          echo "::notice::${{ inputs.name }} joining ${{ inputs.ip }}:${{ inputs.port }} for ${{ inputs.hours }}h"
+          echo "::notice::${{ inputs.name }} joining $BOT_HOST:$BOT_PORT (${{ inputs.server }}) for ${{ inputs.hours }}h"
+          cd "$BOT_DIR"
           set -o pipefail
           # The bot runs until killed, so the timeout IS the stop condition:
           # 124 from `timeout` is this working, not failing.
-          timeout "$secs" bot/plamp.sh '${{ inputs.ip }}' '${{ inputs.port }}' '${{ inputs.name }}' \
-            2>&1 | tee bot-prod-smoke.log || [ $? -eq 124 ]
+          timeout "$secs" bot/plamp.sh "$BOT_HOST" "$BOT_PORT" '${{ inputs.name }}' \
+            2>&1 | tee "$GITHUB_WORKSPACE/bot-prod-smoke.log" || [ $? -eq 124 ]
+
+      # SAME NAME, SAME ACCOUNT on beta. Upstream hands a new name a random id
+      # at its first login; the bot writes it to bot/identities/, and this
+      # commits it to UPSTREAM_BOT_REF so the next run logs back in instead of
+      # being denied as "already taken". Not secret, on purpose: bot accounts.
+      - name: Save the account id
+        if: always() && inputs.server == 'beta'
+        run: |
+          set -eu
+          f="bot/identities/${{ inputs.name }}_${BOT_HOST}.txt"
+          [ -f "upstream/$f" ] || { echo "no id to save"; exit 0; }
+          if [ -f "botsrc/$f" ] && cmp -s "upstream/$f" "botsrc/$f"; then echo "id already saved"; exit 0; fi
+          mkdir -p "botsrc/bot/identities"
+          cp "upstream/$f" "botsrc/$f"
+          cd botsrc
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$f"
+          git commit -m "bot: save account id for '${{ inputs.name }}' on $BOT_HOST"
+          for i in 1 2 3; do
+            git push origin "HEAD:$UPSTREAM_BOT_REF" && exit 0
+            git pull --rebase origin "$UPSTREAM_BOT_REF"
+          done
+          exit 1
 
       - name: Summary
         if: always()
         run: |
           {
-            echo "## Bot Smoke Test (${{ inputs.mode }}) — ${{ inputs.ip }}:${{ inputs.port }}"
+            echo "## Bot Smoke Test (${{ inputs.mode }}, ${{ inputs.server }}) — ${BOT_HOST:-${{ inputs.ip }}}:${BOT_PORT:-${{ inputs.port }}}"
             echo ""
             echo '```'
             tail -n 40 bot-prod-smoke.log || echo "(no log produced)"

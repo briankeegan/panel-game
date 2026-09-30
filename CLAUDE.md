@@ -170,6 +170,14 @@ here" is never the answer — check the workflows first.
   are bot accounts), so re-dispatching a name logs back into the same
   account instead of being denied as "already taken". Names registered
   before this existed hold a random id nobody kept — pick a new name.
+- **`server: beta` puts the bot on UPSTREAM Panel Attack**
+  (`betaserver.panelattack.com:59569`, or the `ip`/`port` inputs if `ip` is
+  changed from the fork default). Upstream's protocol is lockstep, so it is a
+  different client: it lives in `bot/` on `claude/game-bot-creation-action-0e7emk`
+  (see its `bot/README.md`). Each run clones the latest upstream `beta` and
+  drops that `bot/` on top, so it always matches the server's engine.
+  Upstream assigns account ids itself, so the run commits a new name's id
+  back to that branch; the next run logs back in.
 
 ## Self-Hosting
 See `docs/SelfHosting.md` for full Hetzner VPS setup guide.

@@ -8,7 +8,8 @@ protocol.
 ## This folder is dropped onto upstream, not merged into it
 
 `bot/` touches nothing outside itself. The `bot-prod-smoke-test.yml` workflow
-(on `bramp/multi-player`), with `mode: live` and `server: beta`, fetches
+(on `bramp/multi-player`), with `mode: live` and server
+`betaserver.panelattack.com:59569`, fetches
 upstream **at run time**, copies this folder in, and runs `bot/plamp.sh`, so
 the bot runs the server's engine with no one merging updates. Only this folder
 of this branch is used.

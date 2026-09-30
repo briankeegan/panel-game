@@ -119,6 +119,37 @@ jobs:
             print(string.format("%s loads: depth %d beam %d rise %s reaction %d",
               "${{ inputs.profile }}", b.depth, b.beam, tostring(b.rise), b.reaction))'
 
+      # SAME NAME, SAME ACCOUNT, EVERY RUN. A runner starts with no
+      # bot/identities file, so without this every dispatch registers the name
+      # afresh -- and the second dispatch of a name is denied as taken. The id
+      # is not stored anywhere (this repo is public and the id is the
+      # account's password): it is DERIVED from the BOT_ID_SECRET repo secret
+      # and the name, so the same name always yields the same id. The first
+      # run registers the name under it (the server accepts a well-formed
+      # client-supplied id for a free name); every later run logs back in.
+      # Names registered before this existed hold a random id nobody kept,
+      # and cannot be reclaimed this way.
+      - name: Derive this name's account id
+        if: inputs.mode == 'live'
+        env:
+          BOT_ID_SECRET: ${{ secrets.BOT_ID_SECRET }}
+          BOT_NAME: ${{ inputs.name }}
+          BOT_IP: ${{ inputs.ip }}
+        run: |
+          if [ -z "$BOT_ID_SECRET" ]; then
+            echo "::warning::BOT_ID_SECRET is not set: '$BOT_NAME' registers as a new account this run and cannot be reused next run."
+            exit 0
+          fi
+          id=$(python3 -c '
+          import hashlib, hmac, os
+          key = os.environ["BOT_ID_SECRET"].encode()
+          msg = (os.environ["BOT_IP"] + "/" + os.environ["BOT_NAME"].lower()).encode()
+          print("1" + str(int(hmac.new(key, msg, hashlib.sha256).hexdigest(), 16) % 10**18).zfill(18))')
+          echo "::add-mask::$id"
+          mkdir -p bot/identities
+          printf '%s' "$id" > "bot/identities/${BOT_NAME}_${BOT_IP}.txt"
+          echo "'$BOT_NAME' will log in with its saved account"
+
       - name: Sit in the lobby
         if: inputs.mode == 'live'
         id: live

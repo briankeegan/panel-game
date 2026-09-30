@@ -165,6 +165,13 @@ here" is never the answer — check the workflows first.
 - Check the name length (16 chars, server limit) and that the profile file
   exists BEFORE connecting. A rejected name and a missing weight set both
   look identical to "the bot never showed up" three hours later.
+- **A name is reusable across `live` runs only with the `BOT_ID_SECRET` repo
+  secret set.** The workflow derives the account id from that secret and the
+  name, so a name keeps one account run after run; never commit ids to
+  `bot/identities/` (this repo is public, and the id is the password).
+  Without the secret each run registers the name fresh and the next run is
+  denied as "already taken". Names registered before the secret existed
+  cannot be reclaimed this way — pick a new name.
 
 ## Self-Hosting
 See `docs/SelfHosting.md` for full Hetzner VPS setup guide.

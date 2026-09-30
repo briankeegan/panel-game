@@ -28,7 +28,14 @@ local bot = BotClient({
 })
 
 local ok, err = bot:login()
-if not ok then print("login failed: " .. tostring(err)); os.exit(1) end
+if not ok then
+  print("login failed: " .. tostring(err))
+  if tostring(err):find("version") or tostring(err):find("update your game") then
+    print("  -> the server runs a different Panel Attack build than the upstream code this bot was started on.\n" ..
+          "     Run the workflow again with upstream_ref set to the server's build (a commit, tag or branch).")
+  end
+  os.exit(1)
+end
 
 -- shed any stale room from a prior run so we sit idle in the lobby (challengeable)
 bot:leaveRoom()

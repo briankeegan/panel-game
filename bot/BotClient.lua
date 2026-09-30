@@ -355,6 +355,10 @@ function BotClient:tickMatch()
       logger.warn(string.format("bot[%s]: match aborted%s -- my clock %d (%d inputs), opponent clock %d (%d inputs)",
         self.name, self.match.desyncError and " as irrecoverably desynced" or "",
         self.myStack.clock, #self.myStack.confirmedInput, self.oppStack.clock, #self.oppStack.confirmedInput))
+      if self.match.desyncError then
+        logger.warn("  if this repeats, the server may run a different engine build than the upstream code the bot" ..
+          " was started on: pin it with the workflow's upstream_ref input")
+      end
       pcall(function() self.gameplay:sendRequest(ClientProtocol.sendMatchAbort(self.roomNumber)) end)
     else
       local winners = self.match:getWinners()

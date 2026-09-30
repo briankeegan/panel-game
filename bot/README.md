@@ -8,10 +8,16 @@ protocol.
 ## This folder is dropped onto upstream, not merged into it
 
 `bot/` touches nothing outside itself. The `bot-prod-smoke-test.yml` workflow
-(on `bramp/multi-player`), with `mode: live` and `server: beta`, clones
-upstream `beta` **as it is at run time**, copies this folder in, and runs
-`bot/plamp.sh`. So the bot always runs the same engine as the server, with no
-one merging updates. Only this folder of this branch is used.
+(on `bramp/multi-player`), with `mode: live` and `server: beta`, fetches
+upstream **at run time**, copies this folder in, and runs `bot/plamp.sh`, so
+the bot runs the server's engine with no one merging updates. Only this folder
+of this branch is used.
+
+Which upstream: the server does not report its build, so the workflow takes
+the `upstream_ref` input if given, else the `betaserver-live` tag if someone
+moved it on deploy, else the latest `beta`. If the server runs something else,
+the login is refused with a version message and `playBot.lua` says to pin
+`upstream_ref`.
 
 ## How it differs from the fork's bot
 

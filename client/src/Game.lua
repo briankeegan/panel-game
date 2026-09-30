@@ -141,6 +141,13 @@ function Game:load()
   self.navigationStack = NavigationStack({})
   self.navigationStack:push(BootScene({setupRoutine = self.setupRoutine}))
 
+  -- BootScene's constructor (just above) may have corrected consts.CANVAS_WIDTH/
+  -- HEIGHT to match config.portraitMode -- uiRoot was sized from the OS-only
+  -- default back in Game's own constructor, before that correction ran, so
+  -- resync it now.
+  self.uiRoot.width = consts.CANVAS_WIDTH
+  self.uiRoot.height = consts.CANVAS_HEIGHT
+
   -- Add navigation stack to root UI
   self.uiRoot:addChild(self.navigationStack)
   self.globalCanvas = love.graphics.newCanvas(consts.CANVAS_WIDTH, consts.CANVAS_HEIGHT, {dpiscale=GAME:newCanvasSnappedScale()})

@@ -43,6 +43,19 @@ WeightedBrain.__index = WeightedBrain
 
 local WIDTH = BoardSim.WIDTH
 local WAIT = { type = "WAIT" }
+local GARBAGE, RESOLVING = BoardSim.GARBAGE, BoardSim.RESOLVING
+
+-- Swap legality read off a COLOUR grid rather than off board cells, for the
+-- imagined boards a search moves on: those exist only as colours, so
+-- BoardSim.canSwapCells (which wants a cell's state flags) cannot see them.
+-- Same rule the engine applies to a settled board, and the same one the
+-- JavaScript's legalSwaps applies: nothing immovable on either side, the two
+-- must differ, and empty-against-empty is not a move.
+local function swappableColours(a, b)
+  if a == GARBAGE or b == GARBAGE or a == RESOLVING or b == RESOLVING then return false end
+  if a == b then return false end
+  return a ~= 0 or b ~= 0
+end
 
 -- Cursor travel, priced the way the evaluator's travelCost expects: the tap
 -- cadence times the steps, so a swap under the cursor is free and one four
@@ -77,6 +90,15 @@ function WeightedBrain.new(opts)
     density = profile.density and true or false,
     source = profile.source,
     _lastScore = nil, _lastTerms = nil,        -- exposed for diagnostics
+    -- A WEIGHT SET IS ONLY A BOT WHEN PAIRED WITH THE SWITCHES IT WAS FOUND
+    -- UNDER, so these come off the profile. Default 1/0 is the one-ply
+    -- chooser every profile written before this existed was found under.
+    depth = tonumber(profile and profile.depth) or 1,
+    beam = tonumber(profile and profile.beam) or 0,
+    rise = profile and profile.rise and true or false,
+    -- Frames between decisions. The stack rises for all of them whatever the
+    -- bot does, so rise-adjusted scoring has to charge a hold for them too.
+    reaction = tonumber(profile and profile.reaction) or 12,
   }, WeightedBrain)
 end
 
@@ -91,7 +113,61 @@ local function searchTop(state)
   return math.max(1, top)
 end
 
-function WeightedBrain:score(grid, rows, top, state, stack, r, c)
+-- HOW MANY ROWS LAND IN `frames`, given how much of that the stack spends
+-- frozen. Rows do not move while stop time is running.
+--
+-- Nothing about either engine's tables is in here. The clock arrives as the
+-- two numbers that decide it -- frames to the next pixel of rise, and frames
+-- per pixel after that -- plus how many pixels the current row still owes.
+-- A state that does not carry them is a state this cannot answer for, and 0
+-- is the honest answer rather than a guess.
+function WeightedBrain:rowsArriving(frames, paused, state)
+  local first, pixelFrames = state.riseTimer, state.pixelFrames
+  local displacement = state.displacement
+  if not first or not pixelFrames or not displacement or pixelFrames <= 0 then return 0 end
+  local moving = frames - (paused or 0)
+  if moving <= 0 or moving < first then return 0 end
+  local pixels = 1 + math.floor((moving - first) / pixelFrames)
+  local n = 1 + math.floor((pixels - displacement) / 16)
+  return n > 0 and n or 0
+end
+
+-- The two resolves a rise merges. Stop time does not add up -- the engine
+-- awards the larger, it does not bank both -- while broken garbage cells do,
+-- because two clears break two lots of garbage.
+local function mergeEarned(a, b)
+  local sizes = {}
+  for i = 1, #a.comboSizes do sizes[#sizes + 1] = a.comboSizes[i] end
+  for i = 1, #b.comboSizes do sizes[#sizes + 1] = b.comboSizes[i] end
+  local sent = {}
+  for i = 1, #a.garbageSent do sent[#sent + 1] = a.garbageSent[i] end
+  for i = 1, #b.garbageSent do sent[#sent + 1] = b.garbageSent[i] end
+  return {
+    chainLength = math.max(a.chainLength, b.chainLength),
+    comboSizes = sizes,
+    garbageSent = sent,
+    garbageCleared = a.garbageCleared + b.garbageCleared,
+    brokeGarbage = a.brokeGarbage + b.brokeGarbage,
+    stopTimeEarned = math.max(a.stopTimeEarned, b.stopTimeEarned),
+  }
+end
+
+-- Is this board over the line: anything at all in the top row.
+local function boardToppedOut(g, rows)
+  local row = g[rows]
+  if not row then return false end
+  for c = 1, WIDTH do if row[c] ~= 0 then return true end end
+  return false
+end
+
+-- `ply` is what the FIRST move left behind, and is nil at ply 1 because
+-- nothing has happened yet: `paused` is how much of the coming wait the stack
+-- spends frozen, `toppedOut` whether it is over the line, `from` where the
+-- cursor starts. Ply 1 reads all three off the live state instead.
+function WeightedBrain:score(grid, rows, top, state, stack, r, c, ply)
+  local paused = ply and ply.paused or state.stopTime
+  local from = ply and ply.from or state.cursor
+  local toppedOut = (ply and ply.toppedOut) or state.toppedOut or false
   local g, depth, total, _, gbCleared, sizes
   if r then
     g, depth, total, _, gbCleared, sizes = BoardSim.simSwap(grid, rows, r, c)
@@ -103,21 +179,103 @@ function WeightedBrain:score(grid, rows, top, state, stack, r, c)
     depth, total, _, gbCleared, sizes = BoardSim.resolve(g, rows)
   end
 
+  local frames = r and travelFrames(from, r, c) or 0
+  local earned = EvalEarned.from(sizes, depth, gbCleared, stack)
+  -- THE STOP TIME THIS MOVE BUYS is what the move itself cleared, before any
+  -- rise is added: the rows that land during the wait land later, and so does
+  -- whatever they set off. Returned separately because the ply-2 clock is
+  -- built from it while the features are scored on the merged total.
+  local earnedStop = earned.stopTimeEarned
+  -- DID THIS SEARCH LOOK PAST A GARBAGE BREAK. Set, never cleared, from the
+  -- start of a decision; bot/tests/decisionVerify.lua reads it, because past a
+  -- break the two implementations of this evaluator are no longer looking at
+  -- the same board and cannot be required to agree.
+  if gbCleared > 0 then self.brokeGarbage = true end
+
+  -- SCORE THE BOARD A MOMENT LATER, NOT AT ITS UGLIEST INSTANT.
+  --
+  -- Without the first row, a candidate is scored the frame its match finishes
+  -- popping: the hole is open, the cluster is spent, the colour is scarce,
+  -- and the panels that fill it back in never arrive because the simulation
+  -- stops there -- while holding is scored on a board that never moved. That
+  -- asymmetry grows with the size of the clear, so the more a move cleared
+  -- the worse it looked, and the bot waited instead of cashing in.
+  --
+  -- The rows after the first are a different job: time. The stack rises while
+  -- the cursor walks AND while the bot counts out its reaction, so a slow
+  -- move is judged further up than a fast one and a hold is charged for the
+  -- wait it costs. Neither job can be done by the other.
+  if self.rise then
+    local n = 1 + self:rowsArriving(frames + self.reaction, paused, state)
+    for _i = 1, n do
+      BoardSim.rise(g, rows, state.nextRow)
+      local d2, _t2, _f2, gc2, s2 = BoardSim.resolve(g, rows)
+      if gc2 > 0 then self.brokeGarbage = true end
+      if d2 > 0 then
+        earned = mergeEarned(earned, EvalEarned.from(s2, d2, gc2, stack))
+      end
+    end
+  end
+
   local plan = EvalPlan.new(g, rows, top)
   local score, features, terms = PanelEval.evaluate({
     board = { width = WIDTH, height = rows, grid = plan:view() },
     plan = plan,
-    travelFrames = r and travelFrames(state.cursor, r, c) or 0,
+    travelFrames = frames,
     displacement = state.displacement or 0,
-    earned = EvalEarned.from(sizes, depth, gbCleared, stack),
+    clock = { stopTime = paused or 0, toppedOut = toppedOut },
+    earned = earned,
   }, self.weights, { density = self.density })
 
-  return score, features, terms
+  return score, features, terms, g, earnedStop
+end
+
+-- THE VALUE OF A CANDIDATE AT DEPTH 2: the best it can still become.
+--
+-- A ply-1 score asks "which move leaves the best board". That is not the
+-- question the game asks, because the board a move leaves is one the bot is
+-- about to move again on. So a candidate is worth the best of: stopping here,
+-- or any single reply to it. Ported from the JavaScript this evaluator comes
+-- from (games/the-game/ai/eval/puyocpu.js, _value), and checked against it by
+-- bot/tests/decisionVerify.lua rather than reviewed.
+--
+-- Holding at ply 2 is `ply1` itself -- the value of stopping after one move --
+-- which is why v starts there and is never left out.
+--
+-- WHAT TIME IT IS FOR THIS PLY. Every child of a candidate follows the same
+-- first move, so they all inherit one clock, computed once: stop time is the
+-- engine's MAX of what was banked and what the first move earned, not their
+-- sum. Scoring the second ply against the clock as it stood BEFORE the first
+-- move makes "fire the chain now" and "hold, then fire it" identical on stop
+-- time, and they are not the same move.
+--
+-- Raising is NOT offered at ply 2 here. The JavaScript offers it when the bot
+-- is allowed to raise at all; this brain has no raise action, so a raise in
+-- the imagined future would be a move it could never play.
+function WeightedBrain:value(g1, rows, top, state, stack, ply1, earnedStop, from)
+  local v = ply1
+  local banked = state.stopTime or 0
+  local won = earnedStop or 0
+  local ply = {
+    paused = banked > won and banked or won,
+    toppedOut = state.toppedOut or boardToppedOut(g1, rows),
+    from = from,
+  }
+  for r = 1, top do
+    for c = 1, WIDTH - 1 do
+      if swappableColours(g1[r][c], g1[r][c + 1]) then
+        local s = self:score(g1, rows, top, state, stack, r, c, ply)
+        if s > v then v = s end
+      end
+    end
+  end
+  return v
 end
 
 function WeightedBrain:decide(state, stack, _match)
   if not state or not state.board or not state.rows then return WAIT end
 
+  self.brokeGarbage = false
   local rows = state.rows
   local grid = BoardSim.colorGrid(state.board, rows)
   local top = searchTop(state)
@@ -129,21 +287,52 @@ function WeightedBrain:decide(state, stack, _match)
   -- board unchanged, so the bot re-decides identically and stalls.
   local touch = BoardSim.touchableGrid(state.board, rows)
 
-  local best, bestMove = nil, nil
-
-  local holdScore, _, holdTerms = self:score(grid, rows, top, state, stack, nil, nil)
-  best, bestMove = holdScore, nil
-  self._lastTerms = holdTerms
+  -- Every candidate, hold first so it wins ties -- the same order the
+  -- JavaScript enumerates in, which is what makes the two pick alike.
+  local cands = {}
+  local holdScore, _, holdTerms, holdGrid, holdStop =
+      self:score(grid, rows, top, state, stack, nil, nil)
+  cands[1] = { score = holdScore, terms = holdTerms, grid = holdGrid,
+               move = nil, earnedStop = holdStop }
 
   for r = 1, top do
     for c = 1, WIDTH - 1 do
       if touch[r][c] and touch[r][c + 1] then
         local a, b = grid[r][c], grid[r][c + 1]
         if a ~= b and (a ~= 0 or b ~= 0) then
-          local s, _, terms = self:score(grid, rows, top, state, stack, r, c)
-          if s > best then best, bestMove, self._lastTerms = s, { r, c }, terms end
+          local s, _, terms, g, es = self:score(grid, rows, top, state, stack, r, c)
+          cands[#cands + 1] = { score = s, terms = terms, grid = g, move = { r, c }, earnedStop = es }
         end
       end
+    end
+  end
+
+  local pool = cands
+  if self.depth > 1 and self.beam > 0 and self.beam < #cands then
+    -- An explicit beam bounds the cost. It never drops hold: leaving the
+    -- do-nothing move out of the pool asks an easier question than the game
+    -- does. Filtered rather than taken from the ranking, so the pool stays in
+    -- candidate order and ties break as they do at depth 1.
+    local ranked = {}
+    for i = 1, #cands do ranked[i] = cands[i] end
+    table.sort(ranked, function(x, y) return x.score > y.score end)
+    local keep = {}
+    for i = 1, self.beam do if ranked[i] then keep[ranked[i]] = true end end
+    keep[cands[1]] = true
+    pool = {}
+    for i = 1, #cands do if keep[cands[i]] then pool[#pool + 1] = cands[i] end end
+  end
+
+  local best, bestMove = nil, nil
+  for i = 1, #pool do
+    local cand = pool[i]
+    local v = cand.score
+    if self.depth > 1 then
+      -- hold moves nothing, so a reply to it starts from the live cursor
+      v = self:value(cand.grid, rows, top, state, stack, cand.score, cand.earnedStop, cand.move)
+    end
+    if best == nil or v > best then
+      best, bestMove, self._lastTerms = v, cand.move, cand.terms
     end
   end
 

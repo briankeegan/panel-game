@@ -281,6 +281,13 @@ jobs:
           distribution: temurin
           java-version: '17'    # love-android 11.5a requires JDK 17
       - uses: android-actions/setup-android@v3
+        with:
+          # Google removed the legacy `tools` SDK package from the repository
+          # manifest; the action's own default ("tools platform-tools") now fails
+          # sdkmanager outright before anything else runs. Skip its default install
+          # entirely (still sets up ANDROID_HOME and accepts licenses) -- the next
+          # step already installs every package this job actually needs.
+          packages: ""
       - name: Install pinned NDK + cmake (love-android 11.5a)
         run: |
           yes | sdkmanager "platforms;android-34" "build-tools;34.0.0" \
@@ -323,14 +330,25 @@ jobs:
           echo 'app.name=Unofficial Panel Attack FFA &amp; Team' >> gradle.properties
           sed -i "s|^app.version_name=.*|app.version_name=$VER|" gradle.properties
           sed -i "s|^app.version_code=.*|app.version_code=$VCODE|" gradle.properties
-          # Lock the device to PORTRAIT (love-android defaults to landscape, which made
-          # the portrait game render sideways). Mobile defaults to portrait mode.
-          sed -i 's|^app.orientation=.*|app.orientation=sensorPortrait|' gradle.properties
+          # Leave orientation unspecified at the manifest level: conf.lua's
+          # t.window.resizable/width/height (mobile: fixed, derived from
+          # config.portraitMode) already makes love-android's native window-creation
+          # code request the correct orientation directly -- a static manifest lock
+          # here would only fight it.
+          sed -i 's|^app.orientation=.*|app.orientation=unspecified|' gradle.properties
           grep -E '^app\.(name|application_id|version|orientation)' gradle.properties
           # launcher icon is android:icon="@drawable/love" -> overwrite each density
           for d in drawable-mdpi drawable-hdpi drawable-xhdpi drawable-xxhdpi drawable-xxxhdpi; do
             cp "$GITHUB_WORKSPACE/updater-shell/icon.png" "app/src/main/res/$d/love.png"
           done
+
+      - name: Install stable debug keystore (android-shell-patches/debug.keystore)
+        run: |
+          # Without this, Gradle auto-generates a fresh debug key every CI run, so
+          # Android refuses to install a new build over an old one (signature
+          # mismatch) -- forcing an uninstall (and local-data wipe) on every update.
+          mkdir -p ~/.android
+          cp android-shell-patches/debug.keystore ~/.android/debug.keystore
 
       - name: Build the updater-shell boot .love (with embedded offline base)
         env:
@@ -355,9 +373,8 @@ jobs:
       - name: Build APK
         run: |
           cd la && chmod +x gradlew
-          # Debug variant = auto-signed + sideload-installable. TODO: stable release
-          # keystore via secret (debug key differs per run -> APK in-place updates
-          # would need reinstall; game updates come via downloaded .love regardless).
+          # Debug variant = sideload-installable, signed with the stable keystore
+          # installed above, so this and every future build install in place.
           ./gradlew --no-daemon assembleEmbedNoRecordDebug
 
       - name: Collect APK

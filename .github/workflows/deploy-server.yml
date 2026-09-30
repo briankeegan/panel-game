@@ -1,0 +1,45 @@
+name: deploy-server
+
+# Restarts the production multiplayer server (Vultr, 104.156.250.136) with
+# whatever is currently on bramp/multi-player -- the same two commands
+# deploy.sh --server-only runs locally (git pull + systemctl restart), just
+# triggered from GitHub instead of a terminal with SSH access.
+#
+# One-time setup required before this can do anything: add the server's SSH
+# private key as the repository secret VULTR_SSH_KEY.
+#   GitHub web UI -> this repo -> Settings -> Secrets and variables ->
+#   Actions -> "New repository secret" -> name it VULTR_SSH_KEY -> paste the
+#   private key that already has root@104.156.250.136 access -> Add secret.
+# That page works fine from a phone browser. Until the secret exists, this
+# workflow just fails at the SSH step -- the server itself is untouched
+# either way, so it's safe to trigger before it's set up.
+#
+# Trigger: git tag deploy-server-N && git push origin deploy-server-N
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'deploy-server-*'
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Restart panel-attack on the Vultr server
+        uses: appleboy/ssh-action@v1
+        with:
+          host: 104.156.250.136
+          username: root
+          key: ${{ secrets.VULTR_SSH_KEY }}
+          script: |
+            set -e
+            cd /opt/panel-attack
+            git pull
+            systemctl restart panel-attack
+            sleep 2
+            systemctl is-active panel-attack
+            echo "---- last 20 log lines ----"
+            journalctl -u panel-attack -n 20 --no-pager

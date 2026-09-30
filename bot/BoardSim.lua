@@ -210,6 +210,37 @@ local function labelGarbage(g, rows)
 end
 
 -- any garbage on the grid? (early-exit scan)
+-- ONE ROW OF RISE, in place. Everything shifts up a row, the dimmed row under
+-- the stack becomes row 1, and whatever is pushed past the top is gone.
+--
+-- Overflow only happens on a board already touching the ceiling, where the
+-- real engine has stopped rising anyway (rise lock / stop time, and topping
+-- out costs health instead) -- a state the search reaches only when the game
+-- is already being lost, and one maxHeight has been shouting about for
+-- several rows.
+--
+-- `nextRow[c]` is the colour the engine has already dealt into row 0 and drawn
+-- on screen: visible information, not a guess. A column it does not name
+-- arrives as RESOLVING -- occupied, immovable, unmatchable -- which is what
+-- "something is there and its colour is not knowable" has to mean to a search.
+function BoardSim.rise(g, rows, nextRow)
+  local reveal = g.reveal
+  for r = rows, 2, -1 do
+    local src, dst = g[r - 1], g[r]
+    for c = 1, WIDTH do dst[c] = src[c] end
+    if reveal then
+      local rsrc, rdst = reveal[r - 1], reveal[r]
+      for c = 1, WIDTH do rdst[c] = rsrc and rsrc[c] or nil end
+    end
+  end
+  for c = 1, WIDTH do
+    local v = nextRow and nextRow[c]
+    g[1][c] = (type(v) == "number" and v > 0) and v or RESOLVING
+    if reveal and reveal[1] then reveal[1][c] = nil end
+  end
+  return g
+end
+
 function BoardSim.hasGarbage(g, rows)
   for r = 1, rows do
     for c = 1, WIDTH do if isGarbage(g[r][c]) then return true end end
@@ -295,7 +326,7 @@ function BoardSim.applyGravity(g, rows, marks)
 end
 
 -- resolve a grid to quiescence (mutates g) -> chainDepth, totalCleared, firstClear,
--- garbageCleared. Faithful garbage break (engine: matchGarbagePanels/convertGarbage
+-- garbageCleared, sizes (panels cleared per link, in link order). Faithful garbage break (engine: matchGarbagePanels/convertGarbage
 -- Panels): a garbage block orthogonally adjacent to a clearing match has its ENTIRE
 -- BOTTOM ROW converted to panels and the block shrinks by one row (upper rows stay
 -- garbage). Revealed colors are the real engine reveal colors when BoardState
@@ -315,49 +346,11 @@ end
 function BoardSim.resolve(g, rows, maxLinkCap)
   local reveal = g.reveal
   local chain, total, firstClear, garbageCleared = 0, 0, 0, 0
+  -- PER-LINK PANELS CLEARED, in link order. EvalEarned prices a move off this:
+  -- COMBO_GARBAGE is indexed by the size of EACH link, so one total cannot
+  -- stand in for the list -- 4+4 sends twice what a single 8 does.
   local sizes = {}
-  -- THE FIRST MATCH HAPPENS BEFORE THE FALL, AND THAT IS NOT A DETAIL.
-  --
-  -- This used to settle the whole grid and then match. That is right for the
-  -- case it was written for (a swap empties a cell, and the real match only
-  -- forms once the panel above drops into it -- matching the un-fallen grid
-  -- MISSED those clears, bot/tests/boardSimVerify.lua swaps 2 and 3) and wrong
-  -- for the opposite one: when a match is ALREADY there on the swap frame,
-  -- the engine fires it immediately, while the panels that lost their support
-  -- are still in the air. Those panels land afterwards and match SEPARATELY.
-  --
-  -- Settling first merges the two into one clear, and the combo size is what
-  -- decides the attack: two threes send COMBO_GARBAGE[3] twice, which is
-  -- nothing at all, where one six sends a 5-wide block. So a bot reading this
-  -- was offered an attack that does not exist.
-  --
-  -- Measured against the real engine (Puzzle/Match/Stack, reading its own
-  -- `matched` signal) over 4,443 swaps on 393 boards captured from real level-10
-  -- play: 2 disagreements, both of this shape, both on swaps with an EMPTY side.
-  -- bot/tests/comboPartitionVerify.lua is that measurement, kept as a gate.
-  --
-  -- The order below is the engine's: match what is AT REST, and only if
-  -- nothing is matchable there let the board settle and look again. On a grid
-  -- that is already settled every cell is resting, so this is a no-op -- which
-  -- is why it changes nothing for the callers that resolve a settled board.
-  -- A ROUND IS NOT A CHAIN LINK. The engine counts a match as extending the
-  -- chain only when one of its panels is CHAINING -- a panel that fell into
-  -- space a previous clear freed (Panel.lua's enterHoverState propagates the
-  -- flag down the column; checkMatches' isNewChainLink reads it), or one
-  -- revealed by breaking garbage. Two unrelated matches that happen to fire in
-  -- sequence are two COMBOS at chain 1, and they send nothing; a 2-chain sends
-  -- a full-width row. Counting rounds reported a 2 where the game pays a 1.
-  --
-  -- `chaining` below is that flag, carried through gravity by applyGravity's
-  -- marks argument so it moves with the panel it belongs to.
-  local chaining = {}
-  for r = 1, rows do
-    local row = {}
-    for c = 1, WIDTH do row[c] = false end
-    chaining[r] = row
-  end
-  local counter = 0
-  local firstPass = true
+  BoardSim.applyGravity(g, rows)   -- SETTLE FIRST: a swap can empty a cell so the real match only forms after the panel above falls. The engine settles then matches; matching the un-fallen grid MISSED real clears (verified bot/tests/boardSimVerify.lua swap 2,3). No-op when already settled.
   while true do
     local hit, any
     if firstPass then
@@ -437,7 +430,12 @@ function BoardSim.resolve(g, rows, maxLinkCap)
       for _, cell in ipairs(comps[cid]) do
         local r, c = cell[1], cell[2]
         if r == minRow then
-          g[r][c] = (reveal and reveal[r][c]) or 0 -- real color if known, else empty
+          -- A BROKEN GARBAGE CELL IS STILL A CELL. Known reveal colour when
+          -- BoardState captured one; otherwise RESOLVING -- occupied, immovable
+          -- and unmatchable. Not empty: the row does not vanish when a block
+          -- breaks, it becomes panels, and calling it air tells the search the
+          -- stack got six cells shorter and that everything above it falls.
+          g[r][c] = (reveal and reveal[r][c]) or RESOLVING
           if reveal then reveal[r][c] = nil end
           -- A panel revealed by breaking garbage is CHAINING (Panel.lua's
           -- matchedState.enterHoverState sets it unconditionally). This is how
@@ -464,10 +462,7 @@ function BoardSim.resolve(g, rows, maxLinkCap)
     local maxlink = tonumber(os.getenv("PA_MAXLINK")) or maxLinkCap
     if maxlink and chain >= maxlink then break end
   end
-  -- CHAIN DEPTH, NOT ROUND COUNT: the engine's chain counter, which is 1 for a
-  -- cascade that never chained and 0 for one that cleared nothing.
-  local depth = (chain > 0) and math.max(counter, 1) or 0
-  return depth, total, firstClear, garbageCleared, sizes
+  return chain, total, firstClear, garbageCleared, sizes
 end
 
 -- lowest row that holds any garbage (0 if none). The dig has to happen at/below

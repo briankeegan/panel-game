@@ -1804,6 +1804,15 @@ function NetClient:login(ip, port)
 end
 
 function NetClient:logout()
+  -- Intentional session end: leave any room we're sitting in first, so the
+  -- server's normal handleLeaveRoom cleanup (releasing the room, or voiding
+  -- an in-progress match) runs before the socket teardown below. Without
+  -- this, Server:closeConnection can't tell an intentional exit from a
+  -- network drop and preserves the room slot for reconnect either way --
+  -- correct for an actual drop, but wrong here: quitting or hitting the
+  -- lobby "Back" button should actually leave, not silently hold the seat
+  -- so the next login gets shoved right back into it.
+  self:leaveRoom()
   _sendLobby(self, ClientMessages.logout())
   -- we want to give the message a chance to actually be sent to the network before we free the socket
   -- otherwise the socket might get cleared before that and the server will only disconnect the player after a delay (which means they still get shown in lobby for ~10s)

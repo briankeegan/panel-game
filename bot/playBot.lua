@@ -42,8 +42,8 @@ bot:leaveRoom()
 
 local speedDesc = cursorSpeed and string.format("cursor %d/%d", cursorSpeed.cursorMoveInterval, cursorSpeed.reactionFrames) or "full speed"
 print(string.format(
-  "\n=== Bot '%s' (%s, L%d, %s) is idle in the lobby on %s ===\n    Open your client, CHALLENGE '%s' in the lobby, and play — it auto-accepts.\n    Ctrl+C to stop.\n",
-  name, brain, bot.level, speedDesc, ip, name))
+  "\n=== Bot '%s' (%s, L%d, %s, %s) is idle in the lobby on %s ===\n    Open your client, CHALLENGE '%s' in the lobby, and play — it auto-accepts.\n    Ctrl+C to stop.\n",
+  name, brain, bot.level, speedDesc, bot.ranked and "RANKED" or "unranked", ip, name))
 
 local function playerCount()
   local n = 0

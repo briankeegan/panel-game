@@ -92,6 +92,10 @@ local BotClient = class(function(self, opts)
   -- levelData, which the opponent's character-select reads). Character/stage are
   -- random, like a default client.
   self.level = opts.level or 10 -- corpus + play target is L10
+  -- Ranked is a login setting like level and character, and the bot sets it
+  -- EXPLICITLY every time: at login and again on every ready. Off unless a
+  -- caller opts in -- a bot's games must never move anyone's rating.
+  self.ranked = opts.ranked == true
   local level = self.level
   self.playerStub = {
     hasLoaded = false,
@@ -102,7 +106,7 @@ local BotClient = class(function(self, opts)
       selectedCharacterId = consts.RANDOM_CHARACTER_SPECIAL_VALUE, characterId = nil,
       selectedStageId = consts.RANDOM_STAGE_SPECIAL_VALUE, stageId = nil,
       panelId = nil,
-      wantsReady = false, wantsRanked = false,
+      wantsReady = false, wantsRanked = self.ranked,
       inputMethod = "controller",
       endlessNoRaise = false,
     },
@@ -180,7 +184,7 @@ function BotClient:login()
       -- (ready_state_flash_root_cause); "__Random*" resolves to a bundled mod.
       consts.RANDOM_CHARACTER_SPECIAL_VALUE, nil, -- selected character (random), resolved
       consts.RANDOM_STAGE_SPECIAL_VALUE, nil,     -- selected stage (random), resolved
-      false,        -- ranked
+      self.ranked,  -- ranked (off by default; see the constructor)
       false)),       -- save replays publicly
     "login")
   if status ~= "received" then return false, "login " .. status end
@@ -340,6 +344,7 @@ function BotClient:sendReady()
   -- fields, no hand-rolled shape.
   self.playerStub.hasLoaded = true
   self.playerStub.settings.wantsReady = true
+  self.playerStub.settings.wantsRanked = self.ranked -- re-asserted on every ready, not just at login
   local menuState = ServerMessages.toServerMenuState(self.playerStub)
   self.gameplay:sendRequest(ClientProtocol.sendPlayerSettings(menuState))
 end

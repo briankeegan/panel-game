@@ -72,7 +72,7 @@ local BotClient = class(function(self, opts)
   -- search FOUND, scoring the board a move leaves. Anything else that is not
   -- "random" gets EnvelopeBrain, the shape-catalog brain, which is what every
   -- name here used to mean -- brainKind was declared and then never read.
-  self.brainKind = opts.brain or "heuristic"   -- "heuristic"|"random"|"expert"|"search"|"weighted"
+  self.brainKind = opts.brain or "heuristic"   -- "heuristic"|"random"|"expert"|"search"|"weighted"|"survival"
   self.searchProfile = opts.searchProfile       -- weight-set path for brain == "weighted" (bot/profiles/*.json)
   self.cursorSpeed = opts.cursorSpeed -- { cursorMoveInterval, reactionFrames } direct knobs; nil = full speed
   self.gameplay = TcpClient({ name = "bot-gameplay", defaultPort = self.port })
@@ -365,7 +365,13 @@ function BotClient:startMatch()
   -- the bot simulates an EMPTY board from frame 0 (no panels -> brain always
   -- WAITs -> cursor never moves -> the human sees a blank board).
   self.match:start()
-  if self.brainKind == "weighted" then
+  if self.brainKind == "survival" then
+    -- WasmSurvivor: the survival bot, a separate process (GameCreator's
+    -- survivor.js) that plans on this engine's rules and says what to press
+    -- every frame (bot/SurvivalLink.lua). Nothing is decided here.
+    self.survival = self.survival or require("bot.SurvivalLink").new({})
+    self.survival:startMatch(self.myStack)
+  elseif self.brainKind == "weighted" then
     -- The evaluator brain. searchProfile names the weight set; nil takes
     -- bot/profiles/trained.json, the set the cross-entropy search converged
     -- on. Constructing it validates the weights, so a typo'd feature name
@@ -408,7 +414,9 @@ function BotClient:tickMatch()
   -- recorded death frame.
   if not stack:game_ended() then
     local char
-    if self.brain then
+    if self.survival then
+      char = self.survival:input(stack)
+    elseif self.brain then
       local st = self.boardState.extract(stack)
       -- Only run the expensive per-move verify when the controller needs a NEW move; while it's mid-move (locked /
       -- draining) the lock completes through a WAIT, so re-deciding is wasted. ~10x fewer verifies -> the bot runs

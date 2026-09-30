@@ -23,6 +23,7 @@ on:
           - prod-vs          # bot-vs-bot matches on the live server
           - large-garbage    # offline survival vs the "large_garbage" training preset (6x12 blocks); no server contact
           - live             # ONE bot, real name, sits in the lobby so a human can play it
+          - survival         # WasmSurvivor: the survival bot (GameCreator's survivor.js) in the lobby, as live; fork server only
       server:
         description: 'live: which server -- fork (this repo, the ip/port below) or beta (upstream Panel Attack, betaserver.panelattack.com:59569, always on the latest upstream code)'
         required: false
@@ -197,13 +198,17 @@ jobs:
       # re-run it, or run bot/beverly.sh on the server box under systemd for
       # something permanent.
       - name: Check the name and the weight set before connecting
-        if: inputs.mode == 'live'
+        if: inputs.mode == 'live' || inputs.mode == 'survival'
         run: |
           set -eu
           cd "$BOT_DIR"
           n='${{ inputs.name }}'
           [ -n "$n" ] || { echo "name is empty"; exit 1; }
           [ ${#n} -le 16 ] || { echo "name '$n' is ${#n} chars; the server limit is 16"; exit 1; }
+          if [ '${{ inputs.mode }}' = survival ]; then
+            [ '${{ inputs.server }}' = fork ] || { echo "survival plays the fork's server only"; exit 1; }
+            exit 0
+          fi
           [ -f '${{ inputs.profile }}' ] || { echo "no weight set at ${{ inputs.profile }}"; exit 1; }
           eval "$(luarocks path --local --lua-version 5.1)"
           luajit -e 'package.path="./?.lua;"..package.path; require("bot.headlessBoot");
@@ -225,7 +230,7 @@ jobs:
       # one), so a beta bot keeps its name by saving the id it was given
       # instead -- see "Save the account id".
       - name: Derive this name's account id
-        if: inputs.mode == 'live' && inputs.server != 'beta'
+        if: (inputs.mode == 'live' || inputs.mode == 'survival') && inputs.server != 'beta'
         env:
           BOT_NAME: ${{ inputs.name }}
           BOT_IP: ${{ inputs.ip }}
@@ -252,6 +257,46 @@ jobs:
           # The bot runs until killed, so the timeout IS the stop condition:
           # 124 from `timeout` is this working, not failing.
           timeout "$secs" bot/plamp.sh "$BOT_HOST" "$BOT_PORT" '${{ inputs.name }}' \
+            2>&1 | tee "$GITHUB_WORKSPACE/bot-prod-smoke.log" || [ $? -eq 124 ]
+
+      # WASMSURVIVOR. The survival bot is GameCreator's (survivor.js): it
+      # plans on this server's own rules (its pa-engine.js / native/pa.c are
+      # held to this repo's Lua engine frame by frame) and tells the client
+      # what to press every frame through bot/SurvivalLink.lua. It runs beside
+      # the client on this runner, on the cores the client does not use.
+      - name: Check out WasmSurvivor
+        if: inputs.mode == 'survival'
+        uses: actions/checkout@v4
+        with:
+          repository: briankeegan/GameCreator
+          path: GameCreator
+          sparse-checkout: games/the-game
+
+      - uses: actions/setup-node@v4
+        if: inputs.mode == 'survival'
+        with:
+          node-version: '22'
+
+      - name: Start WasmSurvivor
+        if: inputs.mode == 'survival'
+        run: |
+          set -eu
+          nohup node GameCreator/games/the-game/ai/eval/survivor.js --port 47777 --threads 3 > "$GITHUB_WORKSPACE/survivor.log" 2>&1 &
+          for i in $(seq 1 300); do grep -q listening "$GITHUB_WORKSPACE/survivor.log" && break; sleep 0.2; done
+          cat "$GITHUB_WORKSPACE/survivor.log"
+          grep -q listening "$GITHUB_WORKSPACE/survivor.log" || { echo "WasmSurvivor did not start"; exit 1; }
+
+      - name: Sit in the lobby (WasmSurvivor)
+        if: inputs.mode == 'survival'
+        id: survival
+        env:
+          PA_SURVIVOR_PORT: '47777'
+        run: |
+          eval "$(luarocks path --local --lua-version 5.1)"
+          secs=$(( ${{ inputs.hours }} * 3600 ))
+          echo "::notice::${{ inputs.name }} (WasmSurvivor) joining $BOT_HOST:$BOT_PORT for ${{ inputs.hours }}h"
+          set -o pipefail
+          timeout "$secs" luajit bot/playBot.lua "$BOT_HOST" "$BOT_PORT" '${{ inputs.name }}' 4 12 survival \
             2>&1 | tee "$GITHUB_WORKSPACE/bot-prod-smoke.log" || [ $? -eq 124 ]
 
       # SAME NAME, SAME ACCOUNT on beta. Upstream hands a new name a random id
@@ -287,6 +332,7 @@ jobs:
             echo '```'
             tail -n 40 bot-prod-smoke.log || echo "(no log produced)"
             echo '```'
+            if [ -f survivor.log ]; then echo '### WasmSurvivor'; echo '```'; tail -n 40 survivor.log; echo '```'; fi
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload log
@@ -294,8 +340,11 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: bot-prod-smoke-log
-          path: bot-prod-smoke.log
+          path: |
+            bot-prod-smoke.log
+            survivor.log
+          if-no-files-found: ignore
 
       - name: Fail if the run failed
-        if: steps.smoke.outcome == 'failure' || steps.largegarbage.outcome == 'failure' || steps.live.outcome == 'failure'
+        if: steps.smoke.outcome == 'failure' || steps.largegarbage.outcome == 'failure' || steps.live.outcome == 'failure' || steps.survival.outcome == 'failure'
         run: exit 1

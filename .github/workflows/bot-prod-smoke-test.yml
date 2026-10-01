@@ -13,10 +13,10 @@ run-name: "${{ inputs.mode }} · ${{ inputs.server }}${{ (inputs.mode == 'live' 
 #                            code with its bot/ added
 #   bitbot         BitBot, GameCreator's bot (games/the-game/ai/eval/bitbot.js),
 #                  in the lobby the same way, on 104.156.250.136 only. It runs
-#                  beside the client in Node: bot/SurvivalLink.lua sends the
-#                  server's board each frame to GameCreator's survivor.js,
-#                  which asks bot/bitbot_mind.js (BitBot) what to do and
-#                  presses it. GameCreator is fetched fresh every run.
+#                  beside the client in Node (bot/bitbot_link.js): each frame
+#                  bot/SurvivalLink.lua sends the server's board, BitBot's own
+#                  update() plays it, and its keys are pressed. GameCreator is
+#                  fetched fresh every run; BitBot itself is unchanged.
 #   prod-vs        smoke test: two throwaway bots play `matches` games against
 #                  each other in a PRIVATE room on 104.156.250.136; no player
 #                  can join, nothing is ranked
@@ -280,11 +280,11 @@ jobs:
           done
           exit 1
 
-      # BITBOT. GameCreator's survivor.js is the frame loop: it rebuilds the
-      # board the client sends on pa-engine.js (the server's rules), asks its
-      # worker for decisions ahead of time and presses them. Its worker is
-      # survivor_mind.js; bot/bitbot_mind.js replaces it so the worker is
-      # BitBot. Everything of GameCreator's is its latest main.
+      # BITBOT. GameCreator's BitBot (games/the-game/ai/eval/bitbot.js, its
+      # latest main, unchanged) plays through bot/bitbot_link.js: each frame
+      # the client sends the server's board, BitBot's own update() runs on
+      # it, and the keys it presses -- its walk, its swaps, its raise latch --
+      # are the frame's input. Nothing else decides or presses for it.
       - name: Check out GameCreator (BitBot)
         if: inputs.mode == 'bitbot'
         uses: actions/checkout@v4
@@ -298,24 +298,26 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Start BitBot's mind
+      - name: Start BitBot
         if: inputs.mode == 'bitbot'
         run: |
           set -eu
-          eval_dir=GameCreator/games/the-game/ai/eval
-          cp bot/bitbot_mind.js "$eval_dir/survivor_mind.js"
           echo "::notice::BitBot from GameCreator $(git -C GameCreator log -1 --format='%h %s')"
-          GC_SURVIVOR_PROFILE="$GITHUB_WORKSPACE/bot/bitbot.profile.json" \
-            nohup node "$eval_dir/survivor.js" --port 47777 --threads 3 > "$GITHUB_WORKSPACE/bitbot-mind.log" 2>&1 &
+          nohup node bot/bitbot_link.js --dir GameCreator/games/the-game/ai/eval --port 47777 > "$GITHUB_WORKSPACE/bitbot-mind.log" 2>&1 &
           for i in $(seq 1 300); do grep -q listening bitbot-mind.log && break; sleep 0.2; done
           cat bitbot-mind.log
-          grep -q listening bitbot-mind.log || { echo "BitBot's mind did not start"; exit 1; }
+          grep -q listening bitbot-mind.log || { echo "BitBot did not start"; exit 1; }
 
       - name: Sit in the lobby (BitBot)
         if: inputs.mode == 'bitbot'
         id: bitbot
         env:
           PA_SURVIVOR_PORT: '47777'
+          # Wait for every frame's answer. BitBot thinks inside the frame it
+          # decides on (as in its duels); a frame answered late would be
+          # pressed as nothing while BitBot believes it pressed its keys. The
+          # fork server's loose sync lets the client lag and catch up.
+          PA_SURVIVOR_WAIT: '2'
         run: |
           eval "$(luarocks path --local --lua-version 5.1)"
           secs=$(( ${{ inputs.hours }} * 3600 ))

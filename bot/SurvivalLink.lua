@@ -164,6 +164,7 @@ function SurvivalLink:startMatch(stack)
   self:send(enc({ t = "match", levelData = stack.levelData, behaviours = stack.behaviours,
                   stackOverConditions = stack.stackOverConditions }))
   self.awaiting = 1   -- the match's ok, read with the first frame's answer
+  self.planned = nil
   self.frames = 0
 end
 
@@ -178,12 +179,22 @@ function SurvivalLink:input(stack, sources)
   self:send('{"t":"f","state":' .. SurvivalLink.dump(stack, sources) .. '}')
   self.awaiting = (self.awaiting or 0) + 1
   self.frames = self.frames + 1
-  -- Answers come in order; one for an earlier frame is stale.
+  -- Answers come in order; one for an earlier frame is stale, but the keys
+  -- it planned (reply.next, from the frame after its own) are the newest
+  -- known. A frame whose answer is late presses what was planned for it.
   while self.awaiting > 0 do
     local line = self:receive(self.waitSec)
-    if not line then self.late = self.late + 1; return idle end
+    if not line then
+      self.late = self.late + 1
+      local planned = self.planned and self.planned[clock]
+      return planned and KeyDataEncoding.base64encode[planned + 1] or idle
+    end
     self.awaiting = self.awaiting - 1
     local reply = json.decode(line)
+    if reply and reply.clock then
+      self.planned = {}
+      for i, bits in ipairs(reply.next or {}) do self.planned[reply.clock + i] = bits end
+    end
     if reply and reply.clock == clock then
       return KeyDataEncoding.base64encode[(reply.input or 0) + 1] or idle
     end

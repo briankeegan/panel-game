@@ -86,7 +86,10 @@ local function telegraph(sources)
         if t then transit[#transit + 1] = { at = t, garbage = garbageList(q.garbageInTransit[t] or {}) } end
       end
     end
-    out[i] = { stopWatch = src.stopWatch, staged = garbageList(q and q.stagedGarbage or {}), transit = transit }
+    -- capped: an attack engine's garbage, which the game holds back while the
+    -- receiver has 72 queued (GarbageDelivery:_pushToRecipient).
+    out[i] = { stopWatch = src.stopWatch, staged = garbageList(q and q.stagedGarbage or {}), transit = transit,
+               capped = q and q.illegalStuffIsAllowed or false }
   end
   return out
 end

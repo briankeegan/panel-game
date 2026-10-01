@@ -33,6 +33,33 @@ var BitBot = require(path.join(DIR, 'bitbot.js')), PA = require(path.join(DIR, '
 
 var BITS = { right: 1, left: 2, down: 4, up: 8, swap: 16, raise: 32 };
 
+// WHAT BITBOT MAY ASK OF ITS STACK. Reads work on the view as they would on
+// GameCreator's engine; setInput and tryQueueSwap are the two ways it acts,
+// and both are relayed. BitBot is still being written: if a version of it
+// calls anything else on the stack (a new way to act, say), that call would
+// land on the throwaway view and never reach the server -- so it is caught
+// and named in the log ("not relayed"), and the deploy's pre-flight fails on
+// it rather than putting a bot that silently does nothing in the lobby.
+var RELAYED = { setInput: true, tryQueueSwap: true };
+var READS = { panelAt: true, canSwap: true, isToppedOut: true, hasActivePanels: true, hasFallingGarbage: true, fillRatio: true };
+var notRelayed = {};
+function guard(view) {
+  var depth = 0, proto = Object.getPrototypeOf(view);
+  Object.getOwnPropertyNames(proto).forEach(function (name) {
+    if (name === 'constructor' || RELAYED[name] || typeof proto[name] !== 'function') return;
+    var fn = proto[name];
+    view[name] = function () {
+      // only BitBot's own calls: the engine calling itself is not BitBot acting
+      if (depth === 0 && !READS[name] && !notRelayed[name]) {
+        notRelayed[name] = true;
+        console.log('not relayed: BitBot called stack.' + name + '(), which bitbot_link.js does not pass to the server');
+      }
+      depth++;
+      try { return fn.apply(this, arguments); } finally { depth--; }
+    };
+  });
+}
+
 function Match(level) {
   this.level = level;
   this.bot = null;
@@ -44,6 +71,7 @@ Match.prototype.frame = function (state) {
   var truth = PA.fromLua(state, this.level, new PA.Unseen());
   var view = PA.toPanelEngine(truth, PE);
   var input = {}, swap = false, stats = this.stats;
+  guard(view);
   view.setInput = function (inp) { input = inp || {}; };
   view.tryQueueSwap = function (row, col) {
     var p1 = truth.panels[row] && truth.panels[row][col], p2 = truth.panels[row] && truth.panels[row][col + 1];
@@ -63,8 +91,9 @@ Match.prototype.frame = function (state) {
   return { clock: truth.clock, input: bits };
 };
 Match.prototype.summary = function () {
-  var b = this.bot, out = { stats: this.stats };
-  if (b) { out.spend = b.spend; out.decisions = b.decisions; out.counts = { swaps: b.counts.swaps, raises: b.counts.raises, holds: b.counts.holds }; }
+  // BitBot's own counters when it has them -- a later version may not
+  var b = this.bot, c = b && b.counts || {}, out = { stats: this.stats, notRelayed: Object.keys(notRelayed) };
+  if (b) { out.spend = b.spend; out.decisions = b.decisions; out.counts = { swaps: c.swaps, raises: c.raises, holds: c.holds }; }
   return JSON.stringify(out);
 };
 

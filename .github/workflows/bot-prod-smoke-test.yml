@@ -308,6 +308,28 @@ jobs:
           cat bitbot-mind.log
           grep -q listening bitbot-mind.log || { echo "BitBot did not start"; exit 1; }
 
+      # PRE-FLIGHT, EVERY DEPLOY. BitBot is GameCreator's latest main, which is
+      # still being written, so before it joins the lobby it plays 30 seconds
+      # through the exact live path on this repo's Lua engine, offline: its
+      # board over SurvivalLink, BitBot's own update() in bitbot_link.js, the
+      # keys back. The deploy stops here -- with the reason -- if any answer
+      # was late, no swap reached the engine, nothing was cleared, a frame
+      # threw, or BitBot acted on its stack in a way the link does not relay.
+      - name: BitBot pre-flight
+        if: inputs.mode == 'bitbot'
+        env:
+          PA_SURVIVOR_PORT: '47777'
+          PA_SURVIVOR_WAIT: '2'
+        run: |
+          eval "$(luarocks path --local --lua-version 5.1)"
+          set -o pipefail
+          luajit bot/bitbot_preflight.lua 1800 2>&1 | tee bitbot-preflight.log
+          sleep 0.5
+          if grep -a "frame failed\|not relayed" bitbot-mind.log; then
+            echo "BitBot pre-flight FAILED: the lines above are from BitBot's log (bitbot-mind.log)"
+            exit 1
+          fi
+
       - name: Sit in the lobby (BitBot)
         if: inputs.mode == 'bitbot'
         id: bitbot
@@ -347,6 +369,7 @@ jobs:
           path: |
             bot-prod-smoke.log
             bitbot-mind.log
+            bitbot-preflight.log
 
       - name: Fail if the run failed
         if: steps.smoke.outcome == 'failure' || steps.largegarbage.outcome == 'failure' || steps.live.outcome == 'failure' || steps.bitbot.outcome == 'failure'

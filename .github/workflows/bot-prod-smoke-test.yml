@@ -1,6 +1,6 @@
 name: Bot Prod Smoke Test (LIVE SERVER)
 # The run list shows what each run was, e.g. "live · beta · SirBonksALot".
-run-name: "${{ inputs.mode }} · ${{ inputs.server }}${{ inputs.mode == 'live' && format(' · {0}', inputs.name) || '' }}"
+run-name: "${{ inputs.mode }} · ${{ inputs.server }}${{ (inputs.mode == 'live' || inputs.mode == 'bitbot') && format(' · {0}', inputs.name) || '' }}"
 
 # Manual-only. Three things, picked with `mode`:
 #
@@ -11,6 +11,12 @@ run-name: "${{ inputs.mode }} · ${{ inputs.server }}${{ inputs.mode == 'live' &
 #                    betaserver.panelattack.com:59569 upstream Panel Attack's
 #                            beta server; the bot runs on upstream's latest
 #                            code with its bot/ added
+#   bitbot         BitBot, GameCreator's bot (games/the-game/ai/eval/bitbot.js),
+#                  in the lobby the same way, on 104.156.250.136 only. It runs
+#                  beside the client in Node: bot/SurvivalLink.lua sends the
+#                  server's board each frame to GameCreator's survivor.js,
+#                  which asks bot/bitbot_mind.js (BitBot) what to do and
+#                  presses it. GameCreator is fetched fresh every run.
 #   prod-vs        smoke test: two throwaway bots play `matches` games against
 #                  each other in a PRIVATE room on 104.156.250.136; no player
 #                  can join, nothing is ranked
@@ -23,12 +29,13 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'What to run: live = a bot in the lobby for people to play; prod-vs = bot-vs-bot smoke test; large-garbage = offline benchmark'
+        description: 'What to run: live = a bot in the lobby for people to play; bitbot = BitBot (GameCreator) in the lobby; prod-vs = bot-vs-bot smoke test; large-garbage = offline benchmark'
         required: true
         default: 'live'
         type: choice
         options:
           - live
+          - bitbot
           - prod-vs
           - large-garbage
       server:
@@ -109,7 +116,7 @@ jobs:
           set -eu
           server='${{ inputs.server }}'
           if [ "$server" = "$BETA_SERVER" ]; then
-            [ '${{ inputs.mode }}' = live ] || { echo "$BETA_SERVER is only for mode: live"; exit 1; }
+            [ '${{ inputs.mode }}' = live ] || { echo "$BETA_SERVER is only for mode: live"; exit 1; }   # bitbot: the fork's client only
             dir="$GITHUB_WORKSPACE/upstream"
           else
             dir="$GITHUB_WORKSPACE"
@@ -191,13 +198,14 @@ jobs:
       # re-run it, or run bot/beverly.sh on the server box under systemd for
       # something permanent.
       - name: Check the name and the weight set before connecting
-        if: inputs.mode == 'live'
+        if: inputs.mode == 'live' || inputs.mode == 'bitbot'
         run: |
           set -eu
           cd "$BOT_DIR"
           n='${{ inputs.name }}'
           [ -n "$n" ] || { echo "name is empty"; exit 1; }
           [ ${#n} -le 16 ] || { echo "name '$n' is ${#n} chars; the server limit is 16"; exit 1; }
+          [ '${{ inputs.mode }}' = live ] || exit 0   # BitBot has no weight set here
           [ -f '${{ inputs.profile }}' ] || { echo "no weight set at ${{ inputs.profile }}"; exit 1; }
           eval "$(luarocks path --local --lua-version 5.1)"
           luajit -e 'package.path="./?.lua;"..package.path; require("bot.headlessBoot");
@@ -219,7 +227,7 @@ jobs:
       # one), so a beta bot keeps its name by saving the id it was given
       # instead -- see "Save the account id".
       - name: Derive this name's account id
-        if: inputs.mode == 'live' && inputs.server != env.BETA_SERVER
+        if: (inputs.mode == 'live' || inputs.mode == 'bitbot') && inputs.server != env.BETA_SERVER
         env:
           BOT_NAME: ${{ inputs.name }}
           BOT_IP: ${{ env.BOT_HOST }}
@@ -272,6 +280,51 @@ jobs:
           done
           exit 1
 
+      # BITBOT. GameCreator's survivor.js is the frame loop: it rebuilds the
+      # board the client sends on pa-engine.js (the server's rules), asks its
+      # worker for decisions ahead of time and presses them. Its worker is
+      # survivor_mind.js; bot/bitbot_mind.js replaces it so the worker is
+      # BitBot. Everything of GameCreator's is its latest main.
+      - name: Check out GameCreator (BitBot)
+        if: inputs.mode == 'bitbot'
+        uses: actions/checkout@v4
+        with:
+          repository: briankeegan/GameCreator
+          path: GameCreator
+          sparse-checkout: games/the-game
+
+      - uses: actions/setup-node@v4
+        if: inputs.mode == 'bitbot'
+        with:
+          node-version: '22'
+
+      - name: Start BitBot's mind
+        if: inputs.mode == 'bitbot'
+        run: |
+          set -eu
+          eval_dir=GameCreator/games/the-game/ai/eval
+          cp bot/bitbot_mind.js "$eval_dir/survivor_mind.js"
+          echo "::notice::BitBot from GameCreator $(git -C GameCreator log -1 --format='%h %s')"
+          GC_SURVIVOR_PROFILE="$GITHUB_WORKSPACE/bot/bitbot.profile.json" \
+            nohup node "$eval_dir/survivor.js" --port 47777 --threads 3 > "$GITHUB_WORKSPACE/bitbot-mind.log" 2>&1 &
+          for i in $(seq 1 300); do grep -q listening bitbot-mind.log && break; sleep 0.2; done
+          cat bitbot-mind.log
+          grep -q listening bitbot-mind.log || { echo "BitBot's mind did not start"; exit 1; }
+
+      - name: Sit in the lobby (BitBot)
+        if: inputs.mode == 'bitbot'
+        id: bitbot
+        env:
+          PA_SURVIVOR_PORT: '47777'
+        run: |
+          eval "$(luarocks path --local --lua-version 5.1)"
+          secs=$(( ${{ inputs.hours }} * 3600 ))
+          echo "::notice::${{ inputs.name }} (BitBot) joining $BOT_HOST:$BOT_PORT for ${{ inputs.hours }}h"
+          set -o pipefail
+          # Runs until killed; 124 from `timeout` is this working, not failing.
+          timeout "$secs" luajit bot/playBot.lua "$BOT_HOST" "$BOT_PORT" '${{ inputs.name }}' 4 12 survival \
+            2>&1 | tee bot-prod-smoke.log || [ $? -eq 124 ]
+
       - name: Summary
         if: always()
         run: |
@@ -281,6 +334,7 @@ jobs:
             echo '```'
             tail -n 40 bot-prod-smoke.log || echo "(no log produced)"
             echo '```'
+            if [ -f bitbot-mind.log ]; then echo '### BitBot mind'; echo '```'; tail -n 40 bitbot-mind.log; echo '```'; fi
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload log
@@ -288,8 +342,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: bot-prod-smoke-log
-          path: bot-prod-smoke.log
+          path: |
+            bot-prod-smoke.log
+            bitbot-mind.log
 
       - name: Fail if the run failed
-        if: steps.smoke.outcome == 'failure' || steps.largegarbage.outcome == 'failure' || steps.live.outcome == 'failure'
+        if: steps.smoke.outcome == 'failure' || steps.largegarbage.outcome == 'failure' || steps.live.outcome == 'failure' || steps.bitbot.outcome == 'failure'
         run: exit 1

@@ -9,7 +9,7 @@
 -- the timers, the garbage already queued. Not the rows the generator has not
 -- shown yet, and not the colours garbage will break into.
 --
---   local link = require("bot.SurvivalLink").new({ port = 47777 })
+--   local link = require("bot.SurvivalLink").new({ port = 47777 })   -- or PA_SURVIVOR_PORT / PA_SURVIVOR_HOST
 --   link:startMatch(stack)            -- once per match
 --   local char = link:input(stack, match.garbageSources[stack])   -- every frame, before it is run
 local socket = require("socket")
@@ -118,7 +118,7 @@ end
 function SurvivalLink.new(opts)
   opts = opts or {}
   local self = setmetatable({}, SurvivalLink)
-  self.host = opts.host or "127.0.0.1"
+  self.host = opts.host or os.getenv("PA_SURVIVOR_HOST") or "127.0.0.1"
   self.port = opts.port or tonumber(os.getenv("PA_SURVIVOR_PORT") or "") or 47777
   -- How long a frame waits for its answer before holding instead.
   self.waitSec = opts.waitSec or tonumber(os.getenv("PA_SURVIVOR_WAIT") or "") or 0.010

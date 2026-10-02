@@ -1,49 +1,121 @@
 name: Bot Prod Smoke Test (LIVE SERVER)
+# The run list shows what each run was, e.g. "live · beta · SirBonksALot".
+run-name: "${{ inputs.mode }} · ${{ inputs.server }}${{ inputs.mode == 'live' && format(' · {0}', inputs.name) || inputs.mode == 'fight' && format(' · {0} ({1}) vs {2}', inputs.name, inputs.bot, inputs.opponent) || '' }}"
 
-# Manual-only. Connects to the REAL self-hosted production server (default
-# 104.156.250.136:49569) with two throwaway bot accounts that create a PRIVATE
-# room and challenge only each other -- never the public lobby queue, never
-# ranked (BotClient never sets wantsRanked) -- so no real player can ever be
-# matched with them and the leaderboard is never touched. Runs at real 60Hz
-# pace (no PA_FAST), same load profile as one human playing one bot.
+# Manual-only. Three things, picked with `mode`:
 #
-# This is a connectivity/regression smoke test (does the bot still log in,
-# join a room, and finish a match against the deployed server?), not a
-# benchmark -- see bot/BENCHMARK.md for the seed-averaged ceiling numbers,
-# which are measured locally.
+#   live           ONE bot under a real name sits in a server's lobby and
+#                  auto-accepts challenges, so a person can play it. Unranked,
+#                  always. Stays up for `hours`. `server` is one of two:
+#                    104.156.250.136:49569           this repo's server
+#                    betaserver.panelattack.com:59569 upstream Panel Attack's
+#                            beta server; the bot runs on upstream's latest
+#                            code with its bot/ added
+#   fight          pick who plays who on 104.156.250.136 (bot/fight.sh): `bot`
+#                  sits in the lobby as `name`; `opponent` logs in as `name`2
+#                  and challenges it, rematching for `hours` -- or, as "you",
+#                  nobody does and you challenge it. Roster: bitbot (GameCreator's
+#                  BitBot, its latest main, pre-flighted before it goes live),
+#                  beverly, plamp, heuristic.
+#   prod-vs        smoke test: two throwaway bots play `matches` games against
+#                  each other in a PRIVATE room on 104.156.250.136; no player
+#                  can join, nothing is ranked
+#   large-garbage  offline benchmark on the runner, no server contact:
+#                  survival vs 6x12 garbage blocks over `matches` seeds
+#
+# The inputs below are in the order you would fill them in; each one says
+# which mode it is for. Leave the rest alone.
 on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'What to run'
-        required: false
-        default: 'prod-vs'
+        description: 'What to run: live = a bot in the lobby for people to play; fight = pick who plays who (bot and opponent below); prod-vs = bot-vs-bot smoke test; large-garbage = offline benchmark'
+        required: true
+        default: 'live'
         type: choice
         options:
-          - prod-vs          # bot-vs-bot matches on the live server
-          - large-garbage    # offline survival vs the "large_garbage" training preset (6x12 blocks); no server contact
+          - live
+          - fight
+          - prod-vs
+          - large-garbage
+      server:
+        description: 'live: which server the bot joins'
+        required: true
+        default: '104.156.250.136:49569'
+        type: choice
+        options:
+          - 104.156.250.136:49569
+          - betaserver.panelattack.com:59569
+      name:
+        description: 'live: the bot''s name in the lobby (letters, digits, _; 16 max). Reusing a name logs into the same account'
+        required: false
+        default: 'Beverly'
+      hours:
+        description: 'live: how long it stays in the lobby, 1-5 hours (cancel the run to stop it sooner)'
+        required: false
+        default: '5'
+      bot:
+        description: 'fight: who sits in the lobby as `name`'
+        required: false
+        default: 'bitbot'
+        type: choice
+        options:
+          - bitbot
+          - beverly
+          - plamp
+          - heuristic
+      opponent:
+        description: 'fight: who challenges it as `name`2, over and over -- or "you" to leave it waiting for people'
+        required: false
+        default: 'you'
+        type: choice
+        options:
+          - you
+          - bitbot
+          - beverly
+          - plamp
+          - heuristic
+      profile:
+        description: 'live: which trained bot to play as (a file in bot/profiles/)'
+        required: false
+        default: 'bot/profiles/beverly.json'
       matches:
-        description: 'prod-vs: number of matches (~2.5 min worst-case each). large-garbage: number of seeds.'
+        description: 'prod-vs: games to play (~2.5 min each). large-garbage: seeds to run'
         required: false
         default: '3'
-      ip:
-        description: 'Server IP'
-        required: false
-        default: '104.156.250.136'
-      port:
-        description: 'Server port'
-        required: false
-        default: '49569'
       difficulty:
-        description: 'Bot difficulty/level (1-10ish)'
+        description: 'prod-vs / large-garbage: bot difficulty'
         required: false
         default: 'hard'
+      upstream_ref:
+        description: 'Advanced, betaserver only: run the bot on this upstream commit/tag/branch instead of the latest beta. Only needed if the server is not on latest beta'
+        required: false
+        default: ''
+
+# The beta server runs UPSTREAM Panel Attack, whose protocol differs from the
+# fork's (lockstep: each client simulates both stacks from relayed inputs; no
+# garbage/death/display messages). Its bot lives in bot/ on this branch of
+# THIS repo, built to run on an unmodified upstream checkout:
+env:
+  # The two servers `server` offers; the beta one runs upstream's protocol.
+  BETA_SERVER: betaserver.panelattack.com:59569
+  UPSTREAM_REPO: https://github.com/panel-attack/panel-game.git
+  UPSTREAM_REF: beta
+  # If whoever deploys the beta server moves this tag in the upstream repo to
+  # the deployed commit, runs use exactly that build (see the fetch step).
+  UPSTREAM_DEPLOYED_TAG: betaserver-live
+  UPSTREAM_BOT_REF: claude/game-bot-creation-action-0e7emk
 
 jobs:
   bot-vs-bot:
-    name: Bot vs bot on live server
+    name: Run the bot
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # A beta-server run commits a newly registered bot's account id back to
+    # UPSTREAM_BOT_REF so the name can be reused (see "Save the account id").
+    permissions:
+      contents: write
+    # Under the 6-hour hard cap so a `live` session stops on our timeout.
+    timeout-minutes: 355
     steps:
       - uses: actions/checkout@v4
 
@@ -58,6 +130,61 @@ jobs:
           luarocks install --local luafilesystem --lua-version 5.1
           luarocks install --local luautf8 --lua-version 5.1
 
+      # Where the bot runs and what it connects to: this checkout for this
+      # repo's server; a fresh upstream checkout (next steps) for the beta one.
+      - name: Pick the server
+        run: |
+          set -eu
+          server='${{ inputs.server }}'
+          if [ "$server" = "$BETA_SERVER" ]; then
+            [ '${{ inputs.mode }}' = live ] || { echo "$BETA_SERVER is only for mode: live"; exit 1; }   # bitbot: the fork's client only
+            dir="$GITHUB_WORKSPACE/upstream"
+          else
+            dir="$GITHUB_WORKSPACE"
+          fi
+          { echo "BOT_DIR=$dir"; echo "BOT_HOST=${server%%:*}"; echo "BOT_PORT=${server##*:}"; } >> "$GITHUB_ENV"
+          echo "::notice::${{ inputs.mode }} on $server"
+
+      # THE SERVER'S OWN BUILD, AS NEAR AS CAN BE KNOWN. Nothing of upstream is
+      # vendored here: every run fetches upstream and drops this repo's bot/ on
+      # top, so the bot runs the server's engine without anyone merging
+      # updates. bot/ touches nothing outside itself.
+      #
+      # WHICH upstream: the server does not report its build (the version check
+      # answers only yes/no, the login carries no commit) and upstream has no
+      # deploy workflow to read it from, so, in order:
+      #   1. the upstream_ref input, if given -- an exact pin;
+      #   2. the UPSTREAM_DEPLOYED_TAG tag, if it exists -- moved on deploy;
+      #   3. the latest UPSTREAM_REF -- right whenever the server was deployed
+      #      from beta's head, which is the normal case.
+      - name: Check out the upstream bot
+        if: inputs.server == env.BETA_SERVER
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.UPSTREAM_BOT_REF }}
+          path: botsrc
+          sparse-checkout: bot
+
+      - name: Fetch upstream Panel Attack and add the bot
+        if: inputs.server == env.BETA_SERVER
+        env:
+          PIN: ${{ inputs.upstream_ref }}
+        run: |
+          set -eu
+          if [ -n "$PIN" ]; then
+            ref="$PIN"; why="pinned by the upstream_ref input"
+          elif git ls-remote --exit-code --tags "$UPSTREAM_REPO" "refs/tags/$UPSTREAM_DEPLOYED_TAG" >/dev/null; then
+            ref="refs/tags/$UPSTREAM_DEPLOYED_TAG"; why="the $UPSTREAM_DEPLOYED_TAG tag (the last deploy)"
+          else
+            ref="$UPSTREAM_REF"; why="latest $UPSTREAM_REF (no $UPSTREAM_DEPLOYED_TAG tag; assuming the server runs it)"
+          fi
+          git init -q upstream
+          git -C upstream fetch -q --depth 1 "$UPSTREAM_REPO" "$ref"
+          git -C upstream checkout -q FETCH_HEAD
+          echo "::notice::bot runs on upstream $(git -C upstream log -1 --format='%h %s') -- $why"
+          [ ! -e upstream/bot ] || { echo "upstream now has its own bot/ -- refusing to overwrite it"; exit 1; }
+          cp -r botsrc/bot upstream/bot
+
       - name: Run bot-vs-bot smoke test against the live server
         if: inputs.mode == 'prod-vs'
         id: smoke
@@ -65,7 +192,7 @@ jobs:
           eval "$(luarocks path --local --lua-version 5.1)"
           set -o pipefail
           luajit bot/winRateTest.lua "" "" \
-            "${{ inputs.matches }}" "${{ inputs.ip }}" "${{ inputs.port }}" "${{ inputs.difficulty }}" \
+            "${{ inputs.matches }}" "$BOT_HOST" "$BOT_PORT" "${{ inputs.difficulty }}" \
             2>&1 | tee bot-prod-smoke.log
         continue-on-error: true
 
@@ -83,15 +210,144 @@ jobs:
             2>&1 | tee bot-prod-smoke.log
         continue-on-error: true
 
+      # LIVE IS NOT THE SMOKE TEST. prod-vs logs in two throwaway accounts,
+      # puts them in a PRIVATE room against each other and leaves. This logs
+      # in ONE bot under a real name and keeps it up, so a human can find it
+      # in the lobby and play it.
+      #
+      # A job is capped at 6 hours, so it is a session rather than a service:
+      # re-run it, or run bot/beverly.sh on the server box under systemd for
+      # something permanent.
+      - name: Check the name and the weight set before connecting
+        if: inputs.mode == 'live'
+        run: |
+          set -eu
+          cd "$BOT_DIR"
+          n='${{ inputs.name }}'
+          [ -n "$n" ] || { echo "name is empty"; exit 1; }
+          [ ${#n} -le 16 ] || { echo "name '$n' is ${#n} chars; the server limit is 16"; exit 1; }
+          [ -f '${{ inputs.profile }}' ] || { echo "no weight set at ${{ inputs.profile }}"; exit 1; }
+          eval "$(luarocks path --local --lua-version 5.1)"
+          luajit -e 'package.path="./?.lua;"..package.path; require("bot.headlessBoot");
+            local b=require("bot.WeightedBrain").new({profile="${{ inputs.profile }}"})
+            print(string.format("%s loads: depth %d beam %d rise %s reaction %d",
+              "${{ inputs.profile }}", b.depth, b.beam, tostring(b.rise), b.reaction))'
+
+      # SAME NAME, SAME ACCOUNT, EVERY RUN. A runner starts with no
+      # bot/identities file, so without this every dispatch registers the name
+      # afresh -- and the second dispatch of a name is denied as taken. So the
+      # id is not stored: it is DERIVED from the name (lowercased) and the
+      # server ip, and the same name always yields the same id. The first run
+      # registers the name under it (the server accepts a well-formed
+      # client-supplied id for a free name); every later run logs back in.
+      # Deliberately not secret: these are bot accounts, and anyone who
+      # derives the id can log in as the bot, which is fine. Names registered
+      # before this existed hold a random id nobody kept and cannot be reused.
+      # Fork only: upstream never accepts a client-chosen id (it always assigns
+      # one), so a beta bot keeps its name by saving the id it was given
+      # instead -- see "Save the account id".
+      - name: Derive this name's account id
+        if: inputs.mode == 'live' && inputs.server != env.BETA_SERVER
+        env:
+          BASE_NAME: ${{ inputs.name }}
+          BOT_IP: ${{ env.BOT_HOST }}
+        run: |
+          names="$BASE_NAME"
+          mkdir -p bot/identities
+          for BOT_NAME in $names; do
+            id=$(BOT_NAME="$BOT_NAME" python3 -c '
+          import hashlib, os
+          msg = (os.environ["BOT_IP"] + "/" + os.environ["BOT_NAME"].lower()).encode()
+          print("1" + str(int(hashlib.sha256(msg).hexdigest(), 16) % 10**18).zfill(18))')
+            printf '%s' "$id" > "bot/identities/${BOT_NAME}_${BOT_IP}.txt"
+            echo "'$BOT_NAME' logs in with account id $id (same name, same account, every run)"
+          done
+
+      - name: Sit in the lobby
+        if: inputs.mode == 'live'
+        id: live
+        env:
+          PA_SEARCH_PROFILE: ${{ inputs.profile }}
+        run: |
+          eval "$(luarocks path --local --lua-version 5.1)"
+          secs=$(( ${{ inputs.hours }} * 3600 ))
+          echo "::notice::${{ inputs.name }} joining $BOT_HOST:$BOT_PORT for ${{ inputs.hours }}h"
+          cd "$BOT_DIR"
+          set -o pipefail
+          # The bot runs until killed, so the timeout IS the stop condition:
+          # 124 from `timeout` is this working, not failing.
+          timeout "$secs" bot/plamp.sh "$BOT_HOST" "$BOT_PORT" '${{ inputs.name }}' \
+            2>&1 | tee "$GITHUB_WORKSPACE/bot-prod-smoke.log" || [ $? -eq 124 ]
+
+      # SAME NAME, SAME ACCOUNT on beta. Upstream hands a new name a random id
+      # at its first login; the bot writes it to bot/identities/, and this
+      # commits it to UPSTREAM_BOT_REF so the next run logs back in instead of
+      # being denied as "already taken". Not secret, on purpose: bot accounts.
+      - name: Save the account id
+        if: always() && inputs.server == env.BETA_SERVER
+        run: |
+          set -eu
+          f="bot/identities/${{ inputs.name }}_${BOT_HOST}.txt"
+          [ -f "upstream/$f" ] || { echo "no id to save"; exit 0; }
+          if [ -f "botsrc/$f" ] && cmp -s "upstream/$f" "botsrc/$f"; then echo "id already saved"; exit 0; fi
+          mkdir -p "botsrc/bot/identities"
+          cp "upstream/$f" "botsrc/$f"
+          cd botsrc
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$f"
+          git commit -m "bot: save account id for '${{ inputs.name }}' on $BOT_HOST"
+          for i in 1 2 3; do
+            git push origin "HEAD:$UPSTREAM_BOT_REF" && exit 0
+            git pull --rebase origin "$UPSTREAM_BOT_REF"
+          done
+          exit 1
+
+      # BITBOT. GameCreator's BitBot (games/the-game/ai/eval/bitbot.js, its
+      # latest main, unchanged) plays through bot/bitbot_link.js: each frame
+      # the client sends the server's board, BitBot's own update() runs on
+      # it, and the keys it presses -- its walk, its swaps, its raise latch --
+      # are the frame's input. Nothing else decides or presses for it.
+      - name: Check out GameCreator (BitBot)
+        if: inputs.mode == 'fight' && (inputs.bot == 'bitbot' || inputs.opponent == 'bitbot')
+        uses: actions/checkout@v4
+        with:
+          repository: briankeegan/GameCreator
+          path: GameCreator
+          sparse-checkout: games/the-game
+
+      - uses: actions/setup-node@v4
+        if: inputs.mode == 'fight' && (inputs.bot == 'bitbot' || inputs.opponent == 'bitbot')
+        with:
+          node-version: '22'
+
+      # FIGHT: bot/fight.sh does it all -- accounts, BitBot's link and its
+      # pre-flight when BitBot plays (nothing joins the lobby if that fails),
+      # then `bot` in the lobby and `opponent` challenging it.
+      - name: Fight
+        if: inputs.mode == 'fight'
+        id: fight
+        env:
+          GC_EVAL_DIR: ${{ github.workspace }}/GameCreator/games/the-game/ai/eval
+        run: |
+          eval "$(luarocks path --local --lua-version 5.1)"
+          [ "$BOT_HOST" != "$BETA_SERVER" ] && [ "${BOT_HOST}:${BOT_PORT}" != "$BETA_SERVER" ] || { echo "fight plays the fork's server only"; exit 1; }
+          if [ -d GameCreator ]; then echo "::notice::BitBot from GameCreator $(git -C GameCreator log -1 --format='%h %s')"; fi
+          echo "::notice::${{ inputs.name }} (${{ inputs.bot }}) vs ${{ inputs.opponent }} on $BOT_HOST:$BOT_PORT for ${{ inputs.hours }}h"
+          set -o pipefail
+          bot/fight.sh "$BOT_HOST" "$BOT_PORT" $(( ${{ inputs.hours }} * 3600 )) '${{ inputs.bot }}' '${{ inputs.name }}' '${{ inputs.opponent }}' \
+            2>&1 | tee bot-prod-smoke.log
+
       - name: Summary
         if: always()
         run: |
           {
-            echo "## Bot Smoke Test (${{ inputs.mode }}) — ${{ inputs.ip }}:${{ inputs.port }}"
+            echo "## Bot (${{ inputs.mode }}) — ${{ inputs.server }}"
             echo ""
             echo '```'
             tail -n 40 bot-prod-smoke.log || echo "(no log produced)"
             echo '```'
+            if [ -f bitbot-mind.log ]; then echo '### BitBot mind'; echo '```'; tail -n 40 bitbot-mind.log; echo '```'; fi
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload log
@@ -99,8 +355,12 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: bot-prod-smoke-log
-          path: bot-prod-smoke.log
+          path: |
+            bot-prod-smoke.log
+            bitbot-mind.log
+            bitbot-preflight.log
+            fight-*.log
 
-      - name: Fail if the smoke test failed
-        if: steps.smoke.outcome == 'failure' || steps.largegarbage.outcome == 'failure'
+      - name: Fail if the run failed
+        if: steps.smoke.outcome == 'failure' || steps.largegarbage.outcome == 'failure' || steps.live.outcome == 'failure' || steps.fight.outcome == 'failure'
         run: exit 1

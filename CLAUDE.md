@@ -54,6 +54,25 @@ Run server first, then client. Client connects to localhost automatically on thi
 
 **First time:** Set a player name in-game (Main Menu → Set Name) before connecting.
 
+**Bot tests, headless, on Linux (a sandbox or a runner):** `run_server_tests.sh`
+is zsh-and-macOS. The bot verifiers run straight from `luajit` once the paths
+are set, and every one of them needs `bot/headlessBoot`, which pulls in
+`socket`, `lua-utf8` and `lfs`:
+
+```sh
+apt-get install -y luajit luarocks
+luarocks --lua-version 5.1 install luautf8
+luarocks --lua-version 5.1 install luafilesystem
+LUA_PATH="./?.lua;./common/lib/?.lua;/usr/local/share/lua/5.1/?.lua;;" \
+LUA_CPATH="./common/lib/?.so;./common/lib/?/?.so;/usr/local/lib/lua/5.1/?.so;;" \
+  luajit bot/tests/decisionVerify.lua
+```
+
+The bundled `common/lib/socket` is Linux-compiled, so it loads here and is
+the one that needs the `?/?.so` entry. `common/lib` is not on the default
+path — without it `require("socket")` fails while the file is sitting right
+there.
+
 ### Common Issues
 - `love: command not found` — love not in PATH, add to `~/.zshrc`
 - `slice is not valid mach-o file` — bundled `.so` files are Linux-compiled; install the luarocks equivalents above
@@ -111,6 +130,74 @@ journalctl -u panel-attack         # full history
 - Tests are wired into `testLauncher.lua` and also run on server startup
 - No environment variables for config — everything in `server/server_globals.lua`
 - Data files (`PADatabase.sqlite3`, `players.txt`, etc.) are gitignored — auto-created on first run
+
+## Putting a bot on the live server
+
+**This sandbox cannot reach `104.156.250.136:49569`. A GitHub runner can.**
+Every route to the live server goes through Actions, so "unreachable from
+here" is never the answer — check the workflows first.
+
+- **`workflow_dispatch` only registers workflows that exist on the default
+  branch, which is `beta`.** A new workflow file on a feature branch cannot
+  be triggered at all: the dispatch API returns 404 and the file looks fine.
+  A registered workflow, though, runs whatever content is on the ref you
+  dispatch — so a new mode goes INTO an existing registered workflow rather
+  than into a new file. `bot-prod-smoke-test.yml` is the registered one.
+- `mode: live` puts ONE bot in the lobby under a real name and keeps it
+  there, so a human can find it and play it. `mode: prod-vs` is a different
+  thing: two throwaway accounts in a PRIVATE room against each other, which
+  no player can join. Dispatch `live` with `ref: bramp/multi-player`.
+- **A job is capped at 6 hours, so `live` is a session, not a service.**
+  Re-dispatch to bring the bot back. For something permanent, run
+  `bot/beverly.sh` on the server box under systemd or tmux — it runs until
+  killed. `deploy-server.yml` is the SSH route to that box and needs the
+  `VULTR_SSH_KEY` secret; it also lives only on this branch, so it is not
+  dispatchable either until it reaches `beta`.
+- **`bot/winRateTest.lua` is not a way to run a named bot.** It hardcodes
+  the account names `wH…`/`wJ…` and runs `brain = "search"`, so handing it a
+  PanelEval weight set runs the wrong brain under the wrong name. The live
+  path is `bot/playBot.lua … weighted`, which `bot/plamp.sh` wraps.
+- A weight set is only a bot when paired with the switches it was found
+  under, so `bot/profiles/*.json` carries `depth`, `beam`, `rise`,
+  `reaction` and `density` alongside the weights, and `WeightedBrain` reads
+  them from there. `bot/beverly.sh` and `bot/plamp.sh` differ only in the
+  profile and the name; both hand off to one launcher.
+- Check the name length (16 chars, server limit) and that the profile file
+  exists BEFORE connecting. A rejected name and a missing weight set both
+  look identical to "the bot never showed up" three hours later.
+- **A name keeps one account across `live` runs.** The workflow derives the
+  account id from the name and the server ip (not secret, on purpose: these
+  are bot accounts), so re-dispatching a name logs back into the same
+  account instead of being denied as "already taken". Names registered
+  before this existed hold a random id nobody kept — pick a new name.
+- **`server` is one of two addresses.** `104.156.250.136:49569` is this
+  repo's server. `betaserver.panelattack.com:59569` is UPSTREAM Panel Attack's
+  beta server, whose protocol is lockstep, so it is a different client: it
+  lives in `bot/` on `claude/game-bot-creation-action-0e7emk` (see its
+  `bot/README.md`). Each run fetches upstream and drops that `bot/` on top,
+  so it runs the server's engine. The server does not report its build, so
+  the run uses the `upstream_ref` input if set, else upstream's
+  `betaserver-live` tag if it exists (move it to the deployed commit on each
+  deploy to make this exact), else the latest `beta`.
+  Upstream assigns account ids itself, so the run commits a new name's id
+  back to that branch; the next run logs back in.
+
+## Who fights who: `bot/fight.sh` / `mode: fight`
+
+Pick any bot for each side; both play on the fork's server, unranked.
+
+- Workflow: `bot-prod-smoke-test.yml`, `mode: fight`, `ref: bramp/multi-player`.
+  `bot` = who sits in the lobby as `name`; `opponent` = `you` (a human
+  challenges it) or another bot, which logs in as `<name>2` and keeps
+  challenging it until `hours` run out.
+- Roster (either side): `bitbot` (GameCreator's BitBot, latest `main` every
+  run, via `bot/bitbot_link.js`), `beverly`, `plamp` (weighted profiles),
+  `heuristic` (the original bot). Same bot on both sides is fine (self-play).
+- Locally: `bot/fight.sh HOST PORT SECONDS BOT NAME [OPPONENT [OPPONENT_NAME]]`,
+  e.g. `GC_EVAL_DIR=<GameCreator>/games/the-game/ai/eval bot/fight.sh localhost 49569 600 bitbot BitBot beverly`.
+- Anything with BitBot plays a 30 s offline pre-flight first and never joins
+  the lobby if the hookup is broken (late answers, no swaps, or a stack call
+  `bitbot_link.js` cannot relay).
 
 ## Self-Hosting
 See `docs/SelfHosting.md` for full Hetzner VPS setup guide.

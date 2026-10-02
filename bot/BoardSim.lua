@@ -180,6 +180,37 @@ local function labelGarbage(g, rows)
 end
 
 -- any garbage on the grid? (early-exit scan)
+-- ONE ROW OF RISE, in place. Everything shifts up a row, the dimmed row under
+-- the stack becomes row 1, and whatever is pushed past the top is gone.
+--
+-- Overflow only happens on a board already touching the ceiling, where the
+-- real engine has stopped rising anyway (rise lock / stop time, and topping
+-- out costs health instead) -- a state the search reaches only when the game
+-- is already being lost, and one maxHeight has been shouting about for
+-- several rows.
+--
+-- `nextRow[c]` is the colour the engine has already dealt into row 0 and drawn
+-- on screen: visible information, not a guess. A column it does not name
+-- arrives as RESOLVING -- occupied, immovable, unmatchable -- which is what
+-- "something is there and its colour is not knowable" has to mean to a search.
+function BoardSim.rise(g, rows, nextRow)
+  local reveal = g.reveal
+  for r = rows, 2, -1 do
+    local src, dst = g[r - 1], g[r]
+    for c = 1, WIDTH do dst[c] = src[c] end
+    if reveal then
+      local rsrc, rdst = reveal[r - 1], reveal[r]
+      for c = 1, WIDTH do rdst[c] = rsrc and rsrc[c] or nil end
+    end
+  end
+  for c = 1, WIDTH do
+    local v = nextRow and nextRow[c]
+    g[1][c] = (type(v) == "number" and v > 0) and v or RESOLVING
+    if reveal and reveal[1] then reveal[1][c] = nil end
+  end
+  return g
+end
+
 function BoardSim.hasGarbage(g, rows)
   for r = 1, rows do
     for c = 1, WIDTH do if isGarbage(g[r][c]) then return true end end
@@ -255,7 +286,7 @@ function BoardSim.applyGravity(g, rows)
 end
 
 -- resolve a grid to quiescence (mutates g) -> chainDepth, totalCleared, firstClear,
--- garbageCleared. Faithful garbage break (engine: matchGarbagePanels/convertGarbage
+-- garbageCleared, sizes (panels cleared per link, in link order). Faithful garbage break (engine: matchGarbagePanels/convertGarbage
 -- Panels): a garbage block orthogonally adjacent to a clearing match has its ENTIRE
 -- BOTTOM ROW converted to panels and the block shrinks by one row (upper rows stay
 -- garbage). Revealed colors are the real engine reveal colors when BoardState
@@ -265,6 +296,10 @@ end
 function BoardSim.resolve(g, rows, maxLinkCap)
   local reveal = g.reveal
   local chain, total, firstClear, garbageCleared = 0, 0, 0, 0
+  -- PER-LINK PANELS CLEARED, in link order. EvalEarned prices a move off this:
+  -- COMBO_GARBAGE is indexed by the size of EACH link, so one total cannot
+  -- stand in for the list -- 4+4 sends twice what a single 8 does.
+  local sizes = {}
   BoardSim.applyGravity(g, rows)   -- SETTLE FIRST: a swap can empty a cell so the real match only forms after the panel above falls. The engine settles then matches; matching the un-fallen grid MISSED real clears (verified bot/tests/boardSimVerify.lua swap 2,3). No-op when already settled.
   while true do
     local hit, any = BoardSim.findMatches(g, rows)
@@ -301,7 +336,12 @@ function BoardSim.resolve(g, rows, maxLinkCap)
       for _, cell in ipairs(comps[cid]) do
         local r, c = cell[1], cell[2]
         if r == minRow then
-          g[r][c] = (reveal and reveal[r][c]) or 0 -- real color if known, else empty
+          -- A BROKEN GARBAGE CELL IS STILL A CELL. Known reveal colour when
+          -- BoardState captured one; otherwise RESOLVING -- occupied, immovable
+          -- and unmatchable. Not empty: the row does not vanish when a block
+          -- breaks, it becomes panels, and calling it air tells the search the
+          -- stack got six cells shorter and that everything above it falls.
+          g[r][c] = (reveal and reveal[r][c]) or RESOLVING
           if reveal then reveal[r][c] = nil end
           garbageCleared = garbageCleared + 1
         end
@@ -309,6 +349,7 @@ function BoardSim.resolve(g, rows, maxLinkCap)
     end
 
     total = total + n
+    sizes[chain] = n
     if chain == 1 then firstClear = n end
     BoardSim.applyGravity(g, rows)
     -- "DEEP-CHAIN PHANTOM" (2026-07): a prior investigation believed deep links (3+) diverge from the engine
@@ -323,7 +364,7 @@ function BoardSim.resolve(g, rows, maxLinkCap)
     local maxlink = tonumber(os.getenv("PA_MAXLINK")) or maxLinkCap
     if maxlink and chain >= maxlink then break end
   end
-  return chain, total, firstClear, garbageCleared
+  return chain, total, firstClear, garbageCleared, sizes
 end
 
 -- lowest row that holds any garbage (0 if none). The dig has to happen at/below
@@ -647,12 +688,12 @@ function BoardSim.simSwap(grid, rows, r, c, maxLinkCap)
   -- a swap off the board (row past the top / col out of range) is a NO-OP, not a crash. The build planner
   -- (deepFit/EnvelopeBrain) can emit r > rows on a full/near-full board; guard so the bot doesn't die on it.
   if not grid or not r or not c or r < 1 or r > rows or c < 1 or c >= WIDTH or not grid[r] then
-    return grid, 0, 0, nil, 0
+    return grid, 0, 0, nil, 0, {}
   end
   local g = BoardSim.cloneGrid(grid, rows)
   g[r][c], g[r][c + 1] = g[r][c + 1], g[r][c]
-  local chain, total, firstClear, garbageCleared = BoardSim.resolve(g, rows, maxLinkCap)
-  return g, chain, total, firstClear, garbageCleared
+  local chain, total, firstClear, garbageCleared, sizes = BoardSim.resolve(g, rows, maxLinkCap)
+  return g, chain, total, firstClear, garbageCleared, sizes
 end
 
 

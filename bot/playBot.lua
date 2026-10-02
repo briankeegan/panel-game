@@ -19,16 +19,17 @@ local port = tonumber(arg[2]) or 49569
 local name = arg[3] or "PanelBot"
 local cursorInterval = tonumber(arg[4]) -- frames between cursor moves/swaps; nil = full speed
 local reactionFrames = tonumber(arg[5]) -- reaction-cap frames; nil = full speed
-local brain = arg[6] or "heuristic"     -- "heuristic" | "search" | "expert"
+local brain = arg[6] or "heuristic"     -- "heuristic" | "search" | "expert" | "weighted" | "survival"
 local cursorSpeed = (cursorInterval or reactionFrames)
   and { cursorMoveInterval = cursorInterval or 8, reactionFrames = reactionFrames or 3 } or nil
 
--- PA_SEARCH_PROFILE=bot/profiles/<player>.json conditions the search eval per
--- player (Phase B); ignored unless brain == "search".
+-- PA_SEARCH_PROFILE=bot/profiles/<file>.json names the weight set. For
+-- brain == "weighted" that is a bot/PanelEval.lua weight set (default
+-- bot/profiles/trained.json when unset).
 local bot = BotClient({
   ip = ip, port = port, name = name, cursorSpeed = cursorSpeed,
   brain = brain,
-  searchProfile = (brain == "search") and os.getenv("PA_SEARCH_PROFILE") or nil,
+  searchProfile = (brain == "search" or brain == "weighted") and os.getenv("PA_SEARCH_PROFILE") or nil,
 })
 
 if not bot:login() then print("login failed"); os.exit(1) end
@@ -41,8 +42,30 @@ bot:leaveRoom()
 
 local speedDesc = cursorSpeed and string.format("cursor %d/%d", cursorSpeed.cursorMoveInterval, cursorSpeed.reactionFrames) or "full speed"
 print(string.format(
-  "\n=== Bot '%s' (%s, L%d, %s) is idle in the lobby on %s ===\n    Open your client, CHALLENGE '%s' in the lobby, and play — it auto-accepts.\n    Ctrl+C to stop.\n",
-  name, brain, bot.level, speedDesc, ip, name))
+  "\n=== Bot '%s' (%s, L%d, %s, %s) is idle in the lobby on %s ===\n    Open your client, CHALLENGE '%s' in the lobby, and play — it auto-accepts.\n    Ctrl+C to stop.\n",
+  name, brain, bot.level, speedDesc, bot.ranked and "RANKED" or "unranked", ip, name))
+
+-- PA_CHALLENGE=<name>: also CHALLENGE that player whenever both sides are in
+-- the lobby (it auto-accepts if it is a bot like this one), so two bots play
+-- each other for as long as they run -- BitBot's self-play. Unset: the bot
+-- only waits to be challenged, as always.
+local challengeName = os.getenv("PA_CHALLENGE")
+if challengeName == "" then challengeName = nil end
+local lastChallengeAt = 0
+local function challengeIfFree()
+  if not challengeName or bot.inRoom or bot.match or not bot.lobby or not bot.lobby.players then return end
+  local now = socket.gettime()
+  if now - lastChallengeAt < 3 then return end
+  for _, p in pairs(bot.lobby.players) do
+    if p.name == challengeName and p.state == "lobby" then
+      lastChallengeAt = now
+      bot.gameplay:sendRequest(require("common.network.ClientProtocol").updateChallengeStatus(
+        bot.publicId, p.publicId, require("common.data.GameModes").IDs.TWO_PLAYER_VS, true))
+      return
+    end
+  end
+end
+if challengeName then print("    and challenging '" .. challengeName .. "' whenever both are in the lobby.\n") end
 
 local function playerCount()
   local n = 0
@@ -59,6 +82,7 @@ local lastReadyAt = 0
 
 while true do
   bot:pump()
+  challengeIfFree()
 
   -- (Re)ready ~every 1.5s while we're in the room with an opponent and no match
   -- is pending/running. Retrying (not single-shot) survives the post-match room

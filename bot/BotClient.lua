@@ -68,8 +68,12 @@ local BotClient = class(function(self, opts)
   self.ip = opts.ip or "127.0.0.1"
   self.port = opts.port or 49569
   self.name = opts.name or "BotBella"
-  self.brainKind = opts.brain or "heuristic"   -- "heuristic"|"random"|"expert"|"search"
-  self.searchProfile = opts.searchProfile       -- optional per-player eval weights (brain == "search")
+  -- "weighted" is the evaluator brain (bot/WeightedBrain.lua): weights a
+  -- search FOUND, scoring the board a move leaves. Anything else that is not
+  -- "random" gets EnvelopeBrain, the shape-catalog brain, which is what every
+  -- name here used to mean -- brainKind was declared and then never read.
+  self.brainKind = opts.brain or "heuristic"   -- "heuristic"|"random"|"expert"|"search"|"weighted"|"survival"
+  self.searchProfile = opts.searchProfile       -- weight-set path for brain == "weighted" (bot/profiles/*.json)
   self.cursorSpeed = opts.cursorSpeed -- { cursorMoveInterval, reactionFrames } direct knobs; nil = full speed
   self.gameplay = TcpClient({ name = "bot-gameplay", defaultPort = self.port })
   -- Persisted server identity so re-runs reuse the same account instead of
@@ -88,6 +92,10 @@ local BotClient = class(function(self, opts)
   -- levelData, which the opponent's character-select reads). Character/stage are
   -- random, like a default client.
   self.level = opts.level or 10 -- corpus + play target is L10
+  -- Ranked is a login setting like level and character, and the bot sets it
+  -- EXPLICITLY every time: at login and again on every ready. Off unless a
+  -- caller opts in -- a bot's games must never move anyone's rating.
+  self.ranked = opts.ranked == true
   local level = self.level
   self.playerStub = {
     hasLoaded = false,
@@ -98,7 +106,7 @@ local BotClient = class(function(self, opts)
       selectedCharacterId = consts.RANDOM_CHARACTER_SPECIAL_VALUE, characterId = nil,
       selectedStageId = consts.RANDOM_STAGE_SPECIAL_VALUE, stageId = nil,
       panelId = nil,
-      wantsReady = false, wantsRanked = false,
+      wantsReady = false, wantsRanked = self.ranked,
       inputMethod = "controller",
       endlessNoRaise = false,
     },
@@ -176,7 +184,7 @@ function BotClient:login()
       -- (ready_state_flash_root_cause); "__Random*" resolves to a bundled mod.
       consts.RANDOM_CHARACTER_SPECIAL_VALUE, nil, -- selected character (random), resolved
       consts.RANDOM_STAGE_SPECIAL_VALUE, nil,     -- selected stage (random), resolved
-      false,        -- ranked
+      self.ranked,  -- ranked (off by default; see the constructor)
       false)),       -- save replays publicly
     "login")
   if status ~= "received" then return false, "login " .. status end
@@ -336,6 +344,7 @@ function BotClient:sendReady()
   -- fields, no hand-rolled shape.
   self.playerStub.hasLoaded = true
   self.playerStub.settings.wantsReady = true
+  self.playerStub.settings.wantsRanked = self.ranked -- re-asserted on every ready, not just at login
   local menuState = ServerMessages.toServerMenuState(self.playerStub)
   self.gameplay:sendRequest(ClientProtocol.sendPlayerSettings(menuState))
 end
@@ -356,7 +365,21 @@ function BotClient:startMatch()
   -- the bot simulates an EMPTY board from frame 0 (no panels -> brain always
   -- WAITs -> cursor never moves -> the human sees a blank board).
   self.match:start()
-  if self.brainKind ~= "random" then
+  if self.brainKind == "survival" then
+    -- WasmSurvivor: the survival bot, a separate process (GameCreator's
+    -- survivor.js) that plans on this engine's rules and says what to press
+    -- every frame (bot/SurvivalLink.lua). Nothing is decided here.
+    self.survival = self.survival or require("bot.SurvivalLink").new({})
+    self.survival:startMatch(self.myStack)
+  elseif self.brainKind == "weighted" then
+    -- The evaluator brain. searchProfile names the weight set; nil takes
+    -- bot/profiles/trained.json, the set the cross-entropy search converged
+    -- on. Constructing it validates the weights, so a typo'd feature name
+    -- fails here rather than after a match has been played against nothing.
+    self.brain = require("bot.WeightedBrain").new({ profile = self.searchProfile })
+    self.controller = require("bot.CursorController").new(self.cursorSpeed)
+    self.boardState = require("bot.BoardState")
+  elseif self.brainKind ~= "random" then
     -- THE bot, full strength. EnvelopeBrain now plays online here (the only thing it needed
     -- from SearchBrain was this seat in the online-play loop).
     self.brain = require("bot.EnvelopeBrain").new({})
@@ -391,7 +414,9 @@ function BotClient:tickMatch()
   -- recorded death frame.
   if not stack:game_ended() then
     local char
-    if self.brain then
+    if self.survival then
+      char = self.survival:input(stack, self.match.garbageSources[stack])
+    elseif self.brain then
       local st = self.boardState.extract(stack)
       -- Only run the expensive per-move verify when the controller needs a NEW move; while it's mid-move (locked /
       -- draining) the lock completes through a WAIT, so re-deciding is wasted. ~10x fewer verifies -> the bot runs

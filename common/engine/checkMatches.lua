@@ -893,3 +893,12 @@ function Stack:clearChainingFlags()
     end
   end
 end
+
+-- THE PAYOUT TABLES, ON Stack. They are file-locals above because only this
+-- file awards them; they are published here because bot/EvalEarned.lua prices
+-- a candidate move in them, and a bot that retypes a payout table is a copy
+-- that goes stale in silence -- the score still moves, so the bot still looks
+-- like it works while it optimises a payout the game does not pay.
+Stack.COMBO_GARBAGE = COMBO_GARBAGE
+Stack.SCORE_COMBO_TA = SCORE_COMBO_TA
+Stack.SCORE_CHAIN_TA = SCORE_CHAIN_TA

@@ -352,24 +352,6 @@ function Room:getHeldSlots()
   return result
 end
 
----Reserve this leaver's slot so only they can reclaim it on rejoin — called
----from Server:handleLeaveRoom for a genuine pre-match leave, never for a
----mere connection drop (Server:closeConnection keeps the leaver's Player
----record seated in that case instead, so this never runs for it). Dynamic-
----roster and explicitly-open rooms skip reservation: their empty slots are
----first-come-first-served instead.
----@param leaver ServerPlayer
----@return boolean held true if the slot is now reserved for leaver's rejoin
-function Room:reserveSlotForRejoin(leaver)
-  if self:isDynamicRoster() or self.openRoom == true then
-    logger.info(self.roomNumber .. ": " .. leaver.name .. " left pre-match (open room, slot free for fcfs)")
-    return false
-  end
-  self.reservedSlots[leaver.publicPlayerID] = leaver.name
-  logger.info(self.roomNumber .. ": " .. leaver.name .. " left pre-match (slot reserved for rejoin)")
-  return true
-end
-
 ---@param player ServerPlayer
 ---@param slotNumber integer? requested slot (1..maxPlayers). For invite games
 ---  the inviter pre-picks the slot; this is how 2v2 "join purple" lands B at
@@ -1843,16 +1825,31 @@ function Room:handlePlayerDisconnect(sender, reason)
   end
 end
 
----Handle a player leaving or disconnecting mid-match: the room is voided
----and the match is aborted/finished for remaining players. A pre-match leave
----never reaches here — Server:handleLeaveRoom calls
----Room:reserveSlotForRejoin + Room:_removeFromPlayersAndAnnounce directly
----for that case. The leaver is removed from the room (the caller is
----responsible for sending them their own leaveRoom). Remaining players +
----spectators are notified via playerLeftRoom.
+---Handle a player leaving or disconnecting. If a match is in progress, the room is
+---voided and the match is aborted for remaining players. If no match is in progress,
+---the player is simply removed and the room stays open so they can rejoin from the
+---lobby. The leaver is removed from the room (the caller is responsible for sending
+---them their own leaveRoom). Remaining players + spectators are notified via
+---playerLeftRoom.
 ---@param leaver ServerPlayer the player who is leaving / disconnected
 ---@param reason string? human-readable reason (forwarded to remaining clients only when mid-game)
 function Room:voidByLeave(leaver, reason)
+  if not self.game then
+    -- Pre-match: leave the room open so others (or the leaver) can fill the slot.
+    -- Open rooms (dynamic-roster open FFA OR explicitly-flagged open team rooms)
+    -- are first-come-first-served; everyone else (classic invite rooms) reserves
+    -- the slot for the original leaver's rejoin.
+    local isOpenRoom = self:isDynamicRoster() or self.openRoom == true
+    if not isOpenRoom then
+      self.reservedSlots[leaver.publicPlayerID] = leaver.name
+      logger.info(self.roomNumber .. ": " .. leaver.name .. " left pre-match (slot reserved for rejoin)")
+    else
+      logger.info(self.roomNumber .. ": " .. leaver.name .. " left pre-match (open room, slot free for fcfs)")
+    end
+    self:_removeFromPlayersAndAnnounce(leaver)
+    return
+  end
+
   if self.voided then
     -- already void; just log and continue (subsequent leaver from a voided room)
     logger.debug(self.roomNumber .. ": voidByLeave called on already-voided room")

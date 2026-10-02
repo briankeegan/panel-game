@@ -2190,20 +2190,9 @@ function Server:handleLeaveRoom(player, reason)
       -- clears the slot in room.players and broadcasts playerLeftRoom. Without
       -- both, room.players keeps a stale entry — countPlayers() lies, minPlayers
       -- check passes, room stays "alive" with phantom occupants.
-      --
-      -- Reserve the leaver's slot before removing them so the playerLeftRoom
-      -- broadcast's heldSlots snapshot already reflects it. A fixed-roster
-      -- room is "not viable" the instant anyone leaves (isViable requires the
-      -- exact playerCount) — without the override below that would close the
-      -- room out from under the held seat before its owner could ever
-      -- reclaim it, so skip that close while the slot is held and someone is
-      -- still actually there to hold it open for.
-      local heldForRejoin = room:reserveSlotForRejoin(player)
       room:_removeFromPlayersAndAnnounce(player)
       player:removeFromRoom(room, reason)
-      if room:countPlayers() == 0 then
-        self:closeRoom(room, reason or "no players left")
-      elseif not heldForRejoin and not room:isViable() then
+      if not room:isViable() then
         self:closeRoom(room, reason or "no longer viable")
       else
         self:setLobbyChanged()

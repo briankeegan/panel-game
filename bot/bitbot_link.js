@@ -12,12 +12,12 @@
 //                server's board; it is rebuilt on pa-engine.js (the server's
 //                rules) and shown to BitBot as the panel-engine.js Stack it
 //                reads (pa-engine toPanelEngine), then BitBot.update() runs
-//   its keys     what it passes to stack.setInput -- cursor and raise -- is
-//                the frame's input
-//   its swaps    BitBot swaps by calling stack.tryQueueSwap() when its cursor
-//                arrives (panel-cpu.js driveWalk); that is pressed as the
-//                swap key this frame, and the answer it gets is the server's
-//                rules' own (pa-engine canSwapPanels at the cursor)
+//   its view     pa-engine's PA.view -- GameCreator's own hookup for a
+//                panel-engine bot on the server's rules: the board BitBot
+//                reads (with swapLatency 1), its setInput and tryQueueSwap
+//                going to the pa-engine stack of this frame's board
+//   its keys     whatever that stack recorded for the frame -- cursor, raise,
+//                and swap if pressed (answered by the server's rules)
 //
 // The reply is { clock, input } with input in the client's key bits:
 // Right 1, Left 2, Down 4, Up 8, Swap 16, Raise 32.
@@ -67,25 +67,29 @@ function Match(level) {
 }
 // One frame: BitBot plays it on the server's board; the keys it pressed come back.
 Match.prototype.frame = function (state) {
-  var t0 = Date.now();
+  var t0 = Date.now(), stats = this.stats;
   var truth = PA.fromLua(state, this.level, new PA.Unseen());
-  var view = PA.toPanelEngine(truth, PE);
-  var input = {}, swap = false, stats = this.stats;
+  // GameCreator's own hookup for a panel-engine bot on the server's rules
+  // (pa-engine PA.view, what its pa_drill.js and breaklive checks run): the
+  // board as BitBot reads it, swapLatency 1, and its input and swaps going
+  // to `truth` -- the pa-engine stack of the server's board this frame.
+  var view = PA.view(truth, PE);
+  var setInput = view.setInput, tryQueueSwap = view.tryQueueSwap;
   guard(view);
-  view.setInput = function (inp) { input = inp || {}; };
+  view.setInput = setInput;
   view.tryQueueSwap = function (row, col) {
-    var p1 = truth.panels[row] && truth.panels[row][col], p2 = truth.panels[row] && truth.panels[row][col + 1];
-    var ok = !!(p1 && p2 && truth.canSwapPanels(p1, p2)[0]) && row === view.curRow && col === view.curCol;
-    if (ok) { swap = true; stats.swaps++; } else stats.swapsRefused++;
+    var ok = tryQueueSwap.call(view, row, col);
+    if (ok) stats.swaps++; else stats.swapsRefused++;
     return ok;
   };
   if (!this.bot) this.bot = new BitBot(view, {});
   this.bot.stack = view;
   this.bot.update();
-  var bits = 0;
-  ['right', 'left', 'down', 'up', 'raise'].forEach(function (k) { if (input[k]) bits += BITS[k]; });
-  if (swap || input.swap) bits |= BITS.swap;
-  if (input.raise) stats.raiseFrames++;
+  // What this frame presses is what the pa-engine stack recorded, encoded as
+  // pa-engine encodes a frame's input (Stack:run: nextInput, and swap if
+  // pressed). Its bits are the client's: Right 1 Left 2 Down 4 Up 8 Swap 16 Raise 32.
+  var bits = (truth.nextInput || 0) | (truth.pressSwap ? BITS.swap : 0);
+  if (bits & BITS.raise) stats.raiseFrames++;
   stats.frames++;
   stats.maxMs = Math.max(stats.maxMs, Date.now() - t0);
   return { clock: truth.clock, input: bits };

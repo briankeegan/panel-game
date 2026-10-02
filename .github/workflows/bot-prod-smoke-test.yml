@@ -1,6 +1,6 @@
 name: Bot Prod Smoke Test (LIVE SERVER)
 # The run list shows what each run was, e.g. "live · beta · SirBonksALot".
-run-name: "${{ inputs.mode }} · ${{ inputs.server }}${{ (inputs.mode == 'live' || inputs.mode == 'bitbot') && format(' · {0}', inputs.name) || '' }}"
+run-name: "${{ inputs.mode }} · ${{ inputs.server }}${{ inputs.mode == 'live' && format(' · {0}', inputs.name) || inputs.mode == 'fight' && format(' · {0} ({1}) vs {2}', inputs.name, inputs.bot, inputs.opponent) || '' }}"
 
 # Manual-only. Three things, picked with `mode`:
 #
@@ -11,12 +11,12 @@ run-name: "${{ inputs.mode }} · ${{ inputs.server }}${{ (inputs.mode == 'live' 
 #                    betaserver.panelattack.com:59569 upstream Panel Attack's
 #                            beta server; the bot runs on upstream's latest
 #                            code with its bot/ added
-#   bitbot         BitBot, GameCreator's bot (games/the-game/ai/eval/bitbot.js),
-#                  in the lobby the same way, on 104.156.250.136 only. It runs
-#                  beside the client in Node (bot/bitbot_link.js): each frame
-#                  bot/SurvivalLink.lua sends the server's board, BitBot's own
-#                  update() plays it, and its keys are pressed. GameCreator is
-#                  fetched fresh every run; BitBot itself is unchanged.
+#   fight          pick who plays who on 104.156.250.136 (bot/fight.sh): `bot`
+#                  sits in the lobby as `name`; `opponent` logs in as `name`2
+#                  and challenges it, rematching for `hours` -- or, as "you",
+#                  nobody does and you challenge it. Roster: bitbot (GameCreator's
+#                  BitBot, its latest main, pre-flighted before it goes live),
+#                  beverly, plamp, heuristic.
 #   prod-vs        smoke test: two throwaway bots play `matches` games against
 #                  each other in a PRIVATE room on 104.156.250.136; no player
 #                  can join, nothing is ranked
@@ -29,13 +29,13 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'What to run: live = a bot in the lobby for people to play; bitbot = BitBot (GameCreator) in the lobby; prod-vs = bot-vs-bot smoke test; large-garbage = offline benchmark'
+        description: 'What to run: live = a bot in the lobby for people to play; fight = pick who plays who (bot and opponent below); prod-vs = bot-vs-bot smoke test; large-garbage = offline benchmark'
         required: true
         default: 'live'
         type: choice
         options:
           - live
-          - bitbot
+          - fight
           - prod-vs
           - large-garbage
       server:
@@ -54,6 +54,27 @@ on:
         description: 'live: how long it stays in the lobby, 1-5 hours (cancel the run to stop it sooner)'
         required: false
         default: '5'
+      bot:
+        description: 'fight: who sits in the lobby as `name`'
+        required: false
+        default: 'bitbot'
+        type: choice
+        options:
+          - bitbot
+          - beverly
+          - plamp
+          - heuristic
+      opponent:
+        description: 'fight: who challenges it as `name`2, over and over -- or "you" to leave it waiting for people'
+        required: false
+        default: 'you'
+        type: choice
+        options:
+          - you
+          - bitbot
+          - beverly
+          - plamp
+          - heuristic
       profile:
         description: 'live: which trained bot to play as (a file in bot/profiles/)'
         required: false
@@ -198,14 +219,13 @@ jobs:
       # re-run it, or run bot/beverly.sh on the server box under systemd for
       # something permanent.
       - name: Check the name and the weight set before connecting
-        if: inputs.mode == 'live' || inputs.mode == 'bitbot'
+        if: inputs.mode == 'live'
         run: |
           set -eu
           cd "$BOT_DIR"
           n='${{ inputs.name }}'
           [ -n "$n" ] || { echo "name is empty"; exit 1; }
           [ ${#n} -le 16 ] || { echo "name '$n' is ${#n} chars; the server limit is 16"; exit 1; }
-          [ '${{ inputs.mode }}' = live ] || exit 0   # BitBot has no weight set here
           [ -f '${{ inputs.profile }}' ] || { echo "no weight set at ${{ inputs.profile }}"; exit 1; }
           eval "$(luarocks path --local --lua-version 5.1)"
           luajit -e 'package.path="./?.lua;"..package.path; require("bot.headlessBoot");
@@ -227,18 +247,21 @@ jobs:
       # one), so a beta bot keeps its name by saving the id it was given
       # instead -- see "Save the account id".
       - name: Derive this name's account id
-        if: (inputs.mode == 'live' || inputs.mode == 'bitbot') && inputs.server != env.BETA_SERVER
+        if: inputs.mode == 'live' && inputs.server != env.BETA_SERVER
         env:
-          BOT_NAME: ${{ inputs.name }}
+          BASE_NAME: ${{ inputs.name }}
           BOT_IP: ${{ env.BOT_HOST }}
         run: |
-          id=$(python3 -c '
+          names="$BASE_NAME"
+          mkdir -p bot/identities
+          for BOT_NAME in $names; do
+            id=$(BOT_NAME="$BOT_NAME" python3 -c '
           import hashlib, os
           msg = (os.environ["BOT_IP"] + "/" + os.environ["BOT_NAME"].lower()).encode()
           print("1" + str(int(hashlib.sha256(msg).hexdigest(), 16) % 10**18).zfill(18))')
-          mkdir -p bot/identities
-          printf '%s' "$id" > "bot/identities/${BOT_NAME}_${BOT_IP}.txt"
-          echo "'$BOT_NAME' logs in with account id $id (same name, same account, every run)"
+            printf '%s' "$id" > "bot/identities/${BOT_NAME}_${BOT_IP}.txt"
+            echo "'$BOT_NAME' logs in with account id $id (same name, same account, every run)"
+          done
 
       - name: Sit in the lobby
         if: inputs.mode == 'live'
@@ -286,7 +309,7 @@ jobs:
       # it, and the keys it presses -- its walk, its swaps, its raise latch --
       # are the frame's input. Nothing else decides or presses for it.
       - name: Check out GameCreator (BitBot)
-        if: inputs.mode == 'bitbot'
+        if: inputs.mode == 'fight' && (inputs.bot == 'bitbot' || inputs.opponent == 'bitbot')
         uses: actions/checkout@v4
         with:
           repository: briankeegan/GameCreator
@@ -294,60 +317,26 @@ jobs:
           sparse-checkout: games/the-game
 
       - uses: actions/setup-node@v4
-        if: inputs.mode == 'bitbot'
+        if: inputs.mode == 'fight' && (inputs.bot == 'bitbot' || inputs.opponent == 'bitbot')
         with:
           node-version: '22'
 
-      - name: Start BitBot
-        if: inputs.mode == 'bitbot'
-        run: |
-          set -eu
-          echo "::notice::BitBot from GameCreator $(git -C GameCreator log -1 --format='%h %s')"
-          nohup node bot/bitbot_link.js --dir GameCreator/games/the-game/ai/eval --port 47777 > "$GITHUB_WORKSPACE/bitbot-mind.log" 2>&1 &
-          for i in $(seq 1 300); do grep -q listening bitbot-mind.log && break; sleep 0.2; done
-          cat bitbot-mind.log
-          grep -q listening bitbot-mind.log || { echo "BitBot did not start"; exit 1; }
-
-      # PRE-FLIGHT, EVERY DEPLOY. BitBot is GameCreator's latest main, which is
-      # still being written, so before it joins the lobby it plays 30 seconds
-      # through the exact live path on this repo's Lua engine, offline: its
-      # board over SurvivalLink, BitBot's own update() in bitbot_link.js, the
-      # keys back. The deploy stops here -- with the reason -- if any answer
-      # was late, no swap reached the engine, nothing was cleared, a frame
-      # threw, or BitBot acted on its stack in a way the link does not relay.
-      - name: BitBot pre-flight
-        if: inputs.mode == 'bitbot'
+      # FIGHT: bot/fight.sh does it all -- accounts, BitBot's link and its
+      # pre-flight when BitBot plays (nothing joins the lobby if that fails),
+      # then `bot` in the lobby and `opponent` challenging it.
+      - name: Fight
+        if: inputs.mode == 'fight'
+        id: fight
         env:
-          PA_SURVIVOR_PORT: '47777'
-          PA_SURVIVOR_WAIT: '2'
+          GC_EVAL_DIR: ${{ github.workspace }}/GameCreator/games/the-game/ai/eval
         run: |
           eval "$(luarocks path --local --lua-version 5.1)"
+          [ "$BOT_HOST" != "$BETA_SERVER" ] && [ "${BOT_HOST}:${BOT_PORT}" != "$BETA_SERVER" ] || { echo "fight plays the fork's server only"; exit 1; }
+          if [ -d GameCreator ]; then echo "::notice::BitBot from GameCreator $(git -C GameCreator log -1 --format='%h %s')"; fi
+          echo "::notice::${{ inputs.name }} (${{ inputs.bot }}) vs ${{ inputs.opponent }} on $BOT_HOST:$BOT_PORT for ${{ inputs.hours }}h"
           set -o pipefail
-          luajit bot/bitbot_preflight.lua 1800 2>&1 | tee bitbot-preflight.log
-          sleep 0.5
-          if grep -a "frame failed\|not relayed" bitbot-mind.log; then
-            echo "BitBot pre-flight FAILED: the lines above are from BitBot's log (bitbot-mind.log)"
-            exit 1
-          fi
-
-      - name: Sit in the lobby (BitBot)
-        if: inputs.mode == 'bitbot'
-        id: bitbot
-        env:
-          PA_SURVIVOR_PORT: '47777'
-          # Wait for every frame's answer. BitBot thinks inside the frame it
-          # decides on (as in its duels); a frame answered late would be
-          # pressed as nothing while BitBot believes it pressed its keys. The
-          # fork server's loose sync lets the client lag and catch up.
-          PA_SURVIVOR_WAIT: '2'
-        run: |
-          eval "$(luarocks path --local --lua-version 5.1)"
-          secs=$(( ${{ inputs.hours }} * 3600 ))
-          echo "::notice::${{ inputs.name }} (BitBot) joining $BOT_HOST:$BOT_PORT for ${{ inputs.hours }}h"
-          set -o pipefail
-          # Runs until killed; 124 from `timeout` is this working, not failing.
-          timeout "$secs" luajit bot/playBot.lua "$BOT_HOST" "$BOT_PORT" '${{ inputs.name }}' 4 12 survival \
-            2>&1 | tee bot-prod-smoke.log || [ $? -eq 124 ]
+          bot/fight.sh "$BOT_HOST" "$BOT_PORT" $(( ${{ inputs.hours }} * 3600 )) '${{ inputs.bot }}' '${{ inputs.name }}' '${{ inputs.opponent }}' \
+            2>&1 | tee bot-prod-smoke.log
 
       - name: Summary
         if: always()
@@ -370,7 +359,8 @@ jobs:
             bot-prod-smoke.log
             bitbot-mind.log
             bitbot-preflight.log
+            fight-*.log
 
       - name: Fail if the run failed
-        if: steps.smoke.outcome == 'failure' || steps.largegarbage.outcome == 'failure' || steps.live.outcome == 'failure' || steps.bitbot.outcome == 'failure'
+        if: steps.smoke.outcome == 'failure' || steps.largegarbage.outcome == 'failure' || steps.live.outcome == 'failure' || steps.fight.outcome == 'failure'
         run: exit 1

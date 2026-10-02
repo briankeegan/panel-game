@@ -182,5 +182,22 @@ here" is never the answer — check the workflows first.
   Upstream assigns account ids itself, so the run commits a new name's id
   back to that branch; the next run logs back in.
 
+## Who fights who: `bot/fight.sh` / `mode: fight`
+
+Pick any bot for each side; both play on the fork's server, unranked.
+
+- Workflow: `bot-prod-smoke-test.yml`, `mode: fight`, `ref: bramp/multi-player`.
+  `bot` = who sits in the lobby as `name`; `opponent` = `you` (a human
+  challenges it) or another bot, which logs in as `<name>2` and keeps
+  challenging it until `hours` run out.
+- Roster (either side): `bitbot` (GameCreator's BitBot, latest `main` every
+  run, via `bot/bitbot_link.js`), `beverly`, `plamp` (weighted profiles),
+  `heuristic` (the original bot). Same bot on both sides is fine (self-play).
+- Locally: `bot/fight.sh HOST PORT SECONDS BOT NAME [OPPONENT [OPPONENT_NAME]]`,
+  e.g. `GC_EVAL_DIR=<GameCreator>/games/the-game/ai/eval bot/fight.sh localhost 49569 600 bitbot BitBot beverly`.
+- Anything with BitBot plays a 30 s offline pre-flight first and never joins
+  the lobby if the hookup is broken (late answers, no swaps, or a stack call
+  `bitbot_link.js` cannot relay).
+
 ## Self-Hosting
 See `docs/SelfHosting.md` for full Hetzner VPS setup guide.

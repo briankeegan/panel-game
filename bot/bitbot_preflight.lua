@@ -14,6 +14,9 @@
 -- has it today, does not actually play through the link:
 --   * a frame's answer did not come back (SurvivalLink.late)
 --   * no swap reached the engine, or nothing was cleared
+-- PA_PREFLIGHT_LATE_OK=1 for a bot that answers from keys it planned ahead
+-- (WasmSurvivor): a late answer is then its designed path, reported, not
+-- failed. PA_PREFLIGHT_NAME names the bot in the output (default BitBot).
 -- bitbot_link.js separately logs any stack call it cannot relay ("not
 -- relayed"), which the workflow treats as a failure too.
 io.stdout:setvbuf("no")
@@ -27,6 +30,8 @@ local LevelPresets = require("common.data.LevelPresets")
 local SurvivalLink = require("bot.SurvivalLink")
 
 local FRAMES = tonumber(arg[1]) or 1800
+local WHO = os.getenv("PA_PREFLIGHT_NAME") or "BitBot"
+local LATE_OK = os.getenv("PA_PREFLIGHT_LATE_OK") == "1"
 
 local mode = GameModes.getPreset(GameModes.IDs.TWO_PLAYER_VS)
 local match = Match(GeneratorSource(20261001, true), mode.matchRules)
@@ -50,16 +55,16 @@ link:endMatch()
 local played = frames - (firstPlayed or frames)
 local swaps = (stack.swapCount or 0) - swaps0
 local cleared = stack.panels_cleared or 0
-print(string.format("BitBot pre-flight: %d frames played after the countdown%s; %d swaps made, %d panels cleared, %d of %d answers late",
-  played, stack:game_ended() and " (topped out)" or "", swaps, cleared, link.late, link.frames))
+print(string.format("%s pre-flight: %d frames played after the countdown%s; %d swaps made, %d panels cleared, %d of %d answers late",
+  WHO, played, stack:game_ended() and " (topped out)" or "", swaps, cleared, link.late, link.frames))
 
 local problems = {}
-if link.frames == 0 then problems[#problems + 1] = "BitBot was never asked for a frame" end
-if link.late > 0 then problems[#problems + 1] = link.late .. " frames' answers did not come back in time" end
-if swaps == 0 then problems[#problems + 1] = "no swap BitBot made reached the engine" end
-if cleared == 0 then problems[#problems + 1] = "BitBot cleared nothing" end
+if link.frames == 0 then problems[#problems + 1] = WHO .. " was never asked for a frame" end
+if link.late > 0 and not LATE_OK then problems[#problems + 1] = link.late .. " frames' answers did not come back in time" end
+if swaps == 0 then problems[#problems + 1] = "no swap " .. WHO .. " made reached the engine" end
+if cleared == 0 then problems[#problems + 1] = WHO .. " cleared nothing" end
 if #problems > 0 then
-  print("BitBot pre-flight FAILED: " .. table.concat(problems, "; "))
+  print(WHO .. " pre-flight FAILED: " .. table.concat(problems, "; "))
   os.exit(1)
 end
-print("BitBot pre-flight passed")
+print(WHO .. " pre-flight passed")

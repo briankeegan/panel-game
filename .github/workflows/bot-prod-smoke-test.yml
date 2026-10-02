@@ -16,7 +16,8 @@ run-name: "${{ inputs.mode }} · ${{ inputs.server }}${{ inputs.mode == 'live' &
 #                  and challenges it, rematching for `hours` -- or, as "you",
 #                  nobody does and you challenge it. Roster: bitbot (GameCreator's
 #                  BitBot, its latest main, pre-flighted before it goes live),
-#                  beverly, plamp, heuristic.
+#                  wasm (GameCreator's WasmSurvivor, same), beverly, plamp,
+#                  heuristic.
 #   prod-vs        smoke test: two throwaway bots play `matches` games against
 #                  each other in a PRIVATE room on 104.156.250.136; no player
 #                  can join, nothing is ranked
@@ -61,6 +62,7 @@ on:
         type: choice
         options:
           - bitbot
+          - wasm
           - beverly
           - plamp
           - heuristic
@@ -72,6 +74,7 @@ on:
         options:
           - you
           - bitbot
+          - wasm
           - beverly
           - plamp
           - heuristic
@@ -308,8 +311,8 @@ jobs:
       # the client sends the server's board, BitBot's own update() runs on
       # it, and the keys it presses -- its walk, its swaps, its raise latch --
       # are the frame's input. Nothing else decides or presses for it.
-      - name: Check out GameCreator (BitBot)
-        if: inputs.mode == 'fight' && (inputs.bot == 'bitbot' || inputs.opponent == 'bitbot')
+      - name: Check out GameCreator (BitBot, WasmSurvivor)
+        if: inputs.mode == 'fight' && (contains(fromJSON('["bitbot","wasm"]'), inputs.bot) || contains(fromJSON('["bitbot","wasm"]'), inputs.opponent))
         uses: actions/checkout@v4
         with:
           repository: briankeegan/GameCreator
@@ -317,7 +320,7 @@ jobs:
           sparse-checkout: games/the-game
 
       - uses: actions/setup-node@v4
-        if: inputs.mode == 'fight' && (inputs.bot == 'bitbot' || inputs.opponent == 'bitbot')
+        if: inputs.mode == 'fight' && (contains(fromJSON('["bitbot","wasm"]'), inputs.bot) || contains(fromJSON('["bitbot","wasm"]'), inputs.opponent))
         with:
           node-version: '22'
 
@@ -332,7 +335,7 @@ jobs:
         run: |
           eval "$(luarocks path --local --lua-version 5.1)"
           [ "$BOT_HOST" != "$BETA_SERVER" ] && [ "${BOT_HOST}:${BOT_PORT}" != "$BETA_SERVER" ] || { echo "fight plays the fork's server only"; exit 1; }
-          if [ -d GameCreator ]; then echo "::notice::BitBot from GameCreator $(git -C GameCreator log -1 --format='%h %s')"; fi
+          if [ -d GameCreator ]; then echo "::notice::GameCreator $(git -C GameCreator log -1 --format='%h %s')"; fi
           echo "::notice::${{ inputs.name }} (${{ inputs.bot }}) vs ${{ inputs.opponent }} on $BOT_HOST:$BOT_PORT for ${{ inputs.hours }}h"
           set -o pipefail
           bot/fight.sh "$BOT_HOST" "$BOT_PORT" $(( ${{ inputs.hours }} * 3600 )) '${{ inputs.bot }}' '${{ inputs.name }}' '${{ inputs.opponent }}' \
@@ -347,7 +350,7 @@ jobs:
             echo '```'
             tail -n 40 bot-prod-smoke.log || echo "(no log produced)"
             echo '```'
-            if [ -f bitbot-mind.log ]; then echo '### BitBot mind'; echo '```'; tail -n 40 bitbot-mind.log; echo '```'; fi
+            for f in bitbot-mind.log mind-*.log; do [ -f "$f" ] || continue; echo "### $f"; echo '```'; tail -n 40 "$f"; echo '```'; done
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload log
@@ -359,6 +362,8 @@ jobs:
             bot-prod-smoke.log
             bitbot-mind.log
             bitbot-preflight.log
+            mind-*.log
+            preflight-*.log
             fight-*.log
 
       - name: Fail if the run failed

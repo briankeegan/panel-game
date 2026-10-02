@@ -190,14 +190,21 @@ Pick any bot for each side; both play on the fork's server, unranked.
   `bot` = who sits in the lobby as `name`; `opponent` = `you` (a human
   challenges it) or another bot, which logs in as `<name>2` and keeps
   challenging it until `hours` run out.
-- Roster (either side): `bitbot` (GameCreator's BitBot, latest `main` every
-  run, via `bot/bitbot_link.js`), `beverly`, `plamp` (weighted profiles),
-  `heuristic` (the original bot). Same bot on both sides is fine (self-play).
+- Roster (either side): `bitbot` (GameCreator's BitBot, via
+  `bot/bitbot_link.js`), `wasm` (GameCreator's WasmSurvivor, its
+  `survivor.js`) -- both from GameCreator's latest `main` every run --
+  `beverly`, `plamp` (weighted profiles), `heuristic` (the original bot).
+  Same bot on both sides is fine (self-play). Each bitbot/wasm side gets its
+  own Node process and port (`MIND_PORT`, default 47777, and +1).
+- Adding a bot: a case in `play()` (and `start_mind()` if it is a separate
+  process the client asks per frame), its name in `kinds=`, and in the
+  workflow's `bot`/`opponent` options.
 - Locally: `bot/fight.sh HOST PORT SECONDS BOT NAME [OPPONENT [OPPONENT_NAME]]`,
   e.g. `GC_EVAL_DIR=<GameCreator>/games/the-game/ai/eval bot/fight.sh localhost 49569 600 bitbot BitBot beverly`.
-- Anything with BitBot plays a 30 s offline pre-flight first and never joins
-  the lobby if the hookup is broken (late answers, no swaps, or a stack call
-  `bitbot_link.js` cannot relay).
+- bitbot and wasm each play a 30 s offline pre-flight first and never join
+  the lobby if the hookup is broken (no swaps, nothing cleared; for BitBot
+  also late answers or a stack call `bitbot_link.js` cannot relay --
+  WasmSurvivor answers late by design and presses keys it planned ahead).
 
 ## Self-Hosting
 See `docs/SelfHosting.md` for full Hetzner VPS setup guide.

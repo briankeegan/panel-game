@@ -281,7 +281,7 @@ jobs:
         if: inputs.mode == 'survival'
         run: |
           set -eu
-          nohup node GameCreator/games/the-game/ai/eval/survivor.js --port 47777 --threads 3 > "$GITHUB_WORKSPACE/survivor.log" 2>&1 &
+          nohup node GameCreator/games/the-game/ai/eval/survivor.js --port 47777 > "$GITHUB_WORKSPACE/survivor.log" 2>&1 &
           for i in $(seq 1 300); do grep -q listening "$GITHUB_WORKSPACE/survivor.log" && break; sleep 0.2; done
           cat "$GITHUB_WORKSPACE/survivor.log"
           grep -q listening "$GITHUB_WORKSPACE/survivor.log" || { echo "WasmSurvivor did not start"; exit 1; }

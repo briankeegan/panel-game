@@ -283,8 +283,29 @@ function BotClient:dispatch(msg)
   -- relayed input "I" and other messages fall through (ignored for 3a).
 end
 
+-- DeathEvent is the one message that unblocks match-end on the server --
+-- without it the opponent stalls on the silent-death watchdog (or forever).
+-- tickMatch's send is a single attempt; if it doesn't fully clear the socket
+-- (TCP send-buffer stall), nothing else retries it once playBot.lua tears
+-- down self.match on the same tick matchEnded flips. Retry from pump()
+-- instead, which runs every loop tick independent of match/matchEnded state,
+-- until the queue actually drains or the connection is gone. Mirrors
+-- NetClient:_flushPendingDeathSends for a human client.
+function BotClient:_flushPendingDeath()
+  if not self._deathAwaitingFlush then return end
+  if not self.gameplay.socket then
+    self._deathAwaitingFlush = false -- connection is gone; nothing left to retry
+    return
+  end
+  self.gameplay:sendQueuedMessages()
+  if self.gameplay.outgoingMessageQueue:len() == 0 then
+    self._deathAwaitingFlush = false
+  end
+end
+
 -- Non-blocking: read the socket and drain all pushed messages into state.
 function BotClient:pump()
+  self:_flushPendingDeath()
   self.gameplay:processIncomingMessages()
   local q = self.gameplay.receivedMessageQueue
   local msg = q:pop()
@@ -395,6 +416,7 @@ function BotClient:startMatch()
   self.scheduledStartMs = socket.gettime() * 1000 + (self.matchStart.startInMs or 500)
   self.matchEnded = false
   self.deathSent = false
+  self._deathAwaitingFlush = false
   self._resultReported = false
   logger.info(string.format("bot[%s]: match built; my stack = slot %d; start in %dms",
     self.name, self.localPlayerNumber, self.matchStart.startInMs or 500))
@@ -456,6 +478,7 @@ function BotClient:tickMatch()
     logger.info(string.format("bot[%s]: topped out at frame %d -> sending D", self.name, stack.game_over_clock))
     self.gameplay:send(NetworkProtocol.markedMessageForTypeAndBody(D_PREFIX,
       json.encode({ senderFrame = stack.game_over_clock, stopWatch = stack.game_over_stopWatch, reason = "topOut" })))
+    self._deathAwaitingFlush = true
   end
 
   if (self.deathSent or self.oppDied) and not self._resultReported then

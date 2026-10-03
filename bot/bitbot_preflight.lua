@@ -38,7 +38,9 @@ local match = Match(GeneratorSource(20261001, true), mode.matchRules)
 local stack = match:createStackWithSettings(LevelPresets.getModern(10), true, "controller")
 match:start()
 
-local link = SurvivalLink.new({})
+-- PA_PREFLIGHT_BRAIN=bitbot plays BitBot native, in this process
+-- (bot/BitBotNative.lua) -- the live path for BitBot; otherwise the link.
+local link = os.getenv("PA_PREFLIGHT_BRAIN") == "bitbot" and require("bot.BitBotNative").new({}) or SurvivalLink.new({})
 link:startMatch(stack)
 
 local swaps0 = stack.swapCount or 0
@@ -57,6 +59,8 @@ local swaps = (stack.swapCount or 0) - swaps0
 local cleared = stack.panels_cleared or 0
 print(string.format("%s pre-flight: %d frames played after the countdown%s; %d swaps made, %d panels cleared, %d of %d answers late",
   WHO, played, stack:game_ended() and " (topped out)" or "", swaps, cleared, link.late, link.frames))
+
+if link.maxMs then print(string.format("%s: slowest frame %.1f ms (a frame is 16.7)", WHO, link.maxMs)) end
 
 local problems = {}
 if link.frames == 0 then problems[#problems + 1] = WHO .. " was never asked for a frame" end

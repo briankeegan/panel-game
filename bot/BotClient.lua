@@ -72,7 +72,7 @@ local BotClient = class(function(self, opts)
   -- search FOUND, scoring the board a move leaves. Anything else that is not
   -- "random" gets EnvelopeBrain, the shape-catalog brain, which is what every
   -- name here used to mean -- brainKind was declared and then never read.
-  self.brainKind = opts.brain or "heuristic"   -- "heuristic"|"random"|"expert"|"search"|"weighted"|"survival"
+  self.brainKind = opts.brain or "heuristic"   -- "heuristic"|"random"|"expert"|"search"|"weighted"|"survival"|"bitbot"
   self.searchProfile = opts.searchProfile       -- weight-set path for brain == "weighted" (bot/profiles/*.json)
   self.cursorSpeed = opts.cursorSpeed -- { cursorMoveInterval, reactionFrames } direct knobs; nil = full speed
   self.gameplay = TcpClient({ name = "bot-gameplay", defaultPort = self.port })
@@ -386,7 +386,13 @@ function BotClient:startMatch()
   -- the bot simulates an EMPTY board from frame 0 (no panels -> brain always
   -- WAITs -> cursor never moves -> the human sees a blank board).
   self.match:start()
-  if self.brainKind == "survival" then
+  if self.brainKind == "bitbot" then
+    -- BitBot: GameCreator's BitBot, native (libbit.so), in this process,
+    -- hooked up as GameCreator's lua/train.lua hooks it (bot/BitBotNative.lua).
+    -- It answers each frame through the same calls as the survival link.
+    self.survival = self.survival or require("bot.BitBotNative").new({})
+    self.survival:startMatch(self.myStack)
+  elseif self.brainKind == "survival" then
     -- WasmSurvivor: the survival bot, a separate process (GameCreator's
     -- survivor.js) that plans on this engine's rules and says what to press
     -- every frame (bot/SurvivalLink.lua). Nothing is decided here.

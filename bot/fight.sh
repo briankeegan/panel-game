@@ -10,10 +10,11 @@
 #             a person to challenge it.
 #
 # The roster (both sides take any of these):
-#   bitbot     GameCreator's BitBot (games/the-game/ai/eval/bitbot.js, as the
-#              checkout at $GC_EVAL_DIR has it) through bot/bitbot_link.js
+#   bitbot     GameCreator's BitBot (C, games/the-game/ai/eval/native, as the
+#              checkout at $GC_EVAL_DIR has it), built to libbit.so and played
+#              in the client's own process by bot/BitBotNative.lua
 #   wasm       GameCreator's WasmSurvivor (games/the-game/ai/eval/survivor.js,
-#              same checkout), the survival bot, through its own link
+#              same checkout), the survival bot, a Node process per side
 #   beverly    the fork's weighted bot, bot/profiles/beverly.json
 #   plamp      the fork's weighted bot, bot/profiles/plamp.json
 #   heuristic  the fork's original shape-catalog bot
@@ -24,7 +25,8 @@
 #
 # Run from the repo root with the Lua toolchain on the path
 # (eval "$(luarocks path --local --lua-version 5.1)"). bitbot and wasm also
-# need node and GC_EVAL_DIR=<GameCreator>/games/the-game/ai/eval; each plays a
+# need GC_EVAL_DIR=<GameCreator>/games/the-game/ai/eval (bitbot: clang; wasm:
+# node); each plays a
 # 30-second pre-flight offline first, and nothing joins the lobby if its
 # hookup is broken.
 #
@@ -32,8 +34,8 @@
 # name is the same account every run (the fork's server accepts a
 # client-chosen id for a free name). This is the fork's server only.
 #
-# Logs: fight-<NAME>.log per side; for bitbot/wasm also mind-<NAME>.log and
-# preflight-<NAME>.log. In the workflow: mode `fight` (bot-prod-smoke-test.yml).
+# Logs: fight-<NAME>.log per side; preflight-<NAME>.log for bitbot/wasm,
+# mind-<NAME>.log for wasm, bitbot-build.log. In the workflow: mode `fight` (bot-prod-smoke-test.yml).
 set -u
 cd "$(dirname "$0")/.."
 
@@ -63,43 +65,51 @@ print("1" + str(int(hashlib.sha256(msg).hexdigest(), 16) % 10**18).zfill(18))')
   printf '%s' "$id" > "bot/identities/${n}_${HOST}.txt"
 done
 
-# ---- a mind per side: BitBot and WasmSurvivor are Node processes the client
-# asks every frame (bot/SurvivalLink.lua). Each side gets its own, on its own
-# port, so two of them never wait on each other's thinking. Each plays a
-# 30-second pre-flight offline first; nothing joins the lobby if it fails.
+# ---- BitBot: native, in the client's own process (bot/BitBotNative.lua, as
+# GameCreator's lua/train.lua hooks it). libbit.so is built here by the line
+# of GameCreator's native/build.sh that builds it, so it is always the
+# checkout's own BitBot. It plays a 30-second pre-flight offline first.
+build_bitbot() {
+  [ -n "${GC_EVAL_DIR:-}" ] || { echo "fight: bitbot needs GC_EVAL_DIR=<GameCreator>/games/the-game/ai/eval"; exit 2; }
+  local line
+  line=$(grep -E '^clang .*-o libbit\.so$' "$GC_EVAL_DIR/native/build.sh") \
+    || { echo "fight: GameCreator's native/build.sh no longer builds libbit.so -- BitBot's hookup needs a look"; exit 1; }
+  (cd "$GC_EVAL_DIR/native" && eval "$line" 2> "$OLDPWD/bitbot-build.log") \
+    || { cat bitbot-build.log; echo "fight: libbit.so did not build"; exit 1; }
+}
+preflight() {   # KIND NAME [PORT WAIT]
+  local kind=$1 name=$2
+  PA_PREFLIGHT_BRAIN=$([ "$kind" = bitbot ] && echo bitbot) PA_SURVIVOR_PORT=${3:-} PA_SURVIVOR_WAIT=${4:-} \
+    PA_PREFLIGHT_NAME="$kind ($name)" PA_PREFLIGHT_LATE_OK=$([ "$kind" = wasm ] && echo 1) \
+    luajit bot/bitbot_preflight.lua 1800 2>&1 | tee "preflight-$name.log"
+  [ "${PIPESTATUS[0]}" -eq 0 ] || exit 1
+}
+
+# ---- WasmSurvivor: a Node process the client asks every frame
+# (bot/SurvivalLink.lua), one per side, on its own port.
 BASE_PORT=${MIND_PORT:-47777}
-declare -A PORT_OF WAIT_OF
-start_mind() {   # KIND NAME PORT
-  local kind=$1 name=$2 port=$3 log="mind-$2.log"
-  [ -n "${GC_EVAL_DIR:-}" ] || { echo "fight: $kind needs GC_EVAL_DIR=<GameCreator>/games/the-game/ai/eval"; exit 2; }
-  case "$kind" in
-    bitbot) node bot/bitbot_link.js --dir "$GC_EVAL_DIR" --port "$port" > "$log" 2>&1 &
-            WAIT_OF[$name]=2 ;;          # every frame's answer is awaited: BitBot decides per frame
-    wasm)   node "$GC_EVAL_DIR/survivor.js" --port "$port" > "$log" 2>&1 &
-            WAIT_OF[$name]="" ;;         # its own default: it answers from keys it planned ahead
-  esac
+declare -A PORT_OF
+start_wasm() {   # NAME PORT
+  local name=$1 port=$2 log="mind-$1.log"
+  [ -n "${GC_EVAL_DIR:-}" ] || { echo "fight: wasm needs GC_EVAL_DIR=<GameCreator>/games/the-game/ai/eval"; exit 2; }
+  node "$GC_EVAL_DIR/survivor.js" --port "$port" > "$log" 2>&1 &
   PIDS="${PIDS:-} $!"
   PORT_OF[$name]=$port
   for i in $(seq 1 300); do grep -q listening "$log" && break; sleep 0.2; done
-  grep -q listening "$log" || { cat "$log"; echo "fight: $kind ($name) did not start"; exit 1; }
-  PA_SURVIVOR_PORT=$port PA_SURVIVOR_WAIT=${WAIT_OF[$name]} PA_PREFLIGHT_NAME="$kind ($name)" \
-    PA_PREFLIGHT_LATE_OK=$([ "$kind" = wasm ] && echo 1) luajit bot/bitbot_preflight.lua 1800 2>&1 | tee "preflight-$name.log"
-  [ "${PIPESTATUS[0]}" -eq 0 ] || exit 1
-  sleep 0.5
-  if grep -a "frame failed\|not relayed" "$log"; then
-    echo "fight: $kind ($name) pre-flight FAILED (lines above are from $log)"; exit 1
-  fi
+  grep -q listening "$log" || { cat "$log"; echo "fight: wasm ($name) did not start"; exit 1; }
+  preflight wasm "$name" "$port" ""
 }
-trap 'kill $PIDS 2>/dev/null' EXIT
-is_mind() { [ "$1" = bitbot ] || [ "$1" = wasm ]; }
-is_mind "$BOT" && start_mind "$BOT" "$NAME" "$BASE_PORT"
-[ -n "$OPP" ] && is_mind "$OPP" && start_mind "$OPP" "$OPP_NAME" $((BASE_PORT + 1))
+trap 'kill ${PIDS:-} 2>/dev/null' EXIT
+if [ "$BOT" = bitbot ] || [ "$OPP" = bitbot ]; then build_bitbot; fi
+case "$BOT" in bitbot) preflight bitbot "$NAME" ;; wasm) start_wasm "$NAME" "$BASE_PORT" ;; esac
+case "$OPP" in bitbot) preflight bitbot "$OPP_NAME" ;; wasm) start_wasm "$OPP_NAME" $((BASE_PORT + 1)) ;; esac
 
 # ---- one side: KIND NAME [CHALLENGE]
 play() {
   local kind=$1 name=$2 challenge=${3:-}
   case "$kind" in
-    bitbot|wasm) PA_CHALLENGE="$challenge" PA_SURVIVOR_PORT=${PORT_OF[$name]} PA_SURVIVOR_WAIT=${WAIT_OF[$name]} \
+    bitbot)      PA_CHALLENGE="$challenge" timeout "$SECS" luajit bot/playBot.lua "$HOST" "$PORT" "$name" 4 12 bitbot ;;
+    wasm)        PA_CHALLENGE="$challenge" PA_SURVIVOR_PORT=${PORT_OF[$name]} \
                    timeout "$SECS" luajit bot/playBot.lua "$HOST" "$PORT" "$name" 4 12 survival ;;
     beverly)     PA_CHALLENGE="$challenge" PA_SEARCH_PROFILE=bot/profiles/beverly.json \
                    timeout "$SECS" luajit bot/playBot.lua "$HOST" "$PORT" "$name" 4 12 weighted ;;

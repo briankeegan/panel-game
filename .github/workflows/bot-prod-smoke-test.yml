@@ -306,11 +306,10 @@ jobs:
           done
           exit 1
 
-      # BITBOT. GameCreator's BitBot (games/the-game/ai/eval/bitbot.js, its
-      # latest main, unchanged) plays through bot/bitbot_link.js: each frame
-      # the client sends the server's board, BitBot's own update() runs on
-      # it, and the keys it presses -- its walk, its swaps, its raise latch --
-      # are the frame's input. Nothing else decides or presses for it.
+      # BITBOT and WASMSURVIVOR come from GameCreator's latest main. BitBot is
+      # C: fight.sh builds its libbit.so (the line in GameCreator's
+      # native/build.sh) and the client plays it in-process
+      # (bot/BitBotNative.lua, as GameCreator's lua/train.lua does).
       - name: Check out GameCreator (BitBot, WasmSurvivor)
         if: inputs.mode == 'fight' && (contains(fromJSON('["bitbot","wasm"]'), inputs.bot) || contains(fromJSON('["bitbot","wasm"]'), inputs.opponent))
         uses: actions/checkout@v4

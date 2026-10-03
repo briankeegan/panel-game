@@ -10,10 +10,10 @@
 //
 //   each frame   the client (SurvivalLink.lua, brain "survival") sends the
 //                server's board; it is rebuilt on pa-engine.js (the server's
-//                rules) and shown to BitBot as the panel-engine.js Stack it
-//                reads (pa-engine toPanelEngine), then BitBot.update() runs
+//                rules) and shown to BitBot through PA.view, then
+//                BitBot.update() runs
 //   its view     pa-engine's PA.view -- GameCreator's own hookup for a
-//                panel-engine bot on the server's rules: the board BitBot
+//                bot on the server's rules (what pa_drill.js runs): the board BitBot
 //                reads (with swapLatency 1), its setInput and tryQueueSwap
 //                going to the pa-engine stack of this frame's board
 //   its keys     whatever that stack recorded for the frame -- cursor, raise,
@@ -27,9 +27,9 @@ var args = process.argv.slice(2), opt = { port: 47777, host: '127.0.0.1', dir: p
 for (var i = 0; i < args.length; i += 2) { var key = args[i].replace(/^--/, ''); opt[key] = key === 'port' ? Number(args[i + 1]) : args[i + 1]; }
 if (!opt.dir) throw new Error('bitbot_link.js: --dir <GameCreator>/games/the-game/ai/eval');
 var DIR = path.resolve(opt.dir);
-require(path.join(DIR, '..', '..', 'panel-engine.js'));
+// Loaded as GameCreator's own pa_drill.js loads it, from whatever its main has.
 require(path.join(DIR, '..', '..', 'panel-cpu.js'));
-var BitBot = require(path.join(DIR, 'bitbot.js')), PA = require(path.join(DIR, 'pa-engine.js')), PE = globalThis.PanelEngine;
+var BitBot = require(path.join(DIR, 'bitbot.js')), PA = require(path.join(DIR, 'pa-engine.js'));
 
 var BITS = { right: 1, left: 2, down: 4, up: 8, swap: 16, raise: 32 };
 
@@ -69,11 +69,11 @@ function Match(level) {
 Match.prototype.frame = function (state) {
   var t0 = Date.now(), stats = this.stats;
   var truth = PA.fromLua(state, this.level, new PA.Unseen());
-  // GameCreator's own hookup for a panel-engine bot on the server's rules
-  // (pa-engine PA.view, what its pa_drill.js and breaklive checks run): the
+  // GameCreator's own hookup for a bot on the server's rules (pa-engine
+  // PA.view, what its pa_drill.js runs, panel-engine.js gone): the
   // board as BitBot reads it, swapLatency 1, and its input and swaps going
   // to `truth` -- the pa-engine stack of the server's board this frame.
-  var view = PA.view(truth, PE);
+  var view = PA.view(truth);
   var setInput = view.setInput, tryQueueSwap = view.tryQueueSwap;
   guard(view);
   view.setInput = setInput;

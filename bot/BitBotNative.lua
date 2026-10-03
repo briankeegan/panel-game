@@ -4,10 +4,16 @@
 -- BitBot is C now (GameCreator games/the-game/ai/eval/native: bit.c, bot.c,
 -- front.c on pa.c, the server's rules), built as native/libbit.so. This is
 -- GameCreator's own hookup for it, lua/train.lua, frame for frame: each frame
--- the stack is written into BitBot's board (lua/cboard.lua, native/pa.h), the
--- rows and garbage colours to come are fed as train.lua feeds them, and
+-- the stack is written into BitBot's board (lua/cboard.lua, native/pa.h) and
 -- front_frame gives the keys -- plus swap if the board says one was pressed.
 -- Nothing is decided or pressed here.
+--
+-- ONE DIFFERENCE FROM train.lua, ON PURPOSE: BitBot sees what a human sees.
+-- train.lua also feeds the rows the stack will be dealt and the colours its
+-- garbage will break into (off a copy of the generator); a player sees only
+-- the board, the dimmed next row included. So nothing is fed: a row or a
+-- break BitBot's engine needs and was not given takes pa.c's UNSEEN_COLOUR,
+-- which matches nothing and which front.c leaves alone.
 --
 -- Everything BitBot-side is read from GameCreator's checkout at GC_EVAL_DIR
 -- (<GameCreator>/games/the-game/ai/eval) when a match starts -- cboard.lua,
@@ -53,24 +59,14 @@ function BitBotNative:startMatch(stack)
   self.stack = stack
   self.board = C.nb_new()
   self.fid = -1
-  -- What the stack will be dealt, off a copy of its source, and a count of
-  -- what it has taken -- train.lua takes these once the countdown is over;
-  -- the countdown deals nothing, so they are the same now, and taking them
-  -- here keeps their cost (a fraction of a second) out of the first frame.
-  self.dealt = { rows = 0, brks = 0 }
-  self.rows, self.brks = CB.stream(stack, 20000)
-  local src, dealt = stack.panelSource, self.dealt
-  local newRow, brkRow = src.createNewRow, src.getGarbagePanelRowString
-  src.createNewRow = function(...) dealt.rows = dealt.rows + 1; return newRow(...) end
-  src.getGarbagePanelRowString = function(...) dealt.brks = dealt.brks + 1; return brkRow(...) end
   self.frames, self.maxMs = 0, 0
   self.HI, self.NH = {}, C.nb_nhead()
   for i = 0, self.NH - 1 do self.HI[ffi.string(C.nb_head_name(i))] = i end
   self.pv = {}
 end
 
--- train.lua load(): the stack into BitBot's board, and the rows and garbage
--- colours it has not dealt yet.
+-- train.lua load(): the stack into BitBot's board -- and nothing to come
+-- (see the top).
 function BitBotNative:load(a)
   local HI, NH, pv = self.HI, self.NH, self.pv
   local H, B = C.nb_io_head(), C.nb_io_body()
@@ -96,14 +92,6 @@ function BitBotNative:load(a)
   for _, d in ipairs(CB.drop(a)) do B[x] = d; x = x + 1 end
   local err = C.nb_load(self.board)
   if err ~= 0 then error("BitBotNative: BitBot's engine refused the board (err " .. err .. ")") end
-  for i = self.dealt.rows + 1, #self.rows do
-    local r = self.rows[i]
-    if C.nb_feed_row(self.board, r[1], r[2], r[3], r[4], r[5], r[6]) == 0 then break end
-  end
-  for i = self.dealt.brks + 1, #self.brks do
-    local r = self.brks[i]
-    if C.nb_feed_break(self.board, r[1], r[2], r[3], r[4], r[5], r[6]) == 0 then break end
-  end
 end
 
 -- The key to press this frame. Through the countdown nothing is pressed

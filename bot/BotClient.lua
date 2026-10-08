@@ -425,17 +425,24 @@ function BotClient:startMatch()
   self._deathAwaitingFlush = false
   self._resultReported = false
   self._toppedOutFrames = 0
+  self._toppedOutSwapAttempts = 0
   self._toppedOutClearedSnapshot = nil
   logger.info(string.format("bot[%s]: match built; my stack = slot %d; start in %dms",
     self.name, self.localPlayerNumber, self.matchStart.startInMs or 500))
 end
 
--- How long (frames) a topped-out stack gets the benefit of the doubt while
--- not actually clearing anything, before the bot stops trying and just goes
--- idle. Generous -- a full second at 60fps, well past what any real recovery
--- attempt needs -- since this is purely a "give up gracefully" threshold,
--- not a balance lever.
-local TOPPED_OUT_IDLE_FRAMES = 60
+-- How many actual swaps a topped-out stack gets to try before the bot gives
+-- up and goes idle, if none of them clear anything. A real attempt, not a
+-- clock -- 3 genuine tries is plenty of benefit of the doubt without
+-- bothering to judge whether any of them were good moves.
+local TOPPED_OUT_SWAP_ATTEMPTS_ALLOWED = 3
+
+-- Backstop in case the bot never swaps at all (just holds the cursor, or
+-- the brain only ever WAITs) -- without this a stack that's topped out but
+-- never actually attempts a swap would never hit the attempt-count cap
+-- above and could stay "trying" forever. Generous -- several seconds at
+-- 60fps -- since this is a last-resort net, not the main trigger.
+local TOPPED_OUT_IDLE_FRAMES = 300
 
 -- Advance exactly one engine frame: feed+send our input, run, ship D on death,
 -- and finalize on our death or the opponent's. Non-blocking; call per ~60Hz tick.
@@ -452,32 +459,39 @@ function BotClient:tickMatch()
   if not stack:game_ended() then
     local char
 
-    -- Topped out with nothing actually clearing: stop trying instead of
-    -- swapping pointlessly forever. The engine holds off the death clock
-    -- while a swap is in flight (rise_lock, common/engine/Stack.lua
-    -- advancePassiveRaise) -- correct for a real swap resolving, but a bot
-    -- that keeps *something* queued every frame without ever clearing a
-    -- panel can hold that open indefinitely and never die. That's an
-    -- engine mechanic shared with every player, upstream included, so the
-    -- fix belongs here instead: a bot that's genuinely stuck just goes
+    -- Topped out with nothing actually clearing: stop trying after a few
+    -- real swaps instead of swapping pointlessly forever. The engine holds
+    -- off the death clock while a swap is in flight (rise_lock,
+    -- common/engine/Stack.lua advancePassiveRaise) -- correct for a real
+    -- swap resolving, but a bot that keeps *something* queued every frame
+    -- without ever clearing a panel can hold that open indefinitely and
+    -- never die. That's an engine mechanic shared with every player,
+    -- upstream included, so the fix belongs here instead: a bot that's
+    -- genuinely stuck gives up after a handful of honest attempts and goes
     -- idle, the same way a human who's lost would, and the unmodified
     -- death timing takes it from there on its own.
-    if stack:isToppedOut() then
+    local toppedOut = stack:isToppedOut()
+    if toppedOut then
       local cleared = stack.panels_cleared or 0
       if self._toppedOutClearedSnapshot == nil or cleared > self._toppedOutClearedSnapshot then
         -- First topped-out frame, or a clear actually landed since the last
-        -- one -- real progress, give it a fresh window.
+        -- one -- real progress, give it a fresh set of attempts.
         self._toppedOutClearedSnapshot = cleared
         self._toppedOutFrames = 0
+        self._toppedOutSwapAttempts = 0
       else
         self._toppedOutFrames = (self._toppedOutFrames or 0) + 1
       end
     else
       self._toppedOutFrames = 0
+      self._toppedOutSwapAttempts = 0
       self._toppedOutClearedSnapshot = nil
     end
 
-    if (self._toppedOutFrames or 0) > TOPPED_OUT_IDLE_FRAMES then
+    local giveUp = (self._toppedOutSwapAttempts or 0) >= TOPPED_OUT_SWAP_ATTEMPTS_ALLOWED
+      or (self._toppedOutFrames or 0) > TOPPED_OUT_IDLE_FRAMES
+
+    if giveUp then
       char = KeyDataEncoding.base64encode[1] -- idle: no keys pressed
     elseif self.survival then
       char = self.survival:input(stack, self.match.garbageSources[stack])
@@ -502,6 +516,11 @@ function BotClient:tickMatch()
     -- brain's per-frame intent (else swaps_per_clear is inflated). Movement/idle = WAIT.
     if char == KeyDataEncoding.swap then
       self.lastExecuted = { type = "SWAP", pos = { stack.cur_row, stack.cur_col } }
+      if toppedOut and not giveUp then
+        -- A real attempt was just spent -- count it against the allowance
+        -- (reset above the moment a clear actually lands).
+        self._toppedOutSwapAttempts = (self._toppedOutSwapAttempts or 0) + 1
+      end
     elseif char == KeyDataEncoding.raise then
       self.lastExecuted = { type = "RAISE" }
     else

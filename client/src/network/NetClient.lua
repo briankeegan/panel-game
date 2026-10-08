@@ -454,6 +454,12 @@ end
 
 -- starts a 2p vs online match (or joins a team room)
 local function start2pVsOnlineMatch(self, createRoomMessage)
+  -- Defensive: we're demonstrably in a room now (the server just put us in
+  -- one), so any stale pending-leave flag from a round trip that never
+  -- completed can't still be meaningful -- don't let it block future "am I
+  -- in a room" checks.
+  self._pendingLeaveRoom = nil
+
   -- Pending-promotion transition: we were watching the match as a queued
   -- joiner; addToRoom means the previous match ended and we've been promoted.
   -- Tear down the spectator-side state + pop the catch-up scene before
@@ -644,6 +650,9 @@ end
 
 local function processLeaveRoomMessage(self, message)
   local transition
+  -- Round trip is done (or the server's idempotent fallback fired) --
+  -- self.room-based "am I in a room" checks can trust self.room again.
+  self._pendingLeaveRoom = nil
   if self.room then
     if self.room.match then
       self.room.match:disconnectSignal("matchEnded", self.room)
@@ -1156,6 +1165,11 @@ end
 
 -- starts to spectate a 2p vs online match
 spectate2pVsOnlineMatch = function(self, spectateRequestGrantedMessage)
+  -- Defensive: a prior leaveRoom's confirmation could in principle never
+  -- arrive (connection drop mid-round-trip). We're demonstrably in a room
+  -- now, so any stale pending-leave flag from before can't still be
+  -- meaningful -- don't let it block future "am I in a room" checks.
+  self._pendingLeaveRoom = nil
   resetLobbyData(self)
   GAME.battleRoom = BattleRoom.createFromServerMessage(spectateRequestGrantedMessage)
   self.room = GAME.battleRoom
@@ -1432,7 +1446,14 @@ function NetClient:leaveRoom()
     _clearMatchInputState(self)
     _sendLobby(self, ClientMessages.leaveRoom())
     -- the server sends us back the confirmation that we left the room
-    -- so we reenter ONLINE state via processLeaveRoomMessage, not here
+    -- so we reenter ONLINE state via processLeaveRoomMessage, not here --
+    -- but self.room itself stays set until that round trip completes. In
+    -- the meantime, "am I in a room" checks (e.g. Lobby:isLocalPlayerInRoom,
+    -- gating whether clicking another room's Spectate works or shows
+    -- "leave room first") must not trust it, or a fast click / slow network
+    -- round trip makes leaving-then-spectating look broken or inconsistent
+    -- even though the player already left. Cleared in processLeaveRoomMessage.
+    self._pendingLeaveRoom = true
   elseif self.room then
     -- Connection lost but we're still in a room locally - clean up
     logger.info("Cleaning up room locally (disconnected)")

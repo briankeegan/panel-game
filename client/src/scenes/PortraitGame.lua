@@ -159,6 +159,11 @@ function PortraitGame:drawMultibar(stack)
 
   scale = themes[config.theme].multibar_Scale
   local healthHeight = (stack.engine.health / multiBarFrameCount) * multiBarMaxHeight
+  -- Clamp like ClientStack:drawAbsoluteMultibar and MultibarElement already
+  -- do -- this is a separate copy of their same math that dropped the clamp,
+  -- so a health value out of sync with multiBarFrameCount stretched the bar
+  -- past its real height with nothing to stop it.
+  healthHeight = math.min(healthHeight, multiBarMaxHeight)
   self:drawBar(stack, stack.assets.multibar.health, stack.healthQuad, barPos, healthHeight, 0, 0, scale)
 
   bottomOffset = healthHeight

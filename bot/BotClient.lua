@@ -476,6 +476,12 @@ function BotClient:tickMatch()
       if self._toppedOutClearedSnapshot == nil or cleared > self._toppedOutClearedSnapshot then
         -- First topped-out frame, or a clear actually landed since the last
         -- one -- real progress, give it a fresh set of attempts.
+        if self._toppedOutClearedSnapshot ~= nil and (self._toppedOutFrames or 0) > 30 then
+          logger.warn(string.format(
+            "bot[%s]: DIAG reset frame=%d clearedWas=%s clearedNow=%d toFrames=%d attempts=%d",
+            self.name, stack.clock or -1, tostring(self._toppedOutClearedSnapshot), cleared,
+            self._toppedOutFrames or -1, self._toppedOutSwapAttempts or -1))
+        end
         self._toppedOutClearedSnapshot = cleared
         self._toppedOutFrames = 0
         self._toppedOutSwapAttempts = 0
@@ -490,6 +496,29 @@ function BotClient:tickMatch()
 
     local giveUp = (self._toppedOutSwapAttempts or 0) >= TOPPED_OUT_SWAP_ATTEMPTS_ALLOWED
       or (self._toppedOutFrames or 0) > TOPPED_OUT_IDLE_FRAMES
+
+    -- TEMP diagnostics for "topped out but never dies" -- remove once root
+    -- caused. Logs the transition into give-up, then a snapshot every 2s
+    -- while stuck, naming exactly what's still holding rise_lock open.
+    if toppedOut then
+      if giveUp and not self._loggedGiveUp then
+        self._loggedGiveUp = true
+        logger.warn(string.format(
+          "bot[%s]: DIAG giveUp=true frame=%d health=%s rise_lock=%s active=%d/%d shake=%s swapQ=%s",
+          self.name, stack.clock or -1, tostring(stack.health), tostring(stack.rise_lock),
+          stack.n_active_panels or -1, stack.n_prev_active_panels or -1,
+          tostring(stack.shake_time), tostring(stack:swapQueued())))
+      end
+      if giveUp and ((self._toppedOutFrames or 0) % 120 == 0) then
+        logger.warn(string.format(
+          "bot[%s]: DIAG stuck frame=%d toFrames=%d health=%s rise_lock=%s active=%d/%d shake=%s swapQ=%s cleared=%s",
+          self.name, stack.clock or -1, self._toppedOutFrames or -1, tostring(stack.health),
+          tostring(stack.rise_lock), stack.n_active_panels or -1, stack.n_prev_active_panels or -1,
+          tostring(stack.shake_time), tostring(stack:swapQueued()), tostring(stack.panels_cleared)))
+      end
+    else
+      self._loggedGiveUp = false
+    end
 
     if giveUp then
       char = KeyDataEncoding.base64encode[1] -- idle: no keys pressed

@@ -1413,6 +1413,21 @@ NetClient.STATES = states
 function NetClient:maybeEnterRoomFromLobby()
   if self.state ~= states.ONLINE then return false end
   if not self.room then return false end
+
+  -- A leftover spectate attachment (watched something, then landed back at
+  -- the lobby without a clean exit) should never auto-resume -- spectating
+  -- isn't a room you're "in" the way an actual team room is, so the lobby
+  -- has no business surfacing a join-or-leave choice for it. Just leave it
+  -- silently so the lobby always reflects "not in anything" cleanly instead
+  -- of ambiguously showing a stale "Leave game" state or auto-pushing back
+  -- into a match the player already walked away from.
+  if self.room.spectating then
+    if not self._pendingLeaveRoom then
+      self:leaveRoom()
+    end
+    return false
+  end
+
   if not isRoomReadyForWaitingRoom(self.room) then return false end
 
   local roomScene = getSceneFromRoom(self.room)

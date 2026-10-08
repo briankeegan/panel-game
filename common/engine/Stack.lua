@@ -1241,21 +1241,10 @@ function Stack:advancePassiveRaise()
       self:new_row()
     end
   else
-    if self.stop_time == 0 then
+    if not self.rise_lock and self.stop_time == 0 then
       if self:isToppedOut() then
-        -- Deliberately NOT gated on rise_lock: rise_lock exists to hold the
-        -- stack's physical rise during an active swap, not to pause the
-        -- death clock. Continuously queuing swaps (cursor moving, swapping
-        -- repeatedly -- doesn't even need to clear anything) keeps rise_lock
-        -- true indefinitely via updateRiseLock's swapQueued()/hasActivePanels()
-        -- checks. With the old combined gate, that made a topped-out stack
-        -- immortal: health never drained no matter how long it stayed
-        -- topped out, as long as *something* kept getting swapped. Observed
-        -- live: two bots sitting fully topped out, cursors moving, a swap
-        -- every so often, health never moving.
         self.health = self.health - 1
-        return true
-      elseif not self.rise_lock then
+      else
         self.rise_timer = self.rise_timer - 1
         if self.rise_timer <= 0 then -- try to rise
           self.displacement = self.displacement - 1
@@ -1266,8 +1255,8 @@ function Stack:advancePassiveRaise()
           end
           self.rise_timer = self.rise_timer + consts.SPEED_TO_RISE_TIME[self.speed]
         end
-        return true
       end
+      return true
     end
   end
 end

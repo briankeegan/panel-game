@@ -48,8 +48,14 @@ local function pumpFor(secs)
 end
 local function nPlayers(b) local n = 0 if b.players then for _ in pairs(b.players) do n = n + 1 end end return n end
 
-if not host:login() then fail("host login") end
-if not join:login() then fail("join login") end
+do
+  local ok, err = host:login()
+  if not ok then fail("host login: " .. tostring(err)) end
+end
+do
+  local ok, err = join:login()
+  if not ok then fail("join login: " .. tostring(err)) end
+end
 host:leaveRoom(); join:leaveRoom()
 pumpFor(0.6)
 host:leaveRoom(); join:leaveRoom()

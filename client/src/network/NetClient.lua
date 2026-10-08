@@ -459,6 +459,7 @@ local function start2pVsOnlineMatch(self, createRoomMessage)
   -- completed can't still be meaningful -- don't let it block future "am I
   -- in a room" checks.
   self._pendingLeaveRoom = nil
+  self._pendingLeaveRoomAt = nil
 
   -- Pending-promotion transition: we were watching the match as a queued
   -- joiner; addToRoom means the previous match ended and we've been promoted.
@@ -653,6 +654,7 @@ local function processLeaveRoomMessage(self, message)
   -- Round trip is done (or the server's idempotent fallback fired) --
   -- self.room-based "am I in a room" checks can trust self.room again.
   self._pendingLeaveRoom = nil
+  self._pendingLeaveRoomAt = nil
   if self.room then
     if self.room.match then
       self.room.match:disconnectSignal("matchEnded", self.room)
@@ -1170,6 +1172,7 @@ spectate2pVsOnlineMatch = function(self, spectateRequestGrantedMessage)
   -- now, so any stale pending-leave flag from before can't still be
   -- meaningful -- don't let it block future "am I in a room" checks.
   self._pendingLeaveRoom = nil
+  self._pendingLeaveRoomAt = nil
   resetLobbyData(self)
   GAME.battleRoom = BattleRoom.createFromServerMessage(spectateRequestGrantedMessage)
   self.room = GAME.battleRoom
@@ -1433,6 +1436,42 @@ function NetClient:kickPlayer(publicId)
   _sendLobby(self, ClientMessages.kickPlayer(publicId))
 end
 
+-- How long to wait for the server's leaveRoom confirmation before giving up
+-- and cleaning up locally anyway. Normally this arrives in well under a
+-- second; this is a backstop for the case where the server never replies at
+-- all (e.g. a spectated room was already torn down -- the server has a
+-- known gap where its own leave_room handling drops the reply silently in
+-- exactly that case), not a tolerance for ordinary network lag.
+local LEAVE_ROOM_CONFIRM_TIMEOUT = 5
+
+---Tear down room state locally without waiting on (or requiring) anything
+---from the server. Used both when we're not connected to ask the server at
+---all, and as the timeout backstop in update() when we asked but the
+---confirmation never came back.
+---@param self NetClient
+local function _cleanupRoomLocally(self)
+  logger.info("Cleaning up room locally")
+  local roomNumber = self.room and self.room.roomNumber
+  if self.room then
+    self.room:shutdown()
+    self.room = nil
+  end
+  GAME.battleRoom = nil
+  self._pendingLeaveRoom = nil
+  self._pendingLeaveRoomAt = nil
+
+  if self.lobbyDataV2 then
+    if roomNumber then
+      self.lobbyDataV2.rooms[roomNumber] = nil
+    end
+    local localId = GAME.localPlayer and GAME.localPlayer.publicId
+    if localId and self.lobbyDataV2.players[localId] then
+      self.lobbyDataV2.players[localId].roomNumber = nil
+    end
+    self:emitSignal("lobbyStateV2Update", self.lobbyDataV2)
+  end
+end
+
 function NetClient:leaveRoom()
   -- Trust the lobby's view too: if lobbyDataV2 says we're in a room but
   -- self.room is nil (state-divergence from a half-completed prior leave or
@@ -1452,25 +1491,14 @@ function NetClient:leaveRoom()
     -- gating whether clicking another room's Spectate works or shows
     -- "leave room first") must not trust it, or a fast click / slow network
     -- round trip makes leaving-then-spectating look broken or inconsistent
-    -- even though the player already left. Cleared in processLeaveRoomMessage.
+    -- even though the player already left. Cleared in processLeaveRoomMessage,
+    -- or by the update() timeout backstop if that confirmation never arrives.
     self._pendingLeaveRoom = true
+    self._pendingLeaveRoomAt = love.timer.getTime()
   elseif self.room then
-    -- Connection lost but we're still in a room locally - clean up
-    logger.info("Cleaning up room locally (disconnected)")
-    local roomNumber = self.room.roomNumber
-    self.room:shutdown()
-    self.room = nil
-    GAME.battleRoom = nil
-
-    -- Update local lobby data
-    if self.lobbyDataV2 and roomNumber then
-      self.lobbyDataV2.rooms[roomNumber] = nil
-      local localId = GAME.localPlayer.publicId
-      if self.lobbyDataV2.players[localId] then
-        self.lobbyDataV2.players[localId].roomNumber = nil
-      end
-      self:emitSignal("lobbyStateV2Update", self.lobbyDataV2)
-    end
+    -- Not connected (or never actually in a room per the server) -- nothing
+    -- to wait on, clean up now.
+    _cleanupRoomLocally(self)
   end
 end
 
@@ -1871,6 +1899,15 @@ end
 function NetClient:update(dt)
   if self.state == states.OFFLINE then
     return
+  end
+
+  -- Timeout backstop for a leaveRoom that never got confirmed (see
+  -- LEAVE_ROOM_CONFIRM_TIMEOUT) -- force the local cleanup rather than
+  -- leaving self.room stuck forever waiting on a reply that may never come.
+  if self._pendingLeaveRoom and self._pendingLeaveRoomAt
+      and love.timer.getTime() - self._pendingLeaveRoomAt > LEAVE_ROOM_CONFIRM_TIMEOUT then
+    logger.warn("leaveRoom confirmation timed out; forcing local cleanup")
+    _cleanupRoomLocally(self)
   end
 
   -- Drain the simulated-lag queues (PA_NETWORK_LAG_MS). When delayedProcessing

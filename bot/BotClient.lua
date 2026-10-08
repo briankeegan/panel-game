@@ -471,6 +471,15 @@ function BotClient:tickMatch()
     -- idle, the same way a human who's lost would, and the unmodified
     -- death timing takes it from there on its own.
     local toppedOut = stack:isToppedOut()
+    -- Only a frame where NOTHING but a re-queued swap is holding rise_lock
+    -- open counts against the give-up budget. stop_time/shake_time/active
+    -- panels are the engine legitimately running out a chain -- a bot mid
+    -- chain can easily queue 3 swaps (or sit past 300 frames) before stop_time
+    -- clears, and giving up there kills a bot that wasn't stuck at all, just
+    -- still setting up (confirmed live: it goes idle, sits through the rest
+    -- of stop_time doing nothing, then dies the instant stop_time hits 0).
+    local stuckOnlyOnSwap = stack.stop_time == 0 and (stack.shake_time or 0) <= 0
+      and not stack:hasActivePanels()
     if toppedOut then
       local cleared = stack.panels_cleared or 0
       if self._toppedOutClearedSnapshot == nil or cleared > self._toppedOutClearedSnapshot then
@@ -485,7 +494,7 @@ function BotClient:tickMatch()
         self._toppedOutClearedSnapshot = cleared
         self._toppedOutFrames = 0
         self._toppedOutSwapAttempts = 0
-      else
+      elseif stuckOnlyOnSwap then
         self._toppedOutFrames = (self._toppedOutFrames or 0) + 1
       end
     else
@@ -545,9 +554,12 @@ function BotClient:tickMatch()
     -- brain's per-frame intent (else swaps_per_clear is inflated). Movement/idle = WAIT.
     if char == KeyDataEncoding.swap then
       self.lastExecuted = { type = "SWAP", pos = { stack.cur_row, stack.cur_col } }
-      if toppedOut and not giveUp then
-        -- A real attempt was just spent -- count it against the allowance
-        -- (reset above the moment a clear actually lands).
+      if toppedOut and not giveUp and stuckOnlyOnSwap then
+        -- A real attempt was just spent with nothing else going on -- count
+        -- it against the allowance (reset above the moment a clear lands).
+        -- A swap queued while stop_time/shake/active panels are already
+        -- protecting the stack is the bot setting up mid-chain, not stalling;
+        -- don't burn the budget on it.
         self._toppedOutSwapAttempts = (self._toppedOutSwapAttempts or 0) + 1
       end
     elseif char == KeyDataEncoding.raise then

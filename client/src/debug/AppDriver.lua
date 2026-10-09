@@ -455,19 +455,35 @@ end
 -- it presses Ready, on a finished game it presses Return once the game-over
 -- screen has shown, and on the recap it reports and quits. Every stage's
 -- result is reported as it is recorded.
+-- PA_CHALLENGE_STAGE=N starts on stage N (the game's own setStage, as a
+-- stage picked from the menu would); with PA_CHALLENGE_REPEAT=K it plays that
+-- stage K times, won or lost, then quits.
 local function hookChallenge()
   local br = GAME.battleRoom
   if not br or not br.recordStageResult or br._autoHooked then return end
   br._autoHooked = true
+  local only = tonumber(os.getenv("PA_CHALLENGE_STAGE") or "")
+  local times = tonumber(os.getenv("PA_CHALLENGE_REPEAT") or "")
+  if only then br:setStage(only); writeOut("stage set to " .. only) end
+  local played = 0
   local record = br.recordStageResult
   br.recordStageResult = function(self, winners, gameLength)
     local stage = self.stageIndex
     record(self, winners, gameLength)
+    if only and times then
+      played = played + 1
+      self:setStage(only)
+      if played >= times then
+        writeOut(string.format("stage %d %s frames=%d attempt=%d", stage, #winners == 1 and winners[1] == self.player and "lost" or "won", gameLength or 0, played))
+        writeOut("challenge over: " .. played .. " attempts"); st.challenge = nil; st.quitting = { frames = 30 }
+        return
+      end
+    end
     local result = #winners == 2 and "tie" or (#winners == 1 and winners[1] == self.player and "lost" or (#winners == 1 and "won" or "aborted"))
     writeOut(string.format("stage %d %s frames=%d continues=%d next=%d complete=%s", stage, result, gameLength or 0, self.continues, self.stageIndex, tostring(self.challengeComplete)))
     doShoot(string.format("stage%02d_%s_c%d", stage, result, self.continues))
     local cap = tonumber(os.getenv("PA_CHALLENGE_CONTINUES") or "")
-    if cap and self.continues > cap then writeOut("challenge stopped: " .. self.continues .. " continues"); st.challenge = nil; st.quitting = { frames = 30 } end
+    if cap and not times and self.continues > cap then writeOut("challenge stopped: " .. self.continues .. " continues"); st.challenge = nil; st.quitting = { frames = 30 } end
   end
 end
 local function tickChallenge()

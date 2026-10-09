@@ -406,6 +406,47 @@ function BotClient:_wireAnalytics(stack)
   end)
 end
 
+-- Same gap as analytics, same cause: danger_col/danger_timer (the column
+-- bounce animation when a column gets dangerously tall) live on PlayerStack
+-- and are recomputed in PlayerStack:onRun -- a bot has no PlayerStack, so a
+-- spectated bot's columns never bounce even when genuinely in danger.
+-- DisplayEventCapture already reads hostStack.danger_col/danger_timer (it
+-- just finds nothing there for a bot); this is PlayerStack.updateDangerBounce
+-- verbatim, reading off `stack` directly since a bot's "self" IS the engine.
+function BotClient:_wireDangerBounce(stack)
+  stack.danger_col = { false, false, false, false, false, false }
+  stack.danger_timer = 0
+  stack:connectSignal("finishedRun", stack, function()
+    if not stack.behaviours.passiveRaise then return end
+
+    local danger = false
+    for column = 1, stack.width do
+      stack.danger_col[column] = false
+    end
+    for row = stack.height - 1, stack.height do
+      local panelRow = stack.panels[row]
+      if panelRow then
+        for idx = 1, stack.width do
+          if panelRow[idx]:dangerous() then
+            danger = true
+            stack.danger_col[idx] = true
+          end
+        end
+      end
+    end
+
+    if danger then
+      if stack.wasToppedOut and stack.speed ~= 0 then
+        stack.danger_timer = 0
+      elseif stack.stop_time == 0 then
+        stack.danger_timer = stack.danger_timer + 1
+      end
+    else
+      stack.danger_timer = 0
+    end
+  end)
+end
+
 -- Build the live engine match from the matchStart replay (same engine the
 -- client runs, headless) and mark our own stack local. Call once after
 -- matchStart arrives.
@@ -418,6 +459,7 @@ function BotClient:startMatch()
   end
   self.myStack.is_local = true
   self:_wireAnalytics(self.myStack)
+  self:_wireDangerBounce(self.myStack)
   -- Generate each stack's starting board (starting_state), set countdown, and
   -- save the clock-0 rollback base — exactly as a real client does. Without this
   -- the bot simulates an EMPTY board from frame 0 (no panels -> brain always

@@ -153,7 +153,17 @@ function BattleRoom.createFromServerMessage(message)
   battleRoom.roomNumber = message.roomNumber
   -- Platform guard: only enable displayHistory if FFI is supported
   local ffiGuard = require("client.src.network.DisplaySnapshotFFI")
-  if message.displayHistoryEnabled == true and ffiGuard.FFI_SUPPORTED then
+  -- 1v1 always takes the snapshot view. A lobby challenge carries no Spectator
+  -- View choice (only the room-create menus send one), so 1v1 rooms came in
+  -- with it off, and spectators re-simulated each player from their inputs --
+  -- under loose sync that copy drifts (garbage lands on the viewer's own frame)
+  -- and never dies (checkDeath skips remote stacks), so spectators watched
+  -- stacks that were long dead, or never topped out, in the real game. Every
+  -- client in the room decides this from the same message, so the players
+  -- send snapshots and the spectators draw them; the server relays them
+  -- whatever the room's flag.
+  local twoPlayer = gameMode and gameMode.playerCount == 2
+  if (message.displayHistoryEnabled == true or twoPlayer) and ffiGuard.FFI_SUPPORTED then
     battleRoom.displayHistoryEnabled = true
   else
     battleRoom.displayHistoryEnabled = false

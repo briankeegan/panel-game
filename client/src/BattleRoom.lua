@@ -737,6 +737,10 @@ function BattleRoom:_setupDisplayPipeline(match)
         if player.stack then
           player.stack.canvas = nil
           player.stack.displayRendered = true
+          -- Its engine is paused now (pauseNonLocalSimulation), so it can never
+          -- catch up: a spectator joining mid-match would sit on "Catching up:
+          -- 0 out of N frames" forever. Snapshots bring the board up to date.
+          if player.stack.enableCatchup then player.stack:enableCatchup(false) end
         end
       end
     end

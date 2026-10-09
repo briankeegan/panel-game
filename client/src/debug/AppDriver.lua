@@ -50,8 +50,9 @@
 --      tap down            # adjust until `where` shows the target, then:
 --      tap return
 --
---    PA_SURVIVOR=1: the local player's stack is played by WasmSurvivor
---    (survivor.js on PA_SURVIVOR_PORT) instead of the keyboard.
+--    PA_SURVIVOR=1: the local player's stack is played by a bot instead of the
+--    keyboard: PA_BOT=wasm (survivor.js on PA_SURVIVOR_PORT, the default) or
+--    bitbot (BitBot in this process, GC_EVAL_DIR).
 --
 -- B) SCRIPTED (PA_AUTO_REPLAY / PA_AUTO_ONLINE_ROOM) — one-and-forget journeys.
 --    From boot it walks the scenes: Main Menu -> Replay Browser -> open the target
@@ -421,17 +422,23 @@ local function screenHasText(needle)
   end
 end
 
--- WASMSURVIVOR AS THE PLAYER (PA_SURVIVOR=1): the local player's stack takes
--- its input from WasmSurvivor (GameCreator's survivor.js on PA_SURVIVOR_PORT,
--- through bot/SurvivalLink.lua) instead of the keyboard -- one byte a frame,
--- asked with the board as that frame starts. Each stack gets a link of its own.
+-- A BOT AS THE PLAYER (PA_SURVIVOR=1): the local player's stack takes its
+-- input from a bot instead of the keyboard -- one byte a frame, asked with the
+-- board as that frame starts. PA_BOT picks it: "wasm" (the default),
+-- GameCreator's WasmSurvivor (survivor.js on PA_SURVIVOR_PORT, through
+-- bot/SurvivalLink.lua), or "bitbot", GameCreator's BitBot in this process
+-- (bot/BitBotNative.lua, GC_EVAL_DIR). Each stack gets a bot of its own.
+local function newBot()
+  if os.getenv("PA_BOT") == "bitbot" then return require("bot.BitBotNative").new({}) end
+  return require("bot.SurvivalLink").new({})
+end
 local function feedSurvivor()
   local ps = GAME.localPlayer and GAME.localPlayer.stack
   local e = ps and ps.engine
   if not (e and e.confirmedInput and e.receiveConfirmedInput) or e:game_ended() then return end
   if st.survivorStack ~= e then
-    if st.survivorLink then pcall(function() st.survivorLink:endMatch(); st.survivorLink.sock:close() end) end
-    st.survivorLink = require("bot.SurvivalLink").new({})
+    if st.survivorLink then pcall(function() st.survivorLink:endMatch(); if st.survivorLink.sock then st.survivorLink.sock:close() end end) end
+    st.survivorLink = newBot()
     st.survivorLink:startMatch(e)
     st.survivorStack = e
     ps.send_controls = false   -- the keyboard no longer feeds this stack

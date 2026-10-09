@@ -435,18 +435,19 @@ end
 local function feedSurvivor()
   local ps = GAME.localPlayer and GAME.localPlayer.stack
   local e = ps and ps.engine
-  if not (e and e.confirmedInput and e.receiveConfirmedInput) or e:game_ended() then return end
-  if st.survivorStack ~= e then
-    if st.survivorLink then pcall(function() st.survivorLink:endMatch(); if st.survivorLink.sock then st.survivorLink.sock:close() end end) end
-    st.survivorLink = newBot()
-    st.survivorLink:startMatch(e)
-    st.survivorStack = e
-    ps.send_controls = false   -- the keyboard no longer feeds this stack
-  end
-  local m = GAME.battleRoom and GAME.battleRoom.match and GAME.battleRoom.match.engine
-  local sources = m and m.garbageSources and m.garbageSources[e] or {}
-  while #e.confirmedInput < (e.clock or 0) + 1 do
-    e:receiveConfirmedInput(st.survivorLink:input(e, sources))
+  if not (e and e.receiveConfirmedInput) or st.survivorStack == e then return end
+  if st.survivorLink then pcall(function() st.survivorLink:endMatch(); if st.survivorLink.sock then st.survivorLink.sock:close() end end) end
+  local bot = newBot()
+  bot:startMatch(e)
+  st.survivorLink, st.survivorStack = bot, e
+  -- The client asks the stack for its input once for every engine frame it
+  -- runs (ClientMatch -> send_controls), as it asks the keyboard; the bot
+  -- answers that call, so its board runs frame for frame with the others.
+  ps.send_controls = function(self)
+    if self.engine.game_over_clock and self.engine.game_over_clock > 0 then return end
+    local m = GAME.battleRoom and GAME.battleRoom.match and GAME.battleRoom.match.engine
+    local sources = m and m.garbageSources and m.garbageSources[self.engine] or {}
+    self.engine:receiveConfirmedInput(bot:input(self.engine, sources))
   end
 end
 

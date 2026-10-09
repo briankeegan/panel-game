@@ -32,7 +32,7 @@ local bot = BotClient({
   searchProfile = (brain == "search" or brain == "weighted") and os.getenv("PA_SEARCH_PROFILE") or nil,
 })
 
-if not bot:login() then print("login failed"); os.exit(1) end
+do local ok, why = bot:login(); if not ok then print("login failed: " .. tostring(why)); os.exit(1) end end
 
 -- shed any stale room from a prior run so we sit idle in the lobby (challengeable)
 bot:leaveRoom()

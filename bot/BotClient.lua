@@ -424,25 +424,9 @@ function BotClient:startMatch()
   self.deathSent = false
   self._deathAwaitingFlush = false
   self._resultReported = false
-  self._toppedOutFrames = 0
-  self._toppedOutSwapAttempts = 0
-  self._toppedOutClearedSnapshot = nil
   logger.info(string.format("bot[%s]: match built; my stack = slot %d; start in %dms",
     self.name, self.localPlayerNumber, self.matchStart.startInMs or 500))
 end
-
--- How many actual swaps a topped-out stack gets to try before the bot gives
--- up and goes idle, if none of them clear anything. A real attempt, not a
--- clock -- 3 genuine tries is plenty of benefit of the doubt without
--- bothering to judge whether any of them were good moves.
-local TOPPED_OUT_SWAP_ATTEMPTS_ALLOWED = 3
-
--- Backstop in case the bot never swaps at all (just holds the cursor, or
--- the brain only ever WAITs) -- without this a stack that's topped out but
--- never actually attempts a swap would never hit the attempt-count cap
--- above and could stay "trying" forever. Generous -- several seconds at
--- 60fps -- since this is a last-resort net, not the main trigger.
-local TOPPED_OUT_IDLE_FRAMES = 300
 
 -- Advance exactly one engine frame: feed+send our input, run, ship D on death,
 -- and finalize on our death or the opponent's. Non-blocking; call per ~60Hz tick.
@@ -458,80 +442,7 @@ function BotClient:tickMatch()
   -- recorded death frame.
   if not stack:game_ended() then
     local char
-
-    -- Topped out with nothing actually clearing: stop trying after a few
-    -- real swaps instead of swapping pointlessly forever. The engine holds
-    -- off the death clock while a swap is in flight (rise_lock,
-    -- common/engine/Stack.lua advancePassiveRaise) -- correct for a real
-    -- swap resolving, but a bot that keeps *something* queued every frame
-    -- without ever clearing a panel can hold that open indefinitely and
-    -- never die. That's an engine mechanic shared with every player,
-    -- upstream included, so the fix belongs here instead: a bot that's
-    -- genuinely stuck gives up after a handful of honest attempts and goes
-    -- idle, the same way a human who's lost would, and the unmodified
-    -- death timing takes it from there on its own.
-    local toppedOut = stack:isToppedOut()
-    -- Only a frame where NOTHING but a re-queued swap is holding rise_lock
-    -- open counts against the give-up budget. stop_time/shake_time/active
-    -- panels are the engine legitimately running out a chain -- a bot mid
-    -- chain can easily queue 3 swaps (or sit past 300 frames) before stop_time
-    -- clears, and giving up there kills a bot that wasn't stuck at all, just
-    -- still setting up (confirmed live: it goes idle, sits through the rest
-    -- of stop_time doing nothing, then dies the instant stop_time hits 0).
-    local stuckOnlyOnSwap = stack.stop_time == 0 and (stack.shake_time or 0) <= 0
-      and not stack:hasActivePanels()
-    if toppedOut then
-      local cleared = stack.panels_cleared or 0
-      if self._toppedOutClearedSnapshot == nil or cleared > self._toppedOutClearedSnapshot then
-        -- First topped-out frame, or a clear actually landed since the last
-        -- one -- real progress, give it a fresh set of attempts.
-        if self._toppedOutClearedSnapshot ~= nil and (self._toppedOutFrames or 0) > 30 then
-          logger.warn(string.format(
-            "bot[%s]: DIAG reset frame=%d clearedWas=%s clearedNow=%d toFrames=%d attempts=%d",
-            self.name, stack.clock or -1, tostring(self._toppedOutClearedSnapshot), cleared,
-            self._toppedOutFrames or -1, self._toppedOutSwapAttempts or -1))
-        end
-        self._toppedOutClearedSnapshot = cleared
-        self._toppedOutFrames = 0
-        self._toppedOutSwapAttempts = 0
-      elseif stuckOnlyOnSwap then
-        self._toppedOutFrames = (self._toppedOutFrames or 0) + 1
-      end
-    else
-      self._toppedOutFrames = 0
-      self._toppedOutSwapAttempts = 0
-      self._toppedOutClearedSnapshot = nil
-    end
-
-    local giveUp = (self._toppedOutSwapAttempts or 0) >= TOPPED_OUT_SWAP_ATTEMPTS_ALLOWED
-      or (self._toppedOutFrames or 0) > TOPPED_OUT_IDLE_FRAMES
-
-    -- TEMP diagnostics for "topped out but never dies" -- remove once root
-    -- caused. Logs the transition into give-up, then a snapshot every 2s
-    -- while stuck, naming exactly what's still holding rise_lock open.
-    if toppedOut then
-      if giveUp and not self._loggedGiveUp then
-        self._loggedGiveUp = true
-        logger.warn(string.format(
-          "bot[%s]: DIAG giveUp=true frame=%d health=%s rise_lock=%s active=%d/%d shake=%s swapQ=%s",
-          self.name, stack.clock or -1, tostring(stack.health), tostring(stack.rise_lock),
-          stack.n_active_panels or -1, stack.n_prev_active_panels or -1,
-          tostring(stack.shake_time), tostring(stack:swapQueued())))
-      end
-      if giveUp and ((self._toppedOutFrames or 0) % 120 == 0) then
-        logger.warn(string.format(
-          "bot[%s]: DIAG stuck frame=%d toFrames=%d health=%s rise_lock=%s active=%d/%d shake=%s swapQ=%s cleared=%s",
-          self.name, stack.clock or -1, self._toppedOutFrames or -1, tostring(stack.health),
-          tostring(stack.rise_lock), stack.n_active_panels or -1, stack.n_prev_active_panels or -1,
-          tostring(stack.shake_time), tostring(stack:swapQueued()), tostring(stack.panels_cleared)))
-      end
-    else
-      self._loggedGiveUp = false
-    end
-
-    if giveUp then
-      char = KeyDataEncoding.base64encode[1] -- idle: no keys pressed
-    elseif self.survival then
+    if self.survival then
       char = self.survival:input(stack, self.match.garbageSources[stack])
     elseif self.brain then
       local st = self.boardState.extract(stack)
@@ -554,14 +465,6 @@ function BotClient:tickMatch()
     -- brain's per-frame intent (else swaps_per_clear is inflated). Movement/idle = WAIT.
     if char == KeyDataEncoding.swap then
       self.lastExecuted = { type = "SWAP", pos = { stack.cur_row, stack.cur_col } }
-      if toppedOut and not giveUp and stuckOnlyOnSwap then
-        -- A real attempt was just spent with nothing else going on -- count
-        -- it against the allowance (reset above the moment a clear lands).
-        -- A swap queued while stop_time/shake/active panels are already
-        -- protecting the stack is the bot setting up mid-chain, not stalling;
-        -- don't burn the budget on it.
-        self._toppedOutSwapAttempts = (self._toppedOutSwapAttempts or 0) + 1
-      end
     elseif char == KeyDataEncoding.raise then
       self.lastExecuted = { type = "RAISE" }
     else

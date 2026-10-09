@@ -370,6 +370,42 @@ function BotClient:sendReady()
   self.gameplay:sendRequest(ClientProtocol.sendPlayerSettings(menuState))
 end
 
+-- A bot's stack is a bare engine Stack, not a client PlayerStack -- so
+-- unlike a human's game it has no .analytic and nothing ever calls
+-- register_move/register_swap/register_destroyed_panels/register_chain.
+-- DisplayEventCapture already ships whatever's on hostStack.analytic
+-- (BotClient passes the stack itself as hostStack), so a spectator's stats
+-- panel just read zeros the whole match even though real play was
+-- happening. Wire the same signals PlayerStack:init connects, calling the
+-- same AnalyticsInstance methods, so there's something real to ship.
+-- save_to_overall=false: a bot's numbers must never land in a runner's own
+-- lifetime stats file. Rollback replay isn't hooked up (PlayerStack also
+-- wires rollbackPerformed/rollbackSaved) -- a cosmetic spectator stat can
+-- afford to possibly overcount by a rollback's worth on resim; it's not
+-- used for anything that needs to be exact.
+function BotClient:_wireAnalytics(stack)
+  require("client.src.analytics") -- defines the global AnalyticsInstance
+  stack.analytic = AnalyticsInstance(false)
+  stack:connectSignal("matched", stack, function(_, engine, attackGfxOrigin, isChainLink, comboSize, metalCount, garbagePanelCount)
+    stack.analytic:register_destroyed_panels(comboSize)
+  end)
+  stack:connectSignal("cursorMoved", stack, function(_, previousRow, previousCol)
+    -- Mirrors PlayerStack:onCursorMoved's exact gate (common/engine/Stack.lua's
+    -- cursorMoved signal doesn't carry the engine, so read it off `stack`).
+    if (stack.cur_timer == 0 or stack.cur_timer == stack.cur_wait_time)
+        and (stack.cur_row ~= previousRow or stack.cur_col ~= previousCol)
+        and stack.cur_timer ~= stack.cur_wait_time then
+      stack.analytic:register_move()
+    end
+  end)
+  stack:connectSignal("panelsSwapped", stack, function()
+    stack.analytic:register_swap()
+  end)
+  stack.outgoingGarbage:connectSignal("chainEnded", stack, function(_, chainGarbage)
+    stack.analytic:register_chain(#chainGarbage.linkTimes + 1)
+  end)
+end
+
 -- Build the live engine match from the matchStart replay (same engine the
 -- client runs, headless) and mark our own stack local. Call once after
 -- matchStart arrives.
@@ -381,6 +417,7 @@ function BotClient:startMatch()
     error("bot[" .. self.name .. "]: no stack at slot " .. tostring(self.localPlayerNumber))
   end
   self.myStack.is_local = true
+  self:_wireAnalytics(self.myStack)
   -- Generate each stack's starting board (starting_state), set countdown, and
   -- save the clock-0 rollback base — exactly as a real client does. Without this
   -- the bot simulates an EMPTY board from frame 0 (no panels -> brain always

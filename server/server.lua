@@ -740,17 +740,6 @@ function Server:create_room(gameMode, ...)
   if self.leaderboard and tableUtils.deep_content_equal(gameMode, self.leaderboard.gameMode) then
     leaderboard = self.leaderboard
   end
-  -- Spectator View for lobby challenges. A room request always says whether it
-  -- wants it (the room-create menus' "spectate view"); a challenge carries no
-  -- choice, so it was always off, and 1v1 spectators re-simulated each player
-  -- from their inputs. Under loose sync that copy drifts (garbage lands on the
-  -- receiver's own frame) and cannot die (checkDeath skips remote stacks), so
-  -- spectators watched stacks that were long dead in the real game. Snapshots
-  -- show each player's real board. Set after the leaderboard match above, which
-  -- compares the whole game mode.
-  if gameMode.displayHistoryEnabled == nil then
-    gameMode.displayHistoryEnabled = true
-  end
 
   if #players > 1 then
     -- no delay is enabled only to reduce the chances of hitting rollback and rollback only exists in multiplayer

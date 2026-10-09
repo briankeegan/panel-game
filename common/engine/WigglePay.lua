@@ -54,16 +54,6 @@ function WigglePay.canSwap(stack, panel1, panel2)
     elseif oldRecord.leftId == panel1.id and oldRecord.rightId == panel2.id and oldRecord.row == row and oldRecord.col == col then
       if stack.health > stack.behaviours.swapStallingPunish then
         return true, stack.behaviours.swapStallingPunish
-      elseif stack.health > 0 then
-        -- Not enough health left to pay the full punish cost. Denying the
-        -- swap for free instead of charging it pins health just above the
-        -- death threshold forever -- a player who keeps wiggling never pays
-        -- again, checkDeath's health <= 0 never fires, and the match never
-        -- ends. (Observed live: health stuck at 1 for 29,000+ frames in a
-        -- bot-vs-bot match.) Charge whatever health remains instead, so this
-        -- wiggle still succeeds but exhausts health to exactly 0 -- the next
-        -- checkDeath() call ends the match.
-        return true, stack.health
       else
         return false, 0
       end

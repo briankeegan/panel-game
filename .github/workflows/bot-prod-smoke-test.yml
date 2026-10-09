@@ -79,7 +79,7 @@ on:
           - plamp
           - heuristic
       profile:
-        description: 'live: which trained bot to play as (a file in bot/profiles/)'
+        description: 'live: which trained bot to play as (a file in bot/profiles/). fight with wasm: a bot/profiles/*.wasm.json plays those trained weights (e.g. bot/profiles/wasmbot.wasm.json)'
         required: false
         default: 'bot/profiles/beverly.json'
       matches:
@@ -331,6 +331,7 @@ jobs:
         id: fight
         env:
           GC_EVAL_DIR: ${{ github.workspace }}/GameCreator/games/the-game/ai/eval
+          WASM_PROFILE: ${{ inputs.profile }}
         run: |
           eval "$(luarocks path --local --lua-version 5.1)"
           [ "$BOT_HOST" != "$BETA_SERVER" ] && [ "${BOT_HOST}:${BOT_PORT}" != "$BETA_SERVER" ] || { echo "fight plays the fork's server only"; exit 1; }

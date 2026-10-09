@@ -1,0 +1,19 @@
+{
+ "weights": {
+  "travelCost": 15.43176828577962,
+  "stopTimeEarned": 37.70641356121875,
+  "colourVariance": -21.509710634397333,
+  "linksV": -3.991170987533933,
+  "garbageAdjacency": -74.18000177238488,
+  "edgePenalty": 86.1756069216765,
+  "chainLayers": -17.591482824003826,
+  "material": 65.75303210203215,
+  "linksH": 135.95048264330865,
+  "garbageCleared": 19.053128627618445,
+  "garbageOnBoard": 34.77180690735975,
+  "reach2chain": 28.705633216735727,
+  "maxHeight": 91.66806534244404,
+  "reach4combo": 79.09199720424596,
+  "chainLength": 174.6667075478645
+ }
+}

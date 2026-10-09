@@ -92,7 +92,17 @@ declare -A PORT_OF
 start_wasm() {   # NAME PORT
   local name=$1 port=$2 log="mind-$1.log"
   [ -n "${GC_EVAL_DIR:-}" ] || { echo "fight: wasm needs GC_EVAL_DIR=<GameCreator>/games/the-game/ai/eval"; exit 2; }
-  node "$GC_EVAL_DIR/survivor.js" --port "$port" > "$log" 2>&1 &
+  # WASM_PROFILE=bot/profiles/<x>.wasm.json plays trained weights (its
+  # "weights" file sits beside it; survivor.js reads it from its own folder)
+  local prof=""
+  case "${WASM_PROFILE:-}" in
+    *.wasm.json)
+      [ -f "$WASM_PROFILE" ] || { echo "fight: no WasmSurvivor profile $WASM_PROFILE"; exit 2; }
+      local w; w=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["weights"])' "$WASM_PROFILE")
+      cp "$(dirname "$WASM_PROFILE")/$w" "$GC_EVAL_DIR/$w" || { echo "fight: no weights $w beside $WASM_PROFILE"; exit 2; }
+      prof="$PWD/$WASM_PROFILE"; echo "fight: wasm ($name) plays $WASM_PROFILE" ;;
+  esac
+  GC_SURVIVOR_PROFILE=$prof node "$GC_EVAL_DIR/survivor.js" --port "$port" > "$log" 2>&1 &
   PIDS="${PIDS:-} $!"
   PORT_OF[$name]=$port
   for i in $(seq 1 300); do grep -q listening "$log" && break; sleep 0.2; done

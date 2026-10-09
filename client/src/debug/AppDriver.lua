@@ -464,6 +464,7 @@ local function hookChallenge()
     record(self, winners, gameLength)
     local result = #winners == 2 and "tie" or (#winners == 1 and winners[1] == self.player and "lost" or (#winners == 1 and "won" or "aborted"))
     writeOut(string.format("stage %d %s frames=%d continues=%d next=%d complete=%s", stage, result, gameLength or 0, self.continues, self.stageIndex, tostring(self.challengeComplete)))
+    doShoot(string.format("stage%02d_%s_c%d", stage, result, self.continues))
     local cap = tonumber(os.getenv("PA_CHALLENGE_CONTINUES") or "")
     if cap and self.continues > cap then writeOut("challenge stopped: " .. self.continues .. " continues"); st.challenge = nil; st.quitting = { frames = 30 } end
   end

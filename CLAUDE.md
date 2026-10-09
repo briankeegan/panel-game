@@ -170,17 +170,41 @@ here" is never the answer — check the workflows first.
   are bot accounts), so re-dispatching a name logs back into the same
   account instead of being denied as "already taken". Names registered
   before this existed hold a random id nobody kept — pick a new name.
-- **`server: beta` puts the bot on UPSTREAM Panel Attack**
-  (`betaserver.panelattack.com:59569`, or the `ip`/`port` inputs if `ip` is
-  changed from the fork default). Upstream's protocol is lockstep, so it is a
-  different client: it lives in `bot/` on `claude/game-bot-creation-action-0e7emk`
-  (see its `bot/README.md`). Each run fetches upstream and drops that `bot/`
-  on top, so it runs the server's engine. The server does not report its
-  build, so the run uses the `upstream_ref` input if set, else upstream's
+- **`server` is one of two addresses.** `104.156.250.136:49569` is this
+  repo's server. `betaserver.panelattack.com:59569` is UPSTREAM Panel Attack's
+  beta server, whose protocol is lockstep, so it is a different client: it
+  lives in `bot/` on `claude/game-bot-creation-action-0e7emk` (see its
+  `bot/README.md`). Each run fetches upstream and drops that `bot/` on top,
+  so it runs the server's engine. The server does not report its build, so
+  the run uses the `upstream_ref` input if set, else upstream's
   `betaserver-live` tag if it exists (move it to the deployed commit on each
   deploy to make this exact), else the latest `beta`.
   Upstream assigns account ids itself, so the run commits a new name's id
   back to that branch; the next run logs back in.
+
+## Who fights who: `bot/fight.sh` / `mode: fight`
+
+Pick any bot for each side; both play on the fork's server, unranked.
+
+- Workflow: `bot-prod-smoke-test.yml`, `mode: fight`, `ref: bramp/multi-player`.
+  `bot` = who sits in the lobby as `name`; `opponent` = `you` (a human
+  challenges it) or another bot, which logs in as `<name>2` and keeps
+  challenging it until `hours` run out.
+- Roster (either side): `bitbot` (GameCreator's BitBot, via
+  `bot/bitbot_link.js`), `wasm` (GameCreator's WasmSurvivor, its
+  `survivor.js`) -- both from GameCreator's latest `main` every run --
+  `beverly`, `plamp` (weighted profiles), `heuristic` (the original bot).
+  Same bot on both sides is fine (self-play). Each bitbot/wasm side gets its
+  own Node process and port (`MIND_PORT`, default 47777, and +1).
+- Adding a bot: a case in `play()` (and `start_mind()` if it is a separate
+  process the client asks per frame), its name in `kinds=`, and in the
+  workflow's `bot`/`opponent` options.
+- Locally: `bot/fight.sh HOST PORT SECONDS BOT NAME [OPPONENT [OPPONENT_NAME]]`,
+  e.g. `GC_EVAL_DIR=<GameCreator>/games/the-game/ai/eval bot/fight.sh localhost 49569 600 bitbot BitBot beverly`.
+- bitbot and wasm each play a 30 s offline pre-flight first and never join
+  the lobby if the hookup is broken (no swaps, nothing cleared; for BitBot
+  also late answers or a stack call `bitbot_link.js` cannot relay --
+  WasmSurvivor answers late by design and presses keys it planned ahead).
 
 ## Self-Hosting
 See `docs/SelfHosting.md` for full Hetzner VPS setup guide.

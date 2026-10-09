@@ -1,75 +1,107 @@
 name: Bot Prod Smoke Test (LIVE SERVER)
+# The run list shows what each run was, e.g. "live · beta · SirBonksALot".
+run-name: "${{ inputs.mode }} · ${{ inputs.server }}${{ inputs.mode == 'live' && format(' · {0}', inputs.name) || inputs.mode == 'fight' && format(' · {0} ({1}) vs {2}', inputs.name, inputs.bot, inputs.opponent) || '' }}"
 
-# Manual-only. Connects to the REAL self-hosted production server (default
-# 104.156.250.136:49569) with two throwaway bot accounts that create a PRIVATE
-# room and challenge only each other -- never the public lobby queue, never
-# ranked (BotClient never sets wantsRanked) -- so no real player can ever be
-# matched with them and the leaderboard is never touched. Runs at real 60Hz
-# pace (no PA_FAST), same load profile as one human playing one bot.
+# Manual-only. Three things, picked with `mode`:
 #
-# This is a connectivity/regression smoke test (does the bot still log in,
-# join a room, and finish a match against the deployed server?), not a
-# benchmark -- see bot/BENCHMARK.md for the seed-averaged ceiling numbers,
-# which are measured locally.
+#   live           ONE bot under a real name sits in a server's lobby and
+#                  auto-accepts challenges, so a person can play it. Unranked,
+#                  always. Stays up for `hours`. `server` is one of two:
+#                    104.156.250.136:49569           this repo's server
+#                    betaserver.panelattack.com:59569 upstream Panel Attack's
+#                            beta server; the bot runs on upstream's latest
+#                            code with its bot/ added
+#   fight          pick who plays who on 104.156.250.136 (bot/fight.sh): `bot`
+#                  sits in the lobby as `name`; `opponent` logs in as `name`2
+#                  and challenges it, rematching for `hours` -- or, as "you",
+#                  nobody does and you challenge it. Roster: bitbot (GameCreator's
+#                  BitBot, its latest main, pre-flighted before it goes live),
+#                  wasm (GameCreator's WasmSurvivor, same), beverly, plamp,
+#                  heuristic.
+#   prod-vs        smoke test: two throwaway bots play `matches` games against
+#                  each other in a PRIVATE room on 104.156.250.136; no player
+#                  can join, nothing is ranked
+#   large-garbage  offline benchmark on the runner, no server contact:
+#                  survival vs 6x12 garbage blocks over `matches` seeds
+#
+# The inputs below are in the order you would fill them in; each one says
+# which mode it is for. Leave the rest alone.
 on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'What to run'
-        required: false
-        default: 'prod-vs'
+        description: 'What to run: live = a bot in the lobby for people to play; fight = pick who plays who (bot and opponent below); prod-vs = bot-vs-bot smoke test; large-garbage = offline benchmark'
+        required: true
+        default: 'live'
         type: choice
         options:
-          - prod-vs          # bot-vs-bot matches on the live server
-          - large-garbage    # offline survival vs the "large_garbage" training preset (6x12 blocks); no server contact
-          - live             # ONE bot, real name, sits in the lobby so a human can play it
-          - survival         # WasmSurvivor: the survival bot (GameCreator's survivor.js) in the lobby, as live; fork server only
+          - live
+          - fight
+          - prod-vs
+          - large-garbage
       server:
-        description: 'live: which server -- fork (this repo, the ip/port below) or beta (upstream Panel Attack, betaserver.panelattack.com:59569, always on the latest upstream code)'
-        required: false
-        default: 'fork'
+        description: 'live: which server the bot joins'
+        required: true
+        default: '104.156.250.136:49569'
         type: choice
         options:
-          - fork
-          - beta
-      matches:
-        description: 'prod-vs: number of matches (~2.5 min worst-case each). large-garbage: number of seeds.'
-        required: false
-        default: '3'
-      ip:
-        description: 'Server IP'
-        required: false
-        default: '104.156.250.136'
-      port:
-        description: 'Server port'
-        required: false
-        default: '49569'
-      difficulty:
-        description: 'Bot difficulty/level (1-10ish)'
-        required: false
-        default: 'hard'
-      profile:
-        description: 'live: weight set (bot/profiles/*.json)'
-        required: false
-        default: 'bot/profiles/beverly.json'
+          - 104.156.250.136:49569
+          - betaserver.panelattack.com:59569
       name:
-        description: 'live: account name, 16 chars max (server limit)'
+        description: 'live: the bot''s name in the lobby (letters, digits, _; 16 max). Reusing a name logs into the same account'
         required: false
         default: 'Beverly'
       hours:
-        description: 'live: how long to stay up, 1-5'
+        description: 'live: how long it stays in the lobby, 1-5 hours (cancel the run to stop it sooner)'
         required: false
         default: '5'
+      bot:
+        description: 'fight: who sits in the lobby as `name`'
+        required: false
+        default: 'bitbot'
+        type: choice
+        options:
+          - bitbot
+          - wasm
+          - beverly
+          - plamp
+          - heuristic
+      opponent:
+        description: 'fight: who challenges it as `name`2, over and over -- or "you" to leave it waiting for people'
+        required: false
+        default: 'you'
+        type: choice
+        options:
+          - you
+          - bitbot
+          - wasm
+          - beverly
+          - plamp
+          - heuristic
+      profile:
+        description: 'live: which trained bot to play as (a file in bot/profiles/)'
+        required: false
+        default: 'bot/profiles/beverly.json'
+      matches:
+        description: 'prod-vs: games to play (~2.5 min each). large-garbage: seeds to run'
+        required: false
+        default: '3'
+      difficulty:
+        description: 'prod-vs / large-garbage: bot difficulty'
+        required: false
+        default: 'hard'
       upstream_ref:
-        description: 'server beta: upstream commit/tag/branch to run the bot on. Empty = the betaserver-live tag if it exists, else latest beta'
+        description: 'Advanced, betaserver only: run the bot on this upstream commit/tag/branch instead of the latest beta. Only needed if the server is not on latest beta'
         required: false
         default: ''
 
-# `server: beta` plays UPSTREAM Panel Attack, whose protocol differs from the
+# The beta server runs UPSTREAM Panel Attack, whose protocol differs from the
 # fork's (lockstep: each client simulates both stacks from relayed inputs; no
 # garbage/death/display messages). Its bot lives in bot/ on this branch of
 # THIS repo, built to run on an unmodified upstream checkout:
 env:
+  # The two servers `server` offers; the beta one runs upstream's protocol.
+  BETA_SERVER: betaserver.panelattack.com:59569
   UPSTREAM_REPO: https://github.com/panel-attack/panel-game.git
   UPSTREAM_REF: beta
   # If whoever deploys the beta server moves this tag in the upstream repo to
@@ -79,9 +111,9 @@ env:
 
 jobs:
   bot-vs-bot:
-    name: Bot vs bot on live server
+    name: Run the bot
     runs-on: ubuntu-latest
-    # `server: beta` commits a newly registered bot's account id back to
+    # A beta-server run commits a newly registered bot's account id back to
     # UPSTREAM_BOT_REF so the name can be reused (see "Save the account id").
     permissions:
       contents: write
@@ -101,28 +133,20 @@ jobs:
           luarocks install --local luafilesystem --lua-version 5.1
           luarocks install --local luautf8 --lua-version 5.1
 
-      # Where the bot runs and what it connects to. fork: this checkout, the
-      # ip/port inputs. beta: a fresh upstream checkout (next step), upstream's
-      # beta server -- unless the ip input was changed from the fork default,
-      # which points a beta bot somewhere else (e.g. a test server).
+      # Where the bot runs and what it connects to: this checkout for this
+      # repo's server; a fresh upstream checkout (next steps) for the beta one.
       - name: Pick the server
         run: |
           set -eu
-          if [ '${{ inputs.server }}' = beta ]; then
-            [ '${{ inputs.mode }}' = live ] || { echo "server: beta is only for mode: live"; exit 1; }
-            echo "BOT_DIR=$GITHUB_WORKSPACE/upstream" >> "$GITHUB_ENV"
-            if [ '${{ inputs.ip }}' = 104.156.250.136 ]; then
-              echo "BOT_HOST=betaserver.panelattack.com" >> "$GITHUB_ENV"
-              echo "BOT_PORT=59569" >> "$GITHUB_ENV"
-            else
-              echo "BOT_HOST=${{ inputs.ip }}" >> "$GITHUB_ENV"
-              echo "BOT_PORT=${{ inputs.port }}" >> "$GITHUB_ENV"
-            fi
+          server='${{ inputs.server }}'
+          if [ "$server" = "$BETA_SERVER" ]; then
+            [ '${{ inputs.mode }}' = live ] || { echo "$BETA_SERVER is only for mode: live"; exit 1; }   # bitbot: the fork's client only
+            dir="$GITHUB_WORKSPACE/upstream"
           else
-            echo "BOT_DIR=$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
-            echo "BOT_HOST=${{ inputs.ip }}" >> "$GITHUB_ENV"
-            echo "BOT_PORT=${{ inputs.port }}" >> "$GITHUB_ENV"
+            dir="$GITHUB_WORKSPACE"
           fi
+          { echo "BOT_DIR=$dir"; echo "BOT_HOST=${server%%:*}"; echo "BOT_PORT=${server##*:}"; } >> "$GITHUB_ENV"
+          echo "::notice::${{ inputs.mode }} on $server"
 
       # THE SERVER'S OWN BUILD, AS NEAR AS CAN BE KNOWN. Nothing of upstream is
       # vendored here: every run fetches upstream and drops this repo's bot/ on
@@ -137,7 +161,7 @@ jobs:
       #   3. the latest UPSTREAM_REF -- right whenever the server was deployed
       #      from beta's head, which is the normal case.
       - name: Check out the upstream bot
-        if: inputs.server == 'beta'
+        if: inputs.server == env.BETA_SERVER
         uses: actions/checkout@v4
         with:
           ref: ${{ env.UPSTREAM_BOT_REF }}
@@ -145,7 +169,7 @@ jobs:
           sparse-checkout: bot
 
       - name: Fetch upstream Panel Attack and add the bot
-        if: inputs.server == 'beta'
+        if: inputs.server == env.BETA_SERVER
         env:
           PIN: ${{ inputs.upstream_ref }}
         run: |
@@ -171,7 +195,7 @@ jobs:
           eval "$(luarocks path --local --lua-version 5.1)"
           set -o pipefail
           luajit bot/winRateTest.lua "" "" \
-            "${{ inputs.matches }}" "${{ inputs.ip }}" "${{ inputs.port }}" "${{ inputs.difficulty }}" \
+            "${{ inputs.matches }}" "$BOT_HOST" "$BOT_PORT" "${{ inputs.difficulty }}" \
             2>&1 | tee bot-prod-smoke.log
         continue-on-error: true
 
@@ -230,18 +254,21 @@ jobs:
       # one), so a beta bot keeps its name by saving the id it was given
       # instead -- see "Save the account id".
       - name: Derive this name's account id
-        if: (inputs.mode == 'live' || inputs.mode == 'survival') && inputs.server != 'beta'
+        if: inputs.mode == 'live' && inputs.server != env.BETA_SERVER
         env:
-          BOT_NAME: ${{ inputs.name }}
-          BOT_IP: ${{ inputs.ip }}
+          BASE_NAME: ${{ inputs.name }}
+          BOT_IP: ${{ env.BOT_HOST }}
         run: |
-          id=$(python3 -c '
+          names="$BASE_NAME"
+          mkdir -p bot/identities
+          for BOT_NAME in $names; do
+            id=$(BOT_NAME="$BOT_NAME" python3 -c '
           import hashlib, os
           msg = (os.environ["BOT_IP"] + "/" + os.environ["BOT_NAME"].lower()).encode()
           print("1" + str(int(hashlib.sha256(msg).hexdigest(), 16) % 10**18).zfill(18))')
-          mkdir -p bot/identities
-          printf '%s' "$id" > "bot/identities/${BOT_NAME}_${BOT_IP}.txt"
-          echo "'$BOT_NAME' logs in with account id $id (same name, same account, every run)"
+            printf '%s' "$id" > "bot/identities/${BOT_NAME}_${BOT_IP}.txt"
+            echo "'$BOT_NAME' logs in with account id $id (same name, same account, every run)"
+          done
 
       - name: Sit in the lobby
         if: inputs.mode == 'live'
@@ -251,7 +278,7 @@ jobs:
         run: |
           eval "$(luarocks path --local --lua-version 5.1)"
           secs=$(( ${{ inputs.hours }} * 3600 ))
-          echo "::notice::${{ inputs.name }} joining $BOT_HOST:$BOT_PORT (${{ inputs.server }}) for ${{ inputs.hours }}h"
+          echo "::notice::${{ inputs.name }} joining $BOT_HOST:$BOT_PORT for ${{ inputs.hours }}h"
           cd "$BOT_DIR"
           set -o pipefail
           # The bot runs until killed, so the timeout IS the stop condition:
@@ -304,7 +331,7 @@ jobs:
       # commits it to UPSTREAM_BOT_REF so the next run logs back in instead of
       # being denied as "already taken". Not secret, on purpose: bot accounts.
       - name: Save the account id
-        if: always() && inputs.server == 'beta'
+        if: always() && inputs.server == env.BETA_SERVER
         run: |
           set -eu
           f="bot/identities/${{ inputs.name }}_${BOT_HOST}.txt"
@@ -323,16 +350,50 @@ jobs:
           done
           exit 1
 
+      # BITBOT and WASMSURVIVOR come from GameCreator's latest main. BitBot is
+      # C: fight.sh builds its libbit.so (the line in GameCreator's
+      # native/build.sh) and the client plays it in-process
+      # (bot/BitBotNative.lua, as GameCreator's lua/train.lua does).
+      - name: Check out GameCreator (BitBot, WasmSurvivor)
+        if: inputs.mode == 'fight' && (contains(fromJSON('["bitbot","wasm"]'), inputs.bot) || contains(fromJSON('["bitbot","wasm"]'), inputs.opponent))
+        uses: actions/checkout@v4
+        with:
+          repository: briankeegan/GameCreator
+          path: GameCreator
+          sparse-checkout: games/the-game
+
+      - uses: actions/setup-node@v4
+        if: inputs.mode == 'fight' && (contains(fromJSON('["bitbot","wasm"]'), inputs.bot) || contains(fromJSON('["bitbot","wasm"]'), inputs.opponent))
+        with:
+          node-version: '22'
+
+      # FIGHT: bot/fight.sh does it all -- accounts, BitBot's link and its
+      # pre-flight when BitBot plays (nothing joins the lobby if that fails),
+      # then `bot` in the lobby and `opponent` challenging it.
+      - name: Fight
+        if: inputs.mode == 'fight'
+        id: fight
+        env:
+          GC_EVAL_DIR: ${{ github.workspace }}/GameCreator/games/the-game/ai/eval
+        run: |
+          eval "$(luarocks path --local --lua-version 5.1)"
+          [ "$BOT_HOST" != "$BETA_SERVER" ] && [ "${BOT_HOST}:${BOT_PORT}" != "$BETA_SERVER" ] || { echo "fight plays the fork's server only"; exit 1; }
+          if [ -d GameCreator ]; then echo "::notice::GameCreator $(git -C GameCreator log -1 --format='%h %s')"; fi
+          echo "::notice::${{ inputs.name }} (${{ inputs.bot }}) vs ${{ inputs.opponent }} on $BOT_HOST:$BOT_PORT for ${{ inputs.hours }}h"
+          set -o pipefail
+          bot/fight.sh "$BOT_HOST" "$BOT_PORT" $(( ${{ inputs.hours }} * 3600 )) '${{ inputs.bot }}' '${{ inputs.name }}' '${{ inputs.opponent }}' \
+            2>&1 | tee bot-prod-smoke.log
+
       - name: Summary
         if: always()
         run: |
           {
-            echo "## Bot Smoke Test (${{ inputs.mode }}, ${{ inputs.server }}) — ${BOT_HOST:-${{ inputs.ip }}}:${BOT_PORT:-${{ inputs.port }}}"
+            echo "## Bot (${{ inputs.mode }}) — ${{ inputs.server }}"
             echo ""
             echo '```'
             tail -n 40 bot-prod-smoke.log || echo "(no log produced)"
             echo '```'
-            if [ -f survivor.log ]; then echo '### WasmSurvivor'; echo '```'; tail -n 40 survivor.log; echo '```'; fi
+            for f in bitbot-mind.log mind-*.log; do [ -f "$f" ] || continue; echo "### $f"; echo '```'; tail -n 40 "$f"; echo '```'; done
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload log
@@ -342,9 +403,12 @@ jobs:
           name: bot-prod-smoke-log
           path: |
             bot-prod-smoke.log
-            survivor.log
-          if-no-files-found: ignore
+            bitbot-mind.log
+            bitbot-preflight.log
+            mind-*.log
+            preflight-*.log
+            fight-*.log
 
       - name: Fail if the run failed
-        if: steps.smoke.outcome == 'failure' || steps.largegarbage.outcome == 'failure' || steps.live.outcome == 'failure' || steps.survival.outcome == 'failure'
+        if: steps.smoke.outcome == 'failure' || steps.largegarbage.outcome == 'failure' || steps.live.outcome == 'failure' || steps.fight.outcome == 'failure'
         run: exit 1

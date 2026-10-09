@@ -19,7 +19,7 @@ local port = tonumber(arg[2]) or 49569
 local name = arg[3] or "PanelBot"
 local cursorInterval = tonumber(arg[4]) -- frames between cursor moves/swaps; nil = full speed
 local reactionFrames = tonumber(arg[5]) -- reaction-cap frames; nil = full speed
-local brain = arg[6] or "heuristic"     -- "heuristic" | "search" | "expert" | "weighted" | "survival"
+local brain = arg[6] or "heuristic"     -- "heuristic" | "search" | "expert" | "weighted" | "survival" | "bitbot"
 local cursorSpeed = (cursorInterval or reactionFrames)
   and { cursorMoveInterval = cursorInterval or 8, reactionFrames = reactionFrames or 3 } or nil
 
@@ -45,6 +45,28 @@ print(string.format(
   "\n=== Bot '%s' (%s, L%d, %s, %s) is idle in the lobby on %s ===\n    Open your client, CHALLENGE '%s' in the lobby, and play — it auto-accepts.\n    Ctrl+C to stop.\n",
   name, brain, bot.level, speedDesc, bot.ranked and "RANKED" or "unranked", ip, name))
 
+-- PA_CHALLENGE=<name>: also CHALLENGE that player whenever both sides are in
+-- the lobby (it auto-accepts if it is a bot like this one), so two bots play
+-- each other for as long as they run -- BitBot's self-play. Unset: the bot
+-- only waits to be challenged, as always.
+local challengeName = os.getenv("PA_CHALLENGE")
+if challengeName == "" then challengeName = nil end
+local lastChallengeAt = 0
+local function challengeIfFree()
+  if not challengeName or bot.inRoom or bot.match or not bot.lobby or not bot.lobby.players then return end
+  local now = socket.gettime()
+  if now - lastChallengeAt < 3 then return end
+  for _, p in pairs(bot.lobby.players) do
+    if p.name == challengeName and p.state == "lobby" then
+      lastChallengeAt = now
+      bot.gameplay:sendRequest(require("common.network.ClientProtocol").updateChallengeStatus(
+        bot.publicId, p.publicId, require("common.data.GameModes").IDs.TWO_PLAYER_VS, true))
+      return
+    end
+  end
+end
+if challengeName then print("    and challenging '" .. challengeName .. "' whenever both are in the lobby.\n") end
+
 local function playerCount()
   local n = 0
   if bot.players then for _ in pairs(bot.players) do n = n + 1 end end
@@ -60,6 +82,7 @@ local lastReadyAt = 0
 
 while true do
   bot:pump()
+  challengeIfFree()
 
   -- (Re)ready ~every 1.5s while we're in the room with an opponent and no match
   -- is pending/running. Retrying (not single-shot) survives the post-match room

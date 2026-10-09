@@ -819,13 +819,25 @@ end
 ---@param lobbyDataV2 PersonalizedLobbyDataV2?
 ---@return boolean
 function Lobby:isLocalPlayerInRoom(lobbyDataV2)
-  if GAME.netClient.room then
-    return true
+  -- A leaveRoom request is in flight: self.room is still set (it only
+  -- clears once the server's confirmation round-trips back), but we've
+  -- already asked to leave, so treat it as already gone. Otherwise a quick
+  -- click right after leaving (e.g. leaving one spectated room to spectate
+  -- another) sees stale "still in a room" state and gets wrongly blocked
+  -- with "leave room first" -- or the room-submenu with Spectate on it
+  -- never shows at all, which looks like clicking Spectate silently failed.
+  if GAME.netClient._pendingLeaveRoom then
+    return false
   end
 
-  lobbyDataV2 = lobbyDataV2 or GAME.netClient.lobbyDataV2
-  local localData = lobbyDataV2 and lobbyDataV2.players and lobbyDataV2.players[GAME.localPlayer.publicId]
-  return localData and localData.roomNumber ~= nil
+  -- Deliberately NOT falling back to lobbyDataV2.players[...].roomNumber:
+  -- that's the server's own broadcast, and a known server-side bug can drop
+  -- the leave_room reply for a spectator, leaving that field stuck pointing
+  -- at a room this client already left. The server's broadcast about THIS
+  -- client can be stale; what this client itself last did cannot, so it's
+  -- the only signal trusted here. lobbyDataV2 is still fine for questions
+  -- about OTHER players (openPlayerContextMenu, etc.).
+  return GAME.netClient.room ~= nil
 end
 
 ---@param lobbyDataV2 PersonalizedLobbyDataV2?

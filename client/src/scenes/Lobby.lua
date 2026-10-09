@@ -830,13 +830,14 @@ function Lobby:isLocalPlayerInRoom(lobbyDataV2)
     return false
   end
 
-  if GAME.netClient.room then
-    return true
-  end
-
-  lobbyDataV2 = lobbyDataV2 or GAME.netClient.lobbyDataV2
-  local localData = lobbyDataV2 and lobbyDataV2.players and lobbyDataV2.players[GAME.localPlayer.publicId]
-  return localData and localData.roomNumber ~= nil
+  -- Deliberately NOT falling back to lobbyDataV2.players[...].roomNumber:
+  -- that's the server's own broadcast, and a known server-side bug can drop
+  -- the leave_room reply for a spectator, leaving that field stuck pointing
+  -- at a room this client already left. The server's broadcast about THIS
+  -- client can be stale; what this client itself last did cannot, so it's
+  -- the only signal trusted here. lobbyDataV2 is still fine for questions
+  -- about OTHER players (openPlayerContextMenu, etc.).
+  return GAME.netClient.room ~= nil
 end
 
 ---@param lobbyDataV2 PersonalizedLobbyDataV2?

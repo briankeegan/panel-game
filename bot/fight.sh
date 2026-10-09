@@ -30,9 +30,9 @@
 # 30-second pre-flight offline first, and nothing joins the lobby if its
 # hookup is broken.
 #
-# Accounts: each name logs in with an id derived from the name and HOST, so a
-# name is the same account every run (the fork's server accepts a
-# client-chosen id for a free name). This is the fork's server only.
+# Accounts: a new name gets its account from the server; its id is saved in
+# bot/identities/<name>_<HOST>.txt and reused every run after (the workflow
+# commits it). This is the fork's server only.
 #
 # Logs: fight-<NAME>.log per side; preflight-<NAME>.log for bitbot/wasm,
 # mind-<NAME>.log for wasm, bitbot-build.log. In the workflow: mode `fight` (bot-prod-smoke-test.yml).
@@ -55,14 +55,15 @@ for n in "$NAME" ${OPP:+"$OPP_NAME"}; do
 done
 [ -z "$OPP" ] || [ "$NAME" != "$OPP_NAME" ] || { echo "fight: the two sides need different names"; exit 2; }
 
-# ---- same name, same account
+# ---- same name, same account. A name the server has given an account has its
+# id in bot/identities/<name>_<HOST>.txt (committed); the bot logs in with it.
+# A new name logs in without one: the server makes the account, the bot writes
+# its id there, and the workflow commits it ("Save new account ids") so every
+# later run logs back in as the same account.
 mkdir -p bot/identities
 for n in "$NAME" ${OPP:+"$OPP_NAME"}; do
-  id=$(BOT_IP="$HOST" BOT_NAME="$n" python3 -c '
-import hashlib, os
-msg = (os.environ["BOT_IP"] + "/" + os.environ["BOT_NAME"].lower()).encode()
-print("1" + str(int(hashlib.sha256(msg).hexdigest(), 16) % 10**18).zfill(18))')
-  printf '%s' "$id" > "bot/identities/${n}_${HOST}.txt"
+  if [ -s "bot/identities/${n}_${HOST}.txt" ]; then echo "fight: $n logs in to its saved account"
+  else echo "fight: $n is new here -- the server makes its account, and its id is saved"; fi
 done
 
 # ---- BitBot: native, in the client's own process (bot/BitBotNative.lua, as

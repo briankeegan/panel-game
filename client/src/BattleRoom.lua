@@ -1165,6 +1165,16 @@ function BattleRoom:getInfo()
 end
 
 function BattleRoom:setSpectatorList(spectatorList)
+  -- A spectator count increase means someone new just attached. Keyframes
+  -- are otherwise only periodic (DisplayEventCapture's KEYFRAME_EVERY),
+  -- not per-viewer, so whoever just joined would likely get delta-only
+  -- snapshots at first and see an inaccurate, partly-blank board until the
+  -- next scheduled one. Force a real keyframe out now instead.
+  if self._displayCaptures and #spectatorList > #(self.spectators or {}) then
+    for _, capture in ipairs(self._displayCaptures) do
+      pcall(capture.forceKeyframe, capture)
+    end
+  end
   self.spectators = spectatorList
   local str = ""
   for k, v in ipairs(spectatorList) do

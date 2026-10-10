@@ -64,6 +64,8 @@ function DisplayEventCapture.new(engine, playerID, hostStack, historyList)
   -- handlers, drained into each snapshot.
   self._pendingEvents     = {}
   self._popSizeThisFrame  = 1
+  -- Set by forceKeyframe() when a new spectator attaches; see there.
+  self._forceKeyframe = false
   -- Optional list to accumulate every batch for replay recording.
   -- When set, each batch built in _send is appended here in addition
   -- to being sent over the network.
@@ -77,6 +79,19 @@ function DisplayEventCapture.new(engine, playerID, hostStack, historyList)
     engine._renderHost = hostStack
   end
   return self
+end
+
+---Force the next send to be a full keyframe, bypassing the normal rate/
+---idle/unchanged gates entirely. Call when a new spectator attaches: a
+---keyframe is otherwise only periodic (every KEYFRAME_EVERY sends, ~5s at
+---20Hz), not per-viewer, so a spectator who just joined likely gets
+---delta-only snapshots at first. An unresolved delta cell has no cached
+---grid to resolve against yet and renders as empty (see the "Orphan-delta
+---safety" comment in DisplayClientStack:applyBatch) -- so without this,
+---whatever just joined watches an inaccurate, partly-blank board for up
+---to that whole window instead of the real one.
+function DisplayEventCapture:forceKeyframe()
+  self._forceKeyframe = true
 end
 
 ---Per-frame heartbeat driven from BattleRoom:update. Independent of
@@ -421,6 +436,12 @@ end
 
 function DisplayEventCapture:_maybeSend()
   local now = love.timer.getTime()
+  if self._forceKeyframe then
+    -- A freshly-joined spectator needs this now, not whenever the normal
+    -- rate/idle/deficit gates below would otherwise next allow a send.
+    self:_send(now)
+    return
+  end
   -- Fast-events bypass: ship every tick when something visually fast is
   -- happening that 20Hz undersamples. Three triggers:
   --   * manual raise in progress (player holding raise button)
@@ -557,16 +578,23 @@ end
 function DisplayEventCapture:_send(now)
   self.lastFlushTime = now or love.timer.getTime()
 
+  -- Consume the force-keyframe request now: a forced send must go out as
+  -- a real keyframe (skip-when-unchanged bypassed below too) even if the
+  -- board happens to be static the instant a new spectator attaches.
+  local forcingKeyframe = self._forceKeyframe
+  self._forceKeyframe = false
+
   -- Skip-when-unchanged: bail before the expensive serialize if NOTHING
   -- shippable has changed since the last send. Catches:
   --   * Engine clock advancing (normal play) — sig differs
   --   * Panel state flipping while clock frozen (post-death
   --     applyVisualDeath) — panelsSig differs
   --   * One-shot events pending — _pendingEvents non-empty
-  -- All three quiet → no info to ship → skip.
+  -- All three quiet → no info to ship → skip. Never applies when forcing.
   local sig       = stateSignature(self.engine)
   local panelsSig = panelsSignature(self.engine)
-  if sig == self._lastSentSig
+  if not forcingKeyframe
+      and sig == self._lastSentSig
       and panelsSig == self._lastSentPanelsSig
       and #self._pendingEvents == 0 then
     return
@@ -587,7 +615,8 @@ function DisplayEventCapture:_send(now)
   -- grid. Periodic keyframes (every KEYFRAME_EVERY sends) ship the full
   -- grid so receivers can recover from packet loss or stale state.
   self._sendCount = (self._sendCount or 0) + 1
-  local isKeyframe = (self._sendCount == 1)
+  local isKeyframe = forcingKeyframe
+      or (self._sendCount == 1)
       or (self._sendCount % KEYFRAME_EVERY == 0)
   local fullP = snapshot.p
   if fullP then

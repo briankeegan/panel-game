@@ -279,6 +279,17 @@ function BotClient:dispatch(msg)
   elseif msg.leave_room then
     self.inRoom = false
     logger.info("bot[" .. self.name .. "]: left room (" .. tostring(msg.reason) .. ")")
+  elseif msg.spectators then
+    -- A spectator-count increase means someone new just attached to watch
+    -- this match. Keyframes are otherwise only periodic (DisplayEventCapture's
+    -- KEYFRAME_EVERY), not per-viewer, so whoever just joined likely gets
+    -- delta-only snapshots at first and sees an inaccurate, partly-blank
+    -- board until the next scheduled one. Force a real keyframe out now.
+    local newCount = #msg.spectators
+    if self.capture and newCount > (self._lastSpectatorCount or 0) then
+      self.capture:forceKeyframe()
+    end
+    self._lastSpectatorCount = newCount
   end
   -- relayed input "I" and other messages fall through (ignored for 3a).
 end
@@ -503,6 +514,7 @@ function BotClient:startMatch()
   self.deathSent = false
   self._deathAwaitingFlush = false
   self._resultReported = false
+  self._lastSpectatorCount = 0
   logger.info(string.format("bot[%s]: match built; my stack = slot %d; start in %dms",
     self.name, self.localPlayerNumber, self.matchStart.startInMs or 500))
 end

@@ -28,7 +28,7 @@ local ffi = require("ffi")
 local KeyDataEncoding = require("common.data.KeyDataEncoding")
 local ThinkBudget = require("common.engine.computerPlayers.ThinkBudget")
 
-local BOTLOG_FRAMES = tonumber(os.getenv("PA_BITBOT_LOG_FRAMES") or 0)   -- off: its trace is written inside the timed decision, and bot_time would read that as the bot being slow
+local BOTLOG_FRAMES = tonumber(os.getenv("PA_BITBOT_LOG_FRAMES") or 30)   -- the first 30 live frames only: the trace is written inside the timed decision, and bot_time reads that as slow
 
 local BitBotNative = {}
 BitBotNative.__index = BitBotNative

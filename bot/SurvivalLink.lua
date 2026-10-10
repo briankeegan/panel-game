@@ -129,6 +129,12 @@ end
 -- and what of it is kept back for the work after the last wait.
 SurvivalLink.CEILING_SEC = 0.008
 SurvivalLink.MARGIN_SEC = 0.002
+-- The clock a computer player's thinking is timed on (ThinkBudget.now): the
+-- game's timer, or the process clock where there is no love.
+local function thinkNow()
+  if love and love.timer then return love.timer.getTime() end
+  return os.clock()
+end
 function SurvivalLink.new(opts)
   opts = opts or {}
   local self = setmetatable({}, SurvivalLink)
@@ -176,6 +182,17 @@ function SurvivalLink:receive(timeout)
   return nil
 end
 
+-- The next reply line, or nil at `deadline` (socket.gettime seconds). The
+-- system's timers wake a wait late by a millisecond or two, so a wait blocks
+-- only until SPIN_SEC before the deadline and polls the rest.
+SurvivalLink.SPIN_SEC = 0.003
+function SurvivalLink:await(deadline)
+  local coarse = deadline - SurvivalLink.SPIN_SEC - socket.gettime()
+  local line = self:receive(coarse > 0 and coarse or 0)
+  while not line and socket.gettime() < deadline do line = self:receive(0) end
+  return line
+end
+
 function SurvivalLink:startMatch(stack)
   self:connect()
   self:send(enc({ t = "match", levelData = stack.levelData, behaviours = stack.behaviours,
@@ -207,10 +224,10 @@ function SurvivalLink:think(stack, sources)
   -- Everything this frame costs -- the board encoded, sent, every wait and
   -- every reply read -- counts against the frame's thinking budget, so the
   -- waits are cut to what is left of it.
-  local started = socket.gettime()
+  local started, spent = socket.gettime(), thinkNow()
   local deadline = started + SurvivalLink.CEILING_SEC - SurvivalLink.MARGIN_SEC
   local function finish(key)
-    local took = socket.gettime() - started
+    local took = thinkNow() - spent
     if took > self.worst then self.worst = took end
     if took > SurvivalLink.CEILING_SEC then self.over = self.over + 1 end
     return key
@@ -222,7 +239,7 @@ function SurvivalLink:think(stack, sources)
   -- it planned (reply.next, from the frame after its own) are the newest
   -- known. A frame whose answer is late presses what was planned for it.
   while self.awaiting > 0 do
-    local line = self:receive(math.max(0, math.min(self.waitSec, deadline - socket.gettime())))
+    local line = self:await(math.min(deadline, socket.gettime() + self.waitSec))
     if not line then
       self.late = self.late + 1
       local planned = self.planned and self.planned[clock]

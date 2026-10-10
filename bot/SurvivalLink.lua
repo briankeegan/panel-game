@@ -244,6 +244,13 @@ function SurvivalLink.sampleBoard(i)
 end
 function SurvivalLink.warm()
   for i = 1, 400 do SurvivalLink.dump(SurvivalLink.sampleBoard(i)) end
+  -- A frame runs with the collector stopped, so the heap grows by everything the frame makes. Memory
+  -- the process has not touched before is mapped when it is first written, which a frame should
+  -- not wait for: grow the heap by several frames' worth now, then free it for the frames to reuse.
+  collectgarbage("stop")
+  for i = 1, 8 do SurvivalLink.dump(SurvivalLink.sampleBoard(129 + i * 130)) end
+  collectgarbage("restart")
+  collectgarbage()
 end
 
 -- A frame is held to this share of the thinking ceiling: what the system's own
@@ -360,6 +367,8 @@ function SurvivalLink:input(stack, sources)
   end
   local traces0 = stopOnOver and SurvivalLink.tracing.events or 0
   local before = stopOnOver and SurvivalLink.machine() or nil
+  local minor0, major0 = 0, 0
+  if stopOnOver then minor0, major0 = SurvivalLink.faults() end
   collectgarbage("stop")
   local began = ThinkBudget.now()
   local cpu0 = os.clock()
@@ -384,10 +393,20 @@ function SurvivalLink:input(stack, sources)
     local text = {}
     for name, v in pairs(st or {}) do text[#text + 1] = string.format("%s %.1f", name, v * 1000) end
     table.sort(text)
-    self.stopReason = string.format("STOPPED on the first frame over the ceiling: clock %d, wall %.1f ms, this process's cpu %.1f ms, steps (ms) [%s], compiler events in the frame %d, longest single poll %.1f ms, board %d bytes, garbage staged %d / in telegraphs %d; the machine over the frame: stolen %.1f ms, busy %.1f ms of %.1f ms, runnable %d, load %s",
-      stack.clock, took * 1000, cpu * 1000, table.concat(text, ", "), SurvivalLink.tracing.events - traces0, (self.longestPoll or 0) * 1000, self.boardBytes or 0, #stack.incomingGarbage.stagedGarbage, SurvivalLink.telegraphCount(sources), (after.steal - before.steal) * 10, (after.busy - before.busy) * 10, (after.total - before.total) * 10, after.running, after.load)
+    self.stopReason = string.format("STOPPED on the first frame over the ceiling: clock %d, wall %.1f ms, this process's cpu %.1f ms, steps (ms) [%s], compiler events in the frame %d, longest single poll %.1f ms, board %d bytes, garbage staged %d / in telegraphs %d; page faults in the frame: %d minor, %d major; the machine over the frame: stolen %.1f ms, busy %.1f ms of %.1f ms, runnable %d, load %s",
+      stack.clock, took * 1000, cpu * 1000, table.concat(text, ", "), SurvivalLink.tracing.events - traces0, (self.longestPoll or 0) * 1000, self.boardBytes or 0, #stack.incomingGarbage.stagedGarbage, SurvivalLink.telegraphCount(sources), select(1, SurvivalLink.faults()) - minor0, select(2, SurvivalLink.faults()) - major0, (after.steal - before.steal) * 10, (after.busy - before.busy) * 10, (after.total - before.total) * 10, after.running, after.load)
   end
   return key
+end
+
+---The process's minor and major page faults so far (/proc/self/stat), or zeros.
+function SurvivalLink.faults()
+  local f = io.open("/proc/self/stat", "r")
+  if not f then return 0, 0 end
+  local line = f:read("*l") or ""; f:close()
+  local n = {}
+  for v in (line:match("%) (.*)$") or ""):gmatch("%S+") do n[#n + 1] = v end
+  return tonumber(n[8]) or 0, tonumber(n[10]) or 0
 end
 
 ---How many garbage blocks the sources' telegraphs hold, staged and in transit.

@@ -200,6 +200,12 @@ function SurvivalLink:startMatch(stack)
   self.awaiting = 1   -- the match's ok, read with the first frame's answer
   self.planned = nil
   self.frames = 0
+  -- A match's clock starts at 0, so the last match's presses (stamped with
+  -- clocks of up to thousands) would sit inside this one's window for as long
+  -- as the last one ran: a full allowance, every key refused. An allowance the
+  -- link made is the link's to start again; the game's own is the game's.
+  if self.ownInputs then self.inputs = InputBudget.standard() end
+  self.dropped = 0
 end
 
 -- The key to press this frame. Before the countdown ends the bot holds

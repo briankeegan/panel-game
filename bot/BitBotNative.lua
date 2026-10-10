@@ -123,7 +123,7 @@ function BitBotNative:tellOpponent(stack)
       if other:game_ended() then topped = 1 end
     end
   end
-  self.C.front_opponent(self.fid, present, topped)
+  C.front_opponent(self.fid, present, topped)
 end
 
 -- The key to press this frame. Through the countdown nothing is pressed

@@ -194,6 +194,7 @@ play() {
   esac
 }
 
+[ -z "${GC_EVAL_DIR:-}" ] || echo "fight: GameCreator at $(git -C "$GC_EVAL_DIR" log -1 --format='%h %cd -- %s' 2>/dev/null | cut -c1-150)"
 echo "fight: $NAME ($BOT) in the lobby on $HOST:$PORT${OPP:+, challenged by $OPP_NAME ($OPP)}, for ${SECS}s"
 if [ -z "$OPP" ]; then
   play "$BOT" "$NAME" "$([ "$REMOTE" = 1 ] && echo "$OPP_NAME")" 2>&1 | tee "fight-$NAME.log"

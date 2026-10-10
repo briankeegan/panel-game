@@ -2,6 +2,7 @@
 # FIGHT: pick who plays who on the fork's server.
 #
 #   bot/fight.sh HOST PORT SECONDS BOT NAME [OPPONENT [OPPONENT_NAME]]
+#   (NAME may be "BOTNAME,OPPONENTNAME" instead of giving OPPONENT_NAME)
 #
 #   BOT       sits in the lobby as NAME and auto-accepts any challenge
 #   OPPONENT  (optional) logs in as OPPONENT_NAME (default NAME2) and
@@ -13,6 +14,8 @@
 #   bitbot     GameCreator's BitBot (C, games/the-game/ai/eval/native, as the
 #              checkout at $GC_EVAL_DIR has it), built to libbit.so and played
 #              in the client's own process by bot/BitBotNative.lua
+#   bitbotwasm GameCreator's BitBot as its WASM build (bitbot.js on bit.wasm, in
+#              Node), through bot/bitbot_link.js and bot/SurvivalLink.lua
 #   wasm       GameCreator's WasmSurvivor (games/the-game/ai/eval/survivor.js,
 #              same checkout), the survival bot, a Node process per side
 #   beverly    the fork's weighted bot, bot/profiles/beverly.json
@@ -30,9 +33,9 @@
 # 30-second pre-flight offline first, and nothing joins the lobby if its
 # hookup is broken.
 #
-# Accounts: each name logs in with an id derived from the name and HOST, so a
-# name is the same account every run (the fork's server accepts a
-# client-chosen id for a free name). This is the fork's server only.
+# Accounts: a new name gets its account from the server; its id is saved in
+# bot/identities/<name>_<HOST>.txt and reused every run after (the workflow
+# commits it). This is the fork's server only.
 #
 # Logs: fight-<NAME>.log per side; preflight-<NAME>.log for bitbot/wasm,
 # mind-<NAME>.log for wasm, bitbot-build.log. In the workflow: mode `fight` (bot-prod-smoke-test.yml).
@@ -42,27 +45,37 @@ cd "$(dirname "$0")/.."
 usage() { sed -n '2,20p' "$0"; exit 2; }
 [ $# -ge 5 ] || usage
 HOST=$1; PORT=$2; SECS=$3; BOT=$4; NAME=$5
-OPP=${6:-you}; OPP_NAME=${7:-${NAME}2}
+OPP=${6:-you}; OPP_NAME=${7:-}
+# NAME may carry both accounts as "BOTNAME,OPPONENTNAME" (the workflow has no
+# room for a separate input): the opponent then uses that existing account
+# instead of the default NAME2, which would be a new account to create.
+case "$NAME" in *,*) OPP_NAME=${OPP_NAME:-${NAME#*,}}; NAME=${NAME%%,*};; esac
+OPP_NAME=${OPP_NAME:-${NAME}2}
 [ "$OPP" = you ] && OPP=""
+# OPP=challenge: the other side runs in ANOTHER run (its own runner, its own CPUs), sitting in the lobby as
+# OPP_NAME (the second half of NAME, "A,B"). This run's bot challenges it there instead of launching it here.
+REMOTE=0
+if [ "$OPP" = challenge ]; then REMOTE=1; OPP=""; fi
 
-kinds="bitbot wasm beverly plamp heuristic"
+kinds="bitbot bitbotwasm wasm beverly plamp heuristic"
 known() { case " $kinds " in *" $1 "*) return 0;; esac; return 1; }
 known "$BOT" || { echo "fight: no bot '$BOT' (one of: $kinds)"; exit 2; }
 [ -z "$OPP" ] || known "$OPP" || { echo "fight: no opponent '$OPP' (one of: $kinds, or you)"; exit 2; }
-for n in "$NAME" ${OPP:+"$OPP_NAME"}; do
+for n in "$NAME" ${OPP:+"$OPP_NAME"} $([ "$REMOTE" = 1 ] && echo "$OPP_NAME"); do
   [ ${#n} -le 16 ] || { echo "fight: name '$n' is ${#n} chars; the server limit is 16"; exit 2; }
   case "$n" in *[!A-Za-z0-9_]*) echo "fight: name '$n' may only have letters, digits and _"; exit 2;; esac
 done
 [ -z "$OPP" ] || [ "$NAME" != "$OPP_NAME" ] || { echo "fight: the two sides need different names"; exit 2; }
 
-# ---- same name, same account
+# ---- same name, same account. A name the server has given an account has its
+# id in bot/identities/<name>_<HOST>.txt (committed); the bot logs in with it.
+# A new name logs in without one: the server makes the account, the bot writes
+# its id there, and the workflow commits it ("Save new account ids") so every
+# later run logs back in as the same account.
 mkdir -p bot/identities
 for n in "$NAME" ${OPP:+"$OPP_NAME"}; do
-  id=$(BOT_IP="$HOST" BOT_NAME="$n" python3 -c '
-import hashlib, os
-msg = (os.environ["BOT_IP"] + "/" + os.environ["BOT_NAME"].lower()).encode()
-print("1" + str(int(hashlib.sha256(msg).hexdigest(), 16) % 10**18).zfill(18))')
-  printf '%s' "$id" > "bot/identities/${n}_${HOST}.txt"
+  if [ -s "bot/identities/${n}_${HOST}.txt" ]; then echo "fight: $n logs in to its saved account"
+  else echo "fight: $n is new here -- the server makes its account, and its id is saved"; fi
 done
 
 # ---- BitBot: native, in the client's own process (bot/BitBotNative.lua, as
@@ -72,12 +85,14 @@ done
 build_bitbot() {
   [ -n "${GC_EVAL_DIR:-}" ] || { echo "fight: bitbot needs GC_EVAL_DIR=<GameCreator>/games/the-game/ai/eval"; exit 2; }
   local line
-  line=$(grep -E '^clang .*-o libbit\.so$' "$GC_EVAL_DIR/native/build.sh") \
+  line=$(grep -E '^clang .* -shared .*libbit\.so' "$GC_EVAL_DIR/native/build.sh" | head -1) \
     || { echo "fight: GameCreator's native/build.sh no longer builds libbit.so -- BitBot's hookup needs a look"; exit 1; }
   (cd "$GC_EVAL_DIR/native" && eval "$line" 2> "$OLDPWD/bitbot-build.log") \
     || { cat bitbot-build.log; echo "fight: libbit.so did not build"; exit 1; }
 }
 preflight() {   # KIND NAME [PORT WAIT]
+  # Off unless FIGHT_PREFLIGHT=1: a bot goes straight to the lobby, where it can be seen playing.
+  [ "${FIGHT_PREFLIGHT:-0}" = 1 ] || { echo "fight: pre-flight skipped ($1 $2)"; return 0; }
   local kind=$1 name=$2
   PA_PREFLIGHT_BRAIN=$([ "$kind" = bitbot ] && echo bitbot) PA_SURVIVOR_PORT=${3:-} PA_SURVIVOR_WAIT=${4:-} \
     PA_PREFLIGHT_NAME="$kind ($name)" PA_PREFLIGHT_LATE_OK=$([ "$kind" = wasm ] && echo 1) \
@@ -92,17 +107,75 @@ declare -A PORT_OF
 start_wasm() {   # NAME PORT
   local name=$1 port=$2 log="mind-$1.log"
   [ -n "${GC_EVAL_DIR:-}" ] || { echo "fight: wasm needs GC_EVAL_DIR=<GameCreator>/games/the-game/ai/eval"; exit 2; }
-  node "$GC_EVAL_DIR/survivor.js" --port "$port" > "$log" 2>&1 &
+  # WASM_PROFILE=bot/profiles/<x>.wasm.json plays trained weights (its
+  # "weights" file sits beside it; survivor.js reads it from its own folder)
+  local prof=""
+  case "${WASM_PROFILE:-}" in
+    *.wasm.json)
+      [ -f "$WASM_PROFILE" ] || { echo "fight: no WasmSurvivor profile $WASM_PROFILE"; exit 2; }
+      local w; w=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["weights"])' "$WASM_PROFILE")
+      cp "$(dirname "$WASM_PROFILE")/$w" "$GC_EVAL_DIR/$w" || { echo "fight: no weights $w beside $WASM_PROFILE"; exit 2; }
+      prof="$PWD/$WASM_PROFILE"; echo "fight: wasm ($name) plays $WASM_PROFILE" ;;
+  esac
+  GC_SURVIVOR_PROFILE=$prof node "$GC_EVAL_DIR/survivor.js" --port "$port" > "$log" 2>&1 &
   PIDS="${PIDS:-} $!"
   PORT_OF[$name]=$port
   for i in $(seq 1 300); do grep -q listening "$log" && break; sleep 0.2; done
   grep -q listening "$log" || { cat "$log"; echo "fight: wasm ($name) did not start"; exit 1; }
   preflight wasm "$name" "$port" ""
 }
+# ---- BitBot's WASM build (GameCreator's bitbot.js on bit.wasm, in Node): the
+# client sends the server's board every frame (bot/SurvivalLink.lua), bot/
+# bitbot_link.js runs BitBot's own update() on it, and the keys it presses
+# come back. BitBot decides each frame, inside the link's per-frame budget. The pre-flight also fails on any call the link cannot
+# relay ("not relayed") or a frame that threw ("frame failed").
+# bit.wasm is a committed build and trails the source (it was rebuilt at 13:37
+# while bot.c and front.c changed at 14:50), so it is built here from the
+# checkout's source with GameCreator's own line from native/build.sh.
+build_bitbot_wasm() {
+  [ -n "${BITBOT_WASM_BUILT:-}" ] && return 0
+  command -v wasm-ld >/dev/null 2>&1 || sudo apt-get install -y -qq lld >/dev/null 2>&1 || true
+  local log="$PWD/bitbot-wasm-build.log"
+  ( cd "$GC_EVAL_DIR/native" \
+    && eval "$(grep -E '^(FLAGS|PGO)=' build.sh)" \
+    && eval "$(grep -E '^clang \$FLAGS \$PGO .* -o bit\.wasm' build.sh | head -1)" ) > "$log" 2>&1 \
+    || { tail -30 "$log"; echo "fight: bit.wasm did not build from GameCreator's source"; exit 1; }
+  BITBOT_WASM_BUILT=1
+  echo "fight: bit.wasm built from source ($(git -C "$GC_EVAL_DIR" log -1 --format=%h 2>/dev/null))"
+}
+start_bitbotwasm() {   # NAME PORT
+  local name=$1 port=$2 log="mind-$1.log"
+  [ -n "${GC_EVAL_DIR:-}" ] || { echo "fight: bitbotwasm needs GC_EVAL_DIR=<GameCreator>/games/the-game/ai/eval"; exit 2; }
+  build_bitbot_wasm
+  node bot/bitbot_link.js --dir "$GC_EVAL_DIR" --port "$port" > "$log" 2>&1 &
+  PIDS="${PIDS:-} $!"
+  PORT_OF[$name]=$port
+  for i in $(seq 1 300); do grep -q "listening\|Error" "$log" && break; sleep 0.2; done
+  grep -q listening "$log" || { cat "$log"; echo "fight: bitbotwasm ($name) did not start"; exit 1; }
+  # The link holds each frame to the game's thinking budget, so a frame BitBot's
+  # WASM build cannot answer in time presses its planned keys: reported, not failed.
+  PA_SURVIVOR_PORT=$port PA_PREFLIGHT_NAME="bitbotwasm ($name)" PA_PREFLIGHT_LATE_OK=1 \
+    luajit bot/bitbot_preflight.lua 1800 2>&1 | tee "preflight-$name.log"
+  [ "${PIPESTATUS[0]}" -eq 0 ] || { cat "$log"; exit 1; }
+  sleep 0.5
+  if grep -a "frame failed\|not relayed" "$log"; then
+    echo "fight: bitbotwasm ($name) pre-flight FAILED (lines above are from $log)"; exit 1
+  fi
+}
 trap 'kill ${PIDS:-} 2>/dev/null' EXIT
 if [ "$BOT" = bitbot ] || [ "$OPP" = bitbot ]; then build_bitbot; fi
-case "$BOT" in bitbot) preflight bitbot "$NAME" ;; wasm) start_wasm "$NAME" "$BASE_PORT" ;; esac
-case "$OPP" in bitbot) preflight bitbot "$OPP_NAME" ;; wasm) start_wasm "$OPP_NAME" $((BASE_PORT + 1)) ;; esac
+# NAME=BitBotCheck: no lobby. BitBot alone, offline, told an opponent is present, on four boards:
+# the hookup with no network, no BotClient and no other bot in it.
+if [ "$BOT" = bitbot ] && [ "$NAME" = BitBotCheck ]; then
+  for seed in 1 2 3 4; do
+    echo "=== board $seed"
+    PA_PREFLIGHT_OPPONENT=1 PA_PREFLIGHT_SEED=$seed PA_BITBOT_LOG_FRAMES=$([ "$seed" = 1 ] && echo 40 || echo 0) \
+      PA_PREFLIGHT_BRAIN=bitbot PA_PREFLIGHT_NAME="BitBotCheck" luajit bot/bitbot_preflight.lua 1800 2>&1 || true
+  done 2>&1 | tee "fight-$NAME.log"
+  exit 0
+fi
+case "$BOT" in bitbot) preflight bitbot "$NAME" ;; bitbotwasm) start_bitbotwasm "$NAME" "$BASE_PORT" ;; wasm) start_wasm "$NAME" "$BASE_PORT" ;; esac
+case "$OPP" in bitbot) preflight bitbot "$OPP_NAME" ;; bitbotwasm) start_bitbotwasm "$OPP_NAME" $((BASE_PORT + 1)) ;; wasm) start_wasm "$OPP_NAME" $((BASE_PORT + 1)) ;; esac
 
 # ---- one side: KIND NAME [CHALLENGE]
 play() {
@@ -110,6 +183,8 @@ play() {
   case "$kind" in
     bitbot)      PA_CHALLENGE="$challenge" timeout "$SECS" luajit bot/playBot.lua "$HOST" "$PORT" "$name" 4 12 bitbot ;;
     wasm)        PA_CHALLENGE="$challenge" PA_SURVIVOR_PORT=${PORT_OF[$name]} \
+                   timeout "$SECS" luajit bot/playBot.lua "$HOST" "$PORT" "$name" 4 12 survival ;;
+    bitbotwasm)  PA_CHALLENGE="$challenge" PA_SURVIVOR_PORT=${PORT_OF[$name]} \
                    timeout "$SECS" luajit bot/playBot.lua "$HOST" "$PORT" "$name" 4 12 survival ;;
     beverly)     PA_CHALLENGE="$challenge" PA_SEARCH_PROFILE=bot/profiles/beverly.json \
                    timeout "$SECS" luajit bot/playBot.lua "$HOST" "$PORT" "$name" 4 12 weighted ;;
@@ -121,7 +196,7 @@ play() {
 
 echo "fight: $NAME ($BOT) in the lobby on $HOST:$PORT${OPP:+, challenged by $OPP_NAME ($OPP)}, for ${SECS}s"
 if [ -z "$OPP" ]; then
-  play "$BOT" "$NAME" 2>&1 | tee "fight-$NAME.log"
+  play "$BOT" "$NAME" "$([ "$REMOTE" = 1 ] && echo "$OPP_NAME")" 2>&1 | tee "fight-$NAME.log"
   rc=${PIPESTATUS[0]}
 else
   play "$BOT" "$NAME" > "fight-$NAME.log" 2>&1 &

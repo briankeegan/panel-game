@@ -62,24 +62,27 @@ on:
         type: choice
         options:
           - bitbot
+          - bitbotwasm
           - wasm
           - beverly
           - plamp
           - heuristic
       opponent:
-        description: 'fight: who challenges it as `name`2, over and over -- or "you" to leave it waiting for people'
+        description: 'fight: who challenges it as `name`2, over and over -- or "you" to leave it waiting for people, or "challenge" to have `bot` challenge the second name in `name` ("A,B") that sits in the lobby in ANOTHER run -- one runner each'
         required: false
         default: 'you'
         type: choice
         options:
           - you
+          - challenge
           - bitbot
+          - bitbotwasm
           - wasm
           - beverly
           - plamp
           - heuristic
       profile:
-        description: 'live: which trained bot to play as (a file in bot/profiles/)'
+        description: 'live: which trained bot to play as (a file in bot/profiles/). fight with wasm: a bot/profiles/*.wasm.json plays those trained weights (e.g. bot/profiles/wasmbot.wasm.json)'
         required: false
         default: 'bot/profiles/beverly.json'
       matches:
@@ -355,7 +358,7 @@ jobs:
       # native/build.sh) and the client plays it in-process
       # (bot/BitBotNative.lua, as GameCreator's lua/train.lua does).
       - name: Check out GameCreator (BitBot, WasmSurvivor)
-        if: inputs.mode == 'fight' && (contains(fromJSON('["bitbot","wasm"]'), inputs.bot) || contains(fromJSON('["bitbot","wasm"]'), inputs.opponent))
+        if: inputs.mode == 'fight' && (contains(fromJSON('["bitbot","bitbotwasm","wasm"]'), inputs.bot) || contains(fromJSON('["bitbot","bitbotwasm","wasm"]'), inputs.opponent))
         uses: actions/checkout@v4
         with:
           repository: briankeegan/GameCreator
@@ -363,7 +366,7 @@ jobs:
           sparse-checkout: games/the-game
 
       - uses: actions/setup-node@v4
-        if: inputs.mode == 'fight' && (contains(fromJSON('["bitbot","wasm"]'), inputs.bot) || contains(fromJSON('["bitbot","wasm"]'), inputs.opponent))
+        if: inputs.mode == 'fight' && (contains(fromJSON('["bitbot","bitbotwasm","wasm"]'), inputs.bot) || contains(fromJSON('["bitbot","bitbotwasm","wasm"]'), inputs.opponent))
         with:
           node-version: '22'
 
@@ -375,6 +378,7 @@ jobs:
         id: fight
         env:
           GC_EVAL_DIR: ${{ github.workspace }}/GameCreator/games/the-game/ai/eval
+          WASM_PROFILE: ${{ inputs.profile }}
         run: |
           eval "$(luarocks path --local --lua-version 5.1)"
           [ "$BOT_HOST" != "$BETA_SERVER" ] && [ "${BOT_HOST}:${BOT_PORT}" != "$BETA_SERVER" ] || { echo "fight plays the fork's server only"; exit 1; }
@@ -383,6 +387,30 @@ jobs:
           set -o pipefail
           bot/fight.sh "$BOT_HOST" "$BOT_PORT" $(( ${{ inputs.hours }} * 3600 )) '${{ inputs.bot }}' '${{ inputs.name }}' '${{ inputs.opponent }}' \
             2>&1 | tee bot-prod-smoke.log
+
+      # A new name's account id, made by the server at its first login, is
+      # committed back to the branch this ran from, so the next run logs back
+      # in as the same account (fight.sh reads bot/identities/). Runs on
+      # cancel too: an id is saved however the run ends.
+      - name: Save new account ids
+        if: always() && inputs.mode == 'fight'
+        run: |
+          set -u
+          added=""
+          for f in bot/identities/*_"$BOT_HOST".txt; do
+            [ -s "$f" ] || continue
+            git ls-files --error-unmatch "$f" >/dev/null 2>&1 && continue
+            git add -f "$f" && added="$added $(basename "$f" "_$BOT_HOST.txt")"
+          done
+          [ -n "$added" ] || { echo "no new account ids"; exit 0; }
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "bot: save account ids for$added on $BOT_HOST"
+          for i in 1 2 3 4; do
+            git push origin "HEAD:refs/heads/${{ github.ref_name }}" && { echo "saved:$added"; exit 0; }
+            git pull --rebase origin "${{ github.ref_name }}"
+          done
+          echo "::error::could not save account ids for$added"; exit 1
 
       - name: Summary
         if: always()

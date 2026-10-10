@@ -1,0 +1,19 @@
+{
+ "name": "WasmSurvivor_Bot",
+ "weights": "wasmbot.weights.json",
+ "reaction": 12,
+ "swapGap": 12,
+ "cursorMoveFrames": 4,
+ "depth": 2,
+ "modes": true,
+ "ahead": 90,
+ "threat": null,
+ "breakFirst": true,
+ "breakDepth": 1,
+ "lineup": true,
+ "conserve": true,
+ "threesLast": true,
+ "nativeCands": true,
+ "bank": true,
+ "raiseTo": 8
+}

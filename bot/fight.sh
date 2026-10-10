@@ -121,8 +121,7 @@ start_wasm() {   # NAME PORT
 # ---- BitBot's WASM build (GameCreator's bitbot.js on bit.wasm, in Node): the
 # client sends the server's board every frame (bot/SurvivalLink.lua), bot/
 # bitbot_link.js runs BitBot's own update() on it, and the keys it presses
-# come back. Every frame's answer is awaited (PA_SURVIVOR_WAIT=2): BitBot
-# decides each frame. The pre-flight also fails on any call the link cannot
+# come back. BitBot decides each frame, inside the link's per-frame budget. The pre-flight also fails on any call the link cannot
 # relay ("not relayed") or a frame that threw ("frame failed").
 start_bitbotwasm() {   # NAME PORT
   local name=$1 port=$2 log="mind-$1.log"
@@ -132,7 +131,11 @@ start_bitbotwasm() {   # NAME PORT
   PORT_OF[$name]=$port
   for i in $(seq 1 300); do grep -q "listening\|Error" "$log" && break; sleep 0.2; done
   grep -q listening "$log" || { cat "$log"; echo "fight: bitbotwasm ($name) did not start"; exit 1; }
-  PA_SURVIVOR_PORT=$port PA_SURVIVOR_WAIT=2 PA_PREFLIGHT_NAME="bitbotwasm ($name)" \
+  # Late answers are reported, not failed: the link holds every frame to half
+  # the game's 8 ms thinking budget (SurvivalLink), so a frame BitBot's WASM
+  # build cannot answer in time presses its planned keys -- the game's rule,
+  # and the count is what shows how often it happens.
+  PA_SURVIVOR_PORT=$port PA_PREFLIGHT_NAME="bitbotwasm ($name)" PA_PREFLIGHT_LATE_OK=1 \
     luajit bot/bitbot_preflight.lua 1800 2>&1 | tee "preflight-$name.log"
   [ "${PIPESTATUS[0]}" -eq 0 ] || { cat "$log"; exit 1; }
   sleep 0.5
@@ -152,7 +155,7 @@ play() {
     bitbot)      PA_CHALLENGE="$challenge" timeout "$SECS" luajit bot/playBot.lua "$HOST" "$PORT" "$name" 4 12 bitbot ;;
     wasm)        PA_CHALLENGE="$challenge" PA_SURVIVOR_PORT=${PORT_OF[$name]} \
                    timeout "$SECS" luajit bot/playBot.lua "$HOST" "$PORT" "$name" 4 12 survival ;;
-    bitbotwasm)  PA_CHALLENGE="$challenge" PA_SURVIVOR_PORT=${PORT_OF[$name]} PA_SURVIVOR_WAIT=2 \
+    bitbotwasm)  PA_CHALLENGE="$challenge" PA_SURVIVOR_PORT=${PORT_OF[$name]} \
                    timeout "$SECS" luajit bot/playBot.lua "$HOST" "$PORT" "$name" 4 12 survival ;;
     beverly)     PA_CHALLENGE="$challenge" PA_SEARCH_PROFILE=bot/profiles/beverly.json \
                    timeout "$SECS" luajit bot/playBot.lua "$HOST" "$PORT" "$name" 4 12 weighted ;;

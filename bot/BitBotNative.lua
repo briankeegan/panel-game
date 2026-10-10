@@ -34,7 +34,7 @@ local BitBotNative = {}
 BitBotNative.__index = BitBotNative
 
 -- BitBot's library, its declarations and cboard.lua, once per process.
-local C, CB
+local C, CB, TS
 local BOARD, FID     -- one board and one BitBot per process: libbit restarts its front itself when the clock goes back
 local function load(dir)
   if C then return end
@@ -44,8 +44,14 @@ local function load(dir)
   assert(cdef, "BitBotNative: lua/train.lua has no ffi.cdef block to take BitBot's declarations from")
   ffi.cdef(cdef)
   C = ffi.load(dir .. "/native/libbit.so")
+  TS = ffi.new("gc_timespec")     -- declared in train.lua's cdef, with clock_gettime
   CB = dofile(dir .. "/lua/cboard.lua")
 end
+
+-- Wall-clock milliseconds, as train.lua times a frame (CLOCK_MONOTONIC). Not os.clock():
+-- that is CPU time, and BitBot thinks on worker threads, so it counts every thread at once
+-- and shows the bot a frame several times as slow as it was -- it then cuts its search.
+local function nowMs() ffi.C.clock_gettime(1, TS); return tonumber(TS.tv_sec) * 1e3 + tonumber(TS.tv_nsec) / 1e6 end
 
 function BitBotNative.new(opts)
   opts = opts or {}
@@ -156,9 +162,9 @@ function BitBotNative:input(stack)
     return idle
   end
   local t0 = os.clock()
-  local tb0 = ThinkBudget.now()
+  local tb0 = nowMs()
   self:load(stack)
-  local loadMs = (ThinkBudget.now() - tb0) * 1000
+  local loadMs = nowMs() - tb0
   if self.fid < 0 then self.fid = C.front_new(self.board, self.reaction, self.allowRaise); FID = self.fid end
   if self.fid < 0 then error("BitBotNative: BitBot could not be created (front_new answered " .. self.fid .. ")") end
   -- BitBot's own log of its decisions (train.lua's GC_BOTLOG), for the opening
@@ -168,11 +174,11 @@ function BitBotNative:input(stack)
   -- the host's part, every frame before front_frame (train.lua): the think
   -- ceiling and what the last frame's thinking took, and the opponent
   if self.frames == 1 or self.frames == 100 then self:dump(stack) end   -- outside the timed part
-  local tb1 = ThinkBudget.now()
+  local tb1 = nowMs()
   self:tellOpponent(stack)
-  C.bot_time(ThinkBudget.ceilingMillis(), self.lastThought * 1000, ThinkBudget.ceilingMillis() - loadMs)
+  C.bot_time(ThinkBudget.ceilingMillis(), self.lastThought, ThinkBudget.ceilingMillis() - loadMs)
   local bits = C.front_frame(self.fid, self.board)
-  self.lastThought = loadMs / 1000 + (ThinkBudget.now() - tb1)
+  self.lastThought = loadMs + (nowMs() - tb1)     -- ms: this frame's load and front_frame, as train.lua charges it
   if logging then C.botTraceOn = 0 end
   if bits < 0 then error("BitBotNative: BitBot failed at clock " .. tostring(stack.clock)) end
   if C.nb_pressed(self.board) ~= 0 then bits = bit.bor(bits, 16) end

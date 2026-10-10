@@ -113,6 +113,22 @@ function BitBotNative:load(a)
   if err ~= 0 then error("BitBotNative: BitBot's engine refused the board (err " .. err .. ")") end
 end
 
+-- Everything handed to BitBot on this frame, to be read against what train.lua
+-- hands it on the same frame: the head, field by field, and the board.
+function BitBotNative:dump(a)
+  local H, out = C.nb_io_head(), {}
+  for i = 0, self.NH - 1 do out[#out + 1] = ffi.string(C.nb_head_name(i)) .. "=" .. tostring(tonumber(H[i])) end
+  print(string.format("bitbot: HEAD at live frame %d clock %d: %s", self.frames, a.clock, table.concat(out, " ")))
+  for r = #a.panels, 0, -1 do
+    local row = {}
+    for c = 1, a.width do
+      local p = a.panels[r][c]
+      row[c] = string.format("%s%d", p.isGarbage and "g" or "", p.color or 0)
+    end
+    print(string.format("bitbot: BOARD row %2d: %s", r, table.concat(row, " ")))
+  end
+end
+
 -- What the host tells BitBot about the opponent (train.lua leaves this to the
 -- harness): another player is in the match, and that stack has lost.
 function BitBotNative:tellOpponent(stack)
@@ -154,6 +170,7 @@ function BitBotNative:input(stack)
   local tb1 = ThinkBudget.now()
   self:tellOpponent(stack)
   C.bot_time(ThinkBudget.ceilingMillis(), self.lastThought * 1000, ThinkBudget.ceilingMillis() - loadMs)
+  if self.frames == 1 or self.frames == 100 then self:dump(stack) end
   local bits = C.front_frame(self.fid, self.board)
   self.lastThought = loadMs / 1000 + (ThinkBudget.now() - tb1)
   if logging then C.botTraceOn = 0 end

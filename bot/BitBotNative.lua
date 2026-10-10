@@ -26,6 +26,7 @@
 --   local char = bb:input(stack)       -- every frame, before it is run
 local ffi = require("ffi")
 local KeyDataEncoding = require("common.data.KeyDataEncoding")
+local ThinkBudget = require("common.engine.computerPlayers.ThinkBudget")
 
 local BOTLOG_FRAMES = tonumber(os.getenv("PA_BITBOT_LOG_FRAMES") or 300)
 
@@ -57,7 +58,9 @@ function BitBotNative.new(opts)
   return self
 end
 
-function BitBotNative:startMatch(stack)
+function BitBotNative:startMatch(stack, match)
+  self.match = match
+  self.lastThought = 0
   load(self.dir)
   local t0 = os.clock()
   self.matchNo = (self.matchNo or 0) + 1
@@ -78,6 +81,7 @@ function BitBotNative:startMatch(stack)
     if self.fid < 0 then error("BitBotNative: BitBot could not be created (front_new answered " .. self.fid .. ")") end
     FID = self.fid
   end
+  self:tellOpponent(stack)
 end
 
 -- train.lua load(): the stack into BitBot's board -- and nothing to come
@@ -109,6 +113,19 @@ function BitBotNative:load(a)
   if err ~= 0 then error("BitBotNative: BitBot's engine refused the board (err " .. err .. ")") end
 end
 
+-- What the host tells BitBot about the opponent (train.lua leaves this to the
+-- harness): another player is in the match, and that stack has lost.
+function BitBotNative:tellOpponent(stack)
+  local present, topped = 0, 0
+  for _, other in pairs(self.match and self.match.stacks or {}) do
+    if other ~= stack then
+      present = 1
+      if other:game_ended() then topped = 1 end
+    end
+  end
+  self.C.front_opponent(self.fid, present, topped)
+end
+
 -- The key to press this frame. Through the countdown nothing is pressed
 -- (train.lua plays it out idle); BitBot starts when the stopwatch does.
 function BitBotNative:input(stack)
@@ -123,14 +140,22 @@ function BitBotNative:input(stack)
     return idle
   end
   local t0 = os.clock()
+  local tb0 = ThinkBudget.now()
   self:load(stack)
+  local loadMs = (ThinkBudget.now() - tb0) * 1000
   if self.fid < 0 then self.fid = C.front_new(self.board, self.reaction, self.allowRaise); FID = self.fid end
   if self.fid < 0 then error("BitBotNative: BitBot could not be created (front_new answered " .. self.fid .. ")") end
   -- BitBot's own log of its decisions (train.lua's GC_BOTLOG), for the opening
   -- frames of each match: what it decided, and why, while it was standing still
   local logging = self.frames < BOTLOG_FRAMES
   if logging then io.stderr:write("@ clock " .. tostring(stack.clock) .. "\n"); C.botTraceOn = 1 end
+  -- the host's part, every frame before front_frame (train.lua): the think
+  -- ceiling and what the last frame's thinking took, and the opponent
+  local tb1 = ThinkBudget.now()
+  C.bot_time(ThinkBudget.ceilingMillis(), self.lastThought * 1000, ThinkBudget.ceilingMillis() - loadMs)
+  self:tellOpponent(stack)
   local bits = C.front_frame(self.fid, self.board)
+  self.lastThought = loadMs / 1000 + (ThinkBudget.now() - tb1)
   if logging then C.botTraceOn = 0 end
   if bits < 0 then error("BitBotNative: BitBot failed at clock " .. tostring(stack.clock)) end
   if C.nb_pressed(self.board) ~= 0 then bits = bit.bor(bits, 16) end

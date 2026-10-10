@@ -126,6 +126,61 @@ function SurvivalLink.dump(s, sources)
     .. ',"dropColumns":' .. enc(s.currentGarbageDropColumnIndexes) .. ',"telegraph":' .. enc(telegraph(sources)) .. '}'
 end
 
+-- Every field a panel can carry, with the kinds of value it takes. The compiler
+-- compiles the encoder for the shapes it has seen and compiles again, inside a
+-- frame, for each new one; `warm` shows it every shape before the match.
+local PANEL_FIELDS = {
+  chaining = "b", combo_index = "n", combo_size = "n", fell_from_garbage = "n", isSwappingFromLeft = "b",
+  matchesGarbage = "b", matchesMetal = "b", matching = "b", propagatesChaining = "b", propagatesFalling = "b",
+  state = "s", stateChanged = "b", timer = "n", color = "n", column = "n", row = "n", id = "n", dont_swap = "b",
+  garbageId = "n", height = "n", initial_time = "n", isGarbage = "b", matchAnyway = "b", metal = "b", pop_index = "n",
+  pop_time = "n", queuedHover = "b", senderId = "n", shake_time = "n", width = "n", x_offset = "n", y_offset = "n",
+}
+local WARM_STATES = { "normal", "swapping", "matched", "popping", "popped", "hovering", "falling", "landing", "dimmed", "dead" }
+local function warmValue(kind, i)
+  if kind == "b" then return i % 2 == 0 end
+  if kind == "s" then return WARM_STATES[i % #WARM_STATES + 1] end
+  return (i % 3 == 0) and (i % 97) or ((i % 3 == 1) and (i % 97) + 0.5 or -(i % 7))
+end
+local function warmGarbage(i)
+  local list = {}
+  for k = 1, i % 4 do
+    list[k] = { width = 3 + k % 4, height = 1 + (i + k) % 3, isMetal = k % 2 == 0, isChain = (i + k) % 2 == 0,
+                frameEarned = i * 7 + k, finalized = (i + k) % 3 == 0 }
+  end
+  return list
+end
+---Encodes boards of every shape the game can make, so the compiler has compiled the encoder before the first frame
+---and compiles nothing for it within one.
+function SurvivalLink.warm()
+  local names = {}
+  for name in pairs(PANEL_FIELDS) do names[#names + 1] = name end
+  table.sort(names)
+  for i = 1, 400 do
+    local panels = {}
+    for r = 0, 12 do
+      panels[r] = {}
+      for c = 1, 6 do
+        if (r + c + i) % 5 ~= 0 then
+          local p = {}
+          for k, name in ipairs(names) do
+            if (k + r * 3 + c + i) % 3 ~= 0 then p[name] = warmValue(PANEL_FIELDS[name], k + r + c + i) end
+          end
+          panels[r][c] = p
+        end
+      end
+    end
+    local s = { width = 6, panels = panels, clock = i, stopWatch = i, health = 3, rise_timer = i % 40, shake_time = i % 50,
+                incomingGarbage = { stagedGarbage = warmGarbage(i) }, swapStallingBackLog = (i % 3 == 0) and { { frame = i, chaining = true } } or {},
+                garbageLandedThisFrame = (i % 4 == 0) and { i } or {}, currentGarbageDropColumnIndexes = (i % 2 == 0) and { 1, 3 } or { 2 },
+                danger = i % 2 == 0, mode = "vs" }
+    local transit = { [i] = warmGarbage(i + 1) }
+    local sources = { { stopWatch = i, outgoingGarbage = { stagedGarbage = warmGarbage(i + 2),
+                        transitTimers = { first = i, last = i, [i] = i + 30 }, garbageInTransit = { [i + 30] = warmGarbage(i + 3) } } } }
+    SurvivalLink.dump(s, (i % 5 == 0) and {} or sources)
+  end
+end
+
 -- A frame is held to this share of the thinking ceiling: what the system's own
 -- pauses take from a frame comes out of the rest.
 SurvivalLink.TARGET_SHARE = 0.5
@@ -196,19 +251,18 @@ function SurvivalLink:receive(timeout)
   return nil
 end
 
--- The next reply line, or nil at `deadline` (socket.gettime seconds). The
--- system's timers wake a wait late by a millisecond or two, so a wait blocks
--- only until SPIN_SEC before the deadline and polls the rest.
-SurvivalLink.SPIN_SEC = 0.002
+-- The next reply line, or nil at `deadline` (socket.gettime seconds). A wait
+-- that blocks hands its thread back to the system, which returns it late when
+-- every core is busy, so the whole wait polls.
 function SurvivalLink:await(deadline)
-  local coarse = deadline - SurvivalLink.SPIN_SEC - socket.gettime()
-  local line = self:receive(coarse > 0 and coarse or 0)
+  local line = self:receive(0)
   while not line and socket.gettime() < deadline do line = self:receive(0) end
   return line
 end
 
 function SurvivalLink:startMatch(stack)
   self:connect()
+  SurvivalLink.warm()
   self:send(enc({ t = "match", levelData = stack.levelData, behaviours = stack.behaviours,
                   stackOverConditions = stack.stackOverConditions }), true)
   self.awaiting = 1   -- the match's ok, read with the first frame's answer
@@ -226,6 +280,11 @@ end
 -- and its key pressed on the input budget, the game's own.
 function SurvivalLink:input(stack, sources)
   local stopOnOver = os.getenv("PA_STOP_ON_OVER") == "1"
+  if stopOnOver and not SurvivalLink.tracing then
+    SurvivalLink.tracing = { events = 0 }
+    require("jit").attach(function() SurvivalLink.tracing.events = SurvivalLink.tracing.events + 1 end, "trace")
+  end
+  local traces0 = stopOnOver and SurvivalLink.tracing.events or 0
   local before = stopOnOver and SurvivalLink.machine() or nil
   collectgarbage("stop")
   local began = ThinkBudget.now()
@@ -251,8 +310,8 @@ function SurvivalLink:input(stack, sources)
     local text = {}
     for name, v in pairs(st or {}) do text[#text + 1] = string.format("%s %.1f", name, v * 1000) end
     table.sort(text)
-    self.stopReason = string.format("STOPPED on the first frame over the ceiling: clock %d, wall %.1f ms, this process's cpu %.1f ms, steps (ms) [%s]; the machine over the frame: stolen %.1f ms, busy %.1f ms of %.1f ms, runnable %d, load %s",
-      stack.clock, took * 1000, cpu * 1000, table.concat(text, ", "), (after.steal - before.steal) * 10, (after.busy - before.busy) * 10, (after.total - before.total) * 10, after.running, after.load)
+    self.stopReason = string.format("STOPPED on the first frame over the ceiling: clock %d, wall %.1f ms, this process's cpu %.1f ms, steps (ms) [%s], compiler events in the frame %d; the machine over the frame: stolen %.1f ms, busy %.1f ms of %.1f ms, runnable %d, load %s",
+      stack.clock, took * 1000, cpu * 1000, table.concat(text, ", "), SurvivalLink.tracing.events - traces0, (after.steal - before.steal) * 10, (after.busy - before.busy) * 10, (after.total - before.total) * 10, after.running, after.load)
   end
   return key
 end

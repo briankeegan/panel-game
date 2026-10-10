@@ -52,8 +52,6 @@ OPP=${6:-you}; OPP_NAME=${7:-}
 case "$NAME" in *,*) OPP_NAME=${OPP_NAME:-${NAME#*,}}; NAME=${NAME%%,*};; esac
 OPP_NAME=${OPP_NAME:-${NAME}2}
 [ "$OPP" = you ] && OPP=""
-# bot against bot: each match is left and challenged afresh, as the islands do
-[ -n "$OPP" ] && export PA_FRESH_ROOM=1
 
 kinds="bitbot bitbotwasm wasm beverly plamp heuristic"
 known() { case " $kinds " in *" $1 "*) return 0;; esac; return 1; }

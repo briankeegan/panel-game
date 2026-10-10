@@ -28,6 +28,8 @@ local ffi = require("ffi")
 local KeyDataEncoding = require("common.data.KeyDataEncoding")
 local ThinkBudget = require("common.engine.computerPlayers.ThinkBudget")
 
+local DEATHLOG = tonumber(os.getenv("PA_BITBOT_DEATHLOG") or 90)   -- frames of BitBot's own log kept, printed if it dies (train.lua GC_DEATHLOG)
+local LOGP, LOGN = ffi.new("char *[1]"), ffi.new("size_t[1]")
 local BOT_TIME = os.getenv("PA_BITBOT_BOT_TIME") == "1"
 local BOTLOG_FRAMES = tonumber(os.getenv("PA_BITBOT_LOG_FRAMES") or 30)   -- the first 30 live frames only: the trace is written inside the timed decision, and bot_time reads that as slow
 
@@ -183,7 +185,17 @@ function BitBotNative:input(stack)
   -- raising and stopped evaluating swaps. Without it the bot's own budgets stand (bot.c: "With no host the
   -- start values stand").
   if BOT_TIME then C.bot_time(ThinkBudget.ceilingMillis(), self.lastThought, ThinkBudget.ceilingMillis() - loadMs) end
+  local mem
+  if DEATHLOG > 0 and not logging then mem = ffi.C.open_memstream(LOGP, LOGN); C.botLogTo = mem; C.botTraceOn = 1 end
   local bits = C.front_frame(self.fid, self.board)
+  if mem then
+    ffi.C.fclose(mem); C.botLogTo = nil; C.botTraceOn = 0
+    local blog = ffi.string(LOGP[0], LOGN[0]); ffi.C.free(LOGP[0])
+    self.ring = self.ring or {}
+    local keep = { clock = stack.clock, log = blog, bits = bits }
+    if self.frames % 3 == 0 then keep.board = self:boardText(stack) end
+    self.ring[self.frames % DEATHLOG + 1] = keep
+  end
   self.lastThought = loadMs + (nowMs() - tb1)     -- ms: this frame's load and front_frame, as train.lua charges it
   if logging then C.botTraceOn = 0 end
   if bits < 0 then error("BitBotNative: BitBot failed at clock " .. tostring(stack.clock)) end
@@ -224,12 +236,40 @@ function BitBotNative:topRow(stack)
   return 0
 end
 
+function BitBotNative:boardText(stack)
+  local rows = {}
+  for r = math.min(#stack.panels, 13), 1, -1 do
+    local row = {}
+    for c = 1, stack.width do
+      local p = stack.panels[r][c]
+      row[c] = p.color == 0 and "." or (p.isGarbage and "g" or tostring(p.color))
+    end
+    rows[#rows + 1] = table.concat(row)
+  end
+  return table.concat(rows, " ") .. string.format(" | cur %d,%d disp %s inc %d", stack.cur_row, stack.cur_col, tostring(stack.displacement), #stack.incomingGarbage.stagedGarbage)
+end
+
+-- GameCreator's DEATH REPORT (train.lua): BitBot's own log of the last frames before it lost
+function BitBotNative:deathReport(stack)
+  if not self.ring or (stack.game_over_clock or -1) <= 0 then return end
+  print(string.format("bitbot: DEATH REPORT -- the last %d frames before clock %d", math.min(self.frames, DEATHLOG), stack.game_over_clock))
+  for f = math.max(1, self.frames - DEATHLOG + 1), self.frames do
+    local k = self.ring[(f - 1) % DEATHLOG + 1]
+    if k then
+      io.write("@ clock ", tostring(k.clock), " keys ", tostring(k.bits), "\n", k.log)
+      if k.board then io.write("  board: ", k.board, "\n") end
+    end
+  end
+  print("bitbot: END DEATH REPORT")
+end
+
 function BitBotNative:endMatch()
   local st = self.stack
   if not st then return end
   print(string.format("bitbot: match ends -- %d live frames (first at clock %s, last at %d), %d idle, swaps %d cleared %d health %s, game over clock %s, garbage landed on it %s, queued at the end %d, top row %d, raise key held %d frames in %d presses",
     self.frames or 0, tostring(self.firstLive), st.clock or -1, self.idleFrames or 0, st.swapCount or 0, st.panels_cleared or 0,
     tostring(st.health), tostring(st.game_over_clock), tostring(st.garbageCreatedCount), #st.incomingGarbage.stagedGarbage, self:topRow(st), self.raiseFrames or 0, self.raiseRuns or 0))
+  self:deathReport(st)
 end
 
 return BitBotNative

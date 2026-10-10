@@ -158,6 +158,20 @@ local function scalars(t)
   return o
 end
 
+-- The board written so far, joined in strings of PIECES_PER_STRING pieces. The collector shrinks the buffer that
+-- joining uses each time it finishes a cycle, so joining the whole board in one string would regrow it, and fault
+-- in the memory for it, in the frame after; strings of a few kilobytes keep it small.
+local PIECES_PER_STRING = 512
+local joined = {}
+function SurvivalLink.pieces()
+  local count = 0
+  for first = 1, used, PIECES_PER_STRING do
+    count = count + 1
+    joined[count] = table.concat(buf, "", first, math.min(first + PIECES_PER_STRING - 1, used))
+  end
+  return joined, count
+end
+
 function SurvivalLink.dump(s, sources, prefix, suffix)
   used = 0
   if prefix then put(prefix) end
@@ -188,7 +202,7 @@ function SurvivalLink.dump(s, sources, prefix, suffix)
   put(',"telegraph":') putTelegraph(sources)
   put("}")
   if suffix then put(suffix) end
-  return table.concat(buf, "", 1, used)
+  return SurvivalLink.pieces()
 end
 
 -- Every field a panel can carry, with the kinds of value it takes. The compiler
@@ -294,25 +308,43 @@ end
 -- What goes to the survival bot in a frame never waits: a message the socket
 -- cannot take whole stays in the outbox and goes with the next call, in order.
 -- `now` (the match's start and end, outside any frame) waits for it.
-function SurvivalLink:send(line, now, complete)
-  local box = self.outbox
-  if complete and (box == nil or box == "") then
-    self.outbox = line   -- already ends in its newline: no second copy of a board
-  else
-    self.outbox = (box or "") .. line .. (complete and "" or "\n")
-  end
+function SurvivalLink:queue(text)
+  local tail = (self.outTail or 0) + 1
+  self.outq = self.outq or {}
+  self.outq[tail] = text
+  self.outTail = tail
+  self.outHead = self.outHead or 1
+  self.outOffset = self.outOffset or 0
+end
+
+function SurvivalLink:send(line, now)
+  self:queue(line .. "\n")
+  self:flush(now)
+end
+
+-- A board goes out in the pieces it was written in, so no string as long as the board is ever made.
+function SurvivalLink:sendPieces(pieces, count, now)
+  for i = 1, count do self:queue(pieces[i]) end
   self:flush(now)
 end
 
 function SurvivalLink:flush(now)
-  local box = self.outbox
-  if not box or box == "" then return end
+  if not self.outq or self.outHead > self.outTail then return end
   self.sock:settimeout(now and 2 or 0)
-  local sent, err, partial = self.sock:send(box)
-  if sent then self.outbox = ""; return end
-  if err ~= "timeout" then error("SurvivalLink: send failed: " .. tostring(err)) end
-  self.outbox = partial and partial > 0 and box:sub(partial + 1) or box
-  if now then error("SurvivalLink: send timed out") end
+  while self.outHead <= self.outTail do
+    local text = self.outq[self.outHead]
+    if self.outOffset > 0 then text = text:sub(self.outOffset + 1) end
+    local sent, err, partial = self.sock:send(text)
+    if not sent then
+      if err ~= "timeout" then error("SurvivalLink: send failed: " .. tostring(err)) end
+      if partial and partial > 0 then self.outOffset = self.outOffset + partial end
+      if now then error("SurvivalLink: send timed out") end
+      return
+    end
+    self.outq[self.outHead] = nil
+    self.outHead, self.outOffset = self.outHead + 1, 0
+  end
+  self.outHead, self.outTail = 1, 0
 end
 
 -- The next reply line, or nil after `timeout` seconds. A line read in part
@@ -481,10 +513,12 @@ function SurvivalLink:think(stack, sources)
   local ages = self.inputs:ages(clock, self.ages)
   local budget = ',"budget":{"limit":' .. self.inputs.limit .. ',"window":' .. self.inputs.window .. ',"ages":[' .. table.concat(ages, ",") .. ']}'
   local t0 = socket.gettime()
-  local line = SurvivalLink.dump(stack, sources, '{"t":"f","state":', budget .. "}\n")
-  self.boardBytes = #line
+  local pieces, count = SurvivalLink.dump(stack, sources, '{"t":"f","state":', budget .. "}\n")
+  local bytes = 0
+  for i = 1, count do bytes = bytes + #pieces[i] end
+  self.boardBytes = bytes
   local t1 = socket.gettime()
-  self:send(line, nil, true)
+  self:sendPieces(pieces, count)
   local t2 = socket.gettime()
   self.longestPoll = 0
   self.steps = { encode = t1 - t0, send = t2 - t1, wait = 0, read = 0 }

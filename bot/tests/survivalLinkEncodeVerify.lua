@@ -120,11 +120,16 @@ local function same(a, b, path)
   return true
 end
 
+local function text(s, sources)
+  local pieces, count = SurvivalLink.dump(s, sources)
+  return table.concat(pieces, "", 1, count)
+end
+
 local failures, boards = 0, 0
 for i = 1, 600 do
   local s, sources = SurvivalLink.sampleBoard(i)
   local want = json.decode(dump(s, sources))
-  local got, _, err = json.decode(SurvivalLink.dump(s, sources))
+  local got, _, err = json.decode(text(s, sources))
   boards = boards + 1
   local ok, where = same(want, got, "board " .. i)
   if not ok then failures = failures + 1; if failures <= 5 then print("DIFFERS at " .. tostring(where) .. (err and (" " .. err) or "")) end end

@@ -80,42 +80,66 @@ local FRAME = 1 / 60
 local nextFrame = nil
 local lastReadyAt = 0
 
+-- Reset local match state the same way a normal match-end does, so a bot
+-- that hit an error can still rejoin for a future rematch instead of being
+-- stuck (or, pre-xpcall below, instead of the whole process just dying).
+local function resetMatchState()
+  bot.match, bot.matchStart, bot.matchEnded = nil, nil, false
+  bot.oppDied, bot.outcome, bot._resultReported, bot.deathSent = false, nil, false, false
+  bot.capture, nextFrame, lastReadyAt = nil, nil, 0
+end
+
 while true do
-  bot:pump()
-  challengeIfFree()
+  -- Nothing here was ever caught: an uncaught error anywhere in a tick (the
+  -- brain, the engine, a signal handler) used to kill this whole process
+  -- outright. That's invisible to anyone spectating this bot -- its board
+  -- just stops updating, with no error shown anywhere, since the crash and
+  -- its traceback happened on THIS machine, not the viewer's. Catching it
+  -- here can't undo a match already desynced by the error, but it turns a
+  -- silent, unexplained death into a visible one with a trace to diagnose
+  -- from, and lets the bot recover for the next rematch instead of vanishing.
+  local ok, err = xpcall(function()
+    bot:pump()
+    challengeIfFree()
 
-  -- (Re)ready ~every 1.5s while we're in the room with an opponent and no match
-  -- is pending/running. Retrying (not single-shot) survives the post-match room
-  -- reset: the challenge flow keeps both players in the room, so one mistimed
-  -- ready would otherwise strand the rematch (the reported bug).
-  if not bot.match and not bot.matchStart and playerCount() >= 2 then
-    local now = socket.gettime()
-    if now - lastReadyAt > 1.5 then
-      bot:sendReady()
-      lastReadyAt = now
+    -- (Re)ready ~every 1.5s while we're in the room with an opponent and no match
+    -- is pending/running. Retrying (not single-shot) survives the post-match room
+    -- reset: the challenge flow keeps both players in the room, so one mistimed
+    -- ready would otherwise strand the rematch (the reported bug).
+    if not bot.match and not bot.matchStart and playerCount() >= 2 then
+      local now = socket.gettime()
+      if now - lastReadyAt > 1.5 then
+        bot:sendReady()
+        lastReadyAt = now
+      end
     end
-  end
 
-  if bot.matchStart and not bot.match then
-    bot:startMatch()
-    nextFrame = bot.scheduledStartMs / 1000 -- first frame at the aligned start
-    print("both ready — match starting")
-  end
-
-  if bot.match and not bot.matchEnded and nextFrame then
-    local now = socket.gettime()
-    while now >= nextFrame and not bot.matchEnded do
-      bot:tickMatch()
-      nextFrame = nextFrame + FRAME
-      now = socket.gettime()
+    if bot.matchStart and not bot.match then
+      bot:startMatch()
+      nextFrame = bot.scheduledStartMs / 1000 -- first frame at the aligned start
+      print("both ready — match starting")
     end
-  end
 
-  if bot.matchEnded and bot.match then
-    print("match over — bot " .. tostring(bot.outcome) .. "; waiting for a rematch")
-    bot.match, bot.matchStart, bot.matchEnded = nil, nil, false
-    bot.oppDied, bot.outcome, bot._resultReported, bot.deathSent = false, nil, false, false
-    bot.capture, nextFrame, lastReadyAt = nil, nil, 0 -- re-ready promptly for the rematch
+    if bot.match and not bot.matchEnded and nextFrame then
+      local now = socket.gettime()
+      while now >= nextFrame and not bot.matchEnded do
+        bot:tickMatch()
+        nextFrame = nextFrame + FRAME
+        now = socket.gettime()
+      end
+    end
+
+    if bot.matchEnded and bot.match then
+      print("match over — bot " .. tostring(bot.outcome) .. "; waiting for a rematch")
+      resetMatchState()
+    end
+  end, debug.traceback)
+
+  if not ok then
+    print("=== BOT TICK ERROR (recovering, match abandoned) ===")
+    print(err)
+    resetMatchState()
+    socket.sleep(1) -- back off in case the failure is persistent (e.g. in pump() itself)
   end
 
   socket.sleep(0.002)

@@ -310,10 +310,23 @@ function SurvivalLink:input(stack, sources)
     local text = {}
     for name, v in pairs(st or {}) do text[#text + 1] = string.format("%s %.1f", name, v * 1000) end
     table.sort(text)
-    self.stopReason = string.format("STOPPED on the first frame over the ceiling: clock %d, wall %.1f ms, this process's cpu %.1f ms, steps (ms) [%s], compiler events in the frame %d; the machine over the frame: stolen %.1f ms, busy %.1f ms of %.1f ms, runnable %d, load %s",
-      stack.clock, took * 1000, cpu * 1000, table.concat(text, ", "), SurvivalLink.tracing.events - traces0, (after.steal - before.steal) * 10, (after.busy - before.busy) * 10, (after.total - before.total) * 10, after.running, after.load)
+    self.stopReason = string.format("STOPPED on the first frame over the ceiling: clock %d, wall %.1f ms, this process's cpu %.1f ms, steps (ms) [%s], compiler events in the frame %d, board %d bytes, garbage staged %d / in telegraphs %d; the machine over the frame: stolen %.1f ms, busy %.1f ms of %.1f ms, runnable %d, load %s",
+      stack.clock, took * 1000, cpu * 1000, table.concat(text, ", "), SurvivalLink.tracing.events - traces0, self.boardBytes or 0, #stack.incomingGarbage.stagedGarbage, SurvivalLink.telegraphCount(sources), (after.steal - before.steal) * 10, (after.busy - before.busy) * 10, (after.total - before.total) * 10, after.running, after.load)
   end
   return key
+end
+
+---How many garbage blocks the sources' telegraphs hold, staged and in transit.
+function SurvivalLink.telegraphCount(sources)
+  local n = 0
+  for _, src in ipairs(sources or {}) do
+    local q = src.outgoingGarbage
+    if q then
+      n = n + #q.stagedGarbage
+      for _, list in pairs(q.garbageInTransit or {}) do n = n + #list end
+    end
+  end
+  return n
 end
 
 ---What the machine has done: jiffies (10 ms) stolen from it, busy and in all, on every cpu together (/proc/stat), the
@@ -363,6 +376,7 @@ function SurvivalLink:think(stack, sources)
   local budget = ',"budget":{"limit":' .. self.inputs.limit .. ',"window":' .. self.inputs.window .. ',"ages":[' .. table.concat(ages, ",") .. ']}'
   local t0 = socket.gettime()
   local board = SurvivalLink.dump(stack, sources)
+  self.boardBytes = #board
   local t1 = socket.gettime()
   self:send('{"t":"f","state":' .. board .. budget .. '}')
   local t2 = socket.gettime()

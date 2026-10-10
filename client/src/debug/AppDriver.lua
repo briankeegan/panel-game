@@ -432,10 +432,25 @@ local function newBot()
   if os.getenv("PA_BOT") == "bitbot" then return require("bot.BitBotNative").new({}) end
   return require("bot.SurvivalLink").new({})
 end
+-- The thinking and input budgets the bot has used, over every match so far (the link of each
+-- match counted when it is replaced): frames over the ceiling, the worst frame, keys refused.
+local function budgetText()
+  local over, worst, dropped, frames = st.bOver or 0, st.bWorst or 0, st.bDropped or 0, st.bFrames or 0
+  local link = st.survivorLink
+  if link and link.budget then
+    pcall(function()
+      local o, w, d = link:budget()
+      over, dropped, frames = over + o, dropped + d, frames + (link.frames or 0)
+      if w > worst then worst = w end
+    end)
+  end
+  return string.format("thinkOver=%d thinkWorstMs=%.1f inputDropped=%d botFrames=%d", over, worst * 1000, dropped, frames)
+end
 local function feedSurvivor()
   local ps = GAME.localPlayer and GAME.localPlayer.stack
   local e = ps and ps.engine
   if not (e and e.receiveConfirmedInput) or st.survivorStack == e then return end
+  if st.survivorLink then pcall(function() if st.survivorLink.budget then local o, w, d = st.survivorLink:budget(); st.bOver = (st.bOver or 0) + o; st.bWorst = math.max(st.bWorst or 0, w); st.bDropped = (st.bDropped or 0) + d; st.bFrames = (st.bFrames or 0) + (st.survivorLink.frames or 0) end end) end
   if st.survivorLink then pcall(function() st.survivorLink:endMatch(); if st.survivorLink.sock then st.survivorLink.sock:close() end end) end
   local bot = newBot()
   bot:startMatch(e)
@@ -485,7 +500,7 @@ local function hookChallenge()
     writeOut(string.format("stage %d %s frames=%d continues=%d next=%d complete=%s fps=%.1f", stage, result, gameLength or 0, self.continues, self.stageIndex, tostring(self.challengeComplete), secs > 0 and (gameLength or 0) / secs or 0))
     doShoot(string.format("stage%02d_%s_c%d", stage, result, self.continues))
     local cap = tonumber(os.getenv("PA_CHALLENGE_CONTINUES") or "")
-    if cap and not times and self.continues > cap then writeOut("challenge stopped: " .. self.continues .. " continues"); st.challenge = nil; st.quitting = { frames = 30 } end
+    if cap and not times and self.continues > cap then writeOut("challenge stopped: " .. self.continues .. " continues " .. budgetText()); st.challenge = nil; st.quitting = { frames = 30 } end
   end
 end
 local function tickChallenge()
@@ -502,7 +517,7 @@ local function tickChallenge()
   elseif n == "Game1pChallenge" and s and s.gameOverStartTime and love.timer.getTime() - s.gameOverStartTime > 3 then
     tap("return"); st.challenge.wait = 120
   elseif n == "ChallengeModeRecapScene" then
-    writeOut("challenge over"); doShoot("hurricane_recap"); st.challenge = nil
+    writeOut("challenge over " .. budgetText()); doShoot("hurricane_recap"); st.challenge = nil
     st.quitting = { frames = 30 }
   end
 end

@@ -14,6 +14,8 @@
 --   local char = link:input(stack, match.garbageSources[stack])   -- every frame, before it is run
 local socket = require("socket")
 local KeyDataEncoding = require("common.data.KeyDataEncoding")
+local ThinkBudget = require("common.engine.computerPlayers.ThinkBudget")
+local InputBudget = require("common.engine.computerPlayers.InputBudget")
 
 local SurvivalLink = {}
 SurvivalLink.__index = SurvivalLink
@@ -125,28 +127,24 @@ function SurvivalLink.dump(s, sources)
 end
 
 -- ---------------------------------------------------------------- the link
--- The most any computer player may think in one frame (ThinkBudget.ceilingMillis),
--- and what of it is kept back for the work after the last wait.
-SurvivalLink.CEILING_SEC = 0.008
--- A frame is held to half the ceiling: what the system's own pauses take from
--- a frame comes out of the other half.
-SurvivalLink.TARGET_SEC = 0.004
--- The clock a computer player's thinking is timed on (ThinkBudget.now): the
--- game's timer, or the process clock where there is no love.
-local function thinkNow()
-  if love and love.timer then return love.timer.getTime() end
-  return os.clock()
-end
+-- A frame is held to this share of the thinking ceiling: what the system's own
+-- pauses take from a frame comes out of the rest.
+SurvivalLink.TARGET_SHARE = 0.5
 function SurvivalLink.new(opts)
   opts = opts or {}
   local self = setmetatable({}, SurvivalLink)
   self.host = opts.host or os.getenv("PA_SURVIVOR_HOST") or "127.0.0.1"
   self.port = opts.port or tonumber(os.getenv("PA_SURVIVOR_PORT") or "") or 47777
-  -- The most a frame waits for its answer before holding instead; the wait is
-  -- also cut to what is left of the frame's thinking budget (see input).
-  self.waitSec = opts.waitSec or tonumber(os.getenv("PA_SURVIVOR_WAIT") or "") or SurvivalLink.CEILING_SEC
-  self.worst = 0
-  self.over = 0
+  -- The game's budgets: the ceiling on a frame's thinking, and the allowance
+  -- of keys. A budget the game hands in is the game's to charge and press;
+  -- one made here is ours.
+  self.thinking = opts.thinkBudget or ThinkBudget.standard()
+  self.ownThinking = opts.thinkBudget == nil
+  self.inputs = opts.inputBudget or InputBudget.standard()
+  self.ownInputs = opts.inputBudget == nil
+  self.waitSec = opts.waitSec or tonumber(os.getenv("PA_SURVIVOR_WAIT") or "") or self.thinking:snapshot().ceiling
+  self.dropped = 0
+  self.ages = {}
   self.buffer = ""
   self.late = 0
   self.frames = 0
@@ -210,12 +208,29 @@ end
 -- with the board.
 -- The frame's work, with the collector held off for it: a collection that
 -- fell inside would be thinking time the bot did not use, and is left to the
--- game's own work between frames.
+-- game's own work between frames. The frame is charged to the thinking budget
+-- and its key pressed on the input budget, the game's own.
 function SurvivalLink:input(stack, sources)
   collectgarbage("stop")
+  local began = ThinkBudget.now()
   local ok, key = pcall(self.think, self, stack, sources)
+  if ok and self.ownInputs then key = self:press(key, stack.clock) end
+  local took = ThinkBudget.now() - began
   collectgarbage("restart")
   if not ok then error(key, 0) end
+  if self.ownThinking then self.thinking:charge(took) end
+  return key
+end
+
+-- The key, or idle when the allowance of keys cannot pay for it (the game
+-- does not press a key past it).
+function SurvivalLink:press(key, clock)
+  local keys, held, down = KeyDataEncoding.base64decode[key], self.inputs.held, 0
+  for _, bit in ipairs({2, 3, 4, 5, 6}) do
+    if keys and keys[bit] and not held[bit] then down = down + 1 end
+  end
+  if down > self.inputs:remaining(clock) then key = KeyDataEncoding.idle; self.dropped = self.dropped + 1 end
+  self.inputs:press(key, clock)
   return key
 end
 
@@ -226,15 +241,11 @@ function SurvivalLink:think(stack, sources)
   -- Everything this frame costs -- the board encoded, sent, every wait and
   -- every reply read -- counts against the frame's thinking budget, so the
   -- waits are cut to what is left of it.
-  local started, spent = socket.gettime(), thinkNow()
-  local deadline = started + SurvivalLink.TARGET_SEC
-  local function finish(key)
-    local took = thinkNow() - spent
-    if took > self.worst then self.worst = took end
-    if took > SurvivalLink.CEILING_SEC then self.over = self.over + 1 end
-    return key
-  end
-  self:send('{"t":"f","state":' .. SurvivalLink.dump(stack, sources) .. '}')
+  local deadline = socket.gettime() + self.thinking:snapshot().ceiling * SurvivalLink.TARGET_SHARE
+  -- the game's window of keys goes with the board: the frames ago each key still inside it was pressed
+  local ages = self.inputs:ages(clock, self.ages)
+  local budget = ',"budget":{"limit":' .. self.inputs.limit .. ',"window":' .. self.inputs.window .. ',"ages":[' .. table.concat(ages, ",") .. ']}'
+  self:send('{"t":"f","state":' .. SurvivalLink.dump(stack, sources) .. budget .. '}')
   self.awaiting = (self.awaiting or 0) + 1
   self.frames = self.frames + 1
   -- Answers come in order; one for an earlier frame is stale, but the keys
@@ -245,7 +256,7 @@ function SurvivalLink:think(stack, sources)
     if not line then
       self.late = self.late + 1
       local planned = self.planned and self.planned[clock]
-      return finish(planned and KeyDataEncoding.base64encode[planned + 1] or idle)
+      return planned and KeyDataEncoding.base64encode[planned + 1] or idle
     end
     self.awaiting = self.awaiting - 1
     local reply = json.decode(line)
@@ -254,15 +265,15 @@ function SurvivalLink:think(stack, sources)
       for i, bits in ipairs(reply.next or {}) do self.planned[reply.clock + i] = bits end
     end
     if reply and reply.clock == clock then
-      return finish(KeyDataEncoding.base64encode[(reply.input or 0) + 1] or idle)
+      return KeyDataEncoding.base64encode[(reply.input or 0) + 1] or idle
     end
   end
-  return finish(idle)
+  return idle
 end
 
----The frames whose thinking cost more than the ceiling, and the worst frame, in seconds.
+---The frames whose thinking cost more than the ceiling, the worst frame (seconds), and the keys the allowance refused.
 function SurvivalLink:budget()
-  return self.over, self.worst
+  return self.thinking:overruns(), self.thinking:worst(), self.dropped
 end
 
 function SurvivalLink:endMatch()

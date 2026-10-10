@@ -208,6 +208,20 @@ function BitBotNative:input(stack)
   else
     self.raiseDown = false
   end
+  -- how much warning the garbage gives: when each block shows in the queue, and when it lands
+  local q = stack.incomingGarbage.stagedGarbage
+  local nq, landed = #q, stack.garbageCreatedCount or 0
+  self.gEvents = self.gEvents or 0
+  if nq > (self.prevQueued or 0) and self.gEvents < 60 then
+    local g = q[nq]
+    self.gEvents = self.gEvents + 1
+    print(string.format("bitbot: garbage QUEUED at clock %d: %sx%s earned %s (queue now %d)", stack.clock, tostring(g and g.width), tostring(g and g.height), tostring(g and g.frameEarned), nq))
+  end
+  if landed > (self.prevLanded or 0) and self.gEvents < 60 then
+    self.gEvents = self.gEvents + 1
+    print(string.format("bitbot: garbage LANDED at clock %d (landed so far %d, queue %d)", stack.clock, landed, nq))
+  end
+  self.prevQueued, self.prevLanded = nq, landed
   self.frames = self.frames + 1
   self.firstLive = self.firstLive or stack.clock
   if bits == 0 then self.idleFrames = self.idleFrames + 1 end

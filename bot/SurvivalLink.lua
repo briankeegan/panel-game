@@ -500,4 +500,20 @@ function SurvivalLink:endMatch()
   pcall(function() self:send('{"t":"bye"}', true) end)
 end
 
+-- NOTHING IN A FRAME IS COMPILED. The compiler records and compiles a loop the first time it
+-- runs hot -- the first board with a long list of garbage on it, the first long wait -- and a
+-- compile inside the frame costs several milliseconds. This code is built from calls into C and
+-- table writes, which the compiler does not speed up, so it runs interpreted, at the same speed
+-- every frame.
+if jit and jit.off then
+  for _, f in pairs(SurvivalLink) do
+    if type(f) == "function" then jit.off(f, true) end
+  end
+  for _, f in ipairs({ num, enc, put, putScalar, putScalars, putGarbage, putTelegraph, scalars,
+                       getmetatable(numbers).__index, getmetatable(words).__index,
+                       getmetatable(firstKey).__index, getmetatable(nextKey).__index, getmetatable(quoted).__index }) do
+    jit.off(f, true)
+  end
+end
+
 return SurvivalLink

@@ -72,6 +72,7 @@ function BitBotNative:startMatch(stack, match)
   local t0 = os.clock()
   self.matchNo = (self.matchNo or 0) + 1
   self.firstLive, self.pressed, self.idleFrames = nil, 0, 0
+  self.raiseFrames, self.raiseRuns, self.raiseDown = 0, 0, false
   print(string.format("bitbot: match begins (front restarts itself on a new clock; loaded in %.0f ms)", (os.clock() - t0) * 1000))
   self.stack = stack
   BOARD = BOARD or C.nb_new()
@@ -187,6 +188,14 @@ function BitBotNative:input(stack)
   if logging then C.botTraceOn = 0 end
   if bits < 0 then error("BitBotNative: BitBot failed at clock " .. tostring(stack.clock)) end
   if C.nb_pressed(self.board) ~= 0 then bits = bit.bor(bits, 16) end
+  -- how the raise key goes out: frames held, and in how many separate presses
+  if bit.band(bits, 32) ~= 0 then
+    self.raiseFrames = (self.raiseFrames or 0) + 1
+    if not self.raiseDown then self.raiseRuns = (self.raiseRuns or 0) + 1 end
+    self.raiseDown = true
+  else
+    self.raiseDown = false
+  end
   self.frames = self.frames + 1
   self.firstLive = self.firstLive or stack.clock
   if bits == 0 then self.idleFrames = self.idleFrames + 1 end
@@ -218,9 +227,9 @@ end
 function BitBotNative:endMatch()
   local st = self.stack
   if not st then return end
-  print(string.format("bitbot: match ends -- %d live frames (first at clock %s, last at %d), %d idle, swaps %d cleared %d health %s, game over clock %s, garbage landed on it %s, queued at the end %d, top row %d",
+  print(string.format("bitbot: match ends -- %d live frames (first at clock %s, last at %d), %d idle, swaps %d cleared %d health %s, game over clock %s, garbage landed on it %s, queued at the end %d, top row %d, raise key held %d frames in %d presses",
     self.frames or 0, tostring(self.firstLive), st.clock or -1, self.idleFrames or 0, st.swapCount or 0, st.panels_cleared or 0,
-    tostring(st.health), tostring(st.game_over_clock), tostring(st.garbageCreatedCount), #st.incomingGarbage.stagedGarbage, self:topRow(st)))
+    tostring(st.health), tostring(st.game_over_clock), tostring(st.garbageCreatedCount), #st.incomingGarbage.stagedGarbage, self:topRow(st), self.raiseFrames or 0, self.raiseRuns or 0))
 end
 
 return BitBotNative

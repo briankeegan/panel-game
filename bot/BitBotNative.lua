@@ -27,6 +27,8 @@
 local ffi = require("ffi")
 local KeyDataEncoding = require("common.data.KeyDataEncoding")
 
+local BOTLOG_FRAMES = tonumber(os.getenv("PA_BITBOT_LOG_FRAMES") or 300)
+
 local BitBotNative = {}
 BitBotNative.__index = BitBotNative
 
@@ -114,7 +116,12 @@ function BitBotNative:input(stack)
   self:load(stack)
   if self.fid < 0 then self.fid = C.front_new(self.board, self.reaction, self.allowRaise) end
   if self.fid < 0 then error("BitBotNative: BitBot could not be created (front_new answered " .. self.fid .. ")") end
+  -- BitBot's own log of its decisions (train.lua's GC_BOTLOG), for the opening
+  -- frames of each match: what it decided, and why, while it was standing still
+  local logging = self.frames < BOTLOG_FRAMES
+  if logging then io.stderr:write("@ clock " .. tostring(stack.clock) .. "\n"); C.botTraceOn = 1 end
   local bits = C.front_frame(self.fid, self.board)
+  if logging then C.botTraceOn = 0 end
   if bits < 0 then error("BitBotNative: BitBot failed at clock " .. tostring(stack.clock)) end
   if C.nb_pressed(self.board) ~= 0 then bits = bit.bor(bits, 16) end
   self.frames = self.frames + 1

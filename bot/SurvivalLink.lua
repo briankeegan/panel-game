@@ -162,9 +162,23 @@ function SurvivalLink:connect()
   return true
 end
 
-function SurvivalLink:send(line)
-  local ok, err = self.sock:send(line .. "\n")
-  if not ok then error("SurvivalLink: send failed: " .. tostring(err)) end
+-- What goes to the survival bot in a frame never waits: a message the socket
+-- cannot take whole stays in the outbox and goes with the next call, in order.
+-- `now` (the match's start and end, outside any frame) waits for it.
+function SurvivalLink:send(line, now)
+  self.outbox = (self.outbox or "") .. line .. "\n"
+  self:flush(now)
+end
+
+function SurvivalLink:flush(now)
+  local box = self.outbox
+  if not box or box == "" then return end
+  self.sock:settimeout(now and 2 or 0)
+  local sent, err, partial = self.sock:send(box)
+  if sent then self.outbox = ""; return end
+  if err ~= "timeout" then error("SurvivalLink: send failed: " .. tostring(err)) end
+  self.outbox = partial and partial > 0 and box:sub(partial + 1) or box
+  if now then error("SurvivalLink: send timed out") end
 end
 
 -- The next reply line, or nil after `timeout` seconds. A line read in part
@@ -196,7 +210,7 @@ end
 function SurvivalLink:startMatch(stack)
   self:connect()
   self:send(enc({ t = "match", levelData = stack.levelData, behaviours = stack.behaviours,
-                  stackOverConditions = stack.stackOverConditions }))
+                  stackOverConditions = stack.stackOverConditions }), true)
   self.awaiting = 1   -- the match's ok, read with the first frame's answer
   self.planned = nil
   self.frames = 0
@@ -278,7 +292,7 @@ end
 
 function SurvivalLink:endMatch()
   if not self.sock then return end
-  pcall(function() self:send('{"t":"bye"}') end)
+  pcall(function() self:send('{"t":"bye"}', true) end)
 end
 
 return SurvivalLink

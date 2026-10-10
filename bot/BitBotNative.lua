@@ -152,8 +152,8 @@ function BitBotNative:input(stack)
   -- the host's part, every frame before front_frame (train.lua): the think
   -- ceiling and what the last frame's thinking took, and the opponent
   local tb1 = ThinkBudget.now()
-  C.bot_time(ThinkBudget.ceilingMillis(), self.lastThought * 1000, ThinkBudget.ceilingMillis() - loadMs)
   self:tellOpponent(stack)
+  C.bot_time(ThinkBudget.ceilingMillis(), self.lastThought * 1000, ThinkBudget.ceilingMillis() - loadMs)
   local bits = C.front_frame(self.fid, self.board)
   self.lastThought = loadMs / 1000 + (ThinkBudget.now() - tb1)
   if logging then C.botTraceOn = 0 end

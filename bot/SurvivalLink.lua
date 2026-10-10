@@ -335,4 +335,10 @@ function SurvivalLink:endMatch()
   pcall(function() self:send('{"t":"bye"}', true) end)
 end
 
+-- The board is encoded by the interpreter: a trace compiled in the middle of a frame is
+-- thinking time the bot did not choose (compiling one can take tens of milliseconds).
+if jit then
+  for _, f in ipairs({ enc, encScalars, scalars, garbageList, telegraph, SurvivalLink.dump }) do jit.off(f) end
+end
+
 return SurvivalLink

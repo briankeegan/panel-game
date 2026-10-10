@@ -1533,9 +1533,18 @@ function ClientMatch:finalizeReplay()
           elseif stack.difficulty then
             metadata.difficulty = stack.difficulty
           end
-          metadata.analytics = player.stack.analytic.data
+          -- Use `stack` (this loop's own self.stacks[i], already known good)
+          -- rather than `player.stack`: that's a separate, mutable pointer
+          -- on the long-lived Player object that unrelated code can nil out
+          -- independently of THIS match (NetClient's "cancel the catchup"
+          -- path deinits a still-displayed match's players without ever
+          -- calling abort() on it, so self.ended stays false; a later stray
+          -- abort() -- e.g. a spectator hitting MenuEsc right as the next
+          -- match starts -- then reached here with player.stack already nil
+          -- and crashed). `stack` can't be stale: it's this match's own.
+          metadata.analytics = stack.analytic.data
           ---@diagnostic disable-next-line: inject-field
-          metadata.analytics.score = player.stack.engine.score
+          metadata.analytics.score = stack.engine.score
           ---@diagnostic disable-next-line: inject-field
           metadata.analytics.rating = player.rating
         else

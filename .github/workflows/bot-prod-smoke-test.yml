@@ -62,6 +62,7 @@ on:
         type: choice
         options:
           - bitbot
+          - bitbotwasm
           - wasm
           - beverly
           - plamp
@@ -74,6 +75,7 @@ on:
         options:
           - you
           - bitbot
+          - bitbotwasm
           - wasm
           - beverly
           - plamp
@@ -311,7 +313,7 @@ jobs:
       # native/build.sh) and the client plays it in-process
       # (bot/BitBotNative.lua, as GameCreator's lua/train.lua does).
       - name: Check out GameCreator (BitBot, WasmSurvivor)
-        if: inputs.mode == 'fight' && (contains(fromJSON('["bitbot","wasm"]'), inputs.bot) || contains(fromJSON('["bitbot","wasm"]'), inputs.opponent))
+        if: inputs.mode == 'fight' && (contains(fromJSON('["bitbot","bitbotwasm","wasm"]'), inputs.bot) || contains(fromJSON('["bitbot","bitbotwasm","wasm"]'), inputs.opponent))
         uses: actions/checkout@v4
         with:
           repository: briankeegan/GameCreator
@@ -319,7 +321,7 @@ jobs:
           sparse-checkout: games/the-game
 
       - uses: actions/setup-node@v4
-        if: inputs.mode == 'fight' && (contains(fromJSON('["bitbot","wasm"]'), inputs.bot) || contains(fromJSON('["bitbot","wasm"]'), inputs.opponent))
+        if: inputs.mode == 'fight' && (contains(fromJSON('["bitbot","bitbotwasm","wasm"]'), inputs.bot) || contains(fromJSON('["bitbot","bitbotwasm","wasm"]'), inputs.opponent))
         with:
           node-version: '22'
 

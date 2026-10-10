@@ -106,7 +106,15 @@ local function telegraph(sources)
   return out
 end
 
+-- The longest each part of the board took to encode (seconds), for SurvivalLink:phases.
+SurvivalLink.parts = { stack = 0, panels = 0, backlog = 0, incoming = 0, telegraph = 0 }
+local function timed(name, t0)
+  local took = socket.gettime() - t0
+  if took > SurvivalLink.parts[name] then SurvivalLink.parts[name] = took end
+end
+
 function SurvivalLink.dump(s, sources)
+  local t = socket.gettime()
   local rows = {}
   for r = 0, #s.panels do
     local cells = {}
@@ -116,17 +124,25 @@ function SurvivalLink.dump(s, sources)
     end
     rows[r + 1] = "[" .. table.concat(cells, ",") .. "]"
   end
+  timed("panels", t); t = socket.gettime()
   local backlog = {}
   for i, rec in ipairs(s.swapStallingBackLog or {}) do backlog[i] = scalars(rec) end
   local landed = {}
   for i, id in ipairs(s.garbageLandedThisFrame or {}) do landed[i] = id end
-  return '{"stack":' .. encScalars(s) .. ',"panels":[' .. table.concat(rows, ",") .. ']'
-    .. ',"incoming":' .. enc({ staged = garbageList(s.incomingGarbage.stagedGarbage) })
-    .. ',"swapStallingBackLog":' .. enc(backlog) .. ',"garbageLandedThisFrame":' .. enc(landed)
-    .. ',"dropColumns":' .. enc(s.currentGarbageDropColumnIndexes) .. ',"telegraph":' .. enc(telegraph(sources)) .. '}'
+  local backlogJson, landedJson = enc(backlog), enc(landed)
+  timed("backlog", t); t = socket.gettime()
+  local stack = encScalars(s)
+  timed("stack", t); t = socket.gettime()
+  local incoming = enc({ staged = garbageList(s.incomingGarbage.stagedGarbage) })
+  timed("incoming", t); t = socket.gettime()
+  local telegraphJson = enc(telegraph(sources))
+  timed("telegraph", t)
+  return '{"stack":' .. stack .. ',"panels":[' .. table.concat(rows, ",") .. ']'
+    .. ',"incoming":' .. incoming
+    .. ',"swapStallingBackLog":' .. backlogJson .. ',"garbageLandedThisFrame":' .. landedJson
+    .. ',"dropColumns":' .. enc(s.currentGarbageDropColumnIndexes) .. ',"telegraph":' .. telegraphJson .. '}'
 end
 
--- ---------------------------------------------------------------- the link
 -- A frame is held to this share of the thinking ceiling: what the system's own
 -- pauses take from a frame comes out of the rest.
 SurvivalLink.TARGET_SHARE = 0.5
@@ -306,6 +322,7 @@ end
 ---The frames whose thinking cost more than the ceiling, the worst frame (seconds), and the keys the allowance refused.
 ---The longest each step of a frame took, and the longest each took in a frame that went over the ceiling (seconds).
 function SurvivalLink:phases()
+  self.phase.parts = SurvivalLink.parts
   return self.phase
 end
 

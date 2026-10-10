@@ -152,11 +152,6 @@ function DisplayClientStack.new(playerID, player, viewStack)
   self._popSfxQueue  = {}
   self._lastPopLevel = nil
   self._lastPopIndex = nil
-  if self.snapshot and self.snapshot.p then
-    local cache = {}
-    for i = 1, #self.snapshot.p do cache[i] = self.snapshot.p[i] end
-    self._cachedPanels = cache
-  end
   return self
 end
 
@@ -320,7 +315,6 @@ function DisplayClientStack:applyBatch(batch)
     self.snapshot     = nil
     self.prevSnapshot = nil
     self.prevRecvTime = 0
-    self._cachedPanels = nil
     self._popSfxQueue = {}  -- drop stale pops from the previous match
   end
   -- Shift latest → prev for interpolation. Render uses both to lerp
@@ -330,29 +324,6 @@ function DisplayClientStack:applyBatch(batch)
   self.snapshot       = snapshot
   self.latestRecvTime = love.timer.getTime()
   self.snapshotsApplied = self.snapshotsApplied + 1
-
-  -- Delta merge: snapshot.p arrives with `true` for cells unchanged since
-  -- the last shipped state. Resolve to a full grid using the cached
-  -- previous grid, then replace snapshot.p with the resolved grid so the
-  -- rest of the render path (paintGridFromSnapshot) is unaware deltas
-  -- exist.
-  if snapshot.p then
-    local cached = self._cachedPanels
-    -- Orphan-delta safety: if a new spectator joins mid-match, their
-    -- first snapshot may arrive as a delta (sender doesn't know about
-    -- viewers; keyframes only every KEYFRAME_EVERY sends). Without a
-    -- cache, an unresolved `true` cell hits expandCell as `not true.c`
-    -- which is a crash. Resolve to `false` (empty) when nothing cached;
-    -- the next keyframe corrects.
-    for i = 1, #snapshot.p do
-      if snapshot.p[i] == true then
-        snapshot.p[i] = (cached and cached[i]) or false
-      end
-    end
-    local nextCache = {}
-    for i = 1, #snapshot.p do nextCache[i] = snapshot.p[i] end
-    self._cachedPanels = nextCache
-  end
 
   -- Push HUD scalars onto the matching engine so existing HUD render
   -- methods (drawScore etc.) display the correct values.

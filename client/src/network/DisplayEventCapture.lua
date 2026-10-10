@@ -64,8 +64,6 @@ function DisplayEventCapture.new(engine, playerID, hostStack, historyList)
   -- handlers, drained into each snapshot.
   self._pendingEvents     = {}
   self._popSizeThisFrame  = 1
-  -- Set by forceKeyframe() when a new spectator attaches; see there.
-  self._forceKeyframe = false
   -- Optional list to accumulate every batch for replay recording.
   -- When set, each batch built in _send is appended here in addition
   -- to being sent over the network.
@@ -79,19 +77,6 @@ function DisplayEventCapture.new(engine, playerID, hostStack, historyList)
     engine._renderHost = hostStack
   end
   return self
-end
-
----Force the next send to be a full keyframe, bypassing the normal rate/
----idle/unchanged gates entirely. Call when a new spectator attaches: a
----keyframe is otherwise only periodic (every KEYFRAME_EVERY sends, ~5s at
----20Hz), not per-viewer, so a spectator who just joined likely gets
----delta-only snapshots at first. An unresolved delta cell has no cached
----grid to resolve against yet and renders as empty (see the "Orphan-delta
----safety" comment in DisplayClientStack:applyBatch) -- so without this,
----whatever just joined watches an inaccurate, partly-blank board for up
----to that whole window instead of the real one.
-function DisplayEventCapture:forceKeyframe()
-  self._forceKeyframe = true
 end
 
 ---Per-frame heartbeat driven from BattleRoom:update. Independent of
@@ -156,25 +141,6 @@ local function snapshotCell(panel)
   if panel.senderId                               then cell.sid = panel.senderId end
   return cell
 end
-
--- Cell equality covering every shipped field. Used by buildSnapshot to
--- mark cells as unchanged (sentinel `true`) when they match the last
--- shipped state — bandwidth saver.
-local function cellsEqual(a, b)
-  if a == b then return true end
-  if type(a) ~= "table" or type(b) ~= "table" then return false end
-  return a.c  == b.c  and a.s  == b.s  and a.t  == b.t
-     and a.g  == b.g  and a.m  == b.m  and a.ch == b.ch
-     and a.gi == b.gi and a.xo == b.xo and a.yo == b.yo
-     and a.gw == b.gw and a.gh == b.gh and a.pt == b.pt
-     and a.it == b.it and a.cs == b.cs and a.ci == b.ci
-     and a.sl == b.sl and a.fg == b.fg and a.sid == b.sid
-end
-
--- Keyframe interval. Every Nth send goes out as a full grid (no deltas)
--- so receivers that lost a packet, joined late, or got a stale cached
--- value can recover.
-local KEYFRAME_EVERY = 100
 
 -- Build a wire-ready snapshot of the engine's current state. Pure read —
 -- never mutates the engine.
@@ -436,12 +402,6 @@ end
 
 function DisplayEventCapture:_maybeSend()
   local now = love.timer.getTime()
-  if self._forceKeyframe then
-    -- A freshly-joined spectator needs this now, not whenever the normal
-    -- rate/idle/deficit gates below would otherwise next allow a send.
-    self:_send(now)
-    return
-  end
   -- Fast-events bypass: ship every tick when something visually fast is
   -- happening that 20Hz undersamples. Three triggers:
   --   * manual raise in progress (player holding raise button)
@@ -578,23 +538,16 @@ end
 function DisplayEventCapture:_send(now)
   self.lastFlushTime = now or love.timer.getTime()
 
-  -- Consume the force-keyframe request now: a forced send must go out as
-  -- a real keyframe (skip-when-unchanged bypassed below too) even if the
-  -- board happens to be static the instant a new spectator attaches.
-  local forcingKeyframe = self._forceKeyframe
-  self._forceKeyframe = false
-
   -- Skip-when-unchanged: bail before the expensive serialize if NOTHING
   -- shippable has changed since the last send. Catches:
   --   * Engine clock advancing (normal play) — sig differs
   --   * Panel state flipping while clock frozen (post-death
   --     applyVisualDeath) — panelsSig differs
   --   * One-shot events pending — _pendingEvents non-empty
-  -- All three quiet → no info to ship → skip. Never applies when forcing.
+  -- All three quiet → no info to ship → skip.
   local sig       = stateSignature(self.engine)
   local panelsSig = panelsSignature(self.engine)
-  if not forcingKeyframe
-      and sig == self._lastSentSig
+  if sig == self._lastSentSig
       and panelsSig == self._lastSentPanelsSig
       and #self._pendingEvents == 0 then
     return
@@ -607,33 +560,11 @@ function DisplayEventCapture:_send(now)
   self._lastSentCurR = self.engine.cur_row or 0
   self._lastSentCurC = self.engine.cur_col or 0
 
+  -- Always the full grid, every send -- no delta encoding, no periodic
+  -- keyframe cadence to wait on. A spectator joining mid-match (or any
+  -- receiver recovering from a dropped packet) gets a completely accurate
+  -- board on the very next send, full stop.
   local snapshot = buildSnapshot(self.engine)
-
-  -- Delta encoding for the panel grid. Most cells stay unchanged frame-
-  -- to-frame; ship `true` as the unchanged sentinel and the full table
-  -- only where the cell differs. Receiver merges deltas onto its cached
-  -- grid. Periodic keyframes (every KEYFRAME_EVERY sends) ship the full
-  -- grid so receivers can recover from packet loss or stale state.
-  self._sendCount = (self._sendCount or 0) + 1
-  local isKeyframe = forcingKeyframe
-      or (self._sendCount == 1)
-      or (self._sendCount % KEYFRAME_EVERY == 0)
-  local fullP = snapshot.p
-  if fullP then
-    -- Snapshot original cell refs BEFORE mutation so the next send's
-    -- comparison sees the actual shipped values.
-    local newCache = {}
-    for i = 1, #fullP do newCache[i] = fullP[i] end
-    if not isKeyframe and self._lastShippedPanels then
-      local last = self._lastShippedPanels
-      for i = 1, #fullP do
-        if cellsEqual(fullP[i], last[i]) then
-          snapshot.p[i] = true
-        end
-      end
-    end
-    self._lastShippedPanels = newCache
-  end
 
   -- Attach any one-shot triggers collected since last send, then clear.
   -- These play once on the receiver — pop FX and score cards.
@@ -641,8 +572,8 @@ function DisplayEventCapture:_send(now)
     snapshot.e = self._pendingEvents
     self._pendingEvents = {}
   end
-  -- Record this batch for replay playback (same delta-encoded form that
-  -- goes over the wire, so the playback path is identical to live receive).
+  -- Record this batch for replay playback (same full-grid form that goes
+  -- over the wire, so the playback path is identical to live receive).
   if self._historyList then
     self._historyList[#self._historyList + 1] = { from = self.playerID, snapshot = snapshot }
   end

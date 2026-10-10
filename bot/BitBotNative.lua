@@ -197,12 +197,19 @@ function BitBotNative:input(stack)
   return KeyDataEncoding.base64encode[bits + 1]
 end
 
+function BitBotNative:topRow(stack)
+  for r = #stack.panels, 1, -1 do
+    for c = 1, stack.width do if stack.panels[r][c].color ~= 0 then return r end end
+  end
+  return 0
+end
+
 function BitBotNative:endMatch()
   local st = self.stack
   if not st then return end
-  print(string.format("bitbot: match ends -- %d live frames (first at clock %s, last at %d), %d idle, swaps %d cleared %d health %s, game over clock %s",
+  print(string.format("bitbot: match ends -- %d live frames (first at clock %s, last at %d), %d idle, swaps %d cleared %d health %s, game over clock %s, garbage landed on it %s, queued at the end %d, top row %d",
     self.frames or 0, tostring(self.firstLive), st.clock or -1, self.idleFrames or 0, st.swapCount or 0, st.panels_cleared or 0,
-    tostring(st.health), tostring(st.game_over_clock)))
+    tostring(st.health), tostring(st.game_over_clock), tostring(st.garbageCreatedCount), #st.incomingGarbage.stagedGarbage, self:topRow(st)))
 end
 
 return BitBotNative

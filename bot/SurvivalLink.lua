@@ -128,7 +128,7 @@ end
 -- The most any computer player may think in one frame (ThinkBudget.ceilingMillis),
 -- and what of it is kept back for the work after the last wait.
 SurvivalLink.CEILING_SEC = 0.008
-SurvivalLink.MARGIN_SEC = 0.001
+SurvivalLink.MARGIN_SEC = 0.002
 function SurvivalLink.new(opts)
   opts = opts or {}
   local self = setmetatable({}, SurvivalLink)
@@ -164,7 +164,7 @@ end
 -- The next reply line, or nil after `timeout` seconds. A line read in part
 -- is kept for the next call.
 function SurvivalLink:receive(timeout)
-  self.sock:settimeout(timeout)
+  self.sock:settimeout(timeout, "t")   -- a total for the whole read, not a wait per piece of the line
   local line, err, partial = self.sock:receive("*l")
   if line then
     line = self.buffer .. line
@@ -189,7 +189,18 @@ end
 -- still (the search plays only a stack in play).
 -- `sources` are the stacks sending this one garbage; their telegraphs go
 -- with the board.
+-- The frame's work, with the collector held off for it: a collection that
+-- fell inside would be thinking time the bot did not use, and is left to the
+-- game's own work between frames.
 function SurvivalLink:input(stack, sources)
+  collectgarbage("stop")
+  local ok, key = pcall(self.think, self, stack, sources)
+  collectgarbage("restart")
+  if not ok then error(key, 0) end
+  return key
+end
+
+function SurvivalLink:think(stack, sources)
   local idle = KeyDataEncoding.base64encode[1]
   if stack.in_countdown or not stack.stopWatchIsRunning or stack:game_ended() then return idle end
   local clock = stack.clock

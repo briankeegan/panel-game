@@ -33,6 +33,7 @@ BitBotNative.__index = BitBotNative
 -- BitBot's library, its declarations and cboard.lua, once per process.
 local CB
 local copies = 0
+local loaded = {}      -- kept for the process: a library the collector unloads takes its worker threads' code with it
 local function load(dir)
   if CB then return end
   local f = assert(io.open(dir .. "/lua/train.lua"), "BitBotNative: no lua/train.lua under GC_EVAL_DIR=" .. dir)
@@ -54,6 +55,7 @@ local function freshLibrary(dir)
   local i, o = assert(io.open(src, "rb")), assert(io.open(dst, "wb"))
   o:write(i:read("*a")); i:close(); o:close()
   local lib = ffi.load(dst)
+  loaded[#loaded + 1] = lib
   os.remove(dst)       -- mapped already; the file is not needed again
   return lib
 end

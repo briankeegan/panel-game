@@ -123,9 +123,24 @@ start_wasm() {   # NAME PORT
 # bitbot_link.js runs BitBot's own update() on it, and the keys it presses
 # come back. BitBot decides each frame, inside the link's per-frame budget. The pre-flight also fails on any call the link cannot
 # relay ("not relayed") or a frame that threw ("frame failed").
+# bit.wasm is a committed build and trails the source (it was rebuilt at 13:37
+# while bot.c and front.c changed at 14:50), so it is built here from the
+# checkout's source with GameCreator's own line from native/build.sh.
+build_bitbot_wasm() {
+  [ -n "${BITBOT_WASM_BUILT:-}" ] && return 0
+  command -v wasm-ld >/dev/null 2>&1 || sudo apt-get install -y -qq lld >/dev/null 2>&1 || true
+  local log="$PWD/bitbot-wasm-build.log"
+  ( cd "$GC_EVAL_DIR/native" \
+    && eval "$(grep -E '^(FLAGS|PGO)=' build.sh)" \
+    && eval "$(grep -E '^clang \$FLAGS \$PGO .* -o bit\.wasm' build.sh | head -1)" ) > "$log" 2>&1 \
+    || { tail -30 "$log"; echo "fight: bit.wasm did not build from GameCreator's source"; exit 1; }
+  BITBOT_WASM_BUILT=1
+  echo "fight: bit.wasm built from source ($(git -C "$GC_EVAL_DIR" log -1 --format=%h 2>/dev/null))"
+}
 start_bitbotwasm() {   # NAME PORT
   local name=$1 port=$2 log="mind-$1.log"
   [ -n "${GC_EVAL_DIR:-}" ] || { echo "fight: bitbotwasm needs GC_EVAL_DIR=<GameCreator>/games/the-game/ai/eval"; exit 2; }
+  build_bitbot_wasm
   node bot/bitbot_link.js --dir "$GC_EVAL_DIR" --port "$port" > "$log" 2>&1 &
   PIDS="${PIDS:-} $!"
   PORT_OF[$name]=$port

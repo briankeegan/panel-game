@@ -1,5 +1,5 @@
 {
- "name": "WasmBot",
+ "name": "WasmSurvivor_Bot",
  "weights": "wasmbot.weights.json",
  "reaction": 12,
  "swapGap": 12,

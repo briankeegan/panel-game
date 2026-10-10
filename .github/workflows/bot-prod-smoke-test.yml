@@ -68,12 +68,13 @@ on:
           - plamp
           - heuristic
       opponent:
-        description: 'fight: who challenges it as `name`2, over and over -- or "you" to leave it waiting for people'
+        description: 'fight: who challenges it as `name`2, over and over -- or "you" to leave it waiting for people, or "challenge" to have `bot` challenge the second name in `name` ("A,B") that sits in the lobby in ANOTHER run -- one runner each'
         required: false
         default: 'you'
         type: choice
         options:
           - you
+          - challenge
           - bitbot
           - bitbotwasm
           - wasm

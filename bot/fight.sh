@@ -52,12 +52,16 @@ OPP=${6:-you}; OPP_NAME=${7:-}
 case "$NAME" in *,*) OPP_NAME=${OPP_NAME:-${NAME#*,}}; NAME=${NAME%%,*};; esac
 OPP_NAME=${OPP_NAME:-${NAME}2}
 [ "$OPP" = you ] && OPP=""
+# OPP=challenge: the other side runs in ANOTHER run (its own runner, its own CPUs), sitting in the lobby as
+# OPP_NAME (the second half of NAME, "A,B"). This run's bot challenges it there instead of launching it here.
+REMOTE=0
+if [ "$OPP" = challenge ]; then REMOTE=1; OPP=""; fi
 
 kinds="bitbot bitbotwasm wasm beverly plamp heuristic"
 known() { case " $kinds " in *" $1 "*) return 0;; esac; return 1; }
 known "$BOT" || { echo "fight: no bot '$BOT' (one of: $kinds)"; exit 2; }
 [ -z "$OPP" ] || known "$OPP" || { echo "fight: no opponent '$OPP' (one of: $kinds, or you)"; exit 2; }
-for n in "$NAME" ${OPP:+"$OPP_NAME"}; do
+for n in "$NAME" ${OPP:+"$OPP_NAME"} $([ "$REMOTE" = 1 ] && echo "$OPP_NAME"); do
   [ ${#n} -le 16 ] || { echo "fight: name '$n' is ${#n} chars; the server limit is 16"; exit 2; }
   case "$n" in *[!A-Za-z0-9_]*) echo "fight: name '$n' may only have letters, digits and _"; exit 2;; esac
 done
@@ -192,7 +196,7 @@ play() {
 
 echo "fight: $NAME ($BOT) in the lobby on $HOST:$PORT${OPP:+, challenged by $OPP_NAME ($OPP)}, for ${SECS}s"
 if [ -z "$OPP" ]; then
-  play "$BOT" "$NAME" 2>&1 | tee "fight-$NAME.log"
+  play "$BOT" "$NAME" "$([ "$REMOTE" = 1 ] && echo "$OPP_NAME")" 2>&1 | tee "fight-$NAME.log"
   rc=${PIPESTATUS[0]}
 else
   play "$BOT" "$NAME" > "fight-$NAME.log" 2>&1 &

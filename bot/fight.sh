@@ -14,6 +14,8 @@
 #   bitbot     GameCreator's BitBot (C, games/the-game/ai/eval/native, as the
 #              checkout at $GC_EVAL_DIR has it), built to libbit.so and played
 #              in the client's own process by bot/BitBotNative.lua
+#   bitbotwasm GameCreator's BitBot as its WASM build (bitbot.js on bit.wasm, in
+#              Node), through bot/bitbot_link.js and bot/SurvivalLink.lua
 #   wasm       GameCreator's WasmSurvivor (games/the-game/ai/eval/survivor.js,
 #              same checkout), the survival bot, a Node process per side
 #   beverly    the fork's weighted bot, bot/profiles/beverly.json
@@ -51,7 +53,7 @@ case "$NAME" in *,*) OPP_NAME=${OPP_NAME:-${NAME#*,}}; NAME=${NAME%%,*};; esac
 OPP_NAME=${OPP_NAME:-${NAME}2}
 [ "$OPP" = you ] && OPP=""
 
-kinds="bitbot wasm beverly plamp heuristic"
+kinds="bitbot bitbotwasm wasm beverly plamp heuristic"
 known() { case " $kinds " in *" $1 "*) return 0;; esac; return 1; }
 known "$BOT" || { echo "fight: no bot '$BOT' (one of: $kinds)"; exit 2; }
 [ -z "$OPP" ] || known "$OPP" || { echo "fight: no opponent '$OPP' (one of: $kinds, or you)"; exit 2; }
@@ -116,10 +118,32 @@ start_wasm() {   # NAME PORT
   grep -q listening "$log" || { cat "$log"; echo "fight: wasm ($name) did not start"; exit 1; }
   preflight wasm "$name" "$port" ""
 }
+# ---- BitBot's WASM build (GameCreator's bitbot.js on bit.wasm, in Node): the
+# client sends the server's board every frame (bot/SurvivalLink.lua), bot/
+# bitbot_link.js runs BitBot's own update() on it, and the keys it presses
+# come back. Every frame's answer is awaited (PA_SURVIVOR_WAIT=2): BitBot
+# decides each frame. The pre-flight also fails on any call the link cannot
+# relay ("not relayed") or a frame that threw ("frame failed").
+start_bitbotwasm() {   # NAME PORT
+  local name=$1 port=$2 log="mind-$1.log"
+  [ -n "${GC_EVAL_DIR:-}" ] || { echo "fight: bitbotwasm needs GC_EVAL_DIR=<GameCreator>/games/the-game/ai/eval"; exit 2; }
+  node bot/bitbot_link.js --dir "$GC_EVAL_DIR" --port "$port" > "$log" 2>&1 &
+  PIDS="${PIDS:-} $!"
+  PORT_OF[$name]=$port
+  for i in $(seq 1 300); do grep -q "listening\|Error" "$log" && break; sleep 0.2; done
+  grep -q listening "$log" || { cat "$log"; echo "fight: bitbotwasm ($name) did not start"; exit 1; }
+  PA_SURVIVOR_PORT=$port PA_SURVIVOR_WAIT=2 PA_PREFLIGHT_NAME="bitbotwasm ($name)" \
+    luajit bot/bitbot_preflight.lua 1800 2>&1 | tee "preflight-$name.log"
+  [ "${PIPESTATUS[0]}" -eq 0 ] || { cat "$log"; exit 1; }
+  sleep 0.5
+  if grep -a "frame failed\|not relayed" "$log"; then
+    echo "fight: bitbotwasm ($name) pre-flight FAILED (lines above are from $log)"; exit 1
+  fi
+}
 trap 'kill ${PIDS:-} 2>/dev/null' EXIT
 if [ "$BOT" = bitbot ] || [ "$OPP" = bitbot ]; then build_bitbot; fi
-case "$BOT" in bitbot) preflight bitbot "$NAME" ;; wasm) start_wasm "$NAME" "$BASE_PORT" ;; esac
-case "$OPP" in bitbot) preflight bitbot "$OPP_NAME" ;; wasm) start_wasm "$OPP_NAME" $((BASE_PORT + 1)) ;; esac
+case "$BOT" in bitbot) preflight bitbot "$NAME" ;; bitbotwasm) start_bitbotwasm "$NAME" "$BASE_PORT" ;; wasm) start_wasm "$NAME" "$BASE_PORT" ;; esac
+case "$OPP" in bitbot) preflight bitbot "$OPP_NAME" ;; bitbotwasm) start_bitbotwasm "$OPP_NAME" $((BASE_PORT + 1)) ;; wasm) start_wasm "$OPP_NAME" $((BASE_PORT + 1)) ;; esac
 
 # ---- one side: KIND NAME [CHALLENGE]
 play() {
@@ -127,6 +151,8 @@ play() {
   case "$kind" in
     bitbot)      PA_CHALLENGE="$challenge" timeout "$SECS" luajit bot/playBot.lua "$HOST" "$PORT" "$name" 4 12 bitbot ;;
     wasm)        PA_CHALLENGE="$challenge" PA_SURVIVOR_PORT=${PORT_OF[$name]} \
+                   timeout "$SECS" luajit bot/playBot.lua "$HOST" "$PORT" "$name" 4 12 survival ;;
+    bitbotwasm)  PA_CHALLENGE="$challenge" PA_SURVIVOR_PORT=${PORT_OF[$name]} PA_SURVIVOR_WAIT=2 \
                    timeout "$SECS" luajit bot/playBot.lua "$HOST" "$PORT" "$name" 4 12 survival ;;
     beverly)     PA_CHALLENGE="$challenge" PA_SEARCH_PROFILE=bot/profiles/beverly.json \
                    timeout "$SECS" luajit bot/playBot.lua "$HOST" "$PORT" "$name" 4 12 weighted ;;

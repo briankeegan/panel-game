@@ -225,11 +225,15 @@ end
 -- game's own work between frames. The frame is charged to the thinking budget
 -- and its key pressed on the input budget, the game's own.
 function SurvivalLink:input(stack, sources)
+  local stopOnOver = os.getenv("PA_STOP_ON_OVER") == "1"
+  local before = stopOnOver and SurvivalLink.machine() or nil
   collectgarbage("stop")
   local began = ThinkBudget.now()
+  local cpu0 = os.clock()
   local ok, key = pcall(self.think, self, stack, sources)
   if ok and self.ownInputs then key = self:press(key, stack.clock) end
   local took = ThinkBudget.now() - began
+  local cpu = os.clock() - cpu0
   collectgarbage("restart")
   if not ok then error(key, 0) end
   if self.ownThinking then self.thinking:charge(took) end
@@ -241,7 +245,38 @@ function SurvivalLink:input(stack, sources)
     end
     self.steps = nil
   end
+  -- PA_STOP_ON_OVER=1: the first frame over the ceiling ends the run, with what the machine and the frame did
+  if stopOnOver and took > self.thinking:snapshot().ceiling and not self.stopReason then
+    local after = SurvivalLink.machine()
+    local text = {}
+    for name, v in pairs(st or {}) do text[#text + 1] = string.format("%s %.1f", name, v * 1000) end
+    table.sort(text)
+    self.stopReason = string.format("STOPPED on the first frame over the ceiling: clock %d, wall %.1f ms, this process's cpu %.1f ms, steps (ms) [%s]; the machine over the frame: stolen %.1f ms, busy %.1f ms of %.1f ms, runnable %d, load %s",
+      stack.clock, took * 1000, cpu * 1000, table.concat(text, ", "), (after.steal - before.steal) * 10, (after.busy - before.busy) * 10, (after.total - before.total) * 10, after.running, after.load)
+  end
   return key
+end
+
+---What the machine has done: jiffies (10 ms) stolen from it, busy and in all, on every cpu together (/proc/stat), the
+---runnable threads now and the load average (/proc). Zeros where there is no /proc.
+function SurvivalLink.machine()
+  local m = { steal = 0, busy = 0, total = 0, running = 0, load = "?" }
+  local f = io.open("/proc/stat", "r")
+  if f then
+    local line = f:read("*l"); f:close()
+    local n = {}
+    for v in (line or ""):gmatch("%d+") do n[#n + 1] = tonumber(v) end
+    for i, v in ipairs(n) do m.total = m.total + v end
+    m.steal = n[8] or 0
+    m.busy = m.total - (n[4] or 0) - (n[5] or 0)
+  end
+  local l = io.open("/proc/loadavg", "r")
+  if l then
+    local text = l:read("*l") or ""; l:close()
+    m.load = text:match("^(%S+ %S+ %S+)") or "?"
+    m.running = tonumber(text:match("(%d+)/%d+")) or 0
+  end
+  return m
 end
 
 -- The key, or idle when the allowance of keys cannot pay for it (the game

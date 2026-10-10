@@ -34,6 +34,7 @@ BitBotNative.__index = BitBotNative
 
 -- BitBot's library, its declarations and cboard.lua, once per process.
 local C, CB
+local BOARD, FID     -- one board and one BitBot per process: libbit restarts its front itself when the clock goes back
 local function load(dir)
   if C then return end
   local f = assert(io.open(dir .. "/lua/train.lua"), "BitBotNative: no lua/train.lua under GC_EVAL_DIR=" .. dir)
@@ -63,12 +64,20 @@ function BitBotNative:startMatch(stack)
   self.firstLive, self.pressed, self.idleFrames = nil, 0, 0
   print(string.format("bitbot: match begins (front restarts itself on a new clock; loaded in %.0f ms)", (os.clock() - t0) * 1000))
   self.stack = stack
-  self.board = C.nb_new()
-  self.fid = -1
+  BOARD = BOARD or C.nb_new()
+  self.board = BOARD
+  self.fid = FID or -1
   self.frames, self.maxMs = 0, 0
   self.HI, self.NH = {}, C.nb_nhead()
   for i = 0, self.NH - 1 do self.HI[ffi.string(C.nb_head_name(i))] = i end
   self.pv = {}
+  -- BitBot is given the board and made now, before the countdown runs a frame
+  self:load(stack)
+  if self.fid < 0 then
+    self.fid = C.front_new(self.board, self.reaction, self.allowRaise)
+    if self.fid < 0 then error("BitBotNative: BitBot could not be created (front_new answered " .. self.fid .. ")") end
+    FID = self.fid
+  end
 end
 
 -- train.lua load(): the stack into BitBot's board -- and nothing to come
@@ -109,12 +118,13 @@ function BitBotNative:input(stack)
     if self.fid < 0 and not stack:game_ended() then
       self:load(stack)
       self.fid = C.front_new(self.board, self.reaction, self.allowRaise)
+      FID = self.fid
     end
     return idle
   end
   local t0 = os.clock()
   self:load(stack)
-  if self.fid < 0 then self.fid = C.front_new(self.board, self.reaction, self.allowRaise) end
+  if self.fid < 0 then self.fid = C.front_new(self.board, self.reaction, self.allowRaise); FID = self.fid end
   if self.fid < 0 then error("BitBotNative: BitBot could not be created (front_new answered " .. self.fid .. ")") end
   -- BitBot's own log of its decisions (train.lua's GC_BOTLOG), for the opening
   -- frames of each match: what it decided, and why, while it was standing still

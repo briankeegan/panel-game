@@ -106,15 +106,7 @@ local function telegraph(sources)
   return out
 end
 
--- The longest each part of the board took to encode (seconds), for SurvivalLink:phases.
-SurvivalLink.parts = { stack = 0, panels = 0, backlog = 0, incoming = 0, telegraph = 0, rows = 0, cells = 0, slowestRows = 0, slowestCells = 0 }
-local function timed(name, t0)
-  local took = socket.gettime() - t0
-  if took > SurvivalLink.parts[name] then SurvivalLink.parts[name] = took end
-end
-
 function SurvivalLink.dump(s, sources)
-  local t = socket.gettime()
   local rows = {}
   for r = 0, #s.panels do
     local cells = {}
@@ -124,29 +116,14 @@ function SurvivalLink.dump(s, sources)
     end
     rows[r + 1] = "[" .. table.concat(cells, ",") .. "]"
   end
-  local nrows, ncells = #s.panels + 1, 0
-  for r = 0, #s.panels do for c = 1, s.width do if s.panels[r] and s.panels[r][c] then ncells = ncells + 1 end end end
-  local took = socket.gettime() - t
-  if nrows > SurvivalLink.parts.rows then SurvivalLink.parts.rows = nrows end
-  if ncells > SurvivalLink.parts.cells then SurvivalLink.parts.cells = ncells end
-  if took > SurvivalLink.parts.panels then SurvivalLink.parts.slowestRows, SurvivalLink.parts.slowestCells = nrows, ncells end
-  timed("panels", t); t = socket.gettime()
   local backlog = {}
   for i, rec in ipairs(s.swapStallingBackLog or {}) do backlog[i] = scalars(rec) end
   local landed = {}
   for i, id in ipairs(s.garbageLandedThisFrame or {}) do landed[i] = id end
-  local backlogJson, landedJson = enc(backlog), enc(landed)
-  timed("backlog", t); t = socket.gettime()
-  local stack = encScalars(s)
-  timed("stack", t); t = socket.gettime()
-  local incoming = enc({ staged = garbageList(s.incomingGarbage.stagedGarbage) })
-  timed("incoming", t); t = socket.gettime()
-  local telegraphJson = enc(telegraph(sources))
-  timed("telegraph", t)
-  return '{"stack":' .. stack .. ',"panels":[' .. table.concat(rows, ",") .. ']'
-    .. ',"incoming":' .. incoming
-    .. ',"swapStallingBackLog":' .. backlogJson .. ',"garbageLandedThisFrame":' .. landedJson
-    .. ',"dropColumns":' .. enc(s.currentGarbageDropColumnIndexes) .. ',"telegraph":' .. telegraphJson .. '}'
+  return '{"stack":' .. encScalars(s) .. ',"panels":[' .. table.concat(rows, ",") .. ']'
+    .. ',"incoming":' .. enc({ staged = garbageList(s.incomingGarbage.stagedGarbage) })
+    .. ',"swapStallingBackLog":' .. enc(backlog) .. ',"garbageLandedThisFrame":' .. enc(landed)
+    .. ',"dropColumns":' .. enc(s.currentGarbageDropColumnIndexes) .. ',"telegraph":' .. enc(telegraph(sources)) .. '}'
 end
 
 -- A frame is held to this share of the thinking ceiling: what the system's own
@@ -328,7 +305,6 @@ end
 ---The frames whose thinking cost more than the ceiling, the worst frame (seconds), and the keys the allowance refused.
 ---The longest each step of a frame took, and the longest each took in a frame that went over the ceiling (seconds).
 function SurvivalLink:phases()
-  self.phase.parts = SurvivalLink.parts
   return self.phase
 end
 
@@ -339,12 +315,6 @@ end
 function SurvivalLink:endMatch()
   if not self.sock then return end
   pcall(function() self:send('{"t":"bye"}', true) end)
-end
-
--- The board is encoded by the interpreter: a trace compiled in the middle of a frame is
--- thinking time the bot did not choose (compiling one can take tens of milliseconds).
-if jit then
-  for _, f in ipairs({ enc, encScalars, scalars, garbageList, telegraph, SurvivalLink.dump }) do jit.off(f) end
 end
 
 return SurvivalLink

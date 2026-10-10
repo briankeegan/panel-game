@@ -837,7 +837,11 @@ function Lobby:isLocalPlayerInRoom(lobbyDataV2)
   -- client can be stale; what this client itself last did cannot, so it's
   -- the only signal trusted here. lobbyDataV2 is still fine for questions
   -- about OTHER players (openPlayerContextMenu, etc.).
-  return GAME.netClient.room ~= nil
+  --
+  -- Spectating is deliberately NOT "in a room" here either: you're only
+  -- watching, not holding a seat, so Create Team Game/FFA should behave
+  -- normally (not show "Leave game" / try to leave first) while spectating.
+  return GAME.netClient.room ~= nil and not GAME.netClient.room.spectating
 end
 
 ---@param lobbyDataV2 PersonalizedLobbyDataV2?
@@ -1548,7 +1552,13 @@ function Lobby:openRoomSubMenu(room, button)
 
   local lobbyDataV2 = GAME.netClient.lobbyDataV2
   local localPlayerInfo = lobbyDataV2 and lobbyDataV2.players and lobbyDataV2.players[GAME.localPlayer.publicId]
-  local localRoomNumber = localPlayerInfo and localPlayerInfo.roomNumber or (GAME.netClient.room and GAME.netClient.room.roomNumber)
+  -- Only fall back to GAME.netClient.room.roomNumber when it's an actual
+  -- joined room, not a spectate attachment -- otherwise clicking the room
+  -- you're spectating reads as "this is my room" and offers "Leave team
+  -- game" for a game you were only ever watching (same class of bug as
+  -- isLocalPlayerInRoom below, just a separate local derivation of it).
+  local localRoomNumber = localPlayerInfo and localPlayerInfo.roomNumber
+    or (GAME.netClient.room and not GAME.netClient.room.spectating and GAME.netClient.room.roomNumber)
   local localIsMemberOfRoom = room.players and tableUtils.trueForAny(room.players, function(playerId)
     return playerId == GAME.localPlayer.publicId
   end)

@@ -61,6 +61,94 @@ local function enc(v, depth)
   end
   return "null"
 end
+-- The board is written into one reusable list of pieces and joined once, so a
+-- frame makes one long string and none of the short ones the key-by-key
+-- concatenation made (a few thousand on a board with garbage on it).
+local buf, used = {}, 0
+local function put(piece) used = used + 1; buf[used] = piece end
+-- the text of a number, an object key (with and without the comma before it) and a string value, each made once
+local numbers = setmetatable({}, { __index = function(t, v)
+  local text = num(v)
+  if v % 1 == 0 and v > -1e6 and v < 1e6 then t[v] = text end
+  return text
+end })
+local firstKey = setmetatable({}, { __index = function(t, k) local q = string.format("%q", tostring(k)) .. ":"; t[k] = q; return q end })
+local nextKey = setmetatable({}, { __index = function(t, k) local q = "," .. string.format("%q", tostring(k)) .. ":"; t[k] = q; return q end })
+local words = setmetatable({}, { __index = function(t, v)
+  local q = (string.format("%q", v):gsub("\\\n", "\\n"))
+  if #v < 40 then t[v] = q end
+  return q
+end })
+local function putScalar(v)
+  local t = type(v)
+  if t == "number" then
+    if v ~= v then put('"NaN"') elseif v == math.huge then put('"Infinity"') elseif v == -math.huge then put('"-Infinity"') else put(numbers[v]) end
+  elseif t == "boolean" then put(v and "true" or "false")
+  else put(words[v]) end
+end
+-- A table's number, boolean and string fields as a JSON object.
+local function putScalars(t)
+  local first = true
+  put("{")
+  for k, v in pairs(t) do
+    local tv = type(v)
+    if type(k) == "string" and (tv == "number" or tv == "boolean" or tv == "string") then
+      put(first and firstKey[k] or nextKey[k])
+      first = false
+      putScalar(v)
+    end
+  end
+  put("}")
+end
+-- a list of garbage blocks; an empty list is the empty object, as `enc` writes it
+local function putGarbage(q)
+  local n = q and #q or 0
+  if n == 0 then put("{}") return end
+  put("[")
+  for i = 1, n do
+    local g = q[i]
+    if i > 1 then put(",") end
+    put('{"width":') putScalar(g.width)
+    put(',"height":') putScalar(g.height)
+    put(',"isMetal":') putScalar(g.isMetal or false)
+    put(',"isChain":') putScalar(g.isChain or false)
+    if g.frameEarned ~= nil then put(',"frameEarned":') putScalar(g.frameEarned) end
+    if g.finalized ~= nil then put(',"finalized":') putScalar(g.finalized) end
+    put("}")
+  end
+  put("]")
+end
+-- The garbage each source has sent and not yet delivered: what its
+-- telegraph shows (staged, oldest last) and what has left it (transit, by
+-- the stopWatch it lands on). Its colours are not in it.
+local function putTelegraph(sources)
+  if not sources or #sources == 0 then put("{}") return end
+  put("[")
+  for i, src in ipairs(sources) do
+    local q = src.outgoingGarbage
+    if i > 1 then put(",") end
+    put("{")
+    if src.stopWatch ~= nil then put('"stopWatch":') putScalar(src.stopWatch) put(",") end
+    put('"staged":') putGarbage(q and q.stagedGarbage)
+    put(',"transit":')
+    local any = false
+    if q and q.transitTimers then
+      for k = q.transitTimers.first, q.transitTimers.last do
+        local t = q.transitTimers[k]
+        if t then
+          put(any and "," or "[")
+          any = true
+          put('{"at":') putScalar(t)
+          put(',"garbage":') putGarbage(q.garbageInTransit[t])
+          put("}")
+        end
+      end
+    end
+    put(any and "]" or "{}")
+    put("}")
+  end
+  put("]")
+end
 local function scalars(t)
   local o = {}
   for k, v in pairs(t) do
@@ -69,61 +157,36 @@ local function scalars(t)
   end
   return o
 end
--- A table's number, boolean and string fields as a JSON object, without the table `scalars` makes.
-local function encScalars(t)
-  local parts, n = {}, 0
-  for k, v in pairs(t) do
-    local tv = type(v)
-    if type(k) == "string" and (tv == "number" or tv == "boolean" or tv == "string") then n = n + 1; parts[n] = quoted[k] .. ":" .. enc(v) end
-  end
-  return "{" .. table.concat(parts, ",") .. "}"
-end
-local function garbageList(q)
-  local o = {}
-  for i = 1, #q do
-    local g = q[i]
-    o[i] = { width = g.width, height = g.height, isMetal = g.isMetal or false, isChain = g.isChain or false,
-             frameEarned = g.frameEarned, finalized = g.finalized }
-  end
-  return o
-end
--- The garbage each source has sent and not yet delivered: what its
--- telegraph shows (staged, oldest last) and what has left it (transit, by
--- the stopWatch it lands on). Its colours are not in it.
-local function telegraph(sources)
-  local out = {}
-  for i, src in ipairs(sources or {}) do
-    local q = src.outgoingGarbage
-    local transit = {}
-    if q and q.transitTimers then
-      for k = q.transitTimers.first, q.transitTimers.last do
-        local t = q.transitTimers[k]
-        if t then transit[#transit + 1] = { at = t, garbage = garbageList(q.garbageInTransit[t] or {}) } end
-      end
-    end
-    out[i] = { stopWatch = src.stopWatch, staged = garbageList(q and q.stagedGarbage or {}), transit = transit }
-  end
-  return out
-end
 
 function SurvivalLink.dump(s, sources)
-  local rows = {}
+  used = 0
+  put('{"stack":')
+  putScalars(s)
+  put(',"panels":[')
+  local width = s.width
   for r = 0, #s.panels do
-    local cells = {}
-    for c = 1, s.width do
-      local p = s.panels[r] and s.panels[r][c]
-      cells[c] = p and encScalars(p) or "false"
+    local row = s.panels[r]
+    put(r > 0 and ",[" or "[")
+    for c = 1, width do
+      if c > 1 then put(",") end
+      local p = row and row[c]
+      if p then putScalars(p) else put("false") end
     end
-    rows[r + 1] = "[" .. table.concat(cells, ",") .. "]"
+    put("]")
   end
+  put('],"incoming":{"staged":')
+  putGarbage(s.incomingGarbage.stagedGarbage)
+  put("}")
   local backlog = {}
   for i, rec in ipairs(s.swapStallingBackLog or {}) do backlog[i] = scalars(rec) end
   local landed = {}
   for i, id in ipairs(s.garbageLandedThisFrame or {}) do landed[i] = id end
-  return '{"stack":' .. encScalars(s) .. ',"panels":[' .. table.concat(rows, ",") .. ']'
-    .. ',"incoming":' .. enc({ staged = garbageList(s.incomingGarbage.stagedGarbage) })
-    .. ',"swapStallingBackLog":' .. enc(backlog) .. ',"garbageLandedThisFrame":' .. enc(landed)
-    .. ',"dropColumns":' .. enc(s.currentGarbageDropColumnIndexes) .. ',"telegraph":' .. enc(telegraph(sources)) .. '}'
+  put(',"swapStallingBackLog":') put(enc(backlog))
+  put(',"garbageLandedThisFrame":') put(enc(landed))
+  put(',"dropColumns":') put(enc(s.currentGarbageDropColumnIndexes))
+  put(',"telegraph":') putTelegraph(sources)
+  put("}")
+  return table.concat(buf, "", 1, used)
 end
 
 -- Every field a panel can carry, with the kinds of value it takes. The compiler
@@ -152,33 +215,33 @@ local function warmGarbage(i)
 end
 ---Encodes boards of every shape the game can make, so the compiler has compiled the encoder before the first frame
 ---and compiles nothing for it within one.
-function SurvivalLink.warm()
+function SurvivalLink.sampleBoard(i)
   local names = {}
   for name in pairs(PANEL_FIELDS) do names[#names + 1] = name end
   table.sort(names)
-  for i = 1, 400 do
-    local panels = {}
-    for r = 0, 12 do
-      panels[r] = {}
-      for c = 1, 6 do
-        if (r + c + i) % 5 ~= 0 then
-          local p = {}
-          for k, name in ipairs(names) do
-            if (k + r * 3 + c + i) % 3 ~= 0 then p[name] = warmValue(PANEL_FIELDS[name], k + r + c + i) end
-          end
-          panels[r][c] = p
+  local panels = {}
+  for r = 0, 12 do
+    panels[r] = {}
+    for c = 1, 6 do
+      if (r + c + i) % 5 ~= 0 then
+        local p = {}
+        for k, name in ipairs(names) do
+          if (k + r * 3 + c + i) % 3 ~= 0 then p[name] = warmValue(PANEL_FIELDS[name], k + r + c + i) end
         end
+        panels[r][c] = p
       end
     end
-    local s = { width = 6, panels = panels, clock = i, stopWatch = i, health = 3, rise_timer = i % 40, shake_time = i % 50,
-                incomingGarbage = { stagedGarbage = warmGarbage(i) }, swapStallingBackLog = (i % 3 == 0) and { { frame = i, chaining = true } } or {},
-                garbageLandedThisFrame = (i % 4 == 0) and { i } or {}, currentGarbageDropColumnIndexes = (i % 2 == 0) and { 1, 3 } or { 2 },
-                danger = i % 2 == 0, mode = "vs" }
-    local transit = { [i] = warmGarbage(i + 1) }
-    local sources = { { stopWatch = i, outgoingGarbage = { stagedGarbage = warmGarbage(i + 2),
-                        transitTimers = { first = i, last = i, [i] = i + 30 }, garbageInTransit = { [i + 30] = warmGarbage(i + 3) } } } }
-    SurvivalLink.dump(s, (i % 5 == 0) and {} or sources)
   end
+  local s = { width = 6, panels = panels, clock = i, stopWatch = i, health = 3, rise_timer = i % 40, shake_time = i % 50,
+              incomingGarbage = { stagedGarbage = warmGarbage(i) }, swapStallingBackLog = (i % 3 == 0) and { { frame = i, chaining = true } } or {},
+              garbageLandedThisFrame = (i % 4 == 0) and { i } or {}, currentGarbageDropColumnIndexes = (i % 2 == 0) and { 1, 3 } or { 2 },
+              danger = i % 2 == 0, mode = "vs" }
+  local sources = { { stopWatch = (i % 7 ~= 0) and i or nil, outgoingGarbage = { stagedGarbage = warmGarbage(i + 2),
+                      transitTimers = { first = i, last = i + 1, [i] = i + 30 }, garbageInTransit = { [i + 30] = warmGarbage(i + 3) } } } }
+  return s, (i % 5 == 0) and {} or sources
+end
+function SurvivalLink.warm()
+  for i = 1, 400 do SurvivalLink.dump(SurvivalLink.sampleBoard(i)) end
 end
 
 -- A frame is held to this share of the thinking ceiling: what the system's own
@@ -255,8 +318,17 @@ end
 -- that blocks hands its thread back to the system, which returns it late when
 -- every core is busy, so the whole wait polls.
 function SurvivalLink:await(deadline)
+  local before = socket.gettime()
   local line = self:receive(0)
-  while not line and socket.gettime() < deadline do line = self:receive(0) end
+  local now = socket.gettime()
+  local longest = now - before
+  while not line and now < deadline do
+    line = self:receive(0)
+    local after = socket.gettime()
+    if after - now > longest then longest = after - now end
+    now = after
+  end
+  if longest > self.longestPoll then self.longestPoll = longest end
   return line
 end
 
@@ -310,8 +382,8 @@ function SurvivalLink:input(stack, sources)
     local text = {}
     for name, v in pairs(st or {}) do text[#text + 1] = string.format("%s %.1f", name, v * 1000) end
     table.sort(text)
-    self.stopReason = string.format("STOPPED on the first frame over the ceiling: clock %d, wall %.1f ms, this process's cpu %.1f ms, steps (ms) [%s], compiler events in the frame %d, board %d bytes, garbage staged %d / in telegraphs %d; the machine over the frame: stolen %.1f ms, busy %.1f ms of %.1f ms, runnable %d, load %s",
-      stack.clock, took * 1000, cpu * 1000, table.concat(text, ", "), SurvivalLink.tracing.events - traces0, self.boardBytes or 0, #stack.incomingGarbage.stagedGarbage, SurvivalLink.telegraphCount(sources), (after.steal - before.steal) * 10, (after.busy - before.busy) * 10, (after.total - before.total) * 10, after.running, after.load)
+    self.stopReason = string.format("STOPPED on the first frame over the ceiling: clock %d, wall %.1f ms, this process's cpu %.1f ms, steps (ms) [%s], compiler events in the frame %d, longest single poll %.1f ms, board %d bytes, garbage staged %d / in telegraphs %d; the machine over the frame: stolen %.1f ms, busy %.1f ms of %.1f ms, runnable %d, load %s",
+      stack.clock, took * 1000, cpu * 1000, table.concat(text, ", "), SurvivalLink.tracing.events - traces0, (self.longestPoll or 0) * 1000, self.boardBytes or 0, #stack.incomingGarbage.stagedGarbage, SurvivalLink.telegraphCount(sources), (after.steal - before.steal) * 10, (after.busy - before.busy) * 10, (after.total - before.total) * 10, after.running, after.load)
   end
   return key
 end
@@ -380,6 +452,7 @@ function SurvivalLink:think(stack, sources)
   local t1 = socket.gettime()
   self:send('{"t":"f","state":' .. board .. budget .. '}')
   local t2 = socket.gettime()
+  self.longestPoll = 0
   self.steps = { encode = t1 - t0, send = t2 - t1, wait = 0, read = 0 }
   self.awaiting = (self.awaiting or 0) + 1
   self.frames = self.frames + 1

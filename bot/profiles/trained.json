@@ -1,0 +1,28 @@
+{
+  "_comment": "TRAINED WEIGHTS for bot/WeightedBrain.lua — GENERATED, do not hand-tune. Found by the cross-entropy search in the GameCreator repo (games/the-game/ai/eval/train.js). Ported here with bot/PanelEval.lua; the port is checked feature-by-feature against the JavaScript on 393 real boards by bot/tests/panelEvalVerify.lua.",
+  "source": "trained.replace.l10-puyo-puyo18-s11.0914-020835.g00274.json",
+  "_heldOut": "3495 against that game's previous AI at 612 (+471%), on seeds it never trained on",
+  "_switches": "A WEIGHT SET IS ONLY A BOT WHEN PAIRED WITH THE SWITCHES IT WAS FOUND UNDER. This set was found with density OFF — the previous set shipped here was found with it ON, so the flag below FLIPPED when the weights did. Leaving it true would rescale links and edgePenalty against weights that never saw that scaling. depth 1 and beam 6 describe that search's lookahead; this brain plans one swap, which is depth 1.",
+  "density": false,
+  "_genome": "18 features. fillRatio, garbageSent, garbageCleared and chainLength were excluded from the search and are absent here; PanelEval skips a feature with no weight, so they cost nothing.",
+  "weights": {
+    "matchPotential": 277,
+    "chainPotential": 169,
+    "comboPotential": 167,
+    "staircase": 60,
+    "staircaseReady": 40,
+    "flatTop": 35,
+    "links": 11,
+    "colourVariance": 289,
+    "edgePenalty": 69,
+    "garbageOnBoard": 240,
+    "maxHeight": 97,
+    "roughness": 42,
+    "garbageAdjacency": 62,
+    "colourScarcity": 76,
+    "scoreEarned": 79,
+    "stopTimeEarned": 121,
+    "brokeGarbage": 192,
+    "travelCost": 0
+  }
+}

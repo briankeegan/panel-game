@@ -225,13 +225,17 @@ jobs:
       # re-run it, or run bot/beverly.sh on the server box under systemd for
       # something permanent.
       - name: Check the name and the weight set before connecting
-        if: inputs.mode == 'live'
+        if: inputs.mode == 'live' || inputs.mode == 'survival'
         run: |
           set -eu
           cd "$BOT_DIR"
           n='${{ inputs.name }}'
           [ -n "$n" ] || { echo "name is empty"; exit 1; }
           [ ${#n} -le 16 ] || { echo "name '$n' is ${#n} chars; the server limit is 16"; exit 1; }
+          if [ '${{ inputs.mode }}' = survival ]; then
+            [ '${{ inputs.server }}' = fork ] || { echo "survival plays the fork's server only"; exit 1; }
+            exit 0
+          fi
           [ -f '${{ inputs.profile }}' ] || { echo "no weight set at ${{ inputs.profile }}"; exit 1; }
           eval "$(luarocks path --local --lua-version 5.1)"
           luajit -e 'package.path="./?.lua;"..package.path; require("bot.headlessBoot");
@@ -283,6 +287,46 @@ jobs:
           # The bot runs until killed, so the timeout IS the stop condition:
           # 124 from `timeout` is this working, not failing.
           timeout "$secs" bot/plamp.sh "$BOT_HOST" "$BOT_PORT" '${{ inputs.name }}' \
+            2>&1 | tee "$GITHUB_WORKSPACE/bot-prod-smoke.log" || [ $? -eq 124 ]
+
+      # WASMSURVIVOR. The survival bot is GameCreator's (survivor.js): it
+      # plans on this server's own rules (its pa-engine.js / native/pa.c are
+      # held to this repo's Lua engine frame by frame) and tells the client
+      # what to press every frame through bot/SurvivalLink.lua. It runs beside
+      # the client on this runner, on the cores the client does not use.
+      - name: Check out WasmSurvivor
+        if: inputs.mode == 'survival'
+        uses: actions/checkout@v4
+        with:
+          repository: briankeegan/GameCreator
+          path: GameCreator
+          sparse-checkout: games/the-game
+
+      - uses: actions/setup-node@v4
+        if: inputs.mode == 'survival'
+        with:
+          node-version: '22'
+
+      - name: Start WasmSurvivor
+        if: inputs.mode == 'survival'
+        run: |
+          set -eu
+          nohup node GameCreator/games/the-game/ai/eval/survivor.js --port 47777 > "$GITHUB_WORKSPACE/survivor.log" 2>&1 &
+          for i in $(seq 1 300); do grep -q listening "$GITHUB_WORKSPACE/survivor.log" && break; sleep 0.2; done
+          cat "$GITHUB_WORKSPACE/survivor.log"
+          grep -q listening "$GITHUB_WORKSPACE/survivor.log" || { echo "WasmSurvivor did not start"; exit 1; }
+
+      - name: Sit in the lobby (WasmSurvivor)
+        if: inputs.mode == 'survival'
+        id: survival
+        env:
+          PA_SURVIVOR_PORT: '47777'
+        run: |
+          eval "$(luarocks path --local --lua-version 5.1)"
+          secs=$(( ${{ inputs.hours }} * 3600 ))
+          echo "::notice::${{ inputs.name }} (WasmSurvivor) joining $BOT_HOST:$BOT_PORT for ${{ inputs.hours }}h"
+          set -o pipefail
+          timeout "$secs" luajit bot/playBot.lua "$BOT_HOST" "$BOT_PORT" '${{ inputs.name }}' 4 12 survival \
             2>&1 | tee "$GITHUB_WORKSPACE/bot-prod-smoke.log" || [ $? -eq 124 ]
 
       # SAME NAME, SAME ACCOUNT on beta. Upstream hands a new name a random id

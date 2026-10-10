@@ -75,6 +75,24 @@ function chips.recognize(grid, rows, cells, kind, verify, touchable, requireBrea
           end
         end
         if not ok then chips._dbg.notTouch = (chips._dbg.notTouch or 0) + 1 end  -- DBG: match/swap cells not settled
+        -- EXACT PRE-FILTER (2026-07-03, root-caused via bot/useChipsTest.lua: NO-VERIFY precision was 59% -- 13/32
+        -- returned chips never fired, e.g. templates that swap a panel into an empty column and assume it stays put
+        -- while it actually falls to the floor). A template fit is a SHAPE claim; simulate the actual swap sequence
+        -- with BoardSim (proven 0/941 against the engine, settling between swaps exactly like the executor) and drop
+        -- candidates whose own simulation says nothing clears. When engine verify is present it remains the final
+        -- authority -- this just stops burning live-engine verify calls (swap + rollback each) on chips the
+        -- simulator already knows are dead.
+        if ok then
+          local sg, total, gb = BoardSim.cloneGrid(grid, rows), 0, 0
+          for _, sw in ipairs(seq) do
+            sg[sw[1]][sw[2]], sg[sw[1]][sw[2] + 1] = sg[sw[1]][sw[2] + 1], sg[sw[1]][sw[2]]
+            local _, t2, _, g2 = BoardSim.resolve(sg, rows)
+            total = total + (t2 or 0); gb = gb + (g2 or 0)
+          end
+          if requireBreak and gb <= 0 or not requireBreak and total < 3 then
+            ok = false; chips._dbg.simRej = (chips._dbg.simRej or 0) + 1  -- DBG: sim says the sequence doesn't fire
+          end
+        end
         if ok and (not requireBreak or nearGarbage(grid, rows, chip.tmpl, R, C)) then
           local fired, broke = true, false
           if verify then fired, broke = verify(seq, kind) end

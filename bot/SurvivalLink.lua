@@ -128,7 +128,9 @@ end
 -- The most any computer player may think in one frame (ThinkBudget.ceilingMillis),
 -- and what of it is kept back for the work after the last wait.
 SurvivalLink.CEILING_SEC = 0.008
-SurvivalLink.MARGIN_SEC = 0.002
+-- A frame is held to half the ceiling: what the system's own pauses take from
+-- a frame comes out of the other half.
+SurvivalLink.TARGET_SEC = 0.004
 -- The clock a computer player's thinking is timed on (ThinkBudget.now): the
 -- game's timer, or the process clock where there is no love.
 local function thinkNow()
@@ -185,7 +187,7 @@ end
 -- The next reply line, or nil at `deadline` (socket.gettime seconds). The
 -- system's timers wake a wait late by a millisecond or two, so a wait blocks
 -- only until SPIN_SEC before the deadline and polls the rest.
-SurvivalLink.SPIN_SEC = 0.003
+SurvivalLink.SPIN_SEC = 0.002
 function SurvivalLink:await(deadline)
   local coarse = deadline - SurvivalLink.SPIN_SEC - socket.gettime()
   local line = self:receive(coarse > 0 and coarse or 0)
@@ -225,7 +227,7 @@ function SurvivalLink:think(stack, sources)
   -- every reply read -- counts against the frame's thinking budget, so the
   -- waits are cut to what is left of it.
   local started, spent = socket.gettime(), thinkNow()
-  local deadline = started + SurvivalLink.CEILING_SEC - SurvivalLink.MARGIN_SEC
+  local deadline = started + SurvivalLink.TARGET_SEC
   local function finish(key)
     local took = thinkNow() - spent
     if took > self.worst then self.worst = took end

@@ -14,7 +14,6 @@
 --   local char = link:input(stack, match.garbageSources[stack])   -- every frame, before it is run
 local socket = require("socket")
 local KeyDataEncoding = require("common.data.KeyDataEncoding")
-local ThinkBudget = require("common.engine.computerPlayers.ThinkBudget")
 local InputBudget = require("common.engine.computerPlayers.InputBudget")
 
 local SurvivalLink = {}
@@ -127,22 +126,18 @@ function SurvivalLink.dump(s, sources)
 end
 
 -- ---------------------------------------------------------------- the link
--- A frame is held to this share of the thinking ceiling: what the system's own
--- pauses take from a frame comes out of the rest.
-SurvivalLink.TARGET_SHARE = 0.5
 function SurvivalLink.new(opts)
   opts = opts or {}
   local self = setmetatable({}, SurvivalLink)
   self.host = opts.host or os.getenv("PA_SURVIVOR_HOST") or "127.0.0.1"
   self.port = opts.port or tonumber(os.getenv("PA_SURVIVOR_PORT") or "") or 47777
-  -- The game's budgets: the ceiling on a frame's thinking, and the allowance
-  -- of keys. A budget the game hands in is the game's to charge and press;
-  -- one made here is ours.
-  self.thinking = opts.thinkBudget or ThinkBudget.standard()
-  self.ownThinking = opts.thinkBudget == nil
+  -- The game's allowance of keys is the bot's to keep (survivor.js is told
+  -- every board which keys are inside the window); the link only records what
+  -- is pressed so the window it reports is right. It never refuses a key or
+  -- cuts a wait.
   self.inputs = opts.inputBudget or InputBudget.standard()
   self.ownInputs = opts.inputBudget == nil
-  self.waitSec = opts.waitSec or tonumber(os.getenv("PA_SURVIVOR_WAIT") or "") or self.thinking:snapshot().ceiling
+  self.waitSec = opts.waitSec or tonumber(os.getenv("PA_SURVIVOR_WAIT") or "") or 0.010
   self.dropped = 0
   self.ages = {}
   self.buffer = ""
@@ -214,37 +209,18 @@ function SurvivalLink:startMatch(stack)
   self.awaiting = 1   -- the match's ok, read with the first frame's answer
   self.planned = nil
   self.frames = 0
+  -- a match's clock restarts at 0: the last match's presses are not inside this one's window
+  if self.ownInputs then self.inputs = InputBudget.standard() end
 end
 
 -- The key to press this frame. Before the countdown ends the bot holds
 -- still (the search plays only a stack in play).
 -- `sources` are the stacks sending this one garbage; their telegraphs go
 -- with the board.
--- The frame's work, with the collector held off for it: a collection that
--- fell inside would be thinking time the bot did not use, and is left to the
--- game's own work between frames. The frame is charged to the thinking budget
--- and its key pressed on the input budget, the game's own.
 function SurvivalLink:input(stack, sources)
-  collectgarbage("stop")
-  local began = ThinkBudget.now()
-  local ok, key = pcall(self.think, self, stack, sources)
-  if ok and self.ownInputs then key = self:press(key, stack.clock) end
-  local took = ThinkBudget.now() - began
-  collectgarbage("restart")
-  if not ok then error(key, 0) end
-  if self.ownThinking then self.thinking:charge(took) end
-  return key
-end
-
--- The key, or idle when the allowance of keys cannot pay for it (the game
--- does not press a key past it).
-function SurvivalLink:press(key, clock)
-  local keys, held, down = KeyDataEncoding.base64decode[key], self.inputs.held, 0
-  for _, bit in ipairs({2, 3, 4, 5, 6}) do
-    if keys and keys[bit] and not held[bit] then down = down + 1 end
-  end
-  if down > self.inputs:remaining(clock) then key = KeyDataEncoding.idle; self.dropped = self.dropped + 1 end
-  self.inputs:press(key, clock)
+  local key = self:think(stack, sources)
+  -- recorded so the window sent with the next board shows when this key was pressed
+  if self.ownInputs then self.inputs:press(key, stack.clock) end
   return key
 end
 
@@ -252,10 +228,6 @@ function SurvivalLink:think(stack, sources)
   local idle = KeyDataEncoding.base64encode[1]
   if stack.in_countdown or not stack.stopWatchIsRunning or stack:game_ended() then return idle end
   local clock = stack.clock
-  -- Everything this frame costs -- the board encoded, sent, every wait and
-  -- every reply read -- counts against the frame's thinking budget, so the
-  -- waits are cut to what is left of it.
-  local deadline = socket.gettime() + self.thinking:snapshot().ceiling * SurvivalLink.TARGET_SHARE
   -- the game's window of keys goes with the board: the frames ago each key still inside it was pressed
   local ages = self.inputs:ages(clock, self.ages)
   local budget = ',"budget":{"limit":' .. self.inputs.limit .. ',"window":' .. self.inputs.window .. ',"ages":[' .. table.concat(ages, ",") .. ']}'
@@ -266,7 +238,7 @@ function SurvivalLink:think(stack, sources)
   -- it planned (reply.next, from the frame after its own) are the newest
   -- known. A frame whose answer is late presses what was planned for it.
   while self.awaiting > 0 do
-    local line = self:await(math.min(deadline, socket.gettime() + self.waitSec))
+    local line = self:await(socket.gettime() + self.waitSec)
     if not line then
       self.late = self.late + 1
       local planned = self.planned and self.planned[clock]
@@ -283,11 +255,6 @@ function SurvivalLink:think(stack, sources)
     end
   end
   return idle
-end
-
----The frames whose thinking cost more than the ceiling, the worst frame (seconds), and the keys the allowance refused.
-function SurvivalLink:budget()
-  return self.thinking:overruns(), self.thinking:worst(), self.dropped
 end
 
 function SurvivalLink:endMatch()

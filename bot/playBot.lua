@@ -80,6 +80,28 @@ local FRAME = 1 / 60
 local nextFrame = nil
 local lastReadyAt = 0
 
+-- A death relayed while no match is being played is the last match's, not
+-- the next one's: taken for the next, it ended that match on its first tick.
+-- (GameCreator's island2Bot.lua keeps the same guard.)
+do
+  local dispatch = bot.dispatch
+  local deathPrefix = require("common.network.NetworkProtocol").serverMessageTypes.deathEvent.prefix
+  bot.dispatch = function(self, msg)
+    if msg[deathPrefix] and not self.match then return end
+    return dispatch(self, msg)
+  end
+end
+
+-- A link of its own for each match, as the islands do: whatever the last one
+-- left in flight is not read as this one's.
+local function closeLink()
+  local link = bot.survival
+  if not link then return end
+  pcall(function() link:endMatch() end)
+  if link.sock then pcall(function() link.sock:close() end) end
+  bot.survival = nil
+end
+
 -- Reset local match state the same way a normal match-end does, so a bot
 -- that hit an error can still rejoin for a future rematch instead of being
 -- stuck (or, pre-xpcall below, instead of the whole process just dying).
@@ -132,6 +154,10 @@ while true do
     if bot.matchEnded and bot.match then
       print("match over — bot " .. tostring(bot.outcome) .. "; waiting for a rematch")
       resetMatchState()
+      -- back to the lobby, as the islands do after every match: the challenge
+      -- is made again and the room opens like the first one did
+      closeLink()
+      if os.getenv("PA_FRESH_ROOM") == "1" then bot:leaveRoom() end   -- bot against bot (bot/fight.sh); a person rematches in the room
     end
   end, debug.traceback)
 

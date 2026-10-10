@@ -87,6 +87,8 @@ build_bitbot() {
     || { cat bitbot-build.log; echo "fight: libbit.so did not build"; exit 1; }
 }
 preflight() {   # KIND NAME [PORT WAIT]
+  # Off unless FIGHT_PREFLIGHT=1: a bot goes straight to the lobby, where it can be seen playing.
+  [ "${FIGHT_PREFLIGHT:-0}" = 1 ] || { echo "fight: pre-flight skipped ($1 $2)"; return 0; }
   local kind=$1 name=$2
   PA_PREFLIGHT_BRAIN=$([ "$kind" = bitbot ] && echo bitbot) PA_SURVIVOR_PORT=${3:-} PA_SURVIVOR_WAIT=${4:-} \
     PA_PREFLIGHT_NAME="$kind ($name)" PA_PREFLIGHT_LATE_OK=$([ "$kind" = wasm ] && echo 1) \

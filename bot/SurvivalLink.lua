@@ -158,8 +158,9 @@ local function scalars(t)
   return o
 end
 
-function SurvivalLink.dump(s, sources)
+function SurvivalLink.dump(s, sources, prefix, suffix)
   used = 0
+  if prefix then put(prefix) end
   put('{"stack":')
   putScalars(s)
   put(',"panels":[')
@@ -186,6 +187,7 @@ function SurvivalLink.dump(s, sources)
   put(',"dropColumns":') put(enc(s.currentGarbageDropColumnIndexes))
   put(',"telegraph":') putTelegraph(sources)
   put("}")
+  if suffix then put(suffix) end
   return table.concat(buf, "", 1, used)
 end
 
@@ -292,8 +294,13 @@ end
 -- What goes to the survival bot in a frame never waits: a message the socket
 -- cannot take whole stays in the outbox and goes with the next call, in order.
 -- `now` (the match's start and end, outside any frame) waits for it.
-function SurvivalLink:send(line, now)
-  self.outbox = (self.outbox or "") .. line .. "\n"
+function SurvivalLink:send(line, now, complete)
+  local box = self.outbox
+  if complete and (box == nil or box == "") then
+    self.outbox = line   -- already ends in its newline: no second copy of a board
+  else
+    self.outbox = (box or "") .. line .. (complete and "" or "\n")
+  end
   self:flush(now)
 end
 
@@ -387,14 +394,20 @@ function SurvivalLink:input(stack, sources)
     end
     self.steps = nil
   end
+  local faultsNow
+  if stopOnOver then
+    faultsNow = SurvivalLink.faults()
+    self.faultFrames = (self.faultFrames or 0) + 1
+    self.faultTotal = (self.faultTotal or 0) + (faultsNow - minor0)
+  end
   -- PA_STOP_ON_OVER=1: the first frame over the ceiling ends the run, with what the machine and the frame did
   if stopOnOver and took > self.thinking:snapshot().ceiling and not self.stopReason then
     local after = SurvivalLink.machine()
     local text = {}
     for name, v in pairs(st or {}) do text[#text + 1] = string.format("%s %.1f", name, v * 1000) end
     table.sort(text)
-    self.stopReason = string.format("STOPPED on the first frame over the ceiling: clock %d, wall %.1f ms, this process's cpu %.1f ms, steps (ms) [%s], compiler events in the frame %d, longest single poll %.1f ms, board %d bytes, garbage staged %d / in telegraphs %d; page faults in the frame: %d minor, %d major; the machine over the frame: stolen %.1f ms, busy %.1f ms of %.1f ms, runnable %d, load %s",
-      stack.clock, took * 1000, cpu * 1000, table.concat(text, ", "), SurvivalLink.tracing.events - traces0, (self.longestPoll or 0) * 1000, self.boardBytes or 0, #stack.incomingGarbage.stagedGarbage, SurvivalLink.telegraphCount(sources), select(1, SurvivalLink.faults()) - minor0, select(2, SurvivalLink.faults()) - major0, (after.steal - before.steal) * 10, (after.busy - before.busy) * 10, (after.total - before.total) * 10, after.running, after.load)
+    self.stopReason = string.format("STOPPED on the first frame over the ceiling: clock %d, wall %.1f ms, this process's cpu %.1f ms, steps (ms) [%s], compiler events in the frame %d, longest single poll %.1f ms, board %d bytes, garbage staged %d / in telegraphs %d; page faults in the frame: %d minor, %d major (%.1f a frame on average over the %d frames before); the machine over the frame: stolen %.1f ms, busy %.1f ms of %.1f ms, runnable %d, load %s",
+      stack.clock, took * 1000, cpu * 1000, table.concat(text, ", "), SurvivalLink.tracing.events - traces0, (self.longestPoll or 0) * 1000, self.boardBytes or 0, #stack.incomingGarbage.stagedGarbage, SurvivalLink.telegraphCount(sources), faultsNow - minor0, select(2, SurvivalLink.faults()) - major0, ((self.faultTotal or 0) - (faultsNow - minor0)) / math.max(1, (self.faultFrames or 1) - 1), (self.faultFrames or 1) - 1, (after.steal - before.steal) * 10, (after.busy - before.busy) * 10, (after.total - before.total) * 10, after.running, after.load)
   end
   return key
 end
@@ -468,10 +481,10 @@ function SurvivalLink:think(stack, sources)
   local ages = self.inputs:ages(clock, self.ages)
   local budget = ',"budget":{"limit":' .. self.inputs.limit .. ',"window":' .. self.inputs.window .. ',"ages":[' .. table.concat(ages, ",") .. ']}'
   local t0 = socket.gettime()
-  local board = SurvivalLink.dump(stack, sources)
-  self.boardBytes = #board
+  local line = SurvivalLink.dump(stack, sources, '{"t":"f","state":', budget .. "}\n")
+  self.boardBytes = #line
   local t1 = socket.gettime()
-  self:send('{"t":"f","state":' .. board .. budget .. '}')
+  self:send(line, nil, true)
   local t2 = socket.gettime()
   self.longestPoll = 0
   self.steps = { encode = t1 - t0, send = t2 - t1, wait = 0, read = 0 }

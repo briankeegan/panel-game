@@ -160,6 +160,16 @@ start_bitbotwasm() {   # NAME PORT
 }
 trap 'kill ${PIDS:-} 2>/dev/null' EXIT
 if [ "$BOT" = bitbot ] || [ "$OPP" = bitbot ]; then build_bitbot; fi
+# NAME=BitBotCheck: no lobby. BitBot alone, offline, told an opponent is present, on four boards:
+# the hookup with no network, no BotClient and no other bot in it.
+if [ "$BOT" = bitbot ] && [ "$NAME" = BitBotCheck ]; then
+  for seed in 1 2 3 4; do
+    echo "=== board $seed"
+    PA_PREFLIGHT_OPPONENT=1 PA_PREFLIGHT_SEED=$seed PA_BITBOT_LOG_FRAMES=$([ "$seed" = 1 ] && echo 40 || echo 0) \
+      PA_PREFLIGHT_BRAIN=bitbot PA_PREFLIGHT_NAME="BitBotCheck" luajit bot/bitbot_preflight.lua 1800 2>&1 || true
+  done 2>&1 | tee "fight-$NAME.log"
+  exit 0
+fi
 case "$BOT" in bitbot) preflight bitbot "$NAME" ;; bitbotwasm) start_bitbotwasm "$NAME" "$BASE_PORT" ;; wasm) start_wasm "$NAME" "$BASE_PORT" ;; esac
 case "$OPP" in bitbot) preflight bitbot "$OPP_NAME" ;; bitbotwasm) start_bitbotwasm "$OPP_NAME" $((BASE_PORT + 1)) ;; wasm) start_wasm "$OPP_NAME" $((BASE_PORT + 1)) ;; esac
 

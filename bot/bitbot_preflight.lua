@@ -34,14 +34,17 @@ local WHO = os.getenv("PA_PREFLIGHT_NAME") or "BitBot"
 local LATE_OK = os.getenv("PA_PREFLIGHT_LATE_OK") == "1"
 
 local mode = GameModes.getPreset(GameModes.IDs.TWO_PLAYER_VS)
-local match = Match(GeneratorSource(20261001, true), mode.matchRules)
+local match = Match(GeneratorSource(tonumber(os.getenv("PA_PREFLIGHT_SEED")) or 20261001, true), mode.matchRules)
 local stack = match:createStackWithSettings(LevelPresets.getModern(10), true, "controller")
 match:start()
 
 -- PA_PREFLIGHT_BRAIN=bitbot plays BitBot native, in this process
 -- (bot/BitBotNative.lua) -- the live path for BitBot; otherwise the link.
 local link = os.getenv("PA_PREFLIGHT_BRAIN") == "bitbot" and require("bot.BitBotNative").new({}) or SurvivalLink.new({})
-link:startMatch(stack)
+-- PA_PREFLIGHT_OPPONENT=1: BitBot is told another player is in the match, as in a duel
+-- (nobody sends it garbage here): the game with no network and no other bot in it.
+local withOpponent = os.getenv("PA_PREFLIGHT_OPPONENT") == "1" and { stacks = { stack, { game_ended = function() return false end } } } or nil
+link:startMatch(stack, withOpponent)
 
 local swaps0 = stack.swapCount or 0
 local frames, firstPlayed = 0, nil

@@ -31,33 +31,16 @@ local BitBotNative = {}
 BitBotNative.__index = BitBotNative
 
 -- BitBot's library, its declarations and cboard.lua, once per process.
-local CB
-local copies = 0
-local loaded = {}      -- kept for the process: a library the collector unloads takes its worker threads' code with it
+local C, CB
 local function load(dir)
-  if CB then return end
+  if C then return end
   local f = assert(io.open(dir .. "/lua/train.lua"), "BitBotNative: no lua/train.lua under GC_EVAL_DIR=" .. dir)
   local src = f:read("*a"); f:close()
   local cdef = src:match("ffi%.cdef%s*%[%[(.-)%]%]")
   assert(cdef, "BitBotNative: lua/train.lua has no ffi.cdef block to take BitBot's declarations from")
   ffi.cdef(cdef)
+  C = ffi.load(dir .. "/native/libbit.so")
   CB = dofile(dir .. "/lua/cboard.lua")
-end
-
--- A FRESH BitBot LIBRARY PER MATCH. libbit.so is built for one game per
--- process: it keeps 16 bots (front_new answers -1 after that) and its other
--- state in statics, and has nothing to release them. Loading the same path
--- again returns the same copy, so each match loads its own copy of the file.
-local function freshLibrary(dir)
-  copies = copies + 1
-  local src = dir .. "/native/libbit.so"
-  local dst = string.format("%s/libbit-%d-%d.so", os.getenv("TMPDIR") or "/tmp", os.time(), copies)
-  local i, o = assert(io.open(src, "rb")), assert(io.open(dst, "wb"))
-  o:write(i:read("*a")); i:close(); o:close()
-  local lib = ffi.load(dst)
-  loaded[#loaded + 1] = lib
-  os.remove(dst)       -- mapped already; the file is not needed again
-  return lib
 end
 
 function BitBotNative.new(opts)
@@ -74,11 +57,9 @@ end
 function BitBotNative:startMatch(stack)
   load(self.dir)
   local t0 = os.clock()
-  local C = freshLibrary(self.dir)
-  self.C = C
   self.matchNo = (self.matchNo or 0) + 1
   self.firstLive, self.pressed, self.idleFrames = nil, 0, 0
-  print(string.format("bitbot: match begins (library loaded in %.0f ms)", (os.clock() - t0) * 1000))
+  print(string.format("bitbot: match begins (front restarts itself on a new clock; loaded in %.0f ms)", (os.clock() - t0) * 1000))
   self.stack = stack
   self.board = C.nb_new()
   self.fid = -1
@@ -91,7 +72,6 @@ end
 -- train.lua load(): the stack into BitBot's board -- and nothing to come
 -- (see the top).
 function BitBotNative:load(a)
-  local C = self.C
   local HI, NH, pv = self.HI, self.NH, self.pv
   local H, B = C.nb_io_head(), C.nb_io_body()
   for i = 0, NH - 1 do H[i] = 0 / 0 end
@@ -121,7 +101,6 @@ end
 -- The key to press this frame. Through the countdown nothing is pressed
 -- (train.lua plays it out idle); BitBot starts when the stopwatch does.
 function BitBotNative:input(stack)
-  local C = self.C
   local idle = KeyDataEncoding.base64encode[1]
   if stack.in_countdown or not stack.stopWatchIsRunning or stack:game_ended() then
     -- train.lua makes the bot during the countdown, not on a live frame

@@ -71,8 +71,12 @@ end
 
 function BitBotNative:startMatch(stack)
   load(self.dir)
+  local t0 = os.clock()
   local C = freshLibrary(self.dir)
   self.C = C
+  self.matchNo = (self.matchNo or 0) + 1
+  self.firstLive, self.pressed, self.idleFrames = nil, 0, 0
+  print(string.format("bitbot: match begins (library loaded in %.0f ms)", (os.clock() - t0) * 1000))
   self.stack = stack
   self.board = C.nb_new()
   self.fid = -1
@@ -133,23 +137,32 @@ function BitBotNative:input(stack)
   if bits < 0 then error("BitBotNative: BitBot failed at clock " .. tostring(stack.clock)) end
   if C.nb_pressed(self.board) ~= 0 then bits = bit.bor(bits, 16) end
   self.frames = self.frames + 1
+  self.firstLive = self.firstLive or stack.clock
+  if bits == 0 then self.idleFrames = self.idleFrames + 1 end
   local ms = (os.clock() - t0) * 1000
   self.maxMs = math.max(self.maxMs, ms)
   self.slowMs = math.max(self.slowMs or 0, ms)
   -- a line every 10 seconds of play, for the log: is it moving, and in time
-  if self.frames % 600 == 0 then
+  local early = self.frames == 60 or self.frames == 180 or self.frames == 360
+  if early or self.frames % 600 == 0 then
     local top = 0
     for r = #stack.panels, 1, -1 do
       for c = 1, stack.width do if stack.panels[r][c].color ~= 0 then top = r; break end end
       if top > 0 then break end
     end
-    print(string.format("bitbot: clock %d swaps %d cleared %d top row %d health %d slowest %.1f ms",
-      stack.clock, stack.swapCount or 0, stack.panels_cleared or 0, top, stack.health or 0, self.slowMs))
+    print(string.format("bitbot: live frame %d clock %d swaps %d cleared %d top row %d health %d slowest %.1f ms",
+      self.frames, stack.clock, stack.swapCount or 0, stack.panels_cleared or 0, top, stack.health or 0, self.slowMs))
     self.slowMs = 0
   end
   return KeyDataEncoding.base64encode[bits + 1]
 end
 
-function BitBotNative:endMatch() end
+function BitBotNative:endMatch()
+  local st = self.stack
+  if not st then return end
+  print(string.format("bitbot: match ends -- %d live frames (first at clock %s, last at %d), %d idle, swaps %d cleared %d health %s, game over clock %s",
+    self.frames or 0, tostring(self.firstLive), st.clock or -1, self.idleFrames or 0, st.swapCount or 0, st.panels_cleared or 0,
+    tostring(st.health), tostring(st.game_over_clock)))
+end
 
 return BitBotNative

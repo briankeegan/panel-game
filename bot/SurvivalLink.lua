@@ -191,7 +191,9 @@ end
 
 -- Every field a panel can carry, with the kinds of value it takes. The compiler
 -- compiles the encoder for the shapes it has seen and compiles again, inside a
--- frame, for each new one; `warm` shows it every shape before the match.
+-- frame, for each new one -- a loop of more than ~56 turns is compiled the first
+-- time one runs that long, so the garbage lists run to 130 blocks. `warm` shows
+-- it every shape before the match.
 local PANEL_FIELDS = {
   chaining = "b", combo_index = "n", combo_size = "n", fell_from_garbage = "n", isSwappingFromLeft = "b",
   matchesGarbage = "b", matchesMetal = "b", matching = "b", propagatesChaining = "b", propagatesFalling = "b",
@@ -207,7 +209,7 @@ local function warmValue(kind, i)
 end
 local function warmGarbage(i)
   local list = {}
-  for k = 1, i % 4 do
+  for k = 1, i % 130 do
     list[k] = { width = 3 + k % 4, height = 1 + (i + k) % 3, isMetal = k % 2 == 0, isChain = (i + k) % 2 == 0,
                 frameEarned = i * 7 + k, finalized = (i + k) % 3 == 0 }
   end
@@ -246,7 +248,7 @@ end
 
 -- A frame is held to this share of the thinking ceiling: what the system's own
 -- pauses take from a frame comes out of the rest.
-SurvivalLink.TARGET_SHARE = 0.5
+SurvivalLink.TARGET_SHARE = 0.35
 function SurvivalLink.new(opts)
   opts = opts or {}
   local self = setmetatable({}, SurvivalLink)

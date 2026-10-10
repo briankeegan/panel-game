@@ -2,6 +2,7 @@
 # FIGHT: pick who plays who on the fork's server.
 #
 #   bot/fight.sh HOST PORT SECONDS BOT NAME [OPPONENT [OPPONENT_NAME]]
+#   (NAME may be "BOTNAME,OPPONENTNAME" instead of giving OPPONENT_NAME)
 #
 #   BOT       sits in the lobby as NAME and auto-accepts any challenge
 #   OPPONENT  (optional) logs in as OPPONENT_NAME (default NAME2) and
@@ -42,7 +43,12 @@ cd "$(dirname "$0")/.."
 usage() { sed -n '2,20p' "$0"; exit 2; }
 [ $# -ge 5 ] || usage
 HOST=$1; PORT=$2; SECS=$3; BOT=$4; NAME=$5
-OPP=${6:-you}; OPP_NAME=${7:-${NAME}2}
+OPP=${6:-you}; OPP_NAME=${7:-}
+# NAME may carry both accounts as "BOTNAME,OPPONENTNAME" (the workflow has no
+# room for a separate input): the opponent then uses that existing account
+# instead of the default NAME2, which would be a new account to create.
+case "$NAME" in *,*) OPP_NAME=${OPP_NAME:-${NAME#*,}}; NAME=${NAME%%,*};; esac
+OPP_NAME=${OPP_NAME:-${NAME}2}
 [ "$OPP" = you ] && OPP=""
 
 kinds="bitbot wasm beverly plamp heuristic"
@@ -73,7 +79,7 @@ done
 build_bitbot() {
   [ -n "${GC_EVAL_DIR:-}" ] || { echo "fight: bitbot needs GC_EVAL_DIR=<GameCreator>/games/the-game/ai/eval"; exit 2; }
   local line
-  line=$(grep -E '^clang .*-o libbit\.so$' "$GC_EVAL_DIR/native/build.sh") \
+  line=$(grep -E '^clang .* -shared .*libbit\.so' "$GC_EVAL_DIR/native/build.sh" | head -1) \
     || { echo "fight: GameCreator's native/build.sh no longer builds libbit.so -- BitBot's hookup needs a look"; exit 1; }
   (cd "$GC_EVAL_DIR/native" && eval "$line" 2> "$OLDPWD/bitbot-build.log") \
     || { cat bitbot-build.log; echo "fight: libbit.so did not build"; exit 1; }

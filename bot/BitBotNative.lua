@@ -98,7 +98,14 @@ end
 -- (train.lua plays it out idle); BitBot starts when the stopwatch does.
 function BitBotNative:input(stack)
   local idle = KeyDataEncoding.base64encode[1]
-  if stack.in_countdown or not stack.stopWatchIsRunning or stack:game_ended() then return idle end
+  if stack.in_countdown or not stack.stopWatchIsRunning or stack:game_ended() then
+    -- train.lua makes the bot during the countdown, not on a live frame
+    if self.fid < 0 and not stack:game_ended() then
+      self:load(stack)
+      self.fid = C.front_new(self.board, self.reaction, self.allowRaise)
+    end
+    return idle
+  end
   local t0 = os.clock()
   self:load(stack)
   if self.fid < 0 then self.fid = C.front_new(self.board, self.reaction, self.allowRaise) end

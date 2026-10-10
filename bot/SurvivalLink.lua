@@ -107,7 +107,7 @@ local function telegraph(sources)
 end
 
 -- The longest each part of the board took to encode (seconds), for SurvivalLink:phases.
-SurvivalLink.parts = { stack = 0, panels = 0, backlog = 0, incoming = 0, telegraph = 0 }
+SurvivalLink.parts = { stack = 0, panels = 0, backlog = 0, incoming = 0, telegraph = 0, rows = 0, cells = 0, slowestRows = 0, slowestCells = 0 }
 local function timed(name, t0)
   local took = socket.gettime() - t0
   if took > SurvivalLink.parts[name] then SurvivalLink.parts[name] = took end
@@ -124,6 +124,12 @@ function SurvivalLink.dump(s, sources)
     end
     rows[r + 1] = "[" .. table.concat(cells, ",") .. "]"
   end
+  local nrows, ncells = #s.panels + 1, 0
+  for r = 0, #s.panels do for c = 1, s.width do if s.panels[r] and s.panels[r][c] then ncells = ncells + 1 end end end
+  local took = socket.gettime() - t
+  if nrows > SurvivalLink.parts.rows then SurvivalLink.parts.rows = nrows end
+  if ncells > SurvivalLink.parts.cells then SurvivalLink.parts.cells = ncells end
+  if took > SurvivalLink.parts.panels then SurvivalLink.parts.slowestRows, SurvivalLink.parts.slowestCells = nrows, ncells end
   timed("panels", t); t = socket.gettime()
   local backlog = {}
   for i, rec in ipairs(s.swapStallingBackLog or {}) do backlog[i] = scalars(rec) end

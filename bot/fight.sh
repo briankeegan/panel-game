@@ -2,6 +2,7 @@
 # FIGHT: pick who plays who on the fork's server.
 #
 #   bot/fight.sh HOST PORT SECONDS BOT NAME [OPPONENT [OPPONENT_NAME]]
+#   (NAME may be "BOTNAME,OPPONENTNAME" instead of giving OPPONENT_NAME)
 #
 #   BOT       sits in the lobby as NAME and auto-accepts any challenge
 #   OPPONENT  (optional) logs in as OPPONENT_NAME (default NAME2) and
@@ -30,9 +31,9 @@
 # 30-second pre-flight offline first, and nothing joins the lobby if its
 # hookup is broken.
 #
-# Accounts: each name logs in with an id derived from the name and HOST, so a
-# name is the same account every run (the fork's server accepts a
-# client-chosen id for a free name). This is the fork's server only.
+# Accounts: a new name gets its account from the server; its id is saved in
+# bot/identities/<name>_<HOST>.txt and reused every run after (the workflow
+# commits it). This is the fork's server only.
 #
 # Logs: fight-<NAME>.log per side; preflight-<NAME>.log for bitbot/wasm,
 # mind-<NAME>.log for wasm, bitbot-build.log. In the workflow: mode `fight` (bot-prod-smoke-test.yml).
@@ -42,7 +43,12 @@ cd "$(dirname "$0")/.."
 usage() { sed -n '2,20p' "$0"; exit 2; }
 [ $# -ge 5 ] || usage
 HOST=$1; PORT=$2; SECS=$3; BOT=$4; NAME=$5
-OPP=${6:-you}; OPP_NAME=${7:-${NAME}2}
+OPP=${6:-you}; OPP_NAME=${7:-}
+# NAME may carry both accounts as "BOTNAME,OPPONENTNAME" (the workflow has no
+# room for a separate input): the opponent then uses that existing account
+# instead of the default NAME2, which would be a new account to create.
+case "$NAME" in *,*) OPP_NAME=${OPP_NAME:-${NAME#*,}}; NAME=${NAME%%,*};; esac
+OPP_NAME=${OPP_NAME:-${NAME}2}
 [ "$OPP" = you ] && OPP=""
 
 kinds="bitbot wasm beverly plamp heuristic"
@@ -55,14 +61,15 @@ for n in "$NAME" ${OPP:+"$OPP_NAME"}; do
 done
 [ -z "$OPP" ] || [ "$NAME" != "$OPP_NAME" ] || { echo "fight: the two sides need different names"; exit 2; }
 
-# ---- same name, same account
+# ---- same name, same account. A name the server has given an account has its
+# id in bot/identities/<name>_<HOST>.txt (committed); the bot logs in with it.
+# A new name logs in without one: the server makes the account, the bot writes
+# its id there, and the workflow commits it ("Save new account ids") so every
+# later run logs back in as the same account.
 mkdir -p bot/identities
 for n in "$NAME" ${OPP:+"$OPP_NAME"}; do
-  id=$(BOT_IP="$HOST" BOT_NAME="$n" python3 -c '
-import hashlib, os
-msg = (os.environ["BOT_IP"] + "/" + os.environ["BOT_NAME"].lower()).encode()
-print("1" + str(int(hashlib.sha256(msg).hexdigest(), 16) % 10**18).zfill(18))')
-  printf '%s' "$id" > "bot/identities/${n}_${HOST}.txt"
+  if [ -s "bot/identities/${n}_${HOST}.txt" ]; then echo "fight: $n logs in to its saved account"
+  else echo "fight: $n is new here -- the server makes its account, and its id is saved"; fi
 done
 
 # ---- BitBot: native, in the client's own process (bot/BitBotNative.lua, as
@@ -72,7 +79,7 @@ done
 build_bitbot() {
   [ -n "${GC_EVAL_DIR:-}" ] || { echo "fight: bitbot needs GC_EVAL_DIR=<GameCreator>/games/the-game/ai/eval"; exit 2; }
   local line
-  line=$(grep -E '^clang .*-o libbit\.so$' "$GC_EVAL_DIR/native/build.sh") \
+  line=$(grep -E '^clang .* -shared .*libbit\.so' "$GC_EVAL_DIR/native/build.sh" | head -1) \
     || { echo "fight: GameCreator's native/build.sh no longer builds libbit.so -- BitBot's hookup needs a look"; exit 1; }
   (cd "$GC_EVAL_DIR/native" && eval "$line" 2> "$OLDPWD/bitbot-build.log") \
     || { cat bitbot-build.log; echo "fight: libbit.so did not build"; exit 1; }
@@ -92,7 +99,17 @@ declare -A PORT_OF
 start_wasm() {   # NAME PORT
   local name=$1 port=$2 log="mind-$1.log"
   [ -n "${GC_EVAL_DIR:-}" ] || { echo "fight: wasm needs GC_EVAL_DIR=<GameCreator>/games/the-game/ai/eval"; exit 2; }
-  node "$GC_EVAL_DIR/survivor.js" --port "$port" > "$log" 2>&1 &
+  # WASM_PROFILE=bot/profiles/<x>.wasm.json plays trained weights (its
+  # "weights" file sits beside it; survivor.js reads it from its own folder)
+  local prof=""
+  case "${WASM_PROFILE:-}" in
+    *.wasm.json)
+      [ -f "$WASM_PROFILE" ] || { echo "fight: no WasmSurvivor profile $WASM_PROFILE"; exit 2; }
+      local w; w=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["weights"])' "$WASM_PROFILE")
+      cp "$(dirname "$WASM_PROFILE")/$w" "$GC_EVAL_DIR/$w" || { echo "fight: no weights $w beside $WASM_PROFILE"; exit 2; }
+      prof="$PWD/$WASM_PROFILE"; echo "fight: wasm ($name) plays $WASM_PROFILE" ;;
+  esac
+  GC_SURVIVOR_PROFILE=$prof node "$GC_EVAL_DIR/survivor.js" --port "$port" > "$log" 2>&1 &
   PIDS="${PIDS:-} $!"
   PORT_OF[$name]=$port
   for i in $(seq 1 300); do grep -q listening "$log" && break; sleep 0.2; done

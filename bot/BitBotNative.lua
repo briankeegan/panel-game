@@ -28,7 +28,7 @@ local ffi = require("ffi")
 local KeyDataEncoding = require("common.data.KeyDataEncoding")
 local ThinkBudget = require("common.engine.computerPlayers.ThinkBudget")
 
-local BOTLOG_FRAMES = tonumber(os.getenv("PA_BITBOT_LOG_FRAMES") or 300)
+local BOTLOG_FRAMES = tonumber(os.getenv("PA_BITBOT_LOG_FRAMES") or 0)   -- off: its trace is written inside the timed decision, and bot_time would read that as the bot being slow
 
 local BitBotNative = {}
 BitBotNative.__index = BitBotNative
@@ -167,10 +167,10 @@ function BitBotNative:input(stack)
   if logging then io.stderr:write("@ clock " .. tostring(stack.clock) .. "\n"); C.botTraceOn = 1 end
   -- the host's part, every frame before front_frame (train.lua): the think
   -- ceiling and what the last frame's thinking took, and the opponent
+  if self.frames == 1 or self.frames == 100 then self:dump(stack) end   -- outside the timed part
   local tb1 = ThinkBudget.now()
   self:tellOpponent(stack)
   C.bot_time(ThinkBudget.ceilingMillis(), self.lastThought * 1000, ThinkBudget.ceilingMillis() - loadMs)
-  if self.frames == 1 or self.frames == 100 then self:dump(stack) end
   local bits = C.front_frame(self.fid, self.board)
   self.lastThought = loadMs / 1000 + (ThinkBudget.now() - tb1)
   if logging then C.botTraceOn = 0 end

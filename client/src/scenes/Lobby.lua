@@ -2507,13 +2507,21 @@ function Lobby:updateRoomPanel(updateInfo)
         local p2Id = room.players[2]
         local p1Info = GAME.netClient.lobbyDataV2.players[p1Id]
         local p2Info = GAME.netClient.lobbyDataV2.players[p2Id]
+        -- Unguarded room.wins[1]/[2] indexing used to throw when room.wins
+        -- was nil (e.g. a freshly created room before the server's first
+        -- win-count broadcast), silently killing this whole info panel --
+        -- it just never rendered, instead of showing "0 : 0". The FFA and
+        -- team branches above already default missing counts to 0; this
+        -- one didn't.
+        local w1 = room.wins and room.wins[1] or 0
+        local w2 = room.wins and room.wins[2] or 0
         if p1Info and p2Info then
           local p1Name = p1Info.name
           local p2Name = p2Info.name
-          text = string.format("%s %d : %d %s\n%s\n%s %d", p1Name, room.wins[1], room.wins[2], p2Name, room.state, loc("pl_spectators"), #room.spectators)
+          text = string.format("%s %d : %d %s\n%s\n%s %d", p1Name, w1, w2, p2Name, room.state, loc("pl_spectators"), #room.spectators)
         else
           logger.warn(string.format("Failed to retrieve data for playerId %d or %d\nLobby data is %s", p1Id, p2Id, table_to_string(GAME.netClient.lobbyDataV2)))
-          text = string.format("%d : %d \n%s\n%s %d\n%s", room.wins[1], room.wins[2], room.state, loc("pl_spectators"), #room.spectators, "Failed to retrieve player info")
+          text = string.format("%d : %d \n%s\n%s %d\n%s", w1, w2, room.state, loc("pl_spectators"), #room.spectators, "Failed to retrieve player info")
         end
       elseif #room.players == 1 then
         text = string.format("%s\n%s %d", room.state, loc("pl_spectators"), #room.spectators)

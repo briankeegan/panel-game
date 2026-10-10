@@ -90,7 +90,34 @@ local function updateImpl(dt)
             if not okW then error("embedded write failed: " .. tostring(errW)) end
             v.path = localPath
           end
-          GAME_UPDATER:launch(GAME_UPDATER.activeVersion)
+          local ok, err = pcall(function() GAME_UPDATER:launch(GAME_UPDATER.activeVersion) end)
+          if not ok then
+            -- gameUpdater:launch already retries a transient mount failure
+            -- a few times; this is for when it's still failing after that
+            -- (seen live: a just-downloaded version failed to mount, and
+            -- the only way out was force-killing the app). Don't strand
+            -- the user on a dead screen -- try the best OTHER installed
+            -- version instead, same as a device that never saw the broken
+            -- one at all.
+            logger:log("Launching " .. tostring(v.version) .. " failed: " .. tostring(err))
+            local fallback = GAME_UPDATER.getLatestInstalledVersion(GAME_UPDATER.activeReleaseStream, GAME_UPDATER.activeVersion)
+            if fallback then
+              logger:log("Falling back to " .. tostring(fallback.version))
+              local ok2, err2 = pcall(function() GAME_UPDATER:launch(fallback) end)
+              if not ok2 then
+                logger:log("Fallback launch of " .. tostring(fallback.version) .. " also failed: " .. tostring(err2))
+                updateString = tostring(err2)
+                stuck = true
+                loadingIndicator.draw = function() end
+                pcall(logger.write, logger)
+              end
+            else
+              updateString = tostring(err)
+              stuck = true
+              loadingIndicator.draw = function() end
+              pcall(logger.write, logger)
+            end
+          end
         else
           if GAME_UPDATER.activeReleaseStream.name == GAME_UPDATER.defaultReleaseStream.name then
             updateString = "No version available.\nPlease check your internet connection and try again."

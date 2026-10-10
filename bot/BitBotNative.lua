@@ -30,7 +30,7 @@ local ThinkBudget = require("common.engine.computerPlayers.ThinkBudget")
 
 local DEATHLOG = tonumber(os.getenv("PA_BITBOT_DEATHLOG") or 90)   -- frames of BitBot's own log kept, printed if it dies (train.lua GC_DEATHLOG)
 local LOGP, LOGN = ffi.new("char *[1]"), ffi.new("size_t[1]")
-local BOT_TIME = os.getenv("PA_BITBOT_BOT_TIME") == "1"
+local BOT_TIME = os.getenv("PA_BITBOT_BOT_TIME") ~= "0"   -- on, as train.lua calls it; PA_BITBOT_BOT_TIME=0 for a runner shared with other bots
 local BOTLOG_FRAMES = tonumber(os.getenv("PA_BITBOT_LOG_FRAMES") or 30)   -- the first 30 live frames only: the trace is written inside the timed decision, and bot_time reads that as slow
 
 local BitBotNative = {}
@@ -180,7 +180,7 @@ function BitBotNative:input(stack)
   if self.frames == 1 or self.frames == 100 then self:dump(stack) end   -- outside the timed part
   local tb1 = nowMs()
   self:tellOpponent(stack)
-  -- bot_time (train.lua calls it) is OFF unless PA_BITBOT_BOT_TIME=1: it makes the bot cut its search to the
+  -- bot_time (train.lua calls it) is ON unless PA_BITBOT_BOT_TIME=0: it makes the bot cut its search to the
   -- time it measures, and on a CI runner shared with other bots that time is not its own -- it fell back to
   -- raising and stopped evaluating swaps. Without it the bot's own budgets stand (bot.c: "With no host the
   -- start values stand").

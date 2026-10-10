@@ -144,6 +144,7 @@ function SurvivalLink.new(opts)
   self.ownInputs = opts.inputBudget == nil
   self.waitSec = opts.waitSec or tonumber(os.getenv("PA_SURVIVOR_WAIT") or "") or self.thinking:snapshot().ceiling
   self.dropped = 0
+  self.phase = { encode = 0, send = 0, wait = 0, read = 0, overBy = { encode = 0, send = 0, wait = 0, read = 0 } }
   self.ages = {}
   self.buffer = ""
   self.late = 0
@@ -233,6 +234,14 @@ function SurvivalLink:input(stack, sources)
   collectgarbage("restart")
   if not ok then error(key, 0) end
   if self.ownThinking then self.thinking:charge(took) end
+  local st = self.steps
+  if st then
+    for name, v in pairs(st) do
+      if v > self.phase[name] then self.phase[name] = v end
+      if took > self.thinking:snapshot().ceiling and v > self.phase.overBy[name] then self.phase.overBy[name] = v end
+    end
+    self.steps = nil
+  end
   return key
 end
 
@@ -259,21 +268,30 @@ function SurvivalLink:think(stack, sources)
   -- the game's window of keys goes with the board: the frames ago each key still inside it was pressed
   local ages = self.inputs:ages(clock, self.ages)
   local budget = ',"budget":{"limit":' .. self.inputs.limit .. ',"window":' .. self.inputs.window .. ',"ages":[' .. table.concat(ages, ",") .. ']}'
-  self:send('{"t":"f","state":' .. SurvivalLink.dump(stack, sources) .. budget .. '}')
+  local t0 = socket.gettime()
+  local board = SurvivalLink.dump(stack, sources)
+  local t1 = socket.gettime()
+  self:send('{"t":"f","state":' .. board .. budget .. '}')
+  local t2 = socket.gettime()
+  self.steps = { encode = t1 - t0, send = t2 - t1, wait = 0, read = 0 }
   self.awaiting = (self.awaiting or 0) + 1
   self.frames = self.frames + 1
   -- Answers come in order; one for an earlier frame is stale, but the keys
   -- it planned (reply.next, from the frame after its own) are the newest
   -- known. A frame whose answer is late presses what was planned for it.
   while self.awaiting > 0 do
+    local w0 = socket.gettime()
     local line = self:await(math.min(deadline, socket.gettime() + self.waitSec))
+    self.steps.wait = self.steps.wait + (socket.gettime() - w0)
     if not line then
       self.late = self.late + 1
       local planned = self.planned and self.planned[clock]
       return planned and KeyDataEncoding.base64encode[planned + 1] or idle
     end
     self.awaiting = self.awaiting - 1
+    local r0 = socket.gettime()
     local reply = json.decode(line)
+    self.steps.read = self.steps.read + (socket.gettime() - r0)
     if reply and reply.clock then
       self.planned = {}
       for i, bits in ipairs(reply.next or {}) do self.planned[reply.clock + i] = bits end
@@ -286,6 +304,11 @@ function SurvivalLink:think(stack, sources)
 end
 
 ---The frames whose thinking cost more than the ceiling, the worst frame (seconds), and the keys the allowance refused.
+---The longest each step of a frame took, and the longest each took in a frame that went over the ceiling (seconds).
+function SurvivalLink:phases()
+  return self.phase
+end
+
 function SurvivalLink:budget()
   return self.thinking:overruns(), self.thinking:worst(), self.dropped
 end

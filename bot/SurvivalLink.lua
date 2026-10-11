@@ -437,6 +437,7 @@ function SurvivalLink:input(stack, sources)
   collectgarbage("restart")
   if not ok then error(key, 0) end
   if self.ownThinking then self.thinking:charge(took) end
+  if took > (self.worstTook or 0) then self.worstTook, self.worstClock = took, stack.clock end
   local st = self.steps
   if st then
     for name, v in pairs(st) do
@@ -573,6 +574,7 @@ end
 ---The frames whose thinking cost more than the ceiling, the worst frame (seconds), and the keys the allowance refused.
 ---The longest each step of a frame took, and the longest each took in a frame that went over the ceiling (seconds).
 function SurvivalLink:phases()
+  self.phase.worstClock = self.worstClock
   return self.phase
 end
 

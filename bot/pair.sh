@@ -12,6 +12,7 @@
 #                                     lobby, CHALLENGER challenges it. Account names must already be saved
 #                                     (bot/identities): WasmBot, WasmSurvivor_Bot, BitBotSelf, BitBotSelf2.
 #                                     Cancels a run of either name first; other pairs are left alone.
+#   bot/pair.sh profiles              list the profiles wasm-vs can take (and "default")
 #   bot/pair.sh stop                  cancel every fight run that is going
 #   bot/pair.sh status                list the fight runs that are going
 #
@@ -106,6 +107,7 @@ case "${1:-}" in
   start-bitbot) stop_and_wait "$BITBOT_RUN"; dispatch_bitbot ;;
   start-wasm)   stop_and_wait "$WASM_RUN";   dispatch_wasm ;;
   wasm-vs)      HOURS=${6:-5}; wasm_vs "${2:?lobby name}" "${3:?lobby profile}" "${4:?challenger name}" "${5:?challenger profile}" ;;
+  profiles)     echo default; git ls-files 'bot/profiles/*.wasm.json' | sed 's/^/ /' ;;
   stop)         out=$(cancel_matching .); printf '%s\n' "$out" | sed '$d'
                 [ "$(printf '%s\n' "$out" | tail -1)" -gt 0 ] || echo "pair: nothing running" ;;
   status)       out=$(running); if [ -n "$out" ]; then printf '%s\n' "$out"; else echo "pair: nothing running"; fi ;;

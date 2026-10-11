@@ -503,6 +503,14 @@ function BotClient:startMatch()
   self.deathSent = false
   self._deathAwaitingFlush = false
   self._resultReported = false
+  -- oppDied is set by the SRV_D_PREFIX handler when a relayed death arrives
+  -- that isn't ours -- i.e. the previous match's opponent death. Without
+  -- resetting it here, tickMatch's "(self.deathSent or self.oppDied) and not
+  -- self._resultReported" check fires on frame 1 of every match after the
+  -- first one this bot won, instantly (and wrongly) reporting that match's
+  -- outcome and setting matchEnded, which stops this bot from playing or
+  -- sending input for the rest of that match (and every match after it).
+  self.oppDied = false
   logger.info(string.format("bot[%s]: match built; my stack = slot %d; start in %dms",
     self.name, self.localPlayerNumber, self.matchStart.startInMs or 500))
 end

@@ -67,11 +67,19 @@ end
 local buf, used = {}, 0
 local function put(piece) used = used + 1; buf[used] = piece end
 -- the text of a number, an object key (with and without the comma before it) and a string value, each made once
-local numbers = setmetatable({}, { __index = function(t, v)
-  local text = num(v)
-  if v % 1 == 0 and v >= -1024 and v < 4096 then t[v] = text end   -- small whole numbers only: clocks and ids never repeat
+-- A number's text is kept while it is still being written: the garbage on a board keeps its clock and id from frame
+-- to frame, and writing it again as a new string each time fills the string table the game shares, which grows
+-- by a megabyte when it fills. Two generations bound it: what the last few thousand writes used.
+local newer, older, kept = {}, {}, 0
+local function numberText(v)
+  local text = newer[v]
+  if text then return text end
+  text = older[v] or num(v)
+  newer[v] = text
+  kept = kept + 1
+  if kept >= 4096 then older, newer, kept = newer, {}, 0 end
   return text
-end })
+end
 local firstKey = setmetatable({}, { __index = function(t, k) local q = string.format("%q", tostring(k)) .. ":"; t[k] = q; return q end })
 local nextKey = setmetatable({}, { __index = function(t, k) local q = "," .. string.format("%q", tostring(k)) .. ":"; t[k] = q; return q end })
 local words = setmetatable({}, { __index = function(t, v)
@@ -82,7 +90,7 @@ end })
 local function putScalar(v)
   local t = type(v)
   if t == "number" then
-    if v ~= v then put('"NaN"') elseif v == math.huge then put('"Infinity"') elseif v == -math.huge then put('"-Infinity"') else put(numbers[v]) end
+    if v ~= v then put('"NaN"') elseif v == math.huge then put('"Infinity"') elseif v == -math.huge then put('"-Infinity"') else put(numberText(v)) end
   elseif t == "boolean" then put(v and "true" or "false")
   else put(words[v]) end
 end
@@ -408,6 +416,7 @@ function SurvivalLink:input(stack, sources)
   local before = stopOnOver and SurvivalLink.machine() or nil
   local minor0, major0 = 0, 0
   if stopOnOver then minor0, major0 = SurvivalLink.faults() end
+  local heap0 = collectgarbage("count")
   collectgarbage("stop")
   local began = ThinkBudget.now()
   local cpu0 = os.clock()
@@ -438,8 +447,8 @@ function SurvivalLink:input(stack, sources)
     local text = {}
     for name, v in pairs(st or {}) do text[#text + 1] = string.format("%s %.1f", name, v * 1000) end
     table.sort(text)
-    self.stopReason = string.format("STOPPED on the first frame over the ceiling: clock %d, wall %.1f ms, this process's cpu %.1f ms, steps (ms) [%s], compiler events in the frame %d, longest single poll %.1f ms, board %d bytes, garbage staged %d / in telegraphs %d; page faults in the frame: %d minor, %d major (%.1f a frame on average over the %d frames before); the machine over the frame: stolen %.1f ms, busy %.1f ms of %.1f ms, runnable %d, load %s",
-      stack.clock, took * 1000, cpu * 1000, table.concat(text, ", "), SurvivalLink.tracing.events - traces0, (self.longestPoll or 0) * 1000, self.boardBytes or 0, #stack.incomingGarbage.stagedGarbage, SurvivalLink.telegraphCount(sources), faultsNow - minor0, select(2, SurvivalLink.faults()) - major0, ((self.faultTotal or 0) - (faultsNow - minor0)) / math.max(1, (self.faultFrames or 1) - 1), (self.faultFrames or 1) - 1, (after.steal - before.steal) * 10, (after.busy - before.busy) * 10, (after.total - before.total) * 10, after.running, after.load)
+    self.stopReason = string.format("STOPPED on the first frame over the ceiling: clock %d, wall %.1f ms, this process's cpu %.1f ms, steps (ms) [%s], compiler events in the frame %d, longest single poll %.1f ms, board %d bytes, garbage staged %d / in telegraphs %d; page faults in the frame: %d minor, %d major (%.1f a frame on average over the %d frames before); heap %.0f KB before the frame, %+.0f KB over it; the machine over the frame: stolen %.1f ms, busy %.1f ms of %.1f ms, runnable %d, load %s",
+      stack.clock, took * 1000, cpu * 1000, table.concat(text, ", "), SurvivalLink.tracing.events - traces0, (self.longestPoll or 0) * 1000, self.boardBytes or 0, #stack.incomingGarbage.stagedGarbage, SurvivalLink.telegraphCount(sources), faultsNow - minor0, select(2, SurvivalLink.faults()) - major0, ((self.faultTotal or 0) - (faultsNow - minor0)) / math.max(1, (self.faultFrames or 1) - 1), (self.faultFrames or 1) - 1, heap0, collectgarbage("count") - heap0, (after.steal - before.steal) * 10, (after.busy - before.busy) * 10, (after.total - before.total) * 10, after.running, after.load)
   end
   return key
 end
@@ -575,8 +584,8 @@ if jit and jit.off then
   for _, f in pairs(SurvivalLink) do
     if type(f) == "function" then jit.off(f, true) end
   end
-  for _, f in ipairs({ num, enc, put, putScalar, putScalars, putGarbage, putTelegraph, scalars,
-                       getmetatable(numbers).__index, getmetatable(words).__index,
+  for _, f in ipairs({ num, numberText, enc, put, putScalar, putScalars, putGarbage, putTelegraph, scalars,
+                       getmetatable(words).__index,
                        getmetatable(firstKey).__index, getmetatable(nextKey).__index, getmetatable(quoted).__index }) do
     jit.off(f, true)
   end

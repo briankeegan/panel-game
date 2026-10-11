@@ -457,10 +457,13 @@ local function start2pVsOnlineMatch(self, createRoomMessage)
   -- Defensive: we're demonstrably in a room now (the server just put us in
   -- one), so any stale pending-leave flag from a round trip that never
   -- completed can't still be meaningful -- don't let it block future "am I
-  -- in a room" checks.
+  -- in a room" checks. _pendingLeaveRoomRef is deliberately NOT cleared here:
+  -- it identifies the specific room OBJECT a leave was asked for (not just a
+  -- room number), so it stays meaningful even if we've since rejoined a room
+  -- with the same number -- that's what lets a late confirmation for the OLD
+  -- room be recognized as stale instead of tearing down the room we're in now.
   self._pendingLeaveRoom = nil
   self._pendingLeaveRoomAt = nil
-  self._pendingLeaveRoomNumber = nil
 
   -- Pending-promotion transition: we were watching the match as a queued
   -- joiner; addToRoom means the previous match ended and we've been promoted.
@@ -660,16 +663,21 @@ local function processLeaveRoomMessage(self, message)
   -- clear below is unconditionally correct; everything else only applies
   -- if self.room is still (or has no better claim to be) the room this
   -- confirmation is actually for.
-  local pendingFor = self._pendingLeaveRoomNumber
-  local currentRoomNumber = self.room and self.room.roomNumber
-  local stale = pendingFor ~= nil and currentRoomNumber ~= nil and currentRoomNumber ~= pendingFor
+  --
+  -- Compared by OBJECT, not room number: rejoining/re-spectating can land
+  -- you on a NEW room object that happens to share the old room's number,
+  -- and a number-only comparison would wrongly call that "the same room" --
+  -- treating this stale confirmation as live and tearing down the room we
+  -- just (re)joined.
+  local pendingForRef = self._pendingLeaveRoomRef
+  local stale = pendingForRef ~= nil and self.room ~= nil and self.room ~= pendingForRef
   self._pendingLeaveRoom = nil
   self._pendingLeaveRoomAt = nil
-  self._pendingLeaveRoomNumber = nil
+  self._pendingLeaveRoomRef = nil
   if stale then
     logger.info(string.format(
       "Stale leave_room confirmation for room %s ignored -- already on room %s",
-      tostring(pendingFor), tostring(currentRoomNumber)))
+      tostring(pendingForRef and pendingForRef.roomNumber), tostring(self.room and self.room.roomNumber)))
     return
   end
 
@@ -1190,9 +1198,10 @@ spectate2pVsOnlineMatch = function(self, spectateRequestGrantedMessage)
   -- arrive (connection drop mid-round-trip). We're demonstrably in a room
   -- now, so any stale pending-leave flag from before can't still be
   -- meaningful -- don't let it block future "am I in a room" checks.
+  -- _pendingLeaveRoomRef is deliberately NOT cleared here -- see the matching
+  -- comment in start2pVsOnlineMatch.
   self._pendingLeaveRoom = nil
   self._pendingLeaveRoomAt = nil
-  self._pendingLeaveRoomNumber = nil
   resetLobbyData(self)
   GAME.battleRoom = BattleRoom.createFromServerMessage(spectateRequestGrantedMessage)
   self.room = GAME.battleRoom
@@ -1434,6 +1443,12 @@ function NetClient:maybeEnterRoomFromLobby()
   if self.state ~= states.ONLINE then return false end
   if not self.room then return false end
 
+  -- A leave for the current room is already in flight (button was just
+  -- clicked) -- don't let a lobbyStateV2 broadcast landing before the
+  -- server's confirmation does drag the player right back into the room
+  -- they just asked to leave. Let the pending leave resolve first.
+  if self._pendingLeaveRoom then return false end
+
   -- A leftover spectate attachment (watched something, then landed back at
   -- the lobby without a clean exit) should never auto-resume -- spectating
   -- isn't a room you're "in" the way an actual team room is, so the lobby
@@ -1484,22 +1499,24 @@ local LEAVE_ROOM_CONFIRM_TIMEOUT = 5
 ---all, and as the timeout backstop in update() when we asked but the
 ---confirmation never came back.
 ---@param self NetClient
----@param forRoomNumber integer? when given, only actually tear down self.room
----if it's still THIS room. A stale timeout/confirmation for a leave we asked
----for a while ago must not nuke a different room we've since moved on to
----(left and already re-spectated, or joined something new) in the meantime --
----confirmed live: this is what made "leave, then rejoin" look broken, kicking
----the player back to the lobby moments after they'd successfully rejoined.
-local function _cleanupRoomLocally(self, forRoomNumber)
+---@param forRoomRef table? when given, only actually tear down self.room if
+---it's still THIS room object. A stale timeout/confirmation for a leave we
+---asked for a while ago must not nuke a different room we've since moved on
+---to (left and already re-spectated, or joined something new) in the
+---meantime -- confirmed live: this is what made "leave, then rejoin" look
+---broken, kicking the player back to the lobby moments after they'd
+---successfully rejoined. Compared by object, not room number -- a rejoin can
+---land on a new room object sharing the old room's number.
+local function _cleanupRoomLocally(self, forRoomRef)
   local roomNumber = self.room and self.room.roomNumber
-  local staleForADifferentRoom = forRoomNumber ~= nil and roomNumber ~= nil and roomNumber ~= forRoomNumber
+  local staleForADifferentRoom = forRoomRef ~= nil and self.room ~= nil and self.room ~= forRoomRef
   self._pendingLeaveRoom = nil
   self._pendingLeaveRoomAt = nil
-  self._pendingLeaveRoomNumber = nil
+  self._pendingLeaveRoomRef = nil
   if staleForADifferentRoom then
     logger.info(string.format(
       "Stale room cleanup for room %s ignored -- already on room %s",
-      tostring(forRoomNumber), tostring(roomNumber)))
+      tostring(forRoomRef and forRoomRef.roomNumber), tostring(roomNumber)))
     return
   end
 
@@ -1545,12 +1562,12 @@ function NetClient:leaveRoom()
     -- or by the update() timeout backstop if that confirmation never arrives.
     self._pendingLeaveRoom = true
     self._pendingLeaveRoomAt = love.timer.getTime()
-    self._pendingLeaveRoomNumber = self.room and self.room.roomNumber
+    self._pendingLeaveRoomRef = self.room
   elseif self.room then
     -- Not connected (or never actually in a room per the server) -- nothing
     -- to wait on, clean up now. Synchronous (no round trip in between), so
     -- self.room is unambiguously the room being left -- no staleness risk.
-    _cleanupRoomLocally(self, self.room.roomNumber)
+    _cleanupRoomLocally(self, self.room)
   end
 end
 
@@ -1959,7 +1976,7 @@ function NetClient:update(dt)
   if self._pendingLeaveRoom and self._pendingLeaveRoomAt
       and love.timer.getTime() - self._pendingLeaveRoomAt > LEAVE_ROOM_CONFIRM_TIMEOUT then
     logger.warn("leaveRoom confirmation timed out; forcing local cleanup")
-    _cleanupRoomLocally(self, self._pendingLeaveRoomNumber)
+    _cleanupRoomLocally(self, self._pendingLeaveRoomRef)
   end
 
   -- Drain the simulated-lag queues (PA_NETWORK_LAG_MS). When delayedProcessing

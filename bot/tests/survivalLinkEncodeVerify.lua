@@ -1,6 +1,7 @@
 -- survivalLinkEncodeVerify.lua -- the link's board encoder against the key-by-key encoder it replaced: both write
 -- the same board, field for field, on boards of every shape the warm-up makes.
 --   luajit bot/tests/survivalLinkEncodeVerify.lua
+require("bot.headlessBoot")
 local SurvivalLink = require("bot.SurvivalLink")
 local json = require("common.lib.dkjson")
 

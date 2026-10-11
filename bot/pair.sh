@@ -6,6 +6,12 @@
 #                                     BitBot sits in the lobby, WasmSurvivor_Bot challenges it
 #   bot/pair.sh start-bitbot [HOURS]  cancel BitBot's run if going, start only BitBot
 #   bot/pair.sh start-wasm [HOURS]    cancel WasmSurvivor_Bot's run if going, start only it
+#   bot/pair.sh wasm-vs LOBBY LOBBY_PROFILE CHALLENGER CHALLENGER_PROFILE [HOURS]
+#                                     two WasmSurvivors, each on its own profile (a bot/profiles/*.wasm.json,
+#                                     or "default" for GameCreator's survivor.profile.json): LOBBY sits in the
+#                                     lobby, CHALLENGER challenges it. Account names must already be saved
+#                                     (bot/identities): WasmBot, WasmSurvivor_Bot, BitBotSelf, BitBotSelf2.
+#                                     Cancels a run of either name first; other pairs are left alone.
 #   bot/pair.sh stop                  cancel every fight run that is going
 #   bot/pair.sh status                list the fight runs that are going
 #
@@ -79,6 +85,19 @@ dispatch_wasm() {
   echo "pair: WasmSurvivor_Bot queued (challenges BitBot)"
 }
 
+# one WasmSurvivor pair: LOBBY (profile LP) in the lobby, CHALLENGER (profile CP) challenging it
+wasm_vs() {   # LOBBY LP CHALLENGER CP
+  local lobby=$1 lp=$2 chal=$3 cp=$4
+  [ "$lp" = default ] && lp=bot/profiles/beverly.json
+  [ "$cp" = default ] && cp=bot/profiles/beverly.json
+  stop_and_wait "\\(wasm\\) vs you.*$lobby|$lobby\\).*|$chal,$lobby"
+  dispatch "{\"mode\":\"fight\",\"bot\":\"wasm\",\"opponent\":\"you\",\"name\":\"$lobby\",\"hours\":\"$HOURS\",\"profile\":\"$lp\",\"server\":\"$SERVER\"}"
+  echo "pair: $lobby ($lp) queued (sits in the lobby)"
+  sleep "${PA_LOBBY_WAIT:-110}"   # the challenger needs the lobby bot logged in
+  dispatch "{\"mode\":\"fight\",\"bot\":\"wasm\",\"opponent\":\"challenge\",\"name\":\"$chal,$lobby\",\"hours\":\"$HOURS\",\"profile\":\"$cp\",\"server\":\"$SERVER\"}"
+  echo "pair: $chal ($cp) queued (challenges $lobby)"
+}
+
 BITBOT_RUN='BitBot \(bitbot\)'
 WASM_RUN='\(wasm\) vs challenge'
 
@@ -86,6 +105,7 @@ case "${1:-}" in
   start)        stop_and_wait .;             dispatch_bitbot; sleep 2; dispatch_wasm ;;
   start-bitbot) stop_and_wait "$BITBOT_RUN"; dispatch_bitbot ;;
   start-wasm)   stop_and_wait "$WASM_RUN";   dispatch_wasm ;;
+  wasm-vs)      HOURS=${6:-5}; wasm_vs "${2:?lobby name}" "${3:?lobby profile}" "${4:?challenger name}" "${5:?challenger profile}" ;;
   stop)         out=$(cancel_matching .); printf '%s\n' "$out" | sed '$d'
                 [ "$(printf '%s\n' "$out" | tail -1)" -gt 0 ] || echo "pair: nothing running" ;;
   status)       out=$(running); if [ -n "$out" ]; then printf '%s\n' "$out"; else echo "pair: nothing running"; fi ;;

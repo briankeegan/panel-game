@@ -2406,7 +2406,14 @@ function Lobby:updateRoomPanel(updateInfo)
     end
 
     local room = selected.room
-    if room.roomNumber ~= self.roomPanel.roomNumber or updateInfo then
+    -- Also force a redraw every frame while the selected room is the one
+    -- we're actually attached to (spectating or playing): its win counts
+    -- read from live match data (see below) that changes between
+    -- lobbyStateV2 broadcasts, which is the only other thing that sets
+    -- updateInfo. Without this the panel only caught up to a finished
+    -- round whenever some unrelated lobby event happened to refresh it.
+    local isLiveRoom = GAME.netClient.room and GAME.netClient.room.roomNumber == room.roomNumber
+    if room.roomNumber ~= self.roomPanel.roomNumber or updateInfo or isLiveRoom then
       self.roomPanel.roomNumber = room.roomNumber
       local text
       local hasOpenSlots = room.openSlots and #room.openSlots > 0
@@ -2515,6 +2522,21 @@ function Lobby:updateRoomPanel(updateInfo)
         -- one didn't.
         local w1 = room.wins and room.wins[1] or 0
         local w2 = room.wins and room.wins[2] or 0
+        -- room.wins comes from the lobby room LIST (lobbyStateV2), which the
+        -- server only re-broadcasts on room/membership changes -- not on
+        -- every match-end within an ongoing room. Watching this exact room
+        -- continuously, that made the count look frozen between whatever
+        -- else happened to trigger a lobbyStateV2 refresh, even as rounds
+        -- kept finishing. GAME.netClient.room.players[i].wins updates
+        -- immediately via gameResult for whoever's actually attached
+        -- (player or spectator) to the room -- prefer it when we are.
+        local liveRoom = GAME.netClient.room
+        if liveRoom and liveRoom.roomNumber == room.roomNumber and liveRoom.players then
+          for _, p in ipairs(liveRoom.players) do
+            if p.publicId == p1Id and p.wins then w1 = p.wins end
+            if p.publicId == p2Id and p.wins then w2 = p.wins end
+          end
+        end
         if p1Info and p2Info then
           local p1Name = p1Info.name
           local p2Name = p2Info.name

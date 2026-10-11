@@ -69,7 +69,7 @@ local function put(piece) used = used + 1; buf[used] = piece end
 -- the text of a number, an object key (with and without the comma before it) and a string value, each made once
 local numbers = setmetatable({}, { __index = function(t, v)
   local text = num(v)
-  if v % 1 == 0 and v > -1e6 and v < 1e6 then t[v] = text end
+  if v % 1 == 0 and v >= -1024 and v < 4096 then t[v] = text end   -- small whole numbers only: clocks and ids never repeat
   return text
 end })
 local firstKey = setmetatable({}, { __index = function(t, k) local q = string.format("%q", tostring(k)) .. ":"; t[k] = q; return q end })

@@ -10,7 +10,7 @@
 #                                     two WasmSurvivors, each on its own profile (a bot/profiles/*.wasm.json,
 #                                     or "default" for GameCreator's survivor.profile.json): LOBBY sits in the
 #                                     lobby, CHALLENGER challenges it. Account names must already be saved
-#                                     (bot/identities): WasmBot, WasmSurvivor_Bot, BitBotSelf, BitBotSelf2.
+#                                     (bot/identities): WasmSurvivor_Bot, SurvivorDefault, SurvivorAgg1, SurvivorAgg2.
 #                                     Cancels a run of either name first; other pairs are left alone.
 #   bot/pair.sh profiles              list the profiles wasm-vs can take (and "default")
 #   bot/pair.sh stop                  cancel every fight run that is going
@@ -91,7 +91,7 @@ wasm_vs() {   # LOBBY LP CHALLENGER CP
   local lobby=$1 lp=$2 chal=$3 cp=$4
   [ "$lp" = default ] && lp=bot/profiles/beverly.json
   [ "$cp" = default ] && cp=bot/profiles/beverly.json
-  stop_and_wait "\\(wasm\\) vs you.*$lobby|$lobby\\).*|$chal,$lobby"
+  stop_and_wait "· $lobby \\(wasm\\) vs you|· $chal,$lobby \\(wasm\\)"
   dispatch "{\"mode\":\"fight\",\"bot\":\"wasm\",\"opponent\":\"you\",\"name\":\"$lobby\",\"hours\":\"$HOURS\",\"profile\":\"$lp\",\"server\":\"$SERVER\"}"
   echo "pair: $lobby ($lp) queued (sits in the lobby)"
   sleep "${PA_LOBBY_WAIT:-110}"   # the challenger needs the lobby bot logged in

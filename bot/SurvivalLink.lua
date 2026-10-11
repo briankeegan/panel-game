@@ -269,8 +269,8 @@ end
 -- The table every string is interned in doubles when it fills and halves when it is a quarter full, and
 -- doubling rehashes every string in it: about ten milliseconds for what the game keeps there. A frame that makes
 -- strings with the collector stopped is the one that fills it. Holding enough strings that it is always more than a
--- quarter full keeps it from halving, and so from doubling again.
-local PINNED_STRINGS = 140000
+-- quarter full keeps it from halving, and a table sized for more than a match makes keeps it from doubling.
+local PINNED_STRINGS = 540000   -- a table of a million slots, which a match does not fill
 function SurvivalLink.warm()
   if not SurvivalLink.pinned then
     local pinned = {}

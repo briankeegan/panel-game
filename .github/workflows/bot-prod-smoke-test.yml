@@ -436,6 +436,8 @@ jobs:
             mind-*.log
             preflight-*.log
             fight-*.log
+            death-*.jsonl.gz
+            frames-*.jsonl.gz
 
       - name: Fail if the run failed
         if: steps.smoke.outcome == 'failure' || steps.largegarbage.outcome == 'failure' || steps.live.outcome == 'failure' || steps.fight.outcome == 'failure'

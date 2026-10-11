@@ -1537,6 +1537,24 @@ local function _cleanupRoomLocally(self, forRoomRef)
     end
     self:emitSignal("lobbyStateV2Update", self.lobbyDataV2)
   end
+
+  -- Normally the server's leave_room confirmation (processLeaveRoomMessage)
+  -- is what flips self.state back to ONLINE, and this timeout path never has
+  -- to -- but the known server-side gap this backstop exists for (dropping
+  -- the leave_room reply silently for a spectator in some states) means that
+  -- confirmation sometimes never comes at all. Without this, self.room clears
+  -- here but self.state stays stuck on ROOM/INGAME forever -- and the lobby
+  -- listeners (including the one completing a NEW spectate request) only run
+  -- while state is ONLINE, so every spectate attempt after that would send
+  -- fine but its response could never be picked up: silently hung until the
+  -- app restarts.
+  if self.state == states.INGAME or self.state == states.ROOM then
+    self:setState(states.ONLINE)
+    local topScene = GAME.navigationStack.scenes[#GAME.navigationStack.scenes]
+    if not topScene or topScene.name ~= "Lobby" then
+      GAME.navigationStack:popToName("Lobby")
+    end
+  end
 end
 
 function NetClient:leaveRoom()

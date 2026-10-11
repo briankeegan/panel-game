@@ -94,7 +94,6 @@ wasm_vs() {   # LOBBY LP CHALLENGER CP
   stop_and_wait "· $lobby \\(wasm\\) vs you|· $chal,$lobby \\(wasm\\)"
   dispatch "{\"mode\":\"fight\",\"bot\":\"wasm\",\"opponent\":\"you\",\"name\":\"$lobby\",\"hours\":\"$HOURS\",\"profile\":\"$lp\",\"server\":\"$SERVER\"}"
   echo "pair: $lobby ($lp) queued (sits in the lobby)"
-  sleep "${PA_LOBBY_WAIT:-2}"
   dispatch "{\"mode\":\"fight\",\"bot\":\"wasm\",\"opponent\":\"challenge\",\"name\":\"$chal,$lobby\",\"hours\":\"$HOURS\",\"profile\":\"$cp\",\"server\":\"$SERVER\"}"
   echo "pair: $chal ($cp) queued (challenges $lobby)"
 }

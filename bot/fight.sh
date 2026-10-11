@@ -52,12 +52,16 @@ OPP=${6:-you}; OPP_NAME=${7:-}
 case "$NAME" in *,*) OPP_NAME=${OPP_NAME:-${NAME#*,}}; NAME=${NAME%%,*};; esac
 OPP_NAME=${OPP_NAME:-${NAME}2}
 [ "$OPP" = you ] && OPP=""
+# OPP=challenge: the other side runs in ANOTHER run (its own runner, its own CPUs), sitting in the lobby as
+# OPP_NAME (the second half of NAME, "A,B"). This run's bot challenges it there instead of launching it here.
+REMOTE=0
+if [ "$OPP" = challenge ]; then REMOTE=1; OPP=""; fi
 
 kinds="bitbot bitbotwasm wasm beverly plamp heuristic"
 known() { case " $kinds " in *" $1 "*) return 0;; esac; return 1; }
 known "$BOT" || { echo "fight: no bot '$BOT' (one of: $kinds)"; exit 2; }
 [ -z "$OPP" ] || known "$OPP" || { echo "fight: no opponent '$OPP' (one of: $kinds, or you)"; exit 2; }
-for n in "$NAME" ${OPP:+"$OPP_NAME"}; do
+for n in "$NAME" ${OPP:+"$OPP_NAME"} $([ "$REMOTE" = 1 ] && echo "$OPP_NAME"); do
   [ ${#n} -le 16 ] || { echo "fight: name '$n' is ${#n} chars; the server limit is 16"; exit 2; }
   case "$n" in *[!A-Za-z0-9_]*) echo "fight: name '$n' may only have letters, digits and _"; exit 2;; esac
 done
@@ -87,6 +91,8 @@ build_bitbot() {
     || { cat bitbot-build.log; echo "fight: libbit.so did not build"; exit 1; }
 }
 preflight() {   # KIND NAME [PORT WAIT]
+  # Off unless FIGHT_PREFLIGHT=1: a bot goes straight to the lobby, where it can be seen playing.
+  [ "${FIGHT_PREFLIGHT:-0}" = 1 ] || { echo "fight: pre-flight skipped ($1 $2)"; return 0; }
   local kind=$1 name=$2
   PA_PREFLIGHT_BRAIN=$([ "$kind" = bitbot ] && echo bitbot) PA_SURVIVOR_PORT=${3:-} PA_SURVIVOR_WAIT=${4:-} \
     PA_PREFLIGHT_NAME="$kind ($name)" PA_PREFLIGHT_LATE_OK=$([ "$kind" = wasm ] && echo 1) \
@@ -158,6 +164,16 @@ start_bitbotwasm() {   # NAME PORT
 }
 trap 'kill ${PIDS:-} 2>/dev/null' EXIT
 if [ "$BOT" = bitbot ] || [ "$OPP" = bitbot ]; then build_bitbot; fi
+# NAME=BitBotCheck: no lobby. BitBot alone, offline, told an opponent is present, on four boards:
+# the hookup with no network, no BotClient and no other bot in it.
+if [ "$BOT" = bitbot ] && [ "$NAME" = BitBotCheck ]; then
+  for seed in 1 2 3 4; do
+    echo "=== board $seed"
+    PA_PREFLIGHT_OPPONENT=1 PA_PREFLIGHT_SEED=$seed PA_BITBOT_LOG_FRAMES=$([ "$seed" = 1 ] && echo 40 || echo 0) \
+      PA_PREFLIGHT_BRAIN=bitbot PA_PREFLIGHT_NAME="BitBotCheck" luajit bot/bitbot_preflight.lua 1800 2>&1 || true
+  done 2>&1 | tee "fight-$NAME.log"
+  exit 0
+fi
 case "$BOT" in bitbot) preflight bitbot "$NAME" ;; bitbotwasm) start_bitbotwasm "$NAME" "$BASE_PORT" ;; wasm) start_wasm "$NAME" "$BASE_PORT" ;; esac
 case "$OPP" in bitbot) preflight bitbot "$OPP_NAME" ;; bitbotwasm) start_bitbotwasm "$OPP_NAME" $((BASE_PORT + 1)) ;; wasm) start_wasm "$OPP_NAME" $((BASE_PORT + 1)) ;; esac
 
@@ -178,9 +194,10 @@ play() {
   esac
 }
 
+[ -z "${GC_EVAL_DIR:-}" ] || echo "fight: GameCreator at $(git -C "$GC_EVAL_DIR" log -1 --format='%h %cd -- %s' 2>/dev/null | cut -c1-150)"
 echo "fight: $NAME ($BOT) in the lobby on $HOST:$PORT${OPP:+, challenged by $OPP_NAME ($OPP)}, for ${SECS}s"
 if [ -z "$OPP" ]; then
-  play "$BOT" "$NAME" 2>&1 | tee "fight-$NAME.log"
+  play "$BOT" "$NAME" "$([ "$REMOTE" = 1 ] && echo "$OPP_NAME")" 2>&1 | tee "fight-$NAME.log"
   rc=${PIPESTATUS[0]}
 else
   play "$BOT" "$NAME" > "fight-$NAME.log" 2>&1 &

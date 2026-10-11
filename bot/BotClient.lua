@@ -470,7 +470,7 @@ function BotClient:startMatch()
     -- hooked up as GameCreator's lua/train.lua hooks it (bot/BitBotNative.lua).
     -- It answers each frame through the same calls as the survival link.
     self.survival = self.survival or require("bot.BitBotNative").new({})
-    self.survival:startMatch(self.myStack)
+    self.survival:startMatch(self.myStack, self.match)
   elseif self.brainKind == "survival" then
     -- WasmSurvivor: the survival bot, a separate process (GameCreator's
     -- survivor.js) that plans on this engine's rules and says what to press

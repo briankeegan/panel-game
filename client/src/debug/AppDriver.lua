@@ -26,6 +26,9 @@
 --      scene               report the current scene name to the out file
 --      where               report the focused menu item (see above)
 --      run <MACRO>         expand a named macro (TO_MENU / VS_SELF / REPLAYS ...)
+--      challengeloop       Challenge Mode stage after stage: Ready on the
+--                          character select, Return after each game over,
+--                          quit on the recap; each stage's result is reported
 --      leave               leaveRoom but stay connected (back out of a match)
 --      quit                gracefully leave room -> disconnect -> exit (so the
 --                          server frees the room; not an abrupt process kill)
@@ -46,6 +49,10 @@
 --      where               # -> e.g. `where: 4/9 "Create FFA" in Lobby`
 --      tap down            # adjust until `where` shows the target, then:
 --      tap return
+--
+--    PA_SURVIVOR=1: the local player's stack is played by a bot instead of the
+--    keyboard: PA_BOT=wasm (survivor.js on PA_SURVIVOR_PORT, the default) or
+--    bitbot (BitBot in this process, GC_EVAL_DIR).
 --
 -- B) SCRIPTED (PA_AUTO_REPLAY / PA_AUTO_ONLINE_ROOM) — one-and-forget journeys.
 --    From boot it walks the scenes: Main Menu -> Replay Browser -> open the target
@@ -132,6 +139,7 @@ function AppDriver.init()
       clicks = buildClicks(os.getenv("PA_AUTO_INPUT"), tonumber(os.getenv("PA_AUTO_INPUT_HOLD"))), clickIdx = 1,
       trace = os.getenv("PA_AUTO_TRACE") ~= nil, traceEvery = tonumber(os.getenv("PA_AUTO_TRACE")) or 15, traceSeq = 0,
       frame = 0, cooldown = 0, releaseKey = nil,
+      survivor = os.getenv("PA_SURVIVOR") == "1",
     }
     local w = io.open(cmdFile, "w"); if w then w:close() end -- start from an empty queue
     if st.outFile then local o = io.open(st.outFile, "w"); if o then o:close() end end
@@ -414,6 +422,106 @@ local function screenHasText(needle)
   end
 end
 
+-- A BOT AS THE PLAYER (PA_SURVIVOR=1): the local player's stack takes its
+-- input from a bot instead of the keyboard -- one byte a frame, asked with the
+-- board as that frame starts. PA_BOT picks it: "wasm" (the default),
+-- GameCreator's WasmSurvivor (survivor.js on PA_SURVIVOR_PORT, through
+-- bot/SurvivalLink.lua), or "bitbot", GameCreator's BitBot in this process
+-- (bot/BitBotNative.lua, GC_EVAL_DIR). Each stack gets a bot of its own.
+local function newBot()
+  if os.getenv("PA_BOT") == "bitbot" then return require("bot.BitBotNative").new({}) end
+  return require("bot.SurvivalLink").new({})
+end
+-- The thinking and input budgets the bot has used, over every match so far (the link of each
+-- match counted when it is replaced): frames over the ceiling, the worst frame, keys refused.
+local function budgetText()
+  local over, worst, dropped, frames = st.bOver or 0, st.bWorst or 0, st.bDropped or 0, st.bFrames or 0
+  local link = st.survivorLink
+  if link and link.budget then
+    pcall(function()
+      local o, w, d = link:budget()
+      over, dropped, frames = over + o, dropped + d, frames + (link.frames or 0)
+      if w > worst then worst = w end
+    end)
+  end
+  return string.format("thinkOver=%d thinkWorstMs=%.1f inputDropped=%d botFrames=%d", over, worst * 1000, dropped, frames)
+end
+local function feedSurvivor()
+  local ps = GAME.localPlayer and GAME.localPlayer.stack
+  local e = ps and ps.engine
+  if not (e and e.receiveConfirmedInput) or st.survivorStack == e then return end
+  if st.survivorLink then pcall(function() if st.survivorLink.budget then local o, w, d = st.survivorLink:budget(); st.bOver = (st.bOver or 0) + o; st.bWorst = math.max(st.bWorst or 0, w); st.bDropped = (st.bDropped or 0) + d; st.bFrames = (st.bFrames or 0) + (st.survivorLink.frames or 0) end end) end
+  if st.survivorLink then pcall(function() st.survivorLink:endMatch(); if st.survivorLink.sock then st.survivorLink.sock:close() end end) end
+  local bot = newBot()
+  bot:startMatch(e)
+  st.survivorLink, st.survivorStack = bot, e
+  -- The client asks the stack for its input once for every engine frame it
+  -- runs (ClientMatch -> send_controls), as it asks the keyboard; the bot
+  -- answers that call, so its board runs frame for frame with the others.
+  ps.send_controls = function(self)
+    if self.engine.game_over_clock and self.engine.game_over_clock > 0 then return end
+    local m = GAME.battleRoom and GAME.battleRoom.match and GAME.battleRoom.match.engine
+    local sources = m and m.garbageSources and m.garbageSources[self.engine] or {}
+    self.engine:receiveConfirmedInput(bot:input(self.engine, sources))
+  end
+end
+
+-- CHALLENGE MODE, STAGE AFTER STAGE (`challengeloop`): on the character select
+-- it presses Ready, on a finished game it presses Return once the game-over
+-- screen has shown, and on the recap it reports and quits. Every stage's
+-- result is reported as it is recorded.
+-- PA_CHALLENGE_STAGE=N starts on stage N (the game's own setStage, as a
+-- stage picked from the menu would); with PA_CHALLENGE_REPEAT=K it plays that
+-- stage K times, won or lost, then quits.
+local function hookChallenge()
+  local br = GAME.battleRoom
+  if not br or not br.recordStageResult or br._autoHooked then return end
+  br._autoHooked = true
+  local only = tonumber(os.getenv("PA_CHALLENGE_STAGE") or "")
+  local times = tonumber(os.getenv("PA_CHALLENGE_REPEAT") or "")
+  if only then br:setStage(only); writeOut("stage set to " .. only) end
+  local played = 0
+  local record = br.recordStageResult
+  br.recordStageResult = function(self, winners, gameLength)
+    local stage = self.stageIndex
+    record(self, winners, gameLength)
+    if only and times then
+      played = played + 1
+      self:setStage(only)
+      if played >= times then
+        writeOut(string.format("stage %d %s frames=%d attempt=%d", stage, #winners == 1 and winners[1] == self.player and "lost" or "won", gameLength or 0, played))
+        writeOut("challenge over: " .. played .. " attempts"); st.challenge = nil; st.quitting = { frames = 30 }
+        return
+      end
+    end
+    local result = #winners == 2 and "tie" or (#winners == 1 and winners[1] == self.player and "lost" or (#winners == 1 and "won" or "aborted"))
+    -- the game's own speed: frames played over the wall-clock seconds the game scene was up
+    local secs = st.challenge and st.challenge.gameT0 and (love.timer.getTime() - st.challenge.gameT0) or 0
+    writeOut(string.format("stage %d %s frames=%d continues=%d next=%d complete=%s fps=%.1f", stage, result, gameLength or 0, self.continues, self.stageIndex, tostring(self.challengeComplete), secs > 0 and (gameLength or 0) / secs or 0))
+    doShoot(string.format("stage%02d_%s_c%d", stage, result, self.continues))
+    local cap = tonumber(os.getenv("PA_CHALLENGE_CONTINUES") or "")
+    if cap and not times and self.continues > cap then writeOut("challenge stopped: " .. self.continues .. " continues " .. budgetText()); st.challenge = nil; st.quitting = { frames = 30 } end
+  end
+end
+local function tickChallenge()
+  local n, s = sceneName(), scene()
+  hookChallenge()
+  if n == "Game1pChallenge" and not st.challenge.inGame then st.challenge.inGame = true; st.challenge.gameT0 = love.timer.getTime()
+  elseif n ~= "Game1pChallenge" then st.challenge.inGame = false end
+  st.challenge.wait = (st.challenge.wait or 0) - 1
+  if st.challenge.wait > 0 then return end
+  if n == "CharacterSelectChallenge" and GAME.localPlayer and not GAME.localPlayer.settings.wantsReady then
+    local btn = s and s.uiRoot and findClickable(s.uiRoot, loc("ready"), 0)
+    if btn then pcall(function() btn:onClick() end); writeOut("ready") end
+    st.challenge.wait = 120
+  elseif n == "Game1pChallenge" and s and s.gameOverStartTime and love.timer.getTime() - s.gameOverStartTime > 3 then
+    tap("return"); st.challenge.wait = 120
+  elseif n == "ChallengeModeRecapScene" then
+    writeOut("challenge over " .. budgetText()); doShoot("hurricane_recap"); st.challenge = nil
+    st.quitting = { frames = 30 }
+  end
+end
+
 local function execCommand(c)
   local op, args, rest = c.op, c.args, c.rest
   if op == "tap" or op == "key" then tap(args[1]); st.busy = st.tapGap
@@ -432,6 +540,7 @@ local function execCommand(c)
   elseif op == "texts" then
     writeOut("texts[" .. tostring(sceneName()) .. "]: " .. table.concat(sceneTexts(), " | "))
   elseif op == "wait" then st.busy = tonumber(args[1]) or 30
+  elseif op == "challengeloop" then st.challenge = {}; writeOut("challengeloop on")
   elseif op == "scene" then writeOut("scene=" .. tostring(sceneName()))
   elseif op == "click" then
     local s = scene()
@@ -533,6 +642,7 @@ end
 -- advance the current blocking op (hold/menusel/waitscene/idle) or run the next.
 local function tickInteractive()
   if st.clicks then feedClicks() end
+  if st.survivor then feedSurvivor() end
   -- Graceful shutdown in progress: wait for the leaveRoom to flush, then
   -- disconnect cleanly and exit.
   if st.quitting then
@@ -558,6 +668,7 @@ local function tickInteractive()
     if st.hold.frames <= 0 then inputManager:keyReleased(st.hold.key); st.hold = nil end
     return
   end
+  if st.challenge and not st.menusel and #st.q == 0 then tickChallenge() end
   if st.menusel then stepMenusel(); return end
   if st.waitScene then
     st.waitScene.timeout = st.waitScene.timeout - 1

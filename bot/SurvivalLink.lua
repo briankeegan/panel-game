@@ -109,13 +109,14 @@ local function putScalars(t)
   put("}")
 end
 -- a list of garbage blocks; an empty list is the empty object, as `enc` writes it
-local function putGarbage(q)
+local function putGarbage(q, from, to)
   local n = q and #q or 0
-  if n == 0 then put("{}") return end
+  from, to = from or 1, to or n
+  if n == 0 or from > to then put("{}") return end
   put("[")
-  for i = 1, n do
+  for i = from, to do
     local g = q[i]
-    if i > 1 then put(",") end
+    if i > from then put(",") end
     put('{"width":') putScalar(g.width)
     put(',"height":') putScalar(g.height)
     put(',"isMetal":') putScalar(g.isMetal or false)
@@ -129,6 +130,12 @@ end
 -- The garbage each source has sent and not yet delivered: what its
 -- telegraph shows (staged, oldest last) and what has left it (transit, by
 -- the stopWatch it lands on). Its colours are not in it.
+--
+-- Only the garbage due soonest is sent: a source's transit in the order it lands, then its staged from the end of
+-- the list (the end ships first), up to SOURCE_PIECES in all. The survival bot's search takes the 64 soonest of
+-- everything on its way, so a queue of hundreds costs a board tens of kilobytes to encode, send and read every
+-- frame for pieces nothing looks at; the margin past 64 keeps the garbage that enters the 64 from arriving unforeseen.
+local SOURCE_PIECES = 160
 local function putTelegraph(sources)
   if not sources or #sources == 0 then put("{}") return end
   put("[")
@@ -137,22 +144,30 @@ local function putTelegraph(sources)
     if i > 1 then put(",") end
     put("{")
     if src.stopWatch ~= nil then put('"stopWatch":') putScalar(src.stopWatch) put(",") end
-    put('"staged":') putGarbage(q and q.stagedGarbage)
-    put(',"transit":')
-    local any = false
+    -- the transit comes first in the order it lands: whole entries until SOURCE_PIECES are in
+    local sent, staged = 0, q and q.stagedGarbage
+    local transit = {}
     if q and q.transitTimers then
       for k = q.transitTimers.first, q.transitTimers.last do
         local t = q.transitTimers[k]
-        if t then
-          put(any and "," or "[")
-          any = true
-          put('{"at":') putScalar(t)
-          put(',"garbage":') putGarbage(q.garbageInTransit[t])
-          put("}")
+        if t and sent < SOURCE_PIECES then
+          transit[#transit + 1] = t
+          sent = sent + #(q.garbageInTransit[t] or {})
         end
       end
     end
-    put(any and "]" or "{}")
+    -- then the staged that ship first, the last of the list
+    local stagedCount = staged and #staged or 0
+    local keep = math.max(0, math.min(stagedCount, SOURCE_PIECES - sent))
+    put('"staged":') putGarbage(staged, stagedCount - keep + 1, stagedCount)
+    put(',"transit":')
+    for n, t in ipairs(transit) do
+      put(n > 1 and "," or "[")
+      put('{"at":') putScalar(t)
+      put(',"garbage":') putGarbage(q.garbageInTransit[t])
+      put("}")
+    end
+    put(#transit > 0 and "]" or "{}")
     put("}")
   end
   put("]")

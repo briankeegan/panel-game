@@ -72,18 +72,29 @@ end
 -- The garbage each source has sent and not yet delivered: what its
 -- telegraph shows (staged, oldest last) and what has left it (transit, by
 -- the stopWatch it lands on). Its colours are not in it.
+-- Only the garbage due soonest goes: a source's transit in landing order, whole entries, then its staged from the
+-- end of the list, the first SOURCE_PIECES pieces in all.
+local SOURCE_PIECES = 160
 local function telegraph(sources)
   local out = {}
   for i, src in ipairs(sources or {}) do
     local q = src.outgoingGarbage
-    local transit = {}
+    local transit, pieces = {}, 0
     if q and q.transitTimers then
       for k = q.transitTimers.first, q.transitTimers.last do
         local t = q.transitTimers[k]
-        if t then transit[#transit + 1] = { at = t, garbage = garbageList(q.garbageInTransit[t] or {}) } end
+        if t then
+          local list = q.garbageInTransit[t] or {}
+          if pieces < SOURCE_PIECES then transit[#transit + 1] = { at = t, garbage = garbageList(list) } end
+          pieces = pieces + #list
+        end
       end
     end
-    out[i] = { stopWatch = src.stopWatch, staged = garbageList(q and q.stagedGarbage or {}), transit = transit }
+    local staged = q and q.stagedGarbage or {}
+    local room = math.max(0, SOURCE_PIECES - pieces)
+    local kept = {}
+    for j = math.max(1, #staged - room + 1), #staged do kept[#kept + 1] = staged[j] end
+    out[i] = { stopWatch = src.stopWatch, staged = garbageList(kept), transit = transit }
   end
   return out
 end

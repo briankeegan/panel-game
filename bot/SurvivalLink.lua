@@ -302,9 +302,10 @@ function SurvivalLink.warm()
   collectgarbage()
 end
 
--- A frame is held to this share of the thinking ceiling: what the system's own
--- pauses take from a frame comes out of the rest.
-SurvivalLink.TARGET_SHARE = 0.35
+-- A frame is held to this share of the thinking ceiling, counted from the start of its
+-- board's encoding: the sidecar's thread can wait two to three milliseconds for a core
+-- before it reads the line, and the rest of the ceiling is for what the system's pauses take.
+SurvivalLink.TARGET_SHARE = 0.5
 function SurvivalLink.new(opts)
   opts = opts or {}
   local self = setmetatable({}, SurvivalLink)

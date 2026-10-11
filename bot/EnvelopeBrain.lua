@@ -166,30 +166,42 @@ end
 -- extractByMeta(filter, rankFn) -> ordered kinds: every cache kind whose meta passes filter(meta, kind), sorted ASC by
 -- rankFn(kind, meta), with plain COMBO_3 force-appended LAST (policy). THE selection primitive -- filter can be static
 -- (OFFENSE/DANGER below) or situational (e.g. "garbage that breaks the incoming") computed per-decision.
-local function extractByMeta(filter, rankFn)
+local function extractByMeta(filter, rankFn, includeC3)
   local cache = require("bot.chipCache")
   local seen, rows, hasC3 = {}, {}, false
   for _, c in ipairs(cache) do
-    if not isExcluded(c.kind) and not seen[c.kind] and filter(c.meta, c.kind) then
+    -- COMBO_3 handling (2026-07-03, root-caused by bot/tests/popNowVerify.lua): the old code checked
+    -- `c.kind == "COMBO_3"` AFTER the isExcluded gate, which excludes COMBO_3 -- so the documented "pinned
+    -- dead-last in every state" was dead code and OFFENSE/DANGER never contained a plain 3-clear. Making it
+    -- reachable everywhere was then MEASURED WORSE on the 10-seed 6x12 sweep (median 22.0s -> 17.4s: the bot
+    -- mines its own break material with cheap 3s), so the exclusion stands for OFFENSE/DANGER and the append
+    -- is now an EXPLICIT opt-in (includeC3) for the callers whose semantics genuinely need a bare 3-clear:
+    -- POP-NOW ("any immediate pop beats a still frame at stop 0") -- without it that guard can never fire.
+    if c.kind == "COMBO_3" then hasC3 = hasC3 or (includeC3 and filter(c.meta, c.kind) or false)
+    elseif not isExcluded(c.kind) and not seen[c.kind] and filter(c.meta, c.kind) then
       seen[c.kind] = true
-      if c.kind == "COMBO_3" then hasC3 = true                  -- policy: plain 3-clear is the LAST RESORT in EVERY state
-      else rows[#rows + 1] = { kind = c.kind, r = rankFn(c.kind, c.meta) } end
+      rows[#rows + 1] = { kind = c.kind, r = rankFn(c.kind, c.meta) }
     end
   end
   table.sort(rows, function(a, b) if a.r ~= b.r then return a.r < b.r end return a.kind < b.kind end)
   local kinds = {}; for _, r in ipairs(rows) do kinds[#kinds + 1] = r.kind end
-  if hasC3 then kinds[#kinds + 1] = "COMBO_3" end               -- appended dead-last, after everything, in all states
+  if hasC3 then kinds[#kinds + 1] = "COMBO_3" end               -- appended dead-last, only when includeC3 opted in
   return kinds
 end
 local ANY = function() return true end
 -- OFFENSE: build biggest (ready-first, then size/depth). DANGER: the SAME set so it never goes empty, but READY
--- single-swap clears FIRST -- clear NOW; setups/chains fall back only when no ready clear exists. COMBO_3 is pinned
--- dead-last in BOTH by extractByMeta.
+-- single-swap clears FIRST -- clear NOW; setups/chains fall back only when no ready clear exists. NEITHER contains
+-- plain COMBO_3 (measured: allowing it mined break material, 10-seed median 22.0s -> 17.4s); POP-NOW opts in below.
 local OFFENSE_PRIORITIES = extractByMeta(ANY, rankKind)
-local DANGER_PRIORITIES = extractByMeta(ANY, function(kind, meta)
+local dangerRank = function(kind, meta)
   local notReady = (meta and (meta.swaps or 1) == 1 and (meta.chain or 0) == 0) and 0 or 1
   return notReady * 1000000 + rankKind(kind, meta)
-end)
+end
+local DANGER_PRIORITIES = extractByMeta(ANY, dangerRank)
+-- POP-NOW list: ready clears first AND the bare COMBO_3 available dead-last. Used ONLY by the sealed branch's
+-- POP-NOW guard, where ANY immediate pop beats a still frame at stop_time 0 -- without COMBO_3 here the guard
+-- could literally never fire on the boards it exists for (bot/tests/popNowVerify.lua).
+local POPNOW_PRIORITIES = extractByMeta(ANY, dangerRank, true)
 -- CATCH priorities: the catch CREDITS a freed-panel-completed 3+ (incl COMBO_3) as a CHAIN -- the panel falls from the
 -- breaking garbage onto a lined-up pair (Brian: "3+ is great, horizontal too"). So unlike OFFENSE/DANGER (which forbid the
 -- cheap STANDALONE 3-clear), the catch list KEEPS COMBO_3 -- appended last so a bigger combo/chain still wins when the drop
@@ -244,7 +256,15 @@ end
 
 function EnvelopeBrain:tryCatch(grid, rows, stack, priorities, verify, touchable)
   local open = garbageReveal.openColumns(stack)
-  for c = BoardSim.WIDTH, 1, -1 do
+  -- serve order: committed column first (PA_CATCHSTICK, see knob comment), then 6->1 as always. The commit is
+  -- set below whenever a column yields an action, and dropped when its column closes or the window ends.
+  local order = {}
+  local committed = EnvelopeBrain.CATCH_STICK and self._catchCol or nil
+  if committed and not open[committed] then committed = nil; self._catchCol = nil end
+  if committed then order[#order + 1] = committed end
+  for cc = BoardSim.WIDTH, 1, -1 do if cc ~= committed then order[#order + 1] = cc end end
+  if next(open) == nil then self._catchCol = nil end
+  for _, c in ipairs(order) do
     local color = open[c]
     if color then
       local reserved = reservedCellsFrom(grid, rows, open, c)
@@ -279,10 +299,12 @@ function EnvelopeBrain:tryCatch(grid, rows, stack, priorities, verify, touchable
       end
       if cat and cat.kind ~= "TOPOFF" then
         if os.getenv("PA_CATCHDIAG") then print(string.format("  CATCHDIAG col=%d color=%d CATALOG kind=%s", c, color, cat.kind)) end
+        self._catchCol = c
         return { swaps = cat.swaps, kind = "CATCH_" .. cat.kind }
       end       -- catalog combo/chain
       if cat and cat.kind == "TOPOFF" and cat.swap then
         if os.getenv("PA_CATCHDIAG") then print(string.format("  CATCHDIAG col=%d color=%d TOPOFF swap=(%d,%d)", c, color, cat.swap[1], cat.swap[2])) end
+        self._catchCol = c
         return { swaps = { cat.swap }, kind = "CATCH_TOPOFF" }
       end -- 1-swap floor
       if cat and cat.kind == "TOPOFF" and cat.already then
@@ -292,23 +314,168 @@ function EnvelopeBrain:tryCatch(grid, rows, stack, priorities, verify, touchable
         -- disturb the very pair just finished (traced: 4 slides built a matching pair at col5, it broke again 1
         -- decision later once nothing signaled "hold, don't touch this column"). ready=true holds without disturbing it.
         if os.getenv("PA_CATCHDIAG") then print(string.format("  CATCHDIAG col=%d color=%d ALREADY-READY (holding)", c, color)) end
+        self._catchCol = c
         return { ready = true, col = c }
       end
       if not os.getenv("PA_NOSLIDE") then
         local slide = catchPrimitive.catchSlide(grid, rows, c, color, guarded)  -- horizontal-slide: no height requirement, monotonic convergence
         if slide then
           if os.getenv("PA_CATCHDIAG") then print(string.format("  CATCHDIAG col=%d color=%d SLIDE swap=(%d,%d)", c, color, slide[1], slide[2])) end
+          self._catchCol = c
           return { swaps = { slide }, kind = "CATCH_SLIDE" }
         end
       end
       local route = (not os.getenv("PA_NOROUTE")) and catchPrimitive.catchRoute(grid, rows, c, color, guarded) or nil  -- multi-swap stack; PA_NOROUTE isolates whether ONLY this disruptive path hurts vs the 1-swap topoff
       if route then
         if os.getenv("PA_CATCHDIAG") then print(string.format("  CATCHDIAG col=%d color=%d ROUTE swap=(%d,%d)", c, color, route[1], route[2])) end
+        self._catchCol = c
         return { swaps = { route }, kind = "CATCH_ROUTE" }
       end
     end
   end
   return nil
+end
+
+-- LULL SHIELD (pure; extracted 2026-07-03 so bot/tests/lullShieldVerify.lua can prove it in isolation): copy
+-- `touchable` with every intact top PAIR (X at t,t-1), that pair's one cocked-trigger cell (t-2, c+-1, first
+-- match wins), AND the pair column's SUPPORT cells (rows 1..t-2 of the same column) masked NO-GO. Used by the
+-- LULL branch only -- clear/plan/flatten must not mine the staged break material (measured: without it 9/10
+-- seeds hit the first landing with cocked=0); staging mechanics keep the plain mask. Shielding the
+-- sealed/breaking dig clears was measured 2s WORSE, so this never runs there.
+-- SUPPORT-CELL SHIELD (2026-07-03, KNOB -- default OFF, PA_LULLSUPPORT=1 or the module flag to enable): the
+-- cell-level shield leaves a hole -- lull PLANs legally clear panels UNDER a staged pair, riding the whole stage
+-- down by gravity (proven live in lullShieldVerify PIECE 2). Seed 1001's first-landing death is the endpoint:
+-- the lull delivered column heights 5,5,2,3,4,5 and an exhaustive whole-board search proves NO <=3-swap break
+-- existed at landing. Masking the CONTACT column's support (rows 1..t-2 where t == board maxT) fixes exactly
+-- that -- measured on dev seeds 1001-1010: zero-reveal seeds 4 -> 0, p10 11.5s -> 16.9s, mean 22.2 -> 25.7,
+-- broken median 72 -> 141. BUT the holdout window 2001-2010 REGRESSED (mean 24.4 -> 18.4; seeds 2006/2008 with
+-- healthy baseline lulls went to zero reveals), and every-pair scoping was worse still (holdout mean 16.9). Net
+-- 20-seed mean is negative, so the default stays OFF until the 2006-regression is root-caused -- the mechanism
+-- is proven, the interaction isn't understood. Modes (PA_LULLSUPPORT / LULL_SUPPORT_SHIELD): 0 = off (default,
+-- baseline byte-identical), 1 = always lock the contact stage, 2 = TRANSIT-ONLY (lock only while a big block is
+-- announced in transit, pendingBig >= 3 -- the early lull keeps full clear throughput, addressing the measured
+-- "masked lull clears less, board rides higher" failure of mode 1 on the holdout window; measured a NO-OP: the
+-- stage-sinking mining happens before the announcement), 3 = SOFT (2026-07-04): no hard support mask at all --
+-- lull CLEAR tries the support-locked mask first but FALLS BACK to the plain pair shield (throughput never
+-- lost), and lull PLAN scores stage-column sinking as a soft cost (PA_SINKW per dropped row, useChips.planMove
+-- opts) instead of forbidding it. Attacks mode 1's holdout regression (starved clears -> board rides higher)
+-- while keeping its dev win (stage survives to landing).
+-- MODE 3 IS THE DEFAULT (2026-07-04): first variant measured to win dev WITHOUT a holdout regression --
+-- dev median/mean 22.0/22.2 -> 25.5/26.9, holdout 20.5/24.4 -> 22.9/24.0, zero-reveal seeds 9/20 -> 7/20,
+-- broken median 72/69 -> 105/105 (10-seed 600/3600 hard 6x12, PA_MECH). sinkW swept {60,120,250}: a plateau
+-- (both windows within noise across the whole range), so the default weight is untuned-insensitive. PA_LULLSUPPORT=0
+-- recovers the old baseline exactly.
+EnvelopeBrain.LULL_SUPPORT_SHIELD = tonumber(os.getenv("PA_LULLSUPPORT")) or 3
+EnvelopeBrain.SINK_W = tonumber(os.getenv("PA_SINKW")) or 120  -- mode 3 soft cost per row a lull PLAN sinks the stage's contact column (a plain 3-clear's immediate reward is ~500: 120*3=360 loses to a real clear, wins ties). Swept {60,120,250}: flat plateau
+-- PER-COLUMN MATERIAL FLOOR (2026-07-04, handoff candidate c -- default-OFF knob pending sweeps): lull PLANs
+-- pay PA_FLOORW per row any column of the candidate board sits below PA_LULLFLOOR rows. The avgH>=3 lull gates
+-- can't see two hollow columns behind a fine average (seed-1001 landed on 5,5,2,3,4,5 with NO <=3-swap break;
+-- zero-reveal seeds 1006/2001/2003/2010 all show the hollow/jagged injection posture under mode 3). Absolute
+-- (not delta) so refilling a hollow column is rewarded, not just hollowing discouraged. Lull PLAN only -- the
+-- dig branch MUST mine under the block.
+EnvelopeBrain.LULL_FLOOR = tonumber(os.getenv("PA_LULLFLOOR")) or 0
+EnvelopeBrain.FLOOR_W = tonumber(os.getenv("PA_FLOORW")) or 120
+-- CLEAR-side floor PREFERENCE (2026-07-04, default-OFF knob): the PLAN-side floor above was measured a NO-GO
+-- (floor=2 byte-identical no-op, floor=3 regressed BOTH windows -- taxing every clear near short columns
+-- starves lull throughput exactly like the mode-1 hard mask did). But the hollow-column mining is mostly CLEAR
+-- chips, and mode 3's win came from the CLEAR try-order trick: PREFER a clear that avoids the protected cells,
+-- fall back to any clear -- zero throughput cost. PA_FLOORCLEAR=N masks all cells of columns at height <= N in
+-- the lull CLEAR's FIRST attempt only; the fallback chain (stage-locked mask, then plain pair shield) is
+-- unchanged behind it.
+EnvelopeBrain.LULL_FLOOR_CLEAR = tonumber(os.getenv("PA_FLOORCLEAR")) or 0
+-- TRANSIT HOLD (2026-07-04, from the PA_HOLLOW provenance trace -- default-OFF knob): seed 1006's fatal
+-- hollowing (c4 4 -> 1, tops 7,7,6,1,3,3 at injection) is a lull PLAN at f580-594, INSIDE the ~120-frame
+-- transit window before the f600 landing. The lull PLAN passes keepMaterial=false, so 20 frames before a
+-- block lands the planner still takes full immediate-clear rewards and strip-mines for them. planMove already
+-- HAS the hold-material mode (keepMaterial -> immScale 0.15, built for garbage-imminent boards); mode 1 gates it
+-- on pendingBig >= 3, i.e. exactly while a tall block is announced.
+-- Mode 1 MEASURED (2026-07-04): byte-identical NO-OP on both windows, and the trace says why -- the harness's
+-- blocks land ~40-50f after announcement and the fatal mining (f580-594 on seed 1006) is BEFORE the f600
+-- announcement, so there is structurally no lull-decision window with pendingBig >= 3 before a first landing
+-- (this also fully explains the mode-2 shield no-op). The bot can't see an unannounced block -- but it KNOWS
+-- volleys recur (self._bigGarbageGame is sticky). Mode 2: keepMaterial unconditionally in the lull PLAN of a
+-- big-garbage game -- immediate-clear rewards scaled 0.15x ALL lull long; eval still steers, ready CLEAR chips
+-- are untouched, only the planner's appetite for strip-mining clears changes.
+EnvelopeBrain.TRANSIT_HOLD = tonumber(os.getenv("PA_TRANSITHOLD")) or 0
+-- CATCH STICKINESS (2026-07-04, from a PA_TRACE/PA_CATCHDIAG anatomy of holdout seed 2002 -- default-OFF knob):
+-- tryCatch re-serves open columns 6->1 EVERY decision, so with 2+ open columns two donor walks run INTERLEAVED
+-- in the same surface row (traced: col2 walking a 3 leftward via slides (1,5),(1,4) while col4 walks a 2
+-- rightward via (1,1),(1,2),(1,3)) -- each row-1 swap displaces the other walk's donor, and at ~30 frames per
+-- slide neither converges inside the ~110-frame reveal window (seed 2002: reveals=1 catchDone=0, died 20.6s).
+-- Same thrash class breakRoute had before it learned to commit to ONE target. PA_CATCHSTICK=1: once a column
+-- yields an actionable catch, SERVE IT FIRST on subsequent decisions of the same window; other columns are
+-- fallbacks only when the committed column yields nothing. Commit clears when the window ends (no open columns).
+-- DEFAULT ON (2026-07-04, paired sweeps): holdout median/mean 22.9/24.0 -> 23.7/25.2 with seeds 2005 +7.2s and
+-- 2007 +7.5s (2007's catch now completes, 0 -> 1) and window catch-completion 54% -> 60%; dev flat (median
+-- 25.5 -> 25.6, 7 seeds byte-identical, one seed -9.9s traced to healthy downstream divergence -- its catches
+-- converge slides -> TOPOFF -> READY and complete 2/3). PA_CATCHSTICK=0 restores the re-serve-every-frame order.
+EnvelopeBrain.CATCH_STICK = (os.getenv("PA_CATCHSTICK") or "1") == "1"
+-- pure (unit-tested in lullShieldVerify PIECE 6): copy `base`, additionally mask every cell of each column
+-- whose top is 1..floor. Empty columns stay as-is (nothing there to mine; filling them must stay legal in the
+-- masks that allow it).
+function EnvelopeBrain.floorMask(grid, rows, base, floor)
+  local out = {}
+  for r = 1, rows do
+    local src, dst = base[r], {}
+    for c = 1, 6 do dst[c] = (src and src[c]) or false end
+    out[r] = dst
+  end
+  for c = 1, 6 do
+    local h = 0
+    for r = rows, 1, -1 do local v = grid[r][c] or 0; if v ~= 0 then h = r; break end end
+    if h > 0 and h <= floor then for r = 1, h do out[r][c] = false end end
+  end
+  return out
+end
+function EnvelopeBrain.lullShield(grid, rows, touchable, lockStage)
+  -- direct callers (tests) omit lockStage: any non-zero mode means "exercise the support mask"; decide() passes
+  -- the mode-resolved value explicitly (mode 2 folds in the transit gate).
+  if lockStage == nil then lockStage = EnvelopeBrain.LULL_SUPPORT_SHIELD ~= 0 end
+  local stageCols = nil                                            -- 2nd return: contact columns whose support got locked (mode 3 reads these as SOFT-cost columns)
+  local shielded = {}
+  for r = 1, rows do
+    local src, dst = touchable[r], {}
+    for c = 1, 6 do dst[c] = (src and src[c]) or false end
+    shielded[r] = dst
+  end
+  local tops, maxT = {}, 0
+  for c = 1, 6 do
+    tops[c] = 0
+    for r = rows, 1, -1 do local v = grid[r][c] or 0; if v ~= 0 and v ~= BoardSim.GARBAGE then tops[c] = r; break end end
+    if tops[c] > maxT then maxT = tops[c] end
+  end
+  local second = 0
+  for c = 1, 6 do if tops[c] < maxT and tops[c] > second then second = tops[c] end end
+  if second == 0 then second = maxT end                            -- all columns tied
+  for c = 1, 6 do
+    local t = tops[c]
+    if t >= 2 then
+      local X = grid[t][c] or 0
+      if X ~= 0 and X ~= BoardSim.GARBAGE and (grid[t-1][c] or 0) == X then
+        -- SPREAD RELEASE (2026-07-03, root-caused on holdout seed 2006 with PA_LULLSUPPORT=1): pair mask +
+        -- support mask together make the contact column COMPLETELY untouchable, so the rise grows it into a
+        -- runaway tower (2006 died at first landing on heights 4,5,1,4,6,7 -- block resting on the lone c6 tip,
+        -- provably unbreakable; OFF-baseline survives 48.2s there because mining was the tower relief valve).
+        -- A stage 2+ rows above the rest can't brace a flat landing, so once the column is overheight RELEASE
+        -- it entirely -- flatten/plan may level it -- and re-stage after. Gated inside the knob: OFF-mode
+        -- behavior stays byte-identical to baseline.
+        local overheight = lockStage and t == maxT and (maxT - second) >= 2
+        if not overheight then
+          shielded[t][c] = false; shielded[t-1][c] = false
+          if t == maxT and lockStage then                          -- contact column: clearing under it sinks the stage the block lands on
+            for r = 1, t - 2 do shielded[r][c] = false end
+            stageCols = stageCols or {}; stageCols[c] = true
+          end
+          if t >= 3 then
+            for _, nb in ipairs({ c - 1, c + 1 }) do
+              if nb >= 1 and nb <= 6 and (grid[t-2][nb] or 0) == X then shielded[t-2][nb] = false; break end
+            end
+          end
+        end
+      end
+    end
+  end
+  return shielded, stageCols
 end
 
 function EnvelopeBrain:decide(state, stack, match)
@@ -373,8 +540,8 @@ function EnvelopeBrain:decide(state, stack, match)
     --    or flatten ONLY to ENABLE the break -- no raise/plan distractions. C) no garbage -> the height state decides.
     -- breaking and lowestGarbageRow are mutually exclusive situations, so exactly ONE branch runs each frame.
     local breaking = stack and garbageReveal.breakingRow(stack)
-    local function clearChip(req, allowC3, mask)
-      local o = { chipPriorities = priorities, searchPriorities = search, verify = verify, touchable = mask or touchable }
+    local function clearChip(req, allowC3, mask, prios, exactFallback)
+      local o = { chipPriorities = prios or priorities, searchPriorities = search, verify = verify, touchable = mask or touchable, exactFallback = exactFallback }
       if req then o.requireBreak = true end
       local chip = useChips.useChips(grid, rows, cursor, o)
       if chip and chip.kind == "COMBO_3" and not allowC3 then return nil end  -- plain 3-clear: only under pressure (clear freed rows / drop height); held in OFFENSE so it doesn't drain the material we raised
@@ -480,7 +647,9 @@ function EnvelopeBrain:decide(state, stack, match)
         -- flight). When no pops are active and the banked stop is thinner than one cursor trip, the next swap
         -- must ITSELF pop: take any immediate clear over the otherwise-preferred multi-swap setups.
         if (not busy) and (stack.stop_time or 0) <= 45 and (stack.shake_time or 0) == 0 then
-          local pop = clearChip(true, true) or clearChip(false, true)
+          -- exactFallback=true: at stop 0 ANY pop beats a still frame, including the pull-into-empty 1-swap clears
+          -- the catalog can't see (bot/useChips.lua exactOneSwap -- opt-in, engine-exact via simSwap).
+          local pop = clearChip(true, true, nil, POPNOW_PRIORITIES, true) or clearChip(false, true, nil, POPNOW_PRIORITIES, true)
           if pop then fireChip(pop, "CLEAR") end
         end
         if move then -- POP-NOW fired above
@@ -526,27 +695,15 @@ function EnvelopeBrain:decide(state, stack, match)
         -- cocked trigger cell) is off-limits to clear/plan/flatten here; staging mechanics see the plain mask.
         -- Measured: without this, staging was rebuilt and re-mined by PLAN/CLEAR all lull long and 9/10 seeds
         -- arrived at the first landing with cocked=0 (median 12.2s); with it, 6/10 arrive cocked (median 18.4s).
-        local shielded = {}
-        for r = 1, rows do
-          local src, dst = touchable[r], {}
-          for c = 1, 6 do dst[c] = (src and src[c]) or false end
-          shielded[r] = dst
-        end
-        for c = 1, 6 do
-          local t = 0
-          for r = rows, 1, -1 do local v = grid[r][c] or 0; if v ~= 0 and v ~= BoardSim.GARBAGE then t = r; break end end
-          if t >= 2 then
-            local X = grid[t][c] or 0
-            if X ~= 0 and X ~= BoardSim.GARBAGE and (grid[t-1][c] or 0) == X then
-              shielded[t][c] = false; shielded[t-1][c] = false
-              if t >= 3 then
-                for _, nb in ipairs({ c - 1, c + 1 }) do
-                  if nb >= 1 and nb <= 6 and (grid[t-2][nb] or 0) == X then shielded[t-2][nb] = false; break end
-                end
-              end
-            end
-          end
-        end
+        local lullMode = EnvelopeBrain.LULL_SUPPORT_SHIELD
+        local shielded = EnvelopeBrain.lullShield(grid, rows, touchable,
+          lullMode == 1 or (lullMode == 2 and pendingBig >= 3))
+        -- mode 3 SOFT: the pair shield above stays plain; a second, support-LOCKED mask is only the CLEAR
+        -- first-preference (fallback keeps throughput), and its stage columns become planMove's soft sink cost.
+        local hardShield, stageCols
+        if lullMode == 3 then hardShield, stageCols = EnvelopeBrain.lullShield(grid, rows, touchable, true) end
+        local floorPref = EnvelopeBrain.LULL_FLOOR_CLEAR > 0
+          and EnvelopeBrain.floorMask(grid, rows, hardShield or shielded, EnvelopeBrain.LULL_FLOOR_CLEAR) or nil
         -- REBUILD MATERIAL FIRST on a stripped board: a finished dig consumes the board (measured seed 1008: block 1
         -- fully broken, then the lull arrived at avgH 2.3 with two EMPTY columns and block 2 was unbreakable). RAISE
         -- is by far the fastest material source (a full 6-panel row per commit); waiting for it as the last resort
@@ -557,10 +714,19 @@ function EnvelopeBrain:decide(state, stack, match)
         else
         local ct = catchPrimitive.stageContact(grid, rows, touchable)
         if ct then fireSwap(ct, "BRACE_CONTACT")
-        else local cl = (height >= 5 and avgH >= 3) and clearChip(false, true, shielded) or nil  -- avgH floor: keep enough material for a contact trio (a stripped board can't break anything -- seed 1001 got mined to avgH 1.3, 0 breaks)
+        else local cl = (height >= 5 and avgH >= 3) and ((floorPref and clearChip(false, true, floorPref)) or (hardShield and clearChip(false, true, hardShield)) or clearChip(false, true, shielded)) or nil  -- avgH floor: keep enough material for a contact trio (a stripped board can't break anything -- seed 1001 got mined to avgH 1.3, 0 breaks). mode 3: prefer a clear that spares the stage support, fall back to any clear; PA_FLOORCLEAR adds a first preference that also spares short columns
           if cl then fireChip(cl, "CLEAR")
           else local mv, total, chain
-            if height >= 5 and avgH >= 3 then mv, total, chain = useChips.planMove(grid, rows, shielded, cursor, true, false) end
+            if height >= 5 and avgH >= 3 then
+              local softOpts = nil
+              if stageCols or EnvelopeBrain.LULL_FLOOR > 0 then
+                softOpts = { sinkCols = stageCols, sinkW = EnvelopeBrain.SINK_W,
+                             floorH = EnvelopeBrain.LULL_FLOOR, floorW = EnvelopeBrain.FLOOR_W }
+              end
+              local hold = (EnvelopeBrain.TRANSIT_HOLD == 1 and pendingBig >= 3)
+                or (EnvelopeBrain.TRANSIT_HOLD == 2 and self._bigGarbageGame == true)
+              mv, total, chain = useChips.planMove(grid, rows, shielded, cursor, true, hold, softOpts)
+            end
             if mv then firePlan(mv, total, chain)
             else local fl = catchPrimitive.flattenMove(grid, rows, shielded)
               if fl then fireSwap(fl, "FLATTEN")

@@ -59,13 +59,12 @@ function GameUpdater:writeLaunchConfig(version)
   love.filesystem.write(self.path .. "launch.json", launchJson)
 end
 
-function GameUpdater.getLatestInstalledVersion(releaseStream)
+---@param excludeVersion table? skip this exact version entry (used to find a fallback other than one that just failed to launch)
+function GameUpdater.getLatestInstalledVersion(releaseStream, excludeVersion)
   local latestVersion
   for _, version in pairs(releaseStream.installedVersions) do
-    if not latestVersion then
-      latestVersion = version
-    else
-      if version.version > latestVersion.version then
+    if version ~= excludeVersion then
+      if not latestVersion or version.version > latestVersion.version then
         latestVersion = version
       end
     end
@@ -260,18 +259,35 @@ local function launchWithVersion(version)
   love.load(arg)
 end
 
+-- A version downloaded by the background thread this same session can
+-- transiently fail to mount on the very next frame -- seen live on Android:
+-- the thread signals success and the main thread tries to mount moments
+-- later, but the write isn't yet guaranteed visible across that boundary.
+-- A few short retries covers that without masking a genuinely missing or
+-- corrupt file (which will still fail after all of them).
+local MOUNT_RETRY_ATTEMPTS = 5
+local MOUNT_RETRY_DELAY_SECONDS = 0.2
+
 function GameUpdater:launch(version)
   if self.downloadThreads[version] then
     error("Trying to launch a version that is still getting downloaded")
   end
-  if not love.filesystem.mount(version.path, '') then
-    error("Could not mount file " .. version.path)
-  else
-    self.activeVersion = version
-    self:writeLaunchConfig(version)
-    logger:log("Launching version " .. version.version .. " of releaseStream " .. version.releaseStream.name)
-    launchWithVersion(version)
+  local mounted = love.filesystem.mount(version.path, '')
+  if not mounted then
+    for attempt = 1, MOUNT_RETRY_ATTEMPTS do
+      logger:log("Mount of " .. version.path .. " failed, retrying (" .. attempt .. "/" .. MOUNT_RETRY_ATTEMPTS .. ")")
+      love.timer.sleep(MOUNT_RETRY_DELAY_SECONDS)
+      mounted = love.filesystem.mount(version.path, '')
+      if mounted then break end
+    end
   end
+  if not mounted then
+    error("Could not mount file " .. version.path)
+  end
+  self.activeVersion = version
+  self:writeLaunchConfig(version)
+  logger:log("Launching version " .. version.version .. " of releaseStream " .. version.releaseStream.name)
+  launchWithVersion(version)
 end
 
 -- tries to remove the specified version from disk

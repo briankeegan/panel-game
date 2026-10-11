@@ -72,7 +72,7 @@ local BotClient = class(function(self, opts)
   -- search FOUND, scoring the board a move leaves. Anything else that is not
   -- "random" gets EnvelopeBrain, the shape-catalog brain, which is what every
   -- name here used to mean -- brainKind was declared and then never read.
-  self.brainKind = opts.brain or "heuristic"   -- "heuristic"|"random"|"expert"|"search"|"weighted"
+  self.brainKind = opts.brain or "heuristic"   -- "heuristic"|"random"|"expert"|"search"|"weighted"|"survival"|"bitbot"
   self.searchProfile = opts.searchProfile       -- weight-set path for brain == "weighted" (bot/profiles/*.json)
   self.cursorSpeed = opts.cursorSpeed -- { cursorMoveInterval, reactionFrames } direct knobs; nil = full speed
   self.gameplay = TcpClient({ name = "bot-gameplay", defaultPort = self.port })
@@ -92,6 +92,10 @@ local BotClient = class(function(self, opts)
   -- levelData, which the opponent's character-select reads). Character/stage are
   -- random, like a default client.
   self.level = opts.level or 10 -- corpus + play target is L10
+  -- Ranked is a login setting like level and character, and the bot sets it
+  -- EXPLICITLY every time: at login and again on every ready. Off unless a
+  -- caller opts in -- a bot's games must never move anyone's rating.
+  self.ranked = opts.ranked == true
   local level = self.level
   self.playerStub = {
     hasLoaded = false,
@@ -102,7 +106,7 @@ local BotClient = class(function(self, opts)
       selectedCharacterId = consts.RANDOM_CHARACTER_SPECIAL_VALUE, characterId = nil,
       selectedStageId = consts.RANDOM_STAGE_SPECIAL_VALUE, stageId = nil,
       panelId = nil,
-      wantsReady = false, wantsRanked = false,
+      wantsReady = false, wantsRanked = self.ranked,
       inputMethod = "controller",
       endlessNoRaise = false,
     },
@@ -180,7 +184,7 @@ function BotClient:login()
       -- (ready_state_flash_root_cause); "__Random*" resolves to a bundled mod.
       consts.RANDOM_CHARACTER_SPECIAL_VALUE, nil, -- selected character (random), resolved
       consts.RANDOM_STAGE_SPECIAL_VALUE, nil,     -- selected stage (random), resolved
-      false,        -- ranked
+      self.ranked,  -- ranked (off by default; see the constructor)
       false)),       -- save replays publicly
     "login")
   if status ~= "received" then return false, "login " .. status end
@@ -279,8 +283,29 @@ function BotClient:dispatch(msg)
   -- relayed input "I" and other messages fall through (ignored for 3a).
 end
 
+-- DeathEvent is the one message that unblocks match-end on the server --
+-- without it the opponent stalls on the silent-death watchdog (or forever).
+-- tickMatch's send is a single attempt; if it doesn't fully clear the socket
+-- (TCP send-buffer stall), nothing else retries it once playBot.lua tears
+-- down self.match on the same tick matchEnded flips. Retry from pump()
+-- instead, which runs every loop tick independent of match/matchEnded state,
+-- until the queue actually drains or the connection is gone. Mirrors
+-- NetClient:_flushPendingDeathSends for a human client.
+function BotClient:_flushPendingDeath()
+  if not self._deathAwaitingFlush then return end
+  if not self.gameplay.socket then
+    self._deathAwaitingFlush = false -- connection is gone; nothing left to retry
+    return
+  end
+  self.gameplay:sendQueuedMessages()
+  if self.gameplay.outgoingMessageQueue:len() == 0 then
+    self._deathAwaitingFlush = false
+  end
+end
+
 -- Non-blocking: read the socket and drain all pushed messages into state.
 function BotClient:pump()
+  self:_flushPendingDeath()
   self.gameplay:processIncomingMessages()
   local q = self.gameplay.receivedMessageQueue
   local msg = q:pop()
@@ -340,8 +365,86 @@ function BotClient:sendReady()
   -- fields, no hand-rolled shape.
   self.playerStub.hasLoaded = true
   self.playerStub.settings.wantsReady = true
+  self.playerStub.settings.wantsRanked = self.ranked -- re-asserted on every ready, not just at login
   local menuState = ServerMessages.toServerMenuState(self.playerStub)
   self.gameplay:sendRequest(ClientProtocol.sendPlayerSettings(menuState))
+end
+
+-- A bot's stack is a bare engine Stack, not a client PlayerStack -- so
+-- unlike a human's game it has no .analytic and nothing ever calls
+-- register_move/register_swap/register_destroyed_panels/register_chain.
+-- DisplayEventCapture already ships whatever's on hostStack.analytic
+-- (BotClient passes the stack itself as hostStack), so a spectator's stats
+-- panel just read zeros the whole match even though real play was
+-- happening. Wire the same signals PlayerStack:init connects, calling the
+-- same AnalyticsInstance methods, so there's something real to ship.
+-- save_to_overall=false: a bot's numbers must never land in a runner's own
+-- lifetime stats file. Rollback replay isn't hooked up (PlayerStack also
+-- wires rollbackPerformed/rollbackSaved) -- a cosmetic spectator stat can
+-- afford to possibly overcount by a rollback's worth on resim; it's not
+-- used for anything that needs to be exact.
+function BotClient:_wireAnalytics(stack)
+  require("client.src.analytics") -- defines the global AnalyticsInstance
+  stack.analytic = AnalyticsInstance(false)
+  stack:connectSignal("matched", stack, function(_, engine, attackGfxOrigin, isChainLink, comboSize, metalCount, garbagePanelCount)
+    stack.analytic:register_destroyed_panels(comboSize)
+  end)
+  stack:connectSignal("cursorMoved", stack, function(_, previousRow, previousCol)
+    -- Mirrors PlayerStack:onCursorMoved's exact gate (common/engine/Stack.lua's
+    -- cursorMoved signal doesn't carry the engine, so read it off `stack`).
+    if (stack.cur_timer == 0 or stack.cur_timer == stack.cur_wait_time)
+        and (stack.cur_row ~= previousRow or stack.cur_col ~= previousCol)
+        and stack.cur_timer ~= stack.cur_wait_time then
+      stack.analytic:register_move()
+    end
+  end)
+  stack:connectSignal("panelsSwapped", stack, function()
+    stack.analytic:register_swap()
+  end)
+  stack.outgoingGarbage:connectSignal("chainEnded", stack, function(_, chainGarbage)
+    stack.analytic:register_chain(#chainGarbage.linkTimes + 1)
+  end)
+end
+
+-- Same gap as analytics, same cause: danger_col/danger_timer (the column
+-- bounce animation when a column gets dangerously tall) live on PlayerStack
+-- and are recomputed in PlayerStack:onRun -- a bot has no PlayerStack, so a
+-- spectated bot's columns never bounce even when genuinely in danger.
+-- DisplayEventCapture already reads hostStack.danger_col/danger_timer (it
+-- just finds nothing there for a bot); this is PlayerStack.updateDangerBounce
+-- verbatim, reading off `stack` directly since a bot's "self" IS the engine.
+function BotClient:_wireDangerBounce(stack)
+  stack.danger_col = { false, false, false, false, false, false }
+  stack.danger_timer = 0
+  stack:connectSignal("finishedRun", stack, function()
+    if not stack.behaviours.passiveRaise then return end
+
+    local danger = false
+    for column = 1, stack.width do
+      stack.danger_col[column] = false
+    end
+    for row = stack.height - 1, stack.height do
+      local panelRow = stack.panels[row]
+      if panelRow then
+        for idx = 1, stack.width do
+          if panelRow[idx]:dangerous() then
+            danger = true
+            stack.danger_col[idx] = true
+          end
+        end
+      end
+    end
+
+    if danger then
+      if stack.wasToppedOut and stack.speed ~= 0 then
+        stack.danger_timer = 0
+      elseif stack.stop_time == 0 then
+        stack.danger_timer = stack.danger_timer + 1
+      end
+    else
+      stack.danger_timer = 0
+    end
+  end)
 end
 
 -- Build the live engine match from the matchStart replay (same engine the
@@ -355,12 +458,26 @@ function BotClient:startMatch()
     error("bot[" .. self.name .. "]: no stack at slot " .. tostring(self.localPlayerNumber))
   end
   self.myStack.is_local = true
+  self:_wireAnalytics(self.myStack)
+  self:_wireDangerBounce(self.myStack)
   -- Generate each stack's starting board (starting_state), set countdown, and
   -- save the clock-0 rollback base — exactly as a real client does. Without this
   -- the bot simulates an EMPTY board from frame 0 (no panels -> brain always
   -- WAITs -> cursor never moves -> the human sees a blank board).
   self.match:start()
-  if self.brainKind == "weighted" then
+  if self.brainKind == "bitbot" then
+    -- BitBot: GameCreator's BitBot, native (libbit.so), in this process,
+    -- hooked up as GameCreator's lua/train.lua hooks it (bot/BitBotNative.lua).
+    -- It answers each frame through the same calls as the survival link.
+    self.survival = self.survival or require("bot.BitBotNative").new({})
+    self.survival:startMatch(self.myStack, self.match)
+  elseif self.brainKind == "survival" then
+    -- WasmSurvivor: the survival bot, a separate process (GameCreator's
+    -- survivor.js) that plans on this engine's rules and says what to press
+    -- every frame (bot/SurvivalLink.lua). Nothing is decided here.
+    self.survival = self.survival or require("bot.SurvivalLink").new({})
+    self.survival:startMatch(self.myStack)
+  elseif self.brainKind == "weighted" then
     -- The evaluator brain. searchProfile names the weight set; nil takes
     -- bot/profiles/trained.json, the set the cross-entropy search converged
     -- on. Constructing it validates the weights, so a typo'd feature name
@@ -384,6 +501,7 @@ function BotClient:startMatch()
   self.scheduledStartMs = socket.gettime() * 1000 + (self.matchStart.startInMs or 500)
   self.matchEnded = false
   self.deathSent = false
+  self._deathAwaitingFlush = false
   self._resultReported = false
   logger.info(string.format("bot[%s]: match built; my stack = slot %d; start in %dms",
     self.name, self.localPlayerNumber, self.matchStart.startInMs or 500))
@@ -403,7 +521,9 @@ function BotClient:tickMatch()
   -- recorded death frame.
   if not stack:game_ended() then
     local char
-    if self.brain then
+    if self.survival then
+      char = self.survival:input(stack, self.match.garbageSources[stack])
+    elseif self.brain then
       local st = self.boardState.extract(stack)
       -- Only run the expensive per-move verify when the controller needs a NEW move; while it's mid-move (locked /
       -- draining) the lock completes through a WAIT, so re-deciding is wasted. ~10x fewer verifies -> the bot runs
@@ -443,6 +563,7 @@ function BotClient:tickMatch()
     logger.info(string.format("bot[%s]: topped out at frame %d -> sending D", self.name, stack.game_over_clock))
     self.gameplay:send(NetworkProtocol.markedMessageForTypeAndBody(D_PREFIX,
       json.encode({ senderFrame = stack.game_over_clock, stopWatch = stack.game_over_stopWatch, reason = "topOut" })))
+    self._deathAwaitingFlush = true
   end
 
   if (self.deathSent or self.oppDied) and not self._resultReported then

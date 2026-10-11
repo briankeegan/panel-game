@@ -54,6 +54,11 @@ local AppDriver = require("client.src.debug.AppDriver")
 ---@diagnostic disable-next-line: duplicate-set-field
 function love.load(args, rawArgs)
   love.keyboard.setTextInput(false)
+  -- debug.log, closed by conf.lua while the save dir was set, opens in it now
+  if not logger.loveLogFile then
+    local ok, file = pcall(love.filesystem.newFile, "debug.log", "w")
+    if ok and file then pcall(function() file:setBuffer("none") end); logger.loveLogFile = file end
+  end
 
   -- there is a bug on windows that causes the game to start with a size equal to the desktop causing the window handle to be offscreen
   -- check for that and restore the window if that's the case:

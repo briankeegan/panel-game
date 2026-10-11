@@ -142,25 +142,6 @@ local function snapshotCell(panel)
   return cell
 end
 
--- Cell equality covering every shipped field. Used by buildSnapshot to
--- mark cells as unchanged (sentinel `true`) when they match the last
--- shipped state — bandwidth saver.
-local function cellsEqual(a, b)
-  if a == b then return true end
-  if type(a) ~= "table" or type(b) ~= "table" then return false end
-  return a.c  == b.c  and a.s  == b.s  and a.t  == b.t
-     and a.g  == b.g  and a.m  == b.m  and a.ch == b.ch
-     and a.gi == b.gi and a.xo == b.xo and a.yo == b.yo
-     and a.gw == b.gw and a.gh == b.gh and a.pt == b.pt
-     and a.it == b.it and a.cs == b.cs and a.ci == b.ci
-     and a.sl == b.sl and a.fg == b.fg and a.sid == b.sid
-end
-
--- Keyframe interval. Every Nth send goes out as a full grid (no deltas)
--- so receivers that lost a packet, joined late, or got a stale cached
--- value can recover.
-local KEYFRAME_EVERY = 100
-
 -- Build a wire-ready snapshot of the engine's current state. Pure read —
 -- never mutates the engine.
 ---@param engine Stack
@@ -579,32 +560,11 @@ function DisplayEventCapture:_send(now)
   self._lastSentCurR = self.engine.cur_row or 0
   self._lastSentCurC = self.engine.cur_col or 0
 
+  -- Always the full grid, every send -- no delta encoding, no periodic
+  -- keyframe cadence to wait on. A spectator joining mid-match (or any
+  -- receiver recovering from a dropped packet) gets a completely accurate
+  -- board on the very next send, full stop.
   local snapshot = buildSnapshot(self.engine)
-
-  -- Delta encoding for the panel grid. Most cells stay unchanged frame-
-  -- to-frame; ship `true` as the unchanged sentinel and the full table
-  -- only where the cell differs. Receiver merges deltas onto its cached
-  -- grid. Periodic keyframes (every KEYFRAME_EVERY sends) ship the full
-  -- grid so receivers can recover from packet loss or stale state.
-  self._sendCount = (self._sendCount or 0) + 1
-  local isKeyframe = (self._sendCount == 1)
-      or (self._sendCount % KEYFRAME_EVERY == 0)
-  local fullP = snapshot.p
-  if fullP then
-    -- Snapshot original cell refs BEFORE mutation so the next send's
-    -- comparison sees the actual shipped values.
-    local newCache = {}
-    for i = 1, #fullP do newCache[i] = fullP[i] end
-    if not isKeyframe and self._lastShippedPanels then
-      local last = self._lastShippedPanels
-      for i = 1, #fullP do
-        if cellsEqual(fullP[i], last[i]) then
-          snapshot.p[i] = true
-        end
-      end
-    end
-    self._lastShippedPanels = newCache
-  end
 
   -- Attach any one-shot triggers collected since last send, then clear.
   -- These play once on the receiver — pop FX and score cards.
@@ -612,8 +572,8 @@ function DisplayEventCapture:_send(now)
     snapshot.e = self._pendingEvents
     self._pendingEvents = {}
   end
-  -- Record this batch for replay playback (same delta-encoded form that
-  -- goes over the wire, so the playback path is identical to live receive).
+  -- Record this batch for replay playback (same full-grid form that goes
+  -- over the wire, so the playback path is identical to live receive).
   if self._historyList then
     self._historyList[#self._historyList + 1] = { from = self.playerID, snapshot = snapshot }
   end

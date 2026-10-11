@@ -13,6 +13,12 @@ function love.conf(t)
   -- Distinct identity: this is a separate game and must never share its save
   -- dir (config, user-id, replays, logs) with a real Panel Attack install.
   local identity = os.getenv("LOVE_IDENTITY") or "Unofficial Panel Attack FFA & Team"
+  -- The logger opened debug.log in the default save dir as it loaded; a file
+  -- open for writing keeps the write dir from moving (PhysFS), so it is closed
+  -- here and opened again in this identity's dir once love has set it
+  -- (love.load, main.lua).
+  local logger = require("common.lib.logger")
+  if logger.loveLogFile then pcall(function() logger.loveLogFile:close() end); logger.loveLogFile = nil end
   love.filesystem.setIdentity(identity)
   readConfigFile(config)
   if os.getenv("PLAYER_NAME") then

@@ -1117,7 +1117,13 @@ function PlayerStack:drawRelativeMultibar(stop_time, shake_time)
   self:drawLabel(self.assets.multibar.frameRelative, self.theme.healthbar_frame_Pos, self.theme.healthbar_frame_Scale)
 
   -- Healthbar
-  local healthbar = engine.health * (self.assets.multibar.health:getHeight() / engine.levelData.maxHealth)
+  -- Clamp to [0, maxHealth] before scaling -- newer levels (10+) run
+  -- maxHealth as low as 1, so an engine.health even slightly out of sync
+  -- with that tiny max (seen on view-stacks) turns the ratio into many
+  -- multiples of 1.0 with nothing here to stop it, stretching the bar far
+  -- past its normal height instead of just reading wrong by a pixel or two.
+  local clampedHealth = math.max(0, math.min(engine.health, engine.levelData.maxHealth))
+  local healthbar = clampedHealth * (self.assets.multibar.health:getHeight() / engine.levelData.maxHealth)
   self.healthQuad:setViewport(0, self.assets.multibar.health:getHeight() - healthbar, self.assets.multibar.health:getWidth(), healthbar)
   local x = self:elementOriginXWithOffset(self.theme.healthbar_Pos, false) / self.gfxScale
   local y = self:elementOriginYWithOffset(self.theme.healthbar_Pos, false) + (self.assets.multibar.health:getHeight() - healthbar) / self.gfxScale

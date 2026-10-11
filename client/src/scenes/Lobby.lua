@@ -819,13 +819,29 @@ end
 ---@param lobbyDataV2 PersonalizedLobbyDataV2?
 ---@return boolean
 function Lobby:isLocalPlayerInRoom(lobbyDataV2)
-  if GAME.netClient.room then
-    return true
+  -- A leaveRoom request is in flight: self.room is still set (it only
+  -- clears once the server's confirmation round-trips back), but we've
+  -- already asked to leave, so treat it as already gone. Otherwise a quick
+  -- click right after leaving (e.g. leaving one spectated room to spectate
+  -- another) sees stale "still in a room" state and gets wrongly blocked
+  -- with "leave room first" -- or the room-submenu with Spectate on it
+  -- never shows at all, which looks like clicking Spectate silently failed.
+  if GAME.netClient._pendingLeaveRoom then
+    return false
   end
 
-  lobbyDataV2 = lobbyDataV2 or GAME.netClient.lobbyDataV2
-  local localData = lobbyDataV2 and lobbyDataV2.players and lobbyDataV2.players[GAME.localPlayer.publicId]
-  return localData and localData.roomNumber ~= nil
+  -- Deliberately NOT falling back to lobbyDataV2.players[...].roomNumber:
+  -- that's the server's own broadcast, and a known server-side bug can drop
+  -- the leave_room reply for a spectator, leaving that field stuck pointing
+  -- at a room this client already left. The server's broadcast about THIS
+  -- client can be stale; what this client itself last did cannot, so it's
+  -- the only signal trusted here. lobbyDataV2 is still fine for questions
+  -- about OTHER players (openPlayerContextMenu, etc.).
+  --
+  -- Spectating is deliberately NOT "in a room" here either: you're only
+  -- watching, not holding a seat, so Create Team Game/FFA should behave
+  -- normally (not show "Leave game" / try to leave first) while spectating.
+  return GAME.netClient.room ~= nil and not GAME.netClient.room.spectating
 end
 
 ---@param lobbyDataV2 PersonalizedLobbyDataV2?
@@ -1536,7 +1552,13 @@ function Lobby:openRoomSubMenu(room, button)
 
   local lobbyDataV2 = GAME.netClient.lobbyDataV2
   local localPlayerInfo = lobbyDataV2 and lobbyDataV2.players and lobbyDataV2.players[GAME.localPlayer.publicId]
-  local localRoomNumber = localPlayerInfo and localPlayerInfo.roomNumber or (GAME.netClient.room and GAME.netClient.room.roomNumber)
+  -- Only fall back to GAME.netClient.room.roomNumber when it's an actual
+  -- joined room, not a spectate attachment -- otherwise clicking the room
+  -- you're spectating reads as "this is my room" and offers "Leave team
+  -- game" for a game you were only ever watching (same class of bug as
+  -- isLocalPlayerInRoom below, just a separate local derivation of it).
+  local localRoomNumber = localPlayerInfo and localPlayerInfo.roomNumber
+    or (GAME.netClient.room and not GAME.netClient.room.spectating and GAME.netClient.room.roomNumber)
   local localIsMemberOfRoom = room.players and tableUtils.trueForAny(room.players, function(playerId)
     return playerId == GAME.localPlayer.publicId
   end)
@@ -2485,13 +2507,21 @@ function Lobby:updateRoomPanel(updateInfo)
         local p2Id = room.players[2]
         local p1Info = GAME.netClient.lobbyDataV2.players[p1Id]
         local p2Info = GAME.netClient.lobbyDataV2.players[p2Id]
+        -- Unguarded room.wins[1]/[2] indexing used to throw when room.wins
+        -- was nil (e.g. a freshly created room before the server's first
+        -- win-count broadcast), silently killing this whole info panel --
+        -- it just never rendered, instead of showing "0 : 0". The FFA and
+        -- team branches above already default missing counts to 0; this
+        -- one didn't.
+        local w1 = room.wins and room.wins[1] or 0
+        local w2 = room.wins and room.wins[2] or 0
         if p1Info and p2Info then
           local p1Name = p1Info.name
           local p2Name = p2Info.name
-          text = string.format("%s %d : %d %s\n%s\n%s %d", p1Name, room.wins[1], room.wins[2], p2Name, room.state, loc("pl_spectators"), #room.spectators)
+          text = string.format("%s %d : %d %s\n%s\n%s %d", p1Name, w1, w2, p2Name, room.state, loc("pl_spectators"), #room.spectators)
         else
           logger.warn(string.format("Failed to retrieve data for playerId %d or %d\nLobby data is %s", p1Id, p2Id, table_to_string(GAME.netClient.lobbyDataV2)))
-          text = string.format("%d : %d \n%s\n%s %d\n%s", room.wins[1], room.wins[2], room.state, loc("pl_spectators"), #room.spectators, "Failed to retrieve player info")
+          text = string.format("%d : %d \n%s\n%s %d\n%s", w1, w2, room.state, loc("pl_spectators"), #room.spectators, "Failed to retrieve player info")
         end
       elseif #room.players == 1 then
         text = string.format("%s\n%s %d", room.state, loc("pl_spectators"), #room.spectators)

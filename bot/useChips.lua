@@ -66,6 +66,42 @@ local function cellOrder(grid, rows, cursor, band, searchPriorities, maxDistance
   return cells
 end
 
+-- EXACT 1-SWAP FALLBACK (2026-07-03, closes the drop-clear template gap found via bot/useChipsTest.lua +
+-- brute-force classification): the catalog has no "pull-into-empty" shapes (swap a panel into an adjacent empty
+-- cell so its column compacts into a 3-match), so boards whose ONLY play is that shape returned nothing -- 13/40
+-- of the puzzle corpus, none of them dead. Instead of authoring templates for every such shape, scan the same
+-- cursor-ordered cells with BoardSim.simSwap (0/941 vs the engine): any single swap whose OWN simulation clears
+-- >=3 (or breaks garbage, under requireBreak) is a play, by construction. Runs ONLY in the plain-COMBO_3 slot of
+-- the priority list AND only for callers that opt in via opts.exactFallback: a paired 10-seed sweep showed the
+-- one live path where it fired unrequested (findCatch's catalog scan, seed 1003) came out 2.2s WORSE -- the catch
+-- window is timing-sensitive and a bare 3 it couldn't see before isn't automatically a good catch. Current
+-- opt-ins: POP-NOW (any immediate pop beats a still frame at stop 0 -- watertight) and the corpus test (which
+-- measures the recognizer's ceiling). Catch-path inclusion is a recorded tuning-phase candidate, not a default.
+-- `kind` stays COMBO_3 -- it names the priority bucket, not the (possibly bigger) actual clear.
+local function exactOneSwap(grid, rows, cells, verify, touchable, requireBreak)
+  for _, cell in ipairs(cells) do
+    local r, c = cell[1], cell[2]
+    if c >= 1 and c <= 5 and grid[r] then
+      local a, b = grid[r][c] or 0, grid[r][c + 1] or 0
+      if a ~= b and a ~= BoardSim.GARBAGE and b ~= BoardSim.GARBAGE and (a ~= 0 or b ~= 0)
+        and (not touchable or (touchable[r] and touchable[r][c] and touchable[r][c + 1])) then
+        local _, _, total, _, gb = BoardSim.simSwap(grid, rows, r, c)
+        if (requireBreak and (gb or 0) > 0) or (not requireBreak and (total or 0) >= 3) then
+          local fired, broke = true, (gb or 0) > 0
+          if verify then fired, broke = verify({ { r, c } }, "COMBO_3") end
+          if fired and (not requireBreak or broke) then
+            if os.getenv("PA_FALLBACKDIAG") then
+              print(string.format("  FALLBACKDIAG 1-swap (%d,%d) total=%d gb=%d requireBreak=%s verify=%s", r, c, total or 0, gb or 0, tostring(requireBreak or false), tostring(verify ~= nil)))
+            end
+            return { swaps = { { r, c } }, kind = "COMBO_3", brokeGarbage = broke or false }
+          end
+        end
+      end
+    end
+  end
+  return nil
+end
+
 -- useChips(grid, rows, cursor, opts) -> { swaps, kind } | nil. chipPriorities is an ordered list of chip KINDS; ANY
 -- kind authored into bot/chipCache.lua is recognizable (no per-kind registry -- recognize slides the store by kind).
 function M.useChips(grid, rows, cursor, opts)
@@ -74,6 +110,9 @@ function M.useChips(grid, rows, cursor, opts)
   local cells = cellOrder(grid, rows, cursor, opts.band, opts.searchPriorities, opts.maxDistance)
   for _, chipName in ipairs(opts.chipPriorities or {}) do
     local result = chips.recognize(grid, rows, cells, chipName, verify, opts.touchable, opts.requireBreak)  -- recognize this kind, in priority order
+    if not result and chipName == "COMBO_3" and opts.exactFallback then
+      result = exactOneSwap(grid, rows, cells, verify, opts.touchable, opts.requireBreak)
+    end
     if result then return result end
   end
   return nil
@@ -468,12 +507,39 @@ end
 local BEAM_W = 8
 local BEAM_D = tonumber(os.getenv("PA_BEAM_D")) or 1        -- depth-1 greedy, re-planned EVERY frame: deeper plans go stale on the rising board (d2 cleared 51 vs d1 154, 20x slower). knob stays for experiments (env PA_BEAM_D)
 local NODE_BUDGET = 400 * BEAM_D                            -- sim budget scales with depth so deeper levels aren't starved
-function M.planMove(grid, rows, touchable, cursor, force, keepMaterial)
+function M.planMove(grid, rows, touchable, cursor, force, keepMaterial, opts)
   if not touchable then return nil end
   local immScale = keepMaterial and 0.15 or 1   -- garbage imminent/present: devalue immediate clears so the planner HOLDS material (don't strip the stack down -> it stays tall enough for the block to land breakable) instead of clearing it low
   local cr = (cursor and cursor[1]) or 1
   local cc = (cursor and cursor[2]) or 3
-  local _, peak = colHeights(grid, rows)
+  local heights0, peak = colHeights(grid, rows)
+  -- SOFT SINK COST (2026-07-04, lull support-shield redesign): opts.sinkCols = { [col]=true }, opts.sinkW = weight.
+  -- The v1 HARD support mask fixed the seed-1001 stage-sinking death (dev zero-reveal 4->0) but regressed the
+  -- holdout window: masking the contact column starves lull clear throughput, the board rides higher and lands
+  -- jagged anyway (seed 2006). Instead of forbidding swaps, charge sinkW per row the resulting board DROPS a
+  -- protected column -- a stage-sinking clear can still win when it's the only real move, but loses ties to
+  -- equal-value mining elsewhere. Charged against every candidate board (depth-1 and beam leaves alike) by
+  -- comparing the protected columns' heights to the PRE-plan board.
+  local sinkCols, sinkW = opts and opts.sinkCols or nil, opts and opts.sinkW or 0
+  -- PER-COLUMN MATERIAL FLOOR (2026-07-04, candidate c): opts.floorH/floorW. avgH gates let two columns go
+  -- hollow while the average looks fine (seed-1001 anatomy: landed on 5,5,2,3,4,5, no <=3-swap break existed).
+  -- Charge floorW per row ANY column of a candidate board sits below floorH -- absolute, not delta, so the
+  -- planner is also REWARDED for refilling an already-hollow column, not just discouraged from mining one.
+  local floorH, floorW = opts and opts.floorH or 0, opts and opts.floorW or 0
+  local function softPenalty(g)
+    if not sinkCols and floorH == 0 then return 0 end
+    local p = 0
+    for c = 1, WIDTH do
+      local prot, deficit = sinkCols and sinkCols[c], floorH > 0
+      if prot or deficit then
+        local h = 0
+        for r = rows, 1, -1 do if g[r] and g[r][c] ~= 0 then h = r; break end end
+        if prot and h < heights0[c] then p = p + sinkW * (heights0[c] - h) end
+        if floorH > 0 and h < floorH then p = p + floorW * (floorH - h) end
+      end
+    end
+    return p
+  end
   local hiRow = math.min(rows, peak + 1)                          -- only swap within/just above the occupied band
   local budget = NODE_BUDGET
   local beam = {}
@@ -481,6 +547,7 @@ function M.planMove(grid, rows, touchable, cursor, force, keepMaterial)
     if budget <= 0 then break end
     budget = budget - 1
     local s, g, total, chain, bonus = scoreSwap(grid, rows, sw[1], sw[2], immScale)
+    if opts then s = s - softPenalty(g) end
     local reward = (total > 0) and (W_IMMEDIATE_TOTAL * total + W_IMMEDIATE_CHAIN * chain) or 0
     local dist = (sw[1] > cr and sw[1] - cr or cr - sw[1]) + (sw[2] > cc and sw[2] - cc or cc - sw[2])  -- from the cursor
     beam[#beam + 1] = { g = g, score = s, reward = reward, setup = bonus, first = sw, dist = dist, total = total, chain = chain }
@@ -505,7 +572,7 @@ function M.planMove(grid, rows, touchable, cursor, force, keepMaterial)
         local g2, chain, total = BoardSim.simSwap(node.g, rows, sw[1], sw[2], TRUSTED_CHAIN_CAP)
         local lbonus = chipSetupBonus(g2, rows, sw[1], sw[2])
         local reward = node.reward + ((total > 0) and (W_IMMEDIATE_TOTAL * total + W_IMMEDIATE_CHAIN * chain) or 0)
-        local leaf = { g = g2, score = eval(g2, rows) + W_CHIP * lbonus + reward, reward = reward, setup = math.max(node.setup or 0, lbonus), first = node.first, dist = node.dist }
+        local leaf = { g = g2, score = eval(g2, rows) + W_CHIP * lbonus + reward - softPenalty(g2), reward = reward, setup = math.max(node.setup or 0, lbonus), first = node.first, dist = node.dist }
         nxt[#nxt + 1] = leaf
         if leaf.score > best.score or (leaf.score == best.score and leaf.dist < best.dist) then best = leaf end
       end

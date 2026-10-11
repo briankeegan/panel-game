@@ -18,7 +18,7 @@
  "raiseTo": 8,
  "bankTop": 11,
  "bankForce": true,
- "goal": "4-chain",
- "alsoTake": 4,
- "buildToward": 120
+ "calmGoal": "4-chain",
+ "calmToward": 120,
+ "alsoTake": 4
 }

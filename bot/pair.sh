@@ -6,6 +6,13 @@
 #                                     BitBot sits in the lobby, WasmSurvivor_Bot challenges it
 #   bot/pair.sh start-bitbot [HOURS]  cancel BitBot's run if going, start only BitBot
 #   bot/pair.sh start-wasm [HOURS]    cancel WasmSurvivor_Bot's run if going, start only it
+#   bot/pair.sh beta [NAME] [HOURS] [PROFILE]
+#                                     a weighted bot (Beverly/Plamp) in the lobby of UPSTREAM's beta
+#                                     server (betaserver.panelattack.com:59569), the real Panel Attack
+#                                     game. Cancels its earlier beta run first. NAME defaults to
+#                                     Beverly, PROFILE to bot/profiles/beverly.json. Pin the build with
+#                                     PA_UPSTREAM_REF=<commit/tag/branch> (default: the betaserver-live
+#                                     tag if upstream has one, else the latest beta).
 #   bot/pair.sh stop                  cancel every fight run that is going
 #   bot/pair.sh status                list the fight runs that are going
 #
@@ -79,6 +86,12 @@ dispatch_wasm() {
   echo "pair: WasmSurvivor_Bot queued (challenges BitBot)"
 }
 
+dispatch_beta() {   # NAME HOURS PROFILE
+  local ref=${PA_UPSTREAM_REF:-}
+  dispatch "{\"mode\":\"live\",\"server\":\"betaserver.panelattack.com:59569\",\"name\":\"$1\",\"hours\":\"$2\",\"profile\":\"$3\",\"upstream_ref\":\"$ref\"}"
+  echo "pair: $1 queued on the beta server (upstream Panel Attack; the server assigns its account id)"
+}
+
 BITBOT_RUN='BitBot \(bitbot\)'
 WASM_RUN='\(wasm\) vs challenge'
 
@@ -86,8 +99,9 @@ case "${1:-}" in
   start)        stop_and_wait .;             dispatch_bitbot; sleep 2; dispatch_wasm ;;
   start-bitbot) stop_and_wait "$BITBOT_RUN"; dispatch_bitbot ;;
   start-wasm)   stop_and_wait "$WASM_RUN";   dispatch_wasm ;;
+  beta)         stop_and_wait "betaserver";  dispatch_beta "${2:-Beverly}" "${3:-5}" "${4:-bot/profiles/beverly.json}" ;;
   stop)         out=$(cancel_matching .); printf '%s\n' "$out" | sed '$d'
                 [ "$(printf '%s\n' "$out" | tail -1)" -gt 0 ] || echo "pair: nothing running" ;;
   status)       out=$(running); if [ -n "$out" ]; then printf '%s\n' "$out"; else echo "pair: nothing running"; fi ;;
-  *)            sed -n '2,19p' "$0"; exit 2 ;;
+  *)            sed -n '2,/^set -eu/p' "$0" | sed '$d'; exit 2 ;;
 esac

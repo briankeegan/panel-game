@@ -27,9 +27,8 @@
   "maxTop": 10,
   "quietTop": 9,
   "outCells": 3,
-  "highTop": 8,
-  "lowTop": 5,
-  "minChain": 4
+  "minChain": 4,
+  "raiseMax": 10
  },
  "threeBreaksLast": true
 }

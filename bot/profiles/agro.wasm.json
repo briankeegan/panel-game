@@ -53,7 +53,8 @@
   "raiseLeaveRoom": false,
   "dangerTop": 10,
   "dangerRoom": 0,
-  "boundPlans": true
+  "boundPlans": true,
+  "noIdle": true
  },
  "threeBreaksLast": true,
  "account": "WasmAgro_CPU"

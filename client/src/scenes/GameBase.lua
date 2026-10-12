@@ -147,6 +147,34 @@ local function winnerToPlayer(winner, players)
   return nil
 end
 
+-- Server is authoritative for online matches -- same reasoning as
+-- buildTeamResultText below, just for the non-team (1v1 / FFA) winner text.
+-- The server's per-tick elimination check resolves a simultaneous KO (or
+-- any local/server simulation timing difference) the way the match was
+-- actually decided; the local engine's "highest game_over_clock" heuristic
+-- getWinners() uses can disagree -- that disagreement is exactly what
+-- ClientMatch:_checkWinnerMismatch's [WINNER-MISMATCH] log exists to catch,
+-- but that only logs it, it doesn't correct what setupGameOver displays.
+-- Falls back to the engine-local winners for offline/replay (no server) or
+-- an online match where no server outcome has arrived yet.
+local function effectiveWinners(match, localWinners)
+  if match.hasServerOutcome and match:hasServerOutcome() then
+    local idx = match.getServerWinnerIndex and match:getServerWinnerIndex()
+    if not idx then
+      -- Server said tie -- definitive, not a "fall back to local" case.
+      return {}
+    end
+    for _, player in ipairs(match.players) do
+      if player.playerNumber == idx then
+        return { player }
+      end
+    end
+    -- idx set but didn't match anyone in this roster (shouldn't happen) --
+    -- fall through to the local heuristic rather than show nothing.
+  end
+  return localWinners
+end
+
 function GameBase.buildTeamResultText(match, winners)
   local gameMode = match.gameMode
   if not gameMode or gameMode.stackInteraction ~= GameModes.StackInteractions.TEAM_VERSUS then
@@ -523,13 +551,19 @@ function GameBase:setupGameOver()
   end
 
   local winners = self.match:getWinners()
+  -- Non-team branches (FFA, plain 1v1) below show text derived from this --
+  -- server-corrected so a local/server simulation disagreement (the kind
+  -- [WINNER-MISMATCH] logs) doesn't display the wrong result. buildTeamResultText
+  -- for the TEAM_VERSUS branch already does its own server-trust check, so it
+  -- keeps using the raw `winners` local.
+  local nonTeamWinners = effectiveWinners(self.match, winners)
   if self.text == nil then
     if #self.match.players == 1 then
       self.text = loc("pl_gameover")
     elseif isFFA(self.match.gameMode) then
       if self.match:hasLocalPlayer() then
         local localWon = false
-        for _, winner in ipairs(winners) do
+        for _, winner in ipairs(nonTeamWinners) do
           if winner.isLocal then
             localWon = true
             break
@@ -537,20 +571,20 @@ function GameBase:setupGameOver()
         end
         if localWon then
           self.text = loc("pl_you_win")
-        elseif #winners > 0 then
+        elseif #nonTeamWinners > 0 then
           self.text = loc("pl_you_lose")
         else
           self.text = loc("ss_draw")
         end
-      elseif #winners == 1 then
-        self.text = loc("ss_p_wins", winners[1].name)
+      elseif #nonTeamWinners == 1 then
+        self.text = loc("ss_p_wins", nonTeamWinners[1].name)
       else
         self.text = loc("ss_draw")
       end
     elseif self.match.gameMode and self.match.gameMode.stackInteraction == GameModes.StackInteractions.TEAM_VERSUS then
       self.text = GameBase.buildTeamResultText(self.match, winners)
-    elseif #winners == 1 then
-      self.text = loc("ss_p_wins", winners[1].name)
+    elseif #nonTeamWinners == 1 then
+      self.text = loc("ss_p_wins", nonTeamWinners[1].name)
     else
       self.text = loc("ss_draw")
     end

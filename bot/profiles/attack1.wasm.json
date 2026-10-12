@@ -26,6 +26,9 @@
   "minCells": 12,
   "maxComing": 6,
   "maxTop": 10,
-  "quietTop": 9
+  "quietTop": 9,
+  "bigCells": 24,
+  "fireTop": 8,
+  "outCells": 3
  }
 }

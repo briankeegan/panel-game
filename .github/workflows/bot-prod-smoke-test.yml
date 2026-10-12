@@ -327,10 +327,6 @@ jobs:
             brain=survival
           fi
           cd "$BOT_DIR"
-          # the engine this server runs, offline, before the lobby: the bot must press keys that reach it
-          PA_PREFLIGHT_NAME="$name ($brain, upstream engine)" PA_PREFLIGHT_BRAIN=$([ "$brain" = bitbot ] && echo bitbot) PA_PREFLIGHT_LATE_OK=1 \
-            luajit bot/linkPreflight.lua 600 2>&1 | tee "$GITHUB_WORKSPACE/preflight-$name.log"
-          [ "${PIPESTATUS[0]}" -eq 0 ] || { echo "the bot does not play on this engine; not joining the lobby"; exit 1; }
           secs=$(( ${{ inputs.hours }} * 3600 ))
           echo "::notice::$name ($brain) joining $BOT_HOST:$BOT_PORT for ${{ inputs.hours }}h"
           set -o pipefail

@@ -1215,7 +1215,6 @@ spectate2pVsOnlineMatch = function(self, spectateRequestGrantedMessage)
     self.state = states.INGAME
     local vsScene = GameBase({match = GAME.battleRoom.match})
     vsScene:load()
-    local catchUp = GameCatchUp(vsScene)
     -- need to push character select, otherwise the pop on match end will return to lobby
     -- directly add to the stack so it isn't getting displayed
     if roomScene then
@@ -1223,7 +1222,26 @@ spectate2pVsOnlineMatch = function(self, spectateRequestGrantedMessage)
     else
       logger.warn("No room scene available for spectator mode '" .. tostring(self.room.mode and self.room.mode.name) .. "'.")
     end
-    GAME.navigationStack:push(catchUp)
+    if self.room.displayHistoryEnabled then
+      -- GameCatchUp waits for each stack's play_to_end to clear, which
+      -- Stack:run() only does once confirmedInput catches up to clock --
+      -- but displayHistoryEnabled stacks are snapshot-driven, never
+      -- simulated (Match:shouldRun skips them), and processInputMessages
+      -- explicitly skips filling confirmedInput for this room type. So
+      -- play_to_end set on a mid-match join here would never clear --
+      -- stuck on the catch-up screen forever. Nothing to catch up on
+      -- anyway: snapshots paint the current state on arrival, no replay
+      -- needed. Clear play_to_end defensively (in case anything set it
+      -- before this point) and go straight to the live scene.
+      for _, stack in ipairs(GAME.battleRoom.match.stacks) do
+        if stack.engine then
+          stack.engine.play_to_end = nil
+        end
+      end
+      GAME.navigationStack:push(vsScene)
+    else
+      GAME.navigationStack:push(GameCatchUp(vsScene))
+    end
   else
     self.state = states.ROOM
     if roomScene then

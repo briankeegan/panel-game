@@ -24,6 +24,10 @@
 #                                     id; the run commits it back so the name is reused. Pin the build with
 #                                     PA_UPSTREAM_REF=<commit/tag/branch> (default: the betaserver-live tag if
 #                                     upstream has one, else the latest beta).
+#   bot/pair.sh beta-vs OPPONENT [HOURS] [PROFILE]
+#                                     WasmSurvivor_CPU on the beta server, challenging the player named
+#                                     OPPONENT in the lobby (a bot or a person) and rematching until the
+#                                     hours run out. Same as `beta wasm`, with a target.
 #   bot/pair.sh profiles              list the profiles wasm-vs can take (and "default")
 #   bot/pair.sh stop                  cancel every fight run that is going
 #   bot/pair.sh status                list the fight runs that are going
@@ -170,9 +174,11 @@ case "${1:-}" in
   start-bitbot) stop_and_wait "$BITBOT_RUN"; dispatch_bitbot ;;
   start-wasm)   stop_and_wait "$WASM_RUN";   dispatch_wasm ;;
   wasm-vs)      HOURS=${4:-5}; wasm_vs "${2:?lobby profile}" "${3:?challenger profile}" ;;
-  beta)         bot=${2:-beverly}; name=${3:-$(case $bot in wasm) echo WasmSurvivor;; bitbot) echo BitBot;; plamp) echo Plamp;; *) echo Beverly;; esac)}
+  beta)         bot=${2:-beverly}; name=${3:-$(case $bot in wasm) echo WasmSurvivor_CPU;; bitbot) echo BitBot;; plamp) echo Plamp;; *) echo Beverly;; esac)}
                 prof=${5:-$(beta_profile "$bot")}
                 stop_and_wait "betaserver"; dispatch_beta "$bot" "$name" "${4:-5}" "$prof" ;;
+  beta-vs)      opp=${2:?the opponent\'s lobby name}; prof=${4:-$(beta_profile wasm)}
+                stop_and_wait "betaserver"; dispatch_beta wasm "WasmSurvivor_CPU,$opp" "${3:-5}" "$prof" ;;
   profiles)     echo default; git ls-files 'bot/profiles/*.wasm.json' | sed 's/^/ /' ;;
   stop)         out=$(cancel_matching .); printf '%s\n' "$out" | sed '$d'
                 [ "$(printf '%s\n' "$out" | tail -1)" -gt 0 ] || echo "pair: nothing running" ;;

@@ -18,6 +18,27 @@
  "raiseTo": 8,
  "bankTop": 11,
  "bankForce": true,
- "goal": "5-chain",
- "buildToward": 60
+ "pressure": {
+  "rows": 12,
+  "out": {
+   "goal": "4-combo",
+   "alsoTake": 2,
+   "toward": 100
+  },
+  "small": {
+   "goal": "4-combo",
+   "alsoTake": 3,
+   "toward": 100
+  },
+  "medium": {
+   "goal": "5-chain",
+   "alsoTake": 5,
+   "toward": 100
+  },
+  "large": {
+   "goal": "6-chain",
+   "alsoTake": 6,
+   "toward": 100
+  }
+ }
 }

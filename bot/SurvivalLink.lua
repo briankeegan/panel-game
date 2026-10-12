@@ -172,6 +172,24 @@ local function putTelegraph(sources)
   end
   put("]")
 end
+-- Whether a stack this one fights is topped out (a panel in its top row), and the highest row it has a panel in.
+local function opponentOf(sources)
+  local out, top = false, 0
+  for _, src in ipairs(sources or {}) do
+    if type(src.isToppedOut) == "function" and src.panels then
+      if src:isToppedOut() then out = true end
+      for row = src.height or 12, 1, -1 do
+        local found = false
+        for col = 1, src.width or 6 do
+          local p = src.panels[row] and src.panels[row][col]
+          if p and p.color and p.color ~= 0 then found = true break end
+        end
+        if found then if row > top then top = row end break end
+      end
+    end
+  end
+  return ',"opp":{"out":' .. tostring(out) .. ',"top":' .. top .. "}"
+end
 local function scalars(t)
   local o = {}
   for k, v in pairs(t) do
@@ -547,7 +565,7 @@ function SurvivalLink:think(stack, sources)
   local deadline = socket.gettime() + self.thinking:snapshot().ceiling * SurvivalLink.TARGET_SHARE
   -- the game's window of keys goes with the board: the frames ago each key still inside it was pressed
   local ages = self.inputs:ages(clock, self.ages)
-  local budget = ',"budget":{"limit":' .. self.inputs.limit .. ',"window":' .. self.inputs.window .. ',"ages":[' .. table.concat(ages, ",") .. ']}'
+  local budget = ',"budget":{"limit":' .. self.inputs.limit .. ',"window":' .. self.inputs.window .. ',"ages":[' .. table.concat(ages, ",") .. ']}' .. opponentOf(sources)
   local t0 = socket.gettime()
   local pieces, count = SurvivalLink.dump(stack, sources, '{"t":"f","state":', budget .. "}\n")
   local bytes = 0
@@ -612,7 +630,7 @@ if jit and jit.off then
   for _, f in pairs(SurvivalLink) do
     if type(f) == "function" then jit.off(f, true) end
   end
-  for _, f in ipairs({ num, numberText, enc, put, putScalar, putScalars, putGarbage, putTelegraph, scalars,
+  for _, f in ipairs({ num, numberText, enc, put, putScalar, putScalars, putGarbage, putTelegraph, scalars, opponentOf,
                        getmetatable(words).__index,
                        getmetatable(firstKey).__index, getmetatable(nextKey).__index, getmetatable(quoted).__index }) do
     jit.off(f, true)

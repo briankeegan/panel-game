@@ -204,7 +204,7 @@ end
 -- Once a minute of play, what the sources are (one line, in the bot's log): how many stacks send this one
 -- garbage, and for the first, whether it can say it is topped out, its highest row and its stop time.
 local function describeSources(stack, sources)
-  if stack.clock % 3600 ~= 300 then return end
+  if stack.clock % 600 ~= 300 then return end
   local n = sources and #sources or 0
   local src = n > 0 and sources[1] or nil
   local top = 0
@@ -221,6 +221,18 @@ local function describeSources(stack, sources)
     stack.clock, n, src and tostring(src.stackType or src.name or "stack") or "-", src and type(src.isToppedOut) or "-",
     src and type(src.panels) or "-", top, src and src.isToppedOut and tostring(src:isToppedOut()) or "-",
     src and tostring(src.stop_time) or "-"))
+  if src and src.panels then
+    -- how far the stack that sends this one garbage has been run, against this one, and the garbage it holds
+    local garbage = 0
+    for row = 1, src.height or 12 do
+      for col = 1, src.width or 6 do
+        local p = src.panels[row] and src.panels[row][col]
+        if p and p.isGarbage then garbage = garbage + 1 end
+      end
+    end
+    print(string.format("SOURCE clock %d: its clock %s, its inputs %s, garbage cells %d, health %s", stack.clock,
+      tostring(src.clock), src.confirmedInput and tostring(#src.confirmedInput) or "-", garbage, tostring(src.health)))
+  end
 end
 local function scalars(t)
   local o = {}

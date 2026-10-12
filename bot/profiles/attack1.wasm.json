@@ -29,7 +29,8 @@
   "outCells": 3,
   "highTop": 8,
   "lowTop": 5,
-  "minChain": 4
+  "minChain": 4,
+  "ignoreOpp": true
  },
  "threeBreaksLast": true
 }

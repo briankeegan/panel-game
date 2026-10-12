@@ -1,5 +1,5 @@
 {
- "name": "WasmSurvivor",
+ "name": "WasmAgroCPU",
  "weights": "trained.pbt.pbt-r22-s322.0926-142336.g03120.json",
  "reaction": 12,
  "swapGap": 12,
@@ -48,7 +48,12 @@
   "threesOnlyTopped": true,
   "readyBreak": true,
   "readyMs": 150,
-  "minRows": 4
+  "minRows": 4,
+  "lifeFirst": true,
+  "raiseLeaveRoom": true,
+  "dangerTop": 10,
+  "dangerRoom": 0
  },
- "threeBreaksLast": true
+ "threeBreaksLast": true,
+ "account": "WasmAgro_CPU"
 }

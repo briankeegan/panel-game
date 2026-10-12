@@ -106,7 +106,10 @@ HOST=${SERVER%%:*}
 IDS=bot/identities
 # the account name for a profile
 account() {   # PROFILE [SUFFIX]
-  local p=$1
+  local p=$1 f named
+  # a profile that names its account ("account") is played under that name
+  f="bot/profiles/${p##*/}"; f=${f%.wasm.json}; f=${f%.json}.wasm.json
+  if [ -f "$f" ] && named=$(jq -r '.account // empty' "$f") && [ -n "$named" ]; then printf '%s%s' "$named" "${2:-}"; return; fi
   p=${p##*/}; p=${p%.wasm.json}; p=${p%.json}
   [ "$p" = default ] && p=defensive
   p=$(printf '%s' "$p" | tr -cd 'A-Za-z0-9' | cut -c1-12)

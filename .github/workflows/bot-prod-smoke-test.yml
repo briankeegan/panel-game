@@ -327,6 +327,27 @@ jobs:
             brain=survival
           fi
           cd "$BOT_DIR"
+          # The server hands a new name its account id at the first login. Save it to the bot branch the
+          # moment it is written, not only when the run ends: a run that dies would lose it.
+          (
+            f="bot/identities/${name}_${BOT_HOST}.txt"
+            for i in $(seq 1 90); do
+              if [ -s "$BOT_DIR/$f" ]; then
+                mkdir -p "$GITHUB_WORKSPACE/botsrc/bot/identities"
+                cp "$BOT_DIR/$f" "$GITHUB_WORKSPACE/botsrc/$f"
+                cd "$GITHUB_WORKSPACE/botsrc"
+                git config user.name "github-actions[bot]"
+                git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+                git add "$f"
+                if git diff --cached --quiet; then echo "account id already saved"; else
+                  git commit -q -m "bot: save account id for '$name' on $BOT_HOST"
+                  for k in 1 2 3; do git push -q origin "HEAD:$UPSTREAM_BOT_REF" && echo "account id saved" && break; git pull -q --rebase origin "$UPSTREAM_BOT_REF"; done
+                fi
+                break
+              fi
+              sleep 2
+            done
+          ) > "$GITHUB_WORKSPACE/save-id-$name.log" 2>&1 &
           secs=$(( ${{ inputs.hours }} * 3600 ))
           echo "::notice::$name ($brain) joining $BOT_HOST:$BOT_PORT for ${{ inputs.hours }}h"
           set -o pipefail
@@ -496,6 +517,7 @@ jobs:
             bitbot-preflight.log
             mind-*.log
             preflight-*.log
+            save-id-*.log
             fight-*.log
             death-*.jsonl.gz
             frames-*.jsonl.gz

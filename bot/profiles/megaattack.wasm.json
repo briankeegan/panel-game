@@ -47,7 +47,8 @@
   "alwaysRaise": true,
   "threesOnlyTopped": true,
   "readyBreak": true,
-  "readyMs": 150
+  "readyMs": 150,
+  "minRows": 4
  },
  "threeBreaksLast": true
 }

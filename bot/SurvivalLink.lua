@@ -184,7 +184,11 @@ local function putTelegraph(sources)
   put("]")
 end
 -- Whether a stack this one fights is topped out (a panel in its top row), and the highest row it has a panel in.
-local function opponentOf(sources)
+local function opponentOf(sources, view, clock)
+  -- the opponent's own board, as its client shipped it, when one has come lately
+  if view and clock and clock - view.seen <= 90 then
+    return ',"opp":{"out":' .. tostring(view.out) .. ',"top":' .. view.top .. "}"
+  end
   local out, top = false, 0
   for _, src in ipairs(sources or {}) do
     -- a copy of the opponent's stack that has died in the copy has stopped running: it says nothing about the opponent
@@ -496,7 +500,7 @@ end
 -- fell inside would be thinking time the bot did not use, and is left to the
 -- game's own work between frames. The frame is charged to the thinking budget
 -- and its key pressed on the input budget, the game's own.
-function SurvivalLink:input(stack, sources)
+function SurvivalLink:input(stack, sources, view)
   local stopOnOver = os.getenv("PA_STOP_ON_OVER") == "1"
   if stopOnOver and not SurvivalLink.tracing then
     SurvivalLink.tracing = { events = 0 }
@@ -510,7 +514,7 @@ function SurvivalLink:input(stack, sources)
   collectgarbage("stop")
   local began = ThinkBudget.now()
   local cpu0 = os.clock()
-  local ok, key = pcall(self.think, self, stack, sources)
+  local ok, key = pcall(self.think, self, stack, sources, view)
   if ok and self.ownInputs then key = self:press(key, stack.clock) end
   local took = ThinkBudget.now() - began
   local cpu = os.clock() - cpu0
@@ -601,7 +605,7 @@ function SurvivalLink:press(key, clock)
   return key
 end
 
-function SurvivalLink:think(stack, sources)
+function SurvivalLink:think(stack, sources, view)
   local idle = KeyDataEncoding.base64encode[1]
   if counting(stack) or not stack.stopWatchIsRunning or stack:game_ended() then return idle end
   local clock = stack.clock
@@ -612,7 +616,7 @@ function SurvivalLink:think(stack, sources)
   -- the game's window of keys goes with the board: the frames ago each key still inside it was pressed
   local ages = self.inputs:ages(clock, self.ages)
   describeSources(stack, sources)
-  local budget = ',"budget":{"limit":' .. self.inputs.limit .. ',"window":' .. self.inputs.window .. ',"ages":[' .. table.concat(ages, ",") .. ']}' .. opponentOf(sources)
+  local budget = ',"budget":{"limit":' .. self.inputs.limit .. ',"window":' .. self.inputs.window .. ',"ages":[' .. table.concat(ages, ",") .. ']}' .. opponentOf(sources, view, clock)
   local t0 = socket.gettime()
   local pieces, count = SurvivalLink.dump(stack, sources, '{"t":"f","state":', budget .. "}\n")
   local bytes = 0

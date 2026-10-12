@@ -30,6 +30,7 @@ local Y_PREFIX = NetworkProtocol.clientMessageTypes.displayEvent.prefix -- "Y" (
 local SRV_D_PREFIX = NetworkProtocol.serverMessageTypes.deathEvent.prefix -- "D" (relayed)
 local SRV_G_PREFIX = NetworkProtocol.serverMessageTypes.garbageEvent.prefix -- "G" (relayed attack)
 local SRV_I_PREFIX = NetworkProtocol.serverMessageTypes.input.prefix -- "I" (relayed player input)
+local SRV_Y_PREFIX = NetworkProtocol.serverMessageTypes.displayEvent.prefix -- "Y" (relayed board snapshot)
 
 -- The engine (GarbageDelivery, inside match:run) and DisplayEventCapture both
 -- ship via GAME.netClient. Route to the bot currently ticking — set in
@@ -271,6 +272,38 @@ function BotClient:dispatch(msg)
     local other = self.match and body and self.match.stacks and self.match.stacks[body.playerNumber]
     if other and other ~= self.myStack and type(body.input) == "string" then
       other:receiveConfirmedInput(body.input)
+    end
+  elseif msg[SRV_Y_PREFIX] then
+    -- relayed board snapshot of the opponent (what a client paints its board from): the opponent's own panels,
+    -- so how tall its stack is and whether it is topped out are read from them
+    local body = msg[SRV_Y_PREFIX]
+    local snap = type(body) == "table" and body.snapshot
+    if type(snap) == "table" and type(snap.p) == "table" and self.myStack then
+      local width, height = snap.w or 6, snap.h or 12
+      -- a snapshot is a delta: a cell sent as true is unchanged from the last one
+      local cache = self.oppCells
+      if not cache or (snap.f or 0) < (self.oppCellsFrame or 0) then cache = {}; self.oppCells = cache end
+      self.oppCellsFrame = snap.f or 0
+      for idx = 1, (height + 2) * width do
+        local v = snap.p[idx]
+        if v == true then v = cache[idx] end
+        cache[idx] = v
+      end
+      local top, out = 0, (snap.go or 0) > 0
+      for row = height, 1, -1 do
+        for col = 1, width do
+          local cell = cache[row * width + col]
+          if cell and ((cell.c or 0) ~= 0 or cell.g) then
+            if top == 0 then top = row end
+            if row == height then out = true end
+          end
+        end
+      end
+      self.oppView = { top = top, out = out, seen = self.myStack.clock, clock = snap.f, stop = (snap.st or 0) + (snap.ps or 0) }
+      self._yCount = (self._yCount or 0) + 1
+      if self._yCount == 1 or self._yCount % 400 == 0 then
+        logger.info(string.format("bot[%s]: opponent board #%d at its frame %s: top %d, topped out %s", self.name, self._yCount, tostring(snap.f), top, tostring(out)))
+      end
     end
   elseif msg[SRV_D_PREFIX] then
     -- relayed DeathEvent. For 2p, a death we didn't send = the opponent's.
@@ -522,6 +555,8 @@ function BotClient:startMatch()
   -- outcome and setting matchEnded, which stops this bot from playing or
   -- sending input for the rest of that match (and every match after it).
   self.oppDied = false
+  self.oppView = nil
+  self.oppCells = nil
   logger.info(string.format("bot[%s]: match built; my stack = slot %d; start in %dms",
     self.name, self.localPlayerNumber, self.matchStart.startInMs or 500))
 end
@@ -541,7 +576,7 @@ function BotClient:tickMatch()
   if not stack:game_ended() then
     local char
     if self.survival then
-      char = self.survival:input(stack, self.match.garbageSources[stack])
+      char = self.survival:input(stack, self.match.garbageSources[stack], self.oppView)
     elseif self.brain then
       local st = self.boardState.extract(stack)
       -- Only run the expensive per-move verify when the controller needs a NEW move; while it's mid-move (locked /

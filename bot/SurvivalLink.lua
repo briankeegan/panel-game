@@ -190,6 +190,27 @@ local function opponentOf(sources)
   end
   return ',"opp":{"out":' .. tostring(out) .. ',"top":' .. top .. "}"
 end
+-- Once a minute of play, what the sources are (one line, in the bot's log): how many stacks send this one
+-- garbage, and for the first, whether it can say it is topped out, its highest row and its stop time.
+local function describeSources(stack, sources)
+  if stack.clock % 3600 ~= 300 then return end
+  local n = sources and #sources or 0
+  local src = n > 0 and sources[1] or nil
+  local top = 0
+  if src and src.panels then
+    for row = src.height or 12, 1, -1 do
+      for col = 1, src.width or 6 do
+        local p = src.panels[row] and src.panels[row][col]
+        if p and p.color and p.color ~= 0 then top = row break end
+      end
+      if top > 0 then break end
+    end
+  end
+  print(string.format("SOURCES clock %d: %d, first %s, isToppedOut %s, panels %s, top %d, topped %s, stop %s",
+    stack.clock, n, src and tostring(src.stackType or src.name or "stack") or "-", src and type(src.isToppedOut) or "-",
+    src and type(src.panels) or "-", top, src and src.isToppedOut and tostring(src:isToppedOut()) or "-",
+    src and tostring(src.stop_time) or "-"))
+end
 local function scalars(t)
   local o = {}
   for k, v in pairs(t) do
@@ -565,6 +586,7 @@ function SurvivalLink:think(stack, sources)
   local deadline = socket.gettime() + self.thinking:snapshot().ceiling * SurvivalLink.TARGET_SHARE
   -- the game's window of keys goes with the board: the frames ago each key still inside it was pressed
   local ages = self.inputs:ages(clock, self.ages)
+  describeSources(stack, sources)
   local budget = ',"budget":{"limit":' .. self.inputs.limit .. ',"window":' .. self.inputs.window .. ',"ages":[' .. table.concat(ages, ",") .. ']}' .. opponentOf(sources)
   local t0 = socket.gettime()
   local pieces, count = SurvivalLink.dump(stack, sources, '{"t":"f","state":', budget .. "}\n")
@@ -630,7 +652,7 @@ if jit and jit.off then
   for _, f in pairs(SurvivalLink) do
     if type(f) == "function" then jit.off(f, true) end
   end
-  for _, f in ipairs({ num, numberText, enc, put, putScalar, putScalars, putGarbage, putTelegraph, scalars, opponentOf,
+  for _, f in ipairs({ num, numberText, enc, put, putScalar, putScalars, putGarbage, putTelegraph, scalars, opponentOf, describeSources,
                        getmetatable(words).__index,
                        getmetatable(firstKey).__index, getmetatable(nextKey).__index, getmetatable(quoted).__index }) do
     jit.off(f, true)

@@ -488,6 +488,7 @@ function SurvivalLink:startMatch(stack)
   self:send(enc({ t = "match", levelData = stack.levelData, behaviours = stack.behaviours,
                   stackOverConditions = stack.stackOverConditions }), true)
   self.awaiting = 1   -- the match's ok, read with the first frame's answer
+  self.warmed = false
   self.planned = nil
   self.frames = 0
 end
@@ -607,6 +608,14 @@ end
 
 function SurvivalLink:think(stack, sources, view)
   local idle = KeyDataEncoding.base64encode[1]
+  if counting(stack) and not self.warmed then
+    -- the countdown is planning time: the board the match opens on goes to the mind once, to be planned for while the game counts down
+    self.warmed = true
+    local pieces, count = SurvivalLink.dump(stack, sources, '{"t":"warm","state":', "}\n")
+    self:sendPieces(pieces, count)
+    self.awaiting = (self.awaiting or 0) + 1   -- its ok is read with the first frame's answer
+    return idle
+  end
   if counting(stack) or not stack.stopWatchIsRunning or stack:game_ended() then return idle end
   local clock = stack.clock
   -- Everything this frame costs -- the board encoded, sent, every wait and

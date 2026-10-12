@@ -54,7 +54,9 @@
   "dangerTop": 10,
   "dangerRoom": 0,
   "boundPlans": true,
-  "noIdle": true
+  "noIdle": true,
+  "raiseStopBonus": 1,
+  "raiseStopFrames": 60
  },
  "threeBreaksLast": true,
  "account": "WasmAgro_CPU"

@@ -114,14 +114,23 @@ claim() {   # NAME
   echo "pair: account $spare is now named $name"
 }
 
+# a profile name (press2) or path as the file the run loads; "default" is GameCreator's own profile. A name with no
+# file is refused: the run would fall back to the default and say nothing.
+profile_path() {   # NAME-OR-PATH
+  local p=$1
+  [ "$p" = default ] && { echo bot/profiles/beverly.json; return; }
+  [ -f "bot/profiles/$p.wasm.json" ] && { echo "bot/profiles/$p.wasm.json"; return; }
+  [ -f "$p" ] && case "$p" in *.wasm.json) echo "$p"; return;; esac
+  echo "pair: no profile '$p' (bot/profiles/$p.wasm.json)" >&2; exit 1
+}
+
 # one WasmSurvivor pair: the lobby bot (profile LP) and the challenger (profile CP), each named for its profile
 wasm_vs() {   # LP CP
   local lp=$1 cp=$2 lobby chal sfx=""
   lobby=$(account "$lp")
   [ "$(account "$cp")" = "$lobby" ] && sfx=2
   chal=$(account "$cp" "$sfx")
-  [ "$lp" = default ] && lp=bot/profiles/beverly.json
-  [ "$cp" = default ] && cp=bot/profiles/beverly.json
+  lp=$(profile_path "$lp"); cp=$(profile_path "$cp")
   stop_and_wait "· $lobby \\(wasm\\) vs you|· $chal,$lobby \\(wasm\\)"
   claim "$lobby"; claim "$chal"
   dispatch "{\"mode\":\"fight\",\"bot\":\"wasm\",\"opponent\":\"you\",\"name\":\"$lobby\",\"hours\":\"$HOURS\",\"profile\":\"$lp\",\"server\":\"$SERVER\"}"

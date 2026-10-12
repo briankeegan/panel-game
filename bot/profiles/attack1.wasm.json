@@ -23,8 +23,14 @@
   "width": 60,
   "depth": 10,
   "pool": 250,
-  "minCells": 12,
   "maxComing": 6,
-  "maxTop": 8
- }
+  "maxTop": 10,
+  "quietTop": 9,
+  "outCells": 3,
+  "minChain": 4,
+  "raiseMax": 10,
+  "raiseTo": 8,
+  "lowTop": 6
+ },
+ "threeBreaksLast": true
 }

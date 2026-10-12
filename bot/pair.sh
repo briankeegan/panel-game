@@ -99,20 +99,18 @@ account() {   # PROFILE [SUFFIX]
   p=$(printf '%s' "$p" | tr -cd 'A-Za-z0-9' | cut -c1-12)
   printf 'Sv%s%s' "${p^}" "${2:-}"
 }
-# the saved account of NAME exists on the branch
-has_identity() { gh api "repos/$REPO/contents/$IDS/$1_$HOST.txt?ref=$REF" > /dev/null 2>&1; }
-# NAME has an account: if not, a spare one is renamed to it
+# NAME has a saved account: if not, a spare one is renamed to it (the checkout's branch, committed and pushed)
 claim() {   # NAME
-  local name=$1 busy spare sha content
-  has_identity "$name" && return 0
+  local name=$1 busy spare
+  git pull -q --no-rebase origin "$REF"
+  [ -s "$IDS/${name}_$HOST.txt" ] && return 0
   busy=$(running)
-  spare=$(gh api "repos/$REPO/contents/$IDS?ref=$REF" --jq '.[] | select(.name | endswith("_'"$HOST"'.txt")) | .name | sub("_'"$HOST"'.txt$"; "")' \
-          | grep -v -E '^(Sv|BitBot)' | while read -r n; do printf '%s' "$busy" | grep -q -F "$n" || { echo "$n"; break; }; done)
+  spare=$(ls "$IDS" | sed -n 's/_'"$HOST"'\.txt$//p' | grep -v -E '^(Sv|BitBot)' \
+          | while read -r n; do printf '%s' "$busy" | grep -q -F "$n" || { echo "$n"; break; }; done)
   [ -n "$spare" ] || { echo "pair: no spare account to name $name -- every saved account is in use"; exit 1; }
-  sha=$(gh api "repos/$REPO/contents/$IDS/${spare}_$HOST.txt?ref=$REF" --jq .sha)
-  content=$(gh api "repos/$REPO/contents/$IDS/${spare}_$HOST.txt?ref=$REF" --jq .content | tr -d '\n')
-  gh api -X PUT "repos/$REPO/contents/$IDS/${name}_$HOST.txt" -f message="identities: $spare is named $name" -f content="$content" -f branch="$REF" > /dev/null
-  gh api -X DELETE "repos/$REPO/contents/$IDS/${spare}_$HOST.txt" -f message="identities: $spare is named $name" -f sha="$sha" -f branch="$REF" > /dev/null
+  git mv "$IDS/${spare}_$HOST.txt" "$IDS/${name}_$HOST.txt"
+  git commit -q -m "identities: $spare is named $name" -- "$IDS"
+  git push -q origin "HEAD:$REF"
   echo "pair: account $spare is now named $name"
 }
 

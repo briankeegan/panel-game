@@ -14,8 +14,19 @@
 --   local char = link:input(stack, match.garbageSources[stack])   -- every frame, before it is run
 local socket = require("socket")
 local KeyDataEncoding = require("common.data.KeyDataEncoding")
-local ThinkBudget = require("common.engine.computerPlayers.ThinkBudget")
-local InputBudget = require("common.engine.computerPlayers.InputBudget")
+-- the game's budget classes: in the fork's engine, or (upstream has none) the copies in bot/
+local function budgetClass(name)
+  local ok, class = pcall(require, "common.engine.computerPlayers." .. name)
+  if ok then return class end
+  return require("bot." .. name)
+end
+local ThinkBudget = budgetClass("ThinkBudget")
+local InputBudget = budgetClass("InputBudget")
+-- the countdown flag: the fork's engine calls it in_countdown, upstream's do_countdown
+local function counting(stack)
+  if stack.do_countdown ~= nil then return stack.do_countdown end
+  return stack.in_countdown
+end
 
 local SurvivalLink = {}
 SurvivalLink.__index = SurvivalLink
@@ -578,7 +589,7 @@ end
 
 function SurvivalLink:think(stack, sources)
   local idle = KeyDataEncoding.base64encode[1]
-  if stack.in_countdown or not stack.stopWatchIsRunning or stack:game_ended() then return idle end
+  if counting(stack) or not stack.stopWatchIsRunning or stack:game_ended() then return idle end
   local clock = stack.clock
   -- Everything this frame costs -- the board encoded, sent, every wait and
   -- every reply read -- counts against the frame's thinking budget, so the

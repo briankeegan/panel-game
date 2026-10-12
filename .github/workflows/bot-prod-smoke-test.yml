@@ -56,9 +56,9 @@ on:
         required: false
         default: '5'
       bot:
-        description: 'fight: who sits in the lobby as `name`'
+        description: 'fight: who sits in the lobby as `name`. live on the beta server: wasm or bitbot play it with GameCreator''s bots; anything else runs the weighted bot of `profile`'
         required: false
-        default: 'bitbot'
+        default: 'beverly'
         type: choice
         options:
           - bitbot
@@ -225,7 +225,7 @@ jobs:
       # re-run it, or run bot/beverly.sh on the server box under systemd for
       # something permanent.
       - name: Check the name and the weight set before connecting
-        if: inputs.mode == 'live' || inputs.mode == 'survival'
+        if: (inputs.mode == 'live' || inputs.mode == 'survival') && !(inputs.mode == 'live' && inputs.server == env.BETA_SERVER && (inputs.bot == 'wasm' || inputs.bot == 'bitbot'))
         run: |
           set -eu
           cd "$BOT_DIR"
@@ -273,8 +273,70 @@ jobs:
             echo "'$BOT_NAME' logs in with account id $id (same name, same account, every run)"
           done
 
+      # WASMSURVIVOR / BITBOT ON THE BETA SERVER (upstream Panel Attack). Same
+      # bots as on the fork, from GameCreator's latest main; the client is the
+      # upstream-protocol one in bot/ (branch UPSTREAM_BOT_REF), which asks them
+      # for one key per frame at the one place it picks a key. BitBot's library
+      # is built here from GameCreator's own native/build.sh line; WasmSurvivor
+      # is a Node process beside the client (bot/SurvivalLink.lua talks to it).
+      - name: Check out GameCreator (beta bot)
+        if: inputs.mode == 'live' && inputs.server == env.BETA_SERVER && (inputs.bot == 'wasm' || inputs.bot == 'bitbot')
+        uses: actions/checkout@v4
+        with:
+          repository: briankeegan/GameCreator
+          path: GameCreator
+          sparse-checkout: games/the-game
+
+      - uses: actions/setup-node@v4
+        if: inputs.mode == 'live' && inputs.server == env.BETA_SERVER && (inputs.bot == 'wasm' || inputs.bot == 'bitbot')
+        with:
+          node-version: '22'
+
+      - name: Sit in the lobby (beta, ${{ inputs.bot }})
+        if: inputs.mode == 'live' && inputs.server == env.BETA_SERVER && (inputs.bot == 'wasm' || inputs.bot == 'bitbot')
+        id: betalink
+        run: |
+          set -eu
+          eval "$(luarocks path --local --lua-version 5.1)"
+          export GC_EVAL_DIR="$GITHUB_WORKSPACE/GameCreator/games/the-game/ai/eval"
+          name='${{ inputs.name }}'
+          [ -n "$name" ] && [ ${#name} -le 16 ] || { echo "name '$name' must be 1-16 characters"; exit 1; }
+          echo "::notice::GameCreator at $(git -C "$GC_EVAL_DIR" log -1 --format='%h %s' | cut -c1-120)"
+          kind='${{ inputs.bot }}'
+          if [ "$kind" = bitbot ]; then
+            line=$(grep -E '^clang .* -shared .*libbit\.so' "$GC_EVAL_DIR/native/build.sh" | head -1)
+            (cd "$GC_EVAL_DIR/native" && eval "$line") 2> bitbot-build.log || { cat bitbot-build.log; echo "libbit.so did not build"; exit 1; }
+            brain=bitbot
+          else
+            prof='${{ inputs.profile }}'
+            prof_abs=""
+            case "$prof" in
+              *.wasm.json)
+                [ -f "$prof" ] || { echo "no WasmSurvivor profile $prof"; exit 1; }
+                w=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["weights"])' "$prof")
+                cp "$(dirname "$prof")/$w" "$GC_EVAL_DIR/$w"
+                prof_abs="$PWD/$prof"; echo "WasmSurvivor plays $prof" ;;
+              *) echo "profile '$prof' is not a *.wasm.json: WasmSurvivor plays its default" ;;
+            esac
+            GC_SURVIVOR_PROFILE="$prof_abs" GC_SURVIVOR_KEEP=4 nohup node "$GC_EVAL_DIR/survivor.js" --port 47777 > "mind-$name.log" 2>&1 &
+            for i in $(seq 1 300); do grep -q listening "mind-$name.log" && break; sleep 0.2; done
+            grep -q listening "mind-$name.log" || { cat "mind-$name.log"; echo "WasmSurvivor did not start"; exit 1; }
+            export PA_SURVIVOR_PORT=47777
+            brain=survival
+          fi
+          cd "$BOT_DIR"
+          # the engine this server runs, offline, before the lobby: the bot must press keys that reach it
+          PA_PREFLIGHT_NAME="$name ($brain, upstream engine)" PA_PREFLIGHT_BRAIN=$([ "$brain" = bitbot ] && echo bitbot) PA_PREFLIGHT_LATE_OK=1 \
+            luajit bot/linkPreflight.lua 600 2>&1 | tee "$GITHUB_WORKSPACE/preflight-$name.log"
+          [ "${PIPESTATUS[0]}" -eq 0 ] || { echo "the bot does not play on this engine; not joining the lobby"; exit 1; }
+          secs=$(( ${{ inputs.hours }} * 3600 ))
+          echo "::notice::$name ($brain) joining $BOT_HOST:$BOT_PORT for ${{ inputs.hours }}h"
+          set -o pipefail
+          timeout "$secs" luajit bot/playBot.lua "$BOT_HOST" "$BOT_PORT" "$name" 4 12 "$brain" \
+            2>&1 | tee "$GITHUB_WORKSPACE/bot-prod-smoke.log" || [ $? -eq 124 ]
+
       - name: Sit in the lobby
-        if: inputs.mode == 'live'
+        if: inputs.mode == 'live' && !(inputs.mode == 'live' && inputs.server == env.BETA_SERVER && (inputs.bot == 'wasm' || inputs.bot == 'bitbot'))
         id: live
         env:
           PA_SEARCH_PROFILE: ${{ inputs.profile }}

@@ -16,14 +16,14 @@
 # SvDefault; a challenger on the lobby's own profile gets a 2). The name cannot be given. A name with no
 # saved account takes a spare one (bot/identities/*.txt not named Sv..., not BitBot...): its saved id is
 # moved to the new name, and the server renames the account when it logs in.
-#   bot/pair.sh beta [NAME] [HOURS] [PROFILE]
-#                                     a weighted bot (Beverly/Plamp) in the lobby of UPSTREAM's beta server
+#   bot/pair.sh beta [BOT] [NAME] [HOURS] [PROFILE]
+#                                     a bot in the lobby of UPSTREAM's beta server
 #                                     (betaserver.panelattack.com:59569) -- the real Panel Attack game, not
-#                                     the Bramp fork. Cancels its earlier beta run first. NAME defaults to
-#                                     Beverly, PROFILE to bot/profiles/beverly.json. Upstream assigns the
-#                                     account id; the run commits it back so the name is reused. Pin the
-#                                     build with PA_UPSTREAM_REF=<commit/tag/branch> (default: the
-#                                     betaserver-live tag if upstream has one, else the latest beta).
+#                                     the Bramp fork. BOT is beverly (default), plamp, wasm (WasmSurvivor) or
+#                                     bitbot. Cancels its earlier beta run first. Upstream assigns the account
+#                                     id; the run commits it back so the name is reused. Pin the build with
+#                                     PA_UPSTREAM_REF=<commit/tag/branch> (default: the betaserver-live tag if
+#                                     upstream has one, else the latest beta).
 #   bot/pair.sh profiles              list the profiles wasm-vs can take (and "default")
 #   bot/pair.sh stop                  cancel every fight run that is going
 #   bot/pair.sh status                list the fight runs that are going
@@ -150,10 +150,19 @@ wasm_vs() {   # LP CP
 BITBOT_RUN='BitBot \(bitbot\)'
 WASM_RUN='\(wasm\) vs challenge'
 
-dispatch_beta() {   # NAME HOURS PROFILE
+dispatch_beta() {   # BOT NAME HOURS PROFILE
   local ref=${PA_UPSTREAM_REF:-}
-  dispatch "{\"mode\":\"live\",\"server\":\"betaserver.panelattack.com:59569\",\"name\":\"$1\",\"hours\":\"$2\",\"profile\":\"$3\",\"upstream_ref\":\"$ref\"}"
-  echo "pair: $1 queued on the beta server (upstream Panel Attack; the server assigns its account id)"
+  dispatch "{\"mode\":\"live\",\"server\":\"betaserver.panelattack.com:59569\",\"bot\":\"$1\",\"name\":\"$2\",\"hours\":\"$3\",\"profile\":\"$4\",\"upstream_ref\":\"$ref\"}"
+  echo "pair: $2 ($1) queued on the beta server (upstream Panel Attack; the server assigns its account id)"
+}
+# the profile a bot plays by default
+beta_profile() {   # BOT
+  case "$1" in
+    wasm)            echo bot/profiles/wasmbot.wasm.json ;;
+    beverly|plamp)   echo "bot/profiles/$1.json" ;;
+    bitbot)          echo bot/profiles/beverly.json ;;   # (BitBot has no profile; the field is unused)
+    *) echo "pair: no bot '$1' (beverly, plamp, wasm or bitbot)" >&2; exit 2 ;;
+  esac
 }
 
 case "${1:-}" in
@@ -161,7 +170,9 @@ case "${1:-}" in
   start-bitbot) stop_and_wait "$BITBOT_RUN"; dispatch_bitbot ;;
   start-wasm)   stop_and_wait "$WASM_RUN";   dispatch_wasm ;;
   wasm-vs)      HOURS=${4:-5}; wasm_vs "${2:?lobby profile}" "${3:?challenger profile}" ;;
-  beta)         stop_and_wait "betaserver"; dispatch_beta "${2:-Beverly}" "${3:-5}" "${4:-bot/profiles/beverly.json}" ;;
+  beta)         bot=${2:-beverly}; name=${3:-$(case $bot in wasm) echo WasmSurvivor;; bitbot) echo BitBot;; plamp) echo Plamp;; *) echo Beverly;; esac)}
+                prof=${5:-$(beta_profile "$bot")}
+                stop_and_wait "betaserver"; dispatch_beta "$bot" "$name" "${4:-5}" "$prof" ;;
   profiles)     echo default; git ls-files 'bot/profiles/*.wasm.json' | sed 's/^/ /' ;;
   stop)         out=$(cancel_matching .); printf '%s\n' "$out" | sed '$d'
                 [ "$(printf '%s\n' "$out" | tail -1)" -gt 0 ] || echo "pair: nothing running" ;;

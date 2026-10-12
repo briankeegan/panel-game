@@ -26,7 +26,16 @@
 --   local char = bb:input(stack)       -- every frame, before it is run
 local ffi = require("ffi")
 local KeyDataEncoding = require("common.data.KeyDataEncoding")
-local ThinkBudget = require("common.engine.computerPlayers.ThinkBudget")
+local ThinkBudget
+do   -- the game's budget class: in the fork's engine, or (upstream has none) the copy in bot/
+  local ok, class = pcall(require, "common.engine.computerPlayers.ThinkBudget")
+  ThinkBudget = ok and class or require("bot.ThinkBudget")
+end
+-- the countdown flag: the fork's engine calls it in_countdown, upstream's do_countdown
+local function counting(stack)
+  if stack.do_countdown ~= nil then return stack.do_countdown end
+  return stack.in_countdown
+end
 
 local DEATHLOG = tonumber(os.getenv("PA_BITBOT_DEATHLOG") or 90)   -- frames of BitBot's own log kept, printed if it dies (train.lua GC_DEATHLOG)
 local LOGP, LOGN = ffi.new("char *[1]"), ffi.new("size_t[1]")
@@ -97,6 +106,7 @@ end
 -- train.lua load(): the stack into BitBot's board -- and nothing to come
 -- (see the top).
 function BitBotNative:load(a)
+  if a.do_countdown ~= nil then a.in_countdown = a.do_countdown and true or false end
   local HI, NH, pv = self.HI, self.NH, self.pv
   local H, B = C.nb_io_head(), C.nb_io_body()
   for i = 0, NH - 1 do H[i] = 0 / 0 end
@@ -156,7 +166,7 @@ end
 -- (train.lua plays it out idle); BitBot starts when the stopwatch does.
 function BitBotNative:input(stack)
   local idle = KeyDataEncoding.base64encode[1]
-  if stack.in_countdown or not stack.stopWatchIsRunning or stack:game_ended() then
+  if counting(stack) or not stack.stopWatchIsRunning or stack:game_ended() then
     -- train.lua makes the bot during the countdown, not on a live frame
     if self.fid < 0 and not stack:game_ended() then
       self:load(stack)

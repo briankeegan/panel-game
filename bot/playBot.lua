@@ -47,6 +47,26 @@ print(string.format(
   "\n=== Bot '%s' (%s, L%d, %s, %s) is idle in the lobby on %s:%d ===\n    Open your client, CHALLENGE '%s' in the lobby, and play — it auto-accepts.\n    Ctrl+C to stop.\n",
   name, bot.brainKind, bot.level, speedDesc, bot.ranked and "RANKED" or "unranked", ip, port, name))
 
+-- PA_CHALLENGE=<name>: also CHALLENGE that player whenever both sides are in the lobby (it
+-- auto-accepts if it is a bot like this one; a person accepts in the lobby), and keep rematching.
+-- Unset: the bot only waits to be challenged, as always.
+local challengeName = os.getenv("PA_CHALLENGE")
+if challengeName == "" then challengeName = nil end
+local lastChallengeAt = 0
+local function challengeIfFree()
+  if not challengeName or bot.inRoom or bot.match or not bot.lobbyPlayers then return end
+  local now = socket.gettime()
+  if now - lastChallengeAt < 3 then return end
+  for _, p in pairs(bot.lobbyPlayers) do
+    if p.name == challengeName and p.state == "lobby" then
+      lastChallengeAt = now
+      bot:challenge(p.publicId, require("common.data.GameModes").IDs.TWO_PLAYER_VS)
+      return
+    end
+  end
+end
+if challengeName then print("    and challenging '" .. challengeName .. "' whenever both are in the lobby.\n") end
+
 local function playerCount()
   local n = 0
   if bot.players then for _ in pairs(bot.players) do n = n + 1 end end
@@ -64,6 +84,7 @@ local worstOffSchedule = 0
 
 while true do
   bot:pump()
+  challengeIfFree()
   if bot.disconnected then print("disconnected from the server"); os.exit(1) end
 
   -- (Re)ready every 1.5s while in a room with an opponent and no match running;

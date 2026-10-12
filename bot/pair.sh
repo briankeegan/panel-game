@@ -180,7 +180,7 @@ case "${1:-}" in
   beta-vs)      opp=${2:?the opponent\'s lobby name}; prof=${4:-$(beta_profile wasm)}
                 stop_and_wait "betaserver|panelattack\.com"; dispatch_beta wasm "WasmSurvivor_CPU,$opp" "${3:-5}" "$prof" ;;
   profiles)     echo default; git ls-files 'bot/profiles/*.wasm.json' | sed 's/^/ /' ;;
-  stop)         out=$(cancel_matching .); printf '%s\n' "$out" | sed '$d'
+  stop)         out=$(cancel_matching '^fight · '); printf '%s\n' "$out" | sed '$d'
                 [ "$(printf '%s\n' "$out" | tail -1)" -gt 0 ] || echo "pair: nothing running" ;;
   status)       out=$(running); if [ -n "$out" ]; then printf '%s\n' "$out"; else echo "pair: nothing running"; fi ;;
   *)            sed -n '2,/^set -eu/p' "$0" | sed '$d'; exit 2 ;;

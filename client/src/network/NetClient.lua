@@ -1436,10 +1436,49 @@ end)
 
 NetClient.STATES = states
 
+-- Self-heal: the Lobby scene being active is itself proof we're not actually
+-- in a match anymore, no matter what internal state thinks. Every other fix
+-- in this file assumes SOME specific exit path ran to completion (leaveRoom,
+-- the pending-leave timeout, a server confirmation); each is a real gap this
+-- closes when a path nobody's found yet leaves self.state stuck off ONLINE
+-- (e.g. a spectated match that hung without ever cleanly ending, escaped via
+-- whatever combination of back-presses actually got the player out). Once
+-- state is stuck like that, nothing recovers it on its own: the lobby
+-- listeners -- including the one that completes a spectate request, and the
+-- one that would otherwise auto-leave a stale spectate room in
+-- maybeEnterRoomFromLobby below -- only run while state IS ONLINE, so being
+-- stuck off it is self-perpetuating. Trust the UI over the state machine.
+function NetClient:recoverToOnlineIfStuck()
+  if self.state ~= states.ROOM and self.state ~= states.INGAME then return end
+  logger.warn(string.format(
+    "NetClient: Lobby reached while state=%s -- forcing recovery to ONLINE", tostring(self.state)))
+  _clearMatchInputState(self)
+  if self.room then
+    if self.room.match then
+      self.room.match:disconnectSignal("matchEnded", self.room)
+      self.room.match:abort()
+      self.room.match:deinit()
+    end
+    self.room:shutdown()
+    self.room = nil
+  end
+  GAME.battleRoom = nil
+  self._pendingLeaveRoom = nil
+  self._pendingLeaveRoomAt = nil
+  self._pendingLeaveRoomRef = nil
+  -- A spectate request sent while stuck would otherwise hang forever -- its
+  -- response can only be collected while state is ONLINE (see requestSpectate's
+  -- pendingResponses.spectateResponse guard, which blocks every future
+  -- request until this is cleared).
+  self.pendingResponses.spectateResponse = nil
+  self:setState(states.ONLINE)
+end
+
 -- Lobby-side check: if the local player holds a slot in a room and that room
 -- is ready for the waiting room, push the room scene. Reuses the existing
 -- isRoomReadyForWaitingRoom / getSceneFromRoom helpers.
 function NetClient:maybeEnterRoomFromLobby()
+  self:recoverToOnlineIfStuck()
   if self.state ~= states.ONLINE then return false end
   if not self.room then return false end
 
@@ -1995,6 +2034,18 @@ function NetClient:update(dt)
       and love.timer.getTime() - self._pendingLeaveRoomAt > LEAVE_ROOM_CONFIRM_TIMEOUT then
     logger.warn("leaveRoom confirmation timed out; forcing local cleanup")
     _cleanupRoomLocally(self, self._pendingLeaveRoomRef)
+  end
+
+  -- Same self-heal as recoverToOnlineIfStuck, run every tick rather than only
+  -- when something happens to call it: sitting on the Lobby scene while
+  -- state is stuck off ONLINE is a contradiction on its own (nothing else
+  -- shows the Lobby), so don't wait on a signal or a scene reload to notice.
+  do
+    local topScene = GAME.navigationStack and GAME.navigationStack.scenes
+      and GAME.navigationStack.scenes[#GAME.navigationStack.scenes]
+    if topScene and topScene.name == "Lobby" then
+      self:recoverToOnlineIfStuck()
+    end
   end
 
   -- Drain the simulated-lag queues (PA_NETWORK_LAG_MS). When delayedProcessing

@@ -184,6 +184,12 @@ here" is never the answer — check the workflows first.
 
 ## Who fights who: `bot/fight.sh` / `mode: fight`
 
+- **A fight account is named for the profile it plays**, every time: `bot/pair.sh wasm-vs LOBBY_PROFILE CHALLENGER_PROFILE [HOURS]`
+  derives it (`Sv` + the profile's name: press2 -> `SvPress2`, default -> `SvDefault`) and takes no name. A name
+  with no saved account renames a spare one (`bot/identities`) by moving its saved id; the server renames the
+  account on login. A name that says one thing while the account plays another is a bug.
+
+
 Pick any bot for each side; both play on the fork's server, unranked.
 
 - Workflow: `bot-prod-smoke-test.yml`, `mode: fight`, `ref: bramp/multi-player`.

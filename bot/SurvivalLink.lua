@@ -109,13 +109,14 @@ local function putScalars(t)
   put("}")
 end
 -- a list of garbage blocks; an empty list is the empty object, as `enc` writes it
-local function putGarbage(q)
+local function putGarbage(q, from, to)
   local n = q and #q or 0
-  if n == 0 then put("{}") return end
+  from, to = from or 1, to or n
+  if n == 0 or from > to then put("{}") return end
   put("[")
-  for i = 1, n do
+  for i = from, to do
     local g = q[i]
-    if i > 1 then put(",") end
+    if i > from then put(",") end
     put('{"width":') putScalar(g.width)
     put(',"height":') putScalar(g.height)
     put(',"isMetal":') putScalar(g.isMetal or false)
@@ -129,6 +130,12 @@ end
 -- The garbage each source has sent and not yet delivered: what its
 -- telegraph shows (staged, oldest last) and what has left it (transit, by
 -- the stopWatch it lands on). Its colours are not in it.
+--
+-- Only the garbage due soonest is sent: a source's transit in the order it lands, then its staged from the end of
+-- the list (the end ships first), up to SOURCE_PIECES in all. The survival bot's search takes the 64 soonest of
+-- everything on its way, so a queue of hundreds costs a board tens of kilobytes to encode, send and read every
+-- frame for pieces nothing looks at; the margin past 64 keeps the garbage that enters the 64 from arriving unforeseen.
+local SOURCE_PIECES = 160
 local function putTelegraph(sources)
   if not sources or #sources == 0 then put("{}") return end
   put("[")
@@ -137,25 +144,72 @@ local function putTelegraph(sources)
     if i > 1 then put(",") end
     put("{")
     if src.stopWatch ~= nil then put('"stopWatch":') putScalar(src.stopWatch) put(",") end
-    put('"staged":') putGarbage(q and q.stagedGarbage)
-    put(',"transit":')
-    local any = false
+    -- the transit comes first in the order it lands: whole entries until SOURCE_PIECES are in
+    local sent, staged = 0, q and q.stagedGarbage
+    local transit = {}
     if q and q.transitTimers then
       for k = q.transitTimers.first, q.transitTimers.last do
         local t = q.transitTimers[k]
-        if t then
-          put(any and "," or "[")
-          any = true
-          put('{"at":') putScalar(t)
-          put(',"garbage":') putGarbage(q.garbageInTransit[t])
-          put("}")
+        if t and sent < SOURCE_PIECES then
+          transit[#transit + 1] = t
+          sent = sent + #(q.garbageInTransit[t] or {})
         end
       end
     end
-    put(any and "]" or "{}")
+    -- then the staged that ship first, the last of the list
+    local stagedCount = staged and #staged or 0
+    local keep = math.max(0, math.min(stagedCount, SOURCE_PIECES - sent))
+    put('"staged":') putGarbage(staged, stagedCount - keep + 1, stagedCount)
+    put(',"transit":')
+    for n, t in ipairs(transit) do
+      put(n > 1 and "," or "[")
+      put('{"at":') putScalar(t)
+      put(',"garbage":') putGarbage(q.garbageInTransit[t])
+      put("}")
+    end
+    put(#transit > 0 and "]" or "{}")
     put("}")
   end
   put("]")
+end
+-- Whether a stack this one fights is topped out (a panel in its top row), and the highest row it has a panel in.
+local function opponentOf(sources)
+  local out, top = false, 0
+  for _, src in ipairs(sources or {}) do
+    if type(src.isToppedOut) == "function" and src.panels then
+      if src:isToppedOut() then out = true end
+      for row = src.height or 12, 1, -1 do
+        local found = false
+        for col = 1, src.width or 6 do
+          local p = src.panels[row] and src.panels[row][col]
+          if p and p.color and p.color ~= 0 then found = true break end
+        end
+        if found then if row > top then top = row end break end
+      end
+    end
+  end
+  return ',"opp":{"out":' .. tostring(out) .. ',"top":' .. top .. "}"
+end
+-- Once a minute of play, what the sources are (one line, in the bot's log): how many stacks send this one
+-- garbage, and for the first, whether it can say it is topped out, its highest row and its stop time.
+local function describeSources(stack, sources)
+  if stack.clock % 3600 ~= 300 then return end
+  local n = sources and #sources or 0
+  local src = n > 0 and sources[1] or nil
+  local top = 0
+  if src and src.panels then
+    for row = src.height or 12, 1, -1 do
+      for col = 1, src.width or 6 do
+        local p = src.panels[row] and src.panels[row][col]
+        if p and p.color and p.color ~= 0 then top = row break end
+      end
+      if top > 0 then break end
+    end
+  end
+  print(string.format("SOURCES clock %d: %d, first %s, isToppedOut %s, panels %s, top %d, topped %s, stop %s",
+    stack.clock, n, src and tostring(src.stackType or src.name or "stack") or "-", src and type(src.isToppedOut) or "-",
+    src and type(src.panels) or "-", top, src and src.isToppedOut and tostring(src:isToppedOut()) or "-",
+    src and tostring(src.stop_time) or "-"))
 end
 local function scalars(t)
   local o = {}
@@ -269,8 +323,8 @@ end
 -- The table every string is interned in doubles when it fills and halves when it is a quarter full, and
 -- doubling rehashes every string in it: about ten milliseconds for what the game keeps there. A frame that makes
 -- strings with the collector stopped is the one that fills it. Holding enough strings that it is always more than a
--- quarter full keeps it from halving, and so from doubling again.
-local PINNED_STRINGS = 140000
+-- quarter full keeps it from halving, and a table sized for more than a match makes keeps it from doubling.
+local PINNED_STRINGS = 540000   -- a table of a million slots, which a match does not fill
 function SurvivalLink.warm()
   if not SurvivalLink.pinned then
     local pinned = {}
@@ -287,9 +341,10 @@ function SurvivalLink.warm()
   collectgarbage()
 end
 
--- A frame is held to this share of the thinking ceiling: what the system's own
--- pauses take from a frame comes out of the rest.
-SurvivalLink.TARGET_SHARE = 0.35
+-- A frame is held to this share of the thinking ceiling, counted from the start of its
+-- board's encoding: the sidecar's thread can wait two to three milliseconds for a core
+-- before it reads the line, and the rest of the ceiling is for what the system's pauses take.
+SurvivalLink.TARGET_SHARE = 0.5
 function SurvivalLink.new(opts)
   opts = opts or {}
   local self = setmetatable({}, SurvivalLink)
@@ -437,6 +492,7 @@ function SurvivalLink:input(stack, sources)
   collectgarbage("restart")
   if not ok then error(key, 0) end
   if self.ownThinking then self.thinking:charge(took) end
+  if took > (self.worstTook or 0) then self.worstTook, self.worstClock = took, stack.clock end
   local st = self.steps
   if st then
     for name, v in pairs(st) do
@@ -530,7 +586,8 @@ function SurvivalLink:think(stack, sources)
   local deadline = socket.gettime() + self.thinking:snapshot().ceiling * SurvivalLink.TARGET_SHARE
   -- the game's window of keys goes with the board: the frames ago each key still inside it was pressed
   local ages = self.inputs:ages(clock, self.ages)
-  local budget = ',"budget":{"limit":' .. self.inputs.limit .. ',"window":' .. self.inputs.window .. ',"ages":[' .. table.concat(ages, ",") .. ']}'
+  describeSources(stack, sources)
+  local budget = ',"budget":{"limit":' .. self.inputs.limit .. ',"window":' .. self.inputs.window .. ',"ages":[' .. table.concat(ages, ",") .. ']}' .. opponentOf(sources)
   local t0 = socket.gettime()
   local pieces, count = SurvivalLink.dump(stack, sources, '{"t":"f","state":', budget .. "}\n")
   local bytes = 0
@@ -573,6 +630,7 @@ end
 ---The frames whose thinking cost more than the ceiling, the worst frame (seconds), and the keys the allowance refused.
 ---The longest each step of a frame took, and the longest each took in a frame that went over the ceiling (seconds).
 function SurvivalLink:phases()
+  self.phase.worstClock = self.worstClock
   return self.phase
 end
 
@@ -594,7 +652,7 @@ if jit and jit.off then
   for _, f in pairs(SurvivalLink) do
     if type(f) == "function" then jit.off(f, true) end
   end
-  for _, f in ipairs({ num, numberText, enc, put, putScalar, putScalars, putGarbage, putTelegraph, scalars,
+  for _, f in ipairs({ num, numberText, enc, put, putScalar, putScalars, putGarbage, putTelegraph, scalars, opponentOf, describeSources,
                        getmetatable(words).__index,
                        getmetatable(firstKey).__index, getmetatable(nextKey).__index, getmetatable(quoted).__index }) do
     jit.off(f, true)

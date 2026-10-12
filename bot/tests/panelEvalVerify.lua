@@ -80,7 +80,7 @@ local function gridsFrom(flat)
   return eval, sim
 end
 
--- Floating-point features (colourVariance, maxHeight, fillRatio, flatTop,
+-- Floating-point features (colourVariance, maxHeight, material, flatTop,
 -- travelCost) cannot be compared for equality across two languages' printf and
 -- JSON round-trips. 1e-9 is far tighter than any real disagreement and far
 -- looser than the last bits of a double.

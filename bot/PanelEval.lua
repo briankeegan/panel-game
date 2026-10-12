@@ -363,14 +363,18 @@ local function maxHeight(input)
   return top + (input.displacement or 0) / 16
 end
 
--------------------------------------------------------------------- fillRatio
-local function fillRatio(input)
+--------------------------------------------------------------------- material
+-- Colour panels over total cells: the stock a move leaves to build with.
+-- Garbage (-2) cannot be matched and the dimmed incoming row (-1) is not
+-- playable yet, so neither is material. Held apart from maxHeight so depth of
+-- stock and nearness to the ceiling carry their own weights.
+local function material(input)
   local board = input.board
   local grid, W, H = board.grid, board.width, board.height
   if W == 0 or H == 0 then return 0 end
   local used = 0
   for r = 1, H do
-    for c = 1, W do if grid[r][c] ~= 0 then used = used + 1 end end
+    for c = 1, W do if grid[r][c] > 0 then used = used + 1 end end
   end
   return used / (W * H)
 end
@@ -648,7 +652,7 @@ PanelEval.FEATURES = {
   { key = "edgePenalty",      group = "board",  sign = -1, norm = 24, fn = edgePenalty, perPanel = true },
   { key = "garbageOnBoard",   group = "board",  sign = -1, norm = 72, fn = garbageOnBoard },
   { key = "maxHeight",        group = "board",  sign = -1, norm = 13, fn = maxHeight },
-  { key = "fillRatio",        group = "board",  sign = -1, norm = 1, fn = fillRatio },
+  { key = "material",         group = "board",  sign =  1, norm = 1, fn = material },
   { key = "roughness",        group = "board",  sign = -1, norm = 36, fn = roughness },
   { key = "garbageAdjacency", group = "board",  sign =  1, norm = 24, fn = garbageAdjacency },
   { key = "colourScarcity",   group = "board",  sign = -1, norm = 6, fn = colourScarcity },

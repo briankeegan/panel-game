@@ -15,5 +15,7 @@
  "threesLast": true,
  "nativeCands": true,
  "bank": true,
- "raiseTo": 8
+ "raiseTo": 8,
+ "bankTop": 11,
+ "bankForce": true
 }

@@ -6,13 +6,25 @@
 #                                     BitBot sits in the lobby, WasmSurvivor_Bot challenges it
 #   bot/pair.sh start-bitbot [HOURS]  cancel BitBot's run if going, start only BitBot
 #   bot/pair.sh start-wasm [HOURS]    cancel WasmSurvivor_Bot's run if going, start only it
+#   bot/pair.sh wasm-vs LOBBY_PROFILE CHALLENGER_PROFILE [HOURS]
+#                                     two WasmSurvivors, each on its own profile (a bot/profiles/*.wasm.json,
+#                                     or "default" for GameCreator's survivor.profile.json). LOBBY_PROFILE
+#                                     sits in the lobby, CHALLENGER_PROFILE challenges it. Cancels the runs
+#                                     of its own two accounts first; other pairs are left alone.
+#
+# AN ACCOUNT IS NAMED FOR THE PROFILE IT PLAYS: Sv + the profile's name (press2 -> SvPress2, default ->
+# SvDefault; a challenger on the lobby's own profile gets a 2). The name cannot be given. A name with no
+# saved account takes a spare one (bot/identities/*.txt not named Sv..., not BitBot...): its saved id is
+# moved to the new name, and the server renames the account when it logs in.
 #   bot/pair.sh beta [NAME] [HOURS] [PROFILE]
-#                                     a weighted bot (Beverly/Plamp) in the lobby of UPSTREAM's beta
-#                                     server (betaserver.panelattack.com:59569), the real Panel Attack
-#                                     game. Cancels its earlier beta run first. NAME defaults to
-#                                     Beverly, PROFILE to bot/profiles/beverly.json. Pin the build with
-#                                     PA_UPSTREAM_REF=<commit/tag/branch> (default: the betaserver-live
-#                                     tag if upstream has one, else the latest beta).
+#                                     a weighted bot (Beverly/Plamp) in the lobby of UPSTREAM's beta server
+#                                     (betaserver.panelattack.com:59569) -- the real Panel Attack game, not
+#                                     the Bramp fork. Cancels its earlier beta run first. NAME defaults to
+#                                     Beverly, PROFILE to bot/profiles/beverly.json. Upstream assigns the
+#                                     account id; the run commits it back so the name is reused. Pin the
+#                                     build with PA_UPSTREAM_REF=<commit/tag/branch> (default: the
+#                                     betaserver-live tag if upstream has one, else the latest beta).
+#   bot/pair.sh profiles              list the profiles wasm-vs can take (and "default")
 #   bot/pair.sh stop                  cancel every fight run that is going
 #   bot/pair.sh status                list the fight runs that are going
 #
@@ -32,7 +44,7 @@ WORKFLOW=bot-prod-smoke-test.yml
 SERVER=${PA_SERVER:-104.156.250.136:49569}
 PROFILE=${PA_WASM_PROFILE:-bot/profiles/wasmbot.wasm.json}
 RELEASE_WAIT=${PA_RELEASE_WAIT:-120}   # the most to wait for a cancelled run to finish
-HOURS=${2:-5}
+HOURS=${2:-5}   # start takes HOURS second; wasm-vs takes it fourth
 
 # every fight run going, one "id<TAB>title" per line
 running() {
@@ -86,20 +98,71 @@ dispatch_wasm() {
   echo "pair: WasmSurvivor_Bot queued (challenges BitBot)"
 }
 
+HOST=${SERVER%%:*}
+IDS=bot/identities
+# the account name for a profile
+account() {   # PROFILE [SUFFIX]
+  local p=$1
+  p=${p##*/}; p=${p%.wasm.json}; p=${p%.json}
+  p=$(printf '%s' "$p" | tr -cd 'A-Za-z0-9' | cut -c1-12)
+  printf 'Sv%s%s' "${p^}" "${2:-}"
+}
+# NAME has a saved account: if not, a spare one is renamed to it (the checkout's branch, committed and pushed)
+claim() {   # NAME
+  local name=$1 busy spare
+  git pull -q --no-rebase origin "$REF"
+  [ -s "$IDS/${name}_$HOST.txt" ] && return 0
+  busy=$(running)
+  spare=$(ls "$IDS" | sed -n 's/_'"$HOST"'\.txt$//p' | grep -v -E '^(Sv|BitBot)' \
+          | while read -r n; do printf '%s' "$busy" | grep -q -F "$n" || { echo "$n"; break; }; done)
+  [ -n "$spare" ] || { echo "pair: no spare account to name $name -- every saved account is in use"; exit 1; }
+  git mv "$IDS/${spare}_$HOST.txt" "$IDS/${name}_$HOST.txt"
+  git commit -q -m "identities: $spare is named $name" -- "$IDS"
+  git push -q origin "HEAD:$REF"
+  echo "pair: account $spare is now named $name"
+}
+
+# a profile name (press2) or path as the file the run loads; "default" is GameCreator's own profile. A name with no
+# file is refused: the run would fall back to the default and say nothing.
+profile_path() {   # NAME-OR-PATH
+  local p=$1
+  [ "$p" = default ] && { echo bot/profiles/beverly.json; return; }
+  [ -f "bot/profiles/$p.wasm.json" ] && { echo "bot/profiles/$p.wasm.json"; return; }
+  [ -f "$p" ] && case "$p" in *.wasm.json) echo "$p"; return;; esac
+  echo "pair: no profile '$p' (bot/profiles/$p.wasm.json)" >&2; exit 1
+}
+
+# one WasmSurvivor pair: the lobby bot (profile LP) and the challenger (profile CP), each named for its profile
+wasm_vs() {   # LP CP
+  local lp=$1 cp=$2 lobby chal sfx=""
+  lobby=$(account "$lp")
+  [ "$(account "$cp")" = "$lobby" ] && sfx=2
+  chal=$(account "$cp" "$sfx")
+  lp=$(profile_path "$lp"); cp=$(profile_path "$cp")
+  stop_and_wait "· $lobby \\(wasm\\) vs you|· $chal,$lobby \\(wasm\\)"
+  claim "$lobby"; claim "$chal"
+  dispatch "{\"mode\":\"fight\",\"bot\":\"wasm\",\"opponent\":\"you\",\"name\":\"$lobby\",\"hours\":\"$HOURS\",\"profile\":\"$lp\",\"server\":\"$SERVER\"}"
+  echo "pair: $lobby ($lp) queued (sits in the lobby)"
+  dispatch "{\"mode\":\"fight\",\"bot\":\"wasm\",\"opponent\":\"challenge\",\"name\":\"$chal,$lobby\",\"hours\":\"$HOURS\",\"profile\":\"$cp\",\"server\":\"$SERVER\"}"
+  echo "pair: $chal ($cp) queued (challenges $lobby)"
+}
+
+BITBOT_RUN='BitBot \(bitbot\)'
+WASM_RUN='\(wasm\) vs challenge'
+
 dispatch_beta() {   # NAME HOURS PROFILE
   local ref=${PA_UPSTREAM_REF:-}
   dispatch "{\"mode\":\"live\",\"server\":\"betaserver.panelattack.com:59569\",\"name\":\"$1\",\"hours\":\"$2\",\"profile\":\"$3\",\"upstream_ref\":\"$ref\"}"
   echo "pair: $1 queued on the beta server (upstream Panel Attack; the server assigns its account id)"
 }
 
-BITBOT_RUN='BitBot \(bitbot\)'
-WASM_RUN='\(wasm\) vs challenge'
-
 case "${1:-}" in
   start)        stop_and_wait .;             dispatch_bitbot; sleep 2; dispatch_wasm ;;
   start-bitbot) stop_and_wait "$BITBOT_RUN"; dispatch_bitbot ;;
   start-wasm)   stop_and_wait "$WASM_RUN";   dispatch_wasm ;;
-  beta)         stop_and_wait "betaserver";  dispatch_beta "${2:-Beverly}" "${3:-5}" "${4:-bot/profiles/beverly.json}" ;;
+  wasm-vs)      HOURS=${4:-5}; wasm_vs "${2:?lobby profile}" "${3:?challenger profile}" ;;
+  beta)         stop_and_wait "betaserver"; dispatch_beta "${2:-Beverly}" "${3:-5}" "${4:-bot/profiles/beverly.json}" ;;
+  profiles)     echo default; git ls-files 'bot/profiles/*.wasm.json' | sed 's/^/ /' ;;
   stop)         out=$(cancel_matching .); printf '%s\n' "$out" | sed '$d'
                 [ "$(printf '%s\n' "$out" | tail -1)" -gt 0 ] || echo "pair: nothing running" ;;
   status)       out=$(running); if [ -n "$out" ]; then printf '%s\n' "$out"; else echo "pair: nothing running"; fi ;;

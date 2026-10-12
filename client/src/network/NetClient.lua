@@ -457,10 +457,13 @@ local function start2pVsOnlineMatch(self, createRoomMessage)
   -- Defensive: we're demonstrably in a room now (the server just put us in
   -- one), so any stale pending-leave flag from a round trip that never
   -- completed can't still be meaningful -- don't let it block future "am I
-  -- in a room" checks.
+  -- in a room" checks. _pendingLeaveRoomRef is deliberately NOT cleared here:
+  -- it identifies the specific room OBJECT a leave was asked for (not just a
+  -- room number), so it stays meaningful even if we've since rejoined a room
+  -- with the same number -- that's what lets a late confirmation for the OLD
+  -- room be recognized as stale instead of tearing down the room we're in now.
   self._pendingLeaveRoom = nil
   self._pendingLeaveRoomAt = nil
-  self._pendingLeaveRoomNumber = nil
 
   -- Pending-promotion transition: we were watching the match as a queued
   -- joiner; addToRoom means the previous match ended and we've been promoted.
@@ -660,16 +663,21 @@ local function processLeaveRoomMessage(self, message)
   -- clear below is unconditionally correct; everything else only applies
   -- if self.room is still (or has no better claim to be) the room this
   -- confirmation is actually for.
-  local pendingFor = self._pendingLeaveRoomNumber
-  local currentRoomNumber = self.room and self.room.roomNumber
-  local stale = pendingFor ~= nil and currentRoomNumber ~= nil and currentRoomNumber ~= pendingFor
+  --
+  -- Compared by OBJECT, not room number: rejoining/re-spectating can land
+  -- you on a NEW room object that happens to share the old room's number,
+  -- and a number-only comparison would wrongly call that "the same room" --
+  -- treating this stale confirmation as live and tearing down the room we
+  -- just (re)joined.
+  local pendingForRef = self._pendingLeaveRoomRef
+  local stale = pendingForRef ~= nil and self.room ~= nil and self.room ~= pendingForRef
   self._pendingLeaveRoom = nil
   self._pendingLeaveRoomAt = nil
-  self._pendingLeaveRoomNumber = nil
+  self._pendingLeaveRoomRef = nil
   if stale then
     logger.info(string.format(
       "Stale leave_room confirmation for room %s ignored -- already on room %s",
-      tostring(pendingFor), tostring(currentRoomNumber)))
+      tostring(pendingForRef and pendingForRef.roomNumber), tostring(self.room and self.room.roomNumber)))
     return
   end
 
@@ -1190,9 +1198,10 @@ spectate2pVsOnlineMatch = function(self, spectateRequestGrantedMessage)
   -- arrive (connection drop mid-round-trip). We're demonstrably in a room
   -- now, so any stale pending-leave flag from before can't still be
   -- meaningful -- don't let it block future "am I in a room" checks.
+  -- _pendingLeaveRoomRef is deliberately NOT cleared here -- see the matching
+  -- comment in start2pVsOnlineMatch.
   self._pendingLeaveRoom = nil
   self._pendingLeaveRoomAt = nil
-  self._pendingLeaveRoomNumber = nil
   resetLobbyData(self)
   GAME.battleRoom = BattleRoom.createFromServerMessage(spectateRequestGrantedMessage)
   self.room = GAME.battleRoom
@@ -1206,7 +1215,6 @@ spectate2pVsOnlineMatch = function(self, spectateRequestGrantedMessage)
     self.state = states.INGAME
     local vsScene = GameBase({match = GAME.battleRoom.match})
     vsScene:load()
-    local catchUp = GameCatchUp(vsScene)
     -- need to push character select, otherwise the pop on match end will return to lobby
     -- directly add to the stack so it isn't getting displayed
     if roomScene then
@@ -1214,7 +1222,26 @@ spectate2pVsOnlineMatch = function(self, spectateRequestGrantedMessage)
     else
       logger.warn("No room scene available for spectator mode '" .. tostring(self.room.mode and self.room.mode.name) .. "'.")
     end
-    GAME.navigationStack:push(catchUp)
+    if self.room.displayHistoryEnabled then
+      -- GameCatchUp waits for each stack's play_to_end to clear, which
+      -- Stack:run() only does once confirmedInput catches up to clock --
+      -- but displayHistoryEnabled stacks are snapshot-driven, never
+      -- simulated (Match:shouldRun skips them), and processInputMessages
+      -- explicitly skips filling confirmedInput for this room type. So
+      -- play_to_end set on a mid-match join here would never clear --
+      -- stuck on the catch-up screen forever. Nothing to catch up on
+      -- anyway: snapshots paint the current state on arrival, no replay
+      -- needed. Clear play_to_end defensively (in case anything set it
+      -- before this point) and go straight to the live scene.
+      for _, stack in ipairs(GAME.battleRoom.match.stacks) do
+        if stack.engine then
+          stack.engine.play_to_end = nil
+        end
+      end
+      GAME.navigationStack:push(vsScene)
+    else
+      GAME.navigationStack:push(GameCatchUp(vsScene))
+    end
   else
     self.state = states.ROOM
     if roomScene then
@@ -1427,12 +1454,78 @@ end)
 
 NetClient.STATES = states
 
+-- Self-heal: the Lobby scene being active is itself proof we're not actually
+-- in a match anymore, no matter what internal state thinks. Every other fix
+-- in this file assumes SOME specific exit path ran to completion (leaveRoom,
+-- the pending-leave timeout, a server confirmation); each is a real gap this
+-- closes when a path nobody's found yet leaves self.state stuck off ONLINE
+-- (e.g. a spectated match that hung without ever cleanly ending, escaped via
+-- whatever combination of back-presses actually got the player out). Once
+-- state is stuck like that, nothing recovers it on its own: the lobby
+-- listeners -- including the one that completes a spectate request, and the
+-- one that would otherwise auto-leave a stale spectate room in
+-- maybeEnterRoomFromLobby below -- only run while state IS ONLINE, so being
+-- stuck off it is self-perpetuating. Trust the UI over the state machine.
+function NetClient:recoverToOnlineIfStuck()
+  if self.state ~= states.ROOM and self.state ~= states.INGAME then return end
+  logger.warn(string.format(
+    "NetClient: Lobby reached while state=%s -- forcing recovery to ONLINE", tostring(self.state)))
+  _clearMatchInputState(self)
+  local roomNumber = self.room and self.room.roomNumber
+  if self.room then
+    if self.room.match then
+      self.room.match:disconnectSignal("matchEnded", self.room)
+      self.room.match:abort()
+      self.room.match:deinit()
+    end
+    self.room:shutdown()
+    self.room = nil
+  end
+  GAME.battleRoom = nil
+  self._pendingLeaveRoom = nil
+  self._pendingLeaveRoomAt = nil
+  self._pendingLeaveRoomRef = nil
+  -- A spectate request sent while stuck would otherwise hang forever -- its
+  -- response can only be collected while state is ONLINE (see requestSpectate's
+  -- pendingResponses.spectateResponse guard, which blocks every future
+  -- request until this is cleared).
+  self.pendingResponses.spectateResponse = nil
+  self:setState(states.ONLINE)
+
+  -- The room's own entry in the cached lobby snapshot would otherwise sit
+  -- stale until the server independently decides something ELSE changed --
+  -- broadCastLobbyIfChanged is edge-triggered server-side, not periodic, so
+  -- there's no guaranteed follow-up push just because we personally left.
+  -- The normal leave paths (_cleanupRoomLocally, processLeaveRoomMessage)
+  -- already do this; this recovery path bypasses both, so it has to do the
+  -- same thing itself or the Lobby keeps showing a room that's gone until
+  -- the player fully disconnects and logs back in (which forces a fresh
+  -- snapshot on login, which is why that "fixed" it).
+  if self.lobbyDataV2 then
+    if roomNumber then
+      self.lobbyDataV2.rooms[roomNumber] = nil
+    end
+    local localId = GAME.localPlayer and GAME.localPlayer.publicId
+    if localId and self.lobbyDataV2.players[localId] then
+      self.lobbyDataV2.players[localId].roomNumber = nil
+    end
+    self:emitSignal("lobbyStateV2Update", self.lobbyDataV2)
+  end
+end
+
 -- Lobby-side check: if the local player holds a slot in a room and that room
 -- is ready for the waiting room, push the room scene. Reuses the existing
 -- isRoomReadyForWaitingRoom / getSceneFromRoom helpers.
 function NetClient:maybeEnterRoomFromLobby()
+  self:recoverToOnlineIfStuck()
   if self.state ~= states.ONLINE then return false end
   if not self.room then return false end
+
+  -- A leave for the current room is already in flight (button was just
+  -- clicked) -- don't let a lobbyStateV2 broadcast landing before the
+  -- server's confirmation does drag the player right back into the room
+  -- they just asked to leave. Let the pending leave resolve first.
+  if self._pendingLeaveRoom then return false end
 
   -- A leftover spectate attachment (watched something, then landed back at
   -- the lobby without a clean exit) should never auto-resume -- spectating
@@ -1484,22 +1577,24 @@ local LEAVE_ROOM_CONFIRM_TIMEOUT = 5
 ---all, and as the timeout backstop in update() when we asked but the
 ---confirmation never came back.
 ---@param self NetClient
----@param forRoomNumber integer? when given, only actually tear down self.room
----if it's still THIS room. A stale timeout/confirmation for a leave we asked
----for a while ago must not nuke a different room we've since moved on to
----(left and already re-spectated, or joined something new) in the meantime --
----confirmed live: this is what made "leave, then rejoin" look broken, kicking
----the player back to the lobby moments after they'd successfully rejoined.
-local function _cleanupRoomLocally(self, forRoomNumber)
+---@param forRoomRef table? when given, only actually tear down self.room if
+---it's still THIS room object. A stale timeout/confirmation for a leave we
+---asked for a while ago must not nuke a different room we've since moved on
+---to (left and already re-spectated, or joined something new) in the
+---meantime -- confirmed live: this is what made "leave, then rejoin" look
+---broken, kicking the player back to the lobby moments after they'd
+---successfully rejoined. Compared by object, not room number -- a rejoin can
+---land on a new room object sharing the old room's number.
+local function _cleanupRoomLocally(self, forRoomRef)
   local roomNumber = self.room and self.room.roomNumber
-  local staleForADifferentRoom = forRoomNumber ~= nil and roomNumber ~= nil and roomNumber ~= forRoomNumber
+  local staleForADifferentRoom = forRoomRef ~= nil and self.room ~= nil and self.room ~= forRoomRef
   self._pendingLeaveRoom = nil
   self._pendingLeaveRoomAt = nil
-  self._pendingLeaveRoomNumber = nil
+  self._pendingLeaveRoomRef = nil
   if staleForADifferentRoom then
     logger.info(string.format(
       "Stale room cleanup for room %s ignored -- already on room %s",
-      tostring(forRoomNumber), tostring(roomNumber)))
+      tostring(forRoomRef and forRoomRef.roomNumber), tostring(roomNumber)))
     return
   end
 
@@ -1519,6 +1614,24 @@ local function _cleanupRoomLocally(self, forRoomNumber)
       self.lobbyDataV2.players[localId].roomNumber = nil
     end
     self:emitSignal("lobbyStateV2Update", self.lobbyDataV2)
+  end
+
+  -- Normally the server's leave_room confirmation (processLeaveRoomMessage)
+  -- is what flips self.state back to ONLINE, and this timeout path never has
+  -- to -- but the known server-side gap this backstop exists for (dropping
+  -- the leave_room reply silently for a spectator in some states) means that
+  -- confirmation sometimes never comes at all. Without this, self.room clears
+  -- here but self.state stays stuck on ROOM/INGAME forever -- and the lobby
+  -- listeners (including the one completing a NEW spectate request) only run
+  -- while state is ONLINE, so every spectate attempt after that would send
+  -- fine but its response could never be picked up: silently hung until the
+  -- app restarts.
+  if self.state == states.INGAME or self.state == states.ROOM then
+    self:setState(states.ONLINE)
+    local topScene = GAME.navigationStack.scenes[#GAME.navigationStack.scenes]
+    if not topScene or topScene.name ~= "Lobby" then
+      GAME.navigationStack:popToName("Lobby")
+    end
   end
 end
 
@@ -1545,12 +1658,12 @@ function NetClient:leaveRoom()
     -- or by the update() timeout backstop if that confirmation never arrives.
     self._pendingLeaveRoom = true
     self._pendingLeaveRoomAt = love.timer.getTime()
-    self._pendingLeaveRoomNumber = self.room and self.room.roomNumber
+    self._pendingLeaveRoomRef = self.room
   elseif self.room then
     -- Not connected (or never actually in a room per the server) -- nothing
     -- to wait on, clean up now. Synchronous (no round trip in between), so
     -- self.room is unambiguously the room being left -- no staleness risk.
-    _cleanupRoomLocally(self, self.room.roomNumber)
+    _cleanupRoomLocally(self, self.room)
   end
 end
 
@@ -1959,7 +2072,19 @@ function NetClient:update(dt)
   if self._pendingLeaveRoom and self._pendingLeaveRoomAt
       and love.timer.getTime() - self._pendingLeaveRoomAt > LEAVE_ROOM_CONFIRM_TIMEOUT then
     logger.warn("leaveRoom confirmation timed out; forcing local cleanup")
-    _cleanupRoomLocally(self, self._pendingLeaveRoomNumber)
+    _cleanupRoomLocally(self, self._pendingLeaveRoomRef)
+  end
+
+  -- Same self-heal as recoverToOnlineIfStuck, run every tick rather than only
+  -- when something happens to call it: sitting on the Lobby scene while
+  -- state is stuck off ONLINE is a contradiction on its own (nothing else
+  -- shows the Lobby), so don't wait on a signal or a scene reload to notice.
+  do
+    local topScene = GAME.navigationStack and GAME.navigationStack.scenes
+      and GAME.navigationStack.scenes[#GAME.navigationStack.scenes]
+    if topScene and topScene.name == "Lobby" then
+      self:recoverToOnlineIfStuck()
+    end
   end
 
   -- Drain the simulated-lag queues (PA_NETWORK_LAG_MS). When delayedProcessing

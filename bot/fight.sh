@@ -117,7 +117,7 @@ start_wasm() {   # NAME PORT
       cp "$(dirname "$WASM_PROFILE")/$w" "$GC_EVAL_DIR/$w" || { echo "fight: no weights $w beside $WASM_PROFILE"; exit 2; }
       prof="$PWD/$WASM_PROFILE"; echo "fight: wasm ($name) plays $WASM_PROFILE" ;;
   esac
-  GC_SURVIVOR_PROFILE=$prof node "$GC_EVAL_DIR/survivor.js" --port "$port" > "$log" 2>&1 &
+  GC_SURVIVOR_PROFILE=$prof GC_SURVIVOR_KEEP=4 GC_SURVIVOR_DUMP="$PWD/death-$name.jsonl.gz" GC_SURVIVOR_FRAMES="$PWD/frames-$name.jsonl.gz" node "$GC_EVAL_DIR/survivor.js" --port "$port" > "$log" 2>&1 &
   PIDS="${PIDS:-} $!"
   PORT_OF[$name]=$port
   for i in $(seq 1 300); do grep -q listening "$log" && break; sleep 0.2; done

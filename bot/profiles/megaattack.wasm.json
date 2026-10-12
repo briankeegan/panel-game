@@ -43,7 +43,9 @@
   "freeRaise": true,
   "extendGain": 1,
   "extendWidth": 60,
-  "extendDepth": 8
+  "extendDepth": 8,
+  "alwaysRaise": true,
+  "threesOnlyTopped": true
  },
  "threeBreaksLast": true
 }

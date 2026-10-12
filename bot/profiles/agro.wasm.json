@@ -56,7 +56,9 @@
   "boundPlans": true,
   "noIdle": true,
   "raiseStopBonus": 1,
-  "raiseStopFrames": 60
+  "raiseStopFrames": 60,
+  "holdRaise": true,
+  "raiseHoldMax": 54
  },
  "threeBreaksLast": true,
  "account": "WasmAgro_CPU"

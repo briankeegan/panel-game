@@ -48,9 +48,9 @@
   "threesOnlyTopped": true,
   "readyBreak": true,
   "readyMs": 150,
-  "minRows": 5,
+  "minRows": 4,
   "lifeFirst": true,
-  "raiseLeaveRoom": true,
+  "raiseLeaveRoom": false,
   "dangerTop": 10,
   "dangerRoom": 0,
   "boundPlans": true

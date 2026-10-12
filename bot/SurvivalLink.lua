@@ -187,6 +187,8 @@ end
 local function opponentOf(sources)
   local out, top = false, 0
   for _, src in ipairs(sources or {}) do
+    -- a copy of the opponent's stack that has died in the copy has stopped running: it says nothing about the opponent
+    if type(src.game_ended) == "function" and src:game_ended() then return "" end
     if type(src.isToppedOut) == "function" and src.panels then
       if src:isToppedOut() then out = true end
       for row = src.height or 12, 1, -1 do

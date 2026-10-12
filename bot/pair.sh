@@ -8,12 +8,12 @@
 #   bot/pair.sh start-wasm [HOURS]    cancel WasmSurvivor_Bot's run if going, start only it
 #   bot/pair.sh wasm-vs LOBBY_PROFILE CHALLENGER_PROFILE [HOURS]
 #                                     two WasmSurvivors, each on its own profile (a bot/profiles/*.wasm.json,
-#                                     or "default" for GameCreator's survivor.profile.json). LOBBY_PROFILE
+#                                     or "defensive" (the old "default") for GameCreator's survivor.profile.json). LOBBY_PROFILE
 #                                     sits in the lobby, CHALLENGER_PROFILE challenges it. Cancels the runs
 #                                     of its own two accounts first; other pairs are left alone.
 #
-# AN ACCOUNT IS NAMED FOR THE PROFILE IT PLAYS: Sv + the profile's name (press2 -> SvPress2, default ->
-# SvDefault; a challenger on the lobby's own profile gets a 2). The name cannot be given. A name with no
+# AN ACCOUNT IS NAMED FOR THE PROFILE IT PLAYS: Sv + the profile's name (press2 -> SvPress2, defensive ->
+# SvDefensive; a challenger on the lobby's own profile gets a 2). The name cannot be given. A name with no
 # saved account takes a spare one (bot/identities/*.txt not named Sv..., not BitBot...): its saved id is
 # moved to the new name, and the server renames the account when it logs in.
 #   bot/pair.sh beta [BOT] [NAME] [HOURS] [PROFILE]
@@ -108,6 +108,7 @@ IDS=bot/identities
 account() {   # PROFILE [SUFFIX]
   local p=$1
   p=${p##*/}; p=${p%.wasm.json}; p=${p%.json}
+  [ "$p" = default ] && p=defensive
   p=$(printf '%s' "$p" | tr -cd 'A-Za-z0-9' | cut -c1-12)
   printf 'Sv%s%s' "${p^}" "${2:-}"
 }
@@ -130,7 +131,7 @@ claim() {   # NAME
 # file is refused: the run would fall back to the default and say nothing.
 profile_path() {   # NAME-OR-PATH
   local p=$1
-  [ "$p" = default ] && { echo bot/profiles/beverly.json; return; }
+  case "$p" in default|defensive) echo bot/profiles/beverly.json; return;; esac
   [ -f "bot/profiles/$p.wasm.json" ] && { echo "bot/profiles/$p.wasm.json"; return; }
   [ -f "$p" ] && case "$p" in *.wasm.json) echo "$p"; return;; esac
   echo "pair: no profile '$p' (bot/profiles/$p.wasm.json)" >&2; exit 1
@@ -179,7 +180,7 @@ case "${1:-}" in
                 stop_and_wait "betaserver|panelattack\.com"; dispatch_beta "$bot" "$name" "${4:-5}" "$prof" ;;
   beta-vs)      opp=${2:?the opponent\'s lobby name}; prof=${4:-$(beta_profile wasm)}
                 stop_and_wait "betaserver|panelattack\.com"; dispatch_beta wasm "WasmSurvivor_CPU,$opp" "${3:-5}" "$prof" ;;
-  profiles)     echo default; git ls-files 'bot/profiles/*.wasm.json' | sed 's/^/ /' ;;
+  profiles)     echo defensive; git ls-files 'bot/profiles/*.wasm.json' | sed 's/^/ /' ;;
   stop)         out=$(cancel_matching '^fight · '); printf '%s\n' "$out" | sed '$d'
                 [ "$(printf '%s\n' "$out" | tail -1)" -gt 0 ] || echo "pair: nothing running" ;;
   status)       out=$(running); if [ -n "$out" ]; then printf '%s\n' "$out"; else echo "pair: nothing running"; fi ;;

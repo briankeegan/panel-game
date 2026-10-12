@@ -23,12 +23,12 @@
   "width": 60,
   "depth": 10,
   "pool": 250,
-  "minCells": 12,
   "maxComing": 6,
   "maxTop": 10,
   "quietTop": 9,
-  "bigCells": 24,
-  "fireTop": 8,
-  "outCells": 3
+  "outCells": 3,
+  "highTop": 8,
+  "lowTop": 5,
+  "attackCells": 3
  }
 }

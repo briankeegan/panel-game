@@ -29,6 +29,7 @@ local G_PREFIX = NetworkProtocol.clientMessageTypes.garbageEvent.prefix -- "G" (
 local Y_PREFIX = NetworkProtocol.clientMessageTypes.displayEvent.prefix -- "Y" (display snapshot)
 local SRV_D_PREFIX = NetworkProtocol.serverMessageTypes.deathEvent.prefix -- "D" (relayed)
 local SRV_G_PREFIX = NetworkProtocol.serverMessageTypes.garbageEvent.prefix -- "G" (relayed attack)
+local SRV_I_PREFIX = NetworkProtocol.serverMessageTypes.input.prefix -- "I" (relayed player input)
 
 -- The engine (GarbageDelivery, inside match:run) and DisplayEventCapture both
 -- ship via GAME.netClient. Route to the bot currently ticking — set in
@@ -261,6 +262,14 @@ function BotClient:dispatch(msg)
         end
       end
     end
+  elseif msg[SRV_I_PREFIX] then
+    -- relayed input: the other stacks are played from it, as a client's are, so their panels, stop time,
+    -- topped-out state and garbage on its way are the opponent's own (what the survival link reads).
+    local body = msg[SRV_I_PREFIX]
+    local other = self.match and body and self.match.stacks and self.match.stacks[body.playerNumber]
+    if other and other ~= self.myStack and type(body.input) == "string" then
+      other:receiveConfirmedInput(body.input)
+    end
   elseif msg[SRV_D_PREFIX] then
     -- relayed DeathEvent. For 2p, a death we didn't send = the opponent's.
     self.oppDied = true
@@ -280,7 +289,7 @@ function BotClient:dispatch(msg)
     self.inRoom = false
     logger.info("bot[" .. self.name .. "]: left room (" .. tostring(msg.reason) .. ")")
   end
-  -- relayed input "I" and other messages fall through (ignored for 3a).
+  -- other messages fall through (ignored).
 end
 
 -- DeathEvent is the one message that unblocks match-end on the server --

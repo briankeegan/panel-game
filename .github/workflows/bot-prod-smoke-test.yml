@@ -46,6 +46,7 @@ on:
         type: choice
         options:
           - 104.156.250.136:49569
+          - panelattack.com:49569
           - betaserver.panelattack.com:59569
       name:
         description: 'live: the bot''s name in the lobby (letters, digits, _; 16 max). Reusing a name logs into the same account'
@@ -105,6 +106,8 @@ on:
 env:
   # The two servers `server` offers; the beta one runs upstream's protocol.
   BETA_SERVER: betaserver.panelattack.com:59569
+  # the main Panel Attack server (the client's default port); it runs the upstream beta branch's game
+  PROD_SERVER: panelattack.com:49569
   UPSTREAM_REPO: https://github.com/panel-attack/panel-game.git
   UPSTREAM_REF: beta
   # If whoever deploys the beta server moves this tag in the upstream repo to
@@ -142,8 +145,8 @@ jobs:
         run: |
           set -eu
           server='${{ inputs.server }}'
-          if [ "$server" = "$BETA_SERVER" ]; then
-            [ '${{ inputs.mode }}' = live ] || { echo "$BETA_SERVER is only for mode: live"; exit 1; }   # bitbot: the fork's client only
+          if [ "$server" = "$BETA_SERVER" ] || [ "$server" = "$PROD_SERVER" ]; then
+            [ '${{ inputs.mode }}' = live ] || { echo "$server is only for mode: live"; exit 1; }   # fight: the fork's client only
             dir="$GITHUB_WORKSPACE/upstream"
           else
             dir="$GITHUB_WORKSPACE"
@@ -164,7 +167,7 @@ jobs:
       #   3. the latest UPSTREAM_REF -- right whenever the server was deployed
       #      from beta's head, which is the normal case.
       - name: Check out the upstream bot
-        if: inputs.server == env.BETA_SERVER
+        if: (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER)
         uses: actions/checkout@v4
         with:
           ref: ${{ env.UPSTREAM_BOT_REF }}
@@ -172,13 +175,15 @@ jobs:
           sparse-checkout: bot
 
       - name: Fetch upstream Panel Attack and add the bot
-        if: inputs.server == env.BETA_SERVER
+        if: (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER)
         env:
           PIN: ${{ inputs.upstream_ref }}
         run: |
           set -eu
           if [ -n "$PIN" ]; then
             ref="$PIN"; why="pinned by the upstream_ref input"
+          elif [ '${{ inputs.server }}' = "$PROD_SERVER" ]; then
+            ref="$UPSTREAM_REF"; why="latest $UPSTREAM_REF (the game the main server runs)"
           elif git ls-remote --exit-code --tags "$UPSTREAM_REPO" "refs/tags/$UPSTREAM_DEPLOYED_TAG" >/dev/null; then
             ref="refs/tags/$UPSTREAM_DEPLOYED_TAG"; why="the $UPSTREAM_DEPLOYED_TAG tag (the last deploy)"
           else
@@ -225,7 +230,7 @@ jobs:
       # re-run it, or run bot/beverly.sh on the server box under systemd for
       # something permanent.
       - name: Check the name and the weight set before connecting
-        if: (inputs.mode == 'live' || inputs.mode == 'survival') && !(inputs.mode == 'live' && inputs.server == env.BETA_SERVER && (inputs.bot == 'wasm' || inputs.bot == 'bitbot'))
+        if: (inputs.mode == 'live' || inputs.mode == 'survival') && !(inputs.mode == 'live' && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER) && (inputs.bot == 'wasm' || inputs.bot == 'bitbot'))
         run: |
           set -eu
           cd "$BOT_DIR"
@@ -257,7 +262,7 @@ jobs:
       # one), so a beta bot keeps its name by saving the id it was given
       # instead -- see "Save the account id".
       - name: Derive this name's account id
-        if: inputs.mode == 'live' && inputs.server != env.BETA_SERVER
+        if: inputs.mode == 'live' && !(inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER)
         env:
           BASE_NAME: ${{ inputs.name }}
           BOT_IP: ${{ env.BOT_HOST }}
@@ -280,7 +285,7 @@ jobs:
       # is built here from GameCreator's own native/build.sh line; WasmSurvivor
       # is a Node process beside the client (bot/SurvivalLink.lua talks to it).
       - name: Check out GameCreator (beta bot)
-        if: inputs.mode == 'live' && inputs.server == env.BETA_SERVER && (inputs.bot == 'wasm' || inputs.bot == 'bitbot')
+        if: inputs.mode == 'live' && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER) && (inputs.bot == 'wasm' || inputs.bot == 'bitbot')
         uses: actions/checkout@v4
         with:
           repository: briankeegan/GameCreator
@@ -288,12 +293,12 @@ jobs:
           sparse-checkout: games/the-game
 
       - uses: actions/setup-node@v4
-        if: inputs.mode == 'live' && inputs.server == env.BETA_SERVER && (inputs.bot == 'wasm' || inputs.bot == 'bitbot')
+        if: inputs.mode == 'live' && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER) && (inputs.bot == 'wasm' || inputs.bot == 'bitbot')
         with:
           node-version: '22'
 
       - name: Sit in the lobby (beta, ${{ inputs.bot }})
-        if: inputs.mode == 'live' && inputs.server == env.BETA_SERVER && (inputs.bot == 'wasm' || inputs.bot == 'bitbot')
+        if: inputs.mode == 'live' && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER) && (inputs.bot == 'wasm' || inputs.bot == 'bitbot')
         id: betalink
         run: |
           set -eu
@@ -355,7 +360,7 @@ jobs:
             2>&1 | tee "$GITHUB_WORKSPACE/bot-prod-smoke.log" || [ $? -eq 124 ]
 
       - name: Sit in the lobby
-        if: inputs.mode == 'live' && !(inputs.mode == 'live' && inputs.server == env.BETA_SERVER && (inputs.bot == 'wasm' || inputs.bot == 'bitbot'))
+        if: inputs.mode == 'live' && !(inputs.mode == 'live' && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER) && (inputs.bot == 'wasm' || inputs.bot == 'bitbot'))
         id: live
         env:
           PA_SEARCH_PROFILE: ${{ inputs.profile }}
@@ -415,7 +420,7 @@ jobs:
       # commits it to UPSTREAM_BOT_REF so the next run logs back in instead of
       # being denied as "already taken". Not secret, on purpose: bot accounts.
       - name: Save the account id
-        if: always() && inputs.server == env.BETA_SERVER
+        if: always() && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER)
         run: |
           set -eu
           n='${{ inputs.name }}'; n=${n%%,*}   # (a "BOT,OPPONENT" name: the account is the bot's)
@@ -463,7 +468,7 @@ jobs:
           WASM_PROFILE: ${{ inputs.profile }}
         run: |
           eval "$(luarocks path --local --lua-version 5.1)"
-          [ "$BOT_HOST" != "$BETA_SERVER" ] && [ "${BOT_HOST}:${BOT_PORT}" != "$BETA_SERVER" ] || { echo "fight plays the fork's server only"; exit 1; }
+          [ "${BOT_HOST}:${BOT_PORT}" != "$BETA_SERVER" ] && [ "${BOT_HOST}:${BOT_PORT}" != "$PROD_SERVER" ] || { echo "fight plays the fork's server only"; exit 1; }
           if [ -d GameCreator ]; then echo "::notice::GameCreator $(git -C GameCreator log -1 --format='%h %s')"; fi
           echo "::notice::${{ inputs.name }} (${{ inputs.bot }}) vs ${{ inputs.opponent }} on $BOT_HOST:$BOT_PORT for ${{ inputs.hours }}h"
           set -o pipefail

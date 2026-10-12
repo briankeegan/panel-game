@@ -172,13 +172,23 @@ local function putTelegraph(sources)
   end
   put("]")
 end
--- Whether a stack this one fights is topped out (a panel in its top row).
+-- Whether a stack this one fights is topped out (a panel in its top row), and the highest row it has a panel in.
 local function opponentOf(sources)
-  local out = false
+  local out, top = false, 0
   for _, src in ipairs(sources or {}) do
-    if type(src.isToppedOut) == "function" and src:isToppedOut() then out = true end
+    if type(src.isToppedOut) == "function" and src.panels then
+      if src:isToppedOut() then out = true end
+      for row = src.height or 12, 1, -1 do
+        local found = false
+        for col = 1, src.width or 6 do
+          local p = src.panels[row] and src.panels[row][col]
+          if p and p.color and p.color ~= 0 then found = true break end
+        end
+        if found then if row > top then top = row end break end
+      end
+    end
   end
-  return ',"opp":{"out":' .. tostring(out) .. "}"
+  return ',"opp":{"out":' .. tostring(out) .. ',"top":' .. top .. "}"
 end
 local function scalars(t)
   local o = {}

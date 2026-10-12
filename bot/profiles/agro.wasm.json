@@ -51,14 +51,15 @@
   "minRows": 4,
   "lifeFirst": true,
   "raiseLeaveRoom": false,
-  "dangerTop": 10,
-  "dangerRoom": 0,
+  "dangerTop": 11,
   "boundPlans": true,
   "noIdle": true,
   "raiseStopBonus": 1,
   "raiseStopFrames": 60,
   "holdRaise": true,
-  "raiseHoldMax": 54
+  "raiseHoldMax": 54,
+  "dangerSoon": 120,
+  "dangerOver": 1
  },
  "threeBreaksLast": true,
  "account": "WasmAgro_CPU"

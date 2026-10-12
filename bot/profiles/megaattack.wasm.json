@@ -45,7 +45,9 @@
   "extendWidth": 60,
   "extendDepth": 8,
   "alwaysRaise": true,
-  "threesOnlyTopped": true
+  "threesOnlyTopped": true,
+  "readyBreak": true,
+  "readyMs": 150
  },
  "threeBreaksLast": true
 }

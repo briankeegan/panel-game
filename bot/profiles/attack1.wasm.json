@@ -29,7 +29,8 @@
   "outCells": 3,
   "highTop": 8,
   "lowTop": 5,
-  "attackCells": 3
+  "minChain": 4,
+  "fireTop": 9
  },
  "threeBreaksLast": true
 }

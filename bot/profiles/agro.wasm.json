@@ -48,11 +48,12 @@
   "threesOnlyTopped": true,
   "readyBreak": true,
   "readyMs": 150,
-  "minRows": 4,
+  "minRows": 5,
   "lifeFirst": true,
   "raiseLeaveRoom": true,
   "dangerTop": 10,
-  "dangerRoom": 0
+  "dangerRoom": 0,
+  "boundPlans": true
  },
  "threeBreaksLast": true,
  "account": "WasmAgro_CPU"

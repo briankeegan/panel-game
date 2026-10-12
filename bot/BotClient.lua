@@ -249,16 +249,18 @@ function BotClient:dispatch(msg)
     logger.info(string.format("bot[%s]: MATCH START (startInMs=%s)",
       self.name, tostring(msg.startInMs)))
   elseif msg[SRV_G_PREFIX] then
-    -- relayed GarbageEvent: an attack. Apply to our stack if we're a recipient
-    -- (and it isn't our own echo). Server stamped body.sender.
+    -- relayed GarbageEvent: an attack, applied to every stack the server names as a recipient -- ours, and the
+    -- opponent's copy when the attack is ours -- as a client's ClientMatch does. A self-attack's echo is skipped.
     local body = msg[SRV_G_PREFIX]
-    if self.myStack and body.sender ~= self.localPlayerNumber
-        and type(body.recipients) == "table" then
-      for _, r in ipairs(body.recipients) do
-        if r == self.localPlayerNumber then
-          self.myStack:applyNetworkGarbage(body.garbage, body.sender)
-          self._garbageRecvCount = (self._garbageRecvCount or 0) + 1
-          break
+    if self.match and self.match.stacks and type(body.recipients) == "table" and type(body.garbage) == "table" then
+      local echo = #body.recipients == 1 and body.recipients[1] == body.sender
+      if not (echo and body.sender == self.localPlayerNumber) then
+        for _, r in ipairs(body.recipients) do
+          local target = self.match.stacks[r]
+          if target and (r ~= body.sender) then
+            target:applyNetworkGarbage(body.garbage, body.sender)
+            if target == self.myStack then self._garbageRecvCount = (self._garbageRecvCount or 0) + 1 end
+          end
         end
       end
     end

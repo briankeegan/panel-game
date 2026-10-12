@@ -172,29 +172,13 @@ local function putTelegraph(sources)
   end
   put("]")
 end
--- Whether the stacks this one fights are topped out, and for how long they are safe if they are: a stack that
--- touches the top lives only on its stop time. `out`: one of them is topped out; `stop`: the least stop time
--- (stop and pre-stop) of those topped out; `top`: the highest row of any of them with a panel.
+-- Whether a stack this one fights is topped out (a panel in its top row).
 local function opponentOf(sources)
-  local out, stop, top = false, 0, 0
+  local out = false
   for _, src in ipairs(sources or {}) do
-    if type(src.isToppedOut) == "function" and src.panels then
-      for row = src.height or 12, 1, -1 do
-        local found = false
-        for col = 1, src.width or 6 do
-          local p = src.panels[row] and src.panels[row][col]
-          if p and p.color and p.color ~= 0 then found = true break end
-        end
-        if found then if row > top then top = row end break end
-      end
-      if src:isToppedOut() then
-        local safe = (src.stop_time or 0) + (src.pre_stop_time or 0)
-        if not out or safe < stop then stop = safe end
-        out = true
-      end
-    end
+    if type(src.isToppedOut) == "function" and src:isToppedOut() then out = true end
   end
-  return ',"opp":{"out":' .. tostring(out) .. ',"stop":' .. stop .. ',"top":' .. top .. "}"
+  return ',"opp":{"out":' .. tostring(out) .. "}"
 end
 local function scalars(t)
   local o = {}

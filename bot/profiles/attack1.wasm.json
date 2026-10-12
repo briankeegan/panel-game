@@ -25,6 +25,7 @@
   "pool": 250,
   "minCells": 12,
   "maxComing": 6,
-  "maxTop": 8
+  "maxTop": 10,
+  "quietTop": 9
  }
 }

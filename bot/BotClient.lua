@@ -81,8 +81,8 @@ local BotClient = class(function(self, opts)
       -- Concrete ids from the stock bundle: a human client that receives nil
       -- ids indexes characters[nil] while loading and crashes (BattleRoom
       -- updateLoadingState). The bot has no assets of its own to pick from.
-      selectedCharacterId = "pa_characters_dragon", characterId = "pa_characters_dragon",
-      selectedStageId = "pa_stages_wind", stageId = "pa_stages_wind",
+      selectedCharacterId = consts.RANDOM_CHARACTER_SPECIAL_VALUE, characterId = "pa_characters_dragon",
+      selectedStageId = consts.RANDOM_STAGE_SPECIAL_VALUE, stageId = "pa_stages_wind",
       panelId = "panelhd_basic_mizunoketsuban",
       wantsReady = false, wantsRanked = self.ranked,
       inputMethod = "controller",
@@ -155,9 +155,12 @@ function BotClient:login()
       self.userId, self.name,
       self.level,   -- level
       "controller", -- inputMethod
-      nil,          -- panels_dir (cosmetic)
-      consts.RANDOM_CHARACTER_SPECIAL_VALUE, nil, -- character: random, like a fresh client
-      consts.RANDOM_STAGE_SPECIAL_VALUE, nil,     -- stage: random, like a fresh client
+      "panelhd_basic_mizunoketsuban", -- panels_dir
+      -- Random bundle PLUS a concrete id. With the id nil, a stable client builds this
+      -- player with characterId "" and crashes in BattleRoom:updateLoadingState
+      -- (characters[""] is nil). A client without these mods falls back to the random bundle.
+      consts.RANDOM_CHARACTER_SPECIAL_VALUE, "pa_characters_dragon",
+      consts.RANDOM_STAGE_SPECIAL_VALUE, "pa_stages_wind",
       self.ranked,  -- ranked (off by default; see the constructor)
       false)),      -- save replays publicly
     "login")

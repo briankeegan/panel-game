@@ -34,12 +34,16 @@
   "aggro": true,
   "setupTop": 10,
   "setupComing": 6,
-  "extendMs": 200,
+  "extendMs": 250,
   "chainSwaps": 6,
   "rate": 2,
   "quietComing": 2,
   "bigMs": 600,
-  "bigDepth": 10
+  "bigDepth": 10,
+  "freeRaise": true,
+  "extendGain": 1,
+  "extendWidth": 60,
+  "extendDepth": 8
  },
  "threeBreaksLast": true
 }

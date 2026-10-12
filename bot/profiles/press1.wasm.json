@@ -1,0 +1,34 @@
+{
+ "name": "WasmSurvivor",
+ "weights": "trained.pbt.pbt-r22-s322.0926-142336.g03120.json",
+ "reaction": 12,
+ "swapGap": 12,
+ "cursorMoveFrames": 4,
+ "depth": 2,
+ "modes": true,
+ "ahead": 90,
+ "threat": null,
+ "breakFirst": true,
+ "breakDepth": 1,
+ "lineup": true,
+ "conserve": true,
+ "threesLast": true,
+ "nativeCands": true,
+ "bank": true,
+ "raiseTo": 8,
+ "bankTop": 11,
+ "bankForce": true,
+ "vs": {
+  "out": {
+   "goal": "4-combo",
+   "alsoTake": 2,
+   "toward": 100
+  },
+  "idle": {
+   "goal": "4-combo",
+   "alsoTake": 2,
+   "toward": 100
+  }
+ },
+ "vsAlways": true
+}

@@ -19,9 +19,9 @@
  "bankTop": 11,
  "bankForce": true,
  "attack": {
-  "ms": 300,
-  "width": 60,
-  "depth": 10,
+  "ms": 160,
+  "width": 40,
+  "depth": 7,
   "pool": 250,
   "maxComing": 8,
   "maxTop": 11,
@@ -34,8 +34,12 @@
   "aggro": true,
   "setupTop": 10,
   "setupComing": 6,
-  "extendMs": 300,
-  "chainSwaps": 8
+  "extendMs": 200,
+  "chainSwaps": 6,
+  "rate": 2,
+  "quietComing": 2,
+  "bigMs": 600,
+  "bigDepth": 10
  },
  "threeBreaksLast": true
 }

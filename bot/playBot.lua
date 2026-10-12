@@ -24,7 +24,7 @@ local cursorSpeed = (cursorInterval or reactionFrames)
 
 local bot = BotClient({
   ip = ip, port = port, name = name, cursorSpeed = cursorSpeed,
-  brain = "weighted", searchProfile = os.getenv("PA_SEARCH_PROFILE"),
+  brain = arg[6] or "weighted", searchProfile = os.getenv("PA_SEARCH_PROFILE"),   -- arg 6: weighted | survival | bitbot
 })
 
 local ok, err = bot:login()
@@ -44,8 +44,8 @@ while socket.gettime() < t + 0.6 do bot:pump(); socket.sleep(0.01) end
 
 local speedDesc = cursorSpeed and string.format("cursor %d/%d", cursorSpeed.cursorMoveInterval, cursorSpeed.reactionFrames) or "full speed"
 print(string.format(
-  "\n=== Bot '%s' (weighted, L%d, %s, %s) is idle in the lobby on %s:%d ===\n    Open your client, CHALLENGE '%s' in the lobby, and play — it auto-accepts.\n    Ctrl+C to stop.\n",
-  name, bot.level, speedDesc, bot.ranked and "RANKED" or "unranked", ip, port, name))
+  "\n=== Bot '%s' (%s, L%d, %s, %s) is idle in the lobby on %s:%d ===\n    Open your client, CHALLENGE '%s' in the lobby, and play — it auto-accepts.\n    Ctrl+C to stop.\n",
+  name, bot.brainKind, bot.level, speedDesc, bot.ranked and "RANKED" or "unranked", ip, port, name))
 
 local function playerCount()
   local n = 0

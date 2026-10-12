@@ -45,8 +45,11 @@ local BotClient = class(function(self, opts)
   self.name = opts.name or "BotBella"
   -- Only the evaluator brain ships to upstream: EnvelopeBrain and its chip
   -- catalog stay on the fork.
+  -- "weighted" is the evaluator brain; "survival" (GameCreator's WasmSurvivor, a Node process the link
+  -- talks to) and "bitbot" (GameCreator's BitBot, native, in this process) answer with a key every frame.
   self.brainKind = opts.brain or "weighted"
-  assert(self.brainKind == "weighted", "upstream bot supports brain 'weighted' only, got " .. tostring(opts.brain))
+  assert(self.brainKind == "weighted" or self.brainKind == "survival" or self.brainKind == "bitbot",
+    "upstream bot supports brains 'weighted', 'survival' and 'bitbot', got " .. tostring(opts.brain))
   self.searchProfile = opts.searchProfile       -- weight-set path (bot/profiles/*.json)
   self.cursorSpeed = opts.cursorSpeed           -- { cursorMoveInterval, reactionFrames }; nil = full speed
   self.gameplay = TcpClient()
@@ -271,9 +274,15 @@ function BotClient:startMatch()
     if stack ~= self.myStack then self.oppStack, self.oppNumber = stack, i end
   end
   self.match:start()
-  self.brain = require("bot.WeightedBrain").new({ profile = self.searchProfile })
-  self.controller = require("bot.CursorController").new(self.cursorSpeed)
-  self.boardState = require("bot.BoardState")
+  if self.brainKind == "weighted" then
+    self.brain = require("bot.WeightedBrain").new({ profile = self.searchProfile })
+    self.controller = require("bot.CursorController").new(self.cursorSpeed)
+    self.boardState = require("bot.BoardState")
+  else
+    -- a link of its own for each match, so nothing one match left in flight is read as the next's
+    self.link = (self.brainKind == "bitbot") and require("bot.BitBotNative").new({}) or require("bot.SurvivalLink").new({})
+    self.link:startMatch(self.myStack, self.match)
+  end
   self.matchEnded, self.outcome, self._resultReported = false, nil, false
   logger.info(string.format("bot[%s]: match built; my stack = slot %d", self.name, self.localPlayerNumber))
 end
@@ -301,6 +310,14 @@ function BotClient:_sendInput()
   if stack:game_ended() then return end
   if #stack.confirmedInput > 0 and self.oppStack and #self.oppStack.confirmedInput == 0 then return end
   if #stack.confirmedInput - stack.clock > 0 then return end
+
+  if self.link then
+    -- WasmSurvivor / BitBot: the key for this frame, from the bot itself; nothing is decided here
+    local char = self.link:input(stack, self.match.garbageSources and self.match.garbageSources[stack]) or IDLE
+    self.gameplay:send(NetworkProtocol.markedMessageForTypeAndBody(I_PREFIX, char))
+    stack:receiveConfirmedInput(char)
+    return
+  end
 
   local st = self.boardState.extract(stack)
   local decision = WAIT_DECISION
@@ -383,6 +400,11 @@ function BotClient:resetMatch()
   self.match, self.matchStart, self.myStack, self.oppStack = nil, nil, nil, nil
   self.matchEnded, self._resultReported = false, false
   self.brain, self.controller, self.thinking = nil, nil, nil
+  if self.link then
+    pcall(function() self.link:endMatch() end)
+    if self.link.sock then pcall(function() self.link.sock:close() end) end
+    self.link = nil
+  end
 end
 
 function BotClient:leaveRoom()

@@ -1471,6 +1471,7 @@ function NetClient:recoverToOnlineIfStuck()
   logger.warn(string.format(
     "NetClient: Lobby reached while state=%s -- forcing recovery to ONLINE", tostring(self.state)))
   _clearMatchInputState(self)
+  local roomNumber = self.room and self.room.roomNumber
   if self.room then
     if self.room.match then
       self.room.match:disconnectSignal("matchEnded", self.room)
@@ -1490,6 +1491,26 @@ function NetClient:recoverToOnlineIfStuck()
   -- request until this is cleared).
   self.pendingResponses.spectateResponse = nil
   self:setState(states.ONLINE)
+
+  -- The room's own entry in the cached lobby snapshot would otherwise sit
+  -- stale until the server independently decides something ELSE changed --
+  -- broadCastLobbyIfChanged is edge-triggered server-side, not periodic, so
+  -- there's no guaranteed follow-up push just because we personally left.
+  -- The normal leave paths (_cleanupRoomLocally, processLeaveRoomMessage)
+  -- already do this; this recovery path bypasses both, so it has to do the
+  -- same thing itself or the Lobby keeps showing a room that's gone until
+  -- the player fully disconnects and logs back in (which forces a fresh
+  -- snapshot on login, which is why that "fixed" it).
+  if self.lobbyDataV2 then
+    if roomNumber then
+      self.lobbyDataV2.rooms[roomNumber] = nil
+    end
+    local localId = GAME.localPlayer and GAME.localPlayer.publicId
+    if localId and self.lobbyDataV2.players[localId] then
+      self.lobbyDataV2.players[localId].roomNumber = nil
+    end
+    self:emitSignal("lobbyStateV2Update", self.lobbyDataV2)
+  end
 end
 
 -- Lobby-side check: if the local player holds a slot in a room and that room

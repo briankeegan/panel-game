@@ -78,9 +78,12 @@ local BotClient = class(function(self, opts)
       level = level, difficulty = level, speed = 1,
       levelData = LevelPresets.getModern(level),
       style = GameModes.Styles.MODERN,
-      selectedCharacterId = consts.RANDOM_CHARACTER_SPECIAL_VALUE, characterId = nil,
-      selectedStageId = consts.RANDOM_STAGE_SPECIAL_VALUE, stageId = nil,
-      panelId = nil,
+      -- Concrete ids from the stock bundle: a human client that receives nil
+      -- ids indexes characters[nil] while loading and crashes (BattleRoom
+      -- updateLoadingState). The bot has no assets of its own to pick from.
+      selectedCharacterId = "pa_characters_dragon", characterId = "pa_characters_dragon",
+      selectedStageId = "pa_stages_wind", stageId = "pa_stages_wind",
+      panelId = "panelhd_basic_mizunoketsuban",
       wantsReady = false, wantsRanked = self.ranked,
       inputMethod = "controller",
     },

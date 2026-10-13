@@ -45,7 +45,7 @@
   "extendWidth": 60,
   "extendDepth": 8,
   "alwaysRaise": true,
-  "threesOnlyTopped": true, "guardThrees": true, "pressVeto": false, "realDanger": true, "thinkOnHold": true, "thinkEvery": 36, "holdMs": 120, "holdMinMs": 150, "noPingPong": true, "pingFrames": 150, "setupBusy": true, "busyMs": 60, "dangerMs": 100, "attackRank": true, "survivalFirst": true, "continuousLines": true, "breakFirst": true, "climbBig": true, "climbTop": 9, "threeTop": 10, "threeFrames": 240, "guardUseless": true, "readyTime": true, "raiseNoTop": true, "readyFrames": 45, "realThrees": true, "heldChain": true, "pressAudit": false, "nearFrames": 120,
+  "threesOnlyTopped": true, "guardThrees": true, "pressVeto": false, "realDanger": true, "thinkOnHold": true, "thinkEvery": 36, "holdMs": 120, "holdMinMs": 150, "noPingPong": true, "pingFrames": 150, "setupBusy": true, "busyMs": 60, "dangerMs": 100, "attackRank": true, "arbiter": true, "survivalFirst": true, "continuousLines": true, "breakFirst": true, "climbBig": true, "climbTop": 9, "threeTop": 10, "threeFrames": 240, "guardUseless": true, "readyTime": true, "raiseNoTop": true, "readyFrames": 45, "realThrees": true, "heldChain": true, "pressAudit": false, "nearFrames": 120,
   "readyBreak": true,
   "readyMs": 80,
   "minRows": 4,

@@ -509,6 +509,10 @@ jobs:
             tail -n 40 bot-prod-smoke.log || echo "(no log produced)"
             echo '```'
             for f in bitbot-mind.log mind-*.log; do [ -f "$f" ] || continue; echo "### $f"; echo '```'; tail -n 40 "$f"; echo '```'; done
+            if [ -f GameCreator/games/the-game/ai/eval/survivor_runsummary.js ] && ls fight-*.log >/dev/null 2>&1; then
+              echo "## The run's own report"
+              node GameCreator/games/the-game/ai/eval/survivor_runsummary.js . 2>&1 | tail -n 30 || true
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload log

@@ -50,7 +50,7 @@
   "readyMs": 150,
   "minRows": 4,
   "lifeFirst": true,
-  "raiseLeaveRoom": true,
+  "raiseLeaveRoom": false,
   "dangerTop": 11,
   "boundPlans": true,
   "noIdle": true, "noIdleMs": 250, "noIdleWidth": 60, "noIdleDepth": 7,

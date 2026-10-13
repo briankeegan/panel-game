@@ -45,7 +45,7 @@
   "extendWidth": 60,
   "extendDepth": 8,
   "alwaysRaise": true,
-  "threesOnlyTopped": true, "guardThrees": true, "threeTop": 9, "threeFrames": 300, "guardUseless": true, "readyTime": true, "raiseNoTop": true, "readyFrames": 45, "realThrees": true, "heldChain": true, "pressAudit": false, "nearFrames": 120,
+  "threesOnlyTopped": true, "guardThrees": true, "climbBig": true, "climbTop": 9, "threeTop": 12, "threeFrames": 100000, "guardUseless": true, "readyTime": true, "raiseNoTop": true, "readyFrames": 45, "realThrees": true, "heldChain": true, "pressAudit": false, "nearFrames": 120,
   "readyBreak": true,
   "readyMs": 220,
   "minRows": 4,

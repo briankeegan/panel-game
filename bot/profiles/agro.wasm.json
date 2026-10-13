@@ -45,7 +45,7 @@
   "extendWidth": 60,
   "extendDepth": 8,
   "alwaysRaise": true,
-  "threesOnlyTopped": true, "guardThrees": true, "realTopped": true, "toppedStop": 90, "pressAudit": true, "nearFrames": 120,
+  "threesOnlyTopped": true, "guardThrees": true, "pressAudit": false, "nearFrames": 120,
   "readyBreak": true,
   "readyMs": 150,
   "minRows": 4,

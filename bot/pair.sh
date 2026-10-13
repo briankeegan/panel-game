@@ -180,9 +180,9 @@ case "${1:-}" in
   wasm-vs)      HOURS=${4:-5}; wasm_vs "${2:?lobby profile}" "${3:?challenger profile}" ;;
   beta)         bot=${2:-beverly}; name=${3:-$(case $bot in wasm) echo WasmSurvivor_CPU;; bitbot) echo BitBot;; plamp) echo Plamp;; *) echo Beverly;; esac)}
                 prof=${5:-$(beta_profile "$bot")}
-                stop_and_wait "betaserver|panelattack\.com"; dispatch_beta "$bot" "$name" "${4:-5}" "$prof" ;;
+                stop_and_wait "(betaserver|panelattack\.com).* ${name//./\\.}(,|\$)"; dispatch_beta "$bot" "$name" "${4:-5}" "$prof" ;;
   beta-vs)      opp=${2:?the opponent\'s lobby name}; prof=${4:-$(beta_profile wasm)}
-                stop_and_wait "betaserver|panelattack\.com"; dispatch_beta wasm "WasmSurvivor_CPU,$opp" "${3:-5}" "$prof" ;;
+                stop_and_wait "(betaserver|panelattack\.com).* WasmSurvivor_CPU(,|\$)"; dispatch_beta wasm "WasmSurvivor_CPU,$opp" "${3:-5}" "$prof" ;;
   profiles)     echo defensive; git ls-files 'bot/profiles/*.wasm.json' | sed 's/^/ /' ;;
   stop)         out=$(cancel_matching '^fight · '); printf '%s\n' "$out" | sed '$d'
                 [ "$(printf '%s\n' "$out" | tail -1)" -gt 0 ] || echo "pair: nothing running" ;;

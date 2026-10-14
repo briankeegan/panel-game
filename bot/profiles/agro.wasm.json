@@ -46,6 +46,7 @@
   "defendRanked": true,
   "defendRaise": true,
   "defendFlatten": true,
+  "keepLine": true,
   "defendLineMs": 60,
   "defendHoldThrees": { "maxComing": 6, "maxTop": 8 },
   "aggro": true,

@@ -98,6 +98,10 @@ function TrainingMenu:load(sceneParams)
     onValueChange = function() garbagePatternStepper:setState(1) end
   })
 
+  -- (the e2e driver sets the pattern by name: AppDriver `trainingpattern`)
+  self.garbagePatternStepper = garbagePatternStepper
+  self.garbagePatternNames = garbagePatternNames
+
   local menuItems = {
     ui.MenuItem.createStepperMenuItem("Garbage Pattern", nil, false, garbagePatternStepper),
     ui.MenuItem.createSliderMenuItem("width", nil, nil, widthSlider),

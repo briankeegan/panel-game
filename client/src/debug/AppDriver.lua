@@ -24,6 +24,8 @@
 --      shoot [name]        screenshot to <name>.png in the shared save dir
 --      f2                  screenshot via the real F2 shortcut
 --      scene               report the current scene name to the out file
+--      trainingpattern <n> on the Training menu, set the garbage pattern by name
+--                          (combo_storm, factory, large_garbage); reports the block size
 --      where               report the focused menu item (see above)
 --      run <MACRO>         expand a named macro (TO_MENU / VS_SELF / REPLAYS ...)
 --      challengeloop       Challenge Mode stage after stage: Ready on the
@@ -569,6 +571,15 @@ local function execCommand(c)
   elseif op == "wait" then st.busy = tonumber(args[1]) or 30
   elseif op == "challengeloop" then st.challenge = {}; writeOut("challengeloop on")
   elseif op == "trainingloop" then st.training = {}; writeOut("trainingloop on")
+  elseif op == "trainingpattern" then
+    -- trainingpattern <name>: the Training menu's garbage pattern set by name; reports the block it sends, width x height
+    local s = scene()
+    local stp = s and s.garbagePatternStepper
+    local i = stp and indexOf(s.garbagePatternNames, rest)
+    if i then stp:setState(i) end
+    local v = stp and stp.value
+    local a = v and v.attackPatterns and v.attackPatterns[1]
+    writeOut("trainingpattern " .. rest .. " -> " .. tostring(stp and stp.selectedIndex) .. " " .. (a and (a.width .. "x" .. a.height) or "custom"))
   elseif op == "scene" then writeOut("scene=" .. tostring(sceneName()))
   elseif op == "click" then
     local s = scene()

@@ -1,5 +1,6 @@
 {
  "name": "WasmAgroCPU",
+ "planHealth": 1,
  "weights": "trained.pbt.pbt-r22-s322.0926-142336.g03120.json",
  "reaction": 12,
  "swapGap": 12,

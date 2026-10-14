@@ -37,6 +37,8 @@
   "floorRows": 4,
   "mergeWait": 150,
   "defendUnderThreat": true,
+  "strictSwapBack": true,
+  "holdThrough": true,
   "defendHoldThrees": { "maxComing": 6, "maxTop": 8 },
   "aggro": true,
   "setupTop": 10,

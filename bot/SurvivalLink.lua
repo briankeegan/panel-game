@@ -161,7 +161,10 @@ local function putTelegraph(sources)
     if q and q.transitTimers then
       for k = q.transitTimers.first, q.transitTimers.last do
         local t = q.transitTimers[k]
-        if t and sent < SOURCE_PIECES then
+        -- delivered once the source's stopWatch reaches it (GarbageDelivery); a remote source's copy is not always popped
+        -- here, its garbage can come by the server's relay, so what is past its time is on the stack's own queue, not on its way
+        local delivered = src.stopWatch ~= nil and t ~= nil and t <= src.stopWatch
+        if t and not delivered and sent < SOURCE_PIECES then
           transit[#transit + 1] = t
           sent = sent + #(q.garbageInTransit[t] or {})
         end

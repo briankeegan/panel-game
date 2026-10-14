@@ -29,6 +29,8 @@
 --      challengeloop       Challenge Mode stage after stage: Ready on the
 --                          character select, Return after each game over,
 --                          quit on the recap; each stage's result is reported
+--      trainingloop        one training game: Ready on the character select,
+--                          then `training lost|survived frames=F` and quit
 --      leave               leaveRoom but stay connected (back out of a match)
 --      quit                gracefully leave room -> disconnect -> exit (so the
 --                          server frees the room; not an abrupt process kill)
@@ -522,6 +524,31 @@ local function tickChallenge()
   end
 end
 
+-- TRAINING, ONE GAME (`trainingloop`): on the character select it presses Ready; in the game it watches the local player's
+-- stack, and the game ends -- topped out, or past PA_TRAINING_FRAMES frames alive -- with a line
+-- `training lost|survived frames=F <budgets>` and a quit, so each game is a client of its own.
+local function tickTraining()
+  local n, s = sceneName(), scene()
+  st.training.wait = (st.training.wait or 0) - 1
+  if st.training.wait > 0 then return end
+  local ps = GAME.localPlayer and GAME.localPlayer.stack
+  local e = ps and ps.engine
+  if n == "CharacterSelectVsSelf" and GAME.localPlayer and not GAME.localPlayer.settings.wantsReady then
+    local btn = s and s.uiRoot and findClickable(s.uiRoot, loc("ready"), 0)
+    if btn then pcall(function() btn:onClick() end); writeOut("ready") end
+    st.training.wait = 120
+    return
+  end
+  if not (e and e.clock) then return end
+  local cap = tonumber(os.getenv("PA_TRAINING_FRAMES") or "") or 10800
+  local over = e.game_over_clock and e.game_over_clock > 0
+  if over or e.clock >= cap then
+    writeOut(string.format("training %s frames=%d %s", over and "lost" or "survived", over and e.game_over_clock or e.clock, budgetText()))
+    doShoot(over and "training_lost" or "training_survived")
+    st.training = nil; st.quitting = { frames = 30 }
+  end
+end
+
 local function execCommand(c)
   local op, args, rest = c.op, c.args, c.rest
   if op == "tap" or op == "key" then tap(args[1]); st.busy = st.tapGap
@@ -541,6 +568,7 @@ local function execCommand(c)
     writeOut("texts[" .. tostring(sceneName()) .. "]: " .. table.concat(sceneTexts(), " | "))
   elseif op == "wait" then st.busy = tonumber(args[1]) or 30
   elseif op == "challengeloop" then st.challenge = {}; writeOut("challengeloop on")
+  elseif op == "trainingloop" then st.training = {}; writeOut("trainingloop on")
   elseif op == "scene" then writeOut("scene=" .. tostring(sceneName()))
   elseif op == "click" then
     local s = scene()
@@ -669,6 +697,7 @@ local function tickInteractive()
     return
   end
   if st.challenge and not st.menusel and #st.q == 0 then tickChallenge() end
+  if st.training and not st.menusel and #st.q == 0 then tickTraining() end
   if st.menusel then stepMenusel(); return end
   if st.waitScene then
     st.waitScene.timeout = st.waitScene.timeout - 1

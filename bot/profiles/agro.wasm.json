@@ -33,6 +33,7 @@
   "lowTop": 6,
   "volley": true,
   "volleyTo": 9,
+  "floorRows": 4,
   "aggro": true,
   "setupTop": 10,
   "setupComing": 6,

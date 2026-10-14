@@ -220,7 +220,16 @@ function BotClient:dispatch(msg)
     -- makes the server create the room and we fall into the normal match flow.
     local ch = msg.challengeUpdate
     if ch.challengeActive and ch.receiverId == self.publicId and not self.inRoom then
-      self:acceptChallenge(ch.senderId, ch.gameModeId)
+      -- PA_DECLINE_MODES="MODE_ID,MODE_ID": game modes this bot leaves unanswered
+      local declined = false
+      for mode in (os.getenv("PA_DECLINE_MODES") or ""):gmatch("[^,%s]+") do
+        if mode == ch.gameModeId then declined = true end
+      end
+      if declined then
+        logger.info(string.format("bot[%s]: ignoring %s challenge from %s", self.name, tostring(ch.gameModeId), tostring(ch.senderId)))
+      else
+        self:acceptChallenge(ch.senderId, ch.gameModeId)
+      end
     end
   elseif msg.leave_room then
     self.inRoom = false

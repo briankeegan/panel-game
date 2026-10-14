@@ -39,6 +39,7 @@
   "defendUnderThreat": true,
   "strictSwapBack": true,
   "holdThrough": true,
+  "defendRaiseTo": 8,
   "defendHoldThrees": { "maxComing": 6, "maxTop": 8 },
   "aggro": true,
   "setupTop": 10,

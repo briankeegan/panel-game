@@ -57,7 +57,7 @@
   "raiseStopBonus": 1,
   "raiseStopFrames": 60,
   "holdRaise": true,
-  "raiseHoldMax": 54,
+  "raiseHoldMax": 120,
   "dangerSoon": 120,
   "dangerOver": 0
  },

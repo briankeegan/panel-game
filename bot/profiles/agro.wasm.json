@@ -31,6 +31,8 @@
   "raiseMax": 7,
   "raiseTo": 7,
   "lowTop": 6,
+  "volley": true,
+  "volleyTo": 9,
   "aggro": true,
   "setupTop": 10,
   "setupComing": 6,

@@ -485,11 +485,17 @@ function SurvivalLink:await(deadline)
   return line
 end
 
-function SurvivalLink:startMatch(stack)
+-- The match's mode goes with it: a time limit (time attack) or none, how the stacks interact (0 none, 1 versus, 2 self,
+-- 3 attack engine, 4 team versus) and how many stacks play -- so the bot can tell time attack from versus.
+local function modeOf(match)
+  if not match then return nil end
+  return { timeLimit = match.timeLimit or false, stackInteraction = match.stackInteraction or false, stacks = match.stacks and #match.stacks or 0 }
+end
+function SurvivalLink:startMatch(stack, match)
   self:connect()
   SurvivalLink.warm()
   self:send(enc({ t = "match", levelData = stack.levelData, behaviours = stack.behaviours,
-                  stackOverConditions = stack.stackOverConditions }), true)
+                  stackOverConditions = stack.stackOverConditions, mode = modeOf(match) }), true)
   self.awaiting = 1   -- the match's ok, read with the first frame's answer
   self.warmed = false
   self.planned = nil

@@ -520,7 +520,7 @@ function BotClient:startMatch()
     -- survivor.js) that plans on this engine's rules and says what to press
     -- every frame (bot/SurvivalLink.lua). Nothing is decided here.
     self.survival = self.survival or require("bot.SurvivalLink").new({})
-    self.survival:startMatch(self.myStack)
+    self.survival:startMatch(self.myStack, self.match)
   elseif self.brainKind == "weighted" then
     -- The evaluator brain. searchProfile names the weight set; nil takes
     -- bot/profiles/trained.json, the set the cross-entropy search converged

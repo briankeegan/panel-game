@@ -347,6 +347,8 @@ jobs:
             export PA_SURVIVOR_PORT=47777
             brain=survival
           fi
+          # The defensive (default-profile) WasmSurvivor does not take time-attack challenges; the others do.
+          decline=""; case "${prof:-}" in *.wasm.json) ;; *) [ "$kind" = bitbot ] || decline=TWO_PLAYER_TIME_ATTACK ;; esac
           cd "$BOT_DIR"
           # The server hands a new name its account id at the first login. Save it to the bot branch the
           # moment it is written, not only when the run ends: a run that dies would lose it.
@@ -372,7 +374,7 @@ jobs:
           secs=$(( ${{ inputs.hours }} * 3600 ))
           echo "::notice::$name ($brain) joining $BOT_HOST:$BOT_PORT for ${{ inputs.hours }}h"
           set -o pipefail
-          PA_CHALLENGE="$target" timeout "$secs" luajit bot/playBot.lua "$BOT_HOST" "$BOT_PORT" "$name" 4 12 "$brain" \
+          PA_CHALLENGE="$target" PA_DECLINE_MODES="$decline" timeout "$secs" luajit bot/playBot.lua "$BOT_HOST" "$BOT_PORT" "$name" 4 12 "$brain" \
             2>&1 | tee "$GITHUB_WORKSPACE/bot-prod-smoke.log" || [ $? -eq 124 ]
 
       - name: Sit in the lobby

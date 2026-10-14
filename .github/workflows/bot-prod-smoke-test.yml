@@ -202,6 +202,15 @@ jobs:
           echo "::notice::bot runs on upstream $(git -C upstream log -1 --format='%h %s') -- $why"
           [ ! -e upstream/bot ] || { echo "upstream now has its own bot/ -- refusing to overwrite it"; exit 1; }
           cp -r botsrc/bot upstream/bot
+          # THE LINK TO GAMECREATOR'S BOTS IS ALWAYS THIS RUN'S: the upstream-protocol bot/ is its own client, but the
+          # link it hands the board through (SurvivalLink) and its test are the ones on the ref this run was dispatched
+          # on, so every bot plays upstream with the link the fork's bots play with
+          for f in bot/SurvivalLink.lua bot/tests/survivalLinkTelegraphVerify.lua; do
+            mkdir -p "upstream/$(dirname "$f")"; cp "$f" "upstream/$f"
+          done
+          (cd upstream && LUA_PATH="./?.lua;./common/lib/?.lua;$(luarocks path --local --lua-version 5.1 --lr-path);;" \
+             LUA_CPATH="./common/lib/?.so;./common/lib/?/?.so;$(luarocks path --local --lua-version 5.1 --lr-cpath);;" \
+             luajit bot/tests/survivalLinkTelegraphVerify.lua)
 
       - name: Run bot-vs-bot smoke test against the live server
         if: inputs.mode == 'prod-vs'

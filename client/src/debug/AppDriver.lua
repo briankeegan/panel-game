@@ -430,10 +430,16 @@ end
 -- input from a bot instead of the keyboard -- one byte a frame, asked with the
 -- board as that frame starts. PA_BOT picks it: "wasm" (the default),
 -- GameCreator's WasmSurvivor (survivor.js on PA_SURVIVOR_PORT, through
--- bot/SurvivalLink.lua), or "bitbot", GameCreator's BitBot in this process
--- (bot/BitBotNative.lua, GC_EVAL_DIR). Each stack gets a bot of its own.
+-- bot/SurvivalLink.lua), "bitbot", GameCreator's BitBot in this process
+-- (bot/BitBotNative.lua, GC_EVAL_DIR), or "gambit", GameCreator's Gambit in
+-- this process (its gambit/lua/GambitNative.lua, beside GC_EVAL_DIR). Each
+-- stack gets a bot of its own.
 local function newBot()
   if os.getenv("PA_BOT") == "bitbot" then return require("bot.BitBotNative").new({}) end
+  if os.getenv("PA_BOT") == "gambit" then
+    package.loaded["gambit.native"] = package.loaded["gambit.native"] or dofile(os.getenv("GC_EVAL_DIR") .. "/../gambit/lua/GambitNative.lua")
+    return package.loaded["gambit.native"].new({})
+  end
   return require("bot.SurvivalLink").new({})
 end
 -- The thinking and input budgets the bot has used, over every match so far (the link of each

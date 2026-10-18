@@ -171,9 +171,10 @@ dispatch_beta() {   # BOT NAME HOURS PROFILE
 beta_profile() {   # BOT
   case "$1" in
     wasm)            echo bot/profiles/wasmbot.wasm.json ;;
+    gambit)          echo survivor-profiles/gambit.json ;;   # (under GameCreator's eval dir)
     beverly|plamp)   echo "bot/profiles/$1.json" ;;
     bitbot)          echo bot/profiles/beverly.json ;;   # (BitBot has no profile; the field is unused)
-    *) echo "pair: no bot '$1' (beverly, plamp, wasm or bitbot)" >&2; exit 2 ;;
+    *) echo "pair: no bot '$1' (beverly, plamp, wasm, gambit or bitbot)" >&2; exit 2 ;;
   esac
 }
 
@@ -182,7 +183,7 @@ case "${1:-}" in
   start-bitbot) stop_and_wait "$BITBOT_RUN"; dispatch_bitbot ;;
   start-wasm)   stop_and_wait "$WASM_RUN";   dispatch_wasm ;;
   wasm-vs)      HOURS=${4:-5}; wasm_vs "${2:?lobby profile}" "${3:?challenger profile}" ;;
-  beta)         bot=${2:-beverly}; name=${3:-$(case $bot in wasm) echo WasmSurvivor_CPU;; bitbot) echo BitBot;; plamp) echo Plamp;; *) echo Beverly;; esac)}
+  beta)         bot=${2:-beverly}; name=${3:-$(case $bot in wasm) echo WasmSurvivor_CPU;; gambit) echo Ranmaru_CPU;; bitbot) echo BitBot;; plamp) echo Plamp;; *) echo Beverly;; esac)}
                 prof=${5:-$(beta_profile "$bot")}
                 stop_and_wait "(betaserver|panelattack\.com).* ${name//./\\.}(,|\$)"; dispatch_beta "$bot" "$name" "${4:-5}" "$prof" ;;
   duo)          h=${2:-3}

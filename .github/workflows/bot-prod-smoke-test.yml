@@ -323,7 +323,11 @@ jobs:
           export GC_EVAL_DIR="$GITHUB_WORKSPACE/GameCreator/games/the-game/ai/eval"
           # name is "BOT" or "BOT,OPPONENT": the second half is a lobby name this bot challenges
           name='${{ inputs.name }}'
+          # "BOT,OPPONENT" or "BOT,OPPONENT,GAMES": after GAMES finished games against OPPONENT the bot stops challenging
+          # and sits in the lobby accepting whoever challenges
+          games=""
           case "$name" in *,*) target=${name#*,}; name=${name%%,*};; *) target="";; esac
+          case "$target" in *,*) games=${target#*,}; target=${target%%,*};; esac
           [ -n "$name" ] && [ ${#name} -le 16 ] || { echo "name '$name' must be 1-16 characters"; exit 1; }
           echo "::notice::GameCreator at $(git -C "$GC_EVAL_DIR" log -1 --format='%h %s' | cut -c1-120)"
           kind='${{ inputs.bot }}'
@@ -387,7 +391,7 @@ jobs:
           secs=$(( ${{ inputs.hours }} * 3600 ))
           echo "::notice::$name ($brain) joining $BOT_HOST:$BOT_PORT for ${{ inputs.hours }}h"
           set -o pipefail
-          PA_CHALLENGE="$target" PA_DECLINE_MODES="$decline" timeout "$secs" luajit bot/playBot.lua "$BOT_HOST" "$BOT_PORT" "$name" 4 12 "$brain" \
+          PA_CHALLENGE="$target" PA_CHALLENGE_GAMES="$games" PA_DECLINE_MODES="$decline" timeout "$secs" luajit bot/playBot.lua "$BOT_HOST" "$BOT_PORT" "$name" 4 12 "$brain" \
             2>&1 | tee "$GITHUB_WORKSPACE/bot-prod-smoke.log" || [ $? -eq 124 ]
 
       - name: Sit in the lobby

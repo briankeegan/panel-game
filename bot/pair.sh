@@ -32,6 +32,10 @@
 #                                     and taking any challenge: WasmAgro_CPU (bot/profiles/agro.wasm.json) and
 #                                     WasmDefense_CPU (GameCreator's own default profile). Each cancels only its
 #                                     own earlier run. HOURS default 3.
+#   bot/pair.sh ranmaru-vs OPPONENT [GAMES] [HOURS]
+#                                     Ranmaru_CPU (Gambit) on the real server: challenges OPPONENT for GAMES finished
+#                                     games (default 3), then leaves the room and sits in the lobby accepting whoever
+#                                     challenges, until HOURS (default 3) are up.
 #   bot/pair.sh profiles              list the profiles wasm-vs can take (and "default")
 #   bot/pair.sh stop                  cancel every fight run that is going
 #   bot/pair.sh status                list the fight runs that are going
@@ -191,6 +195,9 @@ case "${1:-}" in
                 stop_and_wait "(betaserver|panelattack\.com).* WasmDefense_CPU(,|\$)"
                 dispatch_beta wasm WasmAgro_CPU "$h" bot/profiles/agro.wasm.json
                 dispatch_beta wasm WasmDefense_CPU "$h" default ;;
+  ranmaru-vs)  opp=${2:?the opponent\'s lobby name}; games=${3:-3}
+                stop_and_wait "(betaserver|panelattack\.com).* Ranmaru_CPU(,|\$)"
+                dispatch_beta gambit "Ranmaru_CPU,$opp,$games" "${4:-3}" "$(beta_profile gambit)" ;;
   beta-vs)      opp=${2:?the opponent\'s lobby name}; prof=${4:-$(beta_profile wasm)}
                 stop_and_wait "(betaserver|panelattack\.com).* WasmSurvivor_CPU(,|\$)"; dispatch_beta wasm "WasmSurvivor_CPU,$opp" "${3:-5}" "$prof" ;;
   profiles)     echo defensive; git ls-files 'bot/profiles/*.wasm.json' | sed 's/^/ /' ;;

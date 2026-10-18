@@ -52,6 +52,10 @@ print(string.format(
 -- Unset: the bot only waits to be challenged, as always.
 local challengeName = os.getenv("PA_CHALLENGE")
 if challengeName == "" then challengeName = nil end
+-- PA_CHALLENGE_GAMES=<n>: stop challenging after n finished games against that player, leave the room, and go on
+-- sitting in the lobby, accepting whoever challenges. Unset: keeps rematching until the run ends.
+local challengeGames = tonumber(os.getenv("PA_CHALLENGE_GAMES"))
+local challengeTarget, gamesWithTarget = challengeName, 0
 local lastChallengeAt = 0
 local function challengeIfFree()
   if not challengeName or bot.inRoom or bot.match or not bot.lobbyPlayers then return end
@@ -122,8 +126,21 @@ while true do
   if bot.match and bot.matchEnded then
     print(string.format("match over — bot %s (pace: worst %.2f frames off schedule); waiting for a rematch",
       tostring(bot.outcome), worstOffSchedule))
+    local vsTarget = false
+    if challengeTarget and bot.players then
+      for _, p in pairs(bot.players) do if p.name == challengeTarget then vsTarget = true end end
+    end
     bot:resetMatch()
     nextFrame, lastReadyAt, worstOffSchedule = nil, 0, 0
+    if vsTarget and challengeGames and challengeName then
+      gamesWithTarget = gamesWithTarget + 1
+      print(string.format("game %d of %d against '%s' finished", gamesWithTarget, challengeGames, challengeTarget))
+      if gamesWithTarget >= challengeGames then
+        challengeName = nil
+        bot:leaveRoom()
+        print("done with '" .. challengeTarget .. "': back in the lobby, accepting whoever challenges")
+      end
+    end
   end
 
   socket.sleep(0.002)

@@ -221,8 +221,15 @@ function BotClient:dispatch(msg)
     -- makes the server create the room and we fall into the normal match flow.
     local ch = msg.challengeUpdate
     if ch.challengeActive and ch.receiverId == self.publicId and not self.inRoom then
-      -- PA_DECLINE_MODES="MODE_ID,MODE_ID": game modes this bot leaves unanswered
+      -- PA_ACCEPT_ONLY=<name>: only that player's challenges are answered; everyone else's are left alone
       local declined = false
+      local only = os.getenv("PA_ACCEPT_ONLY")
+      if only and only ~= "" then
+        local who
+        for _, p in pairs(self.lobbyPlayers or {}) do if p.publicId == ch.senderId then who = p.name end end
+        if who ~= only then declined = true end
+      end
+      -- PA_DECLINE_MODES="MODE_ID,MODE_ID": game modes this bot leaves unanswered
       for mode in (os.getenv("PA_DECLINE_MODES") or ""):gmatch("[^,%s]+") do
         if mode == ch.gameModeId then declined = true end
       end

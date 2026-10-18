@@ -365,6 +365,8 @@ jobs:
             brain=survival
           fi
           # The defensive (default-profile) WasmSurvivor does not take time-attack challenges; the others do.
+          # Gambit with a target fights ONLY that player: it answers no one else's challenge
+          only=""; [ "$kind" = gambit ] && only="$target"
           decline=""; if [ "$kind" = wasm ]; then case "${prof:-}" in *.wasm.json) ;; *) decline=TWO_PLAYER_TIME_ATTACK ;; esac; fi
           cd "$BOT_DIR"
           # The server hands a new name its account id at the first login. Save it to the bot branch the
@@ -391,7 +393,7 @@ jobs:
           secs=$(( ${{ inputs.hours }} * 3600 ))
           echo "::notice::$name ($brain) joining $BOT_HOST:$BOT_PORT for ${{ inputs.hours }}h"
           set -o pipefail
-          PA_CHALLENGE="$target" PA_CHALLENGE_GAMES="$games" PA_DECLINE_MODES="$decline" timeout "$secs" luajit bot/playBot.lua "$BOT_HOST" "$BOT_PORT" "$name" 4 12 "$brain" \
+          PA_CHALLENGE="$target" PA_CHALLENGE_GAMES="$games" PA_ACCEPT_ONLY="$only" PA_DECLINE_MODES="$decline" timeout "$secs" luajit bot/playBot.lua "$BOT_HOST" "$BOT_PORT" "$name" 4 12 "$brain" \
             2>&1 | tee "$GITHUB_WORKSPACE/bot-prod-smoke.log" || [ $? -eq 124 ]
 
       - name: Sit in the lobby

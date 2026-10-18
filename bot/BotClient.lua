@@ -46,10 +46,11 @@ local BotClient = class(function(self, opts)
   -- Only the evaluator brain ships to upstream: EnvelopeBrain and its chip
   -- catalog stay on the fork.
   -- "weighted" is the evaluator brain; "survival" (GameCreator's WasmSurvivor, a Node process the link
-  -- talks to) and "bitbot" (GameCreator's BitBot, native, in this process) answer with a key every frame.
+  -- talks to), "bitbot" (GameCreator's BitBot, native, in this process) and "gambit" (GameCreator's Gambit, native)
+  -- answer with a key every frame.
   self.brainKind = opts.brain or "weighted"
-  assert(self.brainKind == "weighted" or self.brainKind == "survival" or self.brainKind == "bitbot",
-    "upstream bot supports brains 'weighted', 'survival' and 'bitbot', got " .. tostring(opts.brain))
+  assert(self.brainKind == "weighted" or self.brainKind == "survival" or self.brainKind == "bitbot" or self.brainKind == "gambit",
+    "upstream bot supports brains 'weighted', 'survival', 'bitbot' and 'gambit', got " .. tostring(opts.brain))
   self.searchProfile = opts.searchProfile       -- weight-set path (bot/profiles/*.json)
   self.cursorSpeed = opts.cursorSpeed           -- { cursorMoveInterval, reactionFrames }; nil = full speed
   self.gameplay = TcpClient()
@@ -295,7 +296,18 @@ function BotClient:startMatch()
     self.boardState = require("bot.BoardState")
   else
     -- a link of its own for each match, so nothing one match left in flight is read as the next's
-    self.link = (self.brainKind == "bitbot") and require("bot.BitBotNative").new({}) or require("bot.SurvivalLink").new({})
+    if self.brainKind == "gambit" then
+      -- GameCreator's Gambit (C, libgambit.so) in this process, its gambit/lua/GambitNative.lua beside GC_EVAL_DIR.
+      -- Not in its network mode: the upstream server is lockstep, so this client plays the opponent's stack from the
+      -- relayed inputs, exactly as a human's client does, and Gambit reads the opponent off that copy.
+      package.loaded["gambit.native"] = package.loaded["gambit.native"]
+        or dofile(assert(os.getenv("GC_EVAL_DIR"), "gambit needs GC_EVAL_DIR") .. "/../gambit/lua/GambitNative.lua")
+      self.link = package.loaded["gambit.native"].new({})
+    elseif self.brainKind == "bitbot" then
+      self.link = require("bot.BitBotNative").new({})
+    else
+      self.link = require("bot.SurvivalLink").new({})
+    end
     self.link:startMatch(self.myStack, self.match)
   end
   self.matchEnded, self.outcome, self._resultReported = false, nil, false

@@ -42,7 +42,10 @@ match:start()
 
 -- PA_PREFLIGHT_BRAIN=bitbot plays BitBot native, in this process
 -- (bot/BitBotNative.lua) -- the live path for BitBot; otherwise the link.
-local link = os.getenv("PA_PREFLIGHT_BRAIN") == "bitbot" and require("bot.BitBotNative").new({}) or SurvivalLink.new({})
+-- PA_PREFLIGHT_BRAIN=gambit plays GameCreator's Gambit in this process (its gambit/lua/GambitNative.lua beside GC_EVAL_DIR).
+local function gambit() return dofile(assert(os.getenv("GC_EVAL_DIR"), "gambit needs GC_EVAL_DIR") .. "/../gambit/lua/GambitNative.lua").new({}) end
+local brain = os.getenv("PA_PREFLIGHT_BRAIN")
+local link = brain == "bitbot" and require("bot.BitBotNative").new({}) or brain == "gambit" and gambit() or SurvivalLink.new({})
 -- PA_PREFLIGHT_OPPONENT=1: BitBot is told another player is in the match, as in a duel
 -- (nobody sends it garbage here): the game with no network and no other bot in it.
 local withOpponent = os.getenv("PA_PREFLIGHT_OPPONENT") == "1" and { stacks = { stack, { game_ended = function() return false end } } } or nil
@@ -50,7 +53,11 @@ link:startMatch(stack, withOpponent)
 
 local swaps0 = stack.swapCount or 0
 local frames, firstPlayed = 0, nil
+-- (Gambit thinks to the game's own frame, as a live match plays it, 60 a second: the frames are paced so, not run back to back)
+local pace = brain == "gambit" and require("socket") or nil
+local t0 = pace and pace.gettime()
 while frames < FRAMES and not stack:game_ended() do
+  if pace then local wait = t0 + frames / 60 - pace.gettime(); if wait > 0 then pace.sleep(wait) end end
   local char = link:input(stack, match.garbageSources and match.garbageSources[stack])
   stack:receiveConfirmedInput(char)
   match:run()
@@ -63,13 +70,13 @@ local played = frames - (firstPlayed or frames)
 local swaps = (stack.swapCount or 0) - swaps0
 local cleared = stack.panels_cleared or 0
 print(string.format("%s pre-flight: %d frames played after the countdown%s; %d swaps made, %d panels cleared, %d of %d answers late",
-  WHO, played, stack:game_ended() and " (topped out)" or "", swaps, cleared, link.late, link.frames))
+  WHO, played, stack:game_ended() and " (topped out)" or "", swaps, cleared, link.late or 0, link.frames))
 
 if link.maxMs then print(string.format("%s: slowest frame %.1f ms (a frame is 16.7)", WHO, link.maxMs)) end
 
 local problems = {}
 if link.frames == 0 then problems[#problems + 1] = WHO .. " was never asked for a frame" end
-if link.late > 0 and not LATE_OK then problems[#problems + 1] = link.late .. " frames' answers did not come back in time" end
+if (link.late or 0) > 0 and not LATE_OK then problems[#problems + 1] = link.late .. " frames' answers did not come back in time" end
 if swaps == 0 then problems[#problems + 1] = "no swap " .. WHO .. " made reached the engine" end
 if cleared == 0 then problems[#problems + 1] = WHO .. " cleared nothing" end
 if #problems > 0 then

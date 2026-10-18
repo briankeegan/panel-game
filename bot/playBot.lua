@@ -24,7 +24,7 @@ local cursorSpeed = (cursorInterval or reactionFrames)
 
 local bot = BotClient({
   ip = ip, port = port, name = name, cursorSpeed = cursorSpeed,
-  brain = arg[6] or "weighted", searchProfile = os.getenv("PA_SEARCH_PROFILE"),   -- arg 6: weighted | survival | bitbot
+  brain = arg[6] or "weighted", searchProfile = os.getenv("PA_SEARCH_PROFILE"),   -- arg 6: weighted | survival | bitbot | gambit
 })
 
 local ok, err = bot:login()

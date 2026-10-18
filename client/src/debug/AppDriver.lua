@@ -553,6 +553,8 @@ local function tickTraining()
   if over or e.clock >= cap then
     writeOut(string.format("training %s frames=%d %s", over and "lost" or "survived", over and e.game_over_clock or e.clock, budgetText()))
     doShoot(over and "training_lost" or "training_survived")
+    -- (the bot's match ended too: it writes what it keeps for the end -- its stats, the last boards it decided on)
+    if st.survivorLink and st.survivorLink.endMatch then pcall(function() st.survivorLink:endMatch() end) end
     st.training = nil; st.quitting = { frames = 30 }
   end
 end

@@ -389,27 +389,31 @@ function BotClient:viewOfOpponent()
   local o, mine = self.oppStack, self.myStack
   if not o or not o.panels or not mine then return nil end
   local width, height = o.width or 6, o.height or 12
-  local top, out, over = 0, false, false
+  -- The engine's own rule (Panel:dangerous): a panel counts unless it is garbage still falling. Garbage that is
+  -- only passing through the top rows on its way down is not the stack's height, and does not top it out.
+  local function counts(p)
+    if not p then return false end
+    if p.isGarbage then return p.state ~= "falling" end
+    return (p.color or 0) ~= 0
+  end
+  local top, over = 0, false
   for row = height, 1, -1 do
     local line = o.panels[row]
     if line then
       for col = 1, width do
-        local p = line[col]
-        if p and ((p.color or 0) ~= 0 or p.isGarbage) then
-          if top == 0 then top = row end
-          if row == height then out = true end
-        end
+        if counts(line[col]) then top = row; break end
       end
     end
+    if top ~= 0 then break end
   end
   local above = o.panels[height + 1]
   if above then
     for col = 1, width do
       local p = above[col]
-      if p and p.isGarbage then over = true end
+      if p and p.isGarbage and p.state ~= "falling" then over = true end
     end
   end
-  if o:game_ended() then out = true end
+  local out = o:isToppedOut() or o:game_ended()
   return { top = top, out = out, over = over, seen = mine.clock, clock = o.clock,
            stop = (o.stop_time or 0) + (o.pre_stop_time or 0) }
 end

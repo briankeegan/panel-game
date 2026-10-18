@@ -195,9 +195,10 @@ case "${1:-}" in
                 stop_and_wait "(betaserver|panelattack\.com).* WasmDefense_CPU(,|\$)"
                 dispatch_beta wasm WasmAgro_CPU "$h" bot/profiles/agro.wasm.json
                 dispatch_beta wasm WasmDefense_CPU "$h" default ;;
-  ranmaru-vs)  opp=${2:?the opponent\'s lobby name}; games=${3:-3}
+  ranmaru-vs)  opp=${2:?the opponent\'s lobby name}; games=${3:-3}   # GAMES 0 or all: keeps challenging OPPONENT whenever it is free
                 stop_and_wait "(betaserver|panelattack\.com).* Ranmaru_CPU(,|\$)"
-                dispatch_beta gambit "Ranmaru_CPU,$opp,$games" "${4:-3}" "$(beta_profile gambit)" ;;
+                case "$games" in 0|all|"") tail="";; *) tail=",$games";; esac
+                dispatch_beta gambit "Ranmaru_CPU,$opp$tail" "${4:-3}" "$(beta_profile gambit)" ;;
   beta-vs)      opp=${2:?the opponent\'s lobby name}; prof=${4:-$(beta_profile wasm)}
                 stop_and_wait "(betaserver|panelattack\.com).* WasmSurvivor_CPU(,|\$)"; dispatch_beta wasm "WasmSurvivor_CPU,$opp" "${3:-5}" "$prof" ;;
   profiles)     echo defensive; git ls-files 'bot/profiles/*.wasm.json' | sed 's/^/ /' ;;

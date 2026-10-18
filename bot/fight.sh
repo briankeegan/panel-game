@@ -21,6 +21,12 @@
 #   beverly    the fork's weighted bot, bot/profiles/beverly.json
 #   plamp      the fork's weighted bot, bot/profiles/plamp.json
 #   heuristic  the fork's original shape-catalog bot
+#   gambit     GameCreator's Gambit (C, games/the-game/ai/gambit, same checkout),
+#              built to libgambit.so and played in the client's own process
+#              (its gambit/lua/GambitNative.lua). Its profile is GAMBIT_PROFILE
+#              (default survivor-profiles/gambit.json: no mode pinned, so the
+#              rules' `when` pick it from the opponent's stack mid-game); its
+#              log is gambit-NAME.log.
 #
 # Every bot plays at the same cadence (cursor every 4 frames, 12-frame
 # reaction) except heuristic, which keeps its own. Matches are unranked:
@@ -57,7 +63,7 @@ OPP_NAME=${OPP_NAME:-${NAME}2}
 REMOTE=0
 if [ "$OPP" = challenge ]; then REMOTE=1; OPP=""; fi
 
-kinds="bitbot bitbotwasm wasm beverly plamp heuristic"
+kinds="bitbot bitbotwasm wasm beverly plamp heuristic gambit"
 known() { case " $kinds " in *" $1 "*) return 0;; esac; return 1; }
 known "$BOT" || { echo "fight: no bot '$BOT' (one of: $kinds)"; exit 2; }
 [ -z "$OPP" ] || known "$OPP" || { echo "fight: no opponent '$OPP' (one of: $kinds, or you)"; exit 2; }
@@ -94,7 +100,8 @@ preflight() {   # KIND NAME [PORT WAIT]
   # Off unless FIGHT_PREFLIGHT=1: a bot goes straight to the lobby, where it can be seen playing.
   [ "${FIGHT_PREFLIGHT:-0}" = 1 ] || { echo "fight: pre-flight skipped ($1 $2)"; return 0; }
   local kind=$1 name=$2
-  PA_PREFLIGHT_BRAIN=$([ "$kind" = bitbot ] && echo bitbot) PA_SURVIVOR_PORT=${3:-} PA_SURVIVOR_WAIT=${4:-} \
+  PA_PREFLIGHT_BRAIN=$(case "$kind" in bitbot|gambit) echo "$kind";; esac) PA_SURVIVOR_PORT=${3:-} PA_SURVIVOR_WAIT=${4:-} \
+    GC_GAMBIT_WORDS="$PWD/gambit.words" GC_GAMBIT_LOG="$PWD/preflight-gambit-$name.log" \
     PA_PREFLIGHT_NAME="$kind ($name)" PA_PREFLIGHT_LATE_OK=$([ "$kind" = wasm ] && echo 1) \
     luajit bot/bitbot_preflight.lua 1800 2>&1 | tee "preflight-$name.log"
   [ "${PIPESTATUS[0]}" -eq 0 ] || exit 1
@@ -162,8 +169,19 @@ start_bitbotwasm() {   # NAME PORT
     echo "fight: bitbotwasm ($name) pre-flight FAILED (lines above are from $log)"; exit 1
   fi
 }
+# ---- Gambit: libgambit.so built here from the checkout (its build.sh), and its profile
+# as numbers (its words.js) -- what GambitNative.lua loads
+build_gambit() {
+  [ -n "${GC_EVAL_DIR:-}" ] || { echo "fight: gambit needs GC_EVAL_DIR=<GameCreator>/games/the-game/ai/eval"; exit 2; }
+  local G="$GC_EVAL_DIR/../gambit" prof="$GC_EVAL_DIR/${GAMBIT_PROFILE:-survivor-profiles/gambit.json}"
+  [ -f "$prof" ] || { echo "fight: no Gambit profile $prof"; exit 2; }
+  "$G/build.sh" native > gambit-build.log 2>&1 || { cat gambit-build.log; echo "fight: libgambit.so did not build"; exit 1; }
+  GC_SURVIVOR_PROFILE="$prof" node "$G/words.js" > "$PWD/gambit.words" 2>> gambit-build.log || { cat gambit-build.log; echo "fight: Gambit's profile did not encode"; exit 1; }
+  echo "fight: gambit built from $(git -C "$GC_EVAL_DIR" log -1 --format=%h 2>/dev/null), profile ${GAMBIT_PROFILE:-survivor-profiles/gambit.json}"
+}
 trap 'kill ${PIDS:-} 2>/dev/null' EXIT
 if [ "$BOT" = bitbot ] || [ "$OPP" = bitbot ]; then build_bitbot; fi
+if [ "$BOT" = gambit ] || [ "$OPP" = gambit ]; then build_gambit; fi
 # NAME=BitBotCheck: no lobby. BitBot alone, offline, told an opponent is present, on four boards:
 # the hookup with no network, no BotClient and no other bot in it.
 if [ "$BOT" = bitbot ] && [ "$NAME" = BitBotCheck ]; then
@@ -174,8 +192,8 @@ if [ "$BOT" = bitbot ] && [ "$NAME" = BitBotCheck ]; then
   done 2>&1 | tee "fight-$NAME.log"
   exit 0
 fi
-case "$BOT" in bitbot) preflight bitbot "$NAME" ;; bitbotwasm) start_bitbotwasm "$NAME" "$BASE_PORT" ;; wasm) start_wasm "$NAME" "$BASE_PORT" ;; esac
-case "$OPP" in bitbot) preflight bitbot "$OPP_NAME" ;; bitbotwasm) start_bitbotwasm "$OPP_NAME" $((BASE_PORT + 1)) ;; wasm) start_wasm "$OPP_NAME" $((BASE_PORT + 1)) ;; esac
+case "$BOT" in bitbot|gambit) preflight "$BOT" "$NAME" ;; bitbotwasm) start_bitbotwasm "$NAME" "$BASE_PORT" ;; wasm) start_wasm "$NAME" "$BASE_PORT" ;; esac
+case "$OPP" in bitbot|gambit) preflight "$OPP" "$OPP_NAME" ;; bitbotwasm) start_bitbotwasm "$OPP_NAME" $((BASE_PORT + 1)) ;; wasm) start_wasm "$OPP_NAME" $((BASE_PORT + 1)) ;; esac
 
 # ---- one side: KIND NAME [CHALLENGE]
 play() {
@@ -191,6 +209,8 @@ play() {
     plamp)       PA_CHALLENGE="$challenge" PA_SEARCH_PROFILE=bot/profiles/plamp.json \
                    timeout "$SECS" luajit bot/playBot.lua "$HOST" "$PORT" "$name" 4 12 weighted ;;
     heuristic)   PA_CHALLENGE="$challenge" timeout "$SECS" luajit bot/playBot.lua "$HOST" "$PORT" "$name" ;;
+    gambit)      PA_CHALLENGE="$challenge" GC_GAMBIT_WORDS="$PWD/gambit.words" GC_GAMBIT_LOG="$PWD/gambit-$name.log" \
+                   timeout "$SECS" luajit bot/playBot.lua "$HOST" "$PORT" "$name" 4 12 gambit ;;
   esac
 }
 

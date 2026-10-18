@@ -525,11 +525,13 @@ function BotClient:startMatch()
   elseif self.brainKind == "gambit" then
     -- Gambit: GameCreator's Gambit (C, libgambit.so) in this process, hooked up as the client's
     -- Training hooks it (its gambit/lua/GambitNative.lua, beside GC_EVAL_DIR; the profile in
-    -- GC_GAMBIT_WORDS). It reads the opponent's stack from the garbage sources: whether it is
-    -- topped out, its height and its stop -- what the rules' `when` and `by` pick the mode by.
+    -- GC_GAMBIT_WORDS). It reads the opponent from its shipped board (oppView): whether garbage hangs
+    -- above its top row, its height and its stop -- what the rules' `when` and `by` pick the mode by.
     package.loaded["gambit.native"] = package.loaded["gambit.native"]
       or dofile(assert(os.getenv("GC_EVAL_DIR"), "gambit needs GC_EVAL_DIR") .. "/../gambit/lua/GambitNative.lua")
-    self.survival = self.survival or package.loaded["gambit.native"].new({})
+    -- (online: the opponent's board and the garbage on its way only as the server sends them -- its snapshots and this stack's
+    -- own queue -- never the copy of the opponent played here)
+    self.survival = self.survival or package.loaded["gambit.native"].new({ network = true })
     self.survival:startMatch(self.myStack, self.match)
   elseif self.brainKind == "survival" then
     -- WasmSurvivor: the survival bot, a separate process (GameCreator's

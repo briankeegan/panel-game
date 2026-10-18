@@ -299,7 +299,14 @@ function BotClient:dispatch(msg)
           end
         end
       end
-      self.oppView = { top = top, out = out, seen = self.myStack.clock, clock = snap.f, stop = (snap.st or 0) + (snap.ps or 0) }
+      -- over: garbage above the top row (the snapshot's row height+1) -- the board that can die, what a
+      -- rule's "enemy topped out" means; a stack that only reaches the top row is tall, not topped out
+      local over = false
+      for col = 1, width do
+        local cell = cache[(height + 1) * width + col]
+        if cell and cell.g then over = true end
+      end
+      self.oppView = { top = top, out = out, over = over, seen = self.myStack.clock, clock = snap.f, stop = (snap.st or 0) + (snap.ps or 0) }
       self._yCount = (self._yCount or 0) + 1
       if self._yCount == 1 or self._yCount % 400 == 0 then
         logger.info(string.format("bot[%s]: opponent board #%d at its frame %s: top %d, topped out %s", self.name, self._yCount, tostring(snap.f), top, tostring(out)))

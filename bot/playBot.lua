@@ -29,6 +29,7 @@ local cursorSpeed = (cursorInterval or reactionFrames)
 local bot = BotClient({
   ip = ip, port = port, name = name, cursorSpeed = cursorSpeed,
   brain = brain,
+  level = tonumber(os.getenv("PA_LEVEL")),   -- (the modern level it plays; BotClient's default when unset)
   searchProfile = (brain == "search" or brain == "weighted") and os.getenv("PA_SEARCH_PROFILE") or nil,
 })
 

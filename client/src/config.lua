@@ -251,7 +251,7 @@ config = {
           end
 
           if type(read_data.level) == "number" then
-            configTable.level = util.bound(1, read_data.level, 10)
+            configTable.level = util.bound(1, read_data.level, require("common.data.LevelPresets").modernPresetCount)
           end
           if type(read_data.endless_speed) == "number" then
             configTable.endless_speed = util.bound(1, read_data.endless_speed, 99)

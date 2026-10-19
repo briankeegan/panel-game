@@ -35,7 +35,7 @@ local LATE_OK = os.getenv("PA_PREFLIGHT_LATE_OK") == "1"
 
 local mode = GameModes.getPreset(GameModes.IDs.TWO_PLAYER_VS)
 local match = Match(GeneratorSource(tonumber(os.getenv("PA_PREFLIGHT_SEED")) or 20261001, true), mode.matchRules)
-local stack = match:createStackWithSettings(LevelPresets.getModern(10), true, "controller")
+local stack = match:createStackWithSettings(LevelPresets.getModern(tonumber(os.getenv("PA_LEVEL")) or 10), true, "controller")   -- (the level the fight plays)
 match:start()
 
 -- PA_PREFLIGHT_BRAIN=bitbot plays BitBot native, in this process

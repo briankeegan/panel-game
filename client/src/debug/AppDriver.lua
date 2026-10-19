@@ -588,6 +588,13 @@ local function execCommand(c)
     local v = stp and stp.value
     local a = v and v.attackPatterns and v.attackPatterns[1]
     writeOut("trainingpattern " .. rest .. " -> " .. tostring(stp and stp.selectedIndex) .. " " .. (a and (a.width .. "x" .. a.height) or "custom"))
+  elseif op == "level" then
+    -- level <n>: the local player's modern level and its level data, as the level slider sets them; reports what the player now holds
+    local LevelPresets = require("common.data.LevelPresets")
+    local n, p = tonumber(args[1]), GAME.localPlayer
+    if n and n >= 1 and n <= LevelPresets.modernPresetCount then p:setLevel(n); p:setLevelData(LevelPresets.getModern(n)) end
+    local ld = p.settings.levelData
+    writeOut("level " .. tostring(p.settings.level) .. " speed " .. tostring(ld and ld.startingSpeed) .. " health " .. tostring(ld and ld.maxHealth))
   elseif op == "scene" then writeOut("scene=" .. tostring(sceneName()))
   elseif op == "click" then
     local s = scene()

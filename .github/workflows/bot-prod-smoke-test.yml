@@ -248,7 +248,7 @@ jobs:
       # re-run it, or run bot/beverly.sh on the server box under systemd for
       # something permanent.
       - name: Check the name and the weight set before connecting
-        if: (inputs.mode == 'live' || inputs.mode == 'survival') && !(inputs.mode == 'live' && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER) && (inputs.bot == 'wasm' || inputs.bot == 'bitbot'))
+        if: (inputs.mode == 'live' || inputs.mode == 'survival') && !(inputs.mode == 'live' && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER) && (inputs.bot == 'wasm' || inputs.bot == 'bitbot' || inputs.bot == 'gambit'))
         run: |
           set -eu
           cd "$BOT_DIR"
@@ -303,7 +303,7 @@ jobs:
       # is built here from GameCreator's own native/build.sh line; WasmSurvivor
       # is a Node process beside the client (bot/SurvivalLink.lua talks to it).
       - name: Check out GameCreator (beta bot)
-        if: inputs.mode == 'live' && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER) && (inputs.bot == 'wasm' || inputs.bot == 'bitbot')
+        if: inputs.mode == 'live' && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER) && (inputs.bot == 'wasm' || inputs.bot == 'bitbot' || inputs.bot == 'gambit')
         uses: actions/checkout@v4
         with:
           repository: briankeegan/GameCreator
@@ -311,12 +311,12 @@ jobs:
           sparse-checkout: games/the-game
 
       - uses: actions/setup-node@v4
-        if: inputs.mode == 'live' && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER) && (inputs.bot == 'wasm' || inputs.bot == 'bitbot')
+        if: inputs.mode == 'live' && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER) && (inputs.bot == 'wasm' || inputs.bot == 'bitbot' || inputs.bot == 'gambit')
         with:
           node-version: '22'
 
       - name: Sit in the lobby (beta, ${{ inputs.bot }})
-        if: inputs.mode == 'live' && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER) && (inputs.bot == 'wasm' || inputs.bot == 'bitbot')
+        if: inputs.mode == 'live' && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER) && (inputs.bot == 'wasm' || inputs.bot == 'bitbot' || inputs.bot == 'gambit')
         id: betalink
         run: |
           set -eu
@@ -324,7 +324,11 @@ jobs:
           export GC_EVAL_DIR="$GITHUB_WORKSPACE/GameCreator/games/the-game/ai/eval"
           # name is "BOT" or "BOT,OPPONENT": the second half is a lobby name this bot challenges
           name='${{ inputs.name }}'
+          # "BOT,OPPONENT" or "BOT,OPPONENT,GAMES": after GAMES finished games against OPPONENT the bot stops challenging
+          # and sits in the lobby accepting whoever challenges
+          games=""
           case "$name" in *,*) target=${name#*,}; name=${name%%,*};; *) target="";; esac
+          case "$target" in *,*) games=${target#*,}; target=${target%%,*};; esac
           [ -n "$name" ] && [ ${#name} -le 16 ] || { echo "name '$name' must be 1-16 characters"; exit 1; }
           echo "::notice::GameCreator at $(git -C "$GC_EVAL_DIR" log -1 --format='%h %s' | cut -c1-120)"
           kind='${{ inputs.bot }}'
@@ -332,6 +336,18 @@ jobs:
             line=$(grep -E '^clang .* -shared .*libbit\.so' "$GC_EVAL_DIR/native/build.sh" | head -1)
             (cd "$GC_EVAL_DIR/native" && eval "$line") 2> bitbot-build.log || { cat bitbot-build.log; echo "libbit.so did not build"; exit 1; }
             brain=bitbot
+          elif [ "$kind" = gambit ]; then
+            # GameCreator's Gambit (C, libgambit.so), built here and played in the client's own process
+            # (gambit/lua/GambitNative.lua). Its profile is a path under the eval dir, as numbers (words.js).
+            G="$GC_EVAL_DIR/../gambit"
+            gp=survivor-profiles/gambit.json
+            case '${{ inputs.profile }}' in survivor-profiles/*) gp='${{ inputs.profile }}';; esac
+            [ -f "$GC_EVAL_DIR/$gp" ] || { echo "no Gambit profile $GC_EVAL_DIR/$gp"; exit 1; }
+            sh "$G/build.sh" native > gambit-build.log 2>&1 || { cat gambit-build.log; echo "libgambit.so did not build"; exit 1; }
+            GC_SURVIVOR_PROFILE="$GC_EVAL_DIR/$gp" node "$G/words.js" > "$PWD/gambit.words" 2>> gambit-build.log || { cat gambit-build.log; echo "Gambit's profile did not encode"; exit 1; }
+            echo "::notice::Gambit built from GameCreator $(git -C "$GC_EVAL_DIR" log -1 --format=%h), profile $gp"
+            export GC_GAMBIT_WORDS="$PWD/gambit.words" GC_GAMBIT_LOG="$PWD/gambit-$name.log"
+            brain=gambit
           else
             prof='${{ inputs.profile }}'
             prof_abs=""
@@ -350,7 +366,9 @@ jobs:
             brain=survival
           fi
           # The defensive (default-profile) WasmSurvivor does not take time-attack challenges; the others do.
-          decline=""; case "${prof:-}" in *.wasm.json) ;; *) [ "$kind" = bitbot ] || decline=TWO_PLAYER_TIME_ATTACK ;; esac
+          # Gambit with a target fights ONLY that player: it answers no one else's challenge
+          only=""; [ "$kind" = gambit ] && only="$target"
+          decline=""; if [ "$kind" = wasm ]; then case "${prof:-}" in *.wasm.json) ;; *) decline=TWO_PLAYER_TIME_ATTACK ;; esac; fi
           cd "$BOT_DIR"
           # The server hands a new name its account id at the first login. Save it to the bot branch the
           # moment it is written, not only when the run ends: a run that dies would lose it.
@@ -376,11 +394,11 @@ jobs:
           secs=$(( ${{ inputs.hours }} * 3600 ))
           echo "::notice::$name ($brain) joining $BOT_HOST:$BOT_PORT for ${{ inputs.hours }}h"
           set -o pipefail
-          PA_CHALLENGE="$target" PA_DECLINE_MODES="$decline" timeout "$secs" luajit bot/playBot.lua "$BOT_HOST" "$BOT_PORT" "$name" 4 12 "$brain" \
+          PA_CHALLENGE="$target" PA_CHALLENGE_GAMES="$games" PA_ACCEPT_ONLY="$only" PA_DECLINE_MODES="$decline" timeout "$secs" luajit bot/playBot.lua "$BOT_HOST" "$BOT_PORT" "$name" 4 12 "$brain" \
             2>&1 | tee "$GITHUB_WORKSPACE/bot-prod-smoke.log" || [ $? -eq 124 ]
 
       - name: Sit in the lobby
-        if: inputs.mode == 'live' && !(inputs.mode == 'live' && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER) && (inputs.bot == 'wasm' || inputs.bot == 'bitbot'))
+        if: inputs.mode == 'live' && !(inputs.mode == 'live' && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER) && (inputs.bot == 'wasm' || inputs.bot == 'bitbot' || inputs.bot == 'gambit'))
         id: live
         env:
           PA_SEARCH_PROFILE: ${{ inputs.profile }}

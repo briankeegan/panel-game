@@ -529,9 +529,9 @@ function BotClient:startMatch()
     -- above its top row, its height and its stop -- what the rules' `when` and `by` pick the mode by.
     package.loaded["gambit.native"] = package.loaded["gambit.native"]
       or dofile(assert(os.getenv("GC_EVAL_DIR"), "gambit needs GC_EVAL_DIR") .. "/../gambit/lua/GambitNative.lua")
-    -- (online: the opponent's board and the garbage on its way only as the server sends them -- its snapshots and this stack's
-    -- own queue -- never the copy of the opponent played here)
-    self.survival = self.survival or package.loaded["gambit.native"].new({ network = true })
+    -- (loose sync: the opponent's board and the garbage on its way only as the server sends them -- its snapshots and this
+    -- stack's own queue; GambitNative asks the engine's own routing which sources come over the wire)
+    self.survival = self.survival or package.loaded["gambit.native"].new({})
     self.survival:startMatch(self.myStack, self.match)
   elseif self.brainKind == "survival" then
     -- WasmSurvivor: the survival bot, a separate process (GameCreator's

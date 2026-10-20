@@ -456,7 +456,9 @@ function BattleRoom:createPanelSource()
   if self.panelSource then
     return self.panelSource
   else
-    return GeneratorSource(math.random(1, 999999), self.mode.stackInteraction ~= GameModes.StackInteractions.NONE)
+    -- (PA_SEED: a harness's fixed seed -- the same panels every run, so two builds are measured on the same games)
+    local seed = tonumber(os.getenv("PA_SEED") or "")
+    return GeneratorSource(seed or math.random(1, 999999), self.mode.stackInteraction ~= GameModes.StackInteractions.NONE)
   end
 end
 

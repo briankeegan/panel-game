@@ -305,12 +305,12 @@ function BotClient:startMatch()
     -- a link of its own for each match, so nothing one match left in flight is read as the next's
     if self.brainKind == "gambit" then
       -- GameCreator's Gambit (C, libgambit.so) in this process, its gambit/lua/GambitNative.lua beside GC_EVAL_DIR.
-      -- Fed what it is fed on the fork's server: network mode (the garbage on its way is this stack's own queue,
-      -- the opponent only the view of it, BotClient:viewOfOpponent). The upstream server is lockstep, so the
-      -- view is read off the opponent's stack this client plays from the relayed inputs, as a human's client sees it.
+      -- Fed exactly as GambitNative reads a lockstep match: the stack and its garbage sources (the opponent's stack, played
+      -- here from the relayed inputs), no shipped view. GambitNative itself reads an opponent whose garbage does not come
+      -- over the wire (no LOOSE_SYNC_GARBAGE upstream) off that stack: its garbage on the way, its top row, its stop and shake.
       package.loaded["gambit.native"] = package.loaded["gambit.native"]
         or dofile(assert(os.getenv("GC_EVAL_DIR"), "gambit needs GC_EVAL_DIR") .. "/../gambit/lua/GambitNative.lua")
-      self.link = package.loaded["gambit.native"].new({ network = true })
+      self.link = package.loaded["gambit.native"].new({})
     elseif self.brainKind == "bitbot" then
       self.link = require("bot.BitBotNative").new({})
     else
@@ -348,8 +348,7 @@ function BotClient:_sendInput()
 
   if self.link then
     -- WasmSurvivor / BitBot: the key for this frame, from the bot itself; nothing is decided here
-    local char = self.link:input(stack, self.match.garbageSources and self.match.garbageSources[stack],
-      self.brainKind == "gambit" and self:viewOfOpponent() or nil) or IDLE
+    local char = self.link:input(stack, self.match.garbageSources and self.match.garbageSources[stack]) or IDLE
     self.gameplay:send(NetworkProtocol.markedMessageForTypeAndBody(I_PREFIX, char))
     stack:receiveConfirmedInput(char)
     return
@@ -389,42 +388,6 @@ end
 -- One tick of a real client's ClientMatch:run at 60Hz: take the opponent's
 -- relayed inputs, send ours, let the engine run both stacks (it catches the
 -- opponent up and rolls back for late garbage), and report once it has ended.
--- What Gambit is told about the opponent, in the shape the fork's bot builds from the server's board snapshots:
--- top (its highest row with a panel or garbage), out (that reaches the top row, or it is out), over (garbage hangs
--- above the top row), stop (stop time + pre-stop). Read off the opponent's stack as this client plays it.
-function BotClient:viewOfOpponent()
-  local o, mine = self.oppStack, self.myStack
-  if not o or not o.panels or not mine then return nil end
-  local width, height = o.width or 6, o.height or 12
-  -- The engine's own rule (Panel:dangerous): a panel counts unless it is garbage still falling. Garbage that is
-  -- only passing through the top rows on its way down is not the stack's height, and does not top it out.
-  local function counts(p)
-    if not p then return false end
-    if p.isGarbage then return p.state ~= "falling" end
-    return (p.color or 0) ~= 0
-  end
-  local top, over = 0, false
-  for row = height, 1, -1 do
-    local line = o.panels[row]
-    if line then
-      for col = 1, width do
-        if counts(line[col]) then top = row; break end
-      end
-    end
-    if top ~= 0 then break end
-  end
-  local above = o.panels[height + 1]
-  if above then
-    for col = 1, width do
-      local p = above[col]
-      if p and p.isGarbage and p.state ~= "falling" then over = true end
-    end
-  end
-  local out = o:isToppedOut() or o:game_ended()
-  return { top = top, out = out, over = over, seen = mine.clock, clock = o.clock,
-           stop = (o.stop_time or 0) + (o.pre_stop_time or 0) }
-end
-
 function BotClient:tickMatch()
   if not self.match or self._resultReported then return end
 

@@ -32,7 +32,7 @@
 #                                     and taking any challenge: WasmAgro_CPU (bot/profiles/agro.wasm.json) and
 #                                     WasmDefense_CPU (GameCreator's own default profile). Each cancels only its
 #                                     own earlier run. HOURS default 3.
-#   bot/pair.sh ranmaru-vs OPPONENT [GAMES] [HOURS]
+#   bot/pair.sh ranmaru-vs OPPONENT [GAMES|firstN] [HOURS]   (first10: a series, first to 10 wins, then it accepts anyone)
 #                                     Ranmaru_CPU (Gambit) on the real server: challenges OPPONENT for GAMES finished
 #                                     games (default 3), then leaves the room and sits in the lobby accepting whoever
 #                                     challenges, until HOURS (default 3) are up.

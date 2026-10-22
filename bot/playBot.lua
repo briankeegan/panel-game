@@ -124,6 +124,11 @@ while true do
   -- The room says the match is over once BOTH sides have reported (gameResult),
   -- or it was aborted; then back to character select for the rematch.
   if bot.match and bot.matchEnded then
+    -- who it played: the other players' names in the room (the lobby ids are all the rest of the log has)
+    local others = {}
+    for _, p in pairs(bot.players or {}) do if p.name ~= name then others[#others + 1] = tostring(p.name) end end
+    table.sort(others)
+    print("match against: " .. (#others > 0 and table.concat(others, ", ") or "?"))
     print(string.format("match over — bot %s (pace: worst %.2f frames off schedule); waiting for a rematch",
       tostring(bot.outcome), worstOffSchedule))
     local vsTarget = false

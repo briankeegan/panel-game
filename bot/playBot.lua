@@ -50,12 +50,17 @@ print(string.format(
 -- PA_CHALLENGE=<name>: also CHALLENGE that player whenever both sides are in the lobby (it
 -- auto-accepts if it is a bot like this one; a person accepts in the lobby), and keep rematching.
 -- Unset: the bot only waits to be challenged, as always.
+bot.acceptOnly = os.getenv("PA_ACCEPT_ONLY")
 local challengeName = os.getenv("PA_CHALLENGE")
 if challengeName == "" then challengeName = nil end
 -- PA_CHALLENGE_GAMES=<n>: stop challenging after n finished games against that player, leave the room, and go on
 -- sitting in the lobby, accepting whoever challenges. Unset: keeps rematching until the run ends.
 local challengeGames = tonumber(os.getenv("PA_CHALLENGE_GAMES"))
 local challengeTarget, gamesWithTarget = challengeName, 0
+-- PA_CHALLENGE_FIRST_TO=<n>: a series against that player, first to n wins (decided games only); then it stops
+-- challenging, leaves the room and goes back to accepting whoever challenges.
+local firstTo = tonumber(os.getenv("PA_CHALLENGE_FIRST_TO"))
+local seriesWon, seriesLost = 0, 0
 local lastChallengeAt = 0
 local function challengeIfFree()
   if not challengeName or bot.inRoom or bot.match or not bot.lobbyPlayers then return end
@@ -137,6 +142,16 @@ while true do
     end
     bot:resetMatch()
     nextFrame, lastReadyAt, worstOffSchedule = nil, 0, 0
+    if vsTarget and firstTo and challengeName and (bot.outcome == "won" or bot.outcome == "lost") then
+      if bot.outcome == "won" then seriesWon = seriesWon + 1 else seriesLost = seriesLost + 1 end
+      print(string.format("series against '%s': %s %d - %d %s (first to %d)", challengeTarget, name, seriesWon, seriesLost, challengeTarget, firstTo))
+      if seriesWon >= firstTo or seriesLost >= firstTo then
+        challengeName = nil
+        bot.acceptOnly = nil
+        bot:leaveRoom()
+        print(string.format("series over: %s %d - %d %s; back in the lobby, accepting whoever challenges", name, seriesWon, seriesLost, challengeTarget))
+      end
+    end
     if vsTarget and challengeGames and challengeName then
       gamesWithTarget = gamesWithTarget + 1
       print(string.format("game %d of %d against '%s' finished", gamesWithTarget, challengeGames, challengeTarget))

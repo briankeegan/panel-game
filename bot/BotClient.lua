@@ -223,7 +223,7 @@ function BotClient:dispatch(msg)
     if ch.challengeActive and ch.receiverId == self.publicId and not self.inRoom then
       -- PA_ACCEPT_ONLY=<name>: only that player's challenges are answered; everyone else's are left alone
       local declined = false
-      local only = os.getenv("PA_ACCEPT_ONLY")
+      local only = self.acceptOnly   -- set by playBot from PA_ACCEPT_ONLY; cleared when a series against that player ends
       if only and only ~= "" then
         local who
         for _, p in pairs(self.lobbyPlayers or {}) do if p.publicId == ch.senderId then who = p.name end end

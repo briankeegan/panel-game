@@ -333,6 +333,7 @@ jobs:
           [ -n "$name" ] && [ ${#name} -le 16 ] || { echo "name '$name' must be 1-16 characters"; exit 1; }
           echo "::notice::GameCreator at $(git -C "$GC_EVAL_DIR" log -1 --format='%h %s' | cut -c1-120)"
           kind='${{ inputs.bot }}'
+          pin=""
           if [ "$kind" = bitbot ]; then
             line=$(grep -E '^clang .* -shared .*libbit\.so' "$GC_EVAL_DIR/native/build.sh" | head -1)
             (cd "$GC_EVAL_DIR/native" && eval "$line") 2> bitbot-build.log || { cat bitbot-build.log; echo "libbit.so did not build"; exit 1; }
@@ -348,6 +349,17 @@ jobs:
             GC_SURVIVOR_PROFILE="$GC_EVAL_DIR/$gp" node "$G/words.js" > "$PWD/gambit.words" 2>> gambit-build.log || { cat gambit-build.log; echo "Gambit's profile did not encode"; exit 1; }
             echo "::notice::Gambit built from GameCreator $(git -C "$GC_EVAL_DIR" log -1 --format=%h), profile $gp"
             export GC_GAMBIT_WORDS="$PWD/gambit.words" GC_GAMBIT_LOG="$PWD/gambit-$name.log"
+            # the machine as Gambit's training gives it (GameCreator's eval/training.sh): the client on CPU 0, Gambit's own thread alone
+            # on a CPU of another core, its four workers (at the idle class) on the CPUs left
+            core() { cat "/sys/devices/system/cpu/cpu$1/topology/core_id" 2>/dev/null || echo "$1"; }
+            gcpu="" wcpus=""
+            for c in $(seq 1 $(( $(nproc) - 1 ))); do
+              if [ -z "$gcpu" ] && [ "$(core "$c")" != "$(core 0)" ]; then gcpu=$c; else wcpus=${wcpus:+$wcpus,}$c; fi
+            done
+            [ -n "$gcpu" ] || { gcpu=0; wcpus=0; }
+            export GC_GAMBIT_WORKERS=4 GC_GAMBIT_CPUS="$gcpu" GC_GAMBIT_WORKER_CPUS="${wcpus:-$gcpu}"
+            pin="taskset -c 0"
+            echo "::notice::Gambit: the client on CPU 0, Gambit on $gcpu, its 4 workers on ${wcpus:-$gcpu}"
             brain=gambit
           else
             prof='${{ inputs.profile }}'
@@ -395,7 +407,7 @@ jobs:
           secs=$(( ${{ inputs.hours }} * 3600 ))
           echo "::notice::$name ($brain) joining $BOT_HOST:$BOT_PORT for ${{ inputs.hours }}h"
           set -o pipefail
-          PA_CHALLENGE="$target" PA_CHALLENGE_GAMES="$games" PA_CHALLENGE_FIRST_TO="$first" PA_ACCEPT_ONLY="$only" PA_DECLINE_MODES="$decline" timeout "$secs" luajit bot/playBot.lua "$BOT_HOST" "$BOT_PORT" "$name" 4 12 "$brain" \
+          PA_CHALLENGE="$target" PA_CHALLENGE_GAMES="$games" PA_CHALLENGE_FIRST_TO="$first" PA_ACCEPT_ONLY="$only" PA_DECLINE_MODES="$decline" timeout "$secs" $pin luajit bot/playBot.lua "$BOT_HOST" "$BOT_PORT" "$name" 4 12 "$brain" \
             2>&1 | tee "$GITHUB_WORKSPACE/bot-prod-smoke.log" || [ $? -eq 124 ]
 
       - name: Sit in the lobby

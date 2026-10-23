@@ -222,12 +222,13 @@ function BotClient:dispatch(msg)
     local ch = msg.challengeUpdate
     if ch.challengeActive and ch.receiverId == self.publicId and not self.inRoom then
       -- PA_ACCEPT_ONLY=<name>: only that player's challenges are answered; everyone else's are left alone
+      -- (a name with a * in it is the part every name must hold: *PDR* answers PDRLava and PDRPoop -- nameMatches)
       local declined = false
       local only = self.acceptOnly   -- set by playBot from PA_ACCEPT_ONLY; cleared when a series against that player ends
       if only and only ~= "" then
         local who
         for _, p in pairs(self.lobbyPlayers or {}) do if p.publicId == ch.senderId then who = p.name end end
-        if who ~= only then declined = true end
+        if not BotClient.nameMatches(only, who) then declined = true end
       end
       -- PA_DECLINE_MODES="MODE_ID,MODE_ID": game modes this bot leaves unanswered
       for mode in (os.getenv("PA_DECLINE_MODES") or ""):gmatch("[^,%s]+") do
@@ -267,6 +268,14 @@ function BotClient:acceptChallenge(senderId, gameModeId)
   logger.info(string.format("bot[%s]: accepting challenge from %s (mode %s)",
     self.name, tostring(senderId), tostring(gameModeId)))
   self.gameplay:sendRequest(ClientProtocol.updateChallengeStatus(self.publicId, senderId, gameModeId, true))
+end
+
+-- A lobby name against a target: the name itself, or, where the target holds a *, any name holding what is left of it
+function BotClient.nameMatches(target, name)
+  if type(name) ~= "string" or type(target) ~= "string" then return false end
+  if not target:find("*", 1, true) then return name == target end
+  local part = target:gsub("%*", "")
+  return part ~= "" and name:find(part, 1, true) ~= nil
 end
 
 function BotClient:challenge(receiverId, gameModeId)

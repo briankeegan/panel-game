@@ -61,18 +61,23 @@ local challengeTarget, gamesWithTarget = challengeName, 0
 -- challenging, leaves the room and goes back to accepting whoever challenges.
 local firstTo = tonumber(os.getenv("PA_CHALLENGE_FIRST_TO"))
 local seriesWon, seriesLost = 0, 0
-local lastChallengeAt = 0
+local lastChallengeAt, challengeTurn = 0, 0
+-- (a target with a * is everyone whose name holds the rest of it -- BotClient.nameMatches -- challenged in turn, one every 3 s, so a
+-- player who leaves a challenge unanswered does not keep the others from theirs; never the bot itself)
 local function challengeIfFree()
   if not challengeName or bot.inRoom or bot.match or not bot.lobbyPlayers then return end
   local now = socket.gettime()
   if now - lastChallengeAt < 3 then return end
+  local free = {}
   for _, p in pairs(bot.lobbyPlayers) do
-    if p.name == challengeName and p.state == "lobby" then
-      lastChallengeAt = now
-      bot:challenge(p.publicId, require("common.data.GameModes").IDs.TWO_PLAYER_VS)
-      return
-    end
+    if p.name ~= name and p.state == "lobby" and BotClient.nameMatches(challengeName, p.name) then free[#free + 1] = p end
   end
+  if #free == 0 then return end
+  table.sort(free, function(a, b) return tostring(a.name) < tostring(b.name) end)
+  challengeTurn = challengeTurn + 1
+  local p = free[(challengeTurn - 1) % #free + 1]
+  lastChallengeAt = now
+  bot:challenge(p.publicId, require("common.data.GameModes").IDs.TWO_PLAYER_VS)
 end
 if challengeName then print("    and challenging '" .. challengeName .. "' whenever both are in the lobby.\n") end
 
@@ -138,7 +143,7 @@ while true do
       tostring(bot.outcome), worstOffSchedule))
     local vsTarget = false
     if challengeTarget and bot.players then
-      for _, p in pairs(bot.players) do if p.name == challengeTarget then vsTarget = true end end
+      for _, p in pairs(bot.players) do if p.name ~= name and BotClient.nameMatches(challengeTarget, p.name) then vsTarget = true end end
     end
     bot:resetMatch()
     nextFrame, lastReadyAt, worstOffSchedule = nil, 0, 0

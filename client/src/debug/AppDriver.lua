@@ -555,7 +555,7 @@ local function tickTraining()
     doShoot(over and "training_lost" or "training_survived")
     -- (the bot's match ended too: it writes what it keeps for the end -- its stats, the last boards it decided on)
     if st.survivorLink and st.survivorLink.endMatch then pcall(function() st.survivorLink:endMatch() end) end
-    st.training = nil; st.quitting = { frames = 30 }
+    st.training = nil; st.quitting = { frames = 30 }; require("client.src.CustomRun").unpaced = false
   end
 end
 
@@ -578,7 +578,9 @@ local function execCommand(c)
     writeOut("texts[" .. tostring(sceneName()) .. "]: " .. table.concat(sceneTexts(), " | "))
   elseif op == "wait" then st.busy = tonumber(args[1]) or 30
   elseif op == "challengeloop" then st.challenge = {}; writeOut("challengeloop on")
-  elseif op == "trainingloop" then st.training = {}; writeOut("trainingloop on")
+  elseif op == "trainingloop" then
+    -- (PA_UNPACED=1: the game's frames back to back, unslept, while it plays -- a bot that waits on its own answers, Gambit's lockstep)
+    st.training = {}; require("client.src.CustomRun").unpaced = os.getenv("PA_UNPACED") == "1"; writeOut("trainingloop on")
   elseif op == "trainingpattern" then
     -- trainingpattern <name>: the Training menu's garbage pattern set by name; reports the block it sends, width x height
     local s = scene()

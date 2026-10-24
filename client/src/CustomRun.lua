@@ -26,6 +26,12 @@ leftover_time = desiredLeftOverTime
 -- Sleeps just the right amount of time to make our next update step be one frame long.
 -- If we have leftover time that hasn't been run yet, it will sleep less to catchup.
 function CustomRun.sleep()
+  -- (unpaced: the next frame at once, as fast as the machine plays it -- AppDriver's trainingloop under PA_UNPACED=1)
+  if CustomRun.unpaced then
+    CustomRun.runMetrics.previousSleepEnd = love.timer.getTime()
+    CustomRun.runMetrics.sleepDuration = 0
+    return
+  end
   local targetDelay = CustomRun.FRAME_RATE
   -- We want leftover time to be above 0 but less than a quarter frame.
   -- If it goes above that, only wait enough to get it down to that.

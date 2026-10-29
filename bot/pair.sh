@@ -32,6 +32,8 @@
 #                                     and taking any challenge: WasmAgro_CPU (bot/profiles/agro.wasm.json) and
 #                                     WasmDefense_CPU (GameCreator's own default profile). Each cancels only its
 #                                     own earlier run. HOURS default 3.
+#   bot/pair.sh ranmaru-100 [HOURS]   Ranmaru_100_CPU on the real server: GameCreator's gambit-w100 build (gambit_from), plain lobby,
+#                                     accepts anyone, no target. HOURS default 3.
 #   bot/pair.sh ranmaru-vs OPPONENT [GAMES|firstN] [HOURS]   (first10: a series, first to 10 wins, then it accepts anyone)
 #                                     Ranmaru_CPU (Gambit) on the real server: challenges OPPONENT for GAMES finished
 #                                     games (default 3), then leaves the room and sits in the lobby accepting whoever
@@ -168,7 +170,7 @@ WASM_RUN='\(wasm\) vs challenge'
 
 dispatch_beta() {   # BOT NAME HOURS PROFILE
   local ref=${PA_UPSTREAM_REF:-}
-  dispatch "{\"mode\":\"live\",\"server\":\"${PA_UPSTREAM_SERVER:-panelattack.com:49569}\",\"bot\":\"$1\",\"name\":\"$2\",\"hours\":\"$3\",\"profile\":\"$4\",\"upstream_ref\":\"$ref\"}"
+  dispatch "{\"mode\":\"live\",\"server\":\"${PA_UPSTREAM_SERVER:-panelattack.com:49569}\",\"bot\":\"$1\",\"name\":\"$2\",\"hours\":\"$3\",\"profile\":\"$4\",\"upstream_ref\":\"$ref\",\"gambit_from\":\"${PA_GAMBIT_FROM:-}\"}"
   echo "pair: $2 ($1) queued on ${PA_UPSTREAM_SERVER:-panelattack.com:49569} (upstream Panel Attack; the server assigns its account id)"
 }
 # the profile a bot plays by default
@@ -195,6 +197,9 @@ case "${1:-}" in
                 stop_and_wait "(betaserver|panelattack\.com).* WasmDefense_CPU(,|\$)"
                 dispatch_beta wasm WasmAgro_CPU "$h" bot/profiles/agro.wasm.json
                 dispatch_beta wasm WasmDefense_CPU "$h" default ;;
+  ranmaru-100)  # Ranmaru_100_CPU: the gambit-w100 build (100 actions per 10 s window), plain lobby, accepts anyone
+                stop_and_wait "(betaserver|panelattack\.com).* Ranmaru_100_CPU(,|\$)"
+                PA_GAMBIT_FROM=gambit-w100 dispatch_beta gambit Ranmaru_100_CPU "${2:-3}" "$(beta_profile gambit)" ;;
   ranmaru-vs)  opp=${2:?the opponent\'s lobby name}; games=${3:-3}   # GAMES 0 or all: keeps challenging OPPONENT whenever it is free
                 stop_and_wait "(betaserver|panelattack\.com).* Ranmaru_CPU(,|\$)"
                 case "$games" in 0|all|"") tail="";; *) tail=",$games";; esac

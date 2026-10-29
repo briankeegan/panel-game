@@ -99,6 +99,10 @@ on:
         description: 'Advanced, betaserver only: run the bot on this upstream commit/tag/branch instead of the latest beta. Only needed if the server is not on latest beta'
         required: false
         default: ''
+      gambit_from:
+        description: 'gambit (live on the beta/real server, or fight): play the Gambit (games/the-game/ai/gambit) of this GameCreator commit, or of a version named in its games/the-game/ai/eval/gambit-versions.txt (e.g. gambit-w100), instead of its latest main'
+        required: false
+        default: ''
 
 # The beta server runs UPSTREAM Panel Attack, whose protocol differs from the
 # fork's (lockstep: each client simulates both stacks from relayed inputs; no
@@ -309,6 +313,19 @@ jobs:
           path: GameCreator
           sparse-checkout: games/the-game
 
+      - name: The Gambit of another GameCreator commit (beta/real server)
+        if: inputs.mode == 'live' && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER) && inputs.bot == 'gambit' && inputs.gambit_from != ''
+        env:
+          GAMBIT_FROM: ${{ inputs.gambit_from }}
+        run: |
+          set -eu
+          cd GameCreator
+          from=$(awk -v n="$GAMBIT_FROM" '$1 == n { print $2 }' games/the-game/ai/eval/gambit-versions.txt 2>/dev/null); from=${from:-$GAMBIT_FROM}
+          git fetch -q --depth 1 origin "$from"
+          rm -rf games/the-game/ai/gambit && git checkout FETCH_HEAD -- games/the-game/ai/gambit
+          echo "GAMBIT_COMMIT=$(git rev-parse FETCH_HEAD)" >> "$GITHUB_ENV"
+          echo "::notice::Gambit of GameCreator $GAMBIT_FROM ($from)"
+
       - uses: actions/setup-node@v4
         if: inputs.mode == 'live' && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER) && (inputs.bot == 'wasm' || inputs.bot == 'bitbot' || inputs.bot == 'gambit')
         with:
@@ -347,7 +364,9 @@ jobs:
             [ -f "$GC_EVAL_DIR/$gp" ] || { echo "no Gambit profile $GC_EVAL_DIR/$gp"; exit 1; }
             sh "$G/build.sh" native > gambit-build.log 2>&1 || { cat gambit-build.log; echo "libgambit.so did not build"; exit 1; }
             GC_SURVIVOR_PROFILE="$GC_EVAL_DIR/$gp" node "$G/words.js" > "$PWD/gambit.words" 2>> gambit-build.log || { cat gambit-build.log; echo "Gambit's profile did not encode"; exit 1; }
-            echo "::notice::Gambit built from GameCreator $(git -C "$GC_EVAL_DIR" log -1 --format=%h), profile $gp"
+            gc=$(git -C "$GC_EVAL_DIR" log -1 --format=%h)
+            [ -z "${GAMBIT_COMMIT:-}" ] || gc="${GAMBIT_COMMIT:0:8} (gambit_from '${{ inputs.gambit_from }}'; main is $gc)"
+            echo "::notice::Gambit built from GameCreator $gc, profile $gp"
             export GC_GAMBIT_WORDS="$PWD/gambit.words" GC_GAMBIT_LOG="$PWD/gambit-$name.log"
             # the machine as Gambit's training gives it (GameCreator's eval/training.sh): the client on CPU 0, Gambit's own thread alone
             # on a CPU of another core, its four workers (at the idle class) on the CPUs left

@@ -100,6 +100,10 @@ on:
         description: 'Advanced, betaserver only: run the bot on this upstream commit/tag/branch instead of the latest beta. Only needed if the server is not on latest beta'
         required: false
         default: ''
+      gambit_from:
+        description: 'fight with gambit: play the Gambit (games/the-game/ai/gambit) of this GameCreator commit, or of a version named in its games/the-game/ai/eval/gambit-versions.txt, instead of its latest main'
+        required: false
+        default: ''
 
 # The beta server runs UPSTREAM Panel Attack, whose protocol differs from the
 # fork's (lockstep: each client simulates both stacks from relayed inputs; no
@@ -489,6 +493,17 @@ jobs:
           repository: briankeegan/GameCreator
           path: GameCreator
           sparse-checkout: games/the-game
+
+      - name: The Gambit of another GameCreator commit
+        if: inputs.mode == 'fight' && inputs.gambit_from != ''
+        env:
+          GAMBIT_FROM: ${{ inputs.gambit_from }}
+        run: |
+          cd GameCreator
+          from=$(awk -v n="$GAMBIT_FROM" '$1 == n { print $2 }' games/the-game/ai/eval/gambit-versions.txt 2>/dev/null); from=${from:-$GAMBIT_FROM}
+          git fetch -q --depth 1 origin "$from"
+          rm -rf games/the-game/ai/gambit && git checkout FETCH_HEAD -- games/the-game/ai/gambit
+          echo "::notice::Gambit of GameCreator $GAMBIT_FROM ($from)"
 
       - uses: actions/setup-node@v4
         if: inputs.mode == 'fight' && (contains(fromJSON('["bitbot","bitbotwasm","wasm","gambit"]'), inputs.bot) || contains(fromJSON('["bitbot","bitbotwasm","wasm","gambit"]'), inputs.opponent))

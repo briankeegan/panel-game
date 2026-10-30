@@ -34,6 +34,8 @@
 #                                     own earlier run. HOURS default 3.
 #   bot/pair.sh ranmaru-100 [HOURS]   Ranmaru_100_CPU on the real server: GameCreator's gambit-w100 build (gambit_from), plain lobby,
 #                                     accepts anyone, no target. HOURS default 3.
+#   bot/pair.sh ranmaru-test [HOURS]  Ranmaru_TEST_CPU on the real server: Gambit pinned to GameCreator commit ffb3f5b5 (override with
+#                                     PA_GAMBIT_FROM=<commit|name>), plain lobby, accepts anyone. HOURS default 5.
 #   bot/pair.sh ranmaru-vs OPPONENT [GAMES|firstN] [HOURS]   (first10: a series, first to 10 wins, then it accepts anyone)
 #                                     Ranmaru_CPU (Gambit) on the real server: challenges OPPONENT for GAMES finished
 #                                     games (default 3), then leaves the room and sits in the lobby accepting whoever
@@ -200,6 +202,9 @@ case "${1:-}" in
   ranmaru-100)  # Ranmaru_100_CPU: the gambit-w100 build (100 actions per 10 s window), plain lobby, accepts anyone
                 stop_and_wait "(betaserver|panelattack\.com).* Ranmaru_100_CPU(,|\$)"
                 PA_GAMBIT_FROM=gambit-w100 dispatch_beta gambit Ranmaru_100_CPU "${2:-3}" "$(beta_profile gambit)" ;;
+  ranmaru-test) # Ranmaru_TEST_CPU: a pinned GameCreator commit (PA_GAMBIT_FROM, default below), plain lobby, accepts anyone
+                stop_and_wait "(betaserver|panelattack\.com).* Ranmaru_TEST_CPU(,|\$)"
+                PA_GAMBIT_FROM=${PA_GAMBIT_FROM:-ffb3f5b51d57c87189aac664099b56a3d920527b} dispatch_beta gambit Ranmaru_TEST_CPU "${2:-5}" "$(beta_profile gambit)" ;;
   ranmaru-vs)  opp=${2:?the opponent\'s lobby name}; games=${3:-3}   # GAMES 0 or all: keeps challenging OPPONENT whenever it is free
                 stop_and_wait "(betaserver|panelattack\.com).* Ranmaru_CPU(,|\$)"
                 case "$games" in 0|all|"") tail="";; *) tail=",$games";; esac

@@ -16,6 +16,7 @@ local ClientProtocol = require("common.network.ClientProtocol")
 local NetworkProtocol = require("common.network.NetworkProtocol")
 local KeyDataEncoding = require("common.data.KeyDataEncoding")
 local consts = require("common.engine.consts")
+local PanelStateCodes = require("client.src.network.PanelStateCodes")
 local ServerMessages = require("client.src.network.ServerMessages") -- toServerMenuState (the canonical ready builder)
 local LevelPresets = require("common.data.LevelPresets")
 local GameModes = require("common.data.GameModes")
@@ -289,11 +290,15 @@ function BotClient:dispatch(msg)
         if v == true then v = cache[idx] end
         cache[idx] = v
       end
+      -- (a cell counts as the engine's Panel:dangerous counts it, and as GambitNative reads a stack played here: garbage still falling
+      -- is not the stack's height, and does not top it out -- the block an attack sends falls in above the top row)
+      local FALLING = PanelStateCodes.codes.falling
+      local function counts(cell) return cell and ((cell.g and cell.s ~= FALLING) or (not cell.g and (cell.c or 0) ~= 0)) end
       local top, out = 0, (snap.go or 0) > 0
       for row = height, 1, -1 do
         for col = 1, width do
           local cell = cache[row * width + col]
-          if cell and ((cell.c or 0) ~= 0 or cell.g) then
+          if counts(cell) then
             if top == 0 then top = row end
             if row == height then out = true end
           end
@@ -304,7 +309,7 @@ function BotClient:dispatch(msg)
       local over = false
       for col = 1, width do
         local cell = cache[(height + 1) * width + col]
-        if cell and cell.g then over = true end
+        if cell and cell.g and cell.s ~= FALLING then over = true end
       end
       self.oppView = { top = top, out = out, over = over, seen = self.myStack.clock, clock = snap.f, stop = (snap.st or 0) + (snap.ps or 0) }
       self._yCount = (self._yCount or 0) + 1

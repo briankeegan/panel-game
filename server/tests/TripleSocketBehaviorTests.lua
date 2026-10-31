@@ -21,6 +21,7 @@ local Room = require("server.Room")
 local GameModes = require("common.data.GameModes")
 local MockConnection = require("server.tests.MockConnection")
 local NetworkProtocol = require("common.network.NetworkProtocol")
+local ServerTesting = require("server.tests.ServerTesting")
 
 -- v009 framing helper: tests need length-prefixed frames so prefix routing
 -- finds the prefix at byte 5.
@@ -238,6 +239,59 @@ local function test_non_critical_falls_back_to_gameplay_only_if_lobby_dead()
     "non-critical J should fall back to gameplay when lobby is missing")
 end
 
+-- A plain 2-player VS room has no bystander sharing the spectate channel —
+-- Room:broadcastInput relays the one opponent's I/G/D onto it (see
+-- test_input_from_p1_goes_to_p2_spectate_queue_not_gameplay above), so for
+-- exactly 2 players that channel IS the latency-critical path, same as
+-- beta's single `connection` before gameplay/lobby/spectate were split.
+-- Server:create_room/closeRoom must enable/disable Nagle on it accordingly.
+local function test_two_player_room_enables_nodelay_on_spectate_channel()
+  logger.info("test_two_player_room_enables_nodelay_on_spectate_channel")
+  local server = ServerTesting.getTestServer()
+  local p1, gc1, _, sc1 = tripleSocketPlayer("NoDelay1", 400)
+  local p2, gc2, _, sc2 = tripleSocketPlayer("NoDelay2", 401)
+  p1:updateSettings({inputMethod = "controller", level = 10})
+  p2:updateSettings({inputMethod = "controller", level = 10})
+
+  server:create_room(GameModes.getPreset(GameModes.IDs.TWO_PLAYER_VS), p1, p2)
+
+  assert(gc1.noDelayEnabled == true, "gameplay channel should get nodelay like before")
+  assert(gc2.noDelayEnabled == true, "gameplay channel should get nodelay like before")
+  assert(sc1.noDelayEnabled == true, "2p room: spectate channel carries the opponent's input and needs nodelay too")
+  assert(sc2.noDelayEnabled == true, "2p room: spectate channel carries the opponent's input and needs nodelay too")
+
+  local room = server.playerToRoom[p1]
+  server:closeRoom(room, "test")
+
+  assert(gc1.noDelayEnabled == false, "gameplay channel nodelay should be released on close")
+  assert(gc2.noDelayEnabled == false, "gameplay channel nodelay should be released on close")
+  assert(sc1.noDelayEnabled == false, "spectate channel nodelay should be released on close")
+  assert(sc2.noDelayEnabled == false, "spectate channel nodelay should be released on close")
+end
+
+-- 3+ player rooms legitimately use the spectate channel for bulk
+-- multi-opponent + bystander fan-out; Nagle should stay on there, same as
+-- before this fix. Only the strict 2-player case changes behavior.
+local function test_three_player_room_leaves_spectate_nodelay_untouched()
+  logger.info("test_three_player_room_leaves_spectate_nodelay_untouched")
+  local server = ServerTesting.getTestServer()
+  local p1, gc1, _, sc1 = tripleSocketPlayer("Tri1", 410)
+  local p2, gc2, _, sc2 = tripleSocketPlayer("Tri2", 411)
+  local p3, gc3, _, sc3 = tripleSocketPlayer("Tri3", 412)
+  p1:updateSettings({inputMethod = "controller", level = 10})
+  p2:updateSettings({inputMethod = "controller", level = 10})
+  p3:updateSettings({inputMethod = "controller", level = 10})
+
+  server:create_room(GameModes.getPreset(GameModes.IDs.THREE_PLAYER_VS_ALL), p1, p2, p3)
+
+  assert(gc1.noDelayEnabled == true, "gameplay channel should still get nodelay for 3p")
+  assert(gc2.noDelayEnabled == true, "gameplay channel should still get nodelay for 3p")
+  assert(gc3.noDelayEnabled == true, "gameplay channel should still get nodelay for 3p")
+  assert(sc1.noDelayEnabled == nil, "3p room: spectate channel carries bulk fan-out, must NOT get nodelay")
+  assert(sc2.noDelayEnabled == nil, "3p room: spectate channel carries bulk fan-out, must NOT get nodelay")
+  assert(sc3.noDelayEnabled == nil, "3p room: spectate channel carries bulk fan-out, must NOT get nodelay")
+end
+
 test_three_channels_all_bind_to_same_player()
 test_attach_rejects_if_slot_filled()
 test_input_from_p1_goes_to_p2_spectate_queue_not_gameplay()
@@ -247,4 +301,6 @@ test_side_channel_close_does_not_tear_down_player()
 test_critical_state_json_routes_to_gameplay_socket()
 test_critical_state_survives_lobby_drop()
 test_non_critical_falls_back_to_gameplay_only_if_lobby_dead()
+test_two_player_room_enables_nodelay_on_spectate_channel()
+test_three_player_room_leaves_spectate_nodelay_untouched()
 logger.info("All TripleSocketBehaviorTests passed!")

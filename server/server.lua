@@ -750,6 +750,21 @@ function Server:create_room(gameMode, ...)
     end
   end
 
+  -- In a plain 2-player room there is no bystander traffic sharing the
+  -- spectate channel: Room:broadcastInput relays the one opponent's I/G/D to
+  -- it (see Room:broadcastInput's sendSpectate calls), so for exactly 2
+  -- players that channel IS the latency-critical opponent-input path, same
+  -- as beta's single `connection` before this room was split into
+  -- gameplay/lobby/spectate sockets. Leave Nagle on for it in 3+ player
+  -- rooms, where it legitimately carries bulk multi-opponent + spectator
+  -- fan-out and head-of-line blocking there is the tradeoff we want.
+  if #players == 2 then
+    for _, player in ipairs(players) do
+---@diagnostic disable-next-line: invisible
+      if player.spectateConnection then player.spectateConnection:enableNoDelay(true) end
+    end
+  end
+
   local newRoom = Room(self.roomNumberIndex, players, gameMode, leaderboard, self.clock)
   newRoom:connectSignal("matchStart", self, self.setLobbyChanged)
   newRoom:connectSignal("matchEnd", self, self.processGameEnd)
@@ -882,12 +897,18 @@ function Server:closeRoom(room, reason)
   -- sparse (e.g. partial team rooms with B at slot 3, slot 2 empty). ipairs
   -- would stop at the first gap and leave a stale playerToRoom entry pointing
   -- at the closed room.
+  -- Snapshot before the loop: countPlayers reads room.players, which the
+  -- loop below doesn't mutate, but room:close() further down does.
+  local wasTwoPlayerRoom = room:countPlayers() == 2
+
   local roster = {}
   for _, player in room:eachPlayer() do
     roster[#roster + 1] = player
     self.playerToRoom[player] = nil
     ---@diagnostic disable-next-line: invisible
     if player.gameplayConnection then player.gameplayConnection:enableNoDelay(false) end
+---@diagnostic disable-next-line: invisible
+    if wasTwoPlayerRoom and player.spectateConnection then player.spectateConnection:enableNoDelay(false) end
   end
 
   for _, player in ipairs(room.spectators) do

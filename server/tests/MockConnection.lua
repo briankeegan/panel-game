@@ -58,6 +58,8 @@ function MockConnection:receiveMessage(message)
   self.incomingMessageQueue:push(message)
 end
 
-function MockConnection:enableNoDelay(enable) end
+function MockConnection:enableNoDelay(enable)
+  self.noDelayEnabled = enable
+end
 
 return MockConnection

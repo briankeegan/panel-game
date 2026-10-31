@@ -569,6 +569,41 @@ jobs:
           done
           echo "::error::could not save account ids for$added"; exit 1
 
+      - name: Per-game sanity (gambit)
+        if: always() && inputs.mode == 'live' && inputs.bot == 'gambit'
+        run: |
+          # Gambit carries state between games when something is not reset per game. These checks show it:
+          # every game must open in "opener", no game may fall back to "time attack" after its first
+          # 300 frames, and the share of lines with the opponent read as topped out must not climb.
+          python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY" || true
+          import glob, re
+          for f in sorted(glob.glob("gambit-*.log")):
+              games, prev = [], None
+              for l in open(f, errors="ignore"):
+                  m = re.match(r"GAMBITD (\d+) ([a-z ]+?) play=.* enemy=\d+/(\d+)/", l) or re.match(r"GAMBITD (\d+) ([a-z ]+?) play=", l)
+                  if not m:
+                      continue
+                  c = int(m.group(1))
+                  if prev is None or c < prev - 500:
+                      games.append([])
+                  prev = c
+                  games[-1].append((c, m.group(2), int(m.group(3)) if m.lastindex >= 3 else None))
+              print(f"## Per-game sanity: {f} ({len(games)} games)")
+              bad = [i + 1 for i, g in enumerate(games) if g and g[0][1] != "opener"]
+              late = [i + 1 for i, g in enumerate(games) if any(s == "time attack" and c > 300 for c, s, _ in g)]
+              def share(gs):
+                  n = sum(1 for g in gs for _, _, o in g if o is not None)
+                  return sum(1 for g in gs for _, _, o in g if o == 1) / n if n else 0
+              k = max(1, len(games) // 3)
+              first, last = share(games[:k]), share(games[-k:])
+              print(f"- games not opening in 'opener': {bad or 'none'}")
+              print(f"- games in 'time attack' after frame 300: {late or 'none'}")
+              print(f"- opponent read as topped out, first third {first:.2f} vs last third {last:.2f}")
+              if bad or late or last > first + 0.15:
+                  print("**State is carrying over between games.**")
+                  print(f"::warning::{f}: per-game state is carrying over (see the job summary)")
+          PY
+
       - name: Summary
         if: always()
         run: |

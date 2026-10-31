@@ -424,7 +424,22 @@ function BotClient:tickMatch()
   end
 
   self:_sendInput()
+  local me = self.myStack
+  local swBefore, madeBefore, transits = me.stopWatch, me.garbageCreatedCount, nil
+  for _, src in ipairs(self.match.garbageSources and self.match.garbageSources[me] or {}) do
+    local q = src.outgoingGarbage and src.outgoingGarbage.transitTimers
+    if q then
+      transits = transits or {}
+      for k = q.first, q.last do if q[k] then transits[#transits + 1] = q[k] end end
+    end
+  end
   self.match:run()
+  -- every block the engine drops on our stack: the stopWatch of the frame it dropped on against the
+  -- transit times in flight just before it (a gap of 0 = landed on its time; the lag is the opponent copy's frames behind)
+  if me.garbageCreatedCount ~= madeBefore then
+    print(string.format("garbage landed: our stopWatch %s clock %d, transits in flight before this frame {%s}, opponent copy %d frames behind, rollbacks so far %d",
+      tostring(swBefore), me.clock - 1, table.concat(transits or {}, ","), me.clock - self.oppStack.clock, self.rollbacks or 0))
+  end
 
   if self.match:hasEnded() then
     self._resultReported = true
@@ -440,7 +455,7 @@ function BotClient:tickMatch()
       end
       pcall(function() self.gameplay:sendRequest(ClientProtocol.sendMatchAbort(self.roomNumber)) end)
     else
-      logger.info(string.format("bot[%s]: engine rolled our stack back %d times for late garbage", self.name, self.rollbacks or 0))
+      print(string.format("engine rolled our stack back %d times for late garbage this match", self.rollbacks or 0))
       local winners = self.match:getWinners()
       local report
       if #winners == 1 then

@@ -436,6 +436,20 @@ function BotClient:tickMatch()
   self.match:run()
   -- every block the engine drops on our stack: the stopWatch of the frame it dropped on against the
   -- transit times in flight just before it (a gap of 0 = landed on its time; the lag is the opponent copy's frames behind)
+  local opp = self.oppStack
+  if opp and opp.panels and not opp:game_ended() and opp.clock % 30 == 0 and pcall(opp.isToppedOut, opp) and opp:isToppedOut() then
+    local rows = {}
+    for r = opp.height, math.max(1, opp.height - 2), -1 do
+      local cells = {}
+      for c = 1, opp.width do
+        local pn = opp.panels[r][c]
+        cells[c] = pn.isGarbage and ("g" .. (pn.state == "falling" and "f" or "")) or tostring(pn.color)
+      end
+      rows[#rows + 1] = "r" .. r .. "=" .. table.concat(cells, "")
+    end
+    print(string.format("opponent topped out: clock %d stopWatch %s stop %d pre-stop %d shake %d health %d, top rows %s",
+      opp.clock, tostring(opp.stopWatch), opp.stop_time or 0, opp.pre_stop_time or 0, opp.shake_time or 0, opp.health or -1, table.concat(rows, " ")))
+  end
   if me.garbageCreatedCount ~= madeBefore then
     print(string.format("garbage landed: our stopWatch %s clock %d, transits in flight before this frame {%s}, opponent copy %d frames behind, rollbacks so far %d",
       tostring(swBefore), me.clock - 1, table.concat(transits or {}, ","), me.clock - self.oppStack.clock, self.rollbacks or 0))
@@ -455,6 +469,11 @@ function BotClient:tickMatch()
       end
       pcall(function() self.gameplay:sendRequest(ClientProtocol.sendMatchAbort(self.roomNumber)) end)
     else
+      do
+        local ok, enc = pcall(require("common.lib.dkjson").encode, { settings = self.matchStart and self.matchStart.replay,
+          mine = self.localPlayerNumber, inputs = { self.match.stacks[1].confirmedInput, self.match.stacks[2] and self.match.stacks[2].confirmedInput } })
+        print("REPLAY " .. (ok and enc or ("unencodable: " .. tostring(enc))))
+      end
       print(string.format("engine rolled our stack back %d times for late garbage this match", self.rollbacks or 0))
       local winners = self.match:getWinners()
       local report

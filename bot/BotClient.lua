@@ -302,6 +302,13 @@ function BotClient:startMatch()
     error("bot[" .. self.name .. "]: no stack at slot " .. tostring(self.localPlayerNumber))
   end
   self.myStack.is_local = true
+  -- count how often the engine rewinds our stack for a late garbage transit (logged when the match ends)
+  self.rollbacks = 0
+  local rollbackTo = self.match.rollbackToStopWatch
+  self.match.rollbackToStopWatch = function(match, stack, stopWatch)
+    if stack == self.myStack then self.rollbacks = self.rollbacks + 1 end
+    return rollbackTo(match, stack, stopWatch)
+  end
   for i, stack in ipairs(self.match.stacks) do
     if stack ~= self.myStack then self.oppStack, self.oppNumber = stack, i end
   end
@@ -405,6 +412,17 @@ function BotClient:tickMatch()
   end
   self.oppInputs = {}
 
+  -- A headless bot has no display to keep smooth, so the opponent's copy is run all the way up to
+  -- its relayed inputs before Gambit reads the garbage transits (Stack:shouldRun's 1-3 steps per
+  -- tick would leave its transits appearing after their time, forcing rollbacks of our stack).
+  if self.oppStack then
+    local guard = 0
+    while guard < 60 and not self.oppStack:game_ended() and #self.oppStack.confirmedInput > self.oppStack.clock do
+      self.match:run()
+      guard = guard + 1
+    end
+  end
+
   self:_sendInput()
   self.match:run()
 
@@ -422,6 +440,7 @@ function BotClient:tickMatch()
       end
       pcall(function() self.gameplay:sendRequest(ClientProtocol.sendMatchAbort(self.roomNumber)) end)
     else
+      logger.info(string.format("bot[%s]: engine rolled our stack back %d times for late garbage", self.name, self.rollbacks or 0))
       local winners = self.match:getWinners()
       local report
       if #winners == 1 then

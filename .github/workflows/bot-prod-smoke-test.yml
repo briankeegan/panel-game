@@ -501,6 +501,8 @@ jobs:
         run: |
           cd GameCreator
           from=$(awk -v n="$GAMBIT_FROM" '$1 == n { print $2 }' games/the-game/ai/eval/gambit-versions.txt 2>/dev/null); from=${from:-$GAMBIT_FROM}
+          # (a short commit hash cannot be fetched by itself: resolved first against the branches' history)
+          case "$from" in *[!0-9a-f]*) ;; *) if [ ${#from} -lt 40 ]; then git fetch -q --filter=blob:none $([ -f .git/shallow ] && echo --unshallow) origin '+refs/heads/*:refs/remotes/origin/*' && from=$(git rev-parse --verify "$from^{commit}"); fi;; esac
           git fetch -q --depth 1 origin "$from"
           rm -rf games/the-game/ai/gambit && git checkout FETCH_HEAD -- games/the-game/ai/gambit
           echo "::notice::Gambit of GameCreator $GAMBIT_FROM ($from)"

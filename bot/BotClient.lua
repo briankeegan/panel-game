@@ -361,6 +361,17 @@ function BotClient:_sendInput()
   if stack:game_ended() then return end
   if #stack.confirmedInput > 0 and self.oppStack and #self.oppStack.confirmedInput == 0 then return end
   if #stack.confirmedInput - stack.clock > 0 then return end
+  -- An opponent gone silent is the server's to call, not ours: the engine aborts the match as desynced once our clock
+  -- is MAX_LAG ahead of the opponent's copy, so stop sending inputs a few frames short of that and wait for the
+  -- opponent's inputs (or the server ending the match) instead of aborting it ourselves.
+  if self.oppStack and stack.clock - self.oppStack.clock >= (MAX_LAG or 245) - 5 then
+    if not self._waitingOnOpponent then
+      self._waitingOnOpponent = true
+      print(string.format("waiting for the opponent: its inputs stopped at clock %d, ours is %d (the server decides)", self.oppStack.clock, stack.clock))
+    end
+    return
+  end
+  self._waitingOnOpponent = nil
 
   if self.link then
     -- WasmSurvivor / BitBot: the key for this frame, from the bot itself; nothing is decided here

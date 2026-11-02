@@ -1,6 +1,6 @@
 name: Bot Prod Smoke Test (LIVE SERVER)
 # The run list shows what each run was, e.g. "live · beta · SirBonksALot".
-run-name: "${{ startsWith(inputs.mode, 'ranmaru') && inputs.mode || format('{0} · {1}', inputs.mode, inputs.server) }}${{ inputs.mode == 'live' && format(' · {0}', inputs.name) || inputs.mode == 'fight' && format(' · {0} ({1}) vs {2}', inputs.name, inputs.bot, inputs.opponent) || '' }}"
+run-name: "${{ startsWith(inputs.mode, 'ranmaru') && inputs.mode || format('{0} · {1}', inputs.mode, inputs.server) }}${{ (inputs.mode == 'live' || inputs.mode == 'versus-player') && format(' · {0}', inputs.name) || inputs.mode == 'fight' && format(' · {0} ({1}) vs {2}', inputs.name, inputs.bot, inputs.opponent) || '' }}"
 
 # Manual-only. Three things, picked with `mode`:
 #
@@ -30,13 +30,14 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'WHAT TO DO. ranmaru-deploy = stop the running Ranmaru_TEST_CPU, then start a new one on the latest main. ranmaru-stop = stop it and show its wins and losses. The rest (live, fight, prod-vs, large-garbage) are for other bots'
+        description: 'WHAT TO DO. ranmaru-deploy = stop the running Ranmaru_TEST_CPU, then start a new one on the latest main. ranmaru-stop = stop it and show its wins and losses. versus-player = a bot of your choice (type its name below) sits in the lobby and only plays challenges people send it; it never challenges anyone. The rest (live = the same as versus-player, fight, prod-vs, large-garbage) are for other bots'
         required: true
         default: 'ranmaru-deploy'
         type: choice
         options:
           - ranmaru-deploy
           - ranmaru-stop
+          - versus-player
           - live
           - fight
           - prod-vs
@@ -59,18 +60,9 @@ on:
         required: false
         default: '5'
       bot:
-        description: 'Ranmaru: leave as gambit. Which bot to run'
+        description: 'Ranmaru: leave as gambit. versus-player / fight: type the bot -- gambit, wasm, bitbot, bitbotwasm, beverly, plamp or heuristic'
         required: false
         default: 'gambit'
-        type: choice
-        options:
-          - gambit
-          - bitbot
-          - bitbotwasm
-          - wasm
-          - beverly
-          - plamp
-          - heuristic
       opponent:
         description: 'Other modes only (fight): type who challenges the bot -- you (a person does), challenge, or a bot name (bitbot, bitbotwasm, wasm, beverly, plamp, heuristic). Ranmaru: ignore'
         required: false
@@ -83,10 +75,6 @@ on:
         description: 'Other modes only (prod-vs, large-garbage): how many games or seeds. Ranmaru: ignore'
         required: false
         default: '3'
-      difficulty:
-        description: 'Other modes only (prod-vs, large-garbage): bot difficulty. Ranmaru: ignore'
-        required: false
-        default: 'hard'
       upstream_ref:
         description: 'Ranmaru: leave empty. (Advanced: an upstream Panel Attack commit to run the bot on, if the server is not on the latest beta)'
         required: false
@@ -101,6 +89,8 @@ on:
 # garbage/death/display messages). Its bot lives in bot/ on this branch of
 # THIS repo, built to run on an unmodified upstream checkout:
 env:
+  # versus-player is `live` under another name
+  MODE: ${{ inputs.mode == 'versus-player' && 'live' || inputs.mode }}
   # The two servers `server` offers; the beta one runs upstream's protocol.
   BETA_SERVER: betaserver.panelattack.com:59569
   # the main Panel Attack server (the client's default port); it runs the upstream beta branch's game
@@ -151,13 +141,13 @@ jobs:
           set -eu
           server='${{ inputs.server }}'
           if [ "$server" = "$BETA_SERVER" ] || [ "$server" = "$PROD_SERVER" ]; then
-            [ '${{ inputs.mode }}' = live ] || { echo "$server is only for mode: live"; exit 1; }   # fight: the fork's client only
+            [ '${{ env.MODE }}' = live ] || { echo "$server is only for mode: live"; exit 1; }   # fight: the fork's client only
             dir="$GITHUB_WORKSPACE/upstream"
           else
             dir="$GITHUB_WORKSPACE"
           fi
           { echo "BOT_DIR=$dir"; echo "BOT_HOST=${server%%:*}"; echo "BOT_PORT=${server##*:}"; } >> "$GITHUB_ENV"
-          echo "::notice::${{ inputs.mode }} on $server"
+          echo "::notice::${{ env.MODE }} on $server"
 
       # THE SERVER'S OWN BUILD, AS NEAR AS CAN BE KNOWN. Nothing of upstream is
       # vendored here: every run fetches upstream and drops this repo's bot/ on
@@ -211,13 +201,13 @@ jobs:
              luajit bot/tests/survivalLinkTelegraphVerify.lua)
 
       - name: Run bot-vs-bot smoke test against the live server
-        if: inputs.mode == 'prod-vs'
+        if: env.MODE == 'prod-vs'
         id: smoke
         run: |
           eval "$(luarocks path --local --lua-version 5.1)"
           set -o pipefail
           luajit bot/winRateTest.lua "" "" \
-            "${{ inputs.matches }}" "$BOT_HOST" "$BOT_PORT" "${{ inputs.difficulty }}" \
+            "${{ inputs.matches }}" "$BOT_HOST" "$BOT_PORT" hard \
             2>&1 | tee bot-prod-smoke.log
         continue-on-error: true
 
@@ -226,12 +216,12 @@ jobs:
       # on the runner, does NOT contact the server. One block per volley interval
       # (900f = the preset's delayBeforeRepeat); 3600f cap = 60s survival target.
       - name: Run large-garbage practice survival (offline, real engine)
-        if: inputs.mode == 'large-garbage'
+        if: env.MODE == 'large-garbage'
         id: largegarbage
         run: |
           eval "$(luarocks path --local --lua-version 5.1)"
           set -o pipefail
-          luajit bot/survivalStress.lua 900 3600 "${{ inputs.matches }}" "" "${{ inputs.difficulty }}" 6 12 \
+          luajit bot/survivalStress.lua 900 3600 "${{ inputs.matches }}" "" hard 6 12 \
             2>&1 | tee bot-prod-smoke.log
         continue-on-error: true
 
@@ -244,14 +234,14 @@ jobs:
       # re-run it, or run bot/beverly.sh on the server box under systemd for
       # something permanent.
       - name: Check the name and the weight set before connecting
-        if: (inputs.mode == 'live' || inputs.mode == 'survival') && !(inputs.mode == 'live' && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER) && (inputs.bot == 'wasm' || inputs.bot == 'bitbot' || inputs.bot == 'gambit'))
+        if: (env.MODE == 'live' || env.MODE == 'survival') && !(env.MODE == 'live' && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER) && (inputs.bot == 'wasm' || inputs.bot == 'bitbot' || inputs.bot == 'gambit'))
         run: |
           set -eu
           cd "$BOT_DIR"
           n='${{ inputs.name }}'
           [ -n "$n" ] || { echo "name is empty"; exit 1; }
           [ ${#n} -le 16 ] || { echo "name '$n' is ${#n} chars; the server limit is 16"; exit 1; }
-          if [ '${{ inputs.mode }}' = survival ]; then
+          if [ '${{ env.MODE }}' = survival ]; then
             [ '${{ inputs.server }}' = fork ] || { echo "survival plays the fork's server only"; exit 1; }
             exit 0
           fi
@@ -276,7 +266,7 @@ jobs:
       # one), so a beta bot keeps its name by saving the id it was given
       # instead -- see "Save the account id".
       - name: Derive this name's account id
-        if: inputs.mode == 'live' && !(inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER)
+        if: env.MODE == 'live' && !(inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER)
         env:
           BASE_NAME: ${{ inputs.name }}
           BOT_IP: ${{ env.BOT_HOST }}
@@ -299,7 +289,7 @@ jobs:
       # is built here from GameCreator's own native/build.sh line; WasmSurvivor
       # is a Node process beside the client (bot/SurvivalLink.lua talks to it).
       - name: Check out GameCreator (beta bot)
-        if: inputs.mode == 'live' && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER) && (inputs.bot == 'wasm' || inputs.bot == 'bitbot' || inputs.bot == 'gambit')
+        if: env.MODE == 'live' && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER) && (inputs.bot == 'wasm' || inputs.bot == 'bitbot' || inputs.bot == 'gambit')
         uses: actions/checkout@v4
         with:
           repository: briankeegan/GameCreator
@@ -307,7 +297,7 @@ jobs:
           sparse-checkout: games/the-game
 
       - name: The Gambit of another GameCreator commit (beta/real server)
-        if: inputs.mode == 'live' && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER) && inputs.bot == 'gambit' && inputs.gambit_from != ''
+        if: env.MODE == 'live' && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER) && inputs.bot == 'gambit' && inputs.gambit_from != ''
         env:
           GAMBIT_FROM: ${{ inputs.gambit_from }}
         run: |
@@ -320,12 +310,12 @@ jobs:
           echo "::notice::Gambit of GameCreator $GAMBIT_FROM ($from)"
 
       - uses: actions/setup-node@v4
-        if: inputs.mode == 'live' && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER) && (inputs.bot == 'wasm' || inputs.bot == 'bitbot' || inputs.bot == 'gambit')
+        if: env.MODE == 'live' && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER) && (inputs.bot == 'wasm' || inputs.bot == 'bitbot' || inputs.bot == 'gambit')
         with:
           node-version: '22'
 
       - name: Sit in the lobby (beta, ${{ inputs.bot }})
-        if: inputs.mode == 'live' && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER) && (inputs.bot == 'wasm' || inputs.bot == 'bitbot' || inputs.bot == 'gambit')
+        if: env.MODE == 'live' && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER) && (inputs.bot == 'wasm' || inputs.bot == 'bitbot' || inputs.bot == 'gambit')
         id: betalink
         run: |
           set -eu
@@ -423,7 +413,7 @@ jobs:
             2>&1 | tee "$GITHUB_WORKSPACE/bot-prod-smoke.log" || [ $? -eq 124 ]
 
       - name: Sit in the lobby
-        if: inputs.mode == 'live' && !(inputs.mode == 'live' && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER) && (inputs.bot == 'wasm' || inputs.bot == 'bitbot' || inputs.bot == 'gambit'))
+        if: env.MODE == 'live' && !(env.MODE == 'live' && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER) && (inputs.bot == 'wasm' || inputs.bot == 'bitbot' || inputs.bot == 'gambit'))
         id: live
         env:
           PA_SEARCH_PROFILE: ${{ inputs.profile }}
@@ -444,7 +434,7 @@ jobs:
       # what to press every frame through bot/SurvivalLink.lua. It runs beside
       # the client on this runner, on the cores the client does not use.
       - name: Check out WasmSurvivor
-        if: inputs.mode == 'survival'
+        if: env.MODE == 'survival'
         uses: actions/checkout@v4
         with:
           repository: briankeegan/GameCreator
@@ -452,12 +442,12 @@ jobs:
           sparse-checkout: games/the-game
 
       - uses: actions/setup-node@v4
-        if: inputs.mode == 'survival'
+        if: env.MODE == 'survival'
         with:
           node-version: '22'
 
       - name: Start WasmSurvivor
-        if: inputs.mode == 'survival'
+        if: env.MODE == 'survival'
         run: |
           set -eu
           nohup node GameCreator/games/the-game/ai/eval/survivor.js --port 47777 > "$GITHUB_WORKSPACE/survivor.log" 2>&1 &
@@ -466,7 +456,7 @@ jobs:
           grep -q listening "$GITHUB_WORKSPACE/survivor.log" || { echo "WasmSurvivor did not start"; exit 1; }
 
       - name: Sit in the lobby (WasmSurvivor)
-        if: inputs.mode == 'survival'
+        if: env.MODE == 'survival'
         id: survival
         env:
           PA_SURVIVOR_PORT: '47777'
@@ -508,7 +498,7 @@ jobs:
       # native/build.sh) and the client plays it in-process
       # (bot/BitBotNative.lua, as GameCreator's lua/train.lua does).
       - name: Check out GameCreator (BitBot, WasmSurvivor)
-        if: inputs.mode == 'fight' && (contains(fromJSON('["bitbot","bitbotwasm","wasm"]'), inputs.bot) || contains(fromJSON('["bitbot","bitbotwasm","wasm"]'), inputs.opponent))
+        if: env.MODE == 'fight' && (contains(fromJSON('["bitbot","bitbotwasm","wasm"]'), inputs.bot) || contains(fromJSON('["bitbot","bitbotwasm","wasm"]'), inputs.opponent))
         uses: actions/checkout@v4
         with:
           repository: briankeegan/GameCreator
@@ -516,7 +506,7 @@ jobs:
           sparse-checkout: games/the-game
 
       - uses: actions/setup-node@v4
-        if: inputs.mode == 'fight' && (contains(fromJSON('["bitbot","bitbotwasm","wasm"]'), inputs.bot) || contains(fromJSON('["bitbot","bitbotwasm","wasm"]'), inputs.opponent))
+        if: env.MODE == 'fight' && (contains(fromJSON('["bitbot","bitbotwasm","wasm"]'), inputs.bot) || contains(fromJSON('["bitbot","bitbotwasm","wasm"]'), inputs.opponent))
         with:
           node-version: '22'
 
@@ -524,7 +514,7 @@ jobs:
       # pre-flight when BitBot plays (nothing joins the lobby if that fails),
       # then `bot` in the lobby and `opponent` challenging it.
       - name: Fight
-        if: inputs.mode == 'fight'
+        if: env.MODE == 'fight'
         id: fight
         env:
           GC_EVAL_DIR: ${{ github.workspace }}/GameCreator/games/the-game/ai/eval
@@ -543,7 +533,7 @@ jobs:
       # in as the same account (fight.sh reads bot/identities/). Runs on
       # cancel too: an id is saved however the run ends.
       - name: Save new account ids
-        if: always() && inputs.mode == 'fight'
+        if: always() && env.MODE == 'fight'
         run: |
           set -u
           added=""
@@ -563,7 +553,7 @@ jobs:
           echo "::error::could not save account ids for$added"; exit 1
 
       - name: Per-game sanity (gambit)
-        if: always() && inputs.mode == 'live' && inputs.bot == 'gambit'
+        if: always() && env.MODE == 'live' && inputs.bot == 'gambit'
         run: |
           # Gambit carries state between games when something is not reset per game. These checks show it:
           # every game must open in "opener", no game may fall back to "time attack" after its first
@@ -601,7 +591,7 @@ jobs:
         if: always()
         run: |
           {
-            echo "## Bot (${{ inputs.mode }}) — ${{ inputs.server }}"
+            echo "## Bot (${{ env.MODE }}) — ${{ inputs.server }}"
             echo ""
             echo '```'
             tail -n 40 bot-prod-smoke.log || echo "(no log produced)"

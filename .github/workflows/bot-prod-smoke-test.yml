@@ -1,36 +1,25 @@
 name: Bot Prod Smoke Test (LIVE SERVER)
 # The run list shows what each run was, e.g. "live · beta · SirBonksALot".
-run-name: "${{ startsWith(inputs.mode, 'ranmaru') && inputs.mode || format('{0} · {1}', inputs.mode, inputs.server) }}${{ (inputs.mode == 'live' || inputs.mode == 'versus-player') && format(' · {0}', inputs.name) || inputs.mode == 'fight' && format(' · {0} ({1}) vs {2}', inputs.name, inputs.bot, inputs.opponent) || '' }}"
+run-name: "${{ startsWith(inputs.mode, 'ranmaru') && inputs.mode || inputs.mode == 'versus-player' && format('live · {0} · {1}{2}', inputs.server, inputs.name, inputs.player != '' && format(',{0}', inputs.player) || '') || format('{0} · {1} · {2} ({3}) vs {4}', inputs.mode, inputs.server, inputs.name, inputs.bot, inputs.player || 'you') }}"
 
-# Manual-only. Three things, picked with `mode`:
+# Manual-only. Pick what to do in the first box (the form is numbered in the order to fill it in):
 #
-#   live           ONE bot under a real name sits in a server's lobby and
-#                  auto-accepts challenges, so a person can play it. Unranked,
-#                  always. Stays up for `hours`. `server` is one of two:
-#                    104.156.250.136:49569           this repo's server
-#                    betaserver.panelattack.com:59569 upstream Panel Attack's
-#                            beta server; the bot runs on upstream's latest
-#                            code with its bot/ added
-#   fight          pick who plays who on 104.156.250.136 (bot/fight.sh): `bot`
-#                  sits in the lobby as `name`; `opponent` logs in as `name`2
-#                  and challenges it, rematching for `hours` -- or, as "you",
-#                  nobody does and you challenge it. Roster: bitbot (GameCreator's
-#                  BitBot, its latest main, pre-flighted before it goes live),
-#                  wasm (GameCreator's WasmSurvivor, same), beverly, plamp,
-#                  heuristic.
-#   prod-vs        smoke test: two throwaway bots play `matches` games against
-#                  each other in a PRIVATE room on 104.156.250.136; no player
-#                  can join, nothing is ranked
-#   large-garbage  offline benchmark on the runner, no server contact:
-#                  survival vs 6x12 garbage blocks over `matches` seeds
+#   ranmaru-deploy  stop the running Ranmaru_TEST_CPU and start a new one on GameCreator's latest main
+#   ranmaru-stop    stop it and show its wins and losses in the run summary
+#   versus-player   ONE bot under a real name sits in a server's lobby and plays challenges. Unranked, always.
+#                   Stays up for `hours`. With a player typed in, it challenges THAT player and plays only them
+#                   (Gambit); blank, it plays whoever challenges it
+#   fight           pick who plays who on 104.156.250.136 (bot/fight.sh): `bot` sits in the lobby as `name`;
+#                   `player` logs in as `name`2 and challenges it, rematching for `hours` -- or "you" and nobody
+#                   does, you challenge it -- or "challenge" for `bot` to challenge the second name in `name` ("A,B")
 #
-# The inputs below are in the order you would fill them in; each one says
-# which mode it is for. Leave the rest alone.
+# `advanced` is a line of key=value words, for what the form does not ask: gambit_from=<GameCreator commit or
+# version name>, upstream_ref=<upstream commit/tag/branch>, profile=<weight set file>. bot/pair.sh sends it.
 on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'WHAT TO DO. ranmaru-deploy = stop the running Ranmaru_TEST_CPU, then start a new one on the latest main. ranmaru-stop = stop it and show its wins and losses. versus-player = a bot of your choice (type its name below) sits in the lobby and only plays challenges people send it; it never challenges anyone. The rest (live = the same as versus-player, fight, prod-vs, large-garbage) are for other bots'
+        description: '1. What to do: ranmaru-deploy = stop the running Ranmaru_TEST_CPU, start a new one on the latest main. ranmaru-stop = stop it and show its wins and losses. versus-player = a bot sits in the lobby (fill in 2-6). fight = two bots play each other on the fork server'
         required: true
         default: 'ranmaru-deploy'
         type: choice
@@ -38,12 +27,9 @@ on:
           - ranmaru-deploy
           - ranmaru-stop
           - versus-player
-          - live
           - fight
-          - prod-vs
-          - large-garbage
       server:
-        description: 'Ranmaru: leave as is (panelattack.com). Which server the bot joins'
+        description: '2. Server (versus-player, fight)'
         required: true
         default: 'panelattack.com:49569'
         type: choice
@@ -51,36 +37,40 @@ on:
           - panelattack.com:49569
           - 104.156.250.136:49569
           - betaserver.panelattack.com:59569
+      bot:
+        description: '3. Bot (versus-player, fight)'
+        required: true
+        default: 'gambit'
+        type: choice
+        options:
+          - gambit
+          - wasm
+          - bitbot
+          - bitbotwasm
+          - beverly
+          - plamp
+          - heuristic
       name:
-        description: 'Ranmaru: leave as is. The bot''s name in the lobby (letters, digits, _; 16 max)'
+        description: '4. The bot''s name in the lobby (letters, digits, _; 16 max)'
         required: false
         default: 'Ranmaru_TEST_CPU'
+      player:
+        description: '5. Player to play. versus-player: a player''s name -- the bot challenges them and plays only them; blank = it plays whoever challenges it. fight: you, challenge, or a bot name'
+        required: false
+        default: ''
       hours:
-        description: 'Ranmaru: leave as 5. How long the bot stays up (1 to 5 hours)'
-        required: false
+        description: '6. Hours the bot stays up'
+        required: true
         default: '5'
-      bot:
-        description: 'Ranmaru: leave as gambit. versus-player / fight: type the bot -- gambit, wasm, bitbot, bitbotwasm, beverly, plamp or heuristic'
-        required: false
-        default: 'gambit'
-      opponent:
-        description: 'versus-player: type the NAME of the player the bot should play -- it challenges them and plays only them. Leave blank and it plays nobody in particular: it waits in the lobby and plays whoever challenges it. fight: you, challenge, or a bot name (bitbot, wasm, beverly, plamp, heuristic). Ranmaru: ignore'
-        required: false
-        default: ''
-      profile:
-        description: 'Ranmaru: leave as is. The trained weights file the bot plays'
-        required: false
-        default: 'survivor-profiles/gambit.json'
-      matches:
-        description: 'Other modes only (prod-vs, large-garbage): how many games or seeds. Ranmaru: ignore'
-        required: false
-        default: '3'
-      upstream_ref:
-        description: 'Ranmaru: leave empty. (Advanced: an upstream Panel Attack commit to run the bot on, if the server is not on the latest beta)'
-        required: false
-        default: ''
-      gambit_from:
-        description: 'Ranmaru: leave empty for GameCreator''s latest main, or type a GameCreator commit to use that one instead'
+        type: choice
+        options:
+          - '5'
+          - '4'
+          - '3'
+          - '2'
+          - '1'
+      advanced:
+        description: '7. Advanced -- leave blank. Words like gambit_from=<GameCreator commit>, upstream_ref=<commit>, profile=<file>'
         required: false
         default: ''
 
@@ -92,7 +82,7 @@ env:
   # versus-player is `live` under another name
   MODE: ${{ inputs.mode == 'versus-player' && 'live' || inputs.mode }}
   # versus-player with a player typed in: the bot challenges that player and plays only them (the NAME,PLAYER form the live step reads)
-  BOT_NAME: ${{ inputs.mode == 'versus-player' && inputs.opponent != '' && format('{0},{1}', inputs.name, inputs.opponent) || inputs.name }}
+  BOT_NAME: ${{ inputs.mode == 'versus-player' && inputs.player != '' && format('{0},{1}', inputs.name, inputs.player) || inputs.name }}
   # The two servers `server` offers; the beta one runs upstream's protocol.
   BETA_SERVER: betaserver.panelattack.com:59569
   # the main Panel Attack server (the client's default port); it runs the upstream beta branch's game
@@ -117,6 +107,32 @@ jobs:
     timeout-minutes: 355
     steps:
       - uses: actions/checkout@v4
+
+      # The `advanced` words, and the weight set the bot plays when none is given
+      - name: Read the options
+        env:
+          ADVANCED: ${{ inputs.advanced }}
+          BOT: ${{ inputs.bot }}
+        run: |
+          set -eu
+          profile=""; gambit_from=""; upstream_ref=""
+          for w in $ADVANCED; do
+            case "$w" in
+              profile=*) profile=${w#profile=};;
+              gambit_from=*) gambit_from=${w#gambit_from=};;
+              upstream_ref=*) upstream_ref=${w#upstream_ref=};;
+              *) echo "::error::advanced: I do not know '$w' (use profile=, gambit_from= or upstream_ref=)"; exit 1;;
+            esac
+          done
+          if [ -z "$profile" ]; then
+            case "$BOT" in
+              gambit) profile=survivor-profiles/gambit.json;;
+              wasm) profile=bot/profiles/wasmbot.wasm.json;;
+              bitbot|bitbotwasm|heuristic) profile=bot/profiles/beverly.json;;
+              *) profile="bot/profiles/$BOT.json";;
+            esac
+          fi
+          { echo "PROFILE=$profile"; echo "GAMBIT_FROM=$gambit_from"; echo "UPSTREAM_REF=$upstream_ref"; } >> "$GITHUB_ENV"
 
       - name: Install luajit + luarocks
         run: |
@@ -174,7 +190,7 @@ jobs:
       - name: Fetch upstream Panel Attack and add the bot
         if: (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER)
         env:
-          PIN: ${{ inputs.upstream_ref }}
+          PIN: ${{ env.UPSTREAM_REF }}
         run: |
           set -eu
           if [ -n "$PIN" ]; then
@@ -202,31 +218,6 @@ jobs:
              LUA_CPATH="./common/lib/?.so;./common/lib/?/?.so;$(luarocks path --local --lua-version 5.1 --lr-cpath);;" \
              luajit bot/tests/survivalLinkTelegraphVerify.lua)
 
-      - name: Run bot-vs-bot smoke test against the live server
-        if: env.MODE == 'prod-vs'
-        id: smoke
-        run: |
-          eval "$(luarocks path --local --lua-version 5.1)"
-          set -o pipefail
-          luajit bot/winRateTest.lua "" "" \
-            "${{ inputs.matches }}" "$BOT_HOST" "$BOT_PORT" hard \
-            2>&1 | tee bot-prod-smoke.log
-        continue-on-error: true
-
-      # "large_garbage" training preset (TrainingMenu.lua): 6-wide x 12-tall blocks.
-      # Offline harness (committed matchStart fixture, real engine) -- runs entirely
-      # on the runner, does NOT contact the server. One block per volley interval
-      # (900f = the preset's delayBeforeRepeat); 3600f cap = 60s survival target.
-      - name: Run large-garbage practice survival (offline, real engine)
-        if: env.MODE == 'large-garbage'
-        id: largegarbage
-        run: |
-          eval "$(luarocks path --local --lua-version 5.1)"
-          set -o pipefail
-          luajit bot/survivalStress.lua 900 3600 "${{ inputs.matches }}" "" hard 6 12 \
-            2>&1 | tee bot-prod-smoke.log
-        continue-on-error: true
-
       # LIVE IS NOT THE SMOKE TEST. prod-vs logs in two throwaway accounts,
       # puts them in a PRIVATE room against each other and leaves. This logs
       # in ONE bot under a real name and keeps it up, so a human can find it
@@ -247,12 +238,12 @@ jobs:
             [ '${{ inputs.server }}' = fork ] || { echo "survival plays the fork's server only"; exit 1; }
             exit 0
           fi
-          [ -f '${{ inputs.profile }}' ] || { echo "no weight set at ${{ inputs.profile }}"; exit 1; }
+          [ -f '${{ env.PROFILE }}' ] || { echo "no weight set at ${{ env.PROFILE }}"; exit 1; }
           eval "$(luarocks path --local --lua-version 5.1)"
           luajit -e 'package.path="./?.lua;"..package.path; require("bot.headlessBoot");
-            local b=require("bot.WeightedBrain").new({profile="${{ inputs.profile }}"})
+            local b=require("bot.WeightedBrain").new({profile="${{ env.PROFILE }}"})
             print(string.format("%s loads: depth %d beam %d rise %s reaction %d",
-              "${{ inputs.profile }}", b.depth, b.beam, tostring(b.rise), b.reaction))'
+              "${{ env.PROFILE }}", b.depth, b.beam, tostring(b.rise), b.reaction))'
 
       # SAME NAME, SAME ACCOUNT, EVERY RUN. A runner starts with no
       # bot/identities file, so without this every dispatch registers the name
@@ -299,9 +290,9 @@ jobs:
           sparse-checkout: games/the-game
 
       - name: The Gambit of another GameCreator commit (beta/real server)
-        if: env.MODE == 'live' && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER) && inputs.bot == 'gambit' && inputs.gambit_from != ''
+        if: env.MODE == 'live' && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER) && inputs.bot == 'gambit' && env.GAMBIT_FROM != ''
         env:
-          GAMBIT_FROM: ${{ inputs.gambit_from }}
+          GAMBIT_FROM: ${{ env.GAMBIT_FROM }}
         run: |
           set -eu
           cd GameCreator
@@ -345,12 +336,12 @@ jobs:
             # (gambit/lua/GambitNative.lua). Its profile is a path under the eval dir, as numbers (words.js).
             G="$GC_EVAL_DIR/../gambit"
             gp=survivor-profiles/gambit.json
-            case '${{ inputs.profile }}' in survivor-profiles/*) gp='${{ inputs.profile }}';; esac
+            case '${{ env.PROFILE }}' in survivor-profiles/*) gp='${{ env.PROFILE }}';; esac
             [ -f "$GC_EVAL_DIR/$gp" ] || { echo "no Gambit profile $GC_EVAL_DIR/$gp"; exit 1; }
             sh "$G/build.sh" native > gambit-build.log 2>&1 || { cat gambit-build.log; echo "libgambit.so did not build"; exit 1; }
             GC_SURVIVOR_PROFILE="$GC_EVAL_DIR/$gp" node "$G/words.js" > "$PWD/gambit.words" 2>> gambit-build.log || { cat gambit-build.log; echo "Gambit's profile did not encode"; exit 1; }
             gc=$(git -C "$GC_EVAL_DIR" log -1 --format=%h)
-            [ -z "${GAMBIT_COMMIT:-}" ] || gc="${GAMBIT_COMMIT:0:8} (gambit_from '${{ inputs.gambit_from }}'; main is $gc)"
+            [ -z "${GAMBIT_COMMIT:-}" ] || gc="${GAMBIT_COMMIT:0:8} (gambit_from '${{ env.GAMBIT_FROM }}'; main is $gc)"
             echo "::notice::Gambit built from GameCreator $gc, profile $gp"
             export GC_GAMBIT_WORDS="$PWD/gambit.words" GC_GAMBIT_LOG="$PWD/gambit-$name.log"
             # the machine as Gambit's training gives it (GameCreator's eval/training.sh): the client on CPU 0, Gambit's own thread alone
@@ -366,7 +357,7 @@ jobs:
             echo "::notice::Gambit: the client on CPU 0, Gambit on $gcpu, its 4 workers on ${wcpus:-$gcpu}"
             brain=gambit
           else
-            prof='${{ inputs.profile }}'
+            prof='${{ env.PROFILE }}'
             prof_abs=""
             case "$prof" in
               *.wasm.json)
@@ -418,7 +409,7 @@ jobs:
         if: env.MODE == 'live' && !(env.MODE == 'live' && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER) && (inputs.bot == 'wasm' || inputs.bot == 'bitbot' || inputs.bot == 'gambit'))
         id: live
         env:
-          PA_SEARCH_PROFILE: ${{ inputs.profile }}
+          PA_SEARCH_PROFILE: ${{ env.PROFILE }}
         run: |
           eval "$(luarocks path --local --lua-version 5.1)"
           secs=$(( ${{ inputs.hours }} * 3600 ))
@@ -500,7 +491,7 @@ jobs:
       # native/build.sh) and the client plays it in-process
       # (bot/BitBotNative.lua, as GameCreator's lua/train.lua does).
       - name: Check out GameCreator (BitBot, WasmSurvivor)
-        if: env.MODE == 'fight' && (contains(fromJSON('["bitbot","bitbotwasm","wasm"]'), inputs.bot) || contains(fromJSON('["bitbot","bitbotwasm","wasm"]'), inputs.opponent))
+        if: env.MODE == 'fight' && (contains(fromJSON('["bitbot","bitbotwasm","wasm"]'), inputs.bot) || contains(fromJSON('["bitbot","bitbotwasm","wasm"]'), inputs.player))
         uses: actions/checkout@v4
         with:
           repository: briankeegan/GameCreator
@@ -508,7 +499,7 @@ jobs:
           sparse-checkout: games/the-game
 
       - uses: actions/setup-node@v4
-        if: env.MODE == 'fight' && (contains(fromJSON('["bitbot","bitbotwasm","wasm"]'), inputs.bot) || contains(fromJSON('["bitbot","bitbotwasm","wasm"]'), inputs.opponent))
+        if: env.MODE == 'fight' && (contains(fromJSON('["bitbot","bitbotwasm","wasm"]'), inputs.bot) || contains(fromJSON('["bitbot","bitbotwasm","wasm"]'), inputs.player))
         with:
           node-version: '22'
 
@@ -520,14 +511,14 @@ jobs:
         id: fight
         env:
           GC_EVAL_DIR: ${{ github.workspace }}/GameCreator/games/the-game/ai/eval
-          WASM_PROFILE: ${{ inputs.profile }}
+          WASM_PROFILE: ${{ env.PROFILE }}
         run: |
           eval "$(luarocks path --local --lua-version 5.1)"
           [ "${BOT_HOST}:${BOT_PORT}" != "$BETA_SERVER" ] && [ "${BOT_HOST}:${BOT_PORT}" != "$PROD_SERVER" ] || { echo "fight plays the fork's server only"; exit 1; }
           if [ -d GameCreator ]; then echo "::notice::GameCreator $(git -C GameCreator log -1 --format='%h %s')"; fi
-          echo "::notice::${{ env.BOT_NAME }} (${{ inputs.bot }}) vs ${{ inputs.opponent || 'you' }} on $BOT_HOST:$BOT_PORT for ${{ inputs.hours }}h"
+          echo "::notice::${{ env.BOT_NAME }} (${{ inputs.bot }}) vs ${{ inputs.player || 'you' }} on $BOT_HOST:$BOT_PORT for ${{ inputs.hours }}h"
           set -o pipefail
-          bot/fight.sh "$BOT_HOST" "$BOT_PORT" $(( ${{ inputs.hours }} * 3600 )) '${{ inputs.bot }}' '${{ env.BOT_NAME }}' '${{ inputs.opponent || 'you' }}' \
+          bot/fight.sh "$BOT_HOST" "$BOT_PORT" $(( ${{ inputs.hours }} * 3600 )) '${{ inputs.bot }}' '${{ env.BOT_NAME }}' '${{ inputs.player || 'you' }}' \
             2>&1 | tee bot-prod-smoke.log
 
       # A new name's account id, made by the server at its first login, is
@@ -675,6 +666,5 @@ jobs:
         if: ${{ inputs.mode == 'ranmaru-deploy' }}
         run: |
           gh workflow run bot-prod-smoke-test.yml --repo "${{ github.repository }}" --ref "${{ github.ref_name }}" \
-            -f mode=live -f server=panelattack.com:49569 -f bot=gambit -f name="$RANMARU" -f hours=5 \
-            -f profile=survivor-profiles/gambit.json -f gambit_from=main
+            -f mode=versus-player -f server=panelattack.com:49569 -f bot=gambit -f name="$RANMARU" -f hours=5
           echo "A new $RANMARU run was started: Gambit of GameCreator's latest main, 5 hours, panelattack.com." >> "$GITHUB_STEP_SUMMARY"

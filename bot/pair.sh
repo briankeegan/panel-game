@@ -106,11 +106,11 @@ dispatch() {   # a JSON object of the workflow's inputs
     | gh api -X POST "repos/$REPO/actions/workflows/$WORKFLOW/dispatches" --input - > /dev/null
 }
 dispatch_bitbot() {
-  dispatch "{\"mode\":\"fight\",\"bot\":\"bitbot\",\"opponent\":\"you\",\"name\":\"BitBot\",\"hours\":\"$HOURS\",\"server\":\"$SERVER\"}"
+  dispatch "{\"mode\":\"fight\",\"bot\":\"bitbot\",\"player\":\"you\",\"name\":\"BitBot\",\"hours\":\"$HOURS\",\"server\":\"$SERVER\"}"
   echo "pair: BitBot queued (sits in the lobby)"
 }
 dispatch_wasm() {
-  dispatch "{\"mode\":\"fight\",\"bot\":\"wasm\",\"opponent\":\"challenge\",\"name\":\"WasmSurvivor_Bot,BitBot\",\"hours\":\"$HOURS\",\"profile\":\"$PROFILE\",\"server\":\"$SERVER\"}"
+  dispatch "{\"mode\":\"fight\",\"bot\":\"wasm\",\"player\":\"challenge\",\"name\":\"WasmSurvivor_Bot,BitBot\",\"hours\":\"$HOURS\",\"advanced\":\"profile=$PROFILE\",\"server\":\"$SERVER\"}"
   echo "pair: WasmSurvivor_Bot queued (challenges BitBot)"
 }
 
@@ -161,9 +161,9 @@ wasm_vs() {   # LP CP
   lp=$(profile_path "$lp"); cp=$(profile_path "$cp")
   stop_and_wait "· $lobby \\(wasm\\) vs you|· $chal,$lobby \\(wasm\\)"
   claim "$lobby"; claim "$chal"
-  dispatch "{\"mode\":\"fight\",\"bot\":\"wasm\",\"opponent\":\"you\",\"name\":\"$lobby\",\"hours\":\"$HOURS\",\"profile\":\"$lp\",\"server\":\"$SERVER\"}"
+  dispatch "{\"mode\":\"fight\",\"bot\":\"wasm\",\"player\":\"you\",\"name\":\"$lobby\",\"hours\":\"$HOURS\",\"advanced\":\"profile=$lp\",\"server\":\"$SERVER\"}"
   echo "pair: $lobby ($lp) queued (sits in the lobby)"
-  dispatch "{\"mode\":\"fight\",\"bot\":\"wasm\",\"opponent\":\"challenge\",\"name\":\"$chal,$lobby\",\"hours\":\"$HOURS\",\"profile\":\"$cp\",\"server\":\"$SERVER\"}"
+  dispatch "{\"mode\":\"fight\",\"bot\":\"wasm\",\"player\":\"challenge\",\"name\":\"$chal,$lobby\",\"hours\":\"$HOURS\",\"advanced\":\"profile=$cp\",\"server\":\"$SERVER\"}"
   echo "pair: $chal ($cp) queued (challenges $lobby)"
 }
 
@@ -172,7 +172,7 @@ WASM_RUN='\(wasm\) vs challenge'
 
 dispatch_beta() {   # BOT NAME HOURS PROFILE
   local ref=${PA_UPSTREAM_REF:-}
-  dispatch "{\"mode\":\"live\",\"server\":\"${PA_UPSTREAM_SERVER:-panelattack.com:49569}\",\"bot\":\"$1\",\"name\":\"$2\",\"hours\":\"$3\",\"profile\":\"$4\",\"upstream_ref\":\"$ref\",\"gambit_from\":\"${PA_GAMBIT_FROM:-}\"}"
+  dispatch "{\"mode\":\"versus-player\",\"server\":\"${PA_UPSTREAM_SERVER:-panelattack.com:49569}\",\"bot\":\"$1\",\"name\":\"$2\",\"hours\":\"$3\",\"advanced\":\"profile=$4 upstream_ref=$ref gambit_from=${PA_GAMBIT_FROM:-}\"}"
   echo "pair: $2 ($1) queued on ${PA_UPSTREAM_SERVER:-panelattack.com:49569} (upstream Panel Attack; the server assigns its account id)"
 }
 # the profile a bot plays by default

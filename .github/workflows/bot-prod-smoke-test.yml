@@ -1,6 +1,6 @@
 name: Bot Prod Smoke Test (LIVE SERVER)
 # The run list shows what each run was, e.g. "live · beta · SirBonksALot".
-run-name: "${{ inputs.mode }} · ${{ inputs.server }}${{ inputs.mode == 'live' && format(' · {0}', inputs.name) || inputs.mode == 'fight' && format(' · {0} ({1}) vs {2}', inputs.name, inputs.bot, inputs.opponent) || '' }}"
+run-name: "${{ startsWith(inputs.mode, 'ranmaru') && inputs.mode || format('{0} · {1}', inputs.mode, inputs.server) }}${{ inputs.mode == 'live' && format(' · {0}', inputs.name) || inputs.mode == 'fight' && format(' · {0} ({1}) vs {2}', inputs.name, inputs.bot, inputs.opponent) || '' }}"
 
 # Manual-only. Three things, picked with `mode`:
 #
@@ -39,6 +39,8 @@ on:
           - fight
           - prod-vs
           - large-garbage
+          - ranmaru-deploy
+          - ranmaru-stop
       server:
         description: 'live: which server the bot joins'
         required: true
@@ -123,6 +125,7 @@ env:
 jobs:
   bot-vs-bot:
     name: Run the bot
+    if: ${{ !startsWith(inputs.mode, 'ranmaru') }}
     runs-on: ubuntu-latest
     # A beta-server run commits a newly registered bot's account id back to
     # UPSTREAM_BOT_REF so the name can be reused (see "Save the account id").
@@ -640,3 +643,56 @@ jobs:
       - name: Fail if the run failed
         if: steps.smoke.outcome == 'failure' || steps.largegarbage.outcome == 'failure' || steps.live.outcome == 'failure' || steps.fight.outcome == 'failure'
         run: exit 1
+
+  # ranmaru-deploy / ranmaru-stop: the Ranmaru_TEST_CPU buttons (Run workflow -> branch bramp/multi-player -> mode).
+  #   ranmaru-stop    cancels the running Ranmaru_TEST_CPU run, waits for it to finish, and writes its wins and losses
+  #                   into this run's summary (its logs stay in that run's bot-prod-smoke-log artifact)
+  #   ranmaru-deploy  does the same, then starts a new live run: Gambit of GameCreator's latest main, on panelattack.com
+  ranmaru:
+    name: Ranmaru_TEST_CPU
+    if: ${{ startsWith(inputs.mode, 'ranmaru') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      actions: write
+      contents: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RANMARU: Ranmaru_TEST_CPU
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cancel the running one and pull down its info
+        run: |
+          set -u
+          repo="${{ github.repository }}"
+          runs() { gh api "repos/$repo/actions/runs?per_page=60" --jq ".workflow_runs[] | select(.id != $GITHUB_RUN_ID) | select(.display_title == \"live · panelattack.com:49569 · $RANMARU\") | select($1) | .id"; }
+          ids=$(runs '.status != "completed"')
+          for id in $ids; do
+            echo "cancelling $id"; gh api -X POST "repos/$repo/actions/runs/$id/cancel" >/dev/null || true
+          done
+          for id in $ids; do
+            for _ in $(seq 1 60); do
+              [ "$(gh api "repos/$repo/actions/runs/$id" --jq .status)" = completed ] && break
+              sleep 5
+            done
+          done
+          # the runs to report on: the ones just cancelled, else the latest finished one
+          [ -n "$ids" ] || ids=$(runs '.status == "completed"' | head -n 1)
+          {
+            echo "## $RANMARU"
+            if [ -z "$ids" ]; then echo "No $RANMARU run found."; fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          for id in $ids; do
+            mkdir -p "pulled/$id"
+            gh run download "$id" -n bot-prod-smoke-log -D "pulled/$id" 2>/dev/null || true
+            python3 .github/scripts/ranmaru_summary.py "$id" "https://github.com/$repo/actions/runs/$id" "pulled/$id" >> "$GITHUB_STEP_SUMMARY"
+          done
+
+      - name: Deploy the latest main
+        if: ${{ inputs.mode == 'ranmaru-deploy' }}
+        run: |
+          gh workflow run bot-prod-smoke-test.yml --repo "${{ github.repository }}" --ref "${{ github.ref_name }}" \
+            -f mode=live -f server=panelattack.com:49569 -f bot=gambit -f name="$RANMARU" -f hours=5 \
+            -f profile=survivor-profiles/gambit.json -f gambit_from=main
+          echo "A new $RANMARU run was started: Gambit of GameCreator's latest main, 5 hours, panelattack.com." >> "$GITHUB_STEP_SUMMARY"

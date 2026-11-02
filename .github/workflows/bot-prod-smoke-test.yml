@@ -30,7 +30,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'What to run: live = a bot in the lobby for people to play; fight = pick who plays who (bot and opponent below); prod-vs = bot-vs-bot smoke test; large-garbage = offline benchmark'
+        description: 'WHAT TO DO. ranmaru-deploy = stop the running Ranmaru_TEST_CPU, then start a new one on the latest main. ranmaru-stop = stop it and show its wins and losses. The rest (live, fight, prod-vs, large-garbage) are for other bots'
         required: true
         default: 'ranmaru-deploy'
         type: choice
@@ -42,7 +42,7 @@ on:
           - prod-vs
           - large-garbage
       server:
-        description: 'live: which server the bot joins'
+        description: 'Ranmaru: leave as is (panelattack.com). Which server the bot joins'
         required: true
         default: 'panelattack.com:49569'
         type: choice
@@ -51,15 +51,15 @@ on:
           - 104.156.250.136:49569
           - betaserver.panelattack.com:59569
       name:
-        description: 'live: the bot''s name in the lobby (letters, digits, _; 16 max). Reusing a name logs into the same account'
+        description: 'Ranmaru: leave as is. The bot''s name in the lobby (letters, digits, _; 16 max)'
         required: false
         default: 'Ranmaru_TEST_CPU'
       hours:
-        description: 'live: how long it stays in the lobby, 1-5 hours (cancel the run to stop it sooner)'
+        description: 'Ranmaru: leave as 5. How long the bot stays up (1 to 5 hours)'
         required: false
         default: '5'
       bot:
-        description: 'fight: who sits in the lobby as `name`. live on the beta server: wasm or bitbot play it with GameCreator''s bots; anything else runs the weighted bot of `profile`'
+        description: 'Ranmaru: leave as gambit. Which bot to run'
         required: false
         default: 'gambit'
         type: choice
@@ -72,37 +72,27 @@ on:
           - plamp
           - heuristic
       opponent:
-        description: 'fight: who challenges it as `name`2, over and over -- or "you" to leave it waiting for people, or "challenge" to have `bot` challenge the second name in `name` ("A,B") that sits in the lobby in ANOTHER run -- one runner each'
+        description: 'Other modes only (fight): type who challenges the bot -- you (a person does), challenge, or a bot name (bitbot, bitbotwasm, wasm, beverly, plamp, heuristic). Ranmaru: ignore'
         required: false
         default: 'you'
-        type: choice
-        options:
-          - you
-          - challenge
-          - bitbot
-          - bitbotwasm
-          - wasm
-          - beverly
-          - plamp
-          - heuristic
       profile:
-        description: 'live: which trained bot to play as (a file in bot/profiles/). fight with wasm: a bot/profiles/*.wasm.json plays those trained weights (e.g. bot/profiles/wasmbot.wasm.json)'
+        description: 'Ranmaru: leave as is. The trained weights file the bot plays'
         required: false
         default: 'survivor-profiles/gambit.json'
       matches:
-        description: 'prod-vs: games to play (~2.5 min each). large-garbage: seeds to run'
+        description: 'Other modes only (prod-vs, large-garbage): how many games or seeds. Ranmaru: ignore'
         required: false
         default: '3'
       difficulty:
-        description: 'prod-vs / large-garbage: bot difficulty'
+        description: 'Other modes only (prod-vs, large-garbage): bot difficulty. Ranmaru: ignore'
         required: false
         default: 'hard'
       upstream_ref:
-        description: 'Advanced, betaserver only: run the bot on this upstream commit/tag/branch instead of the latest beta. Only needed if the server is not on latest beta'
+        description: 'Ranmaru: leave empty. (Advanced: an upstream Panel Attack commit to run the bot on, if the server is not on the latest beta)'
         required: false
         default: ''
       gambit_from:
-        description: 'gambit (live on the beta/real server, or fight): play the Gambit (games/the-game/ai/gambit) of this GameCreator commit, or of a version named in its games/the-game/ai/eval/gambit-versions.txt (e.g. gambit-w100), instead of its latest main'
+        description: 'Ranmaru: leave empty for GameCreator''s latest main, or type a GameCreator commit to use that one instead'
         required: false
         default: ''
 

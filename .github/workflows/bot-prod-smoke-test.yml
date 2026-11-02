@@ -32,28 +32,28 @@ on:
       mode:
         description: 'What to run: live = a bot in the lobby for people to play; fight = pick who plays who (bot and opponent below); prod-vs = bot-vs-bot smoke test; large-garbage = offline benchmark'
         required: true
-        default: 'live'
+        default: 'ranmaru-deploy'
         type: choice
         options:
+          - ranmaru-deploy
+          - ranmaru-stop
           - live
           - fight
           - prod-vs
           - large-garbage
-          - ranmaru-deploy
-          - ranmaru-stop
       server:
         description: 'live: which server the bot joins'
         required: true
-        default: '104.156.250.136:49569'
+        default: 'panelattack.com:49569'
         type: choice
         options:
-          - 104.156.250.136:49569
           - panelattack.com:49569
+          - 104.156.250.136:49569
           - betaserver.panelattack.com:59569
       name:
         description: 'live: the bot''s name in the lobby (letters, digits, _; 16 max). Reusing a name logs into the same account'
         required: false
-        default: 'Beverly'
+        default: 'Ranmaru_TEST_CPU'
       hours:
         description: 'live: how long it stays in the lobby, 1-5 hours (cancel the run to stop it sooner)'
         required: false
@@ -61,16 +61,16 @@ on:
       bot:
         description: 'fight: who sits in the lobby as `name`. live on the beta server: wasm or bitbot play it with GameCreator''s bots; anything else runs the weighted bot of `profile`'
         required: false
-        default: 'beverly'
+        default: 'gambit'
         type: choice
         options:
+          - gambit
           - bitbot
           - bitbotwasm
           - wasm
           - beverly
           - plamp
           - heuristic
-          - gambit
       opponent:
         description: 'fight: who challenges it as `name`2, over and over -- or "you" to leave it waiting for people, or "challenge" to have `bot` challenge the second name in `name` ("A,B") that sits in the lobby in ANOTHER run -- one runner each'
         required: false
@@ -88,7 +88,7 @@ on:
       profile:
         description: 'live: which trained bot to play as (a file in bot/profiles/). fight with wasm: a bot/profiles/*.wasm.json plays those trained weights (e.g. bot/profiles/wasmbot.wasm.json)'
         required: false
-        default: 'bot/profiles/beverly.json'
+        default: 'survivor-profiles/gambit.json'
       matches:
         description: 'prod-vs: games to play (~2.5 min each). large-garbage: seeds to run'
         required: false

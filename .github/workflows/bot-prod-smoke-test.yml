@@ -64,9 +64,9 @@ on:
         required: false
         default: 'gambit'
       opponent:
-        description: 'Other modes only (fight): type who challenges the bot -- you (a person does), challenge, or a bot name (bitbot, bitbotwasm, wasm, beverly, plamp, heuristic). Ranmaru: ignore'
+        description: 'versus-player: type the NAME of the player the bot should play -- it challenges them and plays only them. Leave blank and it plays nobody in particular: it waits in the lobby and plays whoever challenges it. fight: you, challenge, or a bot name (bitbot, wasm, beverly, plamp, heuristic). Ranmaru: ignore'
         required: false
-        default: 'you'
+        default: ''
       profile:
         description: 'Ranmaru: leave as is. The trained weights file the bot plays'
         required: false
@@ -91,6 +91,8 @@ on:
 env:
   # versus-player is `live` under another name
   MODE: ${{ inputs.mode == 'versus-player' && 'live' || inputs.mode }}
+  # versus-player with a player typed in: the bot challenges that player and plays only them (the NAME,PLAYER form the live step reads)
+  BOT_NAME: ${{ inputs.mode == 'versus-player' && inputs.opponent != '' && format('{0},{1}', inputs.name, inputs.opponent) || inputs.name }}
   # The two servers `server` offers; the beta one runs upstream's protocol.
   BETA_SERVER: betaserver.panelattack.com:59569
   # the main Panel Attack server (the client's default port); it runs the upstream beta branch's game
@@ -238,7 +240,7 @@ jobs:
         run: |
           set -eu
           cd "$BOT_DIR"
-          n='${{ inputs.name }}'
+          n='${{ env.BOT_NAME }}'
           [ -n "$n" ] || { echo "name is empty"; exit 1; }
           [ ${#n} -le 16 ] || { echo "name '$n' is ${#n} chars; the server limit is 16"; exit 1; }
           if [ '${{ env.MODE }}' = survival ]; then
@@ -268,7 +270,7 @@ jobs:
       - name: Derive this name's account id
         if: env.MODE == 'live' && !(inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER)
         env:
-          BASE_NAME: ${{ inputs.name }}
+          BASE_NAME: ${{ env.BOT_NAME }}
           BOT_IP: ${{ env.BOT_HOST }}
         run: |
           names="$BASE_NAME"
@@ -322,7 +324,7 @@ jobs:
           eval "$(luarocks path --local --lua-version 5.1)"
           export GC_EVAL_DIR="$GITHUB_WORKSPACE/GameCreator/games/the-game/ai/eval"
           # name is "BOT" or "BOT,OPPONENT": the second half is a lobby name this bot challenges
-          name='${{ inputs.name }}'
+          name='${{ env.BOT_NAME }}'
           # "BOT,OPPONENT" or "BOT,OPPONENT,GAMES": after GAMES finished games against OPPONENT the bot stops challenging
           # and sits in the lobby accepting whoever challenges
           games=""
@@ -420,12 +422,12 @@ jobs:
         run: |
           eval "$(luarocks path --local --lua-version 5.1)"
           secs=$(( ${{ inputs.hours }} * 3600 ))
-          echo "::notice::${{ inputs.name }} joining $BOT_HOST:$BOT_PORT for ${{ inputs.hours }}h"
+          echo "::notice::${{ env.BOT_NAME }} joining $BOT_HOST:$BOT_PORT for ${{ inputs.hours }}h"
           cd "$BOT_DIR"
           set -o pipefail
           # The bot runs until killed, so the timeout IS the stop condition:
           # 124 from `timeout` is this working, not failing.
-          timeout "$secs" bot/plamp.sh "$BOT_HOST" "$BOT_PORT" '${{ inputs.name }}' \
+          timeout "$secs" bot/plamp.sh "$BOT_HOST" "$BOT_PORT" '${{ env.BOT_NAME }}' \
             2>&1 | tee "$GITHUB_WORKSPACE/bot-prod-smoke.log" || [ $? -eq 124 ]
 
       # WASMSURVIVOR. The survival bot is GameCreator's (survivor.js): it
@@ -463,9 +465,9 @@ jobs:
         run: |
           eval "$(luarocks path --local --lua-version 5.1)"
           secs=$(( ${{ inputs.hours }} * 3600 ))
-          echo "::notice::${{ inputs.name }} (WasmSurvivor) joining $BOT_HOST:$BOT_PORT for ${{ inputs.hours }}h"
+          echo "::notice::${{ env.BOT_NAME }} (WasmSurvivor) joining $BOT_HOST:$BOT_PORT for ${{ inputs.hours }}h"
           set -o pipefail
-          timeout "$secs" luajit bot/playBot.lua "$BOT_HOST" "$BOT_PORT" '${{ inputs.name }}' 4 12 survival \
+          timeout "$secs" luajit bot/playBot.lua "$BOT_HOST" "$BOT_PORT" '${{ env.BOT_NAME }}' 4 12 survival \
             2>&1 | tee "$GITHUB_WORKSPACE/bot-prod-smoke.log" || [ $? -eq 124 ]
 
       # SAME NAME, SAME ACCOUNT on beta. Upstream hands a new name a random id
@@ -476,7 +478,7 @@ jobs:
         if: always() && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER)
         run: |
           set -eu
-          n='${{ inputs.name }}'; n=${n%%,*}   # (a "BOT,OPPONENT" name: the account is the bot's)
+          n='${{ env.BOT_NAME }}'; n=${n%%,*}   # (a "BOT,OPPONENT" name: the account is the bot's)
           f="bot/identities/${n}_${BOT_HOST}.txt"
           [ -f "upstream/$f" ] || { echo "no id to save"; exit 0; }
           if [ -f "botsrc/$f" ] && cmp -s "upstream/$f" "botsrc/$f"; then echo "id already saved"; exit 0; fi
@@ -486,7 +488,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add "$f"
-          git commit -m "bot: save account id for '${{ inputs.name }}' on $BOT_HOST"
+          git commit -m "bot: save account id for '${{ env.BOT_NAME }}' on $BOT_HOST"
           for i in 1 2 3; do
             git push origin "HEAD:$UPSTREAM_BOT_REF" && exit 0
             git pull --rebase origin "$UPSTREAM_BOT_REF"
@@ -523,9 +525,9 @@ jobs:
           eval "$(luarocks path --local --lua-version 5.1)"
           [ "${BOT_HOST}:${BOT_PORT}" != "$BETA_SERVER" ] && [ "${BOT_HOST}:${BOT_PORT}" != "$PROD_SERVER" ] || { echo "fight plays the fork's server only"; exit 1; }
           if [ -d GameCreator ]; then echo "::notice::GameCreator $(git -C GameCreator log -1 --format='%h %s')"; fi
-          echo "::notice::${{ inputs.name }} (${{ inputs.bot }}) vs ${{ inputs.opponent }} on $BOT_HOST:$BOT_PORT for ${{ inputs.hours }}h"
+          echo "::notice::${{ env.BOT_NAME }} (${{ inputs.bot }}) vs ${{ inputs.opponent || 'you' }} on $BOT_HOST:$BOT_PORT for ${{ inputs.hours }}h"
           set -o pipefail
-          bot/fight.sh "$BOT_HOST" "$BOT_PORT" $(( ${{ inputs.hours }} * 3600 )) '${{ inputs.bot }}' '${{ inputs.name }}' '${{ inputs.opponent }}' \
+          bot/fight.sh "$BOT_HOST" "$BOT_PORT" $(( ${{ inputs.hours }} * 3600 )) '${{ inputs.bot }}' '${{ env.BOT_NAME }}' '${{ inputs.opponent || 'you' }}' \
             2>&1 | tee bot-prod-smoke.log
 
       # A new name's account id, made by the server at its first login, is

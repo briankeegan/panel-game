@@ -19,7 +19,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: '1. What to do: ranmaru-deploy = stop the running Ranmaru_TEST_CPU, start a new one on the latest main. ranmaru-stop = stop it and show its wins and losses. versus-player = a bot sits in the lobby (fill in 2-6). fight = two bots play each other on the fork server'
+        description: '1. What to do: ranmaru-deploy = stop EVERY bot on the server (step 2), then start the one in steps 3-6. ranmaru-stop = stop every bot on the server and show its wins and losses. versus-player = just start the bot in steps 3-6. fight = two bots play each other on the fork server'
         required: true
         default: 'ranmaru-deploy'
         type: choice
@@ -29,7 +29,7 @@ on:
           - versus-player
           - fight
       server:
-        description: '2. Server (versus-player, fight)'
+        description: '2. Server -- the one the bot joins, and the one stop / deploy clear of bots'
         required: true
         default: 'panelattack.com:49569'
         type: choice
@@ -617,12 +617,13 @@ jobs:
         if: steps.smoke.outcome == 'failure' || steps.largegarbage.outcome == 'failure' || steps.live.outcome == 'failure' || steps.fight.outcome == 'failure'
         run: exit 1
 
-  # ranmaru-deploy / ranmaru-stop: the Ranmaru_TEST_CPU buttons (Run workflow -> branch bramp/multi-player -> mode).
-  #   ranmaru-stop    cancels the running Ranmaru_TEST_CPU run, waits for it to finish, and writes its wins and losses
-  #                   into this run's summary (its logs stay in that run's bot-prod-smoke-log artifact)
-  #   ranmaru-deploy  does the same, then starts a new live run: Gambit of GameCreator's latest main, on panelattack.com
+  # ranmaru-deploy / ranmaru-stop: stop (and start) the bot named in the form (Run workflow -> branch bramp/multi-player -> mode).
+  #   ranmaru-stop    cancels EVERY bot run on `server` (whatever its name), waits for them to finish, and writes their
+  #                   wins and losses into this run's summary (the logs stay in each run's bot-prod-smoke-log artifact)
+  #   ranmaru-deploy  does the same, then starts a new versus-player run with the form's name, bot, player, hours,
+  #                   server and advanced words (Gambit of GameCreator's latest main unless advanced pins one)
   ranmaru:
-    name: Ranmaru_TEST_CPU
+    name: Stop / deploy the named bot
     if: ${{ startsWith(inputs.mode, 'ranmaru') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -631,7 +632,12 @@ jobs:
       contents: read
     env:
       GH_TOKEN: ${{ github.token }}
-      RANMARU: Ranmaru_TEST_CPU
+      NAME: ${{ inputs.name }}
+      SERVER: ${{ inputs.server }}
+      BOT: ${{ inputs.bot }}
+      PLAYER: ${{ inputs.player }}
+      HOURS: ${{ inputs.hours }}
+      ADVANCED: ${{ inputs.advanced }}
     steps:
       - uses: actions/checkout@v4
 
@@ -639,7 +645,8 @@ jobs:
         run: |
           set -u
           repo="${{ github.repository }}"
-          runs() { gh api "repos/$repo/actions/runs?per_page=60" --jq ".workflow_runs[] | select(.id != $GITHUB_RUN_ID) | select(.display_title == \"live · panelattack.com:49569 · $RANMARU\") | select($1) | .id"; }
+          # every bot run on this server, whatever its name: "live · SERVER · NAME[,PLAYER]" and "fight · SERVER · ..."
+          runs() { gh api "repos/$repo/actions/runs?per_page=60" --jq ".workflow_runs[] | select(.id != $GITHUB_RUN_ID) | select(.display_title | startswith(\"live · $SERVER · \") or startswith(\"fight · $SERVER · \")) | select($1) | .id"; }
           ids=$(runs '.status != "completed"')
           for id in $ids; do
             echo "cancelling $id"; gh api -X POST "repos/$repo/actions/runs/$id/cancel" >/dev/null || true
@@ -653,18 +660,22 @@ jobs:
           # the runs to report on: the ones just cancelled, else the latest finished one
           [ -n "$ids" ] || ids=$(runs '.status == "completed"' | head -n 1)
           {
-            echo "## $RANMARU"
-            if [ -z "$ids" ]; then echo "No $RANMARU run found."; fi
+            echo "## Bots on $SERVER"
+            if [ -z "$ids" ]; then echo "No bot run on $SERVER found."; fi
           } >> "$GITHUB_STEP_SUMMARY"
           for id in $ids; do
             mkdir -p "pulled/$id"
             gh run download "$id" -n bot-prod-smoke-log -D "pulled/$id" 2>/dev/null || true
             python3 .github/scripts/ranmaru_summary.py "$id" "https://github.com/$repo/actions/runs/$id" "pulled/$id" >> "$GITHUB_STEP_SUMMARY"
           done
+          # bots still up on other servers (not touched)
+          others=$(gh api "repos/$repo/actions/runs?status=in_progress&per_page=60" --jq ".workflow_runs[] | select(.id != $GITHUB_RUN_ID) | select(.display_title | startswith(\"live · \") or startswith(\"fight · \")) | select(.display_title | contains(\" · $SERVER · \") | not) | \"- \" + .display_title + \" (run \" + (.id|tostring) + \")\"")
+          if [ -n "$others" ]; then { echo; echo "### Still up on other servers (not touched)"; echo "$others"; } >> "$GITHUB_STEP_SUMMARY"; fi
 
-      - name: Deploy the latest main
+      - name: Deploy
         if: ${{ inputs.mode == 'ranmaru-deploy' }}
         run: |
           gh workflow run bot-prod-smoke-test.yml --repo "${{ github.repository }}" --ref "${{ github.ref_name }}" \
-            -f mode=versus-player -f server=panelattack.com:49569 -f bot=gambit -f name="$RANMARU" -f hours=5
-          echo "A new $RANMARU run was started: Gambit of GameCreator's latest main, 5 hours, panelattack.com." >> "$GITHUB_STEP_SUMMARY"
+            -f mode=versus-player -f server="$SERVER" -f bot="$BOT" -f name="$NAME" -f player="$PLAYER" \
+            -f hours="$HOURS" -f advanced="$ADVANCED"
+          echo "A new run was started: $NAME ($BOT) on $SERVER for $HOURS hours." >> "$GITHUB_STEP_SUMMARY"

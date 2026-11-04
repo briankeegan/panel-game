@@ -19,7 +19,7 @@ local port = tonumber(arg[2]) or 49569
 local name = arg[3] or "PanelBot"
 local cursorInterval = tonumber(arg[4]) -- frames between cursor moves/swaps; nil = full speed
 local reactionFrames = tonumber(arg[5]) -- reaction-cap frames; nil = full speed
-local brain = arg[6] or "heuristic"     -- "heuristic" | "search" | "expert" | "weighted" | "survival" | "bitbot"
+local brain = arg[6] or "heuristic"     -- "heuristic" | "search" | "expert" | "weighted" | "survival" | "bitbot" | "gambit"
 local cursorSpeed = (cursorInterval or reactionFrames)
   and { cursorMoveInterval = cursorInterval or 8, reactionFrames = reactionFrames or 3 } or nil
 
@@ -29,6 +29,7 @@ local cursorSpeed = (cursorInterval or reactionFrames)
 local bot = BotClient({
   ip = ip, port = port, name = name, cursorSpeed = cursorSpeed,
   brain = brain,
+  level = tonumber(os.getenv("PA_LEVEL")),   -- (the modern level it plays; BotClient's default when unset)
   searchProfile = (brain == "search" or brain == "weighted") and os.getenv("PA_SEARCH_PROFILE") or nil,
 })
 

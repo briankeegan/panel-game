@@ -99,7 +99,11 @@ local IDLE_LIMIT = tonumber(os.getenv("PA_IDLE_LIMIT") or "") or 0
 local idleSince, readyNow = nil, nil
 -- PA_STOP_FILE: a file some other process creates to say "stop once no game is running" (a deploy or stop waits on the bot)
 local STOP_FILE = os.getenv("PA_STOP_FILE")
+-- once a stop is asked for and no game is running, the bot sits in the room this many seconds WITHOUT readying (so no next game
+-- starts), then leaves; with nobody in the room it leaves at once
+local STOP_GRACE = tonumber(os.getenv("PA_STOP_GRACE") or "") or 5
 local lastStopCheck = 0
+local stopAt = nil
 -- Pace check: how far the loop ever got from the 60Hz schedule this match, in
 -- frames. Every frame's input is owed on time; this should stay under 1.
 local worstOffSchedule = 0
@@ -110,24 +114,32 @@ while true do
   if bot.disconnected then print("disconnected from the server"); os.exit(1) end
 
   -- Stop once no game is running: the file says a stop or a deploy is waiting on this bot
+  if STOP_FILE and (bot.match or bot.matchStart) then stopAt = nil end
   if STOP_FILE and not bot.match and not bot.matchStart then
     local t = socket.gettime()
-    if t - lastStopCheck > 1 then
+    if not stopAt and t - lastStopCheck > 1 then
       lastStopCheck = t
       local f = io.open(STOP_FILE)
       if f then
         f:close()
-        print("stop requested and no game is running: leaving")
-        pcall(function() bot:leaveRoom() end)
-        pcall(function() bot:disconnect() end)
-        os.exit(0)
+        stopAt = t
+        print(string.format("stop requested and no game is running: sitting out %d s without readying, then leaving", STOP_GRACE))
+        -- tells the workflow's watcher: the next bot can come in now (it arrives before this one leaves)
+        local g = io.open(STOP_FILE .. ".grace", "w"); if g then g:write("1"); g:close() end
+        if bot.inRoom then pcall(function() bot:sendReady(false) end) end
       end
+    end
+    if stopAt and (not (bot.inRoom and playerCount() >= 2) or t - stopAt >= STOP_GRACE) then
+      print("leaving")
+      pcall(function() bot:leaveRoom() end)
+      pcall(function() bot:disconnect() end)
+      os.exit(0)
     end
   end
 
   -- (Re)ready every 1.5s while in a room with an opponent and no match running;
   -- retrying survives the post-match reset back to character select.
-  if not bot.match and not bot.matchStart and bot.inRoom and playerCount() >= 2 then
+  if not stopAt and not bot.match and not bot.matchStart and bot.inRoom and playerCount() >= 2 then
     local now = socket.gettime()
     idleSince = idleSince or now
     local idle = now - idleSince

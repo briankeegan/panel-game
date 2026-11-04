@@ -48,8 +48,6 @@ on:
           - gambit-w100
           - gambit-w90
           - gambit-w80
-          - gambit-lockstep
-          - gambit-realtime-fixes
       name:
         description: '4. The bot''s name in the lobby (letters, digits, _; 16 max)'
         required: false

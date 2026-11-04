@@ -50,7 +50,7 @@ on:
           - gambit-w90
           - gambit-w80
       name:
-        description: '4. That bot''s name in the lobby (letters, digits, _; 16 max). A # is the next number: ranmaru-deploy swaps between the two saved accounts and renames one, so Ranmaru_p#_CPU gives p7, then p8, ... On the Bramp server (104.156.250.136) use a name that already has an account: GambitMain, Gambit_100, GambitY, SvAttack1, SvDefensive, WasmAgro_CPU or BitBot'
+        description: '4. That bot''s name in the lobby (letters, digits, _; 16 max). A # is the next number: ranmaru-deploy swaps between the two saved accounts and renames one, so Ranmaru_p#_CPU gives p7, then p8, ... On the Bramp server the names in a fight take over existing accounts, so any name works'
         required: false
         default: 'Ranmaru_p#_CPU'
       opponent:
@@ -65,7 +65,7 @@ on:
           - gambit-w90
           - gambit-w80
       opponent_name:
-        description: '6. Fight only: the second Gambit''s name in the lobby (blank = the first name plus 2). Same rule on the Bramp server: use a name that already has an account'
+        description: '6. Fight only: the second Gambit''s name in the lobby (blank = the first name plus 2). Any name works on the Bramp server too'
         required: false
         default: 'Gambit_100'
       player:
@@ -863,26 +863,32 @@ jobs:
           [ ${#other} -le 16 ] || { echo "::error::the second bot's name '$other' is longer than 16 characters"; exit 1; }
           [ "$other" != "$NAME" ] || { echo "::error::the two bots need different names"; exit 1; }
           if [ "$SERVER" = "104.156.250.136:49569" ]; then
-            # the Bramp server refuses a new name, so a name needs a saved account: Ranmaru_CPU takes over GambitMain's (the
-            # server renames an account at login); any other name must already have one
-            host=104.156.250.136; added=""
+            # The Bramp server refuses a new name, so every name takes over an account that already exists there (the server
+            # renames an account at login). A name that already has one (any letters) keeps it; a new name takes a spare Gambit
+            # account (GambitY, then Gambit_100, then GambitMain) that is not the other bot's.
+            host=104.156.250.136; added=""; used=""
             for n in "$NAME" "$other"; do
-              [ -s "bot/identities/${n}_${host}.txt" ] && continue
-              # the same name in other letters (GAMBIT_100 for Gambit_100) is the same account
-              same=$(ls bot/identities | grep -i -x -- "${n}_${host}.txt" | head -n 1 || true)
-              if [ -n "$same" ]; then
-                cp "bot/identities/$same" "bot/identities/${n}_${host}.txt"; added=1
-                echo "$n uses the account saved as ${same%_${host}.txt} on the Bramp server." >> "$GITHUB_STEP_SUMMARY"
-              elif [ "$n" = Ranmaru_CPU ] && [ -s "bot/identities/GambitMain_${host}.txt" ]; then
-                cp "bot/identities/GambitMain_${host}.txt" "bot/identities/${n}_${host}.txt"; added=1
-                echo "$n takes over the account of GambitMain on the Bramp server." >> "$GITHUB_STEP_SUMMARY"
-              else
-                echo "::error::$n has no account on the Bramp server (it refuses new names). Use GambitMain, Gambit_100, GambitY, SvAttack1, SvDefensive, WasmAgro_CPU or BitBot, or Ranmaru_CPU."; exit 1
+              src=$(ls bot/identities | grep -i -x -- "${n}_${host}.txt" | head -n 1 || true)
+              if [ -n "$src" ]; then
+                used="$used $(cat "bot/identities/$src")"
+                [ -s "bot/identities/${n}_${host}.txt" ] || { cp "bot/identities/$src" "bot/identities/${n}_${host}.txt"; added=1; }
               fi
+            done
+            for n in "$NAME" "$other"; do
+              [ -n "$(ls bot/identities | grep -i -x -- "${n}_${host}.txt" | head -n 1 || true)" ] && continue
+              src=""
+              for cand in GambitY Gambit_100 GambitMain; do
+                [ -s "bot/identities/${cand}_${host}.txt" ] || continue
+                id=$(cat "bot/identities/${cand}_${host}.txt"); case " $used " in *" $id "*) continue;; esac
+                src="${cand}_${host}.txt"; break
+              done
+              [ -n "$src" ] || { echo "::error::no spare account on the Bramp server for $n"; exit 1; }
+              cp "bot/identities/$src" "bot/identities/${n}_${host}.txt"; added=1; used="$used $(cat "bot/identities/$src")"
+              echo "$n takes over the account saved as ${src%_${host}.txt} on the Bramp server (the server renames it at login)." >> "$GITHUB_STEP_SUMMARY"
             done
             if [ -n "$added" ]; then
               git config user.name "github-actions"; git config user.email "actions@github.com"
-              git add bot/identities; git commit -q -m "bot: Ranmaru_CPU takes over the account of GambitMain on $host"
+              git add bot/identities; git commit -q -m "bot: fight names take over existing accounts on $host"
               for k in 1 2 3; do git push -q origin "HEAD:${{ github.ref_name }}" && break; git pull -q --rebase origin "${{ github.ref_name }}"; done
             fi
             # the fork's server: each bot is a fight.sh run -- the lobby bot, and the challenger ("OTHER,LOBBY" challenges LOBBY)

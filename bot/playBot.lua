@@ -92,6 +92,14 @@ end
 local FRAME = 1 / 60
 local nextFrame = nil
 local lastReadyAt = 0
+-- PA_IDLE_LIMIT seconds (0 = off): a player in the room who does not start a game -- from the challenge being accepted, or
+-- from the last game ending -- is left alone in it. For the last 10 s the bot warns: ready off 1 s, on 1 s, ... up to the
+-- last 3 s, which it holds ready; then it leaves the room, back to the lobby (a player can challenge again)
+local IDLE_LIMIT = tonumber(os.getenv("PA_IDLE_LIMIT") or "") or 0
+local idleSince, readyNow = nil, nil
+-- PA_STOP_FILE: a file some other process creates to say "stop once no game is running" (a deploy or stop waits on the bot)
+local STOP_FILE = os.getenv("PA_STOP_FILE")
+local lastStopCheck = 0
 -- Pace check: how far the loop ever got from the 60Hz schedule this match, in
 -- frames. Every frame's input is owed on time; this should stay under 1.
 local worstOffSchedule = 0
@@ -101,14 +109,45 @@ while true do
   challengeIfFree()
   if bot.disconnected then print("disconnected from the server"); os.exit(1) end
 
+  -- Stop once no game is running: the file says a stop or a deploy is waiting on this bot
+  if STOP_FILE and not bot.match and not bot.matchStart then
+    local t = socket.gettime()
+    if t - lastStopCheck > 1 then
+      lastStopCheck = t
+      local f = io.open(STOP_FILE)
+      if f then
+        f:close()
+        print("stop requested and no game is running: leaving")
+        pcall(function() bot:leaveRoom() end)
+        pcall(function() bot:disconnect() end)
+        os.exit(0)
+      end
+    end
+  end
+
   -- (Re)ready every 1.5s while in a room with an opponent and no match running;
   -- retrying survives the post-match reset back to character select.
   if not bot.match and not bot.matchStart and bot.inRoom and playerCount() >= 2 then
     local now = socket.gettime()
-    if now - lastReadyAt > 1.5 then
-      bot:sendReady()
-      lastReadyAt = now
+    idleSince = idleSince or now
+    local idle = now - idleSince
+    if IDLE_LIMIT > 0 and idle >= IDLE_LIMIT then
+      print(string.format("nobody started a game in %d s: leaving the room, back to the lobby", IDLE_LIMIT))
+      bot:leaveRoom()
+      idleSince, readyNow = nil, nil
+    else
+      local wants = true
+      local warnAt = IDLE_LIMIT - 10
+      if IDLE_LIMIT > 0 and idle >= warnAt and idle < IDLE_LIMIT - 3 then
+        wants = math.floor(idle - warnAt) % 2 == 1   -- off for the first second, on the next, ...
+      end
+      if wants ~= readyNow or (wants and now - lastReadyAt > 1.5) then
+        bot:sendReady(wants)
+        readyNow, lastReadyAt = wants, now
+      end
     end
+  else
+    idleSince, readyNow = nil, nil
   end
 
   if bot.matchStart and not bot.match then

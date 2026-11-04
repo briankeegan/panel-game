@@ -284,9 +284,9 @@ end
 
 -- Declare loaded + ready in one settings update. A bot has no assets, so it
 -- just asserts loaded. Server gate: wants_ready and loaded and ready.
-function BotClient:sendReady()
+function BotClient:sendReady(wants)
   self.playerStub.hasLoaded = true
-  self.playerStub.settings.wantsReady = true
+  self.playerStub.settings.wantsReady = wants ~= false
   self.playerStub.settings.wantsRanked = self.ranked -- re-asserted on every ready, not just at login
   local menuState = ServerMessages.toServerMenuState(self.playerStub)
   self.gameplay:sendRequest(ClientProtocol.sendPlayerSettings(menuState))

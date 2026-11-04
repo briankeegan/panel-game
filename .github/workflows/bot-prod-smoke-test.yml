@@ -1,6 +1,6 @@
 name: Bot Prod Smoke Test (LIVE SERVER)
 # The run list shows what each run was, e.g. "live · beta · SirBonksALot".
-run-name: "${{ (startsWith(inputs.mode, 'ranmaru') || inputs.mode == 'bot-handoff') && format('{0} · {1}{2}', inputs.mode, inputs.server, inputs.mode == 'ranmaru-stop' && inputs.advanced != '' && format(' · {0}', inputs.advanced) || '') || inputs.mode == 'versus-player' && format('live · {0} · {1}{2}', inputs.server, inputs.name, inputs.player != '' && format(',{0}', inputs.player) || '') || inputs.mode == 'fight' && !contains(inputs.advanced, 'bot_run') && format('fight-start · {0}', inputs.server) || format('{0} · {1} · {2} ({3}) vs {4}', inputs.mode, inputs.server, inputs.name, inputs.bot, inputs.opponent) }}"
+run-name: "${{ (startsWith(inputs.mode, 'ranmaru') || inputs.mode == 'bot-handoff') && format('{0} · {1}{2}', inputs.mode, (inputs.server != 'auto' && inputs.server || (inputs.mode == 'fight' && '104.156.250.136:49569' || 'panelattack.com:49569')), inputs.mode == 'ranmaru-stop' && inputs.advanced != '' && format(' · {0}', inputs.advanced) || '') || inputs.mode == 'versus-player' && format('live · {0} · {1}{2}', (inputs.server != 'auto' && inputs.server || (inputs.mode == 'fight' && '104.156.250.136:49569' || 'panelattack.com:49569')), inputs.name, inputs.player != '' && format(',{0}', inputs.player) || '') || inputs.mode == 'fight' && !contains(inputs.advanced, 'bot_run') && format('fight-start · {0}', (inputs.server != 'auto' && inputs.server || (inputs.mode == 'fight' && '104.156.250.136:49569' || 'panelattack.com:49569'))) || format('{0} · {1} · {2} ({3}) vs {4}', inputs.mode, (inputs.server != 'auto' && inputs.server || (inputs.mode == 'fight' && '104.156.250.136:49569' || 'panelattack.com:49569')), inputs.name, inputs.bot, inputs.opponent) }}"
 
 # Manual-only. Pick what to do in the first box (the form is numbered in the order to fill it in):
 #
@@ -30,11 +30,12 @@ on:
           - fight
           - bot-handoff
       server:
-        description: '2. Server -- the one the bot joins, and the one stop / deploy / fight clear of bots'
+        description: '2. Server. auto = panelattack.com, or the Bramp server (104.156.250.136) for a fight. Stop / deploy / fight clear it of bots first'
         required: true
-        default: 'panelattack.com:49569'
+        default: 'auto'
         type: choice
         options:
+          - auto
           - panelattack.com:49569
           - 104.156.250.136:49569
       bot:
@@ -55,7 +56,7 @@ on:
       opponent:
         description: '5. Fight only: the second Gambit, who challenges the first'
         required: true
-        default: 'gambit'
+        default: 'gambit-w100'
         type: choice
         options:
           - gambit
@@ -66,7 +67,7 @@ on:
       opponent_name:
         description: '6. Fight only: the second Gambit''s name in the lobby (blank = the first name plus 2). Same rule on the Bramp server: use a name that already has an account'
         required: false
-        default: ''
+        default: 'Gambit_100'
       player:
         description: '7. versus-player only: a player''s name -- the bot challenges them and plays only them. Blank = it plays whoever challenges it'
         required: false
@@ -94,6 +95,8 @@ on:
 env:
   # versus-player is `live` under another name
   MODE: ${{ inputs.mode == 'versus-player' && 'live' || inputs.mode }}
+  # the server picked, 'auto' resolved: the Bramp server for a fight, panelattack.com otherwise
+  SERVER_EFF: ${{ inputs.server != 'auto' && inputs.server || (inputs.mode == 'fight' && '104.156.250.136:49569' || 'panelattack.com:49569') }}
   # versus-player with a player typed in: the bot challenges that player and plays only them (the NAME,PLAYER form the live step reads)
   BOT_NAME: ${{ inputs.mode == 'versus-player' && inputs.player != '' && format('{0},{1}', inputs.name, inputs.player) || inputs.name }}
   # The two servers `server` offers; the beta one runs upstream's protocol.
@@ -170,7 +173,7 @@ jobs:
       - name: Pick the server
         run: |
           set -eu
-          server='${{ inputs.server }}'
+          server='${{ env.SERVER_EFF }}'
           if [ "$server" = "$BETA_SERVER" ] || [ "$server" = "$PROD_SERVER" ]; then
             [ '${{ env.MODE }}' = live ] || { echo "$server is only for mode: live"; exit 1; }   # fight: the fork's client only
             dir="$GITHUB_WORKSPACE/upstream"
@@ -193,7 +196,7 @@ jobs:
       #   3. the latest UPSTREAM_REF -- right whenever the server was deployed
       #      from beta's head, which is the normal case.
       - name: Check out the upstream bot
-        if: (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER)
+        if: (env.SERVER_EFF == env.BETA_SERVER || env.SERVER_EFF == env.PROD_SERVER)
         uses: actions/checkout@v4
         with:
           ref: ${{ env.UPSTREAM_BOT_REF }}
@@ -201,14 +204,14 @@ jobs:
           sparse-checkout: bot
 
       - name: Fetch upstream Panel Attack and add the bot
-        if: (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER)
+        if: (env.SERVER_EFF == env.BETA_SERVER || env.SERVER_EFF == env.PROD_SERVER)
         env:
           PIN: ${{ env.UPSTREAM_REF }}
         run: |
           set -eu
           if [ -n "$PIN" ]; then
             ref="$PIN"; why="pinned by the upstream_ref input"
-          elif [ '${{ inputs.server }}' = "$PROD_SERVER" ]; then
+          elif [ '${{ env.SERVER_EFF }}' = "$PROD_SERVER" ]; then
             ref="$UPSTREAM_REF"; why="latest $UPSTREAM_REF (the game the main server runs)"
           elif git ls-remote --exit-code --tags "$UPSTREAM_REPO" "refs/tags/$UPSTREAM_DEPLOYED_TAG" >/dev/null; then
             ref="refs/tags/$UPSTREAM_DEPLOYED_TAG"; why="the $UPSTREAM_DEPLOYED_TAG tag (the last deploy)"
@@ -240,7 +243,7 @@ jobs:
       # re-run it, or run bot/beverly.sh on the server box under systemd for
       # something permanent.
       - name: Check the name and the weight set before connecting
-        if: (env.MODE == 'live' || env.MODE == 'survival') && !(env.MODE == 'live' && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER) && (env.BOT_KIND == 'wasm' || env.BOT_KIND == 'bitbot' || env.BOT_KIND == 'gambit'))
+        if: (env.MODE == 'live' || env.MODE == 'survival') && !(env.MODE == 'live' && (env.SERVER_EFF == env.BETA_SERVER || env.SERVER_EFF == env.PROD_SERVER) && (env.BOT_KIND == 'wasm' || env.BOT_KIND == 'bitbot' || env.BOT_KIND == 'gambit'))
         run: |
           set -eu
           cd "$BOT_DIR"
@@ -248,7 +251,7 @@ jobs:
           [ -n "$n" ] || { echo "name is empty"; exit 1; }
           [ ${#n} -le 16 ] || { echo "name '$n' is ${#n} chars; the server limit is 16"; exit 1; }
           if [ '${{ env.MODE }}' = survival ]; then
-            [ '${{ inputs.server }}' = fork ] || { echo "survival plays the fork's server only"; exit 1; }
+            [ '${{ env.SERVER_EFF }}' = fork ] || { echo "survival plays the fork's server only"; exit 1; }
             exit 0
           fi
           [ -f '${{ env.PROFILE }}' ] || { echo "no weight set at ${{ env.PROFILE }}"; exit 1; }
@@ -272,7 +275,7 @@ jobs:
       # one), so a beta bot keeps its name by saving the id it was given
       # instead -- see "Save the account id".
       - name: Derive this name's account id
-        if: env.MODE == 'live' && !(inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER)
+        if: env.MODE == 'live' && !(env.SERVER_EFF == env.BETA_SERVER || env.SERVER_EFF == env.PROD_SERVER)
         env:
           BASE_NAME: ${{ env.BOT_NAME }}
           BOT_IP: ${{ env.BOT_HOST }}
@@ -295,7 +298,7 @@ jobs:
       # is built here from GameCreator's own native/build.sh line; WasmSurvivor
       # is a Node process beside the client (bot/SurvivalLink.lua talks to it).
       - name: Check out GameCreator (beta bot)
-        if: env.MODE == 'live' && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER) && (env.BOT_KIND == 'wasm' || env.BOT_KIND == 'bitbot' || env.BOT_KIND == 'gambit')
+        if: env.MODE == 'live' && (env.SERVER_EFF == env.BETA_SERVER || env.SERVER_EFF == env.PROD_SERVER) && (env.BOT_KIND == 'wasm' || env.BOT_KIND == 'bitbot' || env.BOT_KIND == 'gambit')
         uses: actions/checkout@v4
         with:
           repository: briankeegan/GameCreator
@@ -303,7 +306,7 @@ jobs:
           sparse-checkout: games/the-game
 
       - name: The Gambit of another GameCreator commit (beta/real server)
-        if: env.MODE == 'live' && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER) && env.BOT_KIND == 'gambit' && env.GAMBIT_FROM != ''
+        if: env.MODE == 'live' && (env.SERVER_EFF == env.BETA_SERVER || env.SERVER_EFF == env.PROD_SERVER) && env.BOT_KIND == 'gambit' && env.GAMBIT_FROM != ''
         env:
           GAMBIT_FROM: ${{ env.GAMBIT_FROM }}
         run: |
@@ -316,12 +319,12 @@ jobs:
           echo "::notice::Gambit of GameCreator $GAMBIT_FROM ($from)"
 
       - uses: actions/setup-node@v4
-        if: env.MODE == 'live' && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER) && (env.BOT_KIND == 'wasm' || env.BOT_KIND == 'bitbot' || env.BOT_KIND == 'gambit')
+        if: env.MODE == 'live' && (env.SERVER_EFF == env.BETA_SERVER || env.SERVER_EFF == env.PROD_SERVER) && (env.BOT_KIND == 'wasm' || env.BOT_KIND == 'bitbot' || env.BOT_KIND == 'gambit')
         with:
           node-version: '22'
 
       - name: Sit in the lobby (beta, ${{ inputs.bot }})
-        if: env.MODE == 'live' && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER) && (env.BOT_KIND == 'wasm' || env.BOT_KIND == 'bitbot' || env.BOT_KIND == 'gambit')
+        if: env.MODE == 'live' && (env.SERVER_EFF == env.BETA_SERVER || env.SERVER_EFF == env.PROD_SERVER) && (env.BOT_KIND == 'wasm' || env.BOT_KIND == 'bitbot' || env.BOT_KIND == 'gambit')
         id: betalink
         run: |
           set -eu
@@ -455,7 +458,7 @@ jobs:
             2>&1 | tee "$GITHUB_WORKSPACE/bot-prod-smoke.log" || [ $? -eq 124 ]
 
       - name: Sit in the lobby
-        if: env.MODE == 'live' && !(env.MODE == 'live' && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER) && (env.BOT_KIND == 'wasm' || env.BOT_KIND == 'bitbot' || env.BOT_KIND == 'gambit'))
+        if: env.MODE == 'live' && !(env.MODE == 'live' && (env.SERVER_EFF == env.BETA_SERVER || env.SERVER_EFF == env.PROD_SERVER) && (env.BOT_KIND == 'wasm' || env.BOT_KIND == 'bitbot' || env.BOT_KIND == 'gambit'))
         id: live
         env:
           PA_SEARCH_PROFILE: ${{ env.PROFILE }}
@@ -515,7 +518,7 @@ jobs:
       # commits it to UPSTREAM_BOT_REF so the next run logs back in instead of
       # being denied as "already taken". Not secret, on purpose: bot accounts.
       - name: Save the account id
-        if: always() && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER)
+        if: always() && (env.SERVER_EFF == env.BETA_SERVER || env.SERVER_EFF == env.PROD_SERVER)
         run: |
           set -eu
           n='${{ env.BOT_NAME }}'; n=${n%%,*}   # (a "BOT,OPPONENT" name: the account is the bot's)
@@ -645,7 +648,7 @@ jobs:
         if: always()
         run: |
           {
-            echo "## Bot (${{ env.MODE }}) — ${{ inputs.server }}"
+            echo "## Bot (${{ env.MODE }}) — ${{ env.SERVER_EFF }}"
             echo ""
             echo '```'
             tail -n 40 bot-prod-smoke.log || echo "(no log produced)"
@@ -694,7 +697,7 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       NAME: ${{ inputs.name }}
-      SERVER: ${{ inputs.server }}
+      SERVER: ${{ inputs.server != 'auto' && inputs.server || (inputs.mode == 'fight' && '104.156.250.136:49569' || 'panelattack.com:49569') }}
       BOT: ${{ inputs.bot }}
       OPPONENT: ${{ inputs.opponent }}
       OPPONENT_NAME: ${{ inputs.opponent_name }}
@@ -851,13 +854,32 @@ jobs:
       - name: Fight
         if: ${{ inputs.mode == 'fight' }}
         run: |
-          case "$NAME$OPPONENT_NAME" in *'#'*) echo "::error::a fight needs real names (no #): type them in 4 and 6"; exit 1;; esac
+          # the form's default name (Ranmaru_p#_CPU) is the deploy's; a fight's first bot is Ranmaru_CPU unless a name is typed
+          case "$NAME" in *'#'*) NAME=Ranmaru_CPU;; esac
+          case "$OPPONENT_NAME" in *'#'*) echo "::error::the second name needs no # (blank, or e.g. Gambit_100)"; exit 1;; esac
           # two bot runs: the lobby bot waits, the challenger challenges it (its name: the form's, else NAME + 2)
           other="$OPPONENT_NAME"
           [ -n "$other" ] || { other="${NAME}2"; [ ${#other} -le 16 ] || other="${NAME:0:15}2"; }
           [ ${#other} -le 16 ] || { echo "::error::the second bot's name '$other' is longer than 16 characters"; exit 1; }
           [ "$other" != "$NAME" ] || { echo "::error::the two bots need different names"; exit 1; }
           if [ "$SERVER" = "104.156.250.136:49569" ]; then
+            # the Bramp server refuses a new name, so a name needs a saved account: Ranmaru_CPU takes over GambitMain's (the
+            # server renames an account at login); any other name must already have one
+            host=104.156.250.136; added=""
+            for n in "$NAME" "$other"; do
+              [ -s "bot/identities/${n}_${host}.txt" ] && continue
+              if [ "$n" = Ranmaru_CPU ] && [ -s "bot/identities/GambitMain_${host}.txt" ]; then
+                cp "bot/identities/GambitMain_${host}.txt" "bot/identities/${n}_${host}.txt"; added=1
+                echo "$n takes over the account of GambitMain on the Bramp server." >> "$GITHUB_STEP_SUMMARY"
+              else
+                echo "::error::$n has no account on the Bramp server (it refuses new names). Use GambitMain, Gambit_100, GambitY, SvAttack1, SvDefensive, WasmAgro_CPU or BitBot, or Ranmaru_CPU."; exit 1
+              fi
+            done
+            if [ -n "$added" ]; then
+              git config user.name "github-actions"; git config user.email "actions@github.com"
+              git add bot/identities; git commit -q -m "bot: Ranmaru_CPU takes over the account of GambitMain on $host"
+              for k in 1 2 3; do git push -q origin "HEAD:${{ github.ref_name }}" && break; git pull -q --rebase origin "${{ github.ref_name }}"; done
+            fi
             # the fork's server: each bot is a fight.sh run -- the lobby bot, and the challenger ("OTHER,LOBBY" challenges LOBBY)
             gh workflow run bot-prod-smoke-test.yml --repo "${{ github.repository }}" --ref "${{ github.ref_name }}" \
               -f mode=fight -f server="$SERVER" -f bot="$BOT" -f name="$NAME" -f player=you \

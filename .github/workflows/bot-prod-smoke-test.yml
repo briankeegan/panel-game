@@ -1,6 +1,6 @@
 name: Bot Prod Smoke Test (LIVE SERVER)
 # The run list shows what each run was, e.g. "live · beta · SirBonksALot".
-run-name: "${{ startsWith(inputs.mode, 'ranmaru') && inputs.mode || inputs.mode == 'versus-player' && format('live · {0} · {1}{2}', inputs.server, inputs.name, inputs.player != '' && format(',{0}', inputs.player) || '') || format('{0} · {1} · {2} ({3}) vs {4}', inputs.mode, inputs.server, inputs.name, inputs.bot, inputs.player || 'you') }}"
+run-name: "${{ startsWith(inputs.mode, 'ranmaru') && inputs.mode || inputs.mode == 'versus-player' && format('live · {0} · {1}{2}', inputs.server, inputs.name, inputs.player != '' && format(',{0}', inputs.player) || '') || format('{0} · {1} · {2} ({3}) vs {4}', inputs.mode, inputs.server, inputs.name, inputs.bot, inputs.opponent) }}"
 
 # Manual-only. Pick what to do in the first box (the form is numbered in the order to fill it in):
 #
@@ -19,7 +19,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: '1. What to do: ranmaru-deploy = stop EVERY bot on the server (step 2), then start the one in steps 3-6. ranmaru-stop = stop every bot on the server and show its wins and losses. versus-player = just start the bot in steps 3-6. fight = two bots play each other on the fork server'
+        description: '1. What to do: ranmaru-deploy = stop EVERY bot on the server (2), then start the one in 3, 5-7. ranmaru-stop = stop every bot on the server and show its wins and losses. versus-player = just start that bot. fight = stop every bot on the server, then two Gambits fight each other: the bot in 3 sits in the lobby, the opponent in 4 challenges it'
         required: true
         default: 'ranmaru-deploy'
         type: choice
@@ -38,7 +38,18 @@ on:
           - 104.156.250.136:49569
           - betaserver.panelattack.com:59569
       bot:
-        description: '3. Gambit: the latest main, or a kept build named for its actions window (w150 = 150 actions in 10 seconds)'
+        description: '3. Gambit (the bot in the lobby, for a fight): the latest main, or a kept build named for its actions window (w150 = 150 actions in 10 seconds)'
+        required: true
+        default: 'gambit'
+        type: choice
+        options:
+          - gambit
+          - gambit-w150
+          - gambit-w100
+          - gambit-w90
+          - gambit-w80
+      opponent:
+        description: '4. Fight only: the second Gambit, who challenges the one in 3'
         required: true
         default: 'gambit'
         type: choice
@@ -49,15 +60,15 @@ on:
           - gambit-w90
           - gambit-w80
       name:
-        description: '4. The bot''s name in the lobby (letters, digits, _; 16 max)'
+        description: '5. The bot''s name in the lobby (letters, digits, _; 16 max). In a fight the opponent is called this + 2'
         required: false
         default: 'Ranmaru_TEST_CPU'
       player:
-        description: '5. Player to play. versus-player: a player''s name -- the bot challenges them and plays only them; blank = it plays whoever challenges it. fight: you, challenge, or a bot name'
+        description: '6. versus-player only: a player''s name -- the bot challenges them and plays only them. Blank = it plays whoever challenges it'
         required: false
         default: ''
       hours:
-        description: '6. Hours the bot stays up'
+        description: '7. Hours the bot stays up'
         required: true
         default: '5'
         type: choice
@@ -68,7 +79,7 @@ on:
           - '2'
           - '1'
       advanced:
-        description: '7. Advanced -- leave blank. Words like gambit_from=<GameCreator commit>, upstream_ref=<commit>, profile=<file>'
+        description: '8. Advanced -- leave blank. Words like gambit_from=<GameCreator commit>, upstream_ref=<commit>, profile=<file>'
         required: false
         default: ''
 
@@ -95,7 +106,7 @@ env:
 jobs:
   bot-vs-bot:
     name: Run the bot
-    if: ${{ !startsWith(inputs.mode, 'ranmaru') }}
+    if: ${{ !startsWith(inputs.mode, 'ranmaru') && inputs.mode != 'fight' }}
     runs-on: ubuntu-latest
     # A beta-server run commits a newly registered bot's account id back to
     # UPSTREAM_BOT_REF so the name can be reused (see "Save the account id").
@@ -617,8 +628,8 @@ jobs:
   #   ranmaru-deploy  does the same, then starts a new versus-player run with the form's name, bot, player, hours,
   #                   server and advanced words (Gambit of GameCreator's latest main unless advanced pins one)
   ranmaru:
-    name: Stop / deploy the named bot
-    if: ${{ startsWith(inputs.mode, 'ranmaru') }}
+    name: Stop / deploy / fight
+    if: ${{ startsWith(inputs.mode, 'ranmaru') || inputs.mode == 'fight' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -629,6 +640,7 @@ jobs:
       NAME: ${{ inputs.name }}
       SERVER: ${{ inputs.server }}
       BOT: ${{ inputs.bot }}
+      OPPONENT: ${{ inputs.opponent }}
       PLAYER: ${{ inputs.player }}
       HOURS: ${{ inputs.hours }}
       ADVANCED: ${{ inputs.advanced }}
@@ -673,3 +685,15 @@ jobs:
             -f mode=versus-player -f server="$SERVER" -f bot="$BOT" -f name="$NAME" -f player="$PLAYER" \
             -f hours="$HOURS" -f advanced="$ADVANCED"
           echo "A new run was started: $NAME ($BOT) on $SERVER for $HOURS hours." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fight
+        if: ${{ inputs.mode == 'fight' }}
+        run: |
+          # two versus-player runs: the lobby bot waits, the challenger (named NAME + 2, 16 characters at most) challenges it
+          other="${NAME}2"; [ ${#other} -le 16 ] || other="${NAME:0:15}2"
+          gh workflow run bot-prod-smoke-test.yml --repo "${{ github.repository }}" --ref "${{ github.ref_name }}" \
+            -f mode=versus-player -f server="$SERVER" -f bot="$BOT" -f name="$NAME" -f hours="$HOURS" -f advanced="$ADVANCED"
+          gh workflow run bot-prod-smoke-test.yml --repo "${{ github.repository }}" --ref "${{ github.ref_name }}" \
+            -f mode=versus-player -f server="$SERVER" -f bot="$OPPONENT" -f name="$other" -f player="$NAME" \
+            -f hours="$HOURS" -f advanced="$ADVANCED"
+          echo "A fight was started on $SERVER for $HOURS hours: $NAME ($BOT) waits in the lobby, $other ($OPPONENT) challenges it." >> "$GITHUB_STEP_SUMMARY"

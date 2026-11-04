@@ -717,12 +717,14 @@ jobs:
             gh workflow run bot-prod-smoke-test.yml --repo "${{ github.repository }}" --ref "${{ github.ref_name }}" \
               -f mode=fight -f server="$SERVER" -f bot="$BOT" -f name="$NAME" -f player=you \
               -f hours="$HOURS" -f advanced="$ADVANCED bot_run=1"
+            sleep 75   # the server makes a new name's account at its first login, one at a time: the second bot waits for the first
             gh workflow run bot-prod-smoke-test.yml --repo "${{ github.repository }}" --ref "${{ github.ref_name }}" \
               -f mode=fight -f server="$SERVER" -f bot="$OPPONENT" -f name="$other,$NAME" -f player=challenge \
               -f hours="$HOURS" -f advanced="$ADVANCED bot_run=1"
           else
             gh workflow run bot-prod-smoke-test.yml --repo "${{ github.repository }}" --ref "${{ github.ref_name }}" \
               -f mode=versus-player -f server="$SERVER" -f bot="$BOT" -f name="$NAME" -f hours="$HOURS" -f advanced="$ADVANCED"
+            sleep 75   # the server makes a new name's account at its first login, one at a time: the second bot waits for the first
             gh workflow run bot-prod-smoke-test.yml --repo "${{ github.repository }}" --ref "${{ github.ref_name }}" \
               -f mode=versus-player -f server="$SERVER" -f bot="$OPPONENT" -f name="$other" -f player="$NAME" \
               -f hours="$HOURS" -f advanced="$ADVANCED"

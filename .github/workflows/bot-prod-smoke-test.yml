@@ -38,18 +38,18 @@ on:
           - 104.156.250.136:49569
           - betaserver.panelattack.com:59569
       bot:
-        description: '3. Bot (versus-player, fight)'
+        description: '3. Gambit: the latest main, or a kept build named for its actions window (w150 = 150 actions in 10 seconds)'
         required: true
         default: 'gambit'
         type: choice
         options:
           - gambit
-          - wasm
-          - bitbot
-          - bitbotwasm
-          - beverly
-          - plamp
-          - heuristic
+          - gambit-w150
+          - gambit-w100
+          - gambit-w90
+          - gambit-w80
+          - gambit-lockstep
+          - gambit-realtime-fixes
       name:
         description: '4. The bot''s name in the lobby (letters, digits, _; 16 max)'
         required: false
@@ -124,15 +124,11 @@ jobs:
               *) echo "::error::advanced: I do not know '$w' (use profile=, gambit_from= or upstream_ref=)"; exit 1;;
             esac
           done
-          if [ -z "$profile" ]; then
-            case "$BOT" in
-              gambit) profile=survivor-profiles/gambit.json;;
-              wasm) profile=bot/profiles/wasmbot.wasm.json;;
-              bitbot|bitbotwasm|heuristic) profile=bot/profiles/beverly.json;;
-              *) profile="bot/profiles/$BOT.json";;
-            esac
-          fi
-          { echo "PROFILE=$profile"; echo "GAMBIT_FROM=$gambit_from"; echo "UPSTREAM_REF=$upstream_ref"; } >> "$GITHUB_ENV"
+          # gambit-w100 etc.: Gambit of that kept build (a name in GameCreator's gambit-versions.txt)
+          kind=$BOT
+          case "$BOT" in gambit-*) kind=gambit; [ -n "$gambit_from" ] || gambit_from=$BOT;; esac
+          [ -n "$profile" ] || profile=survivor-profiles/gambit.json
+          { echo "PROFILE=$profile"; echo "GAMBIT_FROM=$gambit_from"; echo "UPSTREAM_REF=$upstream_ref"; echo "BOT_KIND=$kind"; } >> "$GITHUB_ENV"
 
       - name: Install luajit + luarocks
         run: |
@@ -227,7 +223,7 @@ jobs:
       # re-run it, or run bot/beverly.sh on the server box under systemd for
       # something permanent.
       - name: Check the name and the weight set before connecting
-        if: (env.MODE == 'live' || env.MODE == 'survival') && !(env.MODE == 'live' && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER) && (inputs.bot == 'wasm' || inputs.bot == 'bitbot' || inputs.bot == 'gambit'))
+        if: (env.MODE == 'live' || env.MODE == 'survival') && !(env.MODE == 'live' && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER) && (env.BOT_KIND == 'wasm' || env.BOT_KIND == 'bitbot' || env.BOT_KIND == 'gambit'))
         run: |
           set -eu
           cd "$BOT_DIR"
@@ -282,7 +278,7 @@ jobs:
       # is built here from GameCreator's own native/build.sh line; WasmSurvivor
       # is a Node process beside the client (bot/SurvivalLink.lua talks to it).
       - name: Check out GameCreator (beta bot)
-        if: env.MODE == 'live' && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER) && (inputs.bot == 'wasm' || inputs.bot == 'bitbot' || inputs.bot == 'gambit')
+        if: env.MODE == 'live' && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER) && (env.BOT_KIND == 'wasm' || env.BOT_KIND == 'bitbot' || env.BOT_KIND == 'gambit')
         uses: actions/checkout@v4
         with:
           repository: briankeegan/GameCreator
@@ -290,7 +286,7 @@ jobs:
           sparse-checkout: games/the-game
 
       - name: The Gambit of another GameCreator commit (beta/real server)
-        if: env.MODE == 'live' && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER) && inputs.bot == 'gambit' && env.GAMBIT_FROM != ''
+        if: env.MODE == 'live' && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER) && env.BOT_KIND == 'gambit' && env.GAMBIT_FROM != ''
         env:
           GAMBIT_FROM: ${{ env.GAMBIT_FROM }}
         run: |
@@ -303,12 +299,12 @@ jobs:
           echo "::notice::Gambit of GameCreator $GAMBIT_FROM ($from)"
 
       - uses: actions/setup-node@v4
-        if: env.MODE == 'live' && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER) && (inputs.bot == 'wasm' || inputs.bot == 'bitbot' || inputs.bot == 'gambit')
+        if: env.MODE == 'live' && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER) && (env.BOT_KIND == 'wasm' || env.BOT_KIND == 'bitbot' || env.BOT_KIND == 'gambit')
         with:
           node-version: '22'
 
       - name: Sit in the lobby (beta, ${{ inputs.bot }})
-        if: env.MODE == 'live' && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER) && (inputs.bot == 'wasm' || inputs.bot == 'bitbot' || inputs.bot == 'gambit')
+        if: env.MODE == 'live' && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER) && (env.BOT_KIND == 'wasm' || env.BOT_KIND == 'bitbot' || env.BOT_KIND == 'gambit')
         id: betalink
         run: |
           set -eu
@@ -325,7 +321,7 @@ jobs:
           first=""; case "$games" in first*) first=${games#first}; games="";; esac
           [ -n "$name" ] && [ ${#name} -le 16 ] || { echo "name '$name' must be 1-16 characters"; exit 1; }
           echo "::notice::GameCreator at $(git -C "$GC_EVAL_DIR" log -1 --format='%h %s' | cut -c1-120)"
-          kind='${{ inputs.bot }}'
+          kind='${{ env.BOT_KIND }}'
           pin=""
           if [ "$kind" = bitbot ]; then
             line=$(grep -E '^clang .* -shared .*libbit\.so' "$GC_EVAL_DIR/native/build.sh" | head -1)
@@ -406,7 +402,7 @@ jobs:
             2>&1 | tee "$GITHUB_WORKSPACE/bot-prod-smoke.log" || [ $? -eq 124 ]
 
       - name: Sit in the lobby
-        if: env.MODE == 'live' && !(env.MODE == 'live' && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER) && (inputs.bot == 'wasm' || inputs.bot == 'bitbot' || inputs.bot == 'gambit'))
+        if: env.MODE == 'live' && !(env.MODE == 'live' && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER) && (env.BOT_KIND == 'wasm' || env.BOT_KIND == 'bitbot' || env.BOT_KIND == 'gambit'))
         id: live
         env:
           PA_SEARCH_PROFILE: ${{ env.PROFILE }}
@@ -491,7 +487,7 @@ jobs:
       # native/build.sh) and the client plays it in-process
       # (bot/BitBotNative.lua, as GameCreator's lua/train.lua does).
       - name: Check out GameCreator (BitBot, WasmSurvivor)
-        if: env.MODE == 'fight' && (contains(fromJSON('["bitbot","bitbotwasm","wasm"]'), inputs.bot) || contains(fromJSON('["bitbot","bitbotwasm","wasm"]'), inputs.player))
+        if: env.MODE == 'fight' && (contains(fromJSON('["bitbot","bitbotwasm","wasm"]'), env.BOT_KIND) || contains(fromJSON('["bitbot","bitbotwasm","wasm"]'), inputs.player))
         uses: actions/checkout@v4
         with:
           repository: briankeegan/GameCreator
@@ -499,7 +495,7 @@ jobs:
           sparse-checkout: games/the-game
 
       - uses: actions/setup-node@v4
-        if: env.MODE == 'fight' && (contains(fromJSON('["bitbot","bitbotwasm","wasm"]'), inputs.bot) || contains(fromJSON('["bitbot","bitbotwasm","wasm"]'), inputs.player))
+        if: env.MODE == 'fight' && (contains(fromJSON('["bitbot","bitbotwasm","wasm"]'), env.BOT_KIND) || contains(fromJSON('["bitbot","bitbotwasm","wasm"]'), inputs.player))
         with:
           node-version: '22'
 
@@ -516,9 +512,9 @@ jobs:
           eval "$(luarocks path --local --lua-version 5.1)"
           [ "${BOT_HOST}:${BOT_PORT}" != "$BETA_SERVER" ] && [ "${BOT_HOST}:${BOT_PORT}" != "$PROD_SERVER" ] || { echo "fight plays the fork's server only"; exit 1; }
           if [ -d GameCreator ]; then echo "::notice::GameCreator $(git -C GameCreator log -1 --format='%h %s')"; fi
-          echo "::notice::${{ env.BOT_NAME }} (${{ inputs.bot }}) vs ${{ inputs.player || 'you' }} on $BOT_HOST:$BOT_PORT for ${{ inputs.hours }}h"
+          echo "::notice::${{ env.BOT_NAME }} (${{ env.BOT_KIND }}) vs ${{ inputs.player || 'you' }} on $BOT_HOST:$BOT_PORT for ${{ inputs.hours }}h"
           set -o pipefail
-          bot/fight.sh "$BOT_HOST" "$BOT_PORT" $(( ${{ inputs.hours }} * 3600 )) '${{ inputs.bot }}' '${{ env.BOT_NAME }}' '${{ inputs.player || 'you' }}' \
+          bot/fight.sh "$BOT_HOST" "$BOT_PORT" $(( ${{ inputs.hours }} * 3600 )) '${{ env.BOT_KIND }}' '${{ env.BOT_NAME }}' '${{ inputs.player || 'you' }}' \
             2>&1 | tee bot-prod-smoke.log
 
       # A new name's account id, made by the server at its first login, is
@@ -546,7 +542,7 @@ jobs:
           echo "::error::could not save account ids for$added"; exit 1
 
       - name: Per-game sanity (gambit)
-        if: always() && env.MODE == 'live' && inputs.bot == 'gambit'
+        if: always() && env.MODE == 'live' && env.BOT_KIND == 'gambit'
         run: |
           # Gambit carries state between games when something is not reset per game. These checks show it:
           # every game must open in "opener", no game may fall back to "time attack" after its first

@@ -49,9 +49,9 @@ on:
           - gambit-w90
           - gambit-w80
       name:
-        description: '4. That bot''s name in the lobby (letters, digits, _; 16 max). On the Bramp server (104.156.250.136) use a name that already has an account: GambitMain, Gambit_100, GambitY, SvAttack1, SvDefensive, WasmAgro_CPU or BitBot -- a new name is refused there'
+        description: '4. That bot''s name in the lobby (letters, digits, _; 16 max). A # is the next number: ranmaru-deploy swaps between the two saved accounts and renames one, so Ranmaru_p#_CPU gives p7, then p8, ... On the Bramp server (104.156.250.136) use a name that already has an account: GambitMain, Gambit_100, GambitY, SvAttack1, SvDefensive, WasmAgro_CPU or BitBot'
         required: false
-        default: 'Ranmaru_TEST_CPU'
+        default: 'Ranmaru_p#_CPU'
       opponent:
         description: '5. Fight only: the second Gambit, who challenges the first'
         required: true
@@ -129,7 +129,7 @@ jobs:
           BOT: ${{ inputs.bot }}
         run: |
           set -eu
-          profile=""; gambit_from=""; upstream_ref=""; standby=""
+          profile=""; gambit_from=""; upstream_ref=""; standby=""; after=""
           for w in $ADVANCED; do
             case "$w" in
               profile=*) profile=${w#profile=};;
@@ -137,6 +137,7 @@ jobs:
               upstream_ref=*) upstream_ref=${w#upstream_ref=};;
               bot_run=*|now) ;;   # bot_run marks a bot run started by a fight; now only matters to stop / deploy
               standby) standby=1;;   # a deploy's new bot: build everything, then wait for the older bots here to leave
+              after=*) after=${w#after=};;   # ... or only for the bot with this name (the account this one takes over)
               *) echo "::error::advanced: I do not know '$w' (use profile=, gambit_from= or upstream_ref=)"; exit 1;;
             esac
           done
@@ -144,7 +145,7 @@ jobs:
           kind=$BOT
           case "$BOT" in gambit-*) kind=gambit; [ -n "$gambit_from" ] || gambit_from=$BOT;; esac
           [ -n "$profile" ] || profile=survivor-profiles/gambit.json
-          { echo "PROFILE=$profile"; echo "GAMBIT_FROM=$gambit_from"; echo "UPSTREAM_REF=$upstream_ref"; echo "BOT_KIND=$kind"; echo "STANDBY=$standby"; } >> "$GITHUB_ENV"
+          { echo "PROFILE=$profile"; echo "GAMBIT_FROM=$gambit_from"; echo "UPSTREAM_REF=$upstream_ref"; echo "BOT_KIND=$kind"; echo "STANDBY=$standby"; echo "AFTER=$after"; } >> "$GITHUB_ENV"
 
       - name: Install luajit + luarocks
         run: |
@@ -415,10 +416,12 @@ jobs:
           echo "::notice::$name ($brain) joining $BOT_HOST:$BOT_PORT for ${{ inputs.hours }}h"
           set -o pipefail
           # A deploy's new bot is built by now and waits, not logged in, until every older bot on this server has left
-          if [ "${STANDBY:-}" = 1 ]; then
-            echo "standby: built; waiting for the older bots on $BOT_HOST:$BOT_PORT to leave"
+          if [ "${STANDBY:-}" = 1 ] || [ -n "${AFTER:-}" ]; then
+            # (a rename takes over the account of the bot named AFTER; it waits for that one only)
+            who="live · $BOT_HOST:$BOT_PORT · ${AFTER:-}"
+            echo "standby: built; waiting for the older bots (${AFTER:-all}) on $BOT_HOST:$BOT_PORT to leave"
             while :; do
-              older=$(GH_TOKEN="${{ github.token }}" gh api "repos/${{ github.repository }}/actions/runs?status=in_progress&per_page=50" --jq "[.workflow_runs[] | select(.id < $GITHUB_RUN_ID) | select(.display_title | startswith(\"live · $BOT_HOST:$BOT_PORT · \"))] | length" 2>/dev/null || echo 1)
+              older=$(GH_TOKEN="${{ github.token }}" gh api "repos/${{ github.repository }}/actions/runs?status=in_progress&per_page=50" --jq "[.workflow_runs[] | select(.id < $GITHUB_RUN_ID) | select(.display_title | startswith(\"$who\"))] | length" 2>/dev/null || echo 1)
               [ "${older:-1}" -eq 0 ] && break
               sleep 10
             done
@@ -429,8 +432,12 @@ jobs:
           export PA_STOP_FILE="$RUNNER_TEMP/stop-after-the-game"; rm -f "$PA_STOP_FILE"
           started=$(date -u +%s)
           ( while sleep 10; do
-              n=$(GH_TOKEN="${{ github.token }}" gh api "repos/${{ github.repository }}/actions/runs?status=in_progress&per_page=30" --jq "[.workflow_runs[] | select(.display_title | test(\"^(ranmaru-stop|ranmaru-deploy|fight-start) · $BOT_HOST:$BOT_PORT\$\")) | select((.created_at | fromdateiso8601) > $started)] | length" 2>/dev/null || echo 0)
-              if [ "${n:-0}" -gt 0 ]; then touch "$PA_STOP_FILE"; break; fi
+              ids=$(GH_TOKEN="${{ github.token }}" gh api "repos/${{ github.repository }}/actions/runs?status=in_progress&per_page=30" --jq ".workflow_runs[] | select(.display_title | test(\"^(ranmaru-stop|ranmaru-deploy|fight-start) · $BOT_HOST:$BOT_PORT\$\")) | select((.created_at | fromdateiso8601) > $started) | .id" 2>/dev/null || true)
+              for rid in $ids; do
+                # (a deploy releases the old bots only after its new bot is in the lobby: its "Cancel the running one" step has begun)
+                begun=$(GH_TOKEN="${{ github.token }}" gh api "repos/${{ github.repository }}/actions/runs/$rid/jobs" --jq '[.jobs[0].steps[] | select(.name | startswith("Cancel the running one")) | select(.status != "pending")] | length' 2>/dev/null || echo 0)
+                if [ "${begun:-0}" -gt 0 ]; then touch "$PA_STOP_FILE"; break 2; fi
+              done
             done ) &
           # a player who does not start a game within 60 s is left alone in the room (not for a bot that challenges someone)
           idle=60; [ -z "$target" ] || idle=0
@@ -673,7 +680,7 @@ jobs:
     timeout-minutes: 355
     permissions:
       actions: write
-      contents: read
+      contents: write
     env:
       GH_TOKEN: ${{ github.token }}
       NAME: ${{ inputs.name }}
@@ -687,13 +694,67 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Start the new bot (it waits for the old ones to leave)
+      - name: Check out the bot branch (the saved accounts)
+        if: ${{ inputs.mode == 'ranmaru-deploy' }}
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.UPSTREAM_BOT_REF }}
+          path: botsrc
+
+      # The new bot starts first. A name with a # takes the next number and the OLDER of the two saved accounts (the server
+      # renames an account at login), so it can log in while the other bot finishes its game and leaves.
+      - name: Start the new bot
         if: ${{ inputs.mode == 'ranmaru-deploy' }}
         run: |
+          set -eu
+          host=${SERVER%%:*}
+          new="$NAME"; extra="standby"
+          case "$NAME" in
+            *'#'*)
+              prefix=${NAME%%#*}; suffix=${NAME#*#}
+              nums=$(ls botsrc/bot/identities | sed -n "s/^${prefix}\([0-9][0-9]*\)${suffix}_${host}\.txt\$/\1/p" | sort -n)
+              last=$(echo "$nums" | tail -n 1); last=${last:-0}
+              new="${prefix}$((last + 1))${suffix}"
+              [ ${#new} -le 16 ] || { echo "::error::'$new' is longer than 16 characters"; exit 1; }
+              extra=""
+              if [ "$(echo "$nums" | grep -c .)" -ge 2 ]; then
+                donor_n=$(echo "$nums" | tail -n 2 | head -n 1)
+                donor="${prefix}${donor_n}${suffix}"
+                (cd botsrc
+                 git config user.name "github-actions"; git config user.email "actions@github.com"
+                 git mv "bot/identities/${donor}_${host}.txt" "bot/identities/${new}_${host}.txt"
+                 git commit -q -m "bot: the account of '$donor' is now '$new' on $host"
+                 for k in 1 2 3; do git push -q origin "HEAD:$UPSTREAM_BOT_REF" && break; git pull -q --rebase origin "$UPSTREAM_BOT_REF"; done)
+                extra="after=$donor"
+                echo "$new takes over the account of $donor (the server renames it at login)" >> "$GITHUB_STEP_SUMMARY"
+              else
+                echo "::error::only two accounts are ever used, renamed in turn, and fewer than two are saved for '$NAME' on $host -- save them first (bot/identities)"; exit 1
+              fi;;
+          esac
           gh workflow run bot-prod-smoke-test.yml --repo "${{ github.repository }}" --ref "${{ github.ref_name }}" \
-            -f mode=versus-player -f server="$SERVER" -f bot="$BOT" -f name="$NAME" -f player="$PLAYER" \
-            -f hours="$HOURS" -f advanced="$ADVANCED standby"
-          echo "A new run was started: $NAME ($BOT) on $SERVER for $HOURS hours. It builds now and logs in when the older bots have left." >> "$GITHUB_STEP_SUMMARY"
+            -f mode=versus-player -f server="$SERVER" -f bot="$BOT" -f name="$new" -f player="$PLAYER" \
+            -f hours="$HOURS" -f advanced="$ADVANCED $extra"
+          echo "A new run was started: $new ($BOT) on $SERVER for $HOURS hours. It logs in as soon as its account is free; the older bots finish their games and leave." >> "$GITHUB_STEP_SUMMARY"
+
+      # The old bots are released only once the new one has been in the lobby for a while without failing (a login the
+      # server refuses ends its run at once), so a refused rename never leaves the lobby empty.
+      - name: Wait for the new bot to be in the lobby
+        if: ${{ inputs.mode == 'ranmaru-deploy' && contains(inputs.name, '#') }}
+        run: |
+          set -u
+          repo="${{ github.repository }}"
+          began=$(gh api "repos/$repo/actions/runs/$GITHUB_RUN_ID" --jq .created_at)
+          for _ in $(seq 1 120); do
+            id=$(gh api "repos/$repo/actions/runs?event=workflow_dispatch&per_page=30" --jq ".workflow_runs[] | select(.created_at > \"$began\") | select(.display_title | startswith(\"live · $SERVER · \")) | .id" | head -n 1)
+            if [ -n "$id" ]; then
+              status=$(gh api "repos/$repo/actions/runs/$id" --jq '.status + " " + (.conclusion // "")')
+              case "$status" in completed*) echo "::error::the new bot's run ($id) ended before it was in the lobby ($status): the old bots are left alone"; exit 1;; esac
+              up=$(gh api "repos/$repo/actions/runs/$id/jobs" --jq '[.jobs[0].steps[] | select(.name | startswith("Sit in the lobby (beta")) | select(.status == "in_progress") | ((now - (.started_at | fromdateiso8601)) | floor)] | first // 0')
+              if [ "${up:-0}" -ge 45 ]; then echo "the new bot ($id) has been in the lobby for ${up}s: releasing the old bots"; exit 0; fi
+            fi
+            sleep 10
+          done
+          echo "::error::the new bot was not in the lobby after 20 minutes: the old bots are left alone"; exit 1
 
       - name: Cancel the running one and pull down its info
         run: |
@@ -750,6 +811,7 @@ jobs:
       - name: Fight
         if: ${{ inputs.mode == 'fight' }}
         run: |
+          case "$NAME$OPPONENT_NAME" in *'#'*) echo "::error::a fight needs real names (no #): type them in 4 and 6"; exit 1;; esac
           # two bot runs: the lobby bot waits, the challenger challenges it (its name: the form's, else NAME + 2)
           other="$OPPONENT_NAME"
           [ -n "$other" ] || { other="${NAME}2"; [ ${#other} -le 16 ] || other="${NAME:0:15}2"; }

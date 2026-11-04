@@ -1,6 +1,6 @@
 name: Bot Prod Smoke Test (LIVE SERVER)
 # The run list shows what each run was, e.g. "live · beta · SirBonksALot".
-run-name: "${{ startsWith(inputs.mode, 'ranmaru') && format('{0} · {1}{2}', inputs.mode, inputs.server, inputs.mode == 'ranmaru-stop' && inputs.advanced != '' && format(' · {0}', inputs.advanced) || '') || inputs.mode == 'versus-player' && format('live · {0} · {1}{2}', inputs.server, inputs.name, inputs.player != '' && format(',{0}', inputs.player) || '') || inputs.mode == 'fight' && !contains(inputs.advanced, 'bot_run') && format('fight-start · {0}', inputs.server) || format('{0} · {1} · {2} ({3}) vs {4}', inputs.mode, inputs.server, inputs.name, inputs.bot, inputs.opponent) }}"
+run-name: "${{ (startsWith(inputs.mode, 'ranmaru') || inputs.mode == 'bot-handoff') && format('{0} · {1}{2}', inputs.mode, inputs.server, inputs.mode == 'ranmaru-stop' && inputs.advanced != '' && format(' · {0}', inputs.advanced) || '') || inputs.mode == 'versus-player' && format('live · {0} · {1}{2}', inputs.server, inputs.name, inputs.player != '' && format(',{0}', inputs.player) || '') || inputs.mode == 'fight' && !contains(inputs.advanced, 'bot_run') && format('fight-start · {0}', inputs.server) || format('{0} · {1} · {2} ({3}) vs {4}', inputs.mode, inputs.server, inputs.name, inputs.bot, inputs.opponent) }}"
 
 # Manual-only. Pick what to do in the first box (the form is numbered in the order to fill it in):
 #
@@ -19,7 +19,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: '1. What to do: ranmaru-deploy = stop EVERY bot on the server (2), then start the bot in 3-4. ranmaru-stop = stop every bot on the server and show its wins and losses. versus-player = just start the bot in 3-4. fight = stop every bot on the server, then two Gambits fight: the bot in 3-4 sits in the lobby, the one in 5-6 challenges it'
+        description: '1. What to do: ranmaru-deploy = stop EVERY bot on the server (2), then start the bot in 3-4. ranmaru-stop = stop every bot on the server and show its wins and losses. versus-player = just start the bot in 3-4. fight = stop every bot on the server, then two Gambits fight: the bot in 3-4 sits in the lobby, the one in 5-6 challenges it bot-handoff = the bots signal each other with it: do not press'
         required: true
         default: 'ranmaru-deploy'
         type: choice
@@ -28,6 +28,7 @@ on:
           - ranmaru-stop
           - versus-player
           - fight
+          - bot-handoff
       server:
         description: '2. Server -- the one the bot joins, and the one stop / deploy / fight clear of bots'
         required: true
@@ -110,13 +111,13 @@ env:
 jobs:
   bot-vs-bot:
     name: Run the bot
-    if: ${{ !startsWith(inputs.mode, 'ranmaru') && (inputs.mode != 'fight' || contains(inputs.advanced, 'bot_run')) }}
+    if: ${{ !startsWith(inputs.mode, 'ranmaru') && inputs.mode != 'bot-handoff' && (inputs.mode != 'fight' || contains(inputs.advanced, 'bot_run')) }}
     runs-on: ubuntu-latest
     # A beta-server run commits a newly registered bot's account id back to
     # UPSTREAM_BOT_REF so the name can be reused (see "Save the account id").
     permissions:
       contents: write
-      actions: read
+      actions: write
     # Under the 6-hour hard cap so a `live` session stops on our timeout.
     timeout-minutes: 355
     steps:
@@ -420,20 +421,34 @@ jobs:
             # (a rename takes over the account of the bot named AFTER; it waits for that one only)
             who="live · $BOT_HOST:$BOT_PORT · ${AFTER:-}"
             echo "standby: built; waiting for the older bots (${AFTER:-all}) on $BOT_HOST:$BOT_PORT to leave"
+            began=$(date -u +%s)
             while :; do
-              older=$(GH_TOKEN="${{ github.token }}" gh api "repos/${{ github.repository }}/actions/runs?status=in_progress&per_page=50" --jq "[.workflow_runs[] | select(.id < $GITHUB_RUN_ID) | select(.display_title | startswith(\"$who\"))] | length" 2>/dev/null || echo 1)
-              [ "${older:-1}" -eq 0 ] && break
+              out=$(GH_TOKEN="${{ github.token }}" gh api "repos/${{ github.repository }}/actions/runs?per_page=50" --jq "[ ([.workflow_runs[] | select(.status != \"completed\") | select(.id < $GITHUB_RUN_ID) | select(.display_title | startswith(\"$who\"))] | length), ([.workflow_runs[] | select(.display_title == \"bot-handoff · $BOT_HOST:$BOT_PORT\") | select((.created_at | fromdateiso8601) > $began)] | length) ] | @tsv" 2>/dev/null || echo "1 0")
+              set -- $out; older=${1:-1}; handoff=${2:-0}
+              [ "$older" -eq 0 ] && break
+              [ "$handoff" -gt 0 ] && { echo "the old bot has finished its game and is sitting out its last seconds"; break; }
               sleep 2
             done
             echo "standby over: logging in"
           fi
           # A stop / deploy / fight-start run for this server, made after this bot started, waits on it: the file tells the bot
           # to leave once no game is running (bot/playBot.lua PA_STOP_FILE). Runs made before it started are not about it.
-          export PA_STOP_FILE="$RUNNER_TEMP/stop-after-the-game"; rm -f "$PA_STOP_FILE"
+          export PA_STOP_FILE="$RUNNER_TEMP/stop-after-the-game"; rm -f "$PA_STOP_FILE" "$PA_STOP_FILE.grace"
           started=$(date -u +%s)
           ( while sleep 10; do
               ids=$(GH_TOKEN="${{ github.token }}" gh api "repos/${{ github.repository }}/actions/runs?per_page=30" --jq ".workflow_runs[] | select(.status != \"completed\") | select(.display_title | test(\"^(ranmaru-stop|fight-start) · $BOT_HOST:$BOT_PORT( · .*)?\$\")) | select((.created_at | fromdateiso8601) > $started) | select(((.display_title | capture(\"except=(?<x>[0-9]+)\")? | .x) // \"0\") != \"$GITHUB_RUN_ID\") | .id" 2>/dev/null || true)
-              if [ -n "$ids" ]; then touch "$PA_STOP_FILE"; break; fi
+              if [ -n "$ids" ]; then
+                touch "$PA_STOP_FILE"
+                # the bot sits out its last seconds after a game; the next bot comes in during them
+                for _ in $(seq 1 14400); do
+                  if [ -e "$PA_STOP_FILE.grace" ]; then
+                    GH_TOKEN="${{ github.token }}" gh workflow run bot-prod-smoke-test.yml --repo "${{ github.repository }}" --ref "${{ github.ref_name }}" -f mode=bot-handoff -f server="$BOT_HOST:$BOT_PORT" || true
+                    break
+                  fi
+                  sleep 0.5
+                done
+                break
+              fi
             done ) &
           # a player who does not start a game within 60 s is left alone in the room (not for a bot that challenges someone)
           idle=60; [ -z "$target" ] || idle=0

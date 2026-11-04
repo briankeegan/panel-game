@@ -416,6 +416,27 @@ jobs:
           secs=$(( ${{ inputs.hours }} * 3600 ))
           echo "::notice::$name ($brain) joining $BOT_HOST:$BOT_PORT for ${{ inputs.hours }}h"
           set -o pipefail
+          # A bot on GameCreator's latest main redeploys itself when a Gambit change merges: every 5 minutes it compares the commit it
+          # was built from with main, and once main has Gambit / Gambit-profile changes that have been quiet for 5 minutes it starts
+          # ranmaru-deploy (the next number, the other account; this bot leaves after its game). Only for a numbered name
+          # (Ranmaru_p9_CPU -> Ranmaru_p#_CPU) that is not a pinned build or a challenger. A bot that is not running cannot redeploy.
+          tmpl=$(echo "$name" | sed -n 's/^\(.*[a-z]\)[0-9][0-9]*\(_.*\)$/\1#\2/p')
+          if [ "$kind" = gambit ] && [ -z "${GAMBIT_FROM:-}" ] && [ -z "$target" ] && [ -n "$tmpl" ] && [ -d GameCreator/.git ]; then
+            built=$(git -C GameCreator rev-parse HEAD)
+            echo "auto-redeploy: built from GameCreator ${built:0:8}; will redeploy as $tmpl when Gambit changes merge to main"
+            ( while sleep 300; do
+                head=$(GH_TOKEN="${{ github.token }}" gh api "repos/briankeegan/GameCreator/commits/main" --jq '.sha + " " + .commit.committer.date' 2>/dev/null || true)
+                [ -n "$head" ] || continue
+                changed=$(GH_TOKEN="${{ github.token }}" gh api "repos/briankeegan/GameCreator/compare/$built...${head%% *}" --jq '[.files[].filename | select(startswith("games/the-game/ai/gambit/") or startswith("games/the-game/ai/eval/survivor-profiles/"))] | length' 2>/dev/null || echo 0)
+                quiet=$(( $(date -u +%s) - $(date -u -d "${head#* }" +%s) ))
+                if [ "${changed:-0}" -gt 0 ] && [ "$quiet" -ge 300 ]; then
+                  echo "auto-redeploy: Gambit changed on main (${head%% *}); starting ranmaru-deploy as $tmpl"
+                  GH_TOKEN="${{ github.token }}" gh workflow run bot-prod-smoke-test.yml --repo "${{ github.repository }}" --ref "${{ github.ref_name }}" \
+                    -f mode=ranmaru-deploy -f server="$BOT_HOST:$BOT_PORT" -f bot=gambit -f name="$tmpl" -f hours="${{ inputs.hours }}" || true
+                  break
+                fi
+              done ) &
+          fi
           # A deploy's new bot is built by now and waits, not logged in, until every older bot on this server has left
           if [ "${STANDBY:-}" = 1 ] || [ -n "${AFTER:-}" ]; then
             # (a rename takes over the account of the bot named AFTER; it waits for that one only)

@@ -888,7 +888,7 @@ jobs:
             done
             if [ -n "$added" ]; then
               git config user.name "github-actions"; git config user.email "actions@github.com"
-              git add bot/identities; git commit -q -m "bot: fight names take over existing accounts on $host"
+              git add -f bot/identities; git commit -q -m "bot: fight names take over existing accounts on $host"
               for k in 1 2 3; do git push -q origin "HEAD:${{ github.ref_name }}" && break; git pull -q --rebase origin "${{ github.ref_name }}"; done
             fi
             # the fork's server: each bot is a fight.sh run -- the lobby bot, and the challenger ("OTHER,LOBBY" challenges LOBBY)

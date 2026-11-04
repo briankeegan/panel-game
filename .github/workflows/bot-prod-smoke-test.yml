@@ -49,7 +49,7 @@ on:
           - gambit-w90
           - gambit-w80
       name:
-        description: '4. That bot''s name in the lobby (letters, digits, _; 16 max)'
+        description: '4. That bot''s name in the lobby (letters, digits, _; 16 max). On the Bramp server (104.156.250.136) use a name that already has an account: GambitMain, Gambit_100, GambitY, SvAttack1, SvDefensive, WasmAgro_CPU or BitBot -- a new name is refused there'
         required: false
         default: 'Ranmaru_TEST_CPU'
       opponent:
@@ -64,7 +64,7 @@ on:
           - gambit-w90
           - gambit-w80
       opponent_name:
-        description: '6. Fight only: the second Gambit''s name in the lobby (blank = the first name plus 2)'
+        description: '6. Fight only: the second Gambit''s name in the lobby (blank = the first name plus 2). Same rule on the Bramp server: use a name that already has an account'
         required: false
         default: ''
       player:

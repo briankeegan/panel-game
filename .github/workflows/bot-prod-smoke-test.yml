@@ -708,14 +708,26 @@ jobs:
           case "$NAME" in
             *'#'*)
               prefix=${NAME%%#*}; suffix=${NAME#*#}
-              nums=$(ls botsrc/bot/identities | sed -n "s/^${prefix}\([0-9][0-9]*\)${suffix}_${host}\.txt\$/\1/p" | sort -n)
-              last=$(echo "$nums" | tail -n 1); last=${last:-0}
-              new="${prefix}$((last + 1))${suffix}"
+              # the letter before the # changes after 99 (p99 -> q1 -> ... -> z99 -> a1): the numbers run per letter
+              letter=${prefix: -1}; base=${prefix%?}
+              case "$letter" in [a-z]) ;; *) echo "::error::the name before # must end in a letter, the one that changes after 99 (e.g. Ranmaru_p#_CPU)"; exit 1;; esac
+              abc=abcdefghijklmnopqrstuvwxyz
+              # the saved names of this template, oldest first: (letters since the template's own) * 100 + number
+              nums=$(ls botsrc/bot/identities | sed -n "s/^${base}\([a-z]\)\([0-9][0-9]*\)${suffix}_${host}\.txt\$/\1 \2/p" \
+                     | awk -v a="$abc" -v s="$letter" '{ print ((index(a,$1) - index(a,s) + 26) % 26) * 100 + $2, $1, $2 }' | sort -n)
+              lastl=$(echo "$nums" | tail -n 1 | cut -d' ' -f2); lastn=$(echo "$nums" | tail -n 1 | cut -d' ' -f3)
+              lastl=${lastl:-$letter}; lastn=${lastn:-0}
+              if [ "$lastn" -ge 99 ]; then
+                lastl=${abc:$(( ($(expr index "$abc" "$lastl")) % 26 )):1}; newn=1
+              else
+                newn=$((lastn + 1))
+              fi
+              new="${base}${lastl}${newn}${suffix}"
               [ ${#new} -le 16 ] || { echo "::error::'$new' is longer than 16 characters"; exit 1; }
               extra=""
               if [ "$(echo "$nums" | grep -c .)" -ge 2 ]; then
-                donor_n=$(echo "$nums" | tail -n 2 | head -n 1)
-                donor="${prefix}${donor_n}${suffix}"
+                donorl=$(echo "$nums" | tail -n 2 | head -n 1 | cut -d' ' -f2); donorn=$(echo "$nums" | tail -n 2 | head -n 1 | cut -d' ' -f3)
+                donor="${base}${donorl}${donorn}${suffix}"
                 (cd botsrc
                  git config user.name "github-actions"; git config user.email "actions@github.com"
                  git mv "bot/identities/${donor}_${host}.txt" "bot/identities/${new}_${host}.txt"

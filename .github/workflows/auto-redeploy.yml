@@ -33,7 +33,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          for server in panelattack.com:49569 betaserver.panelattack.com:59569; do
+          for server in panelattack.com:49569; do
             gh workflow run bot-prod-smoke-test.yml --repo "${{ github.repository }}" --ref bramp/multi-player \
               -f mode=ranmaru-deploy -f server="$server" -f bot=gambit -f advanced="only-if-running"
           done

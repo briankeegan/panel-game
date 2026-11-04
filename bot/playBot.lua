@@ -101,7 +101,7 @@ local idleSince, readyNow = nil, nil
 local STOP_FILE = os.getenv("PA_STOP_FILE")
 -- once a stop is asked for and no game is running, the bot sits in the room this many seconds WITHOUT readying (so no next game
 -- starts), then leaves; with nobody in the room it leaves at once
-local STOP_GRACE = tonumber(os.getenv("PA_STOP_GRACE") or "") or 5
+local STOP_GRACE = tonumber(os.getenv("PA_STOP_GRACE") or "") or 8
 local lastStopCheck = 0
 local stopAt = nil
 -- Pace check: how far the loop ever got from the 60Hz schedule this match, in

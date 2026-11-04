@@ -868,7 +868,12 @@ jobs:
             host=104.156.250.136; added=""
             for n in "$NAME" "$other"; do
               [ -s "bot/identities/${n}_${host}.txt" ] && continue
-              if [ "$n" = Ranmaru_CPU ] && [ -s "bot/identities/GambitMain_${host}.txt" ]; then
+              # the same name in other letters (GAMBIT_100 for Gambit_100) is the same account
+              same=$(ls bot/identities | grep -i -x -- "${n}_${host}.txt" | head -n 1 || true)
+              if [ -n "$same" ]; then
+                cp "bot/identities/$same" "bot/identities/${n}_${host}.txt"; added=1
+                echo "$n uses the account saved as ${same%_${host}.txt} on the Bramp server." >> "$GITHUB_STEP_SUMMARY"
+              elif [ "$n" = Ranmaru_CPU ] && [ -s "bot/identities/GambitMain_${host}.txt" ]; then
                 cp "bot/identities/GambitMain_${host}.txt" "bot/identities/${n}_${host}.txt"; added=1
                 echo "$n takes over the account of GambitMain on the Bramp server." >> "$GITHUB_STEP_SUMMARY"
               else

@@ -423,7 +423,7 @@ jobs:
             while :; do
               older=$(GH_TOKEN="${{ github.token }}" gh api "repos/${{ github.repository }}/actions/runs?status=in_progress&per_page=50" --jq "[.workflow_runs[] | select(.id < $GITHUB_RUN_ID) | select(.display_title | startswith(\"$who\"))] | length" 2>/dev/null || echo 1)
               [ "${older:-1}" -eq 0 ] && break
-              sleep 10
+              sleep 2
             done
             echo "standby over: logging in"
           fi
@@ -733,7 +733,7 @@ jobs:
                  git mv "bot/identities/${donor}_${host}.txt" "bot/identities/${new}_${host}.txt"
                  git commit -q -m "bot: the account of '$donor' is now '$new' on $host"
                  for k in 1 2 3; do git push -q origin "HEAD:$UPSTREAM_BOT_REF" && break; git pull -q --rebase origin "$UPSTREAM_BOT_REF"; done)
-                extra="after=$donor"
+                extra="standby"
                 echo "$new takes over the account of $donor (the server renames it at login)" >> "$GITHUB_STEP_SUMMARY"
               else
                 echo "::error::only two accounts are ever used, renamed in turn, and fewer than two are saved for '$NAME' on $host -- save them first (bot/identities)"; exit 1
@@ -745,29 +745,23 @@ jobs:
             -f hours="$HOURS" -f advanced="$ADVANCED $extra"
           echo "A new run was started: $new ($BOT) on $SERVER for $HOURS hours. It logs in as soon as its account is free; the older bots finish their games and leave." >> "$GITHUB_STEP_SUMMARY"
 
-      # The old bots are released only after the new bot's run has stayed alive for 150 s (a login the server refuses ends its run
-      # within that time), so a refused rename never leaves the lobby empty. Then a stop run, which spares the new bot, does the rest.
-      - name: Check the new bot stays up, then release the old ones
+      # The new bot builds and waits, logged out, until every older bot on the server has left (it checks every 2 s), so it
+      # logs in as the old one goes. This run only has to ask the old bots to leave: a stop run that spares the new bot's run.
+      - name: Ask the old bots to leave
         if: ${{ inputs.mode == 'ranmaru-deploy' }}
         run: |
           set -u
           repo="${{ github.repository }}"
           began=$(gh api "repos/$repo/actions/runs/$GITHUB_RUN_ID" --jq .created_at)
           id=""
-          for _ in $(seq 1 12); do
+          for _ in $(seq 1 24); do
             id=$(gh api "repos/$repo/actions/runs?event=workflow_dispatch&per_page=30" --jq ".workflow_runs[] | select(.created_at > \"$began\") | select(.display_title | startswith(\"live · $SERVER · $NEWNAME\")) | .id" | head -n 1)
             [ -n "$id" ] && break; sleep 5
           done
           [ -n "$id" ] || { echo "::error::the new bot's run did not appear: the old bots are left alone"; exit 1; }
-          echo "the new bot is run $id"
-          for _ in $(seq 1 15); do
-            st=$(gh api "repos/$repo/actions/runs/$id" --jq .status)
-            [ "$st" != completed ] || { echo "::error::the new bot's run ($id) ended within 150 s (it did not stay in the lobby): the old bots are left alone"; exit 1; }
-            sleep 10
-          done
           now=""; case " $ADVANCED " in *" now "*) now=" now";; esac
           gh workflow run bot-prod-smoke-test.yml --repo "$repo" --ref "${{ github.ref_name }}" -f mode=ranmaru-stop -f server="$SERVER" -f advanced="except=$id$now"
-          echo "The new bot ($NEWNAME, run $id) stayed up for 150 s: a stop run was started for the old bots on $SERVER (it spares run $id)." >> "$GITHUB_STEP_SUMMARY"
+          echo "The new bot ($NEWNAME, run $id) is built and waiting. A stop run was started for the old bots on $SERVER (it spares run $id): each leaves after its game, and the new bot logs in when they are gone." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Cancel the running one and pull down its info
         if: ${{ inputs.mode != 'ranmaru-deploy' }}

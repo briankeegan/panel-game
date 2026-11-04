@@ -1,6 +1,6 @@
 name: Bot Prod Smoke Test (LIVE SERVER)
 # The run list shows what each run was, e.g. "live · beta · SirBonksALot".
-run-name: "${{ startsWith(inputs.mode, 'ranmaru') && format('{0} · {1}', inputs.mode, inputs.server) || inputs.mode == 'versus-player' && format('live · {0} · {1}{2}', inputs.server, inputs.name, inputs.player != '' && format(',{0}', inputs.player) || '') || inputs.mode == 'fight' && !contains(inputs.advanced, 'bot_run') && format('fight-start · {0}', inputs.server) || format('{0} · {1} · {2} ({3}) vs {4}', inputs.mode, inputs.server, inputs.name, inputs.bot, inputs.opponent) }}"
+run-name: "${{ startsWith(inputs.mode, 'ranmaru') && format('{0} · {1}{2}', inputs.mode, inputs.server, inputs.mode == 'ranmaru-stop' && inputs.advanced != '' && format(' · {0}', inputs.advanced) || '') || inputs.mode == 'versus-player' && format('live · {0} · {1}{2}', inputs.server, inputs.name, inputs.player != '' && format(',{0}', inputs.player) || '') || inputs.mode == 'fight' && !contains(inputs.advanced, 'bot_run') && format('fight-start · {0}', inputs.server) || format('{0} · {1} · {2} ({3}) vs {4}', inputs.mode, inputs.server, inputs.name, inputs.bot, inputs.opponent) }}"
 
 # Manual-only. Pick what to do in the first box (the form is numbered in the order to fill it in):
 #
@@ -432,12 +432,8 @@ jobs:
           export PA_STOP_FILE="$RUNNER_TEMP/stop-after-the-game"; rm -f "$PA_STOP_FILE"
           started=$(date -u +%s)
           ( while sleep 10; do
-              ids=$(GH_TOKEN="${{ github.token }}" gh api "repos/${{ github.repository }}/actions/runs?status=in_progress&per_page=30" --jq ".workflow_runs[] | select(.display_title | test(\"^(ranmaru-stop|ranmaru-deploy|fight-start) · $BOT_HOST:$BOT_PORT\$\")) | select((.created_at | fromdateiso8601) > $started) | .id" 2>/dev/null || true)
-              for rid in $ids; do
-                # (a deploy releases the old bots only after its new bot is in the lobby: its "Cancel the running one" step has begun)
-                begun=$(GH_TOKEN="${{ github.token }}" gh api "repos/${{ github.repository }}/actions/runs/$rid/jobs" --jq '[.jobs[0].steps[] | select(.name | startswith("Cancel the running one")) | select(.status != "pending")] | length' 2>/dev/null || echo 0)
-                if [ "${begun:-0}" -gt 0 ]; then touch "$PA_STOP_FILE"; break 2; fi
-              done
+              ids=$(GH_TOKEN="${{ github.token }}" gh api "repos/${{ github.repository }}/actions/runs?per_page=30" --jq ".workflow_runs[] | select(.status != \"completed\") | select(.display_title | test(\"^(ranmaru-stop|fight-start) · $BOT_HOST:$BOT_PORT( · .*)?\$\")) | select((.created_at | fromdateiso8601) > $started) | select(((.display_title | capture(\"except=(?<x>[0-9]+)\")? | .x) // \"0\") != \"$GITHUB_RUN_ID\") | .id" 2>/dev/null || true)
+              if [ -n "$ids" ]; then touch "$PA_STOP_FILE"; break; fi
             done ) &
           # a player who does not start a game within 60 s is left alone in the room (not for a bot that challenges someone)
           idle=60; [ -z "$target" ] || idle=0
@@ -731,39 +727,46 @@ jobs:
                 echo "::error::only two accounts are ever used, renamed in turn, and fewer than two are saved for '$NAME' on $host -- save them first (bot/identities)"; exit 1
               fi;;
           esac
+          echo "NEWNAME=$new" >> "$GITHUB_ENV"
           gh workflow run bot-prod-smoke-test.yml --repo "${{ github.repository }}" --ref "${{ github.ref_name }}" \
             -f mode=versus-player -f server="$SERVER" -f bot="$BOT" -f name="$new" -f player="$PLAYER" \
             -f hours="$HOURS" -f advanced="$ADVANCED $extra"
           echo "A new run was started: $new ($BOT) on $SERVER for $HOURS hours. It logs in as soon as its account is free; the older bots finish their games and leave." >> "$GITHUB_STEP_SUMMARY"
 
-      # The old bots are released only once the new one has been in the lobby for a while without failing (a login the
-      # server refuses ends its run at once), so a refused rename never leaves the lobby empty.
-      - name: Wait for the new bot to be in the lobby
-        if: ${{ inputs.mode == 'ranmaru-deploy' && contains(inputs.name, '#') }}
+      # The old bots are released only after the new bot's run has stayed alive for 150 s (a login the server refuses ends its run
+      # within that time), so a refused rename never leaves the lobby empty. Then a stop run, which spares the new bot, does the rest.
+      - name: Check the new bot stays up, then release the old ones
+        if: ${{ inputs.mode == 'ranmaru-deploy' }}
         run: |
           set -u
           repo="${{ github.repository }}"
           began=$(gh api "repos/$repo/actions/runs/$GITHUB_RUN_ID" --jq .created_at)
-          for _ in $(seq 1 120); do
-            id=$(gh api "repos/$repo/actions/runs?event=workflow_dispatch&per_page=30" --jq ".workflow_runs[] | select(.created_at > \"$began\") | select(.display_title | startswith(\"live · $SERVER · \")) | .id" | head -n 1)
-            if [ -n "$id" ]; then
-              status=$(gh api "repos/$repo/actions/runs/$id" --jq '.status + " " + (.conclusion // "")')
-              case "$status" in completed*) echo "::error::the new bot's run ($id) ended before it was in the lobby ($status): the old bots are left alone"; exit 1;; esac
-              up=$(gh api "repos/$repo/actions/runs/$id/jobs" --jq '[.jobs[0].steps[] | select(.name | startswith("Sit in the lobby (beta")) | select(.status == "in_progress") | ((now - (.started_at | fromdateiso8601)) | floor)] | first // 0')
-              if [ "${up:-0}" -ge 45 ]; then echo "the new bot ($id) has been in the lobby for ${up}s: releasing the old bots"; exit 0; fi
-            fi
+          id=""
+          for _ in $(seq 1 12); do
+            id=$(gh api "repos/$repo/actions/runs?event=workflow_dispatch&per_page=30" --jq ".workflow_runs[] | select(.created_at > \"$began\") | select(.display_title | startswith(\"live · $SERVER · $NEWNAME\")) | .id" | head -n 1)
+            [ -n "$id" ] && break; sleep 5
+          done
+          [ -n "$id" ] || { echo "::error::the new bot's run did not appear: the old bots are left alone"; exit 1; }
+          echo "the new bot is run $id"
+          for _ in $(seq 1 15); do
+            st=$(gh api "repos/$repo/actions/runs/$id" --jq .status)
+            [ "$st" != completed ] || { echo "::error::the new bot's run ($id) ended within 150 s (it did not stay in the lobby): the old bots are left alone"; exit 1; }
             sleep 10
           done
-          echo "::error::the new bot was not in the lobby after 20 minutes: the old bots are left alone"; exit 1
+          now=""; case " $ADVANCED " in *" now "*) now=" now";; esac
+          gh workflow run bot-prod-smoke-test.yml --repo "$repo" --ref "${{ github.ref_name }}" -f mode=ranmaru-stop -f server="$SERVER" -f advanced="except=$id$now"
+          echo "The new bot ($NEWNAME, run $id) stayed up for 150 s: a stop run was started for the old bots on $SERVER (it spares run $id)." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Cancel the running one and pull down its info
+        if: ${{ inputs.mode != 'ranmaru-deploy' }}
         run: |
           set -u
           repo="${{ github.repository }}"
           # only the runs that were already there when this one was made (the deploy's new bot is not one of them)
           began=$(gh api "repos/$repo/actions/runs/$GITHUB_RUN_ID" --jq .created_at)
+          except=$(echo "$ADVANCED" | tr ' ' '\n' | sed -n 's/^except=//p' | head -n 1); except=${except:-0}
           # every bot run on this server, whatever its name: "live · SERVER · NAME[,PLAYER]" and "fight · SERVER · ..."
-          runs() { gh api "repos/$repo/actions/runs?per_page=60" --jq ".workflow_runs[] | select(.id != $GITHUB_RUN_ID) | select(.created_at < \"$began\") | select(.display_title | startswith(\"live · $SERVER · \") or startswith(\"fight · $SERVER · \")) | select($1) | .id"; }
+          runs() { gh api "repos/$repo/actions/runs?per_page=60" --jq ".workflow_runs[] | select(.id != $GITHUB_RUN_ID) | select(.id != $except) | select(.created_at < \"$began\") | select(.display_title | startswith(\"live · $SERVER · \") or startswith(\"fight · $SERVER · \")) | select($1) | .id"; }
           ids=$(runs '.status != "completed"')
           now=0; case " $ADVANCED " in *" now "*) now=1;; esac
           # A lobby bot (a "live" run) is not interrupted: it sees this run, finishes the game it is in and leaves, and this

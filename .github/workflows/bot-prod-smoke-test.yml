@@ -36,7 +36,6 @@ on:
         type: choice
         options:
           - panelattack.com:49569
-          - 104.156.250.136:49569
       bot:
         description: '3. Gambit (the bot in the lobby): the latest main, or a kept build named for its actions window (w150 = 150 actions in 10 seconds)'
         required: true

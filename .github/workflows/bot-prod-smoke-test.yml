@@ -19,7 +19,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: '1. What to do: ranmaru-deploy = stop EVERY bot on the server (2), then start the one in 3, 5-7. ranmaru-stop = stop every bot on the server and show its wins and losses. versus-player = just start that bot. fight = stop every bot on the server, then two Gambits fight each other: the bot in 3 sits in the lobby, the opponent in 4 challenges it'
+        description: '1. What to do: ranmaru-deploy = stop EVERY bot on the server (2), then start the bot in 3-4. ranmaru-stop = stop every bot on the server and show its wins and losses. versus-player = just start the bot in 3-4. fight = stop every bot on the server, then two Gambits fight: the bot in 3-4 sits in the lobby, the one in 5-6 challenges it'
         required: true
         default: 'ranmaru-deploy'
         type: choice
@@ -29,7 +29,7 @@ on:
           - versus-player
           - fight
       server:
-        description: '2. Server -- the one the bot joins, and the one stop / deploy clear of bots'
+        description: '2. Server -- the one the bot joins, and the one stop / deploy / fight clear of bots'
         required: true
         default: 'panelattack.com:49569'
         type: choice
@@ -38,18 +38,7 @@ on:
           - 104.156.250.136:49569
           - betaserver.panelattack.com:59569
       bot:
-        description: '3. Gambit (the bot in the lobby, for a fight): the latest main, or a kept build named for its actions window (w150 = 150 actions in 10 seconds)'
-        required: true
-        default: 'gambit'
-        type: choice
-        options:
-          - gambit
-          - gambit-w150
-          - gambit-w100
-          - gambit-w90
-          - gambit-w80
-      opponent:
-        description: '4. Fight only: the second Gambit, who challenges the one in 3'
+        description: '3. Gambit (the bot in the lobby): the latest main, or a kept build named for its actions window (w150 = 150 actions in 10 seconds)'
         required: true
         default: 'gambit'
         type: choice
@@ -60,15 +49,30 @@ on:
           - gambit-w90
           - gambit-w80
       name:
-        description: '5. The bot''s name in the lobby (letters, digits, _; 16 max). In a fight the opponent is called this + 2'
+        description: '4. That bot''s name in the lobby (letters, digits, _; 16 max)'
         required: false
         default: 'Ranmaru_TEST_CPU'
+      opponent:
+        description: '5. Fight only: the second Gambit, who challenges the first'
+        required: true
+        default: 'gambit'
+        type: choice
+        options:
+          - gambit
+          - gambit-w150
+          - gambit-w100
+          - gambit-w90
+          - gambit-w80
+      opponent_name:
+        description: '6. Fight only: the second Gambit''s name in the lobby (blank = the first name plus 2)'
+        required: false
+        default: ''
       player:
-        description: '6. versus-player only: a player''s name -- the bot challenges them and plays only them. Blank = it plays whoever challenges it'
+        description: '7. versus-player only: a player''s name -- the bot challenges them and plays only them. Blank = it plays whoever challenges it'
         required: false
         default: ''
       hours:
-        description: '7. Hours the bot stays up'
+        description: '8. Hours the bots stay up'
         required: true
         default: '5'
         type: choice
@@ -79,7 +83,7 @@ on:
           - '2'
           - '1'
       advanced:
-        description: '8. Advanced -- leave blank. Words like gambit_from=<GameCreator commit>, upstream_ref=<commit>, profile=<file>'
+        description: '9. Advanced -- leave blank. Words like gambit_from=<GameCreator commit>, upstream_ref=<commit>, profile=<file>'
         required: false
         default: ''
 
@@ -641,6 +645,7 @@ jobs:
       SERVER: ${{ inputs.server }}
       BOT: ${{ inputs.bot }}
       OPPONENT: ${{ inputs.opponent }}
+      OPPONENT_NAME: ${{ inputs.opponent_name }}
       PLAYER: ${{ inputs.player }}
       HOURS: ${{ inputs.hours }}
       ADVANCED: ${{ inputs.advanced }}
@@ -689,8 +694,11 @@ jobs:
       - name: Fight
         if: ${{ inputs.mode == 'fight' }}
         run: |
-          # two versus-player runs: the lobby bot waits, the challenger (named NAME + 2, 16 characters at most) challenges it
-          other="${NAME}2"; [ ${#other} -le 16 ] || other="${NAME:0:15}2"
+          # two versus-player runs: the lobby bot waits, the challenger challenges it (its name: the form's, else NAME + 2)
+          other="$OPPONENT_NAME"
+          [ -n "$other" ] || { other="${NAME}2"; [ ${#other} -le 16 ] || other="${NAME:0:15}2"; }
+          [ ${#other} -le 16 ] || { echo "::error::the second bot's name '$other' is longer than 16 characters"; exit 1; }
+          [ "$other" != "$NAME" ] || { echo "::error::the two bots need different names"; exit 1; }
           gh workflow run bot-prod-smoke-test.yml --repo "${{ github.repository }}" --ref "${{ github.ref_name }}" \
             -f mode=versus-player -f server="$SERVER" -f bot="$BOT" -f name="$NAME" -f hours="$HOURS" -f advanced="$ADVANCED"
           gh workflow run bot-prod-smoke-test.yml --repo "${{ github.repository }}" --ref "${{ github.ref_name }}" \

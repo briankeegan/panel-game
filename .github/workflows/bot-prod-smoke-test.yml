@@ -1,6 +1,6 @@
 name: Bot Prod Smoke Test (LIVE SERVER)
 # The run list shows what each run was, e.g. "live · beta · SirBonksALot".
-run-name: "${{ startsWith(inputs.mode, 'ranmaru') && inputs.mode || inputs.mode == 'versus-player' && format('live · {0} · {1}{2}', inputs.server, inputs.name, inputs.player != '' && format(',{0}', inputs.player) || '') || format('{0} · {1} · {2} ({3}) vs {4}', inputs.mode, inputs.server, inputs.name, inputs.bot, inputs.opponent) }}"
+run-name: "${{ startsWith(inputs.mode, 'ranmaru') && format('{0} · {1}', inputs.mode, inputs.server) || inputs.mode == 'versus-player' && format('live · {0} · {1}{2}', inputs.server, inputs.name, inputs.player != '' && format(',{0}', inputs.player) || '') || inputs.mode == 'fight' && !contains(inputs.advanced, 'bot_run') && format('fight-start · {0}', inputs.server) || format('{0} · {1} · {2} ({3}) vs {4}', inputs.mode, inputs.server, inputs.name, inputs.bot, inputs.opponent) }}"
 
 # Manual-only. Pick what to do in the first box (the form is numbered in the order to fill it in):
 #
@@ -116,6 +116,7 @@ jobs:
     # UPSTREAM_BOT_REF so the name can be reused (see "Save the account id").
     permissions:
       contents: write
+      actions: read
     # Under the 6-hour hard cap so a `live` session stops on our timeout.
     timeout-minutes: 355
     steps:
@@ -134,7 +135,7 @@ jobs:
               profile=*) profile=${w#profile=};;
               gambit_from=*) gambit_from=${w#gambit_from=};;
               upstream_ref=*) upstream_ref=${w#upstream_ref=};;
-              bot_run=*) ;;   # marks a bot run started by a fight
+              bot_run=*|now) ;;   # bot_run marks a bot run started by a fight; now only matters to stop / deploy
               *) echo "::error::advanced: I do not know '$w' (use profile=, gambit_from= or upstream_ref=)"; exit 1;;
             esac
           done
@@ -412,7 +413,17 @@ jobs:
           secs=$(( ${{ inputs.hours }} * 3600 ))
           echo "::notice::$name ($brain) joining $BOT_HOST:$BOT_PORT for ${{ inputs.hours }}h"
           set -o pipefail
-          PA_CHALLENGE="$target" PA_CHALLENGE_GAMES="$games" PA_CHALLENGE_FIRST_TO="$first" PA_ACCEPT_ONLY="$only" PA_DECLINE_MODES="$decline" timeout "$secs" $pin luajit bot/playBot.lua "$BOT_HOST" "$BOT_PORT" "$name" 4 12 "$brain" \
+          # A stop / deploy / fight-start run for this server, made after this bot started, waits on it: the file tells the bot
+          # to leave once no game is running (bot/playBot.lua PA_STOP_FILE). Runs made before it started are not about it.
+          export PA_STOP_FILE="$RUNNER_TEMP/stop-after-the-game"; rm -f "$PA_STOP_FILE"
+          started=$(date -u +%s)
+          ( while sleep 10; do
+              n=$(GH_TOKEN="${{ github.token }}" gh api "repos/${{ github.repository }}/actions/runs?status=in_progress&per_page=30" --jq "[.workflow_runs[] | select(.display_title | test(\"^(ranmaru-stop|ranmaru-deploy|fight-start) · $BOT_HOST:$BOT_PORT\$\")) | select((.created_at | fromdateiso8601) > $started)] | length" 2>/dev/null || echo 0)
+              if [ "${n:-0}" -gt 0 ]; then touch "$PA_STOP_FILE"; break; fi
+            done ) &
+          # a player who does not start a game within 60 s is left alone in the room (not for a bot that challenges someone)
+          idle=60; [ -z "$target" ] || idle=0
+          PA_IDLE_LIMIT="$idle" PA_CHALLENGE="$target" PA_CHALLENGE_GAMES="$games" PA_CHALLENGE_FIRST_TO="$first" PA_ACCEPT_ONLY="$only" PA_DECLINE_MODES="$decline" timeout "$secs" $pin luajit bot/playBot.lua "$BOT_HOST" "$BOT_PORT" "$name" 4 12 "$brain" \
             2>&1 | tee "$GITHUB_WORKSPACE/bot-prod-smoke.log" || [ $? -eq 124 ]
 
       - name: Sit in the lobby
@@ -648,7 +659,7 @@ jobs:
     name: Stop / deploy / fight
     if: ${{ startsWith(inputs.mode, 'ranmaru') || (inputs.mode == 'fight' && !contains(inputs.advanced, 'bot_run')) }}
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 355
     permissions:
       actions: write
       contents: read
@@ -672,9 +683,28 @@ jobs:
           # every bot run on this server, whatever its name: "live · SERVER · NAME[,PLAYER]" and "fight · SERVER · ..."
           runs() { gh api "repos/$repo/actions/runs?per_page=60" --jq ".workflow_runs[] | select(.id != $GITHUB_RUN_ID) | select(.display_title | startswith(\"live · $SERVER · \") or startswith(\"fight · $SERVER · \")) | select($1) | .id"; }
           ids=$(runs '.status != "completed"')
+          now=0; case " $ADVANCED " in *" now "*) now=1;; esac
+          # A lobby bot (a "live" run) is not interrupted: it sees this run, finishes the game it is in and leaves, and this
+          # run waits for that however long it takes. `now` in Advanced cancels at once; a fight.sh bot is always cancelled.
+          waiting=""
           for id in $ids; do
+            t=$(gh api "repos/$repo/actions/runs/$id" --jq .display_title)
+            case "$t" in "live · "*) if [ "$now" = 0 ]; then waiting="$waiting $id"; continue; fi;; esac
             echo "cancelling $id"; gh api -X POST "repos/$repo/actions/runs/$id/cancel" >/dev/null || true
           done
+          if [ -n "$waiting" ]; then
+            echo "waiting for the bots to finish their games and leave:$waiting"
+            n=0
+            while :; do
+              left=""
+              for id in $waiting; do
+                [ "$(gh api "repos/$repo/actions/runs/$id" --jq .status)" = completed ] || left="$left $id"
+              done
+              [ -n "$left" ] || break
+              n=$((n + 1)); [ $((n % 20)) -ne 0 ] || echo "still waiting for:$left (put 'now' in Advanced to cancel them)"
+              sleep 15
+            done
+          fi
           for id in $ids; do
             for _ in $(seq 1 60); do
               [ "$(gh api "repos/$repo/actions/runs/$id" --jq .status)" = completed ] && break

@@ -129,13 +129,14 @@ jobs:
           BOT: ${{ inputs.bot }}
         run: |
           set -eu
-          profile=""; gambit_from=""; upstream_ref=""
+          profile=""; gambit_from=""; upstream_ref=""; standby=""
           for w in $ADVANCED; do
             case "$w" in
               profile=*) profile=${w#profile=};;
               gambit_from=*) gambit_from=${w#gambit_from=};;
               upstream_ref=*) upstream_ref=${w#upstream_ref=};;
               bot_run=*|now) ;;   # bot_run marks a bot run started by a fight; now only matters to stop / deploy
+              standby) standby=1;;   # a deploy's new bot: build everything, then wait for the older bots here to leave
               *) echo "::error::advanced: I do not know '$w' (use profile=, gambit_from= or upstream_ref=)"; exit 1;;
             esac
           done
@@ -143,7 +144,7 @@ jobs:
           kind=$BOT
           case "$BOT" in gambit-*) kind=gambit; [ -n "$gambit_from" ] || gambit_from=$BOT;; esac
           [ -n "$profile" ] || profile=survivor-profiles/gambit.json
-          { echo "PROFILE=$profile"; echo "GAMBIT_FROM=$gambit_from"; echo "UPSTREAM_REF=$upstream_ref"; echo "BOT_KIND=$kind"; } >> "$GITHUB_ENV"
+          { echo "PROFILE=$profile"; echo "GAMBIT_FROM=$gambit_from"; echo "UPSTREAM_REF=$upstream_ref"; echo "BOT_KIND=$kind"; echo "STANDBY=$standby"; } >> "$GITHUB_ENV"
 
       - name: Install luajit + luarocks
         run: |
@@ -413,6 +414,16 @@ jobs:
           secs=$(( ${{ inputs.hours }} * 3600 ))
           echo "::notice::$name ($brain) joining $BOT_HOST:$BOT_PORT for ${{ inputs.hours }}h"
           set -o pipefail
+          # A deploy's new bot is built by now and waits, not logged in, until every older bot on this server has left
+          if [ "${STANDBY:-}" = 1 ]; then
+            echo "standby: built; waiting for the older bots on $BOT_HOST:$BOT_PORT to leave"
+            while :; do
+              older=$(GH_TOKEN="${{ github.token }}" gh api "repos/${{ github.repository }}/actions/runs?status=in_progress&per_page=50" --jq "[.workflow_runs[] | select(.id < $GITHUB_RUN_ID) | select(.display_title | startswith(\"live · $BOT_HOST:$BOT_PORT · \"))] | length" 2>/dev/null || echo 1)
+              [ "${older:-1}" -eq 0 ] && break
+              sleep 10
+            done
+            echo "standby over: logging in"
+          fi
           # A stop / deploy / fight-start run for this server, made after this bot started, waits on it: the file tells the bot
           # to leave once no game is running (bot/playBot.lua PA_STOP_FILE). Runs made before it started are not about it.
           export PA_STOP_FILE="$RUNNER_TEMP/stop-after-the-game"; rm -f "$PA_STOP_FILE"
@@ -676,12 +687,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Start the new bot (it waits for the old ones to leave)
+        if: ${{ inputs.mode == 'ranmaru-deploy' }}
+        run: |
+          gh workflow run bot-prod-smoke-test.yml --repo "${{ github.repository }}" --ref "${{ github.ref_name }}" \
+            -f mode=versus-player -f server="$SERVER" -f bot="$BOT" -f name="$NAME" -f player="$PLAYER" \
+            -f hours="$HOURS" -f advanced="$ADVANCED standby"
+          echo "A new run was started: $NAME ($BOT) on $SERVER for $HOURS hours. It builds now and logs in when the older bots have left." >> "$GITHUB_STEP_SUMMARY"
+
       - name: Cancel the running one and pull down its info
         run: |
           set -u
           repo="${{ github.repository }}"
+          # only the runs that were already there when this one was made (the deploy's new bot is not one of them)
+          began=$(gh api "repos/$repo/actions/runs/$GITHUB_RUN_ID" --jq .created_at)
           # every bot run on this server, whatever its name: "live · SERVER · NAME[,PLAYER]" and "fight · SERVER · ..."
-          runs() { gh api "repos/$repo/actions/runs?per_page=60" --jq ".workflow_runs[] | select(.id != $GITHUB_RUN_ID) | select(.display_title | startswith(\"live · $SERVER · \") or startswith(\"fight · $SERVER · \")) | select($1) | .id"; }
+          runs() { gh api "repos/$repo/actions/runs?per_page=60" --jq ".workflow_runs[] | select(.id != $GITHUB_RUN_ID) | select(.created_at < \"$began\") | select(.display_title | startswith(\"live · $SERVER · \") or startswith(\"fight · $SERVER · \")) | select($1) | .id"; }
           ids=$(runs '.status != "completed"')
           now=0; case " $ADVANCED " in *" now "*) now=1;; esac
           # A lobby bot (a "live" run) is not interrupted: it sees this run, finishes the game it is in and leaves, and this
@@ -725,14 +746,6 @@ jobs:
           # bots still up on other servers (not touched)
           others=$(gh api "repos/$repo/actions/runs?status=in_progress&per_page=60" --jq ".workflow_runs[] | select(.id != $GITHUB_RUN_ID) | select(.display_title | startswith(\"live · \") or startswith(\"fight · \")) | select(.display_title | contains(\" · $SERVER · \") | not) | \"- \" + .display_title + \" (run \" + (.id|tostring) + \")\"")
           if [ -n "$others" ]; then { echo; echo "### Still up on other servers (not touched)"; echo "$others"; } >> "$GITHUB_STEP_SUMMARY"; fi
-
-      - name: Deploy
-        if: ${{ inputs.mode == 'ranmaru-deploy' }}
-        run: |
-          gh workflow run bot-prod-smoke-test.yml --repo "${{ github.repository }}" --ref "${{ github.ref_name }}" \
-            -f mode=versus-player -f server="$SERVER" -f bot="$BOT" -f name="$NAME" -f player="$PLAYER" \
-            -f hours="$HOURS" -f advanced="$ADVANCED"
-          echo "A new run was started: $NAME ($BOT) on $SERVER for $HOURS hours." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Fight
         if: ${{ inputs.mode == 'fight' }}

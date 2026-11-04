@@ -37,7 +37,6 @@ on:
         options:
           - panelattack.com:49569
           - 104.156.250.136:49569
-          - betaserver.panelattack.com:59569
       bot:
         description: '3. Gambit (the bot in the lobby): the latest main, or a kept build named for its actions window (w150 = 150 actions in 10 seconds)'
         required: true
@@ -136,7 +135,7 @@ jobs:
               profile=*) profile=${w#profile=};;
               gambit_from=*) gambit_from=${w#gambit_from=};;
               upstream_ref=*) upstream_ref=${w#upstream_ref=};;
-              bot_run=*|now|only-if-running) ;;   # bot_run marks a bot run started by a fight; now only matters to stop / deploy
+              bot_run=*|now|only-if-running|dry-run) ;;   # bot_run marks a bot run started by a fight; now only matters to stop / deploy
               standby) standby=1;;   # a deploy's new bot: build everything, then wait for the older bots here to leave
               after=*) after=${w#after=};;   # ... or only for the bot with this name (the account this one takes over)
               *) echo "::error::advanced: I do not know '$w' (use profile=, gambit_from= or upstream_ref=)"; exit 1;;
@@ -718,6 +717,7 @@ jobs:
           fi
           name=$(echo "$line" | awk -F' · ' '{print $3}')
           tmpl=$(echo "$name" | sed -n 's/^\(.*[a-z]\)[0-9][0-9]*\(_.*\)$/\1#\2/p')
+          case " $ADVANCED " in *" dry-run "*) echo "Dry run: $name is deployed on $SERVER; a real run would redeploy it as $tmpl. Nothing was started." >> "$GITHUB_STEP_SUMMARY"; echo "SKIP=1" >> "$GITHUB_ENV"; exit 0;; esac
           echo "NAME=$tmpl" >> "$GITHUB_ENV"
           echo "$name is deployed on $SERVER: redeploying it as $tmpl." >> "$GITHUB_STEP_SUMMARY"
 

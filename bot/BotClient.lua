@@ -311,7 +311,10 @@ function BotClient:dispatch(msg)
         local cell = cache[(height + 1) * width + col]
         if cell and cell.g and cell.s ~= FALLING then over = true end
       end
-      self.oppView = { top = top, out = out, over = over, seen = self.myStack.clock, clock = snap.f, stop = (snap.st or 0) + (snap.ps or 0) }
+      -- og: its outgoing garbage as its client shows it (the telegraph a player sees at the top), and the stopWatch this stack saw the
+      -- board on -- the forecast of a wired opponent's garbage (GameCreator's GambitNative viewTelegraph)
+      self.oppView = { top = top, out = out, over = over, seen = self.myStack.clock, seenSW = self.myStack.stopWatch, clock = snap.f,
+                       stop = (snap.st or 0) + (snap.ps or 0), og = snap.og }
       self._yCount = (self._yCount or 0) + 1
       if self._yCount == 1 or self._yCount % 400 == 0 then
         logger.info(string.format("bot[%s]: opponent board #%d at its frame %s: top %d, topped out %s", self.name, self._yCount, tostring(snap.f), top, tostring(out)))

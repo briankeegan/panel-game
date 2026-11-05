@@ -1,107 +1,90 @@
 name: Bot Prod Smoke Test (LIVE SERVER)
 # The run list shows what each run was, e.g. "live · beta · SirBonksALot".
-run-name: "${{ inputs.mode }} · ${{ inputs.server }}${{ inputs.mode == 'live' && format(' · {0}', inputs.name) || inputs.mode == 'fight' && format(' · {0} ({1}) vs {2}', inputs.name, inputs.bot, inputs.opponent) || '' }}"
+run-name: "${{ (startsWith(inputs.mode, 'ranmaru') || inputs.mode == 'bot-handoff') && format('{0} · {1}{2}', inputs.mode, (inputs.server != 'auto' && inputs.server || (inputs.mode == 'fight' && '104.156.250.136:49569' || 'panelattack.com:49569')), inputs.mode == 'ranmaru-stop' && inputs.advanced != '' && format(' · {0}', inputs.advanced) || '') || inputs.mode == 'versus-player' && format('live · {0} · {1}{2}', (inputs.server != 'auto' && inputs.server || (inputs.mode == 'fight' && '104.156.250.136:49569' || 'panelattack.com:49569')), inputs.name, inputs.player != '' && format(',{0}', inputs.player) || '') || inputs.mode == 'fight' && !contains(inputs.advanced, 'bot_run') && format('fight-start · {0}', (inputs.server != 'auto' && inputs.server || (inputs.mode == 'fight' && '104.156.250.136:49569' || 'panelattack.com:49569'))) || format('{0} · {1} · {2} ({3}) vs {4}', inputs.mode, (inputs.server != 'auto' && inputs.server || (inputs.mode == 'fight' && '104.156.250.136:49569' || 'panelattack.com:49569')), inputs.name, inputs.bot, inputs.opponent) }}"
 
-# Manual-only. Three things, picked with `mode`:
+# Manual-only. Pick what to do in the first box (the form is numbered in the order to fill it in):
 #
-#   live           ONE bot under a real name sits in a server's lobby and
-#                  auto-accepts challenges, so a person can play it. Unranked,
-#                  always. Stays up for `hours`. `server` is one of two:
-#                    104.156.250.136:49569           this repo's server
-#                    betaserver.panelattack.com:59569 upstream Panel Attack's
-#                            beta server; the bot runs on upstream's latest
-#                            code with its bot/ added
-#   fight          pick who plays who on 104.156.250.136 (bot/fight.sh): `bot`
-#                  sits in the lobby as `name`; `opponent` logs in as `name`2
-#                  and challenges it, rematching for `hours` -- or, as "you",
-#                  nobody does and you challenge it. Roster: bitbot (GameCreator's
-#                  BitBot, its latest main, pre-flighted before it goes live),
-#                  wasm (GameCreator's WasmSurvivor, same), beverly, plamp,
-#                  heuristic.
-#   prod-vs        smoke test: two throwaway bots play `matches` games against
-#                  each other in a PRIVATE room on 104.156.250.136; no player
-#                  can join, nothing is ranked
-#   large-garbage  offline benchmark on the runner, no server contact:
-#                  survival vs 6x12 garbage blocks over `matches` seeds
+#   ranmaru-deploy  stop the running Ranmaru_TEST_CPU and start a new one on GameCreator's latest main
+#   ranmaru-stop    stop it and show its wins and losses in the run summary
+#   versus-player   ONE bot under a real name sits in a server's lobby and plays challenges. Unranked, always.
+#                   Stays up for `hours`. With a player typed in, it challenges THAT player and plays only them
+#                   (Gambit); blank, it plays whoever challenges it
+#   fight           pick who plays who on 104.156.250.136 (bot/fight.sh): `bot` sits in the lobby as `name`;
+#                   `player` logs in as `name`2 and challenges it, rematching for `hours` -- or "you" and nobody
+#                   does, you challenge it -- or "challenge" for `bot` to challenge the second name in `name` ("A,B")
 #
-# The inputs below are in the order you would fill them in; each one says
-# which mode it is for. Leave the rest alone.
+# `advanced` is a line of key=value words, for what the form does not ask: gambit_from=<GameCreator commit or
+# version name>, upstream_ref=<upstream commit/tag/branch>, profile=<weight set file>. bot/pair.sh sends it.
 on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'What to run: live = a bot in the lobby for people to play; fight = pick who plays who (bot and opponent below); prod-vs = bot-vs-bot smoke test; large-garbage = offline benchmark'
+        description: '1. What to do: ranmaru-deploy = stop EVERY bot on the server (2), then start the bot in 3-4. ranmaru-stop = stop every bot on the server and show its wins and losses. versus-player = just start the bot in 3-4. fight = stop every bot on the server, then two Gambits fight: the bot in 3-4 sits in the lobby, the one in 5-6 challenges it bot-handoff = the bots signal each other with it: do not press'
         required: true
-        default: 'live'
+        default: 'ranmaru-deploy'
         type: choice
         options:
-          - live
+          - ranmaru-deploy
+          - ranmaru-stop
+          - versus-player
           - fight
-          - prod-vs
-          - large-garbage
+          - bot-handoff
       server:
-        description: 'live: which server the bot joins'
+        description: '2. Server. auto = panelattack.com, or the Bramp server (104.156.250.136) for a fight. Stop / deploy / fight clear it of bots first'
         required: true
-        default: '104.156.250.136:49569'
+        default: 'auto'
         type: choice
         options:
-          - 104.156.250.136:49569
+          - auto
           - panelattack.com:49569
-          - betaserver.panelattack.com:59569
-      name:
-        description: 'live: the bot''s name in the lobby (letters, digits, _; 16 max). Reusing a name logs into the same account'
-        required: false
-        default: 'Beverly'
-      hours:
-        description: 'live: how long it stays in the lobby, 1-5 hours (cancel the run to stop it sooner)'
-        required: false
-        default: '5'
+          - 104.156.250.136:49569
       bot:
-        description: 'fight: who sits in the lobby as `name`. live on the beta server: wasm or bitbot play it with GameCreator''s bots; anything else runs the weighted bot of `profile`'
-        required: false
-        default: 'beverly'
+        description: '3. Gambit (the bot in the lobby): the latest main, or a kept build named for its actions window (w150 = 150 actions in 10 seconds)'
+        required: true
+        default: 'gambit'
         type: choice
         options:
-          - bitbot
-          - bitbotwasm
-          - wasm
-          - beverly
-          - plamp
-          - heuristic
           - gambit
+          - gambit-w150
+          - gambit-w100
+          - gambit-w90
+          - gambit-w80
+      name:
+        description: '4. That bot''s name in the lobby (letters, digits, _; 16 max). A # is the next number: ranmaru-deploy swaps between the two saved accounts and renames one, so Ranmaru_p#_CPU gives p7, then p8, ... On the Bramp server the names in a fight take over existing accounts, so any name works'
+        required: false
+        default: 'Ranmaru_p#_CPU'
       opponent:
-        description: 'fight: who challenges it as `name`2, over and over -- or "you" to leave it waiting for people, or "challenge" to have `bot` challenge the second name in `name` ("A,B") that sits in the lobby in ANOTHER run -- one runner each'
-        required: false
-        default: 'you'
+        description: '5. Fight only: the second Gambit, who challenges the first'
+        required: true
+        default: 'gambit-w100'
         type: choice
         options:
-          - you
-          - challenge
-          - bitbot
-          - bitbotwasm
-          - wasm
-          - beverly
-          - plamp
-          - heuristic
           - gambit
-      profile:
-        description: 'live: which trained bot to play as (a file in bot/profiles/). fight with wasm: a bot/profiles/*.wasm.json plays those trained weights (e.g. bot/profiles/wasmbot.wasm.json)'
+          - gambit-w150
+          - gambit-w100
+          - gambit-w90
+          - gambit-w80
+      opponent_name:
+        description: '6. Fight only: the second Gambit''s name in the lobby (blank = the first name plus 2). Any name works on the Bramp server too'
         required: false
-        default: 'bot/profiles/beverly.json'
-      matches:
-        description: 'prod-vs: games to play (~2.5 min each). large-garbage: seeds to run'
-        required: false
-        default: '3'
-      difficulty:
-        description: 'prod-vs / large-garbage: bot difficulty'
-        required: false
-        default: 'hard'
-      upstream_ref:
-        description: 'Advanced, betaserver only: run the bot on this upstream commit/tag/branch instead of the latest beta. Only needed if the server is not on latest beta'
+        default: 'Gambit_100'
+      player:
+        description: '7. versus-player only: a player''s name -- the bot challenges them and plays only them. Blank = it plays whoever challenges it'
         required: false
         default: ''
-      gambit_from:
-        description: 'fight with gambit: play the Gambit (games/the-game/ai/gambit) of this GameCreator commit, or of a version named in its games/the-game/ai/eval/gambit-versions.txt, instead of its latest main'
+      hours:
+        description: '8. Hours the bots stay up'
+        required: true
+        default: '5'
+        type: choice
+        options:
+          - '5'
+          - '4'
+          - '3'
+          - '2'
+          - '1'
+      advanced:
+        description: '9. Advanced -- leave blank. Words like gambit_from=<GameCreator commit>, upstream_ref=<commit>, profile=<file>'
         required: false
         default: ''
 
@@ -110,6 +93,12 @@ on:
 # garbage/death/display messages). Its bot lives in bot/ on this branch of
 # THIS repo, built to run on an unmodified upstream checkout:
 env:
+  # versus-player is `live` under another name
+  MODE: ${{ inputs.mode == 'versus-player' && 'live' || inputs.mode }}
+  # the server picked, 'auto' resolved: the Bramp server for a fight, panelattack.com otherwise
+  SERVER_EFF: ${{ inputs.server != 'auto' && inputs.server || (inputs.mode == 'fight' && '104.156.250.136:49569' || 'panelattack.com:49569') }}
+  # versus-player with a player typed in: the bot challenges that player and plays only them (the NAME,PLAYER form the live step reads)
+  BOT_NAME: ${{ inputs.mode == 'versus-player' && inputs.player != '' && format('{0},{1}', inputs.name, inputs.player) || inputs.name }}
   # The two servers `server` offers; the beta one runs upstream's protocol.
   BETA_SERVER: betaserver.panelattack.com:59569
   # the main Panel Attack server (the client's default port); it runs the upstream beta branch's game
@@ -124,15 +113,42 @@ env:
 jobs:
   bot-vs-bot:
     name: Run the bot
+    if: ${{ !startsWith(inputs.mode, 'ranmaru') && inputs.mode != 'bot-handoff' && (inputs.mode != 'fight' || contains(inputs.advanced, 'bot_run')) }}
     runs-on: ubuntu-latest
     # A beta-server run commits a newly registered bot's account id back to
     # UPSTREAM_BOT_REF so the name can be reused (see "Save the account id").
     permissions:
       contents: write
+      actions: write
     # Under the 6-hour hard cap so a `live` session stops on our timeout.
     timeout-minutes: 355
     steps:
       - uses: actions/checkout@v4
+
+      # The `advanced` words, and the weight set the bot plays when none is given
+      - name: Read the options
+        env:
+          ADVANCED: ${{ inputs.advanced }}
+          BOT: ${{ inputs.bot }}
+        run: |
+          set -eu
+          profile=""; gambit_from=""; upstream_ref=""; standby=""; after=""
+          for w in $ADVANCED; do
+            case "$w" in
+              profile=*) profile=${w#profile=};;
+              gambit_from=*) gambit_from=${w#gambit_from=};;
+              upstream_ref=*) upstream_ref=${w#upstream_ref=};;
+              bot_run=*|now|only-if-running|dry-run) ;;   # bot_run marks a bot run started by a fight; now only matters to stop / deploy
+              standby) standby=1;;   # a deploy's new bot: build everything, then wait for the older bots here to leave
+              after=*) after=${w#after=};;   # ... or only for the bot with this name (the account this one takes over)
+              *) echo "::error::advanced: I do not know '$w' (use profile=, gambit_from= or upstream_ref=)"; exit 1;;
+            esac
+          done
+          # gambit-w100 etc.: Gambit of that kept build (a name in GameCreator's gambit-versions.txt)
+          kind=$BOT
+          case "$BOT" in gambit-*) kind=gambit; [ -n "$gambit_from" ] || gambit_from=$BOT;; esac
+          [ -n "$profile" ] || profile=survivor-profiles/gambit.json
+          { echo "PROFILE=$profile"; echo "GAMBIT_FROM=$gambit_from"; echo "UPSTREAM_REF=$upstream_ref"; echo "BOT_KIND=$kind"; echo "STANDBY=$standby"; echo "AFTER=$after"; } >> "$GITHUB_ENV"
 
       - name: Install luajit + luarocks
         run: |
@@ -157,15 +173,15 @@ jobs:
       - name: Pick the server
         run: |
           set -eu
-          server='${{ inputs.server }}'
+          server='${{ env.SERVER_EFF }}'
           if [ "$server" = "$BETA_SERVER" ] || [ "$server" = "$PROD_SERVER" ]; then
-            [ '${{ inputs.mode }}' = live ] || { echo "$server is only for mode: live"; exit 1; }   # fight: the fork's client only
+            [ '${{ env.MODE }}' = live ] || { echo "$server is only for mode: live"; exit 1; }   # fight: the fork's client only
             dir="$GITHUB_WORKSPACE/upstream"
           else
             dir="$GITHUB_WORKSPACE"
           fi
           { echo "BOT_DIR=$dir"; echo "BOT_HOST=${server%%:*}"; echo "BOT_PORT=${server##*:}"; } >> "$GITHUB_ENV"
-          echo "::notice::${{ inputs.mode }} on $server"
+          echo "::notice::${{ env.MODE }} on $server"
 
       # THE SERVER'S OWN BUILD, AS NEAR AS CAN BE KNOWN. Nothing of upstream is
       # vendored here: every run fetches upstream and drops this repo's bot/ on
@@ -180,7 +196,7 @@ jobs:
       #   3. the latest UPSTREAM_REF -- right whenever the server was deployed
       #      from beta's head, which is the normal case.
       - name: Check out the upstream bot
-        if: (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER)
+        if: (env.SERVER_EFF == env.BETA_SERVER || env.SERVER_EFF == env.PROD_SERVER)
         uses: actions/checkout@v4
         with:
           ref: ${{ env.UPSTREAM_BOT_REF }}
@@ -188,14 +204,14 @@ jobs:
           sparse-checkout: bot
 
       - name: Fetch upstream Panel Attack and add the bot
-        if: (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER)
+        if: (env.SERVER_EFF == env.BETA_SERVER || env.SERVER_EFF == env.PROD_SERVER)
         env:
-          PIN: ${{ inputs.upstream_ref }}
+          PIN: ${{ env.UPSTREAM_REF }}
         run: |
           set -eu
           if [ -n "$PIN" ]; then
             ref="$PIN"; why="pinned by the upstream_ref input"
-          elif [ '${{ inputs.server }}' = "$PROD_SERVER" ]; then
+          elif [ '${{ env.SERVER_EFF }}' = "$PROD_SERVER" ]; then
             ref="$UPSTREAM_REF"; why="latest $UPSTREAM_REF (the game the main server runs)"
           elif git ls-remote --exit-code --tags "$UPSTREAM_REPO" "refs/tags/$UPSTREAM_DEPLOYED_TAG" >/dev/null; then
             ref="refs/tags/$UPSTREAM_DEPLOYED_TAG"; why="the $UPSTREAM_DEPLOYED_TAG tag (the last deploy)"
@@ -218,31 +234,6 @@ jobs:
              LUA_CPATH="./common/lib/?.so;./common/lib/?/?.so;$(luarocks path --local --lua-version 5.1 --lr-cpath);;" \
              luajit bot/tests/survivalLinkTelegraphVerify.lua)
 
-      - name: Run bot-vs-bot smoke test against the live server
-        if: inputs.mode == 'prod-vs'
-        id: smoke
-        run: |
-          eval "$(luarocks path --local --lua-version 5.1)"
-          set -o pipefail
-          luajit bot/winRateTest.lua "" "" \
-            "${{ inputs.matches }}" "$BOT_HOST" "$BOT_PORT" "${{ inputs.difficulty }}" \
-            2>&1 | tee bot-prod-smoke.log
-        continue-on-error: true
-
-      # "large_garbage" training preset (TrainingMenu.lua): 6-wide x 12-tall blocks.
-      # Offline harness (committed matchStart fixture, real engine) -- runs entirely
-      # on the runner, does NOT contact the server. One block per volley interval
-      # (900f = the preset's delayBeforeRepeat); 3600f cap = 60s survival target.
-      - name: Run large-garbage practice survival (offline, real engine)
-        if: inputs.mode == 'large-garbage'
-        id: largegarbage
-        run: |
-          eval "$(luarocks path --local --lua-version 5.1)"
-          set -o pipefail
-          luajit bot/survivalStress.lua 900 3600 "${{ inputs.matches }}" "" "${{ inputs.difficulty }}" 6 12 \
-            2>&1 | tee bot-prod-smoke.log
-        continue-on-error: true
-
       # LIVE IS NOT THE SMOKE TEST. prod-vs logs in two throwaway accounts,
       # puts them in a PRIVATE room against each other and leaves. This logs
       # in ONE bot under a real name and keeps it up, so a human can find it
@@ -252,23 +243,23 @@ jobs:
       # re-run it, or run bot/beverly.sh on the server box under systemd for
       # something permanent.
       - name: Check the name and the weight set before connecting
-        if: (inputs.mode == 'live' || inputs.mode == 'survival') && !(inputs.mode == 'live' && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER) && (inputs.bot == 'wasm' || inputs.bot == 'bitbot' || inputs.bot == 'gambit'))
+        if: (env.MODE == 'live' || env.MODE == 'survival') && !(env.MODE == 'live' && (env.SERVER_EFF == env.BETA_SERVER || env.SERVER_EFF == env.PROD_SERVER) && (env.BOT_KIND == 'wasm' || env.BOT_KIND == 'bitbot' || env.BOT_KIND == 'gambit'))
         run: |
           set -eu
           cd "$BOT_DIR"
-          n='${{ inputs.name }}'
+          n='${{ env.BOT_NAME }}'
           [ -n "$n" ] || { echo "name is empty"; exit 1; }
           [ ${#n} -le 16 ] || { echo "name '$n' is ${#n} chars; the server limit is 16"; exit 1; }
-          if [ '${{ inputs.mode }}' = survival ]; then
-            [ '${{ inputs.server }}' = fork ] || { echo "survival plays the fork's server only"; exit 1; }
+          if [ '${{ env.MODE }}' = survival ]; then
+            [ '${{ env.SERVER_EFF }}' = fork ] || { echo "survival plays the fork's server only"; exit 1; }
             exit 0
           fi
-          [ -f '${{ inputs.profile }}' ] || { echo "no weight set at ${{ inputs.profile }}"; exit 1; }
+          [ -f '${{ env.PROFILE }}' ] || { echo "no weight set at ${{ env.PROFILE }}"; exit 1; }
           eval "$(luarocks path --local --lua-version 5.1)"
           luajit -e 'package.path="./?.lua;"..package.path; require("bot.headlessBoot");
-            local b=require("bot.WeightedBrain").new({profile="${{ inputs.profile }}"})
+            local b=require("bot.WeightedBrain").new({profile="${{ env.PROFILE }}"})
             print(string.format("%s loads: depth %d beam %d rise %s reaction %d",
-              "${{ inputs.profile }}", b.depth, b.beam, tostring(b.rise), b.reaction))'
+              "${{ env.PROFILE }}", b.depth, b.beam, tostring(b.rise), b.reaction))'
 
       # SAME NAME, SAME ACCOUNT, EVERY RUN. A runner starts with no
       # bot/identities file, so without this every dispatch registers the name
@@ -284,9 +275,9 @@ jobs:
       # one), so a beta bot keeps its name by saving the id it was given
       # instead -- see "Save the account id".
       - name: Derive this name's account id
-        if: inputs.mode == 'live' && !(inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER)
+        if: env.MODE == 'live' && !(env.SERVER_EFF == env.BETA_SERVER || env.SERVER_EFF == env.PROD_SERVER)
         env:
-          BASE_NAME: ${{ inputs.name }}
+          BASE_NAME: ${{ env.BOT_NAME }}
           BOT_IP: ${{ env.BOT_HOST }}
         run: |
           names="$BASE_NAME"
@@ -307,35 +298,51 @@ jobs:
       # is built here from GameCreator's own native/build.sh line; WasmSurvivor
       # is a Node process beside the client (bot/SurvivalLink.lua talks to it).
       - name: Check out GameCreator (beta bot)
-        if: inputs.mode == 'live' && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER) && (inputs.bot == 'wasm' || inputs.bot == 'bitbot' || inputs.bot == 'gambit')
+        if: env.MODE == 'live' && (env.SERVER_EFF == env.BETA_SERVER || env.SERVER_EFF == env.PROD_SERVER) && (env.BOT_KIND == 'wasm' || env.BOT_KIND == 'bitbot' || env.BOT_KIND == 'gambit')
         uses: actions/checkout@v4
         with:
           repository: briankeegan/GameCreator
           path: GameCreator
           sparse-checkout: games/the-game
 
+      - name: The Gambit of another GameCreator commit (beta/real server)
+        if: env.MODE == 'live' && (env.SERVER_EFF == env.BETA_SERVER || env.SERVER_EFF == env.PROD_SERVER) && env.BOT_KIND == 'gambit' && env.GAMBIT_FROM != ''
+        env:
+          GAMBIT_FROM: ${{ env.GAMBIT_FROM }}
+        run: |
+          set -eu
+          cd GameCreator
+          from=$(awk -v n="$GAMBIT_FROM" '$1 == n { print $2 }' games/the-game/ai/eval/gambit-versions.txt 2>/dev/null); from=${from:-$GAMBIT_FROM}
+          git fetch -q --depth 1 origin "$from"
+          rm -rf games/the-game/ai/gambit && git checkout FETCH_HEAD -- games/the-game/ai/gambit
+          echo "GAMBIT_COMMIT=$(git rev-parse FETCH_HEAD)" >> "$GITHUB_ENV"
+          echo "::notice::Gambit of GameCreator $GAMBIT_FROM ($from)"
+
       - uses: actions/setup-node@v4
-        if: inputs.mode == 'live' && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER) && (inputs.bot == 'wasm' || inputs.bot == 'bitbot' || inputs.bot == 'gambit')
+        if: env.MODE == 'live' && (env.SERVER_EFF == env.BETA_SERVER || env.SERVER_EFF == env.PROD_SERVER) && (env.BOT_KIND == 'wasm' || env.BOT_KIND == 'bitbot' || env.BOT_KIND == 'gambit')
         with:
           node-version: '22'
 
       - name: Sit in the lobby (beta, ${{ inputs.bot }})
-        if: inputs.mode == 'live' && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER) && (inputs.bot == 'wasm' || inputs.bot == 'bitbot' || inputs.bot == 'gambit')
+        if: env.MODE == 'live' && (env.SERVER_EFF == env.BETA_SERVER || env.SERVER_EFF == env.PROD_SERVER) && (env.BOT_KIND == 'wasm' || env.BOT_KIND == 'bitbot' || env.BOT_KIND == 'gambit')
         id: betalink
         run: |
           set -eu
           eval "$(luarocks path --local --lua-version 5.1)"
           export GC_EVAL_DIR="$GITHUB_WORKSPACE/GameCreator/games/the-game/ai/eval"
           # name is "BOT" or "BOT,OPPONENT": the second half is a lobby name this bot challenges
-          name='${{ inputs.name }}'
+          name='${{ env.BOT_NAME }}'
           # "BOT,OPPONENT" or "BOT,OPPONENT,GAMES": after GAMES finished games against OPPONENT the bot stops challenging
           # and sits in the lobby accepting whoever challenges
           games=""
           case "$name" in *,*) target=${name#*,}; name=${name%%,*};; *) target="";; esac
           case "$target" in *,*) games=${target#*,}; target=${target%%,*};; esac
+          # GAMES may be "first10": a series, first to 10 wins, then back to accepting anyone
+          first=""; case "$games" in first*) first=${games#first}; games="";; esac
           [ -n "$name" ] && [ ${#name} -le 16 ] || { echo "name '$name' must be 1-16 characters"; exit 1; }
           echo "::notice::GameCreator at $(git -C "$GC_EVAL_DIR" log -1 --format='%h %s' | cut -c1-120)"
-          kind='${{ inputs.bot }}'
+          kind='${{ env.BOT_KIND }}'
+          pin=""
           if [ "$kind" = bitbot ]; then
             line=$(grep -E '^clang .* -shared .*libbit\.so' "$GC_EVAL_DIR/native/build.sh" | head -1)
             (cd "$GC_EVAL_DIR/native" && eval "$line") 2> bitbot-build.log || { cat bitbot-build.log; echo "libbit.so did not build"; exit 1; }
@@ -345,15 +352,28 @@ jobs:
             # (gambit/lua/GambitNative.lua). Its profile is a path under the eval dir, as numbers (words.js).
             G="$GC_EVAL_DIR/../gambit"
             gp=survivor-profiles/gambit.json
-            case '${{ inputs.profile }}' in survivor-profiles/*) gp='${{ inputs.profile }}';; esac
+            case '${{ env.PROFILE }}' in survivor-profiles/*) gp='${{ env.PROFILE }}';; esac
             [ -f "$GC_EVAL_DIR/$gp" ] || { echo "no Gambit profile $GC_EVAL_DIR/$gp"; exit 1; }
             sh "$G/build.sh" native > gambit-build.log 2>&1 || { cat gambit-build.log; echo "libgambit.so did not build"; exit 1; }
             GC_SURVIVOR_PROFILE="$GC_EVAL_DIR/$gp" node "$G/words.js" > "$PWD/gambit.words" 2>> gambit-build.log || { cat gambit-build.log; echo "Gambit's profile did not encode"; exit 1; }
-            echo "::notice::Gambit built from GameCreator $(git -C "$GC_EVAL_DIR" log -1 --format=%h), profile $gp"
+            gc=$(git -C "$GC_EVAL_DIR" log -1 --format=%h)
+            [ -z "${GAMBIT_COMMIT:-}" ] || gc="${GAMBIT_COMMIT:0:8} (gambit_from '${{ env.GAMBIT_FROM }}'; main is $gc)"
+            echo "::notice::Gambit built from GameCreator $gc, profile $gp"
             export GC_GAMBIT_WORDS="$PWD/gambit.words" GC_GAMBIT_LOG="$PWD/gambit-$name.log"
+            # the machine as Gambit's training gives it (GameCreator's eval/training.sh): the client on CPU 0, Gambit's own thread alone
+            # on a CPU of another core, its four workers (at the idle class) on the CPUs left
+            core() { cat "/sys/devices/system/cpu/cpu$1/topology/core_id" 2>/dev/null || echo "$1"; }
+            gcpu="" wcpus=""
+            for c in $(seq 1 $(( $(nproc) - 1 ))); do
+              if [ -z "$gcpu" ] && [ "$(core "$c")" != "$(core 0)" ]; then gcpu=$c; else wcpus=${wcpus:+$wcpus,}$c; fi
+            done
+            [ -n "$gcpu" ] || { gcpu=0; wcpus=0; }
+            export GC_GAMBIT_WORKERS=4 GC_GAMBIT_CPUS="$gcpu" GC_GAMBIT_WORKER_CPUS="${wcpus:-$gcpu}"
+            pin="taskset -c 0"
+            echo "::notice::Gambit: the client on CPU 0, Gambit on $gcpu, its 4 workers on ${wcpus:-$gcpu}"
             brain=gambit
           else
-            prof='${{ inputs.profile }}'
+            prof='${{ env.PROFILE }}'
             prof_abs=""
             case "$prof" in
               *.wasm.json)
@@ -398,23 +418,59 @@ jobs:
           secs=$(( ${{ inputs.hours }} * 3600 ))
           echo "::notice::$name ($brain) joining $BOT_HOST:$BOT_PORT for ${{ inputs.hours }}h"
           set -o pipefail
-          PA_CHALLENGE="$target" PA_CHALLENGE_GAMES="$games" PA_ACCEPT_ONLY="$only" PA_DECLINE_MODES="$decline" timeout "$secs" luajit bot/playBot.lua "$BOT_HOST" "$BOT_PORT" "$name" 4 12 "$brain" \
+          # A deploy's new bot is built by now and waits, not logged in, until every older bot on this server has left
+          if [ "${STANDBY:-}" = 1 ] || [ -n "${AFTER:-}" ]; then
+            # (a rename takes over the account of the bot named AFTER; it waits for that one only)
+            who="live · $BOT_HOST:$BOT_PORT · ${AFTER:-}"
+            echo "standby: built; waiting for the older bots (${AFTER:-all}) on $BOT_HOST:$BOT_PORT to leave"
+            began=$(date -u +%s)
+            while :; do
+              out=$(GH_TOKEN="${{ github.token }}" gh api "repos/${{ github.repository }}/actions/runs?per_page=50" --jq "[ ([.workflow_runs[] | select(.status != \"completed\") | select(.id < $GITHUB_RUN_ID) | select(.display_title | startswith(\"$who\"))] | length), ([.workflow_runs[] | select(.display_title == \"bot-handoff · $BOT_HOST:$BOT_PORT\") | select((.created_at | fromdateiso8601) > $began)] | length) ] | @tsv" 2>/dev/null || echo "1 0")
+              set -- $out; older=${1:-1}; handoff=${2:-0}
+              [ "$older" -eq 0 ] && break
+              [ "$handoff" -gt 0 ] && { echo "the old bot has finished its game and is sitting out its last seconds"; break; }
+              sleep 2
+            done
+            echo "standby over: logging in"
+          fi
+          # A stop / deploy / fight-start run for this server, made after this bot started, waits on it: the file tells the bot
+          # to leave once no game is running (bot/playBot.lua PA_STOP_FILE). Runs made before it started are not about it.
+          export PA_STOP_FILE="$RUNNER_TEMP/stop-after-the-game"; rm -f "$PA_STOP_FILE" "$PA_STOP_FILE.grace"
+          started=$(date -u +%s)
+          ( while sleep 10; do
+              ids=$(GH_TOKEN="${{ github.token }}" gh api "repos/${{ github.repository }}/actions/runs?per_page=30" --jq ".workflow_runs[] | select(.status != \"completed\") | select(.display_title | test(\"^(ranmaru-stop|fight-start) · $BOT_HOST:$BOT_PORT( · .*)?\$\")) | select((.created_at | fromdateiso8601) > $started) | select(((.display_title | capture(\"except=(?<x>[0-9]+)\")? | .x) // \"0\") != \"$GITHUB_RUN_ID\") | .id" 2>/dev/null || true)
+              if [ -n "$ids" ]; then
+                touch "$PA_STOP_FILE"
+                # the bot sits out its last seconds after a game; the next bot comes in during them
+                for _ in $(seq 1 14400); do
+                  if [ -e "$PA_STOP_FILE.grace" ]; then
+                    GH_TOKEN="${{ github.token }}" gh workflow run bot-prod-smoke-test.yml --repo "${{ github.repository }}" --ref "${{ github.ref_name }}" -f mode=bot-handoff -f server="$BOT_HOST:$BOT_PORT" || true
+                    break
+                  fi
+                  sleep 0.5
+                done
+                break
+              fi
+            done ) &
+          # a player who does not start a game within 60 s is left alone in the room (not for a bot that challenges someone)
+          idle=60; [ -z "$target" ] || idle=0
+          PA_IDLE_LIMIT="$idle" PA_CHALLENGE="$target" PA_CHALLENGE_GAMES="$games" PA_CHALLENGE_FIRST_TO="$first" PA_ACCEPT_ONLY="$only" PA_DECLINE_MODES="$decline" timeout "$secs" $pin luajit bot/playBot.lua "$BOT_HOST" "$BOT_PORT" "$name" 4 12 "$brain" \
             2>&1 | tee "$GITHUB_WORKSPACE/bot-prod-smoke.log" || [ $? -eq 124 ]
 
       - name: Sit in the lobby
-        if: inputs.mode == 'live' && !(inputs.mode == 'live' && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER) && (inputs.bot == 'wasm' || inputs.bot == 'bitbot' || inputs.bot == 'gambit'))
+        if: env.MODE == 'live' && !(env.MODE == 'live' && (env.SERVER_EFF == env.BETA_SERVER || env.SERVER_EFF == env.PROD_SERVER) && (env.BOT_KIND == 'wasm' || env.BOT_KIND == 'bitbot' || env.BOT_KIND == 'gambit'))
         id: live
         env:
-          PA_SEARCH_PROFILE: ${{ inputs.profile }}
+          PA_SEARCH_PROFILE: ${{ env.PROFILE }}
         run: |
           eval "$(luarocks path --local --lua-version 5.1)"
           secs=$(( ${{ inputs.hours }} * 3600 ))
-          echo "::notice::${{ inputs.name }} joining $BOT_HOST:$BOT_PORT for ${{ inputs.hours }}h"
+          echo "::notice::${{ env.BOT_NAME }} joining $BOT_HOST:$BOT_PORT for ${{ inputs.hours }}h"
           cd "$BOT_DIR"
           set -o pipefail
           # The bot runs until killed, so the timeout IS the stop condition:
           # 124 from `timeout` is this working, not failing.
-          timeout "$secs" bot/plamp.sh "$BOT_HOST" "$BOT_PORT" '${{ inputs.name }}' \
+          timeout "$secs" bot/plamp.sh "$BOT_HOST" "$BOT_PORT" '${{ env.BOT_NAME }}' \
             2>&1 | tee "$GITHUB_WORKSPACE/bot-prod-smoke.log" || [ $? -eq 124 ]
 
       # WASMSURVIVOR. The survival bot is GameCreator's (survivor.js): it
@@ -423,7 +479,7 @@ jobs:
       # what to press every frame through bot/SurvivalLink.lua. It runs beside
       # the client on this runner, on the cores the client does not use.
       - name: Check out WasmSurvivor
-        if: inputs.mode == 'survival'
+        if: env.MODE == 'survival'
         uses: actions/checkout@v4
         with:
           repository: briankeegan/GameCreator
@@ -431,12 +487,12 @@ jobs:
           sparse-checkout: games/the-game
 
       - uses: actions/setup-node@v4
-        if: inputs.mode == 'survival'
+        if: env.MODE == 'survival'
         with:
           node-version: '22'
 
       - name: Start WasmSurvivor
-        if: inputs.mode == 'survival'
+        if: env.MODE == 'survival'
         run: |
           set -eu
           nohup node GameCreator/games/the-game/ai/eval/survivor.js --port 47777 > "$GITHUB_WORKSPACE/survivor.log" 2>&1 &
@@ -445,16 +501,16 @@ jobs:
           grep -q listening "$GITHUB_WORKSPACE/survivor.log" || { echo "WasmSurvivor did not start"; exit 1; }
 
       - name: Sit in the lobby (WasmSurvivor)
-        if: inputs.mode == 'survival'
+        if: env.MODE == 'survival'
         id: survival
         env:
           PA_SURVIVOR_PORT: '47777'
         run: |
           eval "$(luarocks path --local --lua-version 5.1)"
           secs=$(( ${{ inputs.hours }} * 3600 ))
-          echo "::notice::${{ inputs.name }} (WasmSurvivor) joining $BOT_HOST:$BOT_PORT for ${{ inputs.hours }}h"
+          echo "::notice::${{ env.BOT_NAME }} (WasmSurvivor) joining $BOT_HOST:$BOT_PORT for ${{ inputs.hours }}h"
           set -o pipefail
-          timeout "$secs" luajit bot/playBot.lua "$BOT_HOST" "$BOT_PORT" '${{ inputs.name }}' 4 12 survival \
+          timeout "$secs" luajit bot/playBot.lua "$BOT_HOST" "$BOT_PORT" '${{ env.BOT_NAME }}' 4 12 survival \
             2>&1 | tee "$GITHUB_WORKSPACE/bot-prod-smoke.log" || [ $? -eq 124 ]
 
       # SAME NAME, SAME ACCOUNT on beta. Upstream hands a new name a random id
@@ -462,10 +518,10 @@ jobs:
       # commits it to UPSTREAM_BOT_REF so the next run logs back in instead of
       # being denied as "already taken". Not secret, on purpose: bot accounts.
       - name: Save the account id
-        if: always() && (inputs.server == env.BETA_SERVER || inputs.server == env.PROD_SERVER)
+        if: always() && (env.SERVER_EFF == env.BETA_SERVER || env.SERVER_EFF == env.PROD_SERVER)
         run: |
           set -eu
-          n='${{ inputs.name }}'; n=${n%%,*}   # (a "BOT,OPPONENT" name: the account is the bot's)
+          n='${{ env.BOT_NAME }}'; n=${n%%,*}   # (a "BOT,OPPONENT" name: the account is the bot's)
           f="bot/identities/${n}_${BOT_HOST}.txt"
           [ -f "upstream/$f" ] || { echo "no id to save"; exit 0; }
           if [ -f "botsrc/$f" ] && cmp -s "upstream/$f" "botsrc/$f"; then echo "id already saved"; exit 0; fi
@@ -475,7 +531,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add "$f"
-          git commit -m "bot: save account id for '${{ inputs.name }}' on $BOT_HOST"
+          git commit -m "bot: save account id for '${{ env.BOT_NAME }}' on $BOT_HOST"
           for i in 1 2 3; do
             git push origin "HEAD:$UPSTREAM_BOT_REF" && exit 0
             git pull --rebase origin "$UPSTREAM_BOT_REF"
@@ -487,28 +543,27 @@ jobs:
       # native/build.sh) and the client plays it in-process
       # (bot/BitBotNative.lua, as GameCreator's lua/train.lua does).
       - name: Check out GameCreator (BitBot, WasmSurvivor)
-        if: inputs.mode == 'fight' && (contains(fromJSON('["bitbot","bitbotwasm","wasm","gambit"]'), inputs.bot) || contains(fromJSON('["bitbot","bitbotwasm","wasm","gambit"]'), inputs.opponent))
+        if: env.MODE == 'fight' && (contains(fromJSON('["bitbot","bitbotwasm","wasm","gambit"]'), env.BOT_KIND) || contains(fromJSON('["bitbot","bitbotwasm","wasm","gambit"]'), inputs.player))
         uses: actions/checkout@v4
         with:
           repository: briankeegan/GameCreator
           path: GameCreator
           sparse-checkout: games/the-game
 
-      - name: The Gambit of another GameCreator commit
-        if: inputs.mode == 'fight' && inputs.gambit_from != ''
+      - name: The Gambit of another GameCreator commit (fight)
+        if: env.MODE == 'fight' && env.BOT_KIND == 'gambit' && env.GAMBIT_FROM != ''
         env:
-          GAMBIT_FROM: ${{ inputs.gambit_from }}
+          GAMBIT_FROM: ${{ env.GAMBIT_FROM }}
         run: |
+          set -eu
           cd GameCreator
           from=$(awk -v n="$GAMBIT_FROM" '$1 == n { print $2 }' games/the-game/ai/eval/gambit-versions.txt 2>/dev/null); from=${from:-$GAMBIT_FROM}
-          # (a short commit hash cannot be fetched by itself: resolved first against the branches' history)
-          case "$from" in *[!0-9a-f]*) ;; *) if [ ${#from} -lt 40 ]; then git fetch -q --filter=blob:none $([ -f .git/shallow ] && echo --unshallow) origin '+refs/heads/*:refs/remotes/origin/*' && from=$(git rev-parse --verify "$from^{commit}"); fi;; esac
           git fetch -q --depth 1 origin "$from"
           rm -rf games/the-game/ai/gambit && git checkout FETCH_HEAD -- games/the-game/ai/gambit
           echo "::notice::Gambit of GameCreator $GAMBIT_FROM ($from)"
 
       - uses: actions/setup-node@v4
-        if: inputs.mode == 'fight' && (contains(fromJSON('["bitbot","bitbotwasm","wasm","gambit"]'), inputs.bot) || contains(fromJSON('["bitbot","bitbotwasm","wasm","gambit"]'), inputs.opponent))
+        if: env.MODE == 'fight' && (contains(fromJSON('["bitbot","bitbotwasm","wasm","gambit"]'), env.BOT_KIND) || contains(fromJSON('["bitbot","bitbotwasm","wasm","gambit"]'), inputs.player))
         with:
           node-version: '22'
 
@@ -516,18 +571,18 @@ jobs:
       # pre-flight when BitBot plays (nothing joins the lobby if that fails),
       # then `bot` in the lobby and `opponent` challenging it.
       - name: Fight
-        if: inputs.mode == 'fight'
+        if: env.MODE == 'fight'
         id: fight
         env:
           GC_EVAL_DIR: ${{ github.workspace }}/GameCreator/games/the-game/ai/eval
-          WASM_PROFILE: ${{ inputs.profile }}
+          WASM_PROFILE: ${{ env.PROFILE }}
         run: |
           eval "$(luarocks path --local --lua-version 5.1)"
           [ "${BOT_HOST}:${BOT_PORT}" != "$BETA_SERVER" ] && [ "${BOT_HOST}:${BOT_PORT}" != "$PROD_SERVER" ] || { echo "fight plays the fork's server only"; exit 1; }
           if [ -d GameCreator ]; then echo "::notice::GameCreator $(git -C GameCreator log -1 --format='%h %s')"; fi
-          echo "::notice::${{ inputs.name }} (${{ inputs.bot }}) vs ${{ inputs.opponent }} on $BOT_HOST:$BOT_PORT for ${{ inputs.hours }}h"
+          echo "::notice::${{ env.BOT_NAME }} (${{ env.BOT_KIND }}) vs ${{ inputs.player || 'you' }} on $BOT_HOST:$BOT_PORT for ${{ inputs.hours }}h"
           set -o pipefail
-          bot/fight.sh "$BOT_HOST" "$BOT_PORT" $(( ${{ inputs.hours }} * 3600 )) '${{ inputs.bot }}' '${{ inputs.name }}' '${{ inputs.opponent }}' \
+          bot/fight.sh "$BOT_HOST" "$BOT_PORT" $(( ${{ inputs.hours }} * 3600 )) '${{ env.BOT_KIND }}' '${{ env.BOT_NAME }}' '${{ inputs.player || 'you' }}' \
             2>&1 | tee bot-prod-smoke.log
 
       # A new name's account id, made by the server at its first login, is
@@ -535,7 +590,7 @@ jobs:
       # in as the same account (fight.sh reads bot/identities/). Runs on
       # cancel too: an id is saved however the run ends.
       - name: Save new account ids
-        if: always() && inputs.mode == 'fight'
+        if: always() && env.MODE == 'fight'
         run: |
           set -u
           added=""
@@ -554,11 +609,46 @@ jobs:
           done
           echo "::error::could not save account ids for$added"; exit 1
 
+      - name: Per-game sanity (gambit)
+        if: always() && env.MODE == 'live' && env.BOT_KIND == 'gambit'
+        run: |
+          # Gambit carries state between games when something is not reset per game. These checks show it:
+          # every game must open in "opener", no game may fall back to "time attack" after its first
+          # 300 frames, and the share of lines with the opponent read as topped out must not climb.
+          python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY" || true
+          import glob, re
+          for f in sorted(glob.glob("gambit-*.log")):
+              games, prev = [], None
+              for l in open(f, errors="ignore"):
+                  m = re.match(r"GAMBITD (\d+) ([a-z ]+?) play=.* enemy=\d+/(\d+)/", l) or re.match(r"GAMBITD (\d+) ([a-z ]+?) play=", l)
+                  if not m:
+                      continue
+                  c = int(m.group(1))
+                  if prev is None or c < prev - 500:
+                      games.append([])
+                  prev = c
+                  games[-1].append((c, m.group(2), int(m.group(3)) if m.lastindex >= 3 else None))
+              print(f"## Per-game sanity: {f} ({len(games)} games)")
+              bad = [i + 1 for i, g in enumerate(games) if g and g[0][1] != "opener"]
+              late = [i + 1 for i, g in enumerate(games) if any(s == "time attack" and c > 300 for c, s, _ in g)]
+              def share(gs):
+                  n = sum(1 for g in gs for _, _, o in g if o is not None)
+                  return sum(1 for g in gs for _, _, o in g if o == 1) / n if n else 0
+              k = max(1, len(games) // 3)
+              first, last = share(games[:k]), share(games[-k:])
+              print(f"- games not opening in 'opener': {bad or 'none'}")
+              print(f"- games in 'time attack' after frame 300: {late or 'none'}")
+              print(f"- opponent read as topped out, first third {first:.2f} vs last third {last:.2f}")
+              if bad or late or last > first + 0.15:
+                  print("**State is carrying over between games.**")
+                  print(f"::warning::{f}: per-game state is carrying over (see the job summary)")
+          PY
+
       - name: Summary
         if: always()
         run: |
           {
-            echo "## Bot (${{ inputs.mode }}) — ${{ inputs.server }}"
+            echo "## Bot (${{ env.MODE }}) — ${{ env.SERVER_EFF }}"
             echo ""
             echo '```'
             tail -n 40 bot-prod-smoke.log || echo "(no log produced)"
@@ -590,3 +680,231 @@ jobs:
       - name: Fail if the run failed
         if: steps.smoke.outcome == 'failure' || steps.largegarbage.outcome == 'failure' || steps.live.outcome == 'failure' || steps.fight.outcome == 'failure'
         run: exit 1
+
+  # ranmaru-deploy / ranmaru-stop: stop (and start) the bot named in the form (Run workflow -> branch bramp/multi-player -> mode).
+  #   ranmaru-stop    cancels EVERY bot run on `server` (whatever its name), waits for them to finish, and writes their
+  #                   wins and losses into this run's summary (the logs stay in each run's bot-prod-smoke-log artifact)
+  #   ranmaru-deploy  does the same, then starts a new versus-player run with the form's name, bot, player, hours,
+  #                   server and advanced words (Gambit of GameCreator's latest main unless advanced pins one)
+  ranmaru:
+    name: Stop / deploy / fight
+    if: ${{ startsWith(inputs.mode, 'ranmaru') || (inputs.mode == 'fight' && !contains(inputs.advanced, 'bot_run')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    permissions:
+      actions: write
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      NAME: ${{ inputs.name }}
+      SERVER: ${{ inputs.server != 'auto' && inputs.server || (inputs.mode == 'fight' && '104.156.250.136:49569' || 'panelattack.com:49569') }}
+      BOT: ${{ inputs.bot }}
+      OPPONENT: ${{ inputs.opponent }}
+      OPPONENT_NAME: ${{ inputs.opponent_name }}
+      PLAYER: ${{ inputs.player }}
+      HOURS: ${{ inputs.hours }}
+      ADVANCED: ${{ inputs.advanced }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # `only-if-running` in Advanced (the automatic redeploys): redeploy a numbered bot that is already deployed on this
+      # server, under its own name template; nothing deployed, nothing happens
+      - name: Only if a bot is deployed
+        if: ${{ inputs.mode == 'ranmaru-deploy' && contains(inputs.advanced, 'only-if-running') }}
+        run: |
+          set -u
+          repo="${{ github.repository }}"
+          line=$(gh api "repos/$repo/actions/runs?per_page=60" --jq '.workflow_runs[] | select(.status != "completed") | .display_title' | grep -E "^live · $SERVER · [A-Za-z0-9_]*[a-z][0-9]+_[A-Za-z0-9_]*$" | head -n 1 || true)
+          if [ -z "$line" ]; then
+            echo "No numbered bot is deployed on $SERVER: nothing to do." >> "$GITHUB_STEP_SUMMARY"; echo "SKIP=1" >> "$GITHUB_ENV"; exit 0
+          fi
+          name=$(echo "$line" | awk -F' · ' '{print $3}')
+          tmpl=$(echo "$name" | sed -n 's/^\(.*[a-z]\)[0-9][0-9]*\(_.*\)$/\1#\2/p')
+          case " $ADVANCED " in *" dry-run "*) echo "Dry run: $name is deployed on $SERVER; a real run would redeploy it as $tmpl. Nothing was started." >> "$GITHUB_STEP_SUMMARY"; echo "SKIP=1" >> "$GITHUB_ENV"; exit 0;; esac
+          echo "NAME=$tmpl" >> "$GITHUB_ENV"
+          echo "$name is deployed on $SERVER: redeploying it as $tmpl." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Check out the bot branch (the saved accounts)
+        if: ${{ inputs.mode == 'ranmaru-deploy' && env.SKIP != '1' }}
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.UPSTREAM_BOT_REF }}
+          path: botsrc
+
+      # The new bot starts first. A name with a # takes the next number and the OLDER of the two saved accounts (the server
+      # renames an account at login), so it can log in while the other bot finishes its game and leaves.
+      - name: Start the new bot
+        if: ${{ inputs.mode == 'ranmaru-deploy' && env.SKIP != '1' }}
+        run: |
+          set -eu
+          host=${SERVER%%:*}
+          new="$NAME"; extra="standby"
+          case "$NAME" in
+            *'#'*)
+              prefix=${NAME%%#*}; suffix=${NAME#*#}
+              # the letter before the # changes after 99 (p99 -> q1 -> ... -> z99 -> a1): the numbers run per letter
+              letter=${prefix: -1}; base=${prefix%?}
+              case "$letter" in [a-z]) ;; *) echo "::error::the name before # must end in a letter, the one that changes after 99 (e.g. Ranmaru_p#_CPU)"; exit 1;; esac
+              abc=abcdefghijklmnopqrstuvwxyz
+              # the saved names of this template, oldest first: (letters since the template's own) * 100 + number
+              nums=$(ls botsrc/bot/identities | sed -n "s/^${base}\([a-z]\)\([0-9][0-9]*\)${suffix}_${host}\.txt\$/\1 \2/p" \
+                     | awk -v a="$abc" -v s="$letter" '{ print ((index(a,$1) - index(a,s) + 26) % 26) * 100 + $2, $1, $2 }' | sort -n)
+              lastl=$(echo "$nums" | tail -n 1 | cut -d' ' -f2); lastn=$(echo "$nums" | tail -n 1 | cut -d' ' -f3)
+              lastl=${lastl:-$letter}; lastn=${lastn:-0}
+              if [ "$lastn" -ge 99 ]; then
+                lastl=${abc:$(( ($(expr index "$abc" "$lastl")) % 26 )):1}; newn=1
+              else
+                newn=$((lastn + 1))
+              fi
+              new="${base}${lastl}${newn}${suffix}"
+              [ ${#new} -le 16 ] || { echo "::error::'$new' is longer than 16 characters"; exit 1; }
+              extra=""
+              if [ "$(echo "$nums" | grep -c .)" -ge 2 ]; then
+                donorl=$(echo "$nums" | tail -n 2 | head -n 1 | cut -d' ' -f2); donorn=$(echo "$nums" | tail -n 2 | head -n 1 | cut -d' ' -f3)
+                donor="${base}${donorl}${donorn}${suffix}"
+                (cd botsrc
+                 git config user.name "github-actions"; git config user.email "actions@github.com"
+                 git mv "bot/identities/${donor}_${host}.txt" "bot/identities/${new}_${host}.txt"
+                 git commit -q -m "bot: the account of '$donor' is now '$new' on $host"
+                 for k in 1 2 3; do git push -q origin "HEAD:$UPSTREAM_BOT_REF" && break; git pull -q --rebase origin "$UPSTREAM_BOT_REF"; done)
+                extra="standby"
+                echo "$new takes over the account of $donor (the server renames it at login)" >> "$GITHUB_STEP_SUMMARY"
+              else
+                echo "::error::only two accounts are ever used, renamed in turn, and fewer than two are saved for '$NAME' on $host -- save them first (bot/identities)"; exit 1
+              fi;;
+          esac
+          echo "NEWNAME=$new" >> "$GITHUB_ENV"
+          gh workflow run bot-prod-smoke-test.yml --repo "${{ github.repository }}" --ref "${{ github.ref_name }}" \
+            -f mode=versus-player -f server="$SERVER" -f bot="$BOT" -f name="$new" -f player="$PLAYER" \
+            -f hours="$HOURS" -f advanced="$ADVANCED $extra"
+          echo "A new run was started: $new ($BOT) on $SERVER for $HOURS hours. It logs in as soon as its account is free; the older bots finish their games and leave." >> "$GITHUB_STEP_SUMMARY"
+
+      # The new bot builds and waits, logged out, until every older bot on the server has left (it checks every 2 s), so it
+      # logs in as the old one goes. This run only has to ask the old bots to leave: a stop run that spares the new bot's run.
+      - name: Ask the old bots to leave
+        if: ${{ inputs.mode == 'ranmaru-deploy' && env.SKIP != '1' }}
+        run: |
+          set -u
+          repo="${{ github.repository }}"
+          began=$(gh api "repos/$repo/actions/runs/$GITHUB_RUN_ID" --jq .created_at)
+          id=""
+          for _ in $(seq 1 24); do
+            id=$(gh api "repos/$repo/actions/runs?event=workflow_dispatch&per_page=30" --jq ".workflow_runs[] | select(.created_at > \"$began\") | select(.display_title | startswith(\"live · $SERVER · $NEWNAME\")) | .id" | head -n 1)
+            [ -n "$id" ] && break; sleep 5
+          done
+          [ -n "$id" ] || { echo "::error::the new bot's run did not appear: the old bots are left alone"; exit 1; }
+          now=""; case " $ADVANCED " in *" now "*) now=" now";; esac
+          gh workflow run bot-prod-smoke-test.yml --repo "$repo" --ref "${{ github.ref_name }}" -f mode=ranmaru-stop -f server="$SERVER" -f advanced="except=$id$now"
+          echo "The new bot ($NEWNAME, run $id) is built and waiting. A stop run was started for the old bots on $SERVER (it spares run $id): each leaves after its game, and the new bot logs in when they are gone." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Cancel the running one and pull down its info
+        if: ${{ inputs.mode != 'ranmaru-deploy' }}
+        run: |
+          set -u
+          repo="${{ github.repository }}"
+          # only the runs that were already there when this one was made (the deploy's new bot is not one of them)
+          began=$(gh api "repos/$repo/actions/runs/$GITHUB_RUN_ID" --jq .created_at)
+          except=$(echo "$ADVANCED" | tr ' ' '\n' | sed -n 's/^except=//p' | head -n 1); except=${except:-0}
+          # every bot run on this server, whatever its name: "live · SERVER · NAME[,PLAYER]" and "fight · SERVER · ..."
+          runs() { gh api "repos/$repo/actions/runs?per_page=60" --jq ".workflow_runs[] | select(.id != $GITHUB_RUN_ID) | select(.id != $except) | select(.created_at < \"$began\") | select(.display_title | startswith(\"live · $SERVER · \") or startswith(\"fight · $SERVER · \")) | select($1) | .id"; }
+          ids=$(runs '.status != "completed"')
+          now=0; case " $ADVANCED " in *" now "*) now=1;; esac
+          # A lobby bot (a "live" run) is not interrupted: it sees this run, finishes the game it is in and leaves, and this
+          # run waits for that however long it takes. `now` in Advanced cancels at once; a fight.sh bot is always cancelled.
+          waiting=""
+          for id in $ids; do
+            t=$(gh api "repos/$repo/actions/runs/$id" --jq .display_title)
+            case "$t" in "live · "*) if [ "$now" = 0 ]; then waiting="$waiting $id"; continue; fi;; esac
+            echo "cancelling $id"; gh api -X POST "repos/$repo/actions/runs/$id/cancel" >/dev/null || true
+          done
+          if [ -n "$waiting" ]; then
+            echo "waiting for the bots to finish their games and leave:$waiting"
+            n=0
+            while :; do
+              left=""
+              for id in $waiting; do
+                [ "$(gh api "repos/$repo/actions/runs/$id" --jq .status)" = completed ] || left="$left $id"
+              done
+              [ -n "$left" ] || break
+              n=$((n + 1)); [ $((n % 20)) -ne 0 ] || echo "still waiting for:$left (put 'now' in Advanced to cancel them)"
+              sleep 15
+            done
+          fi
+          for id in $ids; do
+            for _ in $(seq 1 60); do
+              [ "$(gh api "repos/$repo/actions/runs/$id" --jq .status)" = completed ] && break
+              sleep 5
+            done
+          done
+          # the runs to report on: the ones just cancelled, else the latest finished one
+          [ -n "$ids" ] || ids=$(runs '.status == "completed"' | head -n 1)
+          {
+            echo "## Bots on $SERVER"
+            if [ -z "$ids" ]; then echo "No bot run on $SERVER found."; fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          for id in $ids; do
+            mkdir -p "pulled/$id"
+            gh run download "$id" -n bot-prod-smoke-log -D "pulled/$id" 2>/dev/null || true
+            python3 .github/scripts/ranmaru_summary.py "$id" "https://github.com/$repo/actions/runs/$id" "pulled/$id" >> "$GITHUB_STEP_SUMMARY"
+          done
+          # bots still up on other servers (not touched)
+          others=$(gh api "repos/$repo/actions/runs?status=in_progress&per_page=60" --jq ".workflow_runs[] | select(.id != $GITHUB_RUN_ID) | select(.display_title | startswith(\"live · \") or startswith(\"fight · \")) | select(.display_title | contains(\" · $SERVER · \") | not) | \"- \" + .display_title + \" (run \" + (.id|tostring) + \")\"")
+          if [ -n "$others" ]; then { echo; echo "### Still up on other servers (not touched)"; echo "$others"; } >> "$GITHUB_STEP_SUMMARY"; fi
+
+      - name: Fight
+        if: ${{ inputs.mode == 'fight' }}
+        run: |
+          # the form's default name (Ranmaru_p#_CPU) is the deploy's; a fight's first bot is Ranmaru_CPU unless a name is typed
+          case "$NAME" in *'#'*) NAME=Ranmaru_CPU;; esac
+          case "$OPPONENT_NAME" in *'#'*) echo "::error::the second name needs no # (blank, or e.g. Gambit_100)"; exit 1;; esac
+          # two bot runs: the lobby bot waits, the challenger challenges it (its name: the form's, else NAME + 2)
+          other="$OPPONENT_NAME"
+          [ -n "$other" ] || { other="${NAME}2"; [ ${#other} -le 16 ] || other="${NAME:0:15}2"; }
+          [ ${#other} -le 16 ] || { echo "::error::the second bot's name '$other' is longer than 16 characters"; exit 1; }
+          [ "$other" != "$NAME" ] || { echo "::error::the two bots need different names"; exit 1; }
+          if [ "$SERVER" = "104.156.250.136:49569" ]; then
+            # The Bramp server refuses a new name, so every name takes over an account that already exists there (the server
+            # renames an account at login). A name that already has one (any letters) keeps it; a new name takes a spare Gambit
+            # account (GambitY, then Gambit_100, then GambitMain) that is not the other bot's.
+            host=104.156.250.136; added=""; used=""
+            for n in "$NAME" "$other"; do
+              src=$(ls bot/identities | grep -i -x -- "${n}_${host}.txt" | head -n 1 || true)
+              if [ -n "$src" ]; then
+                used="$used $(cat "bot/identities/$src")"
+                [ -s "bot/identities/${n}_${host}.txt" ] || { cp "bot/identities/$src" "bot/identities/${n}_${host}.txt"; added=1; }
+              fi
+            done
+            for n in "$NAME" "$other"; do
+              [ -n "$(ls bot/identities | grep -i -x -- "${n}_${host}.txt" | head -n 1 || true)" ] && continue
+              src=""
+              for cand in GambitY Gambit_100 GambitMain; do
+                [ -s "bot/identities/${cand}_${host}.txt" ] || continue
+                id=$(cat "bot/identities/${cand}_${host}.txt"); case " $used " in *" $id "*) continue;; esac
+                src="${cand}_${host}.txt"; break
+              done
+              [ -n "$src" ] || { echo "::error::no spare account on the Bramp server for $n"; exit 1; }
+              cp "bot/identities/$src" "bot/identities/${n}_${host}.txt"; added=1; used="$used $(cat "bot/identities/$src")"
+              echo "$n takes over the account saved as ${src%_${host}.txt} on the Bramp server (the server renames it at login)." >> "$GITHUB_STEP_SUMMARY"
+            done
+            if [ -n "$added" ]; then
+              git config user.name "github-actions"; git config user.email "actions@github.com"
+              git add -f bot/identities; git commit -q -m "bot: fight names take over existing accounts on $host"
+              for k in 1 2 3; do git push -q origin "HEAD:${{ github.ref_name }}" && break; git pull -q --rebase origin "${{ github.ref_name }}"; done
+            fi
+            # the fork's server: each bot is a fight.sh run -- the lobby bot, and the challenger ("OTHER,LOBBY" challenges LOBBY)
+            gh workflow run bot-prod-smoke-test.yml --repo "${{ github.repository }}" --ref "${{ github.ref_name }}" \
+              -f mode=fight -f server="$SERVER" -f bot="$BOT" -f name="$NAME" -f player=you \
+              -f hours="$HOURS" -f advanced="$ADVANCED bot_run=1"
+            sleep 75   # the server makes a new name's account at its first login, one at a time: the second bot waits for the first
+            gh workflow run bot-prod-smoke-test.yml --repo "${{ github.repository }}" --ref "${{ github.ref_name }}" \
+              -f mode=fight -f server="$SERVER" -f bot="$OPPONENT" -f name="$other,$NAME" -f player=challenge \
+              -f hours="$HOURS" -f advanced="$ADVANCED bot_run=1"
+          else
+            gh workflow run bot-prod-smoke-test.yml --repo "${{ github.repository }}" --ref "${{ github.ref_name }}" \
+              -f mode=versus-player -f server="$SERVER" -f bot="$BOT" -f name="$NAME" -f hours="$HOURS" -f advanced="$ADVANCED"
+            sleep 75   # the server makes a new name's account at its first login, one at a time: the second bot waits for the first
+            gh workflow run bot-prod-smoke-test.yml --repo "${{ github.repository }}" --ref "${{ github.ref_name }}" \
+              -f mode=versus-player -f server="$SERVER" -f bot="$OPPONENT" -f name="$other" -f player="$NAME" \
+              -f hours="$HOURS" -f advanced="$ADVANCED"
+          fi
+          echo "A fight was started on $SERVER for $HOURS hours: $NAME ($BOT) waits in the lobby, $other ($OPPONENT) challenges it." >> "$GITHUB_STEP_SUMMARY"

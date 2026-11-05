@@ -25,7 +25,7 @@
 --      f2                  screenshot via the real F2 shortcut
 --      scene               report the current scene name to the out file
 --      trainingpattern <n> on the Training menu, set the garbage pattern by name
---                          (combo_storm, factory, large_garbage); reports the block size
+--                          (combo_storm, factory, large_garbage, endless); reports the block size, "endless" for none
 --      where               report the focused menu item (see above)
 --      run <MACRO>         expand a named macro (TO_MENU / VS_SELF / REPLAYS ...)
 --      challengeloop       Challenge Mode stage after stage: Ready on the
@@ -589,7 +589,7 @@ local function execCommand(c)
     if i then stp:setState(i) end
     local v = stp and stp.value
     local a = v and v.attackPatterns and v.attackPatterns[1]
-    writeOut("trainingpattern " .. rest .. " -> " .. tostring(stp and stp.selectedIndex) .. " " .. (a and (a.width .. "x" .. a.height) or "custom"))
+    writeOut("trainingpattern " .. rest .. " -> " .. tostring(stp and stp.selectedIndex) .. " " .. (v and v.endless and "endless" or a and (a.width .. "x" .. a.height) or "custom"))
   elseif op == "level" then
     -- level <n>: the local player's modern level and its level data, as the level slider sets them; reports what the player now holds
     local LevelPresets = require("common.data.LevelPresets")

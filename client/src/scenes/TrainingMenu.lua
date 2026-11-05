@@ -24,8 +24,8 @@ local function exitMenu()
   GAME.navigationStack:pop()
 end
 
-local function createBasicTrainingMode(name, width, height)
-  local delayBeforeStart = 150
+local function createBasicTrainingMode(name, width, height, delay)
+  local delayBeforeStart = delay or 150
   local delayBeforeRepeat = 900
   local attacksPerVolley = 50
   local attackPatterns = {}
@@ -37,6 +37,13 @@ local function createBasicTrainingMode(name, width, height)
   local customTrainingModeData = {delayBeforeStart = delayBeforeStart, delayBeforeRepeat = delayBeforeRepeat, attackPatterns = attackPatterns}
 
   return customTrainingModeData
+end
+
+-- ENDLESS: no garbage ever arrives (its one volley is due at a frame no game reaches) -- a game played for what it sends alone
+local function createEndlessTrainingMode()
+  local data = createBasicTrainingMode("endless", 1, 1, 1000000000)
+  data.endless = true
+  return data
 end
 
 function TrainingMenu:goToCharacterSelect(value, width, height)
@@ -51,12 +58,13 @@ function TrainingMenu:goToCharacterSelect(value, width, height)
 end
 
 function TrainingMenu:load(sceneParams)
-  local garbagePatternNames = {"Custom", "combo_storm", "factory", "large_garbage"}
+  local garbagePatternNames = {"Custom", "combo_storm", "factory", "large_garbage", "endless"}
   local garbagePatternValues = {
     nil,
     createBasicTrainingMode(loc("combo_storm"), 4, 1),
     createBasicTrainingMode(loc("factory"), 6, 2),
     createBasicTrainingMode(loc("large_garbage"), 6, 12),
+    createEndlessTrainingMode(),
   }
   local translatableGarbagePatternNames = {"combo_storm", "factory", "large_garbage"}
   for _, value in ipairs(save.readAttackFiles("training")) do

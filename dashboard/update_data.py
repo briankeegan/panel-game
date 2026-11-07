@@ -13,6 +13,7 @@ ap = argparse.ArgumentParser()
 ap.add_argument("--run-id", required=True); ap.add_argument("--dir", required=True); ap.add_argument("--data", required=True)
 ap.add_argument("--title", default=""); ap.add_argument("--started", required=True); ap.add_argument("--ended", default="")
 ap.add_argument("--subject", default="")
+ap.add_argument("--job-log", default="", help="the run's job log (it has a time on every line), for the time each game was played")
 a = ap.parse_args()
 HERE = os.path.dirname(os.path.abspath(__file__))
 LUA = os.path.join(HERE, "replayFrames.lua")
@@ -46,6 +47,13 @@ for line in open(log, errors="ignore"):
         games.append(dict(r=r, opp=opp, rep=rep, top=sum(1 for l in cur if l.startswith("opponent topped out")) * 30, land=sum(1 for l in cur if l.startswith("garbage landed"))))
         cur, rep = [], None
 games = [g for g in games if g["r"] in "WL"]
+times = []
+if a.job_log and os.path.exists(a.job_log):
+    for line in open(a.job_log, errors="ignore"):
+        if "match over —" in line:
+            m = re.match(r"(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d)", line)
+            if ("bot won" in line or "bot lost" in line): times.append(m.group(1) + "Z" if m else None)
+if len(times) != len(games): times = [None] * len(games)
 
 sha = ""
 for f in glob.glob(os.path.join(a.dir, "*.log")):
@@ -71,13 +79,13 @@ if gl:
 rows = load("games.json", [])
 nrep = max([int(f.split("replay_r")[1].split(".")[0]) for f in glob.glob(os.path.join(a.data, "replay_r*.json.gz"))] + [0])
 added = 0
-for g in games:
+for gi, g in enumerate(games):
     n = None; x = None
     if g["rep"]:
         try: x = json.loads(g["rep"]); n = len(x["inputs"][x["mine"] - 1])
         except Exception: x = None
     row = dict(sha=sha, bot=bot, date=date, opp=g["opp"], res=g["r"], secs=round(n / 60) if n else None,
-               top=min(100, round(100 * g["top"] / n)) if n else None, land=g["land"])
+               top=min(100, round(100 * g["top"] / n)) if n else None, land=g["land"], at=times[gi])
     if g["r"] == "L" and x and n:
         nrep += 1; rid = "r%d" % nrep
         tmp = os.path.join(a.data, rid + "_in.json"); json.dump(x, open(tmp, "w"))

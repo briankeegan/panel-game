@@ -297,7 +297,6 @@
         <div class="gw-now" id="gw-now"></div>
         <div class="gw-over">
           <button type="button" class="gw-btn" id="gw-plan" aria-pressed="false" title="Draw Gambit's plan on its board, and explain it">Show plan</button>
-          <button type="button" class="gw-btn" id="gw-result" aria-pressed="false" title="Swap Gambit's board for the board as it should look after the plan runs (a projection)" hidden>Show what it builds</button>
           <button type="button" class="gw-btn" id="gw-prevp" aria-label="Previous plan change" title="Jump to the previous plan change" hidden>‹ Plan</button>
           <button type="button" class="gw-btn" id="gw-nextp" aria-label="Next plan change" title="Jump to the next plan change" hidden>Plan ›</button>
         </div>
@@ -384,6 +383,7 @@
   const $ = (id) => document.getElementById(id);
   const fmtPct = d3.format('.0%');
   const dur = (s) => (s == null || isNaN(s)) ? '—' : Math.floor(Math.round(s) / 60) + ':' + String(Math.round(s) % 60).padStart(2, '0');
+  const playedAt = (r) => { if (!r || !r.at) return ''; const t = new Date(new Date(r.at).getTime() - (r.secs || 0) * 1000); return t.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }); };
   const wilson = (w, n) => {
     if (!n) return [0, 0];
     const z = 1.96, p = w / n, d = 1 + z * z / n;
@@ -743,14 +743,14 @@
   function openReplay(row, scroll) {
     if (R.rid !== row.replay) { stopPlay(); R.rid = row.replay; R.row = row; R.D = null; R.idx = 0; R.part = 'end'; }
     R.rid = row.replay; markSources();
-    $('gw-sub').textContent = 'Lost to ' + row.opp + ' in ' + dur(row.secs) + ' (' + row.bot + ', ' + d3.utcFormat('%b %-d')(new Date(row.date)) + ')' + '' + '.';
+    $('gw-sub').textContent = 'Lost to ' + row.opp + ' in ' + dur(row.secs) + ' (' + row.bot + ', ' + (playedAt(row) || d3.utcFormat('%b %-d')(new Date(row.date))) + ')' + '' + '.';
     syncPick();
     refreshPlayer();
     if (scroll) $('sec-watch').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
   // the losses in the current selection, newest first; the newest is open by default
   const WL = { list: [], all: [], player: '' };
-  const lossLabel = (r) => d3.utcFormat('%b %-d')(new Date(r.date)) + (WL.player ? '' : ' · ' + r.opp) + ' · ' + dur(r.secs) + ' · ' + kind(r);
+  const lossLabel = (r) => (playedAt(r) || d3.utcFormat('%b %-d')(new Date(r.date))) + (WL.player ? '' : ' · ' + r.opp) + ' · ' + dur(r.secs) + ' · ' + kind(r);
   function syncPick() {
     const i = WL.list.findIndex((r) => r.replay === R.rid);
     const sel = $('gw-select'); if (sel.value !== R.rid) sel.value = R.rid;
@@ -1105,7 +1105,6 @@ function projectPlan(G, seq, cursor) {
       const st = sOf(k);
       const planNow = k === mine && PLAN.on ? PLAN.current(f[0]) : null;
       const topped = drawBoard(g$(fc), D.grids[st[6]], st[4], st[5], st[0], st[8], planNow);
-      if (k === mine) { const hb = !!(planNow && planNow.build); g$('result').hidden = !PLAN.on || !hb; g$('result').textContent = R.ovl ? 'Hide what it builds' : 'Show what it builds'; g$('result').setAttribute('aria-pressed', String(!!R.ovl)); }
       
       showIncoming(g$('i' + slot), D.queues ? D.queues[st[7]] : '', st[0]);
       g$(fb).classList.toggle('topped', topped);
@@ -1327,7 +1326,6 @@ function projectPlan(G, seq, cursor) {
   }
   try { if (localStorage.getItem('gs-plan') === '0') setTimeout(() => setPlan(false), 0); else setTimeout(() => setPlan(true), 0); } catch (e) {}
   g$('plan').addEventListener('click', () => setPlan(!PLAN.on));
-  g$('result').addEventListener('click', () => { R.ovl = !R.ovl; if (R.D) updatePlayer(); });
   function jumpPlan(dir) {
     if (!R.D || !PLAN.on) return; stopPlay();
     const cur = R.D.frames[R.idx][0], cl = PLAN.changeClocks();

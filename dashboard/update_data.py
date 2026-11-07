@@ -17,7 +17,10 @@ ap.add_argument("--job-log", default="", help="the run's job log (it has a time 
 a = ap.parse_args()
 HERE = os.path.dirname(os.path.abspath(__file__))
 LUA = os.path.join(HERE, "replayFrames.lua")
-ENV = dict(os.environ, LUA_PATH="./?.lua;./common/lib/?.lua;/usr/local/share/lua/5.1/?.lua;;", LUA_CPATH="./common/lib/?.so;./common/lib/?/?.so;/usr/local/lib/lua/5.1/?.so;;")
+# the repo's own libraries first, then whatever luarocks (or the system) provides: in CI that comes from `luarocks path` in the environment
+ENV = dict(os.environ,
+           LUA_PATH="./?.lua;./common/lib/?.lua;" + os.environ.get("LUA_PATH", "/usr/local/share/lua/5.1/?.lua;;"),
+           LUA_CPATH="./common/lib/?.so;./common/lib/?/?.so;" + os.environ.get("LUA_CPATH", "/usr/local/lib/lua/5.1/?.so;;"))
 
 def load(name, default):
     p = os.path.join(a.data, name)
@@ -58,9 +61,13 @@ if len(times) != len(games): times = [None] * len(games)
 sha = ""
 for f in glob.glob(os.path.join(a.dir, "*.log")):
     for line in open(f, errors="ignore"):
-        m = re.search(r"Gambit built from GameCreator (\S+)", line)
+        m = re.search(r"Gambit built from GameCreator ([0-9a-f]{7,40})\b", line)
         if m: sha = m.group(1)[:8]; break
     if sha: break
+if not sha and a.job_log and os.path.exists(a.job_log):      # the commit is only printed in the job log (a workflow notice)
+    for line in open(a.job_log, errors="ignore"):
+        m = re.search(r"Gambit built from GameCreator ([0-9a-f]{7,40})\b", line)
+        if m: sha = m.group(1)[:8]; break
 m = re.search(r"[_-]p(\d+)[_-]", a.title) or re.search(r"\bp(\d+)\b", a.title)
 bot = "p" + m.group(1) if m else "p?"
 date = a.started[:10]
@@ -120,8 +127,14 @@ for gi, g in enumerate(games):
 vers = load("versions.json", [])
 if vers and vers[-1]["sha"] == sha and sha:
     v = vers[-1]; v["runs"] = v.get("runs", 1) + 1; v["end"] = a.ended or v.get("end")
-    first = (v["label"].split("–")[0]); v["label"] = first if first == bot else first + "–" + bot[1:]
+    nums = [int(x) for x in re.findall(r"\d+", v["label"]) + re.findall(r"\d+", bot)]
+    v["label"] = "p%d" % min(nums) if min(nums) == max(nums) else "p%d–%d" % (min(nums), max(nums))
 elif sha:
+    if not a.subject:                                   # best effort: the commit's first line, if this token may read GameCreator
+        try:
+            r = subprocess.run(["gh", "api", "repos/briankeegan/GameCreator/commits/" + sha, "--jq", ".commit.message"], capture_output=True, text=True, timeout=30)
+            if r.returncode == 0: a.subject = r.stdout.strip().split("\n")[0][:200]
+        except Exception: pass
     vers.append(dict(sha=sha, subject=a.subject, start=a.started, end=a.ended or a.started, label=bot, runs=1))
 save("games.json", rows); save("versions.json", vers); runs.append(a.run_id); save("runs.json", runs)
 print("run %s: %d games added (%s, %s, %d new replays)" % (a.run_id, added, bot, sha, sum(1 for g in rows[-added:] if g.get("replay"))))

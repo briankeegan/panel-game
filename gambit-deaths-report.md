@@ -116,11 +116,11 @@ times garbage landed on Gambit. The mode is the mode of the last decision.
 | # | Run | Opponent | Length | Mode at the end | Opp topped out | Landings | What we threw | Last logged move |
 |---|---|---|---|---|---|---|---|---|
 | 1 | p28 | StreetsTM | 0:10 | opener | 0% | 2 | nothing | break_line |
-| 2 | p35 | Kevin123 | 6:57 | finish them (89%) | 65% | 43 | 63 attacks, chains 2–7, combos 4–8 | hold |
+| 2 | p35 | Kevin123 | 6:57 | finish them (89%) | 65% | 43 | 65 attacks, chains 2–7, combos 4–8 | hold |
 | 3 | p38 | FabiDFox2004 | 0:43 | finish them | 1% | 4 | chain 4, 5, 6 | hold |
-| 4 | p38 | FabiDFox2004 | 2:07 | pressure | 51% | 15 | 21 attacks, mostly 2–6 | hold |
-| 5 | p39 | javi | 2:19 | pressure | 67% | 48 | 33 attacks | hold |
-| 6 | p40 | Mastershadow | 2:58 | pressure | 34% | 28 | 33 attacks | hold |
+| 4 | p38 | FabiDFox2004 | 2:07 | pressure | 51% | 15 | 20 attacks, mostly 2–6 | hold |
+| 5 | p39 | javi | 2:19 | pressure | 67% | 48 | 34 attacks | hold |
+| 6 | p40 | Mastershadow | 2:58 | pressure | 34% | 28 | 34 attacks | hold |
 | 7 | p44 | javi | 0:31 | pressure | 19% | 5 | combo 4 ×2, chain 2, chain 6 | hold |
 | 8 | p47 | Snicholas289v2 | 4:01 | finish them (97%) | 81% | 57 | 62 attacks | hold |
 | 9 | p48 | Mako | 0:21 | opener | 0% | 2 | chain 5 | hold |

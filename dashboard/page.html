@@ -92,6 +92,19 @@
 .gs-dot { width: 14px; height: 14px; padding: 0; border-radius: 50%; border: 0; background: color-mix(in srgb, var(--color-fg) 28%, transparent); cursor: default; }
 .gs-dot.l { background: var(--cds-chart-status-critical); width: 18px; height: 18px; margin: -2px 0; cursor: pointer; }
 .gs-dot.l:hover, .gs-dot.l:focus-visible { outline: 2px solid var(--color-fg); outline-offset: 1px; }
+.gw-lw { margin-top: 0; display: flex; flex-direction: column; gap: 6px; }
+.gw-lh { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.gw-list { height: 9.6em; overflow-y: auto; border: 1px solid var(--color-border-line); border-radius: 8px; background: var(--color-bg); -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+.gw-li { display: block; width: 100%; text-align: left; font: inherit; background: none; color: var(--color-fg); border: 0; border-bottom: 1px solid var(--color-border-line); padding: 7px 10px; cursor: pointer; }
+.gw-li:hover { background: color-mix(in srgb, var(--color-fg) 6%, transparent); }
+.gw-li.on { background: color-mix(in srgb, #4de3ff 18%, transparent); box-shadow: inset 3px 0 0 #4de3ff; }
+.gw-li .t { font-variant-numeric: tabular-nums; color: var(--color-fg-muted); font-size: 12px; margin-right: 6px; }
+.gw-li .m { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; margin-right: 6px; }
+.gw-li .h { font-weight: 600; font-size: 13.5px; }
+.gw-li .w { display: block; color: var(--color-fg-muted); font-size: 12px; margin-top: 2px; }
+.gw-li .w b { color: var(--color-bad); font-weight: 600; }
+.gw-li.drop .h::before { content: '✕ '; color: var(--color-bad); }
+.gw-li.neu .h::before { content: '＋ '; color: #3fbf5a; }
 .gw-stage { display: flex; flex-direction: column; gap: 8px; min-width: 0; background: var(--color-panel); position: sticky; top: env(safe-area-inset-top, 0px); z-index: 4; padding-block: 4px 8px; }
 #gw-body { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: var(--cds-gap-lg); align-items: start; }
 .gw-details { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
@@ -107,7 +120,10 @@
   #gw-body { grid-template-columns: minmax(0, 1fr); gap: 8px; }
   .gw-stage { border-bottom: 1px solid var(--color-border-line); box-shadow: 0 6px 10px -8px rgba(0,0,0,.35); margin-inline: calc(-1 * var(--cds-pad-lg)); padding-inline: var(--cds-pad-lg); }
   .gw-boards { gap: 4px; }
-  .gw-board canvas { width: auto; max-width: 100%; height: min(25svh, 230px); }
+  .gw-board canvas { width: auto; max-width: 100%; height: min(20svh, 190px); }
+  .gw-list { height: 5.4em; }
+  .gw-li { padding: 5px 9px; }
+  .gw-li .w { font-size: 11.5px; }
   .gw-board figcaption { margin-bottom: 2px; }
   .gw-st { font-size: 11px; height: 2.7em; margin-top: 2px; }
   .gw-now { display: block; }
@@ -301,7 +317,10 @@
           <button type="button" class="gw-btn" id="gw-nextp" aria-label="Next plan change" title="Jump to the next plan change" hidden>Plan ›</button>
         </div>
         <canvas id="gw-strip" aria-label="Timeline of Gambit's decisions. Click to jump."></canvas>
-        <div class="gw-key" id="gw-key">Game timeline. Blue line: Gambit made a new plan. Red tick: Gambit's own forecast said the board would be lost.</div>
+        <div class="gw-lw" id="gw-lw">
+        <div class="gw-lh"><b>Gambit's choices</b><div class="gs-seg sm" role="group" aria-label="Which decisions" id="gw-lmode"><button type="button" data-m="chg" aria-pressed="true">Plan changes</button><button type="button" data-m="all" aria-pressed="false">Every decision</button></div></div>
+        <div class="gw-list" id="gw-list" role="list"></div>
+        </div>
         <input type="range" id="gw-scrub" min="0" max="0" value="0" aria-label="Frame">
         <div class="gw-ctl">
           <button type="button" class="gw-btn" id="gw-prevd" aria-label="Previous decision" title="Previous decision (,)"><span aria-hidden="true">⏮</span><span class="gw-t"> decision</span></button>
@@ -1116,6 +1135,8 @@ function projectPlan(G, seq, cursor) {
     g$('play').textContent = R.playing ? 'Pause' : (R.idx >= last ? 'Replay' : 'Play');
     drawStrip();
     showDecision(f[0]);
+    if (LIST.rid !== R.rid || LIST.D !== D) { LIST.D = D; buildList(); }
+    markList(f[0]);
   }
   function drawStrip() {
     const cv = g$('strip'), D = R.D;
@@ -1273,6 +1294,50 @@ function projectPlan(G, seq, cursor) {
     }
     { const cur0 = PLAN.current(clock); if (cur0 && cur0.dropped) { const g = document.createElement('div'); g.className = 'whyline def'; g.textContent = 'New plan. The grey arrows are the plan it just dropped.'; cap.appendChild(g); } }
   }
+  // the list of Gambit's choices: each plan it made or threw away, tap one to jump there
+  const LIST = { rid: null, mode: 'chg', rows: [] };
+  function buildList() {
+    const D = R.D, box = g$('list'), L = D.plans; box.replaceChildren(); LIST.rows = [];
+    if (!L || !D.dec.length) { box.textContent = 'No decisions were logged for this game.'; return; }
+    const nm = (q) => (q || 'hold').replace(/_/g, ' '), lostTxt = (lo) => (lo === 'L' || lo === 'inf') ? 'board never lost' : (numOk(lo) ? 'board lost in ' + fs1(lo) : '');
+    const frag = document.createDocumentFragment();
+    for (let i = 0; i < D.dec.length; i++) {
+      const d = D.dec[i], e = L[i]; if (!e) continue;
+      const seq = PLAN.seqOf(e), pe = i > 0 ? L[i - 1] : null, pseq = pe ? PLAN.seqOf(pe) : [], st = PLAN.status(i);
+      let kind = '', head = '', why = '';
+      const opts = (d[14] || '').split(',').map((q) => q.split(':')).filter((q) => q[0]).map((q) => ({ nm: nm(q[0].replace(/[*~]/g, '')), lo: q[1] }));
+      const find = (n) => opts.find((o) => o.nm === n);
+      if (st.kind === 'new') {
+        kind = pseq.length ? 'drop' : 'neu';
+        head = (pseq.length ? 'Changed its plan: ' : 'New plan: ') + seq.length + (seq.length === 1 ? ' swap' : ' swaps');
+        const mine = find(nm(d[2])); const bits = ['chose "' + nm(d[2]) + '"' + (mine && lostTxt(mine.lo) ? ' (' + lostTxt(mine.lo) + ')' : '')];
+        if (pseq.length) { const old = find(nm(D.dec[i - 1][2])); bits.unshift('dropped "' + nm(D.dec[i - 1][2]) + '"' + (old && lostTxt(old.lo) ? ' (' + lostTxt(old.lo) + ' now)' : '')); }
+        why = bits.join(' → ');
+      } else if (st.kind === 'wait' && pseq.length) {
+        kind = 'drop'; head = 'Plan ended, now ' + nm(d[2]);
+        const old = find(nm(D.dec[i - 1][2])); why = 'dropped "' + nm(D.dec[i - 1][2]) + '"' + (old && lostTxt(old.lo) ? ' (' + lostTxt(old.lo) + ' now)' : '');
+      } else if (LIST.mode === 'all') { head = nm(d[2]); const mine = find(nm(d[2])); why = mine && lostTxt(mine.lo) ? lostTxt(mine.lo) : ''; }
+      else continue;
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'gw-li ' + kind; b.dataset.clock = d[0]; b.dataset.i = i; b.setAttribute('role', 'listitem');
+      const t = document.createElement('span'); t.className = 't'; t.textContent = fmtClock(d[0]);
+      const m = document.createElement('span'); m.className = 'm'; m.style.color = (MODES[d[1]] || { c: '#6b7488' }).c; m.textContent = d[1];
+      const h = document.createElement('span'); h.className = 'h'; h.textContent = head; b.append(t, m, h);
+      if (why) { const w = document.createElement('span'); w.className = 'w'; w.textContent = why; b.appendChild(w); }
+      frag.appendChild(b); LIST.rows.push(b);
+    }
+    if (!LIST.rows.length) box.textContent = 'Gambit did not change its plan in this game.'; else box.appendChild(frag);
+    LIST.rid = R.rid; LIST.active = null;
+  }
+  function markList(clock) {
+    if (!LIST.rows.length) return;
+    let cur = null; for (const b of LIST.rows) { if (Number(b.dataset.clock) <= clock) cur = b; else break; }
+    if (cur === LIST.active) return;
+    if (LIST.active) LIST.active.classList.remove('on');
+    LIST.active = cur; const box = g$('list');
+    if (cur) { cur.classList.add('on'); const top = cur.offsetTop - box.offsetTop; if (top < box.scrollTop || top + cur.offsetHeight > box.scrollTop + box.clientHeight) box.scrollTop = Math.max(0, top - box.clientHeight / 2 + cur.offsetHeight / 2); }
+  }
+  g$('list').addEventListener('click', (e) => { const b = e.target.closest('.gw-li'); if (!b || !R.D) return; stopPlay(); seek(idxOfClock(Number(b.dataset.clock))); });
+  g$('lmode').addEventListener('click', (e) => { const b = e.target.closest('button[data-m]'); if (!b) return; LIST.mode = b.dataset.m; document.querySelectorAll('#gw-lmode button').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); if (R.D) { buildList(); markList(R.D.frames[R.idx][0]); } });
   function stopPlay() { R.playing = false; R.last = 0; R.acc = 0; cancelAnimationFrame(R.raf); }
   function tickPlay(ts) {
     if (!R.playing || !R.D) return;

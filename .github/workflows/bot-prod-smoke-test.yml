@@ -84,7 +84,7 @@ on:
           - '2'
           - '1'
       advanced:
-        description: '9. Advanced -- leave blank. Words like gambit_from=<GameCreator commit>, upstream_ref=<commit>, profile=<file>'
+        description: '9. Advanced -- leave blank. Words like force (deploy even if Gambit has not changed), gambit_from=<GameCreator commit>, upstream_ref=<commit>, profile=<file>'
         required: false
         default: ''
 
@@ -138,7 +138,7 @@ jobs:
               profile=*) profile=${w#profile=};;
               gambit_from=*) gambit_from=${w#gambit_from=};;
               upstream_ref=*) upstream_ref=${w#upstream_ref=};;
-              bot_run=*|now|only-if-running|dry-run) ;;   # bot_run marks a bot run started by a fight; now only matters to stop / deploy
+              bot_run=*|now|only-if-running|dry-run|force) ;;   # bot_run marks a bot run started by a fight; now only matters to stop / deploy
               standby) standby=1;;   # a deploy's new bot: build everything, then wait for the older bots here to leave
               after=*) after=${w#after=};;   # ... or only for the bot with this name (the account this one takes over)
               *) echo "::error::advanced: I do not know '$w' (use profile=, gambit_from= or upstream_ref=)"; exit 1;;
@@ -723,6 +723,29 @@ jobs:
           case " $ADVANCED " in *" dry-run "*) echo "Dry run: $name is deployed on $SERVER; a real run would redeploy it as $tmpl. Nothing was started." >> "$GITHUB_STEP_SUMMARY"; echo "SKIP=1" >> "$GITHUB_ENV"; exit 0;; esac
           echo "NAME=$tmpl" >> "$GITHUB_ENV"
           echo "$name is deployed on $SERVER: redeploying it as $tmpl." >> "$GITHUB_STEP_SUMMARY"
+
+      # A deploy of GameCreator's latest Gambit changes the number only when Gambit changed: if nothing under Gambit's
+      # code or profiles is newer than the start of the bot that is running now, nothing is started (`force` overrides).
+      # If the lookup fails, it deploys as before.
+      - name: Skip when Gambit has not changed
+        if: ${{ inputs.mode == 'ranmaru-deploy' && env.SKIP != '1' && inputs.bot == 'gambit' && !contains(inputs.advanced, 'force') && !contains(inputs.advanced, 'gambit_from=') && !contains(inputs.advanced, 'profile=') }}
+        run: |
+          set -u
+          repo="${{ github.repository }}"
+          started=$(gh api "repos/$repo/actions/runs?per_page=60" --jq '[.workflow_runs[] | select(.status != "completed") | select(.display_title | test("^live · " + env.SERVER + " · [A-Za-z0-9_]*[a-z][0-9]+_[A-Za-z0-9_]*$"))] | max_by(.created_at) | .created_at // empty' 2>/dev/null || true)
+          if [ -z "$started" ]; then echo "No numbered bot is running on $SERVER: deploying."; exit 0; fi
+          newest=""
+          for p in games/the-game/ai/gambit games/the-game/ai/eval/survivor-profiles; do
+            d=$(gh api "repos/briankeegan/GameCreator/commits?sha=main&per_page=1&path=$p" --jq '.[0].commit.committer.date // empty' 2>/dev/null || true)
+            [ -n "$d" ] || { echo "::warning::could not read GameCreator's commits under $p: deploying anyway"; exit 0; }
+            [ -z "$newest" ] || [ "$d" \> "$newest" ] && newest="$d"
+          done
+          if [ "$newest" \< "$started" ] || [ "$newest" = "$started" ]; then
+            echo "Gambit has not changed: the bot running now started $started, Gambit's newest change is $newest. Nothing was started (add force to Advanced to deploy anyway)." | tee -a "$GITHUB_STEP_SUMMARY"
+            echo "SKIP=1" >> "$GITHUB_ENV"
+          else
+            echo "Gambit changed at $newest, after the running bot started ($started): deploying."
+          fi
 
       - name: Check out the bot branch (the saved accounts)
         if: ${{ inputs.mode == 'ranmaru-deploy' && env.SKIP != '1' }}

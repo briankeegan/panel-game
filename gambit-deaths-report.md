@@ -76,3 +76,76 @@ chain and combo sizes. Getting shapes would mean replaying the saved inputs thro
 
 Gambit is in GameCreator (`games/the-game/ai/gambit/`), not in this repo.
 Analysis scripts are in the session scratchpad (`kills.py`, `pat.py`, `loss.py`, `table.py`).
+
+---
+
+# Second batch — runs p28 to p48 (5 Nov 10:09 to 6 Nov evening)
+
+278 games against 20 opponents: **269 won, 9 lost (96.8%)**. Wins average 1:24 (median 0:57).
+Losses average 2:14 (median 2:07). Run p30 (the older `Ranmaru` run) had no log artifact and p49 was
+still running, so neither is counted.
+
+Both batches together: **379 games, 365 won, 14 lost (96.3%)**.
+
+| Opponent | Games | Won | Lost | Avg game | Longest |
+|---|---|---|---|---|---|
+| Bramp | 32 | 32 | 0 | 0:40 | 1:38 |
+| javi | 31 | 29 | 2 | 2:31 | 6:02 |
+| eeeeyuke | 27 | 27 | 0 | 0:59 | 3:07 |
+| KillGore | 24 | 24 | 0 | 1:04 | 3:19 |
+| Bowser | 23 | 23 | 0 | 1:23 | 3:05 |
+| Mako | 23 | 22 | 1 | 1:10 | 3:43 |
+| FabiDFox2004 | 19 | 17 | 2 | 1:20 | 2:25 |
+| Kevin123 | 18 | 17 | 1 | 1:49 | 9:23 |
+| Wyniverse | 17 | 17 | 0 | 1:45 | 3:37 |
+| StreetsTM | 14 | 13 | 1 | 0:36 | 0:59 |
+| Snicholas289v2 | 11 | 10 | 1 | 2:25 | 7:58 |
+| MabPa | 10 | 10 | 0 | 0:41 | 1:47 |
+| mrbad | 8 | 8 | 0 | 2:40 | 6:13 |
+| Mastershadow | 7 | 6 | 1 | 2:40 | 7:28 |
+| DonVonVinii | 6 | 6 | 0 | 1:15 | 3:14 |
+| ponv | 3 | 3 | 0 | 0:24 | 0:35 |
+| Deagle | 2 | 2 | 0 | 2:11 | 2:30 |
+| Andrej, LAZGamer, some_noob | 1 each | 3 | 0 | | |
+
+## The 9 losses
+
+"Opp topped out" is the share of the game the opponent spent at row 12. "Landings" is how many
+times garbage landed on Gambit. The mode is the mode of the last decision.
+
+| # | Run | Opponent | Length | Mode at the end | Opp topped out | Landings | What we threw | Last logged move |
+|---|---|---|---|---|---|---|---|---|
+| 1 | p28 | StreetsTM | 0:10 | opener | 0% | 2 | nothing | break_line |
+| 2 | p35 | Kevin123 | 6:57 | finish them (89%) | 65% | 43 | 63 attacks, chains 2–7, combos 4–8 | hold |
+| 3 | p38 | FabiDFox2004 | 0:43 | finish them | 1% | 4 | chain 4, 5, 6 | hold |
+| 4 | p38 | FabiDFox2004 | 2:07 | pressure | 51% | 15 | 21 attacks, mostly 2–6 | hold |
+| 5 | p39 | javi | 2:19 | pressure | 67% | 48 | 33 attacks | hold |
+| 6 | p40 | Mastershadow | 2:58 | pressure | 34% | 28 | 33 attacks | hold |
+| 7 | p44 | javi | 0:31 | pressure | 19% | 5 | combo 4 ×2, chain 2, chain 6 | hold |
+| 8 | p47 | Snicholas289v2 | 4:01 | finish them (97%) | 81% | 57 | 62 attacks | hold |
+| 9 | p48 | Mako | 0:21 | opener | 0% | 2 | chain 5 | hold |
+
+## Patterns across the 9
+
+- **Two more stalemates, the Tanycanayt shape (2 and 8).** Kevin123 and Snicholas289v2 were
+  topped out for 65% and 81% of the game and still did not die. Gambit sat in `finish them` for 89%
+  and 97% of its decisions and was killed by garbage first.
+- **Four early losses, 43 s or less (1, 3, 7, 9).** Two ended in `opener`, one in `finish them` and one in
+  `pressure`. In 1 and 9 the opponent was never topped out; in 9 Gambit's stack was already
+  high (mat 56) with garbage still landing (108) and it threw one chain 5. These are lost races,
+  not stalls.
+- **Three mid-length losses in `pressure` (4, 5, 6).** Against javi, FabiDFox2004 and Mastershadow the
+  opponent was topped out for 34–67% of the game, but Gambit had dropped back to `pressure` by the end.
+  In 5 and 6 the last line is `hold` with `dies=1` (the death forecast) and no garbage in flight (land 0).
+- **8 of 9 end on `hold`.** This is the last logged line, so it shows what the bot was doing at the end,
+  not that holding caused the loss. It is the same signature as the first five losses (4 of 5).
+- Across all 14 losses, 4 are stalemates against a protected opponent (Tanycanayt ×2, Kevin123,
+  Snicholas289v2, with the third Tanycanayt loss in `pressure`), and the rest are short losses
+  in the opening or in `pressure`.
+
+## Limits
+
+- Loss 1 (10 s) only logged 23 decisions in `opener`, and the end of its decision log is about 110 frames
+  past the game length, so the match between the two logs is approximate.
+- The logs do not record Gambit's own stack height or the incoming garbage queue.
+- As before, 14 losses in 379 games is a small sample.

@@ -931,3 +931,46 @@ jobs:
               -f hours="$HOURS" -f advanced="$ADVANCED"
           fi
           echo "A fight was started on $SERVER for $HOURS hours: $NAME ($BOT) waits in the lobby, $other ($OPPONENT) challenges it." >> "$GITHUB_STEP_SUMMARY"
+
+      # The Gambit stats page (https://<owner>.github.io/<repo>/, served from the gh-pages branch): when a deployment is stopped or switched out
+      # its log is complete, so add every finished lobby bot run that is not on the page yet -- its games, the Gambit commit it played, and a
+      # full-game replay of each loss. See dashboard/update_data.py. Never fails the job.
+      - name: Update the Gambit stats page
+        if: ${{ always() && startsWith(inputs.mode, 'ranmaru') }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -u
+          repo="${{ github.repository }}"
+          git fetch --depth=1 origin gh-pages:refs/remotes/origin/gh-pages || { echo "no gh-pages branch yet: nothing to update"; exit 0; }
+          git worktree add --detach site origin/gh-pages
+          mkdir -p site/data
+          runs=$(gh api "repos/$repo/actions/runs?per_page=100&status=completed" --jq '[.workflow_runs[] | select(.display_title | test("^live · .* · [A-Za-z0-9_]*_p[0-9]+_"))] | sort_by(.created_at) | .[] | [.id, .display_title, .run_started_at, .updated_at] | @tsv')
+          todo=0
+          while IFS=$'\t' read -r id title started ended; do
+            [ -n "$id" ] || continue
+            grep -q "\"$id\"" site/data/runs.json 2>/dev/null && continue
+            todo=$((todo + 1))
+          done <<< "$runs"
+          echo "$todo finished bot runs are not on the stats page yet"
+          [ "$todo" -gt 0 ] || exit 0
+          sudo apt-get update -q && sudo apt-get install -y -q luajit luarocks liblua5.1-0-dev build-essential unzip libreadline-dev
+          luarocks install --local luasocket --lua-version 5.1 >/dev/null
+          luarocks install --local luafilesystem --lua-version 5.1 >/dev/null
+          luarocks install --local luautf8 --lua-version 5.1 >/dev/null
+          eval "$(luarocks path --local --lua-version 5.1)"
+          while IFS=$'\t' read -r id title started ended; do
+            [ -n "$id" ] || continue
+            grep -q "\"$id\"" site/data/runs.json 2>/dev/null && continue
+            d="stats-pulled/$id"; mkdir -p "$d"
+            gh run download "$id" -n bot-prod-smoke-log -D "$d" 2>/dev/null || { echo "run $id: no log artifact, skipped"; continue; }
+            job=$(gh api "repos/$repo/actions/runs/$id/jobs" --jq '.jobs[0].id')
+            gh api "repos/$repo/actions/jobs/$job/logs" > "$d/job.log" 2>/dev/null || true
+            python3 dashboard/update_data.py --run-id "$id" --dir "$d" --data site/data --title "$title" --started "$started" --ended "$ended" --job-log "$d/job.log" || echo "run $id: update failed"
+          done <<< "$runs"
+          python3 dashboard/make_site.py site
+          cd site
+          git add -A
+          if git diff --cached --quiet; then echo "stats page is up to date"; exit 0; fi
+          git -c user.name="github-actions" -c user.email="actions@github.com" commit -q -m "Gambit stats: add finished bot runs"
+          git push origin HEAD:gh-pages || { git fetch -q origin gh-pages && git rebase -q origin/gh-pages && git push origin HEAD:gh-pages; }

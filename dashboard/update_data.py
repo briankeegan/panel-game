@@ -17,6 +17,7 @@ ap.add_argument("--job-log", default="", help="the run's job log (it has a time 
 ap.add_argument("--partial", action="store_true", help="a run still going: add its finished games without replays; the final call for the run takes them back and does it properly")
 ap.add_argument("--sha", default="", help="the Gambit commit, when the logs do not name it")
 ap.add_argument("--now", default="", help="the time to give a game seen only while the run is going")
+ap.add_argument("--engine", default="", help="a checkout whose game engine plays the replays back (the one the games were played on); this repo's own when blank")
 ap.add_argument("--max-mb", type=float, default=900, help="keep the replays under this size: the oldest go first")
 ap.add_argument("--sizes", default="", help="a file of 'bytes name' lines for the replays already on the page, when they are not all on disk")
 ap.add_argument("--prune-out", default="", help="a file to list the replays that were removed but were not on disk")
@@ -121,7 +122,7 @@ for gi, g in enumerate(games):
         nrep += 1; rid = "r%d" % nrep
         tmp = os.path.join(a.data, rid + "_in.json"); json.dump(x, open(tmp, "w"))
         out_fr = os.path.join(a.data, rid + "_fr.json")
-        p = subprocess.run(["luajit", LUA, tmp, out_fr, "0"], capture_output=True, text=True, env=ENV)
+        p = subprocess.run(["luajit", LUA, os.path.abspath(tmp), os.path.abspath(out_fr), "0"], capture_output=True, text=True, env=ENV, cwd=a.engine or None)
         if not os.path.exists(out_fr):
             print("replay failed for", rid, p.stderr[-300:]); nrep -= 1; os.remove(tmp)
         else:

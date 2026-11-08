@@ -111,7 +111,7 @@
 .gc-tbl tfoot td { font-weight: 600; }
 @media (max-width: 640px) { #gw-gc { height: 64px; } }
 #gw-strip { width: 100%; height: 30px; display: block; cursor: pointer; border: 1px solid var(--color-border-line); border-radius: 6px; background: var(--color-bg); }
-#gw-scrub { width: 100%; }
+#gw-scrub, #gm-scrub { width: 100%; }
 .gw-ctl { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .gw-btn { font: inherit; font-size: var(--cds-font-size-caption); padding: 7px 12px; border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); background: transparent; color: var(--color-fg); cursor: pointer; }
 .gw-btn.main { background: var(--color-fg); color: var(--color-bg); border-color: var(--color-fg); min-width: 6.5em; }
@@ -148,7 +148,7 @@
 .gw-stage.ovon .gw-now { display: none !important; }
 .gw-now { font-size: var(--cds-font-size-caption); font-weight: 600; height: 1.4em; line-height: 1.4em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: none; }
 .gw-ctl { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-#gw-scrub { width: 100%; height: 28px; margin: 0; }
+#gw-scrub, #gm-scrub { width: 100%; height: 28px; margin: 0; }
 .gw-time { margin-left: auto; }
 @media (max-width: 760px) {
   .gw-over .gw-btn { min-height: 40px; }
@@ -395,6 +395,8 @@
     <canvas id="gw-gc" aria-label="Every piece of garbage over the whole game, one lane per player. Tap to jump."></canvas>
     <div class="gm-nav"><button type="button" class="gw-btn" id="gm-prev">◀ Earlier</button><span class="gs-note" id="gm-pos"></span><button type="button" class="gw-btn" id="gm-next">Later ▶</button></div>
     <div class="gm" id="gm" aria-label="Garbage sent around the moment you are watching"></div>
+    <input type="range" id="gm-scrub" min="0" max="0" value="0" aria-label="Frame (the same position as the replay above)">
+    <div class="gm-nav"><button type="button" class="gw-btn main" id="gm-play">Play</button><span class="gw-time" id="gm-time"></span></div>
   </section>
 
   <section class="gs-card" id="sec-versions">
@@ -1232,6 +1234,7 @@ function projectPlan(G, seq, cursor) {
     g$('play').textContent = R.playing ? 'Pause' : (R.idx >= last ? 'Replay' : 'Play');
     drawStrip();
     drawGarbage();
+    { const ms = $('gm-scrub'); if (Number(ms.max) !== last) ms.max = last; ms.value = R.idx; $('gm-play').textContent = g$('play').textContent; $('gm-time').textContent = g$('time').textContent; }
     showDecision(f[0]);
     if (LIST.rid !== R.rid || LIST.D !== D) { LIST.D = D; buildList(); }
     markList(f[0]);
@@ -1628,6 +1631,8 @@ function projectPlan(G, seq, cursor) {
     bd.addEventListener('pointerup', () => { if (down && !down.moved) togglePlay(); down = null; });
     bd.addEventListener('pointercancel', () => { down = null; });
   })();
+  $('gm-scrub').addEventListener('input', (e) => { stopPlay(); seek(Number(e.target.value)); });
+  $('gm-play').addEventListener('click', togglePlay);
   g$('scrub').addEventListener('input', (e) => { stopPlay(); seek(Number(e.target.value)); });
   $('gm').addEventListener('click', (e) => { const r = e.target.closest('.gm-r'); if (r && R.D) { stopPlay(); seek(Number(r.dataset.i)); } });
   const gmStep = (d) => { if (!R.D || !R.D._gs || !R.D._gs.moments) return; const M = R.D._gs.moments; let cur = -1; for (let q = 0; q < M.length && M[q].i <= R.idx; q++) cur = q; const t = M[Math.max(0, Math.min(M.length - 1, cur + d))]; if (t) { stopPlay(); seek(t.i); } };

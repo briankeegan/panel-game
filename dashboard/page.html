@@ -9,6 +9,7 @@
 .gs-bar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--cds-gap-md); padding: var(--cds-pad-md); border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); background: var(--color-panel); }
 .gs-f { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .gs-f[hidden], .gs-card[hidden] { display: none; }
+#gs [hidden] { display: none !important; }
 .gs-f > span { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); letter-spacing: .02em; }
 .gs-f select { max-width: min(100%, 22rem); }
 .gs-seg { display: inline-flex; border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); overflow: hidden; }
@@ -86,13 +87,13 @@
 .gw-opts .played { font-weight: 600; } .gw-opts .lo { color: var(--cds-chart-status-critical); }
 .gw-log { font-size: 11px; color: var(--color-fg-muted); font-variant-numeric: tabular-nums; line-height: 1.5; }
 .gw-log div.now { color: var(--color-fg); font-weight: 600; }
-#gw-gc { width: 100%; height: 170px; display: block; cursor: pointer; border: 1px solid var(--color-border-line); border-radius: 6px; background: var(--color-bg); }
+#gw-gc { width: 100%; height: 240px; display: block; cursor: pointer; border: 1px solid var(--color-border-line); border-radius: 6px; background: var(--color-bg); }
 .gc-tbl td, .gc-tbl th { padding: 6px 8px; }
 .gc-tbl .k { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 7px; vertical-align: -1px; }
 .gc-tbl td.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .gc-tbl .dim { color: var(--color-fg-muted); }
 .gc-tbl tfoot td { font-weight: 600; }
-@media (max-width: 640px) { #gw-gc { height: 170px; } }
+@media (max-width: 640px) { #gw-gc { height: 220px; } }
 #gw-strip { width: 100%; height: 30px; display: block; cursor: pointer; border: 1px solid var(--color-border-line); border-radius: 6px; background: var(--color-bg); }
 #gw-scrub { width: 100%; }
 .gw-ctl { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
@@ -372,7 +373,7 @@
 
   <section class="gs-card" id="sec-garbage" hidden>
     <div class="gw-head"><h2>Garbage sent</h2></div>
-    <p class="gs-note">Every piece of garbage each player sent in this game, by kind and size (width × height). Combo garbage is purple, chain garbage orange, shock garbage grey. "So far" counts up to the moment you are watching. Tap the timeline to jump there.</p>
+    <p class="gs-note">Every piece of garbage each player sent in this game, by kind and size (width × height). Combo garbage is purple, chain garbage orange, shock garbage grey. "So far" counts up to the moment you are watching. On the timeline the pieces are in the order sent, spaced so none overlap, and faded ones are still to come. Tap it to jump there.</p>
     <div class="gc-tblwrap"><table class="gs-tbl gc-tbl" id="gc-tbl"></table></div>
     <canvas id="gw-gc" aria-label="Garbage pieces sent over time, one lane per player. Tap to jump."></canvas>
   </section>
@@ -818,7 +819,7 @@
     const ps = $('gw-player'); ps.replaceChildren(new Option('All players (' + all.length + ')', ''), ...cnt.map(([n, k]) => new Option(n + ' (' + k + ')', n))); ps.value = WL.player; ps.hidden = cnt.length < 2;
     const body = $('gw-body'), pick = $('gw-pick');
     $('gw-count').textContent = list.length ? list.length + (list.length === 1 ? ' loss' : ' losses') : '';
-    if (!list.length) { stopPlay(); R.rid = null; R.D = null; body.hidden = true; pick.hidden = true; $('sec-garbage').hidden = true; $('gw-sub').textContent = 'No losses to replay here. Choose a version or opponent that lost a game, or reset the filters.'; return; }
+    if (!list.length) { stopPlay(); R.rid = null; R.D = null; body.hidden = true; pick.hidden = true; $('sec-garbage').hidden = true; $('gw-select').replaceChildren(); $('gw-list').replaceChildren(); LIST.rid = null; $('gw-sub').textContent = 'No losses to replay here. Choose a version or opponent that lost a game, or reset the filters.'; return; }
     body.hidden = false; pick.hidden = false;
     $('gw-select').replaceChildren(...list.map((r) => new Option(lossLabel(r), r.replay)));
     if (!list.some((r) => r.replay === R.rid)) openReplay(list[0], false);
@@ -1244,7 +1245,7 @@ function projectPlan(G, seq, cursor) {
     if (rows.length > 1) { const ft = tb.createTFoot().insertRow(); ft.insertCell().textContent = 'All pieces'; cell(ft, tot[0][0], tot[0][1]); cell(ft, tot[1][0], tot[1][1]); }
     }
     // timeline: one lane per player, a square per piece (area = panels), pieces that land together are stacked
-    const cv = g$('gc'), w = cv.clientWidth || 600, h = cv.clientHeight || 170, dpr = window.devicePixelRatio || 1;
+    const cv = g$('gc'), w = cv.clientWidth || 600, h = cv.clientHeight || 240, dpr = window.devicePixelRatio || 1;
     if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
     const x = cv.getContext('2d'); x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, w, h);
     const css = getComputedStyle(document.documentElement), ink = css.getPropertyValue('--color-text-muted').trim() || '#6b7488', line = css.getPropertyValue('--color-border-line').trim() || '#d0d5de', fg = css.getPropertyValue('--color-text').trim() || '#1f2937';
@@ -1255,12 +1256,17 @@ function projectPlan(G, seq, cursor) {
     [[S.me, 'Ranmaru'], [S.opp, oppName]].forEach(([evs, name], lane) => {
       const y0 = T + lane * laneH, yb = y0 + laneH - 4;
       x.strokeStyle = line; x.beginPath(); x.moveTo(L, Math.round(yb) + 0.5); x.lineTo(w - R2, Math.round(yb) + 0.5); x.stroke();
-      x.fillStyle = fg; x.textAlign = 'left'; x.fillText(name.length > 9 ? name.slice(0, 8) + '…' : name, 4, y0 + laneH / 2);
-      let edge = -99;
-      evs.forEach((e) => {
-        const side = Math.max(8, Math.min(laneH - 10, 3 + Math.sqrt(e.w * e.h) * 4.5)), X = Math.max(px(e.i), edge + side / 2 + 1);
-        edge = X + side / 2; const Y = yb - side - 1; x.globalAlpha = e.i <= now ? 1 : 0.35; x.fillStyle = GCOL[e.k]; x.fillRect(X - side / 2, Y, side, side); x.globalAlpha = 1;
+      x.fillStyle = fg; x.textAlign = 'left'; x.font = '600 12px system-ui, sans-serif'; x.fillText(name.length > 9 ? name.slice(0, 8) + '…' : name, 4, y0 + laneH / 2);
+      x.font = '600 11px system-ui, sans-serif'; x.textAlign = 'center';
+      const bw = Math.max(24, Math.min(34, (w - L - R2) / Math.max(1, evs.length) - 2)), xs = [];
+      evs.forEach((e, k) => { xs.push(Math.max(px(e.i) + bw / 2, k ? xs[k - 1] + bw + 2 : 0)); });       // left to right, no overlap
+      for (let k = xs.length - 1; k >= 0; k--) xs[k] = Math.min(xs[k], k < xs.length - 1 ? xs[k + 1] - bw - 2 : w - R2 - bw / 2);   // and never past the right edge
+      evs.forEach((e, k) => {
+        const bh = Math.max(20, Math.min(laneH - 8, 10 + e.w * e.h * 2.4)), X = xs[k], Y = yb - bh - 1;
+        x.globalAlpha = e.i <= now ? 1 : 0.4; x.fillStyle = GCOL[e.k]; x.beginPath(); x.roundRect ? x.roundRect(X - bw / 2, Y, bw, bh, 4) : x.rect(X - bw / 2, Y, bw, bh); x.fill();
+        x.fillStyle = '#fff'; x.fillText(e.w + '×' + e.h, X, Y + bh / 2 + 1); x.globalAlpha = 1;
       });
+      x.font = '12px system-ui, sans-serif';
     });
     const X = Math.round(px(now)) + 0.5; x.strokeStyle = fg; x.lineWidth = 1.5; x.beginPath(); x.moveTo(X, T); x.lineTo(X, h - AX); x.stroke(); x.lineWidth = 1;
   }

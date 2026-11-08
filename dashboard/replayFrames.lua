@@ -85,8 +85,20 @@ while not match:hasEnded() and n < 200000 do
   for _, st in ipairs(match.stacks) do if st.clock < #st.confirmedInput then done = false end end
   if done then break end
 end
+-- the modern level each side plays: the preset its level data equals (speed, shock frequency, health)
+local levels = {}
+do
+  local LevelPresets = require("common.data.LevelPresets")
+  for i, st in ipairs(match.stacks) do
+    local ld = st.levelData
+    for L = 1, LevelPresets.modernPresetCount do
+      local m = LevelPresets.getModern(L)
+      if ld and m.startingSpeed == ld.startingSpeed and m.shockFrequency == ld.shockFrequency and m.maxHealth == ld.maxHealth and m.speedIncreaseMode == ld.speedIncreaseMode then levels[i] = L; break end
+    end
+  end
+end
 local out = io.open(arg[2], "w")
-out:write(json.encode({ mine = rp.mine, width = match.stacks[1].width, grids = grids, queues = queues, frames = frames, ended = match:hasEnded(),
+out:write(json.encode({ mine = rp.mine, width = match.stacks[1].width, grids = grids, queues = queues, frames = frames, ended = match:hasEnded(), levels = levels,
   fc = (function() local f = match.stacks[1].levelData and match.stacks[1].levelData.frameConstants or {}; return { flash = f.FLASH, face = f.FACE, pop = f.POP } end)() }))
 out:close()
 print(string.format("frames %d, distinct boards %d, clock %d, ended %s", #frames, #grids, match.clock, tostring(match:hasEnded())))

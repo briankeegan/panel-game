@@ -23,6 +23,10 @@
 .gs-kv { font-family: var(--font-anthropic-serif); font-size: clamp(1.6rem, 5vw, 2rem); line-height: 1.15; font-variant-numeric: tabular-nums; min-height: 1.15em; }
 .gs-kn { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); font-variant-numeric: tabular-nums; min-height: 1.3em; }
 .gs-good { color: var(--color-ok); } .gs-bad { color: var(--color-bad); }
+.gs-nav { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: var(--cds-font-size-caption); }
+.gs-nav a { color: var(--color-fg-muted); text-decoration: none; padding: 4px 0; border-bottom: 1px solid var(--color-border-line); }
+.gs-nav a:hover { color: var(--color-fg); }
+.gs-card { scroll-margin-top: 12px; }
 .gs-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--cds-gap-md); }
 .gs-card { padding: var(--cds-pad-lg); border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); background: var(--color-panel); min-width: 0; position: relative; display: flex; flex-direction: column; gap: 6px; }
 .gs-note { color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); max-width: 75ch; }
@@ -301,6 +305,17 @@
     <div class="gs-kpi"><div class="gs-kl">Longest game</div><div class="gs-kv" id="k-lg" data-source="games">—</div><div class="gs-kn" id="k-lg-n"></div></div>
   </section>
 
+  <nav class="gs-nav" aria-label="Sections"><a href="#sec-opp">Opponents</a><a href="#sec-watch">Watch a loss</a><a href="#sec-garbage">Garbage sent</a><a href="#sec-versions">Versions</a><a href="#sec-len">Game length</a></nav>
+
+  <section class="gs-card" id="sec-opp">
+    <h2>Opponents</h2>
+    <p class="gs-note" id="opp-note">Who Gambit plays. Click a row to filter everything on this page to that opponent.</p>
+    <div class="gs-tools"><input id="s-opp" class="gs-search" type="search" placeholder="Search a player…" aria-label="Search a player" autocomplete="off">
+      <div class="gs-seg sm" role="group" aria-label="Minimum games" id="m-opp"><button type="button" data-m="0" aria-pressed="true">Any</button><button type="button" data-m="5" aria-pressed="false">5+ games</button><button type="button" data-m="10" aria-pressed="false">10+</button><button type="button" data-m="-1" aria-pressed="false">Beat Gambit</button></div>
+      <span class="gs-count" id="c-opp"></span></div>
+    <div class="gs-scroll tall" data-source="games"><table class="gs-tbl" id="t-opp"></table></div>
+  </section>
+
   <section class="gs-card" id="sec-form">
     <h2>Recent games</h2>
     <p class="gs-note" id="form-note"></p>
@@ -373,23 +388,6 @@
     <div class="gs-tip" id="tip"></div>
   </section>
 
-  <div class="gs-grid">
-    <section class="gs-card" id="sec-opp">
-      <h2>Opponents</h2>
-      <p class="gs-note" id="opp-note">Click a row to filter everything to that opponent.</p>
-      <div class="gs-tools"><input id="s-opp" class="gs-search" type="search" placeholder="Search a player…" aria-label="Search a player" autocomplete="off">
-        <div class="gs-seg sm" role="group" aria-label="Minimum games" id="m-opp"><button type="button" data-m="0" aria-pressed="true">Any</button><button type="button" data-m="5" aria-pressed="false">5+ games</button><button type="button" data-m="10" aria-pressed="false">10+</button></div>
-        <span class="gs-count" id="c-opp"></span></div>
-      <div class="gs-scroll tall" data-source="games"><table class="gs-tbl" id="t-opp"></table></div>
-    </section>
-    <section class="gs-card" id="sec-len">
-      <h2>How long games last</h2>
-      <p class="gs-note">Games per length, split into wins and losses. Long games are mostly stalemates.</p>
-      <div class="gs-legend"><span class="sq" style="--c: var(--dash-c0, var(--color-fg))" id="lg-w">Won</span><span class="sq" style="--c: var(--cds-chart-status-critical)">Lost</span></div>
-      <div class="gs-chart short dash-skeleton" id="hist" data-source="games"></div>
-    </section>
-  </div>
-
   <section class="gs-card" id="sec-table">
     <h2>Versions</h2>
     <p class="gs-note">Click a row to filter everything to that version. Click a column title to sort.</p>
@@ -397,7 +395,14 @@
     <div class="gs-scroll" data-source="games versions"><table class="gs-tbl" id="t-ver"></table></div>
   </section>
 
-  <section class="gs-card" id="sec-loss">
+  <section class="gs-card" id="sec-len">
+    <h2>How long games last</h2>
+    <p class="gs-note">Games per length, split into wins and losses. Long games are mostly stalemates.</p>
+    <div class="gs-legend"><span class="sq" style="--c: var(--dash-c0, var(--color-fg))" id="lg-w">Won</span><span class="sq" style="--c: var(--cds-chart-status-critical)">Lost</span></div>
+    <div class="gs-chart short dash-skeleton" id="hist" data-source="games"></div>
+  </section>
+
+  <section class="gs-card" id="sec-loss" hidden>
     <h2 id="loss-h">Losses</h2>
     <p class="gs-note">Early is under a minute. Stalemate is a game where the opponent sat topped out for 60% or more of it and still did not die. Mid-game is the rest. Newest first.</p>
     <div class="gs-tools"><input id="s-loss" class="gs-search" type="search" placeholder="Search losses by opponent or version" aria-label="Search losses" autocomplete="off">
@@ -414,8 +419,8 @@
       <dt>Plausible range</dt><dd>The 95% Wilson interval for the win rate. Two versions whose lines overlap cannot be told apart yet.</dd>
       <dt>Opponent topped out</dt><dd>Share of the game the opponent had panels or landed garbage in the top row (sampled every half second).</dd>
       <dt>Commit for older bots</dt><dd>For p13 to p27 the commit is the newest Gambit change before the bot started, which can be off by one. From about p28 it is the commit the redeploy was triggered by.</dd>
-      <dt>Missing</dt><dd>Run p30 and the unnumbered Ranmaru run saved no log, so their games are not counted. A bot that is still running is counted once it ends.</dd>
-      <dt>Source</dt><dd>Snapshot from the saved bot logs of each run. It does not update by itself yet.</dd>
+      <dt>Missing</dt><dd>Run p30 and the unnumbered Ranmaru run saved no log, so their games are not counted. A bot that is still running shows the games it has finished so far, without replays; replays of its losses come when it is replaced.</dd>
+      <dt>Source</dt><dd>The saved bot logs of each run. The page updates by itself: about every 20 minutes while a bot runs, and fully when it is replaced.</dd>
     </dl>
   </details>
 </div>
@@ -643,9 +648,9 @@
     // opponents table (version filter applied)
     const os = Array.from(d3.group(byVer, (g) => g.opp), ([o, a]) => Object.assign({ opp: o, last: d3.max(a, (g) => g.date) }, stat(a)));
     const qo = $('s-opp').value.trim().toLowerCase();
-    const osShown = os.filter((o) => o.n >= oppMin && has(qo, o.opp));
+    const osShown = os.filter((o) => (oppMin < 0 ? o.l > 0 : o.n >= oppMin) && has(qo, o.opp));
     $('c-opp').textContent = (qo || oppMin ? osShown.length + ' of ' : '') + os.length + (os.length === 1 ? ' opponent' : ' opponents');
-    $('opp-note').textContent = ver ? 'Against ' + (pickedV ? pickedV.label : 'this version') + ' only. Click a row to filter everything to that opponent.' : 'All versions. Click a row to filter everything to that opponent. Dimmed rows have under 5 games.';
+    $('opp-note').textContent = ver ? 'Against ' + (pickedV ? pickedV.label : 'this version') + ' only. Click a row to filter everything to that opponent.' : 'All versions. Click a row to filter everything to that opponent. ';
     table($('t-opp'), 'opp', [
       { key: 'opp', label: 'Opponent', val: (r) => r.opp.toLowerCase(), cell: plain((r) => r.opp) },
       { key: 'n', label: 'Games', num: true, val: (r) => r.n, cell: plain((r) => r.n) },

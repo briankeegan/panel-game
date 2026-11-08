@@ -1287,7 +1287,9 @@ function projectPlan(G, seq, cursor) {
     if (!PLAN.on) { cap.appendChild(dn); return; }
     const logged = []; if (seq.length && Number(combo) > 0) logged.push('combo of ' + combo); if (seq.length && Number(chain) > 0) logged.push('chain of ' + chain);
     const t = document.createElement('div'); t.className = 'whyline goal';
-    t.textContent = !seq.length ? 'No swaps planned' : 'Plan: ' + seq.length + (seq.length === 1 ? ' swap' : ' swaps') + (logged.length ? ' to build a ' + logged.join(' + ') : '');
+    const mb = 1 + 9 * (R.D.mine - 1), nowF = R.D.frames[R.idx], oldF = R.idx >= 14 ? R.D.frames[R.idx - 14] : null;
+    const moving = !!(oldF && nowF[mb + 4] && oldF[mb + 4] && (nowF[mb + 4] !== oldF[mb + 4] || nowF[mb + 5] !== oldF[mb + 5]));
+    t.textContent = !seq.length ? (moving ? 'Cursor moving, no plan logged for this decision' : 'No swaps planned') : 'Plan: ' + seq.length + (seq.length === 1 ? ' swap' : ' swaps') + (logged.length ? ' to build a ' + logged.join(' + ') : '');
     cap.appendChild(t);
     {
       // the rule that picked this move, and the options it passed on, straight from the log

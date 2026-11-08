@@ -89,6 +89,7 @@
 .gw-log div.now { color: var(--color-fg); font-weight: 600; }
 #gw-gc { width: 100%; max-width: 100%; height: 240px; display: block; cursor: pointer; border: 1px solid var(--color-border-line); border-radius: 6px; background: var(--color-bg); }
 .gc-scroll { overflow: hidden; }
+.gc-tbl { width: 100%; }
 .gc-tbl td, .gc-tbl th { padding: 6px 8px; }
 .gc-tbl .slab { display: inline-block; vertical-align: middle; border: 2px solid; border-radius: 3px; margin-right: 9px; box-sizing: border-box; }
 .gc-tbl td:first-child { white-space: nowrap; }
@@ -376,7 +377,7 @@
 
   <section class="gs-card" id="sec-garbage" hidden>
     <div class="gw-head"><h2>Garbage sent</h2></div>
-    <p class="gs-note">Every piece of garbage each player sent, drawn as it lands: width × height cells, in the column it landed in. Purple is combo garbage, orange chain garbage, grey shock garbage. Pieces sent together are stacked. The tick on each lane is the exact time sent; blocks keep the order sent and are only moved aside so they do not overlap. Faded ones are still to come. Tap to jump there.</p>
+    <p class="gs-note">Every piece each player sent, drawn as it lands in the column it landed in. Each kind and size has its own colour, the same in the table and on the chart: combos purple, chains yellow to red (taller = redder), shock grey. Size is cells wide × tall. "2 of 3" is 2 sent so far out of 3 in the game. Pieces sent together are stacked; the tick on each lane is the exact send time, and blocks are only moved aside so they do not overlap. Faded = still to come. Tap to jump.</p>
     <div class="gc-tblwrap"><table class="gs-tbl gc-tbl" id="gc-tbl"></table></div>
     <div class="gc-scroll" id="gc-scroll"><canvas id="gw-gc" aria-label="Garbage pieces sent over time, one lane per player. Tap to jump."></canvas></div>
   </section>
@@ -1233,6 +1234,13 @@ function projectPlan(G, seq, cursor) {
     const m = D.mine - 1;    // sent by a player = what arrived at the other one
     return (D._gs = { me: ev[1 - m], opp: ev[m] });
   }
+  // one colour per kind and size, the same in the table and on the chart: combo purple (wider = darker), chain orange to red (taller = redder), shock grey
+  const sizeColours = (rows) => {
+    const m = new Map(), by = { p: [], c: [], m: [] }; rows.forEach((r) => by[r.k].push(r));
+    const put = (list, f) => list.forEach((r, i) => { const t = list.length < 2 ? 0.5 : i / (list.length - 1), [h, sa, l] = f(t); m.set(r.k + r.w + 'x' + r.h, { fill: 'hsl(' + h + ',' + sa + '%,' + l + '%)', edge: 'hsl(' + h + ',' + sa + '%,' + (l - 18) + '%)' }); });
+    put(by.p, (t) => [268, 70, 72 - 34 * t]); put(by.c, (t) => [44 - 40 * t, 92, 58 - 8 * t]); put(by.m, (t) => [215, 14, 68 - 24 * t]);
+    return m;
+  };
   // pieces sent in the same moment land together, so they are stacked one on the other, like on the board
   const colsOf = (evs) => { const C = []; evs.forEach((e) => { const c = C[C.length - 1]; if (c && e.i - c.i <= 2) { c.p.push(e); c.h += e.h; } else C.push({ i: e.i, w: 6, h: e.h, p: [e] }); }); return C; };
   const GAP = 5;     // space between pieces, so the small ones can be told apart
@@ -1243,19 +1251,19 @@ function projectPlan(G, seq, cursor) {
     // table: one row per kind and size, so combo 4 and combo 5 and each chain size can be told apart
     const order = (a, b) => 'pcm'.indexOf(a.k) - 'pcm'.indexOf(b.k) || a.w * a.h - b.w * b.h || a.w - b.w;
     const sizes = new Map(); [S.me, S.opp].forEach((L, who) => L.forEach((e) => { const key = e.k + e.w + 'x' + e.h; let r = sizes.get(key); if (!r) sizes.set(key, r = { k: e.k, w: e.w, h: e.h, t: [0, 0], s: [0, 0] }); r.t[who]++; if (e.i <= now) r.s[who]++; }));
-    const rows = [...sizes.values()].sort(order), tb = $('gc-tbl'), tot = [[0, 0], [0, 0]], sig = rows.map((r) => r.s.join(',')).join('|') + oppName;
+    const rows = [...sizes.values()].sort(order), pal = sizeColours(rows), gcol = (e) => pal.get(e.k + e.w + 'x' + e.h) || { fill: GCOL[e.k], edge: GDARK[e.k] }, tb = $('gc-tbl'), tot = [[0, 0], [0, 0]], sig = rows.map((r) => r.s.join(',')).join('|') + oppName;
     if (D._gsig !== sig || !tb.rows.length) {
     D._gsig = sig; tb.replaceChildren();
-    const hd = tb.createTHead().insertRow(); ['Garbage', 'Ranmaru', oppName].forEach((t, i) => { const th = document.createElement('th'); th.textContent = t; if (i) th.style.textAlign = 'right'; hd.appendChild(th); });
+    const hd = tb.createTHead().insertRow(); [['Kind', 0], ['Size', 0], ['Ranmaru', 1], [oppName, 1]].forEach(([t, right]) => { const th = document.createElement('th'); th.textContent = t; if (right) { th.style.textAlign = 'right'; th.style.maxWidth = '96px'; th.style.overflow = 'hidden'; th.style.textOverflow = 'ellipsis'; th.title = t; } hd.appendChild(th); });
     const body = tb.createTBody();
-    if (!rows.length) { const c = body.insertRow().insertCell(); c.colSpan = 3; c.className = 'gs-empty'; c.textContent = 'No garbage was sent in this game.'; }
-    const cell = (tr, a, b) => { const c = tr.insertCell(); c.className = 'n' + (b ? '' : ' dim'); c.textContent = a + ' of ' + b; };
+    if (!rows.length) { const c = body.insertRow().insertCell(); c.colSpan = 4; c.className = 'gs-empty'; c.textContent = 'No garbage was sent in this game.'; }
+    const cell = (tr, a, b) => { const c = tr.insertCell(); c.className = 'n' + (b ? '' : ' dim'); c.textContent = a + ' of ' + b; c.title = a + ' sent so far, ' + b + ' in the whole game'; };
     rows.forEach((r) => {
-      const tr = body.insertRow(), c0 = tr.insertCell(); const sq = document.createElement('span'); sq.className = 'slab'; sq.style.cssText = 'width:' + r.w * 8 + 'px;height:' + Math.min(r.h, 8) * 8 + 'px;background:' + GCOL[r.k] + ';border-color:' + GDARK[r.k]; c0.append(sq, GNAME[r.k] + ' ' + r.w + '×' + r.h);
+      const tr = body.insertRow(), c0 = tr.insertCell(); const sq = document.createElement('span'); sq.className = 'slab'; sq.style.cssText = 'width:' + r.w * 8 + 'px;height:' + Math.min(r.h, 8) * 8 + 'px;background:' + pal.get(r.k + r.w + 'x' + r.h).fill + ';border-color:' + pal.get(r.k + r.w + 'x' + r.h).edge; c0.append(sq, GNAME[r.k]); const c1 = tr.insertCell(); c1.textContent = r.w + ' × ' + r.h; c1.style.whiteSpace = 'nowrap';
       cell(tr, r.s[0], r.t[0]); cell(tr, r.s[1], r.t[1]);
       tot[0][0] += r.s[0]; tot[0][1] += r.t[0]; tot[1][0] += r.s[1]; tot[1][1] += r.t[1];
     });
-    if (rows.length > 1) { const ft = tb.createTFoot().insertRow(); ft.insertCell().textContent = 'All pieces'; cell(ft, tot[0][0], tot[0][1]); cell(ft, tot[1][0], tot[1][1]); }
+    if (rows.length > 1) { const ft = tb.createTFoot().insertRow(); ft.insertCell().textContent = 'All pieces'; ft.insertCell(); cell(ft, tot[0][0], tot[0][1]); cell(ft, tot[1][0], tot[1][1]); }
     }
     // timeline: one lane per player, a square per piece (area = panels), pieces that land together are stacked
     const CM = colsOf(S.me), CO = colsOf(S.opp), sumW = (C) => C.reduce((t, c) => t + c.w, 0);
@@ -1289,7 +1297,7 @@ function projectPlan(G, seq, cursor) {
         let Yb = yb - 1;
         c.p.forEach((e) => {
           const sw = e.w * cs, sh = e.h * cs, X = xs[k] + (e.c || 0) * cs, Y = Yb - sh; Yb = Y; x.globalAlpha = e.i <= now ? 1 : 0.4;
-          x.fillStyle = GCOL[e.k]; x.fillRect(X, Y, sw, sh); x.strokeStyle = GDARK[e.k]; x.lineWidth = 2; x.strokeRect(X + 1, Y + 1, sw - 2, sh - 2);
+          x.fillStyle = gcol(e).fill; x.fillRect(X, Y, sw, sh); x.strokeStyle = gcol(e).edge; x.lineWidth = 2; x.strokeRect(X + 1, Y + 1, sw - 2, sh - 2);
           if (cs >= 7) { const fx = X + Math.floor((e.w - 1) / 2) * cs, fy = Y + Math.floor((e.h - 1) / 2) * cs, r = Math.max(1, cs * 0.09);
             x.fillStyle = 'rgba(255,255,255,.92)'; x.beginPath(); x.arc(fx + cs * 0.35, fy + cs * 0.42, r, 0, 7); x.arc(fx + cs * 0.65, fy + cs * 0.42, r, 0, 7); x.fill(); x.fillRect(fx + cs * 0.3, fy + cs * 0.68, cs * 0.4, Math.max(1, cs * 0.07)); }
           x.globalAlpha = 1;

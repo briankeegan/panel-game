@@ -25,6 +25,8 @@ local cursorSpeed = (cursorInterval or reactionFrames)
 local bot = BotClient({
   ip = ip, port = port, name = name, cursorSpeed = cursorSpeed,
   brain = arg[6] or "weighted", searchProfile = os.getenv("PA_SEARCH_PROFILE"),   -- arg 6: weighted | survival | bitbot | gambit
+  level = tonumber(os.getenv("PA_LEVEL")),   -- (the modern level it plays; 10 when unset)
+  followUp = os.getenv("PA_LEVEL") == nil,   -- (a lobby bot with no level set plays a whole set on 11 once the other player takes level 11)
 })
 
 local ok, err = bot:login()

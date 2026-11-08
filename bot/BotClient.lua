@@ -66,6 +66,10 @@ local BotClient = class(function(self, opts)
   self.matchStart = nil
   self.oppInputs = {} -- relayed opponent inputs, held until the match exists to take them
   self.level = opts.level or 10
+  -- The level this bot plays at when a set starts. With followUp, a person who takes level 11 in the room makes the bot play 11 for the
+  -- rest of that set (even if they go back down); it returns to baseLevel when the set is closed.
+  self.baseLevel = self.level
+  self.followUp = opts.followUp == true
   -- Ranked is a login setting like level and character, and the bot sets it
   -- EXPLICITLY every time: at login and again on every ready. Off unless a
   -- caller opts in -- a bot's games must never move anyone's rating.
@@ -187,6 +191,29 @@ local function findLocalNumber(players, publicId)
   end
 end
 
+-- Change the level this bot plays at. The next ready it sends (playBot sends one every second or so while it waits) carries it.
+function BotClient:setLevel(level, why)
+  if level == self.level then return end
+  self.level = level
+  local st = self.playerStub.settings
+  st.level = level; st.difficulty = level; st.levelData = LevelPresets.getModern(level)
+  logger.info(string.format("bot[%s]: playing level %d (%s)", self.name, level, why))
+  print(string.format("level: %s plays level %d (%s)", self.name, level, why))
+end
+
+local FOLLOW_LEVEL = 11
+-- The other player chose a level: if it is 11, this set is played on 11, whatever they pick next.
+function BotClient:noteOpponentLevel(level)
+  if self.followUp and tonumber(level) == FOLLOW_LEVEL and self.level ~= FOLLOW_LEVEL then
+    self:setLevel(FOLLOW_LEVEL, "the other player chose it: the rest of this set")
+  end
+end
+
+-- The set is closed (the room is gone): back to the usual level.
+function BotClient:endSet()
+  if self.level ~= self.baseLevel then self:setLevel(self.baseLevel, "the set is over") end
+end
+
 -- Apply one sanitized server-pushed message to our local state.
 function BotClient:dispatch(msg)
   if msg[OPP_PREFIX] then
@@ -202,6 +229,9 @@ function BotClient:dispatch(msg)
     self.localPlayerNumber = findLocalNumber(msg.players, self.publicId) or self.localPlayerNumber
     logger.info(string.format("bot[%s]: in room %s as slot %s", self.name, tostring(self.roomNumber),
       tostring(self.localPlayerNumber)))
+    for pn, pl in pairs(msg.players or {}) do   -- someone already in the room with level 11 chosen
+      if pn ~= self.localPlayerNumber and type(pl) == "table" and type(pl.settings) == "table" then self:noteOpponentLevel(pl.settings.level) end
+    end
   elseif msg.match_start then
     -- inputs still queued belong to the previous match (NetClient drops them here too)
     self.oppInputs = {}
@@ -240,7 +270,11 @@ function BotClient:dispatch(msg)
         self:acceptChallenge(ch.senderId, ch.gameModeId)
       end
     end
+  elseif msg.menu_state then
+    local ms = msg.menu_state     -- another player's settings changed (their level, character, ready ...)
+    if type(ms) == "table" and ms.playerNumber and ms.playerNumber ~= self.localPlayerNumber and ms.level then self:noteOpponentLevel(ms.level) end
   elseif msg.leave_room then
+    self:endSet()
     self.inRoom = false
     self.players = nil
     self.roomNumber = nil
@@ -509,6 +543,7 @@ end
 
 function BotClient:leaveRoom()
   pcall(function() self.gameplay:sendRequest(ClientProtocol.leaveRoom()) end)
+  self:endSet()
   self.inRoom = false
   self.roomNumber = nil
   self.players = nil

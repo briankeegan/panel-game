@@ -294,12 +294,12 @@
 
 <div class="gs" id="gs">
   <header>
-    <h1 id="gs-title">Gambit on panelattack.com</h1>
+    <h1 id="gs-title">Ranmaru on panelattack.com</h1>
     <p class="gs-take" id="gs-take" data-source="games versions"></p>
   </header>
 
   <section class="gs-bar" aria-label="Filters">
-    <label class="gs-f"><span>Version (Gambit commit)</span><select id="f-ver" class="dash-select"></select></label>
+    <label class="gs-f"><span>Version (Ranmaru commit)</span><select id="f-ver" class="dash-select"></select></label>
     <div class="gs-f" id="f-chips-wrap" hidden><span>Showing only</span><div class="gs-chips" id="f-chips"></div></div>
     <button type="button" class="gs-link" id="f-reset" hidden>Reset filters</button>
   </section>
@@ -316,9 +316,9 @@
 
   <section class="gs-card" id="sec-opp">
     <h2>Opponents</h2>
-    <p class="gs-note" id="opp-note">Who Gambit plays. Click a row to filter everything on this page to that opponent.</p>
+    <p class="gs-note" id="opp-note">Who Ranmaru plays. Click a row to filter everything on this page to that opponent.</p>
     <div class="gs-tools"><input id="s-opp" class="gs-search" type="search" placeholder="Search a player…" aria-label="Search a player" autocomplete="off">
-      <div class="gs-seg sm" role="group" aria-label="Minimum games" id="m-opp"><button type="button" data-m="0" aria-pressed="true">Any</button><button type="button" data-m="5" aria-pressed="false">5+ games</button><button type="button" data-m="10" aria-pressed="false">10+</button><button type="button" data-m="-1" aria-pressed="false">Beat Gambit</button></div>
+      <div class="gs-seg sm" role="group" aria-label="Minimum games" id="m-opp"><button type="button" data-m="0" aria-pressed="true">Any</button><button type="button" data-m="5" aria-pressed="false">5+ games</button><button type="button" data-m="10" aria-pressed="false">10+</button><button type="button" data-m="-1" aria-pressed="false">Beat Ranmaru</button></div>
       <span class="gs-count" id="c-opp"></span></div>
     <div class="gs-scroll tall" data-source="games"><table class="gs-tbl" id="t-opp"></table></div>
   </section>
@@ -331,7 +331,7 @@
 
   <section class="gs-card" id="sec-watch">
     <div class="gw-head"><h2 id="gw-title">Watch a loss</h2><span class="gs-count" id="gw-count"></span></div>
-    <p class="gs-note" id="gw-sub">Pick a loss to replay it frame by frame, with Gambit's decisions beside the boards.</p>
+    <p class="gs-note" id="gw-sub">Pick a loss to replay it frame by frame, with Ranmaru's decisions beside the boards.</p>
     <div class="gw-pick" id="gw-pick">
       <button type="button" class="gw-btn" id="gw-newer">◀ Newer</button>
       <select id="gw-player" class="dash-select" aria-label="Choose a player"></select>
@@ -343,19 +343,19 @@
       <div class="gw-stage" id="gw-stage">
         <div class="gw-seg-row"><div class="gs-seg sm" role="group" aria-label="Part of the game" id="gw-part"><button type="button" data-p="open" aria-pressed="false">Start of game</button><button type="button" data-p="end" aria-pressed="true">End of game</button></div></div>
         <div class="gw-boards" id="gw-boards" title="Tap to play or pause. Drag sideways to scrub.">
-          <figure class="gw-board" id="gw-b1"><figcaption><b id="gw-n1">Gambit</b><span id="gw-t1"></span></figcaption><div class="gw-in" id="gw-i1" aria-label="Garbage on its way"></div><canvas id="gw-c1" aria-label="Gambit's board"></canvas><div class="gw-st" id="gw-s1"></div></figure>
-          <div class="gw-mid" id="gw-mid" aria-label="Gambit's mode"></div><figure class="gw-board" id="gw-b2"><figcaption><b id="gw-n2">Opponent</b><span id="gw-t2"></span></figcaption><div class="gw-in" id="gw-i2" aria-label="Garbage on its way"></div><canvas id="gw-c2" aria-label="The opponent's board"></canvas><div class="gw-st" id="gw-s2"></div></figure>
+          <figure class="gw-board" id="gw-b1"><figcaption><b id="gw-n1">Ranmaru</b><span id="gw-t1"></span></figcaption><div class="gw-in" id="gw-i1" aria-label="Garbage on its way"></div><canvas id="gw-c1" aria-label="Ranmaru's board"></canvas><div class="gw-st" id="gw-s1"></div></figure>
+          <div class="gw-mid" id="gw-mid" aria-label="Ranmaru's mode"></div><figure class="gw-board" id="gw-b2"><figcaption><b id="gw-n2">Opponent</b><span id="gw-t2"></span></figcaption><div class="gw-in" id="gw-i2" aria-label="Garbage on its way"></div><canvas id="gw-c2" aria-label="The opponent's board"></canvas><div class="gw-st" id="gw-s2"></div></figure>
         </div>
         <div class="gw-cap" id="gw-cap" aria-live="off"></div>
         <div class="gw-now" id="gw-now"></div>
         <div class="gw-over">
-          <button type="button" class="gw-btn" id="gw-plan" aria-pressed="false" title="Draw Gambit's plan on its board, and explain it">Show plan</button>
+          <button type="button" class="gw-btn" id="gw-plan" aria-pressed="false" title="Draw Ranmaru's plan on its board, and explain it">Show plan</button>
           <button type="button" class="gw-btn" id="gw-prevp" aria-label="Previous plan change" title="Jump to the previous plan change" hidden>‹ Plan</button>
           <button type="button" class="gw-btn" id="gw-nextp" aria-label="Next plan change" title="Jump to the next plan change" hidden>Plan ›</button>
         </div>
-        <canvas id="gw-strip" aria-label="Timeline of Gambit's decisions. Click to jump."></canvas>
+        <canvas id="gw-strip" aria-label="Timeline of Ranmaru's decisions. Click to jump."></canvas>
         <div class="gw-lw" id="gw-lw">
-        <div class="gw-lh"><b>Gambit's choices</b><div class="gs-seg sm" role="group" aria-label="Which decisions" id="gw-lmode"><button type="button" data-m="chg" aria-pressed="true">Plan changes</button><button type="button" data-m="all" aria-pressed="false">Every decision</button></div></div>
+        <div class="gw-lh"><b>Ranmaru's choices</b><div class="gs-seg sm" role="group" aria-label="Which decisions" id="gw-lmode"><button type="button" data-m="chg" aria-pressed="true">Plan changes</button><button type="button" data-m="all" aria-pressed="false">Every decision</button></div></div>
         <div class="gw-list" id="gw-list" role="list"></div>
         </div>
         <input type="range" id="gw-scrub" min="0" max="0" value="0" aria-label="Frame">
@@ -375,7 +375,7 @@
 
   <section class="gs-card" id="sec-garbage" hidden>
     <div class="gw-head"><h2>Garbage sent</h2></div>
-    <p class="gs-note">Panels of garbage each player has sent so far. Pick a type to see combo, chain or shock garbage on its own. The coloured band under the chart is Gambit's mode. Tap the chart to jump there.</p>
+    <p class="gs-note">Panels of garbage each player has sent so far. Pick a type to see combo, chain or shock garbage on its own. The coloured band under the chart is Ranmaru's mode. Tap the chart to jump there.</p>
     <div class="gs-seg sm" role="group" aria-label="Type of garbage" id="gc-kind"><button type="button" data-k="all" aria-pressed="true">All</button><button type="button" data-k="p" aria-pressed="false">Combo</button><button type="button" data-k="c" aria-pressed="false">Chain</button><button type="button" data-k="m" aria-pressed="false">Shock</button></div>
     <canvas id="gw-gc" aria-label="Garbage sent over time. Tap to jump."></canvas>
     <div class="gc-leg" id="gc-leg"></div>
@@ -383,7 +383,7 @@
 
   <section class="gs-card" id="sec-versions">
     <h2>Win rate by version</h2>
-    <p class="gs-note" id="ch-note">Each dot is one Gambit commit, oldest on the left. The line through a dot is the range the true win rate could plausibly be in; a short line means many games. Click a dot to look at that version alone.</p>
+    <p class="gs-note" id="ch-note">Each dot is one Ranmaru commit, oldest on the left. The line through a dot is the range the true win rate could plausibly be in; a short line means many games. Click a dot to look at that version alone.</p>
     <div class="gs-legend"><span style="--c: var(--color-fg)">10+ games</span><span class="hollow" style="--c: var(--color-fg)">under 10 games</span><span class="sq" style="--c: var(--cds-chart-muted)">games played</span></div>
     <div class="gs-tools"><div class="gs-f"><span>Versions shown</span>
       <div class="gs-seg" role="group" aria-label="Versions shown" id="f-min">
@@ -421,11 +421,11 @@
   <details>
     <summary>Definitions and what this leaves out</summary>
     <dl>
-      <dt>Version</dt><dd>A Gambit commit. Bots p49 and p50 ran the same commit, so they are one version; a redeploy with no Gambit change adds games to the same row.</dd>
+      <dt>Version</dt><dd>A Ranmaru commit. Bots p49 and p50 ran the same commit, so they are one version; a redeploy with no Ranmaru change adds games to the same row.</dd>
       <dt>Win rate</dt><dd>Games won out of games won plus lost, as seen by the lobby bot on panelattack.com. Fights and games on the other server are not here.</dd>
       <dt>Plausible range</dt><dd>The 95% Wilson interval for the win rate. Two versions whose lines overlap cannot be told apart yet.</dd>
       <dt>Opponent topped out</dt><dd>Share of the game the opponent had panels or landed garbage in the top row (sampled every half second).</dd>
-      <dt>Commit for older bots</dt><dd>For p13 to p27 the commit is the newest Gambit change before the bot started, which can be off by one. From about p28 it is the commit the redeploy was triggered by.</dd>
+      <dt>Commit for older bots</dt><dd>For p13 to p27 the commit is the newest Ranmaru change before the bot started, which can be off by one. From about p28 it is the commit the redeploy was triggered by.</dd>
       <dt>Missing</dt><dd>Run p30 and the unnumbered Ranmaru run saved no log, so their games are not counted. A bot that is still running shows the games it has finished so far, without replays; replays of its losses come when it is replaced.</dd>
       <dt>Source</dt><dd>The saved bot logs of each run. The page updates by itself: about every 20 minutes while a bot runs, and fully when it is replaced.</dd>
     </dl>
@@ -628,8 +628,8 @@
     const vs = vers.map((v) => Object.assign({}, v, stat(byOpp.filter((g) => g.sha === v.sha)))).filter((v) => v.n > 0 && (v.n >= (opp ? 0 : minn) || v.sha === ver));
     const all = stat(byOpp);
     $('ch-note').textContent = opp
-      ? 'Against ' + opp + ' only, so every version that played them is shown, even with few games. Each dot is one Gambit commit, oldest on the left; a long line means few games. Click a dot to look at that version alone.'
-      : 'Each dot is one Gambit commit, oldest on the left. The line through a dot is the range the true win rate could plausibly be in; a short line means many games. Click a dot to look at that version alone.';
+      ? 'Against ' + opp + ' only, so every version that played them is shown, even with few games. Each dot is one Ranmaru commit, oldest on the left; a long line means few games. Click a dot to look at that version alone.'
+      : 'Each dot is one Ranmaru commit, oldest on the left. The line through a dot is the range the true win rate could plausibly be in; a short line means many games. Click a dot to look at that version alone.';
     drawChart(vs, all, ver);
 
     // versions table
@@ -842,7 +842,7 @@
       R.D = r.data;
       R.idx = Math.max(0, R.D.frames.length - 1 - 600);   // start ten seconds before the end of the game
       g$('scrub').max = R.D.frames.length - 1;
-      g$('n1').textContent = 'Gambit (' + R.D.bot + ')';
+      g$('n1').textContent = 'Ranmaru (' + R.D.bot + ')';
       g$('n2').textContent = R.D.opp;
     }
     syncPart();
@@ -972,7 +972,7 @@
     x.restore();
     return topped;
   }
-  // what Gambit planned when it last decided: its line of swaps, numbered, joined by arrows
+  // what Ranmaru planned when it last decided: its line of swaps, numbered, joined by arrows
 // Projects a logged swap line onto the board it was made on: swaps, gravity, matches, chains. Instant (no timing).
 // G: rows top to bottom as parseGrid gives them; seq: [[row from bottom, col (right cell of the pair, 1-based)], ...]
 function simulate(G, seq) {
@@ -1174,7 +1174,7 @@ function projectPlan(G, seq, cursor) {
   }
   // did the cursor move between two frames? When the stack rises a row the cursor's row number goes up by one to ride with it: that is not a move
   const cursorMoved = (a1, b1, mb) => { if (!a1 || !b1 || !a1[mb + 4] || !b1[mb + 4]) return false; const dr = b1[mb + 4] - a1[mb + 4], dc = b1[mb + 5] - a1[mb + 5]; if (dc === 0 && dr === 1 && b1[mb + 8] > a1[mb + 8] + 6) return false; return dr !== 0 || dc !== 0; };
-  // how many swaps Gambit has made since a given clock, from the recording: a swap starts when the board first shows a panel in the 'swapping' state
+  // how many swaps Ranmaru has made since a given clock, from the recording: a swap starts when the board first shows a panel in the 'swapping' state
   function swapsDone(fromClock) {
     const D = R.D; if (!D._swc) {
       const mb = 1 + 9 * (D.mine - 1), has = new Map(), hs = (gi) => { let v = has.get(gi); if (v === undefined) { v = /[1-6]s/.test(D.grids[gi]); has.set(gi, v); } return v; };
@@ -1248,7 +1248,7 @@ function projectPlan(G, seq, cursor) {
     // time axis: m:ss, spaced so labels never touch
     const secs = n / 60, stepS = [10, 15, 30, 60, 120, 300].find((q) => (secs / q) <= Math.max(3, Math.floor((w - L) / 70))) || 600;
     x.textAlign = 'center'; for (let s = 0; s <= secs; s += stepS) { const i = s * 60, X = Math.round(px(Math.min(i, n - 1))) + 0.5; x.strokeStyle = line; x.beginPath(); x.moveTo(X, h - B); x.lineTo(X, h - B + 4); x.stroke(); x.fillStyle = ink; x.fillText(Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'), Math.min(w - 14, Math.max(L, X)), h - B + 17); }
-    // Gambit's mode: one coloured band under the time axis
+    // Ranmaru's mode: one coloured band under the time axis
     const share = {}; D.dec.forEach((d, k) => { const nx = D.dec[k + 1], c0 = d[0] - F0(), c1 = nx ? nx[0] - F0() : n - 1; share[d[1]] = (share[d[1]] || 0) + Math.max(0, c1 - c0); x.fillStyle = (MODES[d[1]] || { c: '#6b7488' }).c; x.fillRect(px(c0), h - MB - 1, Math.max(1, px(c1) - px(c0)), MB - 2); });
     // the two lines, stepped, drawn as thick as they are readable
     [[so, col.opp], [sm, col.me]].forEach(([a, c]) => {
@@ -1264,8 +1264,8 @@ function projectPlan(G, seq, cursor) {
     const row = (c, name, now, all, T2) => '<div class="gc-row"><i class="ln" style="background:' + c + '"></i><b>' + name + '</b><span class="gc-now">' + now + '</span><span class="gc-sub">of ' + all + ' panels sent in the game' + (kk === 'all' ? ' (' + brk(T2) + ')' : '') + '</span></div>';
     const ml = Object.keys(share).sort((a, b) => share[b] - share[a]).map((m) => '<span><i style="background:' + (MODES[m] || { c: '#6b7488' }).c + '"></i>' + m + ' ' + Math.round(100 * share[m] / Math.max(1, n - 1)) + '%</span>').join('');
     $('gc-leg').innerHTML = '<div class="gc-time">At ' + fmtClock(D.frames[R.idx][0]) + (kk === 'all' ? '' : ' · ' + GKIND[kk].toLowerCase() + ' garbage only') + '</div>'
-      + row(col.me, 'Gambit', sm[R.idx], sm[n - 1], S.meT) + row(col.opp, D.opp || 'Opponent', so[R.idx], so[n - 1], S.oppT)
-      + '<div class="gc-modes"><span class="gc-sub">Gambit\'s mode (band under the chart):</span>' + ml + '</div>';
+      + row(col.me, 'Ranmaru', sm[R.idx], sm[n - 1], S.meT) + row(col.opp, D.opp || 'Opponent', so[R.idx], so[n - 1], S.oppT)
+      + '<div class="gc-modes"><span class="gc-sub">Ranmaru\'s mode (band under the chart):</span>' + ml + '</div>';
   }
   function drawStrip() {
     const cv = g$('strip'), D = R.D;
@@ -1284,7 +1284,7 @@ function projectPlan(G, seq, cursor) {
     if (PLAN.on) { x.fillStyle = '#4ea8ff'; PLAN.changeClocks().forEach((c) => { const px = ((c - c0) / span) * (w - 2) + 1; x.fillRect(px - 1, 0, 3, 30); }); }
     x.fillStyle = getComputedStyle(cv).color || '#888'; x.fillRect((R.idx / span) * (w - 2), 0, 2, 30);
   }
-  // PLAN: what Gambit itself logged at each decision (its swap line, what it expects, how it ranked the options); nothing is added with hindsight
+  // PLAN: what Ranmaru itself logged at each decision (its swap line, what it expects, how it ranked the options); nothing is added with hindsight
   const PLAN = {
     on: true,
     list() { return R.D && R.D.plans ? R.D.plans : null; },
@@ -1305,7 +1305,7 @@ function projectPlan(G, seq, cursor) {
       let dropped = null; if (i > 0 && L[i - 1] && L[i - 1][1] && this.status(i).kind === 'new') { const pk = this.steps(i - 1); const pkk = pk ? this.shift({ grid: pk.grid }) : null; if (pkk != null) dropped = this.seqOf(L[i - 1]).map(([r, c]) => [r + pkk, c]); }
       return { seq, total, done, left: seq.length, carried, at: R.D.dec[i][0], dropped: carried ? null : dropped, off: m ? Number(m[1]) - 1 : 0, build: (() => { if (!stp || kk == null) return null; const pp = stp.steps.find((q) => q.kind === 'pop'); return pp ? { board: pp.board, k: kk, cells: pp.cells } : null; })(), pops: (stp && kk != null) ? stp.steps.filter((q) => q.kind === 'pop').slice(0, 1).map((q) => ({ link: q.link, cells: q.cells.map(([r, c, col]) => [r + kk, c, col]) })) : null, shape: (() => { const sh = this.shape(i); if (!sh) return null; const k = this.shift(sh); return k == null ? null : { cells: sh.cells.map(([r, c, col]) => [r + k, c, col]), gone: sh.gone.map(([r, c, lk]) => [r + k, c, lk]), built: sh.built, final: sh.final, cleared: sh.cleared, h0: sh.h0, h1: sh.h1, exact: sh.exact }; })() };
     },
-    // the end shape: the panels the line clears, from running its swaps on the board it was made on. Shown only when that agrees with the chain Gambit logged.
+    // the end shape: the panels the line clears, from running its swaps on the board it was made on. Shown only when that agrees with the chain Ranmaru logged.
     shape(i) {
       const D = R.D, L = this.list(); if (!D._shape || D._shapeFor !== L) { D._shape = {}; D._shapeFor = L; }
       if (i in D._shape) return D._shape[i];
@@ -1391,7 +1391,7 @@ function projectPlan(G, seq, cursor) {
     const setSt = (k, html) => { g$(k).innerHTML = html; };
     cap.replaceChildren(); g$('mid').replaceChildren();
     if (!D.dec.length || i < 0) {
-      const t = document.createElement('div'); t.className = 'why'; t.textContent = D.dec.length ? (clock < 190 ? 'Countdown: the game moves the cursor to its start spot. Gambit has not acted yet.' : 'Before the first decision.') : 'No decisions were logged for this game.'; cap.appendChild(t); return;
+      const t = document.createElement('div'); t.className = 'why'; t.textContent = D.dec.length ? (clock < 190 ? 'Countdown: the game moves the cursor to its start spot. Ranmaru has not acted yet.' : 'Before the first decision.') : 'No decisions were logged for this game.'; cap.appendChild(t); return;
     }
     const d = D.dec[i], [c, mode, play, want, v, dies, land, chain, combo, thrown, eTop, eOut, eStop] = d;
     const L = PLAN.list(), e = L && L[i] && L[i][0] === c ? L[i] : null;
@@ -1407,7 +1407,7 @@ function projectPlan(G, seq, cursor) {
     const M = MODES[mode] || { c: '#6b7488', aim: '', tip: '' };
     g$('mid').style.setProperty('--mc', M.c);
     const l1 = g$('mid');
-    const ml = document.createElement('div'); ml.className = 'mlabel'; ml.textContent = "Gambit's mode"; l1.appendChild(ml);
+    const ml = document.createElement('div'); ml.className = 'mlabel'; ml.textContent = "Ranmaru's mode"; l1.appendChild(ml);
     const mc = document.createElement('span'); mc.className = 'chip'; mc.textContent = mode; mc.title = mode; l1.appendChild(mc);
     if (mode === 'fill' && /^\d+$/.test(d[16] || '')) { const fc = document.createElement('span'); fc.className = 'chip'; fc.textContent = Number(d[16]) >= 3 ? 'up to ' + d[16] + 'x' : 'small combos'; l1.appendChild(fc); }
     if (PLAN.on && e) { const st = PLAN.status(i), sc = document.createElement('span'); sc.className = 'chip ' + st.kind; const m2 = /swap (\d+) of (\d+)/.exec(st.text);
@@ -1429,10 +1429,10 @@ function projectPlan(G, seq, cursor) {
       const mine0 = opts.find((o) => o.nm === (play || '').replace(/_/g, ' ')), seen = new Set([(play || '').replace(/_/g, ' ')]), others = [];
       opts.forEach((o) => { if (!seen.has(o.nm) && lostTxt(o.lost)) { seen.add(o.nm); others.push(o); } });
       const why = [mode + ' mode', e && RULE[e[6]] ? 'rule: ' + RULE[e[6]] : '', mine0 ? lostTxt(mine0.lost) : ''].filter(Boolean).join(' · ');
-      if (seq.length && Number(d[9]) > 0) {          // Gambit's forecast for the line it chose: the garbage blocks it expects to send the opponent
+      if (seq.length && Number(d[9]) > 0) {          // Ranmaru's forecast for the line it chose: the garbage blocks it expects to send the opponent
         const gt = document.createElement('div'); gt.className = 'whyline def'; gt.textContent = 'Plan should send ' + Number(d[9]) + (Number(d[9]) === 1 ? ' garbage block' : ' garbage blocks') + ' (forecast)'; cap.appendChild(gt);
       }
-      if (/^\d+$/.test(d[15] || '')) {            // the game lets a bot press only so many keys in any 10 seconds (a held direction counts once); Gambit logs how many it may still press
+      if (/^\d+$/.test(d[15] || '')) {            // the game lets a bot press only so many keys in any 10 seconds (a held direction counts once); Ranmaru logs how many it may still press
         const lim = D._lim || (D._lim = Math.max(1, ...D.dec.map((q) => Number(q[15]) || 0))), left = Number(d[15]);
         const bd = document.createElement('div'); bd.className = 'budget' + (left <= lim * 0.15 ? ' low' : ''); bd.title = 'The game lets a bot press at most ' + lim + ' keys in any 10 seconds. A held direction counts as one press.';
         const bt = document.createElement('span'); bt.append('Key presses left: '); const bb = document.createElement('b'); bb.textContent = left + ' of ' + lim; bt.appendChild(bb); bt.append(' (per 10 s)');
@@ -1443,7 +1443,7 @@ function projectPlan(G, seq, cursor) {
     }
     { const cur0 = PLAN.current(clock); if (cur0 && cur0.dropped) { const g = document.createElement('div'); g.className = 'whyline def'; g.textContent = 'New plan. The grey arrows are the plan it just dropped.'; cap.appendChild(g); } }
   }
-  // the list of Gambit's choices: each plan it made or threw away, tap one to jump there
+  // the list of Ranmaru's choices: each plan it made or threw away, tap one to jump there
   const LIST = { rid: null, mode: 'chg', rows: [] };
   function buildList() {
     const D = R.D, box = g$('list'), L = D.plans; box.replaceChildren(); LIST.rows = [];
@@ -1474,7 +1474,7 @@ function projectPlan(G, seq, cursor) {
       if (why) { const w = document.createElement('span'); w.className = 'w'; w.textContent = why; b.appendChild(w); }
       frag.appendChild(b); LIST.rows.push(b);
     }
-    if (!LIST.rows.length) box.textContent = 'Gambit did not change its plan in this game.'; else box.appendChild(frag);
+    if (!LIST.rows.length) box.textContent = 'Ranmaru did not change its plan in this game.'; else box.appendChild(frag);
     LIST.rid = R.rid; LIST.active = null;
   }
   function markList(clock) {
@@ -1549,7 +1549,7 @@ function projectPlan(G, seq, cursor) {
   g$('prevp').addEventListener('click', () => jumpPlan(-1));
   g$('nextp').addEventListener('click', () => jumpPlan(1));
   g$('play').addEventListener('click', togglePlay);
-  // a "move" is a frame where Gambit's cursor changes cell, or a swap starts: stepping by single frames took many clicks to see the next one
+  // a "move" is a frame where Ranmaru's cursor changes cell, or a swap starts: stepping by single frames took many clicks to see the next one
   function isMove(j) {
     const D = R.D, mb = 1 + 9 * (D.mine - 1), a1 = D.frames[j - 1], b1 = D.frames[j]; if (!a1 || !b1) return false;
     if (cursorMoved(a1, b1, mb)) return true;

@@ -1123,6 +1123,16 @@ function projectPlan(G, seq, cursor) {
   }
   // did the cursor move between two frames? When the stack rises a row the cursor's row number goes up by one to ride with it: that is not a move
   const cursorMoved = (a1, b1, mb) => { if (!a1 || !b1 || !a1[mb + 4] || !b1[mb + 4]) return false; const dr = b1[mb + 4] - a1[mb + 4], dc = b1[mb + 5] - a1[mb + 5]; if (dc === 0 && dr === 1 && b1[mb + 8] > a1[mb + 8] + 6) return false; return dr !== 0 || dc !== 0; };
+  // how many swaps Gambit has made since a given clock, from the recording: a swap starts when the board first shows a panel in the 'swapping' state
+  function swapsDone(fromClock) {
+    const D = R.D; if (!D._swc) {
+      const mb = 1 + 9 * (D.mine - 1), has = new Map(), hs = (gi) => { let v = has.get(gi); if (v === undefined) { v = /[1-6]s/.test(D.grids[gi]); has.set(gi, v); } return v; };
+      const c = new Uint32Array(D.frames.length); let n = 0, prev = false;
+      for (let q = 0; q < D.frames.length; q++) { const now = hs(D.frames[q][mb + 6]); if (now && !prev) n++; prev = now; c[q] = n; }
+      D._swc = c;
+    }
+    const f0 = Math.max(0, Math.min(D.frames.length - 1, fromClock - D.frames[0][0])); return Math.max(0, D._swc[R.idx] - D._swc[f0]);
+  }
   const fmtClock = (c) => { const s = c / 60; return Math.floor(s / 60) + ':' + (s % 60 < 10 ? '0' : '') + (s % 60).toFixed(1); };
   function updatePlayer() {
     const D = R.D; if (!D) return;
@@ -1179,12 +1189,12 @@ function projectPlan(G, seq, cursor) {
         for (let q = Math.max(1, R.idx - 40); q <= R.idx && !moved; q++) { if (cursorMoved(R.D.frames[q - 1], R.D.frames[q], mb)) moved = true; }
         if (moved) for (let j = i0 - 1; j >= 0 && i0 - j <= 30; j--) { if (L[j] && this.seqOf(L[j]).length) { i = j; carried = true; break; } }
       }
-      let seq = this.seqOf(L[i]);
-      if (!seq.length) { const w = /^(\d+),(\d+)$/.exec(R.D.dec[i][3]); if (w) seq = [[Number(w[1]), Number(w[2])]]; }
+      let seq = this.seqOf(L[i]); const total = seq.length, done = Math.min(total, swapsDone(R.D.dec[i][0])); seq = seq.slice(done);
+      if (!seq.length && !total) { const w = /^(\d+),(\d+)$/.exec(R.D.dec[i][3]); if (w) seq = [[Number(w[1]), Number(w[2])]]; }
       const m = /swap (\d+) of/.exec(this.status(i).text);
       const stp = this.steps(i), kk = stp ? this.shift({ grid: stp.grid }) : null;
       let dropped = null; if (i > 0 && L[i - 1] && L[i - 1][1] && this.status(i).kind === 'new') { const pk = this.steps(i - 1); const pkk = pk ? this.shift({ grid: pk.grid }) : null; if (pkk != null) dropped = this.seqOf(L[i - 1]).map(([r, c]) => [r + pkk, c]); }
-      return { seq, carried, at: R.D.dec[i][0], dropped: carried ? null : dropped, off: m ? Number(m[1]) - 1 : 0, build: (() => { if (!stp || kk == null) return null; const pp = stp.steps.find((q) => q.kind === 'pop'); return pp ? { board: pp.board, k: kk, cells: pp.cells } : null; })(), pops: (stp && kk != null) ? stp.steps.filter((q) => q.kind === 'pop').slice(0, 1).map((q) => ({ link: q.link, cells: q.cells.map(([r, c, col]) => [r + kk, c, col]) })) : null, shape: (() => { const sh = this.shape(i); if (!sh) return null; const k = this.shift(sh); return k == null ? null : { cells: sh.cells.map(([r, c, col]) => [r + k, c, col]), gone: sh.gone.map(([r, c, lk]) => [r + k, c, lk]), built: sh.built, final: sh.final, cleared: sh.cleared, h0: sh.h0, h1: sh.h1, exact: sh.exact }; })() };
+      return { seq, total, done, left: seq.length, carried, at: R.D.dec[i][0], dropped: carried ? null : dropped, off: m ? Number(m[1]) - 1 : 0, build: (() => { if (!stp || kk == null) return null; const pp = stp.steps.find((q) => q.kind === 'pop'); return pp ? { board: pp.board, k: kk, cells: pp.cells } : null; })(), pops: (stp && kk != null) ? stp.steps.filter((q) => q.kind === 'pop').slice(0, 1).map((q) => ({ link: q.link, cells: q.cells.map(([r, c, col]) => [r + kk, c, col]) })) : null, shape: (() => { const sh = this.shape(i); if (!sh) return null; const k = this.shift(sh); return k == null ? null : { cells: sh.cells.map(([r, c, col]) => [r + k, c, col]), gone: sh.gone.map(([r, c, lk]) => [r + k, c, lk]), built: sh.built, final: sh.final, cleared: sh.cleared, h0: sh.h0, h1: sh.h1, exact: sh.exact }; })() };
     },
     // the end shape: the panels the line clears, from running its swaps on the board it was made on. Shown only when that agrees with the chain Gambit logged.
     shape(i) {
@@ -1291,13 +1301,14 @@ function projectPlan(G, seq, cursor) {
     const mc = document.createElement('span'); mc.className = 'chip'; mc.textContent = mode; mc.title = mode; l1.appendChild(mc);
     if (PLAN.on && e) { const st = PLAN.status(i), sc = document.createElement('span'); sc.className = 'chip ' + st.kind; const m2 = /swap (\d+) of (\d+)/.exec(st.text);
       sc.textContent = st.kind === 'new' ? 'New plan · ' + seq.length + (seq.length === 1 ? ' swap' : ' swaps') : st.kind === 'same' ? (m2 ? (Number(m2[2]) - Number(m2[1]) + 1) + (Number(m2[2]) - Number(m2[1]) === 0 ? ' swap left' : ' swaps left') : 'Same plan') : (play === 'raise' ? 'Raising' : 'Waiting'); l1.appendChild(sc); }
+    { const cp = PLAN.on ? PLAN.current(clock) : null; if (cp && cp.total) { let c2 = l1.querySelector('.chip.new, .chip.same, .chip.wait'); if (!c2) { c2 = document.createElement('span'); l1.appendChild(c2); } c2.className = 'chip ' + (cp.left ? (cp.done ? 'same' : 'new') : 'wait'); c2.textContent = cp.left ? cp.left + ' of ' + cp.total + (cp.total === 1 ? ' swap left' : ' swaps left') : 'Plan done'; } }
     const dn = document.createElement('span'); dn.className = 'do'; dn.textContent = doing;
     if (!PLAN.on) { cap.appendChild(dn); return; }
     const logged = []; if (seq.length && Number(combo) > 0) logged.push('combo of ' + combo); if (seq.length && Number(chain) > 0) logged.push('chain of ' + chain);
     const t = document.createElement('div'); t.className = 'whyline goal';
     const cur0 = PLAN.current(clock), mb = 1 + 9 * (R.D.mine - 1), nowF = R.D.frames[R.idx], oldF = R.idx >= 14 ? R.D.frames[R.idx - 14] : null;
     let moving = false; if (oldF) for (let q = R.idx - 13; q <= R.idx && !moving; q++) if (cursorMoved(R.D.frames[q - 1], R.D.frames[q], mb)) moving = true;
-    t.textContent = !seq.length ? (cur0 && cur0.carried ? 'Still finishing the plan from ' + fmtClock(cur0.at) + ': the cursor keeps going through "hold"' : moving ? 'Cursor moving, no plan logged for this decision' : 'No swaps planned') : 'Plan: ' + seq.length + (seq.length === 1 ? ' swap' : ' swaps') + (logged.length ? ' to build a ' + logged.join(' + ') : '');
+    t.textContent = !seq.length ? (cur0 && cur0.carried ? 'Still finishing the plan from ' + fmtClock(cur0.at) + ': the cursor keeps going through "hold"' : moving ? 'Cursor moving, no plan logged for this decision' : 'No swaps planned') : 'Plan: ' + (cur0 && cur0.total ? cur0.total : seq.length) + ((cur0 && cur0.total ? cur0.total : seq.length) === 1 ? ' swap' : ' swaps') + (cur0 && cur0.done ? ', ' + cur0.left + ' left' : '') + (logged.length ? ' to build a ' + logged.join(' + ') : '');
     cap.appendChild(t);
     {
       // the rule that picked this move, and the options it passed on, straight from the log

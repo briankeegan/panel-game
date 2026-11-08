@@ -89,13 +89,13 @@ on:
         required: true
         default: '10'
         type: choice
-        options: ['10', '11', '9', '8', '7', '6', '5', '4', '3', '2', '1']
+        options: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11']
       opponent_level:
         description: '10. Fight only: the level the second bot (5, 6) plays at. Pick a different one for a handicap match, e.g. 11 against 10, or 1 against 2'
         required: true
         default: '10'
         type: choice
-        options: ['10', '11', '9', '8', '7', '6', '5', '4', '3', '2', '1']
+        options: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11']
       advanced:
         description: '11. Advanced -- leave blank. Words like force (deploy even if Gambit has not changed), gambit_from=<GameCreator commit>, upstream_ref=<commit>, profile=<file>'
         required: false

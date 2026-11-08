@@ -1121,6 +1121,8 @@ function projectPlan(G, seq, cursor) {
     });
     if (items.length > shown) { const m = document.createElement('span'); m.className = 'gw-chip more'; m.textContent = '+' + (items.length - shown); el.appendChild(m); }
   }
+  // did the cursor move between two frames? When the stack rises a row the cursor's row number goes up by one to ride with it: that is not a move
+  const cursorMoved = (a1, b1, mb) => { if (!a1 || !b1 || !a1[mb + 4] || !b1[mb + 4]) return false; const dr = b1[mb + 4] - a1[mb + 4], dc = b1[mb + 5] - a1[mb + 5]; if (dc === 0 && dr === 1 && b1[mb + 8] > a1[mb + 8] + 6) return false; return dr !== 0 || dc !== 0; };
   const fmtClock = (c) => { const s = c / 60; return Math.floor(s / 60) + ':' + (s % 60 < 10 ? '0' : '') + (s % 60).toFixed(1); };
   function updatePlayer() {
     const D = R.D; if (!D) return;
@@ -1130,7 +1132,7 @@ function projectPlan(G, seq, cursor) {
     [[1, mine, 'b1', 'c1', 's1'], [2, o, 'b2', 'c2', 's2']].forEach(([slot, k, fb, fc, fs]) => {
       const st = sOf(k);
       const planNow = k === mine && PLAN.on ? PLAN.current(f[0]) : null;
-      const pf = k === mine && PLAN.on && R.idx >= 14 ? D.frames[R.idx - 14] : null, trail = pf ? [pf[1 + 9 * (k - 1) + 4], pf[1 + 9 * (k - 1) + 5]] : null;
+      const pf = k === mine && PLAN.on && R.idx >= 14 ? D.frames[R.idx - 14] : null, trail = pf ? (() => { const tb = 1 + 9 * (k - 1); let rr = pf[tb + 4]; for (let q = R.idx - 13; q <= R.idx; q++) { const a1 = D.frames[q - 1], b1 = D.frames[q]; if (a1 && b1 && b1[tb + 8] > a1[tb + 8] + 6) rr++; } return [rr, pf[tb + 5]]; })() : null;
       const topped = drawBoard(g$(fc), D.grids[st[6]], st[4], st[5], st[0], st[8], planNow, trail && trail[0] ? trail : null);
       
       showIncoming(g$('i' + slot), D.queues ? D.queues[st[7]] : '', st[0]);
@@ -1174,7 +1176,7 @@ function projectPlan(G, seq, cursor) {
       let i = i0, carried = false;
       if (!this.seqOf(L[i0]).length) {      // the cursor controller locks onto a plan and finishes it, whatever the later decisions say: while the cursor still moves, the earlier plan is the one it is carrying out
         let moved = false; const mb = 1 + 9 * (R.D.mine - 1);
-        for (let q = Math.max(1, R.idx - 40); q <= R.idx && !moved; q++) { const a1 = R.D.frames[q - 1], b1 = R.D.frames[q]; if (b1[mb + 4] && a1[mb + 4] && (b1[mb + 4] !== a1[mb + 4] || b1[mb + 5] !== a1[mb + 5])) moved = true; }
+        for (let q = Math.max(1, R.idx - 40); q <= R.idx && !moved; q++) { if (cursorMoved(R.D.frames[q - 1], R.D.frames[q], mb)) moved = true; }
         if (moved) for (let j = i0 - 1; j >= 0 && i0 - j <= 30; j--) { if (L[j] && this.seqOf(L[j]).length) { i = j; carried = true; break; } }
       }
       let seq = this.seqOf(L[i]);
@@ -1294,7 +1296,7 @@ function projectPlan(G, seq, cursor) {
     const logged = []; if (seq.length && Number(combo) > 0) logged.push('combo of ' + combo); if (seq.length && Number(chain) > 0) logged.push('chain of ' + chain);
     const t = document.createElement('div'); t.className = 'whyline goal';
     const cur0 = PLAN.current(clock), mb = 1 + 9 * (R.D.mine - 1), nowF = R.D.frames[R.idx], oldF = R.idx >= 14 ? R.D.frames[R.idx - 14] : null;
-    const moving = !!(oldF && nowF[mb + 4] && oldF[mb + 4] && (nowF[mb + 4] !== oldF[mb + 4] || nowF[mb + 5] !== oldF[mb + 5]));
+    let moving = false; if (oldF) for (let q = R.idx - 13; q <= R.idx && !moving; q++) if (cursorMoved(R.D.frames[q - 1], R.D.frames[q], mb)) moving = true;
     t.textContent = !seq.length ? (cur0 && cur0.carried ? 'Still finishing the plan from ' + fmtClock(cur0.at) + ': the cursor keeps going through "hold"' : moving ? 'Cursor moving, no plan logged for this decision' : 'No swaps planned') : 'Plan: ' + seq.length + (seq.length === 1 ? ' swap' : ' swaps') + (logged.length ? ' to build a ' + logged.join(' + ') : '');
     cap.appendChild(t);
     {
@@ -1419,7 +1421,7 @@ function projectPlan(G, seq, cursor) {
   // a "move" is a frame where Gambit's cursor changes cell, or a swap starts: stepping by single frames took many clicks to see the next one
   function isMove(j) {
     const D = R.D, mb = 1 + 9 * (D.mine - 1), a1 = D.frames[j - 1], b1 = D.frames[j]; if (!a1 || !b1) return false;
-    if (b1[mb + 4] && a1[mb + 4] && (b1[mb + 4] !== a1[mb + 4] || b1[mb + 5] !== a1[mb + 5])) return true;
+    if (cursorMoved(a1, b1, mb)) return true;
     return b1[mb + 6] !== a1[mb + 6] && /[1-6]s/.test(D.grids[b1[mb + 6]]) && !/[1-6]s/.test(D.grids[a1[mb + 6]]);
   }
   function stepMove(dir) {

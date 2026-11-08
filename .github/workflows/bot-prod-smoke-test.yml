@@ -153,7 +153,7 @@ jobs:
               upstream_ref=*) upstream_ref=${w#upstream_ref=};;
               level=*) level=${w#level=}; case "$level" in ''|*[!0-9]*) echo "::error::advanced: level= is a number from 1 to 11"; exit 1;; esac
                        [ "$level" -ge 1 ] && [ "$level" -le 11 ] || { echo "::error::advanced: level= is a number from 1 to 11"; exit 1; };;   # the modern level this bot plays (PA_LEVEL; 10 when not given)
-              bot_run=*|now|only-if-running|dry-run|force) ;;   # bot_run marks a bot run started by a fight; now only matters to stop / deploy
+              bot_run=*|now|only-if-running|dry-run|force|no-restart) ;;   # bot_run marks a bot run started by a fight; now only matters to stop / deploy
               standby) standby=1;;   # a deploy's new bot: build everything, then wait for the older bots here to leave
               after=*) after=${w#after=};;   # ... or only for the bot with this name (the account this one takes over)
               *) echo "::error::advanced: I do not know '$w' (use profile=, gambit_from=, upstream_ref= or level=)"; exit 1;;
@@ -163,7 +163,7 @@ jobs:
           kind=$BOT
           case "$BOT" in gambit-*) kind=gambit; [ -n "$gambit_from" ] || gambit_from=$BOT;; esac
           [ -n "$profile" ] || profile=survivor-profiles/gambit.json
-          { echo "PROFILE=$profile"; echo "GAMBIT_FROM=$gambit_from"; echo "UPSTREAM_REF=$upstream_ref"; echo "BOT_KIND=$kind"; echo "STANDBY=$standby"; echo "AFTER=$after"; [ -z "$level" ] || echo "PA_LEVEL=$level"; } >> "$GITHUB_ENV"
+          { echo "RUN_START=$(date +%s)"; echo "PROFILE=$profile"; echo "GAMBIT_FROM=$gambit_from"; echo "UPSTREAM_REF=$upstream_ref"; echo "BOT_KIND=$kind"; echo "STANDBY=$standby"; echo "AFTER=$after"; [ -z "$level" ] || echo "PA_LEVEL=$level"; } >> "$GITHUB_ENV"
 
       - name: Install luajit + luarocks
         run: |
@@ -710,6 +710,22 @@ jobs:
             gambit-*.log
             death-*.jsonl.gz
             frames-*.jsonl.gz
+
+      # A lobby bot that ends on its own -- the hours ran out, the connection could not be kept, the runner died -- is replaced at once, so
+      # the lobby is never left without one. Not when a stop or deploy asked it to leave, and not when it lived under 10 minutes (a bot that
+      # cannot stay up must not start itself in a loop). `no-restart` in Advanced turns this off.
+      - name: Bring the bot back if it ended on its own
+        if: ${{ always() && env.MODE == 'live' && env.BOT_KIND == 'gambit' && contains(env.BOT_NAME, '_p') && !contains(inputs.advanced, 'no-restart') && !contains(inputs.advanced, 'bot_run') }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -e "$RUNNER_TEMP/stop-after-the-game" ]; then echo "a stop or deploy asked this bot to leave: nothing to restart"; exit 0; fi
+          ran=$(( $(date +%s) - ${RUN_START:-$(date +%s)} ))
+          if [ "$ran" -lt 600 ]; then echo "ended after only $ran s: not restarting (it would loop)"; exit 0; fi
+          echo "the bot ended on its own after $ran s: starting a replacement"
+          gh workflow run bot-prod-smoke-test.yml --repo "$GITHUB_REPOSITORY" --ref "${{ github.ref_name }}" -f mode=ranmaru-deploy -f server="${{ env.SERVER_EFF }}" -f advanced="force"
+          echo "A replacement was started: the bot ended on its own after $((ran / 60)) min." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Fail if the run failed
         if: steps.smoke.outcome == 'failure' || steps.largegarbage.outcome == 'failure' || steps.live.outcome == 'failure' || steps.fight.outcome == 'failure'

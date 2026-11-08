@@ -324,9 +324,9 @@
         <input type="range" id="gw-scrub" min="0" max="0" value="0" aria-label="Frame">
         <div class="gw-ctl">
           <button type="button" class="gw-btn" id="gw-prevd" aria-label="Previous decision" title="Previous decision (,)"><span aria-hidden="true">⏮</span><span class="gw-t"> decision</span></button>
-          <button type="button" class="gw-btn" id="gw-prevf" aria-label="One frame back" title="One frame back (←)"><span aria-hidden="true">◀</span><span class="gw-t"> frame</span></button>
+          <button type="button" class="gw-btn" id="gw-prevf" aria-label="Previous move" title="Previous move: the cursor moves or a swap (← ; shift + ← is one frame)"><span aria-hidden="true">◀</span><span class="gw-t"> move</span></button>
           <button type="button" class="gw-btn main" id="gw-play" title="Play or pause (space)">Play</button>
-          <button type="button" class="gw-btn" id="gw-nextf" aria-label="One frame on" title="One frame on (→)"><span class="gw-t">frame </span><span aria-hidden="true">▶</span></button>
+          <button type="button" class="gw-btn" id="gw-nextf" aria-label="Next move" title="Next move: the cursor moves or a swap (→ ; shift + → is one frame)"><span class="gw-t">move </span><span aria-hidden="true">▶</span></button>
           <button type="button" class="gw-btn" id="gw-nextd" aria-label="Next decision" title="Next decision (.)"><span class="gw-t">decision </span><span aria-hidden="true">⏭</span></button>
           <button type="button" class="gw-btn" id="gw-back10" title="10 seconds back">−10 s</button>
           <div class="gs-seg sm" role="group" aria-label="Speed" id="gw-speed"><button type="button" data-sp="1" aria-pressed="true">1×</button><button type="button" data-sp="0.5" aria-pressed="false">½×</button><button type="button" data-sp="0.25" aria-pressed="false">¼×</button><button type="button" data-sp="0.125" aria-pressed="false">⅛×</button></div>
@@ -1269,7 +1269,7 @@ function projectPlan(G, seq, cursor) {
     const setSt = (k, html) => { g$(k).innerHTML = html; };
     cap.replaceChildren(); g$('mid').replaceChildren();
     if (!D.dec.length || i < 0) {
-      const t = document.createElement('div'); t.className = 'why'; t.textContent = D.dec.length ? 'Before the first decision.' : 'No decisions were logged for this game.'; cap.appendChild(t); return;
+      const t = document.createElement('div'); t.className = 'why'; t.textContent = D.dec.length ? (clock < 190 ? 'Countdown: the game moves the cursor to its start spot. Gambit has not acted yet.' : 'Before the first decision.') : 'No decisions were logged for this game.'; cap.appendChild(t); return;
     }
     const d = D.dec[i], [c, mode, play, want, v, dies, land, chain, combo, thrown, eTop, eOut, eStop] = d;
     const L = PLAN.list(), e = L && L[i] && L[i][0] === c ? L[i] : null;
@@ -1416,8 +1416,19 @@ function projectPlan(G, seq, cursor) {
   g$('prevp').addEventListener('click', () => jumpPlan(-1));
   g$('nextp').addEventListener('click', () => jumpPlan(1));
   g$('play').addEventListener('click', togglePlay);
-  g$('prevf').addEventListener('click', () => { stopPlay(); seek(R.idx - 1); });
-  g$('nextf').addEventListener('click', () => { stopPlay(); seek(R.idx + 1); });
+  // a "move" is a frame where Gambit's cursor changes cell, or a swap starts: stepping by single frames took many clicks to see the next one
+  function isMove(j) {
+    const D = R.D, mb = 1 + 9 * (D.mine - 1), a1 = D.frames[j - 1], b1 = D.frames[j]; if (!a1 || !b1) return false;
+    if (b1[mb + 4] && a1[mb + 4] && (b1[mb + 4] !== a1[mb + 4] || b1[mb + 5] !== a1[mb + 5])) return true;
+    return b1[mb + 6] !== a1[mb + 6] && /[1-6]s/.test(D.grids[b1[mb + 6]]) && !/[1-6]s/.test(D.grids[a1[mb + 6]]);
+  }
+  function stepMove(dir) {
+    if (!R.D) return; stopPlay(); const last = R.D.frames.length - 1;
+    for (let j = R.idx + dir, n = 0; j >= 1 && j <= last && n < 1800; j += dir, n++) if (isMove(j)) { seek(j); return; }
+    seek(R.idx + dir);
+  }
+  g$('prevf').addEventListener('click', () => stepMove(-1));
+  g$('nextf').addEventListener('click', () => stepMove(1));
   g$('prevd').addEventListener('click', () => jumpDecision(-1));
   g$('nextd').addEventListener('click', () => jumpDecision(1));
   g$('back10').addEventListener('click', () => { stopPlay(); seek(R.idx - 600); });
@@ -1437,8 +1448,8 @@ function projectPlan(G, seq, cursor) {
     const t = e.target; if (t && (t.tagName === 'INPUT' && t.type !== 'range' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA')) return;
     const step = e.shiftKey ? 10 : 1;
     if (e.key === ' ' && !(t && t.tagName === 'BUTTON')) { e.preventDefault(); togglePlay(); }
-    else if (e.key === 'ArrowLeft' && !(t && t.type === 'range')) { e.preventDefault(); stopPlay(); seek(R.idx - step); }
-    else if (e.key === 'ArrowRight' && !(t && t.type === 'range')) { e.preventDefault(); stopPlay(); seek(R.idx + step); }
+    else if (e.key === 'ArrowLeft' && !(t && t.type === 'range')) { e.preventDefault(); if (e.shiftKey) { stopPlay(); seek(R.idx - 1); } else stepMove(-1); }
+    else if (e.key === 'ArrowRight' && !(t && t.type === 'range')) { e.preventDefault(); if (e.shiftKey) { stopPlay(); seek(R.idx + 1); } else stepMove(1); }
     else if (e.key === ',') jumpDecision(-1);
     else if (e.key === '.') jumpDecision(1);
     else if (e.key === '[' || e.key === ']') { const sp = [1, .5, .25, .125]; const k = sp.indexOf(R.speed); setSpeed(sp[Math.max(0, Math.min(3, k + (e.key === '[' ? 1 : -1)))]); }

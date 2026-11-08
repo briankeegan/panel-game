@@ -87,8 +87,8 @@
 .gw-opts .played { font-weight: 600; } .gw-opts .lo { color: var(--cds-chart-status-critical); }
 .gw-log { font-size: 11px; color: var(--color-fg-muted); font-variant-numeric: tabular-nums; line-height: 1.5; }
 .gw-log div.now { color: var(--color-fg); font-weight: 600; }
-#gw-gc { width: 100%; max-width: none; height: 240px; display: block; cursor: pointer; border: 1px solid var(--color-border-line); border-radius: 6px; background: var(--color-bg); }
-.gc-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+#gw-gc { width: 100%; max-width: 100%; height: 240px; display: block; cursor: pointer; border: 1px solid var(--color-border-line); border-radius: 6px; background: var(--color-bg); }
+.gc-scroll { overflow: hidden; }
 .gc-tbl td, .gc-tbl th { padding: 6px 8px; }
 .gc-tbl .slab { display: inline-block; vertical-align: middle; border: 2px solid; border-radius: 3px; margin-right: 9px; box-sizing: border-box; }
 .gc-tbl td:first-child { white-space: nowrap; }
@@ -376,7 +376,7 @@
 
   <section class="gs-card" id="sec-garbage" hidden>
     <div class="gw-head"><h2>Garbage sent</h2></div>
-    <p class="gs-note">Every piece of garbage each player sent, drawn as it looks when it lands: width × height cells, in the column it landed in. The outline shows the kind: combo purple, chain orange, shock grey. Pieces sent together are stacked. The tick on the lane line is the exact time sent; blocks are in the order sent, moved aside only so they do not overlap. Faded ones are still to come. Tap to jump there.</p>
+    <p class="gs-note">Every piece of garbage each player sent, drawn as it lands: width × height cells, in the column it landed in. Purple is combo garbage, orange chain garbage, grey shock garbage. Pieces sent together are stacked. The tick on each lane is the exact time sent; blocks keep the order sent and are only moved aside so they do not overlap. Faded ones are still to come. Tap to jump there.</p>
     <div class="gc-tblwrap"><table class="gs-tbl gc-tbl" id="gc-tbl"></table></div>
     <div class="gc-scroll" id="gc-scroll"><canvas id="gw-gc" aria-label="Garbage pieces sent over time, one lane per player. Tap to jump."></canvas></div>
   </section>
@@ -1213,7 +1213,7 @@ function projectPlan(G, seq, cursor) {
     markList(f[0]);
   }
   // garbage sent: a piece is counted the first time it shows up in the receiver's queue (its key is landing frame + size + kind); panels = width x height
-  const GCOL = { p: '#8a5cf0', c: '#e8590c', m: '#7b8496' }, GNAME = { p: 'Combo', c: 'Chain', m: 'Shock' };
+  const GCOL = { p: '#8a5cf0', c: '#e8590c', m: '#6b7488' }, GDARK = { p: '#5b34b5', c: '#9c3a06', m: '#475064' }, GNAME = { p: 'Combo', c: 'Chain', m: 'Shock' };
   // every piece of garbage sent: it is counted the first time it shows up in the receiver's queue (its key is landing frame + size + kind)
   function garbageSeries() {
     const D = R.D; if (D._gs) return D._gs;
@@ -1235,7 +1235,7 @@ function projectPlan(G, seq, cursor) {
   }
   // pieces sent in the same moment land together, so they are stacked one on the other, like on the board
   const colsOf = (evs) => { const C = []; evs.forEach((e) => { const c = C[C.length - 1]; if (c && e.i - c.i <= 2) { c.p.push(e); c.h += e.h; } else C.push({ i: e.i, w: 6, h: e.h, p: [e] }); }); return C; };
-  const GAP = 7;     // space between pieces, so the small ones can be told apart
+  const GAP = 5;     // space between pieces, so the small ones can be told apart
   function drawGarbage() {
     const D = R.D, sec = $('sec-garbage'); if (!D || !D.queues) { sec.hidden = true; return; }
     sec.hidden = false;
@@ -1251,7 +1251,7 @@ function projectPlan(G, seq, cursor) {
     if (!rows.length) { const c = body.insertRow().insertCell(); c.colSpan = 3; c.className = 'gs-empty'; c.textContent = 'No garbage was sent in this game.'; }
     const cell = (tr, a, b) => { const c = tr.insertCell(); c.className = 'n' + (b ? '' : ' dim'); c.textContent = a + ' of ' + b; };
     rows.forEach((r) => {
-      const tr = body.insertRow(), c0 = tr.insertCell(); const sq = document.createElement('span'); sq.className = 'slab'; sq.style.cssText = 'width:' + r.w * 8 + 'px;height:' + Math.min(r.h, 8) * 8 + 'px;background:' + (r.k === 'm' ? '#4b5160' : '#4a2f6a') + ';border-color:' + GCOL[r.k]; c0.append(sq, GNAME[r.k] + ' ' + r.w + '×' + r.h);
+      const tr = body.insertRow(), c0 = tr.insertCell(); const sq = document.createElement('span'); sq.className = 'slab'; sq.style.cssText = 'width:' + r.w * 8 + 'px;height:' + Math.min(r.h, 8) * 8 + 'px;background:' + GCOL[r.k] + ';border-color:' + GDARK[r.k]; c0.append(sq, GNAME[r.k] + ' ' + r.w + '×' + r.h);
       cell(tr, r.s[0], r.t[0]); cell(tr, r.s[1], r.t[1]);
       tot[0][0] += r.s[0]; tot[0][1] += r.t[0]; tot[1][0] += r.s[1]; tot[1][1] += r.t[1];
     });
@@ -1259,23 +1259,22 @@ function projectPlan(G, seq, cursor) {
     }
     // timeline: one lane per player, a square per piece (area = panels), pieces that land together are stacked
     const CM = colsOf(S.me), CO = colsOf(S.opp), sumW = (C) => C.reduce((t, c) => t + c.w, 0);
-    const cv = g$('gc'), box = $('gc-scroll'), boxW = box.clientWidth || 600, need = 66 + 10 + GAP * Math.max(CM.length, CO.length) + 10 * Math.max(sumW(CM), sumW(CO));
-    cv.style.width = Math.max(boxW, need) + 'px';
+    const cv = g$('gc'), boxW = $('gc-scroll').clientWidth || 600;
     const w = cv.clientWidth || 600, h = cv.clientHeight || 240, dpr = window.devicePixelRatio || 1;
     if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
     const x = cv.getContext('2d'); x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, w, h);
     const css = getComputedStyle(document.documentElement), ink = css.getPropertyValue('--color-text-muted').trim() || '#6b7488', line = css.getPropertyValue('--color-border-line').trim() || '#d0d5de', fg = css.getPropertyValue('--color-text').trim() || '#1f2937';
-    const L = 66, R2 = 10, T = 8, AX = 22, laneH = (h - T - AX) / 2, px = (i) => L + (i / Math.max(1, n - 1)) * (w - L - R2);
+    const L = 8, R2 = 8, T = 8, AX = 22, laneH = (h - T - AX) / 2, px = (i) => L + (i / Math.max(1, n - 1)) * (w - L - R2);
     x.font = '12px system-ui, sans-serif'; x.textBaseline = 'middle';
     const secs = n / 60, stepS = [10, 15, 30, 60, 120, 300].find((q) => (secs / q) <= Math.max(3, Math.floor((w - L) / 70))) || 600;
-    x.textAlign = 'center'; for (let sc = 0; sc <= secs; sc += stepS) { const X = Math.round(px(Math.min(sc * 60, n - 1))) + 0.5; x.strokeStyle = line; x.beginPath(); x.moveTo(X, T); x.lineTo(X, h - AX); x.stroke(); x.fillStyle = ink; x.fillText(Math.floor(sc / 60) + ':' + String(sc % 60).padStart(2, '0'), Math.min(w - 14, Math.max(L, X)), h - 9); }
+    x.textAlign = 'center'; for (let sc = 0; sc <= secs; sc += stepS) { const X = Math.round(px(Math.min(sc * 60, n - 1))) + 0.5; x.strokeStyle = line; x.beginPath(); x.moveTo(X, T); x.lineTo(X, h - AX); x.stroke(); x.fillStyle = ink; x.fillText(Math.floor(sc / 60) + ':' + String(sc % 60).padStart(2, '0'), Math.min(w - 14, Math.max(16, X)), h - 9); }
     const maxColH = Math.max(1, ...CM.map((c) => c.h), ...CO.map((c) => c.h));
-    const cs = Math.max(4, Math.min(14, (laneH - 8) / maxColH, (w - L - R2 - GAP * Math.max(CM.length, CO.length)) / Math.max(1, sumW(CM), sumW(CO))));
+    const cs = Math.max(2, Math.min(14, (laneH - 8) / maxColH, (w - L - R2 - GAP * Math.max(CM.length, CO.length)) / Math.max(1, sumW(CM), sumW(CO))));
     const laneNames = [];
     [[CM, 'Ranmaru'], [CO, oppName]].forEach(([cols, name], lane) => {
       const y0 = T + lane * laneH, yb = y0 + laneH - 4;
       x.strokeStyle = line; x.beginPath(); x.moveTo(L, Math.round(yb) + 0.5); x.lineTo(w - R2, Math.round(yb) + 0.5); x.stroke();
-      laneNames.push([name, y0 + laneH / 2]);
+      laneNames.push([name, y0 + 9]);
       // each piece drawn as the board draws garbage when it lands: a slab of w x h cells with a face on its middle cell; its outline shows the kind.
       // Pieces sent together are stacked (the first one at the bottom); columns are in the order sent, spaced so none overlap
       const xs = [];
@@ -1290,16 +1289,15 @@ function projectPlan(G, seq, cursor) {
         let Yb = yb - 1;
         c.p.forEach((e) => {
           const sw = e.w * cs, sh = e.h * cs, X = xs[k] + (e.c || 0) * cs, Y = Yb - sh; Yb = Y; x.globalAlpha = e.i <= now ? 1 : 0.4;
-          x.fillStyle = e.k === 'm' ? '#4b5160' : '#4a2f6a'; x.fillRect(X, Y, sw, sh); x.strokeStyle = GCOL[e.k]; x.lineWidth = 2; x.strokeRect(X + 1, Y + 1, sw - 2, sh - 2);
+          x.fillStyle = GCOL[e.k]; x.fillRect(X, Y, sw, sh); x.strokeStyle = GDARK[e.k]; x.lineWidth = 2; x.strokeRect(X + 1, Y + 1, sw - 2, sh - 2);
           if (cs >= 7) { const fx = X + Math.floor((e.w - 1) / 2) * cs, fy = Y + Math.floor((e.h - 1) / 2) * cs, r = Math.max(1, cs * 0.09);
-            x.fillStyle = 'rgba(255,255,255,.8)'; x.beginPath(); x.arc(fx + cs * 0.35, fy + cs * 0.42, r, 0, 7); x.arc(fx + cs * 0.65, fy + cs * 0.42, r, 0, 7); x.fill(); x.fillRect(fx + cs * 0.3, fy + cs * 0.68, cs * 0.4, Math.max(1, cs * 0.07)); }
+            x.fillStyle = 'rgba(255,255,255,.92)'; x.beginPath(); x.arc(fx + cs * 0.35, fy + cs * 0.42, r, 0, 7); x.arc(fx + cs * 0.65, fy + cs * 0.42, r, 0, 7); x.fill(); x.fillRect(fx + cs * 0.3, fy + cs * 0.68, cs * 0.4, Math.max(1, cs * 0.07)); }
           x.globalAlpha = 1;
         });
       });
       x.font = '12px system-ui, sans-serif';
     });
-    x.font = '600 12px system-ui, sans-serif'; x.textAlign = 'left'; laneNames.forEach(([nm, y]) => { const t = nm.length > 9 ? nm.slice(0, 8) + '…' : nm, x0 = box.scrollLeft; x.fillStyle = css.getPropertyValue('--color-bg').trim() || '#f6f7fb'; x.globalAlpha = 0.9; x.fillRect(x0, y - 11, Math.min(L - 2, x.measureText(t).width + 10), 22); x.globalAlpha = 1; x.fillStyle = fg; x.fillText(t, x0 + 4, y); });
-    if (w > boxW) { const pxNow = px(now); if (pxNow < box.scrollLeft + L || pxNow > box.scrollLeft + boxW - 20) box.scrollLeft = Math.max(0, pxNow - boxW / 2); }
+    x.font = '600 12px system-ui, sans-serif'; x.textAlign = 'left'; laneNames.forEach(([nm, y]) => { const t = nm.length > 16 ? nm.slice(0, 15) + '…' : nm, x0 = 0; x.fillStyle = css.getPropertyValue('--color-bg').trim() || '#f6f7fb'; x.globalAlpha = 0.9; x.fillRect(x0, y - 10, x.measureText(t).width + 10, 20); x.globalAlpha = 1; x.fillStyle = fg; x.fillText(t, x0 + 4, y); });
     const X = Math.round(px(now)) + 0.5; x.strokeStyle = fg; x.lineWidth = 1.5; x.beginPath(); x.moveTo(X, T); x.lineTo(X, h - AX); x.stroke(); x.lineWidth = 1;
   }
   function drawStrip() {
@@ -1609,8 +1607,7 @@ function projectPlan(G, seq, cursor) {
     bd.addEventListener('pointercancel', () => { down = null; });
   })();
   g$('scrub').addEventListener('input', (e) => { stopPlay(); seek(Number(e.target.value)); });
-  $('gc-scroll').addEventListener('scroll', () => { if (R.D) drawGarbage(); }, { passive: true });
-  g$('gc').addEventListener('click', (e) => { if (!R.D) return; const b = e.currentTarget.getBoundingClientRect(), L = 66; stopPlay(); seek(Math.round((e.clientX - b.left - L) / (b.width - L - 10) * (R.D.frames.length - 1))); });
+  g$('gc').addEventListener('click', (e) => { if (!R.D) return; const b = e.currentTarget.getBoundingClientRect(), L = 8; stopPlay(); seek(Math.round((e.clientX - b.left - L) / (b.width - L - 8) * (R.D.frames.length - 1))); });
   g$('strip').addEventListener('click', (e) => { if (!R.D) return; const b = e.currentTarget.getBoundingClientRect(); stopPlay(); seek(Math.round((e.clientX - b.left) / b.width * (R.D.frames.length - 1))); });
   g$('speed').addEventListener('click', (e) => { const b = e.target.closest('button[data-sp]'); if (b) setSpeed(Number(b.dataset.sp)); });
   document.addEventListener('keydown', (e) => {

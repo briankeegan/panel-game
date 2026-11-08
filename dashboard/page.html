@@ -181,7 +181,7 @@
 @media (max-width: 760px) { .gw-ov { font-size: 10.5px; padding: 5px 7px; gap: 3px; top: 46px; } .gw-ov .do { font-size: 12px; } .gw-ov .aim { display: none; } .gw-ov .chip { font-size: 9.5px; padding: 1px 6px; } }
 .gw-ov { display: none !important; }
 .gw-now { display: none !important; }
-.gw-cap { height: 10.2em; display: flex; flex-direction: column; gap: 3px; overflow: hidden; font-size: 12.5px; line-height: 1.3; }
+.gw-cap { height: 11.8em; display: flex; flex-direction: column; gap: 3px; overflow: hidden; font-size: 12.5px; line-height: 1.3; }
 .gw-cap .l1 { display: flex; gap: 6px; align-items: center; white-space: nowrap; overflow: hidden; }
 .gw-minibox { display: none; flex-direction: column; align-items: center; gap: 3px; margin-top: 4px; font-size: 9.5px; line-height: 1.15; color: var(--color-fg-muted); text-transform: uppercase; letter-spacing: .03em; }
 .gw-minibox canvas { width: 54px; height: 108px; border-radius: 5px; background: #14101c; display: block; }
@@ -1323,6 +1323,9 @@ function projectPlan(G, seq, cursor) {
       const mine0 = opts.find((o) => o.nm === (play || '').replace(/_/g, ' ')), seen = new Set([(play || '').replace(/_/g, ' ')]), others = [];
       opts.forEach((o) => { if (!seen.has(o.nm) && lostTxt(o.lost)) { seen.add(o.nm); others.push(o); } });
       const why = [mode + ' mode', e && RULE[e[6]] ? 'rule: ' + RULE[e[6]] : '', mine0 ? lostTxt(mine0.lost) : ''].filter(Boolean).join(' · ');
+      if (seq.length && Number(d[9]) > 0) {          // Gambit's forecast for the line it chose: the garbage blocks it expects to send the opponent
+        const gt = document.createElement('div'); gt.className = 'whyline def'; gt.textContent = 'Plan should send ' + Number(d[9]) + (Number(d[9]) === 1 ? ' garbage block' : ' garbage blocks') + ' (forecast)'; cap.appendChild(gt);
+      }
       if (/^\d+$/.test(d[15] || '')) {            // the game lets a bot press only so many keys in any 10 seconds (a held direction counts once); Gambit logs how many it may still press
         const lim = D._lim || (D._lim = Math.max(1, ...D.dec.map((q) => Number(q[15]) || 0))), left = Number(d[15]);
         const bd = document.createElement('div'); bd.className = 'budget' + (left <= lim * 0.15 ? ' low' : ''); bd.title = 'The game lets a bot press at most ' + lim + ' keys in any 10 seconds. A held direction counts as one press.';

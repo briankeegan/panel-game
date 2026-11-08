@@ -34,6 +34,8 @@ local function grid(st)
         local tm = "00"
         if sl == "m" or sl == "p" or sl == "s" or sl == "l" or sl == "x" then tm = b36(p.timer or 0) end
         local dir = sl == "s" and (p.isSwappingFromLeft and "L" or "R") or "0"
+        -- a matched garbage panel of the bottom row already has the colour it turns into: the page shows it as the panel pops
+        if sl == "m" and p.isGarbage and p.color and p.color ~= 0 then dir = tostring(p.color) end
         cells[c] = col .. sl .. gid .. tm .. dir
       end
     end
@@ -84,6 +86,7 @@ while not match:hasEnded() and n < 200000 do
   if done then break end
 end
 local out = io.open(arg[2], "w")
-out:write(json.encode({ mine = rp.mine, width = match.stacks[1].width, grids = grids, queues = queues, frames = frames, ended = match:hasEnded() }))
+out:write(json.encode({ mine = rp.mine, width = match.stacks[1].width, grids = grids, queues = queues, frames = frames, ended = match:hasEnded(),
+  fc = (function() local f = match.stacks[1].levelData and match.stacks[1].levelData.frameConstants or {}; return { flash = f.FLASH, face = f.FACE, pop = f.POP } end)() }))
 out:close()
 print(string.format("frames %d, distinct boards %d, clock %d, ended %s", #frames, #grids, match.clock, tostring(match:hasEnded())))

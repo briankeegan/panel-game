@@ -872,7 +872,7 @@
     }
     x.fill();
   }
-  function drawBoard(cv, gridStr, curRow, curCol, clock, disp, plan, trail) {
+  function drawBoard(cv, gridStr, curRow, curCol, clock, disp, plan, trail, gm) {
     const G = parseGrid(gridStr), n = G.length, H = 12 * CS, bottom = H;
     if (cv.width !== 6 * CS || cv.height !== H) { cv.width = 6 * CS; cv.height = H; }
     const x = cv.getContext('2d');
@@ -886,9 +886,25 @@
     // each garbage slab: its box, so the face sits on its middle panel
     const slabs = {};
     for (let row = 0; row < n; row++) for (let c = 0; c < 6; c++) { const k = at(row, c); if (k && (k.col === 'g' || k.col === 'G')) { const s = slabs[k.id] || (slabs[k.id] = { c0: c, c1: c, r0: row, r1: row }); s.c0 = Math.min(s.c0, c); s.c1 = Math.max(s.c1, c); s.r0 = Math.min(s.r0, row); s.r1 = Math.max(s.r1, row); } }
+    // matched garbage, as the game draws it: it flashes, then every panel shows a 'popped' cell; the cells then open one at a time
+    // (bottom row first, right to left, one every POP frames) onto the panel that was hidden in the bottom row
+    const FC = (gm && gm.fc) || { flash: 28, pop: 7 }, mm = {}, mg = {};
+    for (let row = 0; row < n; row++) for (let c = 0; c < 6; c++) { const k = at(row, c); if (k && (k.col === 'g' || k.col === 'G') && k.st === 'm') (mg[k.tm] || (mg[k.tm] = [])).push([row, c]); }
+    Object.keys(mg).forEach((t) => { const L = mg[t].sort((a, b) => a[0] - b[0] || b[1] - a[1]); L.forEach(([r2, c2], i) => { mm[r2 + ',' + c2] = FC.pop * (L.length - 1 - i); }); });
     for (let row = 0; row < n; row++) for (let c = 0; c < 6; c++) {
-      const k = at(row, c); if (!k) continue;
+      let k = at(row, c); if (!k) continue;
       let px = c * CS, py = bottom - row * CS - rise;
+      if ((k.col === 'g' || k.col === 'G') && k.st === 'm') {
+        const popT = mm[row + ',' + c], age = gm && gm.age ? gm.age(row, c) : 999, first = FC.pop * (Object.values(mg).find((L) => L.some((q) => q[0] === row && q[1] === c)).length - 1);
+        if (age >= FC.flash) {
+          if (k.tm > popT) {                                    // not open yet: the popped cell, and the garbage itself is gone
+            x.fillStyle = '#2a1c3d'; x.fillRect(px, py, CS, CS); x.strokeStyle = 'rgba(201,167,255,.35)'; x.lineWidth = 1; x.strokeRect(px + 2.5, py + 2.5, CS - 5, CS - 5); continue;
+          }
+          if (/^[1-8]$/.test(k.dir)) k = { col: k.dir, st: 'n', tm: 0, id: k.id, dir: '0' };    // open: the panel that was underneath, in its own colour
+          else if (k.tm > first) { x.fillStyle = '#2a1c3d'; x.fillRect(px, py, CS, CS); continue; }
+          else k = { col: k.col, st: 'n', tm: 0, id: k.id, dir: '0' };                            // the rest of the garbage is back once the first cell has opened
+        }
+      }
       if (k.st === 's') px += (k.dir === 'L' ? -1 : 1) * (k.tm / 4) * CS;
       if (k.col === 'g' || k.col === 'G') {
         const flash = k.st === 'm' && k.tm % 8 < 4;
@@ -1166,7 +1182,8 @@ function projectPlan(G, seq, cursor) {
       const st = sOf(k);
       const planNow = k === mine && PLAN.on ? PLAN.current(f[0]) : null;
       const pf = k === mine && PLAN.on && R.idx >= 14 ? D.frames[R.idx - 14] : null, trail = pf ? (() => { const tb = 1 + 9 * (k - 1); let rr = pf[tb + 4]; for (let q = R.idx - 13; q <= R.idx; q++) { const a1 = D.frames[q - 1], b1 = D.frames[q]; if (a1 && b1 && b1[tb + 8] > a1[tb + 8] + 6) rr++; } return [rr, pf[tb + 5]]; })() : null;
-      const topped = drawBoard(g$(fc), D.grids[st[6]], st[4], st[5], st[0], st[8], planNow, trail && trail[0] ? trail : null);
+      const gmx = { fc: D.fc, age: (rr, cc) => { let a0 = 0; for (let q = R.idx - 1; q >= 0 && a0 < 400; q--) { const gq = parseGrid(D.grids[D.frames[q][1 + 9 * (k - 1) + 6]]), v = gq[gq.length - 1 - rr] && gq[gq.length - 1 - rr][cc]; if (!v || v.st !== 'm' || (v.col !== 'g' && v.col !== 'G')) break; a0++; } return a0; } };
+      const topped = drawBoard(g$(fc), D.grids[st[6]], st[4], st[5], st[0], st[8], planNow, trail && trail[0] ? trail : null, gmx);
       
       showIncoming(g$('i' + slot), D.queues ? D.queues[st[7]] : '', st[0]);
       g$(fb).classList.toggle('topped', topped);

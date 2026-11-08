@@ -9,7 +9,8 @@ run-name: "${{ (startsWith(inputs.mode, 'ranmaru') || inputs.mode == 'bot-handof
 #   versus-player   ONE bot under a real name sits in a server's lobby and plays challenges. Unranked, always.
 #                   Stays up for `hours`. With a player typed in, it challenges THAT player and plays only them
 #                   (Gambit); blank, it plays whoever challenges it
-#   fight           pick who plays who on 104.156.250.136 (bot/fight.sh): `bot` sits in the lobby as `name`;
+#   fight           pick who plays who on 104.156.250.136 (bot/fight.sh): `bot` sits in the lobby as `name`, at `level`, and the
+#                   second bot at `opponent_level` (1-11, 10 each by default: pick two different ones for a handicap match);
 #                   `player` logs in as `name`2 and challenges it, rematching for `hours` -- or "you" and nobody
 #                   does, you challenge it -- or "challenge" for `bot` to challenge the second name in `name` ("A,B")
 #
@@ -83,8 +84,20 @@ on:
           - '3'
           - '2'
           - '1'
+      level:
+        description: '9. Fight only: the level the first bot (4) plays at: modern levels 1-11 (10 is the usual). Other modes ignore it'
+        required: true
+        default: '10'
+        type: choice
+        options: ['10', '11', '9', '8', '7', '6', '5', '4', '3', '2', '1']
+      opponent_level:
+        description: '10. Fight only: the level the second bot (5, 6) plays at. Pick a different one for a handicap match, e.g. 11 against 10, or 1 against 2'
+        required: true
+        default: '10'
+        type: choice
+        options: ['10', '11', '9', '8', '7', '6', '5', '4', '3', '2', '1']
       advanced:
-        description: '9. Advanced -- leave blank. Words like force (deploy even if Gambit has not changed), gambit_from=<GameCreator commit>, upstream_ref=<commit>, profile=<file>'
+        description: '11. Advanced -- leave blank. Words like force (deploy even if Gambit has not changed), gambit_from=<GameCreator commit>, upstream_ref=<commit>, profile=<file>'
         required: false
         default: ''
 
@@ -132,23 +145,25 @@ jobs:
           BOT: ${{ inputs.bot }}
         run: |
           set -eu
-          profile=""; gambit_from=""; upstream_ref=""; standby=""; after=""
+          profile=""; gambit_from=""; upstream_ref=""; standby=""; after=""; level=""
           for w in $ADVANCED; do
             case "$w" in
               profile=*) profile=${w#profile=};;
               gambit_from=*) gambit_from=${w#gambit_from=};;
               upstream_ref=*) upstream_ref=${w#upstream_ref=};;
+              level=*) level=${w#level=}; case "$level" in ''|*[!0-9]*) echo "::error::advanced: level= is a number from 1 to 11"; exit 1;; esac
+                       [ "$level" -ge 1 ] && [ "$level" -le 11 ] || { echo "::error::advanced: level= is a number from 1 to 11"; exit 1; };;   # the modern level this bot plays (PA_LEVEL; 10 when not given)
               bot_run=*|now|only-if-running|dry-run|force) ;;   # bot_run marks a bot run started by a fight; now only matters to stop / deploy
               standby) standby=1;;   # a deploy's new bot: build everything, then wait for the older bots here to leave
               after=*) after=${w#after=};;   # ... or only for the bot with this name (the account this one takes over)
-              *) echo "::error::advanced: I do not know '$w' (use profile=, gambit_from= or upstream_ref=)"; exit 1;;
+              *) echo "::error::advanced: I do not know '$w' (use profile=, gambit_from=, upstream_ref= or level=)"; exit 1;;
             esac
           done
           # gambit-w100 etc.: Gambit of that kept build (a name in GameCreator's gambit-versions.txt)
           kind=$BOT
           case "$BOT" in gambit-*) kind=gambit; [ -n "$gambit_from" ] || gambit_from=$BOT;; esac
           [ -n "$profile" ] || profile=survivor-profiles/gambit.json
-          { echo "PROFILE=$profile"; echo "GAMBIT_FROM=$gambit_from"; echo "UPSTREAM_REF=$upstream_ref"; echo "BOT_KIND=$kind"; echo "STANDBY=$standby"; echo "AFTER=$after"; } >> "$GITHUB_ENV"
+          { echo "PROFILE=$profile"; echo "GAMBIT_FROM=$gambit_from"; echo "UPSTREAM_REF=$upstream_ref"; echo "BOT_KIND=$kind"; echo "STANDBY=$standby"; echo "AFTER=$after"; [ -z "$level" ] || echo "PA_LEVEL=$level"; } >> "$GITHUB_ENV"
 
       - name: Install luajit + luarocks
         run: |
@@ -713,6 +728,8 @@ jobs:
       PLAYER: ${{ inputs.player }}
       HOURS: ${{ inputs.hours }}
       ADVANCED: ${{ inputs.advanced }}
+      LEVEL: ${{ inputs.level }}
+      OPP_LEVEL: ${{ inputs.opponent_level }}
     steps:
       - uses: actions/checkout@v4
 
@@ -926,18 +943,18 @@ jobs:
             # the fork's server: each bot is a fight.sh run -- the lobby bot, and the challenger ("OTHER,LOBBY" challenges LOBBY)
             gh workflow run bot-prod-smoke-test.yml --repo "${{ github.repository }}" --ref "${{ github.ref_name }}" \
               -f mode=fight -f server="$SERVER" -f bot="$BOT" -f name="$NAME" -f player=you \
-              -f hours="$HOURS" -f advanced="$ADVANCED bot_run=1"
+              -f hours="$HOURS" -f advanced="$ADVANCED bot_run=1 level=$LEVEL"
             sleep 75   # the server makes a new name's account at its first login, one at a time: the second bot waits for the first
             gh workflow run bot-prod-smoke-test.yml --repo "${{ github.repository }}" --ref "${{ github.ref_name }}" \
               -f mode=fight -f server="$SERVER" -f bot="$OPPONENT" -f name="$other,$NAME" -f player=challenge \
-              -f hours="$HOURS" -f advanced="$ADVANCED bot_run=1"
+              -f hours="$HOURS" -f advanced="$ADVANCED bot_run=1 level=$OPP_LEVEL"
           else
             gh workflow run bot-prod-smoke-test.yml --repo "${{ github.repository }}" --ref "${{ github.ref_name }}" \
-              -f mode=versus-player -f server="$SERVER" -f bot="$BOT" -f name="$NAME" -f hours="$HOURS" -f advanced="$ADVANCED"
+              -f mode=versus-player -f server="$SERVER" -f bot="$BOT" -f name="$NAME" -f hours="$HOURS" -f advanced="$ADVANCED level=$LEVEL"
             sleep 75   # the server makes a new name's account at its first login, one at a time: the second bot waits for the first
             gh workflow run bot-prod-smoke-test.yml --repo "${{ github.repository }}" --ref "${{ github.ref_name }}" \
               -f mode=versus-player -f server="$SERVER" -f bot="$OPPONENT" -f name="$other" -f player="$NAME" \
-              -f hours="$HOURS" -f advanced="$ADVANCED"
+              -f hours="$HOURS" -f advanced="$ADVANCED level=$OPP_LEVEL"
           fi
           echo "A fight was started on $SERVER for $HOURS hours: $NAME ($BOT) waits in the lobby, $other ($OPPONENT) challenges it." >> "$GITHUB_STEP_SUMMARY"
 

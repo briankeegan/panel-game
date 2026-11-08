@@ -53,6 +53,9 @@ usage() { sed -n '2,20p' "$0"; exit 2; }
 HOST=$1; PORT=$2; SECS=$3; BOT=$4; NAME=$5
 # the modern level both sides play (bot/playBot.lua, the preflight): 10 -- the server's highest -- unless PA_LEVEL says otherwise
 export PA_LEVEL="${PA_LEVEL:-10}"
+case "$PA_LEVEL" in ''|*[!0-9]*) echo "fight: level '$PA_LEVEL' is a number from 1 to 11"; exit 2;; esac
+[ "$PA_LEVEL" -ge 1 ] && [ "$PA_LEVEL" -le 11 ] || { echo "fight: level $PA_LEVEL is not one of the game's modern levels, 1 to 11"; exit 2; }
+echo "fight: this bot plays at level $PA_LEVEL"
 OPP=${6:-you}; OPP_NAME=${7:-}
 # NAME may carry both accounts as "BOTNAME,OPPONENTNAME" (the workflow has no
 # room for a separate input): the opponent then uses that existing account

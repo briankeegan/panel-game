@@ -766,11 +766,16 @@ jobs:
             [ -n "$d" ] || { echo "::warning::could not read GameCreator's commits under $p: deploying anyway"; exit 0; }
             [ -z "$newest" ] || [ "$d" \> "$newest" ] && newest="$d"
           done
+          # the lobby client the bot plays through (on the bot branch) counts too: a change there needs a new bot as much as a Gambit change does
+          for f in bot/BotClient.lua bot/playBot.lua; do
+            d=$(gh api "repos/$repo/commits?sha=$UPSTREAM_BOT_REF&per_page=1&path=$f" --jq '.[0].commit.committer.date // empty' 2>/dev/null || true)
+            [ -z "$d" ] || [ -z "$newest" ] || ! [ "$d" \> "$newest" ] || newest="$d"
+          done
           if [ "$newest" \< "$started" ] || [ "$newest" = "$started" ]; then
-            echo "Gambit has not changed: the bot running now started $started, Gambit's newest change is $newest. Nothing was started (add force to Advanced to deploy anyway)." | tee -a "$GITHUB_STEP_SUMMARY"
+            echo "Gambit and its lobby client have not changed: the bot running now started $started, the newest change is $newest. Nothing was started (add force to Advanced to deploy anyway)." | tee -a "$GITHUB_STEP_SUMMARY"
             echo "SKIP=1" >> "$GITHUB_ENV"
           else
-            echo "Gambit changed at $newest, after the running bot started ($started): deploying."
+            echo "Gambit or its lobby client changed at $newest, after the running bot started ($started): deploying."
           fi
 
       - name: Check out the bot branch (the saved accounts)

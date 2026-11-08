@@ -86,16 +86,13 @@
 .gw-opts .played { font-weight: 600; } .gw-opts .lo { color: var(--cds-chart-status-critical); }
 .gw-log { font-size: 11px; color: var(--color-fg-muted); font-variant-numeric: tabular-nums; line-height: 1.5; }
 .gw-log div.now { color: var(--color-fg); font-weight: 600; }
-#gw-gc { width: 100%; height: 210px; display: block; cursor: pointer; border: 1px solid var(--color-border-line); border-radius: 6px; background: var(--color-bg); }
-.gc-leg { display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
-.gc-leg i { display: inline-block; width: 11px; height: 11px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
-.gc-leg i.ln { width: 18px; height: 4px; border-radius: 2px; vertical-align: 3px; }
-.gc-time { font-weight: 600; }
-.gc-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; }
-.gc-now { font-size: 22px; font-weight: 700; line-height: 1; }
-.gc-sub { color: var(--color-text-muted); font-size: 13px; }
-.gc-modes { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; }
-@media (max-width: 640px) { #gw-gc { height: 190px; } }
+#gw-gc { width: 100%; height: 170px; display: block; cursor: pointer; border: 1px solid var(--color-border-line); border-radius: 6px; background: var(--color-bg); }
+.gc-tbl td, .gc-tbl th { padding: 6px 8px; }
+.gc-tbl .k { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 7px; vertical-align: -1px; }
+.gc-tbl td.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.gc-tbl .dim { color: var(--color-fg-muted); }
+.gc-tbl tfoot td { font-weight: 600; }
+@media (max-width: 640px) { #gw-gc { height: 170px; } }
 #gw-strip { width: 100%; height: 30px; display: block; cursor: pointer; border: 1px solid var(--color-border-line); border-radius: 6px; background: var(--color-bg); }
 #gw-scrub { width: 100%; }
 .gw-ctl { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
@@ -375,10 +372,9 @@
 
   <section class="gs-card" id="sec-garbage" hidden>
     <div class="gw-head"><h2>Garbage sent</h2></div>
-    <p class="gs-note">Panels of garbage each player has sent so far. Pick a type to see combo, chain or shock garbage on its own. The coloured band under the chart is Ranmaru's mode. Tap the chart to jump there.</p>
-    <div class="gs-seg sm" role="group" aria-label="Type of garbage" id="gc-kind"><button type="button" data-k="all" aria-pressed="true">All</button><button type="button" data-k="p" aria-pressed="false">Combo</button><button type="button" data-k="c" aria-pressed="false">Chain</button><button type="button" data-k="m" aria-pressed="false">Shock</button></div>
-    <canvas id="gw-gc" aria-label="Garbage sent over time. Tap to jump."></canvas>
-    <div class="gc-leg" id="gc-leg"></div>
+    <p class="gs-note">Every piece of garbage each player sent in this game, by kind and size (width × height). Combo garbage is purple, chain garbage orange, shock garbage grey. "So far" counts up to the moment you are watching. Tap the timeline to jump there.</p>
+    <div class="gc-tblwrap"><table class="gs-tbl gc-tbl" id="gc-tbl"></table></div>
+    <canvas id="gw-gc" aria-label="Garbage pieces sent over time, one lane per player. Tap to jump."></canvas>
   </section>
 
   <section class="gs-card" id="sec-versions">
@@ -1213,60 +1209,60 @@ function projectPlan(G, seq, cursor) {
     markList(f[0]);
   }
   // garbage sent: a piece is counted the first time it shows up in the receiver's queue (its key is landing frame + size + kind); panels = width x height
-  const GKIND = { all: 'All', p: 'Combo', c: 'Chain', m: 'Shock' };
-  let gKind = 'all';
+  const GCOL = { p: '#8a5cf0', c: '#e8590c', m: '#7b8496' }, GNAME = { p: 'Combo', c: 'Chain', m: 'Shock' };
+  // every piece of garbage sent: it is counted the first time it shows up in the receiver's queue (its key is landing frame + size + kind)
   function garbageSeries() {
     const D = R.D; if (D._gs) return D._gs;
-    const n = D.frames.length, tok = new Map(), seen = [new Set(), new Set()], K = ['all', 'p', 'c', 'm'];
-    const tot = [{ all: 0, p: 0, c: 0, m: 0 }, { all: 0, p: 0, c: 0, m: 0 }], pcs = [{ all: 0, p: 0, c: 0, m: 0 }, { all: 0, p: 0, c: 0, m: 0 }];
-    const out = [{}, {}]; K.forEach((k) => { out[0][k] = new Uint16Array(n); out[1][k] = new Uint16Array(n); });
-    const parse = (qi) => { let v = tok.get(qi); if (!v) { v = []; (D.queues[qi] || '').split(';').forEach((t) => { const m = /^[stw](\d*):(\d+)x(\d+)([mcp])$/.exec(t); if (m) v.push([t.replace(/^[stw]/, ''), m[2] * m[3], m[4]]); }); tok.set(qi, v); } return v; };
+    const n = D.frames.length, tok = new Map(), seen = [new Set(), new Set()], ev = [[], []];
+    const parse = (qi) => { let v = tok.get(qi); if (!v) { v = []; (D.queues[qi] || '').split(';').forEach((t) => { const m = /^[stw](\d*):(\d+)x(\d+)([mcp])$/.exec(t); if (m) v.push([t.replace(/^[stw]/, ''), Number(m[2]), Number(m[3]), m[4]]); }); tok.set(qi, v); } return v; };
     for (let i = 0; i < n; i++) {
       const f = D.frames[i];
-      for (let s = 0; s < 2; s++) {             // receiver s+1: what was sent to it comes from the other player
-        const qi = f[1 + 9 * s + 7]; if (qi) parse(qi).forEach(([k, a, fl]) => { if (!seen[s].has(k)) { seen[s].add(k); tot[s].all += a; tot[s][fl] += a; pcs[s].all++; pcs[s][fl]++; } });
-        K.forEach((k) => { out[s][k][i] = Math.min(65535, tot[s][k]); });
-      }
+      for (let s = 0; s < 2; s++) { const qi = f[1 + 9 * s + 7]; if (qi) parse(qi).forEach(([k, w, h, kd]) => { if (!seen[s].has(k)) { seen[s].add(k); ev[s].push({ i, w, h, k: kd }); } }); }
     }
     const m = D.mine - 1;    // sent by a player = what arrived at the other one
-    return (D._gs = { me: out[1 - m], opp: out[m], meT: tot[1 - m], oppT: tot[m], meN: pcs[1 - m], oppN: pcs[m] });
+    return (D._gs = { me: ev[1 - m], opp: ev[m] });
   }
   function drawGarbage() {
     const D = R.D, sec = $('sec-garbage'); if (!D || !D.queues) { sec.hidden = true; return; }
     sec.hidden = false;
-    const S = garbageSeries(), cv = g$('gc'), w = cv.clientWidth || 600, h = cv.clientHeight || 200, kk = gKind, sm = S.me[kk], so = S.opp[kk], dpr = window.devicePixelRatio || 1;
-    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
-    const x = cv.getContext('2d'); x.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const n = D.frames.length, top0 = Math.max(10, sm[n - 1], so[n - 1]);
-    const step = top0 > 200 ? 50 : top0 > 100 ? 25 : top0 > 40 ? 10 : 5, top = Math.ceil(top0 / step) * step;
-    const L = 40, R2 = 12, T = 10, MB = 12, B = 22 + MB + 6, col = { me: '#2f7fe0', opp: '#e8590c' };
-    const css = getComputedStyle(document.documentElement), ink = css.getPropertyValue('--color-text-muted').trim() || '#6b7488', line = css.getPropertyValue('--color-border-line').trim() || '#d0d5de', fg = css.getPropertyValue('--color-text').trim() || '#1f2937';
-    const px = (i) => L + (i / Math.max(1, n - 1)) * (w - L - R2), py = (v) => h - B - (v / top) * (h - B - T);
-    x.clearRect(0, 0, w, h); x.font = '12px system-ui, sans-serif'; x.lineWidth = 1;
-    // grid + panels axis
-    x.textAlign = 'right'; x.fillStyle = ink;
-    for (let v = 0; v <= top; v += step) { const y = Math.round(py(v)) + 0.5; x.strokeStyle = v ? line : ink; x.beginPath(); x.moveTo(L, y); x.lineTo(w - R2, y); x.stroke(); x.fillText(String(v), L - 6, y + 4); }
-    // time axis: m:ss, spaced so labels never touch
-    const secs = n / 60, stepS = [10, 15, 30, 60, 120, 300].find((q) => (secs / q) <= Math.max(3, Math.floor((w - L) / 70))) || 600;
-    x.textAlign = 'center'; for (let s = 0; s <= secs; s += stepS) { const i = s * 60, X = Math.round(px(Math.min(i, n - 1))) + 0.5; x.strokeStyle = line; x.beginPath(); x.moveTo(X, h - B); x.lineTo(X, h - B + 4); x.stroke(); x.fillStyle = ink; x.fillText(Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'), Math.min(w - 14, Math.max(L, X)), h - B + 17); }
-    // Ranmaru's mode: one coloured band under the time axis
-    const share = {}; D.dec.forEach((d, k) => { const nx = D.dec[k + 1], c0 = d[0] - F0(), c1 = nx ? nx[0] - F0() : n - 1; share[d[1]] = (share[d[1]] || 0) + Math.max(0, c1 - c0); x.fillStyle = (MODES[d[1]] || { c: '#6b7488' }).c; x.fillRect(px(c0), h - MB - 1, Math.max(1, px(c1) - px(c0)), MB - 2); });
-    // the two lines, stepped, drawn as thick as they are readable
-    [[so, col.opp], [sm, col.me]].forEach(([a, c]) => {
-      x.strokeStyle = c; x.lineWidth = 3; x.lineJoin = 'round'; x.beginPath(); let prev = -1;
-      for (let i = 0; i < n; i += Math.max(1, Math.floor(n / (w * 2)))) { const v = a[i]; if (v === prev && i) continue; if (prev < 0) x.moveTo(px(i), py(v)); else { x.lineTo(px(i), py(prev)); x.lineTo(px(i), py(v)); } prev = v; }
-      x.lineTo(px(n - 1), py(a[n - 1])); x.stroke();
-      x.fillStyle = c; x.beginPath(); x.arc(px(n - 1), py(a[n - 1]), 4, 0, 7); x.fill();
+    const S = garbageSeries(), n = D.frames.length, now = R.idx, oppName = D.opp || 'Opponent';
+    // table: one row per kind and size, so combo 4 and combo 5 and each chain size can be told apart
+    const order = (a, b) => 'pcm'.indexOf(a.k) - 'pcm'.indexOf(b.k) || a.w * a.h - b.w * b.h || a.w - b.w;
+    const sizes = new Map(); [S.me, S.opp].forEach((L, who) => L.forEach((e) => { const key = e.k + e.w + 'x' + e.h; let r = sizes.get(key); if (!r) sizes.set(key, r = { k: e.k, w: e.w, h: e.h, t: [0, 0], s: [0, 0] }); r.t[who]++; if (e.i <= now) r.s[who]++; }));
+    const rows = [...sizes.values()].sort(order), tb = $('gc-tbl'), tot = [[0, 0], [0, 0]], sig = rows.map((r) => r.s.join(',')).join('|') + oppName;
+    if (D._gsig !== sig || !tb.rows.length) {
+    D._gsig = sig; tb.replaceChildren();
+    const hd = tb.createTHead().insertRow(); ['Garbage', 'Ranmaru', oppName].forEach((t, i) => { const th = document.createElement('th'); th.textContent = t; if (i) th.style.textAlign = 'right'; hd.appendChild(th); });
+    const body = tb.createTBody();
+    if (!rows.length) { const c = body.insertRow().insertCell(); c.colSpan = 3; c.className = 'gs-empty'; c.textContent = 'No garbage was sent in this game.'; }
+    const cell = (tr, a, b) => { const c = tr.insertCell(); c.className = 'n' + (b ? '' : ' dim'); c.textContent = a + ' of ' + b; };
+    rows.forEach((r) => {
+      const tr = body.insertRow(), c0 = tr.insertCell(); const sq = document.createElement('span'); sq.className = 'k'; sq.style.background = GCOL[r.k]; c0.append(sq, GNAME[r.k] + ' ' + r.w + '×' + r.h);
+      cell(tr, r.s[0], r.t[0]); cell(tr, r.s[1], r.t[1]);
+      tot[0][0] += r.s[0]; tot[0][1] += r.t[0]; tot[1][0] += r.s[1]; tot[1][1] += r.t[1];
     });
-    // playhead with a dot on each line
-    const X = Math.round(px(R.idx)) + 0.5; x.strokeStyle = fg; x.lineWidth = 1.5; x.beginPath(); x.moveTo(X, T); x.lineTo(X, h - B); x.stroke();
-    [[so, col.opp], [sm, col.me]].forEach(([a, c]) => { x.fillStyle = '#fff'; x.strokeStyle = c; x.lineWidth = 3; x.beginPath(); x.arc(X, py(a[R.idx]), 5, 0, 7); x.fill(); x.stroke(); });
-    const brk = (T2) => ['p', 'c', 'm'].map((k) => GKIND[k].toLowerCase() + ' ' + T2[k]).join(', ');
-    const row = (c, name, now, all, T2) => '<div class="gc-row"><i class="ln" style="background:' + c + '"></i><b>' + name + '</b><span class="gc-now">' + now + '</span><span class="gc-sub">of ' + all + ' panels sent in the game' + (kk === 'all' ? ' (' + brk(T2) + ')' : '') + '</span></div>';
-    const ml = Object.keys(share).sort((a, b) => share[b] - share[a]).map((m) => '<span><i style="background:' + (MODES[m] || { c: '#6b7488' }).c + '"></i>' + m + ' ' + Math.round(100 * share[m] / Math.max(1, n - 1)) + '%</span>').join('');
-    $('gc-leg').innerHTML = '<div class="gc-time">At ' + fmtClock(D.frames[R.idx][0]) + (kk === 'all' ? '' : ' · ' + GKIND[kk].toLowerCase() + ' garbage only') + '</div>'
-      + row(col.me, 'Ranmaru', sm[R.idx], sm[n - 1], S.meT) + row(col.opp, D.opp || 'Opponent', so[R.idx], so[n - 1], S.oppT)
-      + '<div class="gc-modes"><span class="gc-sub">Ranmaru\'s mode (band under the chart):</span>' + ml + '</div>';
+    if (rows.length > 1) { const ft = tb.createTFoot().insertRow(); ft.insertCell().textContent = 'All pieces'; cell(ft, tot[0][0], tot[0][1]); cell(ft, tot[1][0], tot[1][1]); }
+    }
+    // timeline: one lane per player, a square per piece (area = panels), pieces that land together are stacked
+    const cv = g$('gc'), w = cv.clientWidth || 600, h = cv.clientHeight || 170, dpr = window.devicePixelRatio || 1;
+    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+    const x = cv.getContext('2d'); x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, w, h);
+    const css = getComputedStyle(document.documentElement), ink = css.getPropertyValue('--color-text-muted').trim() || '#6b7488', line = css.getPropertyValue('--color-border-line').trim() || '#d0d5de', fg = css.getPropertyValue('--color-text').trim() || '#1f2937';
+    const L = 66, R2 = 10, T = 8, AX = 22, laneH = (h - T - AX) / 2, px = (i) => L + (i / Math.max(1, n - 1)) * (w - L - R2);
+    x.font = '12px system-ui, sans-serif'; x.textBaseline = 'middle';
+    const secs = n / 60, stepS = [10, 15, 30, 60, 120, 300].find((q) => (secs / q) <= Math.max(3, Math.floor((w - L) / 70))) || 600;
+    x.textAlign = 'center'; for (let sc = 0; sc <= secs; sc += stepS) { const X = Math.round(px(Math.min(sc * 60, n - 1))) + 0.5; x.strokeStyle = line; x.beginPath(); x.moveTo(X, T); x.lineTo(X, h - AX); x.stroke(); x.fillStyle = ink; x.fillText(Math.floor(sc / 60) + ':' + String(sc % 60).padStart(2, '0'), Math.min(w - 14, Math.max(L, X)), h - 9); }
+    [[S.me, 'Ranmaru'], [S.opp, oppName]].forEach(([evs, name], lane) => {
+      const y0 = T + lane * laneH, yb = y0 + laneH - 4;
+      x.strokeStyle = line; x.beginPath(); x.moveTo(L, Math.round(yb) + 0.5); x.lineTo(w - R2, Math.round(yb) + 0.5); x.stroke();
+      x.fillStyle = fg; x.textAlign = 'left'; x.fillText(name.length > 9 ? name.slice(0, 8) + '…' : name, 4, y0 + laneH / 2);
+      let edge = -99;
+      evs.forEach((e) => {
+        const side = Math.max(8, Math.min(laneH - 10, 3 + Math.sqrt(e.w * e.h) * 4.5)), X = Math.max(px(e.i), edge + side / 2 + 1);
+        edge = X + side / 2; const Y = yb - side - 1; x.globalAlpha = e.i <= now ? 1 : 0.35; x.fillStyle = GCOL[e.k]; x.fillRect(X - side / 2, Y, side, side); x.globalAlpha = 1;
+      });
+    });
+    const X = Math.round(px(now)) + 0.5; x.strokeStyle = fg; x.lineWidth = 1.5; x.beginPath(); x.moveTo(X, T); x.lineTo(X, h - AX); x.stroke(); x.lineWidth = 1;
   }
   function drawStrip() {
     const cv = g$('strip'), D = R.D;
@@ -1575,8 +1571,7 @@ function projectPlan(G, seq, cursor) {
     bd.addEventListener('pointercancel', () => { down = null; });
   })();
   g$('scrub').addEventListener('input', (e) => { stopPlay(); seek(Number(e.target.value)); });
-  $('gc-kind').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; gKind = b.dataset.k; $('gc-kind').querySelectorAll('button').forEach((q) => q.setAttribute('aria-pressed', q === b ? 'true' : 'false')); if (R.D) drawGarbage(); });
-  g$('gc').addEventListener('click', (e) => { if (!R.D) return; const b = e.currentTarget.getBoundingClientRect(), L = 40; stopPlay(); seek(Math.round((e.clientX - b.left - L) / (b.width - L - 12) * (R.D.frames.length - 1))); });
+  g$('gc').addEventListener('click', (e) => { if (!R.D) return; const b = e.currentTarget.getBoundingClientRect(), L = 66; stopPlay(); seek(Math.round((e.clientX - b.left - L) / (b.width - L - 10) * (R.D.frames.length - 1))); });
   g$('strip').addEventListener('click', (e) => { if (!R.D) return; const b = e.currentTarget.getBoundingClientRect(); stopPlay(); seek(Math.round((e.clientX - b.left) / b.width * (R.D.frames.length - 1))); });
   g$('speed').addEventListener('click', (e) => { const b = e.target.closest('button[data-sp]'); if (b) setSpeed(Number(b.dataset.sp)); });
   document.addEventListener('keydown', (e) => {

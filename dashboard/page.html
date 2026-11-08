@@ -762,6 +762,7 @@
     box.replaceChildren();
     const withLen = fg.filter((g) => g.secs != null);
     if (!withLen.length) { const p = document.createElement('p'); p.className = 'gs-empty'; p.textContent = 'No games in this selection.'; box.appendChild(p); return; }
+    if (withLen.length < 5) { const p = document.createElement('p'); p.className = 'gs-empty'; p.textContent = 'Only ' + withLen.length + (withLen.length === 1 ? ' game' : ' games') + ' here, too few to show a spread. Reset the filters to see all games.'; box.appendChild(p); return; }
     const bins = d3.range(0, 11).map((i) => ({ i, lo: i * 30, hi: i === 10 ? Infinity : (i + 1) * 30, w: 0, l: 0 }));
     withLen.forEach((g) => { const b = bins[Math.min(10, Math.floor(g.secs / 30))]; if (g.res === 'W') b.w++; else b.l++; });
     const svg = d3.select(box).append('svg').attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'img').attr('aria-label', 'Games by length');
@@ -821,7 +822,7 @@
     const ps = $('gw-player'); ps.replaceChildren(new Option('All players (' + all.length + ')', ''), ...cnt.map(([n, k]) => new Option(n + ' (' + k + ')', n))); ps.value = WL.player; ps.hidden = cnt.length < 2;
     const body = $('gw-body'), pick = $('gw-pick');
     $('gw-count').textContent = list.length ? list.length + (list.length === 1 ? ' loss' : ' losses') : '';
-    if (!list.length) { stopPlay(); R.rid = null; R.D = null; body.hidden = true; pick.hidden = true; $('gw-sub').textContent = 'No lost games in this selection to replay.'; return; }
+    if (!list.length) { stopPlay(); R.rid = null; R.D = null; body.hidden = true; pick.hidden = true; $('sec-garbage').hidden = true; $('gw-sub').textContent = 'No losses to replay here. Choose a version or opponent that lost a game, or reset the filters.'; return; }
     body.hidden = false; pick.hidden = false;
     $('gw-select').replaceChildren(...list.map((r) => new Option(lossLabel(r), r.replay)));
     if (!list.some((r) => r.replay === R.rid)) openReplay(list[0], false);

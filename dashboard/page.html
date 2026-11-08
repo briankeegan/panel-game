@@ -5,6 +5,7 @@
 .gs h2 { font-size: var(--cds-font-size-heading); font-weight: var(--cds-font-weight-medium); margin: 0; }
 .gs p { margin: 0; }
 .gs-take { margin-top: 6px !important; color: var(--color-fg-muted); font-size: var(--cds-font-size-body); max-width: 70ch; min-height: 1.4em; }
+.gs-commit { color: var(--color-fg); text-decoration: underline; text-underline-offset: 2px; }
 .gs-take b { color: var(--color-fg); font-weight: 600; }
 .gs-bar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--cds-gap-md); padding: var(--cds-pad-md); border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); background: var(--color-panel); }
 .gs-f { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
@@ -336,6 +337,7 @@
 
   <section class="gs-bar" aria-label="Filters">
     <label class="gs-f"><span>Version (Ranmaru commit)</span><select id="f-ver" class="dash-select"></select></label>
+    <p class="gs-note" id="f-vinfo" hidden></p>
     <div class="gs-f" id="f-chips-wrap" hidden><span>Showing only</span><div class="gs-chips" id="f-chips"></div></div>
     <button type="button" class="gs-link" id="f-reset" hidden>Reset filters</button>
   </section>
@@ -513,6 +515,8 @@
     tip.style.top = Math.max(0, y - tip.offsetHeight - 10) + 'px';
   }
   const hideTip = () => { tip.style.display = 'none'; };
+  const commitUrl = (sha) => sha ? 'https://github.com/briankeegan/GameCreator/commit/' + sha : '';   // the Ranmaru (GameCreator) commit a version was built from; GitHub shows the merge it came in with
+  const linkTo = (parent, sha, text) => { const a = document.createElement('a'); a.href = commitUrl(sha); a.target = '_blank'; a.rel = 'noopener'; a.textContent = text || sha; a.className = 'gs-commit'; parent.appendChild(a); return a; };
   const txt = (parent, cls, text) => { const s = document.createElement('span'); if (cls) s.className = cls; s.textContent = text; parent.appendChild(s); return s; };
 
   function table(el, key, cols, rows, selKey, onPick) {
@@ -605,6 +609,8 @@
     document.querySelectorAll('#f-min button').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.min) === minn)));
     $('f-reset').hidden = !(ver || opp || minn !== 10);
     const chips = $('f-chips'); chips.replaceChildren();
+    { const vi = $('f-vinfo'); vi.replaceChildren(); vi.hidden = !pickedV;
+      if (pickedV) { vi.append(document.createTextNode(pickedV.label + ' was built from commit ')); linkTo(vi, pickedV.sha); if (pickedV.subject) vi.append(document.createTextNode(': ' + pickedV.subject)); vi.append(document.createTextNode(' ')); } }
     [[ver && pickedV ? 'Version ' + pickedV.label : '', 'ver'], [opp ? 'Player ' + opp : '', 'opp']].forEach(([label, name]) => {
       if (!label) return;
       const b = document.createElement('button'); b.type = 'button'; b.className = 'gs-fchip'; b.textContent = label + '  ×';
@@ -638,7 +644,7 @@
       take.append(document.createTextNode('.'));
       if (!pickedV) {
         const lv = vers.slice().reverse().map((v) => Object.assign({}, v, stat(byOpp.filter((g) => g.sha === v.sha)))).find((v) => v.n > 0);
-        if (lv) take.append(document.createTextNode(' The newest version (' + lv.label + ', ' + lv.sha + ') has won ' + lv.w + ' of ' + lv.n + ' (' + fmtPct(lv.rate) + ').'));
+        if (lv) { take.append(document.createTextNode(' The newest version (' + lv.label + ', commit ')); linkTo(take, lv.sha); take.append(document.createTextNode(') has won ' + lv.w + ' of ' + lv.n + ' (' + fmtPct(lv.rate) + ').')); }
       }
     }
 
@@ -683,7 +689,7 @@
     const vcols = [
       { key: 'order', label: 'Version', cls: '', val: (r) => r.order, cell: (td, r) => { td.textContent = r.label; td.style.fontWeight = '600'; } },
       { key: 'start', label: 'Started', cls: 'hide-s', val: (r) => r.start, cell: plain((r) => d3.utcFormat('%b %-d')(new Date(r.start))) },
-      { key: 'sha', label: 'Commit', cls: 'hide-s', val: (r) => r.sha, cell: (td, r) => { const s = txt(td, 'mono', r.sha); td.title = r.subject; } },
+      { key: 'sha', label: 'Commit', cls: 'hide-s', val: (r) => r.sha, cell: (td, r) => { const a = linkTo(td, r.sha); a.classList.add('mono'); a.title = (r.subject || 'Open the commit on GitHub') + ' (opens GitHub)'; a.addEventListener('click', (e) => e.stopPropagation()); } },
       { key: 'subject', label: 'What changed', cls: 'sub hide-s', val: (r) => r.subject, cell: (td, r) => { td.textContent = r.subject; td.title = r.subject; } },
       { key: 'n', label: 'Games', num: true, val: (r) => r.n, cell: plain((r) => r.n) },
       { key: 'w', label: 'Won', num: true, val: (r) => r.w, cell: plain((r) => r.w) },

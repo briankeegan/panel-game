@@ -87,8 +87,20 @@
 .gw-opts .played { font-weight: 600; } .gw-opts .lo { color: var(--cds-chart-status-critical); }
 .gw-log { font-size: 11px; color: var(--color-fg-muted); font-variant-numeric: tabular-nums; line-height: 1.5; }
 .gw-log div.now { color: var(--color-fg); font-weight: 600; }
-#gw-gc { width: 100%; max-width: 100%; height: 240px; display: block; cursor: pointer; border: 1px solid var(--color-border-line); border-radius: 6px; background: var(--color-bg); }
-.gc-scroll { overflow: hidden; }
+#gw-gc { width: 100%; max-width: 100%; height: 64px; display: block; cursor: pointer; border: 1px solid var(--color-border-line); border-radius: 6px; background: var(--color-bg); }
+.gm-nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.gm { display: flex; flex-direction: column; gap: 2px; }
+.gm-h, .gm-r { display: grid; grid-template-columns: 46px 1fr 1fr; gap: 6px; padding: 4px 6px; border-radius: 8px; }
+.gm-h { font-weight: 600; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+.gm-h span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gm-r { cursor: pointer; align-items: end; }
+.gm-r.cur { background: var(--color-border-line); }
+.gm-r.fut { opacity: .5; }
+.gm-t { font-variant-numeric: tabular-nums; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); align-self: center; }
+.gm-c { display: flex; flex-direction: column-reverse; gap: 2px; min-height: 10px; }
+.gm-s { box-sizing: border-box; border: 2px solid; border-radius: 3px; position: relative; }
+.gm-s i { position: absolute; left: 50%; top: 50%; width: 5px; height: 2px; margin: 1px 0 0 -2px; background: rgba(255,255,255,.9); border-radius: 1px; }
+
 .gc-tbl { width: 100%; }
 .gc-tbl td, .gc-tbl th { padding: 6px 8px; }
 .gc-tbl .slab { display: inline-block; vertical-align: middle; border: 2px solid; border-radius: 3px; margin-right: 9px; box-sizing: border-box; }
@@ -97,7 +109,7 @@
 .gc-tbl td.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .gc-tbl .dim { color: var(--color-fg-muted); }
 .gc-tbl tfoot td { font-weight: 600; }
-@media (max-width: 640px) { #gw-gc { height: 220px; } }
+@media (max-width: 640px) { #gw-gc { height: 64px; } }
 #gw-strip { width: 100%; height: 30px; display: block; cursor: pointer; border: 1px solid var(--color-border-line); border-radius: 6px; background: var(--color-bg); }
 #gw-scrub { width: 100%; }
 .gw-ctl { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
@@ -377,9 +389,11 @@
 
   <section class="gs-card" id="sec-garbage" hidden>
     <div class="gw-head"><h2>Garbage sent</h2></div>
-    <p class="gs-note">What each player sent, by what made it: "Combo 4" is a 4-panel combo, "Chain ×3" a 3-chain. Each has its own colour, the same in the table and on the chart (chains go from yellow to red as they get taller). The chart draws every piece as it landed, in its column. "2 of 3" is 2 sent so far out of 3 in the game. Pieces sent together are stacked; the tick on each lane is the exact send time, and blocks are only moved aside so they do not overlap. Faded = still to come. Tap to jump.</p>
+    <p class="gs-note">What each player sent, by what made it: "Combo 4" is a 4-panel combo, "Chain ×3" a 3-chain. Each has its own colour. "2 of 3" is 2 sent so far out of 3 in the game. The strip shows the whole game (taller tick = more panels); below it is the garbage around the moment you are watching, drawn as it landed, in its column, with its time. Tap a row or the strip to jump.</p>
     <div class="gc-tblwrap"><table class="gs-tbl gc-tbl" id="gc-tbl"></table></div>
-    <div class="gc-scroll" id="gc-scroll"><canvas id="gw-gc" aria-label="Garbage pieces sent over time, one lane per player. Tap to jump."></canvas></div>
+    <canvas id="gw-gc" aria-label="Every piece of garbage over the whole game, one lane per player. Tap to jump."></canvas>
+    <div class="gm-nav"><button type="button" class="gw-btn" id="gm-prev">◀ Earlier</button><span class="gs-note" id="gm-pos"></span><button type="button" class="gw-btn" id="gm-next">Later ▶</button></div>
+    <div class="gm" id="gm" aria-label="Garbage sent around the moment you are watching"></div>
   </section>
 
   <section class="gs-card" id="sec-versions">
@@ -1242,72 +1256,62 @@ function projectPlan(G, seq, cursor) {
     put(by.p, (t) => [268, 70, 72 - 34 * t]); put(by.c, (t) => [44 - 40 * t, 92, 58 - 8 * t]); put(by.m, (t) => [215, 14, 68 - 24 * t]);
     return m;
   };
-  // pieces sent in the same moment land together, so they are stacked one on the other, like on the board
-  const colsOf = (evs) => { const C = []; evs.forEach((e) => { const c = C[C.length - 1]; if (c && e.i - c.i <= 2) { c.p.push(e); c.h += e.h; } else C.push({ i: e.i, w: 6, h: e.h, p: [e] }); }); return C; };
-  const GAP = 5;     // space between pieces, so the small ones can be told apart
+  const GCS = 9;      // one cell of garbage, in pixels, everywhere in the list
   function drawGarbage() {
     const D = R.D, sec = $('sec-garbage'); if (!D || !D.queues) { sec.hidden = true; return; }
     sec.hidden = false;
     const S = garbageSeries(), n = D.frames.length, now = R.idx, oppName = D.opp || 'Opponent';
-    // table: one row per kind and size, so combo 4 and combo 5 and each chain size can be told apart
+    // moments: pieces sent in the same instant (either player) belong to one row
+    if (!S.moments) {
+      const all = S.me.map((e) => ({ e, who: 0 })).concat(S.opp.map((e) => ({ e, who: 1 }))).sort((a, b) => a.e.i - b.e.i), M = [];
+      all.forEach(({ e, who }) => { let m = M[M.length - 1]; if (!m || e.i - m.i > 2) { m = { i: e.i, p: [[], []] }; M.push(m); } m.p[who].push(e); });
+      S.moments = M; S.rowH = Math.max(1, ...M.map((m) => Math.max(m.p[0].reduce((t, e) => t + e.h, 0), m.p[1].reduce((t, e) => t + e.h, 0)))) * GCS + 14;
+    }
+    const M = S.moments;
+    // one table row per kind and size: what made it, and how many each player sent (so far of all)
     const order = (a, b) => 'pcm'.indexOf(a.k) - 'pcm'.indexOf(b.k) || a.w * a.h - b.w * b.h || a.w - b.w;
     const sizes = new Map(); [S.me, S.opp].forEach((L, who) => L.forEach((e) => { const key = e.k + e.w + 'x' + e.h; let r = sizes.get(key); if (!r) sizes.set(key, r = { k: e.k, w: e.w, h: e.h, t: [0, 0], s: [0, 0] }); r.t[who]++; if (e.i <= now) r.s[who]++; }));
-    const rows = [...sizes.values()].sort(order), pal = sizeColours(rows), gcol = (e) => pal.get(e.k + e.w + 'x' + e.h) || { fill: GCOL[e.k], edge: GDARK[e.k] }, tb = $('gc-tbl'), tot = [[0, 0], [0, 0]], sig = rows.map((r) => r.s.join(',')).join('|') + oppName;
+    const rows = [...sizes.values()].sort(order), pal = sizeColours(rows), tb = $('gc-tbl'), tot = [[0, 0], [0, 0]], sig = rows.map((r) => r.s.join(',')).join('|') + oppName;
+    const gcol = (e) => pal.get(e.k + e.w + 'x' + e.h) || { fill: GCOL[e.k], edge: GDARK[e.k] };
     if (D._gsig !== sig || !tb.rows.length) {
-    D._gsig = sig; tb.replaceChildren();
-    const hd = tb.createTHead().insertRow(); [['Garbage', 0], ['Ranmaru', 1], [oppName, 1]].forEach(([t, right]) => { const th = document.createElement('th'); th.textContent = t; if (right) { th.style.textAlign = 'right'; th.style.maxWidth = '96px'; th.style.overflow = 'hidden'; th.style.textOverflow = 'ellipsis'; th.title = t; } hd.appendChild(th); });
-    const body = tb.createTBody();
-    if (!rows.length) { const c = body.insertRow().insertCell(); c.colSpan = 3; c.className = 'gs-empty'; c.textContent = 'No garbage was sent in this game.'; }
-    const cell = (tr, a, b) => { const c = tr.insertCell(); c.className = 'n' + (b ? '' : ' dim'); c.textContent = a + ' of ' + b; c.title = a + ' sent so far, ' + b + ' in the whole game'; };
-    rows.forEach((r) => {
-      const tr = body.insertRow(), c0 = tr.insertCell(); const sq = document.createElement('span'); sq.className = 'slab'; sq.style.cssText = 'width:' + r.w * 8 + 'px;height:' + Math.min(r.h, 8) * 8 + 'px;background:' + pal.get(r.k + r.w + 'x' + r.h).fill + ';border-color:' + pal.get(r.k + r.w + 'x' + r.h).edge; c0.append(sq, gname(r)); c0.title = r.w + ' wide × ' + r.h + ' tall';
-      cell(tr, r.s[0], r.t[0]); cell(tr, r.s[1], r.t[1]);
-      tot[0][0] += r.s[0]; tot[0][1] += r.t[0]; tot[1][0] += r.s[1]; tot[1][1] += r.t[1];
-    });
-    if (rows.length > 1) { const ft = tb.createTFoot().insertRow(); ft.insertCell().textContent = 'All pieces'; cell(ft, tot[0][0], tot[0][1]); cell(ft, tot[1][0], tot[1][1]); }
+      D._gsig = sig; tb.replaceChildren();
+      const hd = tb.createTHead().insertRow(); [['Garbage', 0], ['Ranmaru', 1], [oppName, 1]].forEach(([t, right]) => { const th = document.createElement('th'); th.textContent = t; if (right) { th.style.textAlign = 'right'; th.style.maxWidth = '96px'; th.style.overflow = 'hidden'; th.style.textOverflow = 'ellipsis'; th.title = t; } hd.appendChild(th); });
+      const body = tb.createTBody();
+      if (!rows.length) { const c = body.insertRow().insertCell(); c.colSpan = 3; c.className = 'gs-empty'; c.textContent = 'No garbage was sent in this game.'; }
+      const cell = (tr, a, b) => { const c = tr.insertCell(); c.className = 'n' + (b ? '' : ' dim'); c.textContent = a + ' of ' + b; c.title = a + ' sent so far, ' + b + ' in the whole game'; };
+      rows.forEach((r) => {
+        const tr = body.insertRow(), c0 = tr.insertCell(), cl = pal.get(r.k + r.w + 'x' + r.h); const sq = document.createElement('span'); sq.className = 'slab'; sq.style.cssText = 'width:' + r.w * 5 + 'px;height:' + Math.min(r.h, 8) * 5 + 'px;background:' + cl.fill + ';border-color:' + cl.edge; c0.append(sq, gname(r)); c0.title = r.w + ' wide × ' + r.h + ' tall';
+        cell(tr, r.s[0], r.t[0]); cell(tr, r.s[1], r.t[1]); tot[0][0] += r.s[0]; tot[0][1] += r.t[0]; tot[1][0] += r.s[1]; tot[1][1] += r.t[1];
+      });
+      if (rows.length > 1) { const ft = tb.createTFoot().insertRow(); ft.insertCell().textContent = 'All pieces'; cell(ft, tot[0][0], tot[0][1]); cell(ft, tot[1][0], tot[1][1]); }
     }
-    // timeline: one lane per player, a square per piece (area = panels), pieces that land together are stacked
-    const CM = colsOf(S.me), CO = colsOf(S.opp), sumW = (C) => C.reduce((t, c) => t + c.w, 0);
-    const cv = g$('gc'), boxW = $('gc-scroll').clientWidth || 600;
-    const w = cv.clientWidth || 600, h = cv.clientHeight || 240, dpr = window.devicePixelRatio || 1;
+    // the whole game on one thin strip: a tick per piece (taller = more panels), the playhead, tap to jump
+    const cv = g$('gc'), w = cv.clientWidth || 600, h = cv.clientHeight || 64, dpr = window.devicePixelRatio || 1;
     if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
     const x = cv.getContext('2d'); x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, w, h);
-    const css = getComputedStyle(document.documentElement), ink = css.getPropertyValue('--color-text-muted').trim() || '#6b7488', line = css.getPropertyValue('--color-border-line').trim() || '#d0d5de', fg = css.getPropertyValue('--color-text').trim() || '#1f2937';
-    const L = 8, R2 = 8, T = 8, AX = 22, laneH = (h - T - AX) / 2, px = (i) => L + (i / Math.max(1, n - 1)) * (w - L - R2);
-    x.font = '12px system-ui, sans-serif'; x.textBaseline = 'middle';
-    const secs = n / 60, stepS = [10, 15, 30, 60, 120, 300].find((q) => (secs / q) <= Math.max(3, Math.floor((w - L) / 70))) || 600;
-    x.textAlign = 'center'; for (let sc = 0; sc <= secs; sc += stepS) { const X = Math.round(px(Math.min(sc * 60, n - 1))) + 0.5; x.strokeStyle = line; x.beginPath(); x.moveTo(X, T); x.lineTo(X, h - AX); x.stroke(); x.fillStyle = ink; x.fillText(Math.floor(sc / 60) + ':' + String(sc % 60).padStart(2, '0'), Math.min(w - 14, Math.max(16, X)), h - 9); }
-    const maxColH = Math.max(1, ...CM.map((c) => c.h), ...CO.map((c) => c.h));
-    const cs = Math.max(2, Math.min(14, (laneH - 8) / maxColH, (w - L - R2 - GAP * Math.max(CM.length, CO.length)) / Math.max(1, sumW(CM), sumW(CO))));
-    const laneNames = [];
-    [[CM, 'Ranmaru'], [CO, oppName]].forEach(([cols, name], lane) => {
-      const y0 = T + lane * laneH, yb = y0 + laneH - 4;
-      x.strokeStyle = line; x.beginPath(); x.moveTo(L, Math.round(yb) + 0.5); x.lineTo(w - R2, Math.round(yb) + 0.5); x.stroke();
-      laneNames.push([name, y0 + 9]);
-      // each piece drawn as the board draws garbage when it lands: a slab of w x h cells with a face on its middle cell; its outline shows the kind.
-      // Pieces sent together are stacked (the first one at the bottom); columns are in the order sent, spaced so none overlap
-      const xs = [];
-      cols.forEach((c, k) => { xs.push(Math.max(px(c.i), k ? xs[k - 1] + cols[k - 1].w * cs + GAP : L)); });
-      for (let k = xs.length - 1; k >= 0; k--) xs[k] = Math.min(xs[k], k < xs.length - 1 ? xs[k + 1] - cols[k].w * cs - GAP : w - R2 - cols[k].w * cs);
-      cols.forEach((c, k) => {          // the exact time it was sent: a tick on the lane line, joined to its pieces when they have been moved aside
-        const tx = Math.round(px(c.i)) + 0.5, cx = xs[k] + c.w * cs / 2;
-        x.strokeStyle = ink; x.lineWidth = 1; x.beginPath(); x.moveTo(tx, yb - 5); x.lineTo(tx, yb + 3); x.stroke();
-        if (Math.abs(cx - tx) > 3) { x.save(); x.globalAlpha = 0.5; x.setLineDash([2, 3]); x.beginPath(); x.moveTo(tx, yb + 3); x.lineTo(Math.min(Math.max(tx, xs[k]), xs[k] + c.w * cs), yb + 3); x.stroke(); x.restore(); }
-      });
-      cols.forEach((c, k) => {
-        let Yb = yb - 1;
-        c.p.forEach((e) => {
-          const sw = e.w * cs, sh = e.h * cs, X = xs[k] + (e.c || 0) * cs, Y = Yb - sh; Yb = Y; x.globalAlpha = e.i <= now ? 1 : 0.4;
-          x.fillStyle = gcol(e).fill; x.fillRect(X, Y, sw, sh); x.strokeStyle = gcol(e).edge; x.lineWidth = 2; x.strokeRect(X + 1, Y + 1, sw - 2, sh - 2);
-          if (cs >= 7) { const fx = X + Math.floor((e.w - 1) / 2) * cs, fy = Y + Math.floor((e.h - 1) / 2) * cs, r = Math.max(1, cs * 0.09);
-            x.fillStyle = 'rgba(255,255,255,.92)'; x.beginPath(); x.arc(fx + cs * 0.35, fy + cs * 0.42, r, 0, 7); x.arc(fx + cs * 0.65, fy + cs * 0.42, r, 0, 7); x.fill(); x.fillRect(fx + cs * 0.3, fy + cs * 0.68, cs * 0.4, Math.max(1, cs * 0.07)); }
-          x.globalAlpha = 1;
-        });
-      });
-      x.font = '12px system-ui, sans-serif';
-    });
-    x.font = '600 12px system-ui, sans-serif'; x.textAlign = 'left'; laneNames.forEach(([nm, y]) => { const t = nm.length > 16 ? nm.slice(0, 15) + '…' : nm, x0 = 0; x.fillStyle = css.getPropertyValue('--color-bg').trim() || '#f6f7fb'; x.globalAlpha = 0.9; x.fillRect(x0, y - 10, x.measureText(t).width + 10, 20); x.globalAlpha = 1; x.fillStyle = fg; x.fillText(t, x0 + 4, y); });
-    const X = Math.round(px(now)) + 0.5; x.strokeStyle = fg; x.lineWidth = 1.5; x.beginPath(); x.moveTo(X, T); x.lineTo(X, h - AX); x.stroke(); x.lineWidth = 1;
+    const css = getComputedStyle(document.documentElement), cv_ = (k, d) => css.getPropertyValue(k).trim() || d, ink = cv_('--color-fg-muted', '#8a93a6'), line = cv_('--color-border-line', '#3a4050'), fg = cv_('--color-fg', '#e8eaf0');
+    const L = 8, R2 = 8, px = (i) => L + (i / Math.max(1, n - 1)) * (w - L - R2), mid = h / 2 - 2, maxP = Math.max(8, ...S.me.concat(S.opp).map((e) => e.w * e.h));
+    x.strokeStyle = line; x.lineWidth = 1; x.beginPath(); x.moveTo(L, Math.round(mid) + 0.5); x.lineTo(w - R2, Math.round(mid) + 0.5); x.stroke();
+    [[S.me, -1], [S.opp, 1]].forEach(([evs, dir]) => evs.forEach((e) => { const bh = 3 + (e.w * e.h / maxP) * (mid - 6); x.fillStyle = gcol(e).fill; x.globalAlpha = e.i <= now ? 1 : 0.45; x.fillRect(px(e.i) - 1.5, dir < 0 ? mid - bh - 1 : mid + 2, 3, bh); x.globalAlpha = 1; }));
+    x.font = '11px system-ui, sans-serif'; x.fillStyle = ink; x.textAlign = 'left'; x.fillText('Ranmaru', L, 10); x.fillText(oppName.length > 14 ? oppName.slice(0, 13) + '…' : oppName, L, h - 3);
+    x.textAlign = 'right'; x.fillText(fmtClock(D.frames[n - 1][0]), w - R2, h - 3);
+    const X = Math.round(px(now)) + 0.5; x.strokeStyle = fg; x.lineWidth = 1.5; x.beginPath(); x.moveTo(X, 0); x.lineTo(X, h); x.stroke();
+    // the list: the garbage sent just before and just after the moment you are watching, at one scale, landing columns kept
+    let cur = -1; for (let q = 0; q < M.length && M[q].i <= now; q++) cur = q;
+    const key = D.id + '|' + cur + '|' + oppName; const list = $('gm');
+    $('gm-pos').textContent = M.length ? (cur < 0 ? 'Before the first garbage' : 'Garbage ' + (cur + 1) + ' of ' + M.length) : '';
+    if (list._key !== key) {
+      list._key = key; list.replaceChildren(); list.style.minHeight = (5 * (Math.min(S.rowH, 62) + 2) + 22) + 'px';
+      const hd = document.createElement('div'); hd.className = 'gm-h'; ['', 'Ranmaru', oppName].forEach((t) => { const sp = document.createElement('span'); sp.textContent = t; hd.appendChild(sp); }); list.appendChild(hd);
+      for (let q = Math.max(0, cur - 1); q < Math.min(M.length, Math.max(0, cur - 1) + 5); q++) {
+        const m = M[q], r = document.createElement('div'); r.className = 'gm-r' + (q === cur ? ' cur' : q > cur ? ' fut' : ''); r.dataset.i = m.i; r.setAttribute('role', 'button'); r.tabIndex = 0;
+        const t = document.createElement('div'); t.className = 'gm-t'; t.textContent = fmtClock(D.frames[Math.min(n - 1, m.i)][0]).replace(/\.\d$/, ''); r.appendChild(t);
+        m.p.forEach((pcs) => { const c = document.createElement('div'); c.className = 'gm-c'; c.style.minWidth = 6 * GCS + 'px';
+          pcs.forEach((e) => { const sl = document.createElement('div'), cl = gcol(e); sl.className = 'gm-s'; sl.style.cssText = 'width:' + e.w * GCS + 'px;height:' + e.h * GCS + 'px;margin-left:' + (e.c || 0) * GCS + 'px;background:' + cl.fill + ';border-color:' + cl.edge; sl.title = gname(e); sl.appendChild(document.createElement('i')); c.appendChild(sl); });
+          r.appendChild(c); });
+        list.appendChild(r);
+      }
+    }
   }
   function drawStrip() {
     const cv = g$('strip'), D = R.D;
@@ -1616,6 +1620,9 @@ function projectPlan(G, seq, cursor) {
     bd.addEventListener('pointercancel', () => { down = null; });
   })();
   g$('scrub').addEventListener('input', (e) => { stopPlay(); seek(Number(e.target.value)); });
+  $('gm').addEventListener('click', (e) => { const r = e.target.closest('.gm-r'); if (r && R.D) { stopPlay(); seek(Number(r.dataset.i)); } });
+  const gmStep = (d) => { if (!R.D || !R.D._gs || !R.D._gs.moments) return; const M = R.D._gs.moments; let cur = -1; for (let q = 0; q < M.length && M[q].i <= R.idx; q++) cur = q; const t = M[Math.max(0, Math.min(M.length - 1, cur + d))]; if (t) { stopPlay(); seek(t.i); } };
+  $('gm-prev').addEventListener('click', () => gmStep(-1)); $('gm-next').addEventListener('click', () => gmStep(1));
   g$('gc').addEventListener('click', (e) => { if (!R.D) return; const b = e.currentTarget.getBoundingClientRect(), L = 8; stopPlay(); seek(Math.round((e.clientX - b.left - L) / (b.width - L - 8) * (R.D.frames.length - 1))); });
   g$('strip').addEventListener('click', (e) => { if (!R.D) return; const b = e.currentTarget.getBoundingClientRect(); stopPlay(); seek(Math.round((e.clientX - b.left) / b.width * (R.D.frames.length - 1))); });
   g$('speed').addEventListener('click', (e) => { const b = e.target.closest('button[data-sp]'); if (b) setSpeed(Number(b.dataset.sp)); });

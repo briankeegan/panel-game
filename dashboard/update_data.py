@@ -17,6 +17,9 @@ ap.add_argument("--job-log", default="", help="the run's job log (it has a time 
 ap.add_argument("--partial", action="store_true", help="a run still going: add its finished games without replays; the final call for the run takes them back and does it properly")
 ap.add_argument("--sha", default="", help="the Gambit commit, when the logs do not name it")
 ap.add_argument("--now", default="", help="the time to give a game seen only while the run is going")
+ap.add_argument("--max-mb", type=float, default=900, help="keep the replays under this size: the oldest go first")
+ap.add_argument("--sizes", default="", help="a file of 'bytes name' lines for the replays already on the page, when they are not all on disk")
+ap.add_argument("--prune-out", default="", help="a file to list the replays that were removed but were not on disk")
 a = ap.parse_args()
 HERE = os.path.dirname(os.path.abspath(__file__))
 LUA = os.path.join(HERE, "replayFrames.lua")
@@ -101,7 +104,8 @@ if gl:
             prev = c; gg[-1].append((c, m.group(2), l))
 
 rows = load("games.json", [])
-nrep = max([int(f.split("replay_r")[1].split(".")[0]) for f in glob.glob(os.path.join(a.data, "replay_r*.json.gz"))] + [0])
+def rnum(name): return int(re.search(r"r(\d+)", name).group(1))
+nrep = max([rnum(os.path.basename(f)) for f in glob.glob(os.path.join(a.data, "replay_r*.json.gz"))] + [rnum(r["replay"]) for r in rows if r.get("replay")] + [0])
 added = 0
 for gi, g in enumerate(games):
     n = None; x = None
@@ -110,7 +114,7 @@ for gi, g in enumerate(games):
         except Exception: x = None
     row = dict(sha=sha, bot=bot, date=date, opp=g["opp"], res=g["r"], secs=round(n / 60) if n else None,
                top=min(100, round(100 * g["top"] / n)) if n else None, land=g["land"], at=times[gi], run=a.run_id)
-    if g["r"] == "L" and x and n and not a.partial:
+    if x and n and not a.partial:
         nrep += 1; rid = "r%d" % nrep
         tmp = os.path.join(a.data, rid + "_in.json"); json.dump(x, open(tmp, "w"))
         out_fr = os.path.join(a.data, rid + "_fr.json")
@@ -157,6 +161,26 @@ elif sha:
             if r.returncode == 0: a.subject = r.stdout.strip().split("\n")[0][:200]
         except Exception: pass
     vers.append(dict(sha=sha, subject=a.subject, start=a.started, end=a.ended or a.started, label=bot, runs=1)); info["new"] = True
+if not a.partial:
+    # keep the replays under the size limit: drop the oldest first (their games stay in the statistics)
+    known = {}
+    for f in glob.glob(os.path.join(a.data, "replay_r*.json.gz")): known[os.path.basename(f)] = os.path.getsize(f)
+    if a.sizes and os.path.exists(a.sizes):
+        for line in open(a.sizes):
+            parts = line.split(None, 1)
+            if len(parts) == 2 and parts[1].strip().startswith("replay_r"): known.setdefault(parts[1].strip(), int(parts[0]))
+    total = sum(known.values()); limit = a.max_mb * 1e6; gone = []
+    for name in sorted(known, key=rnum):
+        if total <= limit: break
+        total -= known[name]; gone.append(name)
+        fp = os.path.join(a.data, name)
+        if os.path.exists(fp): os.remove(fp)
+    if gone:
+        ids = {n.replace("replay_", "").replace(".json.gz", "") for n in gone}
+        for r in rows:
+            if r.get("replay") in ids: del r["replay"]
+        if a.prune_out: open(a.prune_out, "a").write("".join("data/" + n + "\n" for n in gone))
+        print("pruned %d old replays, %.0f MB kept" % (len(gone), total / 1e6))
 save("games.json", rows); save("versions.json", vers)
 if a.partial: part[a.run_id] = info; save("partial.json", part)
 else: runs.append(a.run_id); save("runs.json", runs); save("partial.json", part)

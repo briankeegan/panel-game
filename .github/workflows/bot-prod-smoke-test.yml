@@ -951,38 +951,44 @@ jobs:
         run: |
           set -u
           repo="${{ github.repository }}"
-          git fetch --depth=1 origin gh-pages:refs/remotes/origin/gh-pages || { echo "no gh-pages branch yet: nothing to update"; exit 0; }
-          git worktree add --detach site origin/gh-pages
-          mkdir -p site/data
-          runs=$(gh api "repos/$repo/actions/runs?per_page=100&status=completed" --jq '[.workflow_runs[] | select(.display_title | test("^live · .* · [A-Za-z0-9_]*_p[0-9]+_"))] | sort_by(.created_at) | .[] | [.id, .display_title, .run_started_at, .updated_at] | @tsv')
-          todo=0
-          while IFS=$'\t' read -r id title started ended; do
-            [ -n "$id" ] || continue
-            grep -q "\"$id\"" site/data/runs.json 2>/dev/null && continue
-            todo=$((todo + 1))
-          done <<< "$runs"
-          echo "$todo finished bot runs are not on the stats page yet"
-          [ "$todo" -gt 0 ] || exit 0
-          sudo apt-get update -q && sudo apt-get install -y -q luajit luarocks liblua5.1-0-dev build-essential unzip libreadline-dev
-          luarocks install --local luasocket --lua-version 5.1 >/dev/null
-          luarocks install --local luafilesystem --lua-version 5.1 >/dev/null
-          luarocks install --local luautf8 --lua-version 5.1 >/dev/null
-          eval "$(luarocks path --local --lua-version 5.1)"
-          while IFS=$'\t' read -r id title started ended; do
-            [ -n "$id" ] || continue
-            grep -q "\"$id\"" site/data/runs.json 2>/dev/null && continue
-            d="stats-pulled/$id"; mkdir -p "$d"
-            gh run download "$id" -n bot-prod-smoke-log -D "$d" 2>/dev/null || { echo "run $id: no log artifact, skipped"; continue; }
-            job=$(gh api "repos/$repo/actions/runs/$id/jobs" --jq '([.jobs[] | select(.name == "Run the bot")][0] // .jobs[0]).id')
-            # the job log (it names the Gambit commit and has the time of each game): the API answers with a redirect to the log file
-            url=$(curl -sS -o /dev/null -w '%{redirect_url}' -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/$repo/actions/jobs/$job/logs")
-            if [ -n "$url" ]; then curl -sSL "$url" -o "$d/job.log" || true; else gh api "repos/$repo/actions/jobs/$job/logs" > "$d/job.log" || true; fi
-            echo "run $id: job $job, job log $(wc -c < "$d/job.log" 2>/dev/null || echo 0) bytes, Gambit commit line: $(grep -m1 -o 'Gambit built from GameCreator [0-9a-f]*' "$d/job.log" 2>/dev/null || echo NONE)"
-            python3 dashboard/update_data.py --run-id "$id" --dir "$d" --data site/data --title "$title" --started "$started" --ended "$ended" --job-log "$d/job.log" || echo "run $id: update failed"
-          done <<< "$runs"
-          python3 dashboard/make_site.py site
-          cd site
-          git add -A
-          if git diff --cached --quiet; then echo "stats page is up to date"; exit 0; fi
-          git -c user.name="github-actions" -c user.email="actions@github.com" commit -q -m "Gambit stats: add finished bot runs"
-          git push origin HEAD:gh-pages || { git fetch -q origin gh-pages && git rebase -q origin/gh-pages && git push origin HEAD:gh-pages; }
+          . dashboard/site_git.sh
+          done_setup=0
+          for attempt in 1 2 3; do
+            site_open "$PWD/site" || { echo "no gh-pages branch yet: nothing to update"; exit 0; }
+            : > site-prune.txt
+            runs=$(gh api "repos/$repo/actions/runs?per_page=100&status=completed" --jq '[.workflow_runs[] | select(.display_title | test("^live · .* · [A-Za-z0-9_]*_p[0-9]+_"))] | sort_by(.created_at) | .[] | [.id, .display_title, .run_started_at, .updated_at] | @tsv')
+            todo=0
+            while IFS=$'\t' read -r id title started ended; do
+              [ -n "$id" ] || continue
+              grep -q "\"$id\"" site/data/runs.json 2>/dev/null && continue
+              todo=$((todo + 1))
+            done <<< "$runs"
+            echo "$todo finished bot runs are not on the stats page yet"
+            [ "$todo" -gt 0 ] || exit 0
+            if [ "$done_setup" = 0 ]; then
+              sudo apt-get update -q && sudo apt-get install -y -q luajit luarocks liblua5.1-0-dev build-essential unzip libreadline-dev
+              luarocks install --local luasocket --lua-version 5.1 >/dev/null
+              luarocks install --local luafilesystem --lua-version 5.1 >/dev/null
+              luarocks install --local luautf8 --lua-version 5.1 >/dev/null
+              done_setup=1
+            fi
+            eval "$(luarocks path --local --lua-version 5.1)"
+            while IFS=$'\t' read -r id title started ended; do
+              [ -n "$id" ] || continue
+              grep -q "\"$id\"" site/data/runs.json 2>/dev/null && continue
+              d="stats-pulled/$id"; mkdir -p "$d"
+              [ -s "$d/bot-prod-smoke.log" ] || gh run download "$id" -n bot-prod-smoke-log -D "$d" 2>/dev/null || { echo "run $id: no log artifact, skipped"; continue; }
+              if [ ! -s "$d/job.log" ]; then
+                job=$(gh api "repos/$repo/actions/runs/$id/jobs" --jq '([.jobs[] | select(.name == "Run the bot")][0] // .jobs[0]).id')
+                # the job log (it names the Gambit commit and has the time of each game): the API answers with a redirect to the log file
+                url=$(curl -sS -o /dev/null -w '%{redirect_url}' -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/$repo/actions/jobs/$job/logs")
+                if [ -n "$url" ]; then curl -sSL "$url" -o "$d/job.log" || true; else gh api "repos/$repo/actions/jobs/$job/logs" > "$d/job.log" || true; fi
+                echo "run $id: job $job, job log $(wc -c < "$d/job.log" 2>/dev/null || echo 0) bytes, Gambit commit line: $(grep -m1 -o 'Gambit built from GameCreator [0-9a-f]*' "$d/job.log" 2>/dev/null || echo NONE)"
+              fi
+              python3 dashboard/update_data.py --run-id "$id" --dir "$d" --data site/data --title "$title" --started "$started" --ended "$ended" --job-log "$d/job.log" --sizes site-sizes.txt --prune-out site-prune.txt --max-mb 900 || echo "run $id: update failed"
+              if [ -s site-prune.txt ]; then sed 's#.*/##' site-prune.txt | sort -u > .gone; grep -vFf .gone site-sizes.txt > .sizes && mv .sizes site-sizes.txt; fi
+            done <<< "$runs"
+            python3 dashboard/make_site.py site
+            site_push "$PWD/site" "Gambit stats: add finished bot runs" && break
+            echo "the page changed while this ran (attempt $attempt): starting over"
+          done

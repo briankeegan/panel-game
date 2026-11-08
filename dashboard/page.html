@@ -75,6 +75,9 @@
 .gw-opts .played { font-weight: 600; } .gw-opts .lo { color: var(--cds-chart-status-critical); }
 .gw-log { font-size: 11px; color: var(--color-fg-muted); font-variant-numeric: tabular-nums; line-height: 1.5; }
 .gw-log div.now { color: var(--color-fg); font-weight: 600; }
+#gw-gc { width: 100%; height: 130px; display: block; cursor: pointer; border: 1px solid var(--color-border-line); border-radius: 6px; background: var(--color-bg); }
+.gc-leg { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 13px; }
+.gc-leg i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
 #gw-strip { width: 100%; height: 30px; display: block; cursor: pointer; border: 1px solid var(--color-border-line); border-radius: 6px; background: var(--color-bg); }
 #gw-scrub { width: 100%; }
 .gw-ctl { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
@@ -339,6 +342,13 @@
         </div>
       </div>
     </div>
+  </section>
+
+  <section class="gs-card" id="sec-garbage" hidden>
+    <div class="gw-head"><h2>Garbage sent</h2></div>
+    <p class="gs-note">Panels of garbage each player has sent so far in the game you are watching. Tap the chart to jump there.</p>
+    <canvas id="gw-gc" aria-label="Garbage sent over time. Tap to jump."></canvas>
+    <div class="gc-leg" id="gc-leg"></div>
   </section>
 
   <section class="gs-card" id="sec-versions">
@@ -1159,9 +1169,47 @@ function projectPlan(G, seq, cursor) {
     g$('time').textContent = fmtClock(f[0]) + ' · ' + (R.idx === last ? 'the end' : ((last - R.idx) / 60).toFixed(1) + ' s to the end') + ' · frame ' + f[0];
     g$('play').textContent = R.playing ? 'Pause' : (R.idx >= last ? 'Replay' : 'Play');
     drawStrip();
+    drawGarbage();
     showDecision(f[0]);
     if (LIST.rid !== R.rid || LIST.D !== D) { LIST.D = D; buildList(); }
     markList(f[0]);
+  }
+  // garbage sent: a piece is counted the first time it shows up in the receiver's queue (its key is landing frame + size + kind); panels = width x height
+  function garbageSeries() {
+    const D = R.D; if (D._gs) return D._gs;
+    const n = D.frames.length, tok = new Map(), seen = [new Set(), new Set()], tot = [0, 0];
+    const out = [new Uint16Array(n), new Uint16Array(n)], pieces = [0, 0];
+    const parse = (qi) => { let v = tok.get(qi); if (!v) { v = []; (D.queues[qi] || '').split(';').forEach((t) => { const m = /^[stw](\d*):(\d+)x(\d+)([mcp])$/.exec(t); if (m) v.push([t.replace(/^[stw]/, ''), m[2] * m[3]]); }); tok.set(qi, v); } return v; };
+    for (let i = 0; i < n; i++) {
+      const f = D.frames[i];
+      for (let s = 0; s < 2; s++) {             // receiver s+1: what was sent to it comes from the other player
+        const qi = f[1 + 9 * s + 7]; if (qi) parse(qi).forEach(([k, a]) => { if (!seen[s].has(k)) { seen[s].add(k); tot[s] += a; pieces[s]++; } });
+        out[s][i] = Math.min(65535, tot[s]);
+      }
+    }
+    // sent by stack k = what arrived at the other one
+    const m = D.mine - 1;
+    return (D._gs = { me: out[1 - m], opp: out[m], meN: pieces[1 - m], oppN: pieces[m] });
+  }
+  function drawGarbage() {
+    const D = R.D, sec = $('sec-garbage'); if (!D || !D.queues) { sec.hidden = true; return; }
+    sec.hidden = false;
+    const S = garbageSeries(), cv = g$('gc'), w = cv.clientWidth || 600, h = 130;
+    if (cv.width !== w) cv.width = w; cv.height = h;
+    const x = cv.getContext('2d'), n = D.frames.length, top = Math.max(10, S.me[n - 1], S.opp[n - 1]) * 1.08, L = 34, B = 16;
+    const css = getComputedStyle(document.documentElement), ink = css.getPropertyValue('--color-text-muted').trim() || '#8a93a6', line = css.getPropertyValue('--color-border-line').trim() || '#444';
+    const px = (i) => L + (i / Math.max(1, n - 1)) * (w - L - 4), py = (v) => h - B - (v / top) * (h - B - 6);
+    x.clearRect(0, 0, w, h); x.font = '11px system-ui, sans-serif'; x.fillStyle = ink; x.strokeStyle = line; x.lineWidth = 1;
+    const step = top > 120 ? 50 : top > 50 ? 20 : top > 20 ? 10 : 5;
+    for (let v = 0; v <= top; v += step) { const y = Math.round(py(v)) + 0.5; x.beginPath(); x.moveTo(L, y); x.lineTo(w - 4, y); x.stroke(); x.textAlign = 'right'; x.fillText(String(v), L - 4, y + 4); }
+    x.textAlign = 'center'; const mins = Math.floor(n / 3600); for (let m = 1; m <= mins; m++) { const i = m * 3600; if (mins > 12 && m % 2) continue; x.fillText(m + ':00', px(i), h - 3); }
+    [[S.opp, '#ff8c42'], [S.me, '#4ea8ff']].forEach(([a, col]) => {
+      x.strokeStyle = col; x.lineWidth = 2; x.beginPath(); let prev = -1;
+      for (let i = 0; i < n; i += Math.max(1, Math.floor(n / (w * 2)))) { const v = a[i]; if (v === prev && i) continue; if (prev < 0) x.moveTo(px(i), py(v)); else { x.lineTo(px(i), py(prev)); x.lineTo(px(i), py(v)); } prev = v; }
+      x.lineTo(px(n - 1), py(a[n - 1])); x.stroke();
+    });
+    x.strokeStyle = ink; x.lineWidth = 1; x.beginPath(); x.moveTo(Math.round(px(R.idx)) + 0.5, 4); x.lineTo(Math.round(px(R.idx)) + 0.5, h - B); x.stroke();
+    $('gc-leg').innerHTML = '<span><i style="background:#4ea8ff"></i>Gambit ' + S.me[R.idx] + ' of ' + S.me[n - 1] + ' panels (' + S.meN + ' pieces in all)</span><span><i style="background:#ff8c42"></i>' + (D.opp || 'Opponent') + ' ' + S.opp[R.idx] + ' of ' + S.opp[n - 1] + ' panels (' + S.oppN + ' pieces)</span>';
   }
   function drawStrip() {
     const cv = g$('strip'), D = R.D;
@@ -1275,6 +1323,7 @@ function projectPlan(G, seq, cursor) {
     'big chain': { c: '#a06bff' },
     'pressure': { c: '#ff8c42' },
     'build': { c: '#4ea8ff' },
+    'fill': { c: '#f0c33c' },
   };
   const CATWHY = { lives: 'Board stays alive', plan: 'Follows its plan', breaks: 'Breaks garbage', ready: 'Ready for the next block', buys: 'Buys the most time', dies: 'Lost either way, this lasts longest' };
   const CIRC = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨'];
@@ -1304,6 +1353,7 @@ function projectPlan(G, seq, cursor) {
     const l1 = g$('mid');
     const ml = document.createElement('div'); ml.className = 'mlabel'; ml.textContent = "Gambit's mode"; l1.appendChild(ml);
     const mc = document.createElement('span'); mc.className = 'chip'; mc.textContent = mode; mc.title = mode; l1.appendChild(mc);
+    if (mode === 'fill' && /^\d+$/.test(d[16] || '')) { const fc = document.createElement('span'); fc.className = 'chip'; fc.textContent = Number(d[16]) >= 3 ? 'up to ' + d[16] + 'x' : 'small combos'; l1.appendChild(fc); }
     if (PLAN.on && e) { const st = PLAN.status(i), sc = document.createElement('span'); sc.className = 'chip ' + st.kind; const m2 = /swap (\d+) of (\d+)/.exec(st.text);
       sc.textContent = st.kind === 'new' ? 'New plan · ' + seq.length + (seq.length === 1 ? ' swap' : ' swaps') : st.kind === 'same' ? (m2 ? (Number(m2[2]) - Number(m2[1]) + 1) + (Number(m2[2]) - Number(m2[1]) === 0 ? ' swap left' : ' swaps left') : 'Same plan') : (play === 'raise' ? 'Raising' : 'Waiting'); l1.appendChild(sc); }
     { const cp = PLAN.on ? PLAN.current(clock) : null; if (cp && cp.total) { let c2 = l1.querySelector('.chip.new, .chip.same, .chip.wait'); if (!c2) { c2 = document.createElement('span'); l1.appendChild(c2); } c2.className = 'chip ' + (cp.left ? (cp.done ? 'same' : 'new') : 'wait'); c2.textContent = cp.left ? cp.left + ' of ' + cp.total + (cp.total === 1 ? ' swap left' : ' swaps left') : 'Plan done'; } }
@@ -1468,6 +1518,7 @@ function projectPlan(G, seq, cursor) {
     bd.addEventListener('pointercancel', () => { down = null; });
   })();
   g$('scrub').addEventListener('input', (e) => { stopPlay(); seek(Number(e.target.value)); });
+  g$('gc').addEventListener('click', (e) => { if (!R.D) return; const b = e.currentTarget.getBoundingClientRect(), L = 34; stopPlay(); seek(Math.round((e.clientX - b.left - L) / (b.width - L - 4) * (R.D.frames.length - 1))); });
   g$('strip').addEventListener('click', (e) => { if (!R.D) return; const b = e.currentTarget.getBoundingClientRect(); stopPlay(); seek(Math.round((e.clientX - b.left) / b.width * (R.D.frames.length - 1))); });
   g$('speed').addEventListener('click', (e) => { const b = e.target.closest('button[data-sp]'); if (b) setSpeed(Number(b.dataset.sp)); });
   document.addEventListener('keydown', (e) => {

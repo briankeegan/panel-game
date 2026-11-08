@@ -333,6 +333,7 @@
   <header>
     <h1 id="gs-title">Ranmaru on panelattack.com</h1>
     <p class="gs-take" id="gs-take" data-source="games versions"></p>
+    <p class="gs-take gs-dep" id="gs-dep" data-source="versions" hidden></p>
   </header>
 
   <section class="gs-bar" aria-label="Filters">
@@ -628,6 +629,14 @@
 
     // headline sentence
     const scope = (pickedV ? pickedV.label + ' (' + pickedV.sha + ')' : 'All versions') + (opp ? ' against ' + opp : '');
+    { const dep = $('gs-dep'); dep.replaceChildren(); dep.hidden = !pickedV;
+      if (pickedV && pickedV.start) {
+        const f = (t) => new Date(t).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+        const a = new Date(pickedV.start).getTime(), z = pickedV.end ? new Date(pickedV.end).getTime() : a, mins = Math.round((z - a) / 60000);
+        const len = mins >= 60 ? Math.floor(mins / 60) + ' h ' + (mins % 60) + ' min' : mins + ' min';
+        const bold = document.createElement('b'); bold.textContent = 'Deployed ';
+        dep.append(bold, document.createTextNode(z - a < 60000 ? f(a) + ', and still running or just started' : f(a) + ' until ' + f(z) + ' (' + len + (pickedV.runs > 1 ? ', ' + pickedV.runs + ' bot runs' : '') + ')'));
+      } }
     const take = $('gs-take'); take.replaceChildren();
     if (!S.n) { take.textContent = scope + ': no games yet.'; }
     else {

@@ -108,7 +108,7 @@ for gi, g in enumerate(games):
                 for c, mode, l in ([] if off > 5 else dg):
                     cc = c - off; en = fld(l, "enemy").split("/")
                     plans.append([cc, fld(l, "seq"), fld(l, "done"), fld(l, "fire"), fld(l, "ats"), fld(l, "broke"), fld(l, "rule"), fld(l, "cat"), fld(l, "tier"), fld(l, "lost"), fld(l, "sooner"), fld(l, "carryBy"), fld(l, "own"), fld(l, "swaps"), fld(l, "w3"), fld(l, "veto")])
-                    dec.append([cc, mode, fld(l, "play"), fld(l, "want"), fld(l, "v"), fld(l, "dies"), fld(l, "land"), fld(l, "chain"), fld(l, "combo"), fld(l, "thrown"), en[0] if en else "", en[1] if len(en) > 1 else "", en[2] if len(en) > 2 else "", fld(l, "why"), fld(l, "opts")])
+                    dec.append([cc, mode, fld(l, "play"), fld(l, "want"), fld(l, "v"), fld(l, "dies"), fld(l, "land"), fld(l, "chain"), fld(l, "combo"), fld(l, "thrown"), en[0] if en else "", en[1] if len(en) > 1 else "", en[2] if len(en) > 2 else "", fld(l, "why"), fld(l, "opts"), fld(l, "allow")])
             used = sorted({s[6] for f in fr["frames"] for s in f[1:3]}); remap = {u: i for i, u in enumerate(used)}
             qused = sorted({s[7] for f in fr["frames"] for s in f[1:3]}); qmap = {u: i for i, u in enumerate(qused)}
             def squeeze(gr):

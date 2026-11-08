@@ -135,7 +135,7 @@ for gi, g in enumerate(games):
                 return "|".join(o)
             frames = [[f[0]] + [v for s in f[1:3] for v in s[:6] + [remap[s[6]], qmap[s[7]], s[8]]] for f in fr["frames"]]
             out = dict(id=rid, opp=g["opp"], bot=bot, sha=sha, date=date, secs=row["secs"], mine=x["mine"], start=0, end=fr["frames"][-1][0],
-                       grids=[squeeze(fr["grids"][u]) for u in used], queues=[fr["queues"][u] for u in qused], frames=frames, dec=dec, plans=plans)
+                       grids=[squeeze(fr["grids"][u]) for u in used], queues=[fr["queues"][u] for u in qused], frames=frames, dec=dec, plans=plans, fc=fr.get("fc"))
             with gzip.open(os.path.join(a.data, "replay_%s.json.gz" % rid), "wt", compresslevel=9) as z: json.dump(out, z, separators=(",", ":"))
             row["replay"] = rid
     rows.append(row); added += 1

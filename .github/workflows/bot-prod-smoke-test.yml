@@ -478,8 +478,18 @@ jobs:
           fi
           # a player who does not start a game within 60 s is left alone in the room (not for a bot that challenges someone)
           idle=60; [ -z "$target" ] || idle=0
-          PA_IDLE_LIMIT="$idle" PA_CHALLENGE="$target" PA_CHALLENGE_GAMES="$games" PA_CHALLENGE_FIRST_TO="$first" PA_ACCEPT_ONLY="$only" PA_DECLINE_MODES="$decline" timeout "$secs" $pin luajit bot/playBot.lua "$BOT_HOST" "$BOT_PORT" "$name" 4 12 "$brain" \
-            2>&1 | tee "$GITHUB_WORKSPACE/bot-prod-smoke.log" || [ $? -eq 124 ]
+          # The server sometimes closes the connection (the bot then exits with 75): log back in and carry on until the hours are up,
+          # so a dropped connection does not end the run and leave no bot in the lobby. 0 (a stop or deploy asked it to leave) and 124 (the hours ran out) end it.
+          deadline=$(( $(date +%s) + secs )); : > "$GITHUB_WORKSPACE/bot-prod-smoke.log"; rc=0
+          while :; do
+            left=$(( deadline - $(date +%s) )); [ "$left" -gt 60 ] || break
+            PA_IDLE_LIMIT="$idle" PA_CHALLENGE="$target" PA_CHALLENGE_GAMES="$games" PA_CHALLENGE_FIRST_TO="$first" PA_ACCEPT_ONLY="$only" PA_DECLINE_MODES="$decline" timeout "$left" $pin luajit bot/playBot.lua "$BOT_HOST" "$BOT_PORT" "$name" 4 12 "$brain" \
+              2>&1 | tee -a "$GITHUB_WORKSPACE/bot-prod-smoke.log"
+            rc=${PIPESTATUS[0]}
+            if [ "$rc" -eq 75 ]; then echo "the server closed the connection: logging back in in 20 s"; sleep 20; continue; fi
+            break
+          done
+          case "$rc" in 0|124|75) : ;; *) exit "$rc";; esac
 
       - name: Sit in the lobby
         if: env.MODE == 'live' && !(env.MODE == 'live' && (env.SERVER_EFF == env.BETA_SERVER || env.SERVER_EFF == env.PROD_SERVER) && (env.BOT_KIND == 'wasm' || env.BOT_KIND == 'bitbot' || env.BOT_KIND == 'gambit'))

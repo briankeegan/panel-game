@@ -326,7 +326,7 @@
     <div class="gs-kpi"><div class="gs-kl">Longest game</div><div class="gs-kv" id="k-lg" data-source="games">—</div><div class="gs-kn" id="k-lg-n"></div></div>
   </section>
 
-  <nav class="gs-nav" aria-label="Sections"><a href="#sec-opp">Opponents</a><a href="#sec-watch">Watch a loss</a><a href="#sec-garbage">Garbage sent</a><a href="#sec-versions">Versions</a><a href="#sec-len">Game length</a></nav>
+  <nav class="gs-nav" aria-label="Sections"><a href="#sec-opp">Opponents</a><a href="#sec-watch">Watch a game</a><a href="#sec-garbage">Garbage sent</a><a href="#sec-versions">Versions</a><a href="#sec-len">Game length</a></nav>
 
   <section class="gs-card" id="sec-opp">
     <h2>Opponents</h2>
@@ -344,9 +344,10 @@
   </section>
 
   <section class="gs-card" id="sec-watch">
-    <div class="gw-head"><h2 id="gw-title">Watch a loss</h2><span class="gs-count" id="gw-count"></span></div>
-    <p class="gs-note" id="gw-sub">Pick a loss to replay it frame by frame, with Ranmaru's decisions beside the boards.</p>
+    <div class="gw-head"><h2 id="gw-title">Watch a game</h2><span class="gs-count" id="gw-count"></span></div>
+    <p class="gs-note" id="gw-sub">Pick a game to replay it frame by frame, with Ranmaru's decisions beside the boards.</p>
     <div class="gw-pick" id="gw-pick">
+      <div class="gs-seg sm" role="group" aria-label="Result" id="gw-res"><button type="button" data-r="" aria-pressed="true">All</button><button type="button" data-r="L" aria-pressed="false">Lost</button><button type="button" data-r="W" aria-pressed="false">Won</button></div>
       <button type="button" class="gw-btn" id="gw-newer">◀ Newer</button>
       <select id="gw-player" class="dash-select" aria-label="Choose a player"></select>
       <select id="gw-select" class="dash-select" aria-label="Choose a game to watch"></select>
@@ -633,11 +634,11 @@
       const d = document.createElement('button'); d.type = 'button'; d.className = 'gs-dot' + (g.res === 'L' ? ' l' : '');
       d.title = (g.res === 'W' ? 'Won' : 'Lost') + ' vs ' + g.opp + ' · ' + dur(g.secs) + ' · ' + g.bot + ' · ' + d3.utcFormat('%b %-d')(new Date(g.date));
       d.setAttribute('aria-label', d.title);
-      if (g.res === 'L' && g.replay) d.addEventListener('click', () => openReplay(g, true)); else d.tabIndex = -1;
+      if (g.replay) d.addEventListener('click', () => openReplay(g, true)); else d.tabIndex = -1;
       fm.appendChild(d);
     });
     const rl = recent.filter((g) => g.res === 'L').length;
-    $('form-note').textContent = recent.length ? 'The last ' + recent.length + ' games, oldest on the left: ' + (recent.length - rl) + ' won, ' + rl + ' lost. Click a red dot to watch that loss.' : 'No games in this selection.';
+    $('form-note').textContent = recent.length ? 'The last ' + recent.length + ' games, oldest on the left: ' + (recent.length - rl) + ' won, ' + rl + ' lost. Click a dot to watch that game.' : 'No games in this selection.';
 
     // per-version stats (opponent filter applied)
     const vs = vers.map((v) => Object.assign({}, v, stat(byOpp.filter((g) => g.sha === v.sha)))).filter((v) => v.n > 0 && (v.n >= (opp ? 0 : minn) || v.sha === ver));
@@ -711,7 +712,7 @@
       { key: 'kind', label: 'Type', val: (r) => kind(r), cell: (td, r) => { const k = kind(r); txt(td, 'gs-chip' + (k === 'Stalemate' ? ' stalemate' : ''), k); } },
     ], lsShown, null, null);
     document.querySelectorAll('#t-loss tbody tr').forEach((tr) => { tr.style.cursor = 'default'; });
-    updateWatch(ls);
+    updateWatch(fg);
     refreshPlayer();
   }
 
@@ -813,22 +814,27 @@
   function openReplay(row, scroll) {
     if (R.rid !== row.replay) { stopPlay(); R.rid = row.replay; R.row = row; R.D = null; R.idx = 0; R.part = 'end'; }
     R.rid = row.replay; markSources();
-    $('gw-sub').textContent = 'Lost to ' + row.opp + ' in ' + dur(row.secs) + ' (' + row.bot + ', ' + (playedAt(row) || d3.utcFormat('%b %-d')(new Date(row.date))) + ')' + '' + '.';
+    $('gw-sub').textContent = (row.res === 'W' ? 'Won against ' : 'Lost to ') + row.opp + ' in ' + dur(row.secs) + ' (' + row.bot + ', ' + (playedAt(row) || d3.utcFormat('%b %-d')(new Date(row.date))) + ')' + '' + '.';
     syncPick();
     refreshPlayer();
     if (scroll) $('sec-watch').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
-  // the losses in the current selection, newest first; the newest is open by default
-  const WL = { list: [], all: [], player: '' };
-  const lossLabel = (r) => (playedAt(r) || d3.utcFormat('%b %-d')(new Date(r.date))) + (WL.player ? '' : ' · ' + r.opp) + ' · ' + dur(r.secs) + ' · ' + kind(r);
+  // the games of the current selection that have a replay, newest first; the newest is open by default
+  const WL = { list: [], all: [], src: [], player: '', res: '' };
+  const resWord = (r) => r.res === 'W' ? 'Won' : 'Lost';
+  const lossLabel = (r) => (playedAt(r) || d3.utcFormat('%b %-d')(new Date(r.date))) + (WL.player ? '' : ' · ' + r.opp) + ' · ' + resWord(r) + ' · ' + dur(r.secs);
   function syncPick() {
     const i = WL.list.findIndex((r) => r.replay === R.rid);
     const sel = $('gw-select'); if (sel.value !== R.rid) sel.value = R.rid;
     $('gw-newer').disabled = i <= 0; $('gw-older').disabled = i < 0 || i >= WL.list.length - 1;
-    $('gw-pos').textContent = i < 0 ? '' : 'Loss ' + (i + 1) + ' of ' + WL.list.length + ', newest first';
+    $('gw-pos').textContent = i < 0 ? '' : 'Game ' + (i + 1) + ' of ' + WL.list.length + ', newest first';
   }
-  function updateWatch(ls) {
-    const all = ls.filter((r) => r.replay).sort((a, b) => b.idx - a.idx);
+  function updateWatch(src) {
+    const withRep = src.filter((r) => r.replay).sort((a, b) => b.idx - a.idx);
+    WL.src = withRep;
+    const cntR = { '': withRep.length, L: withRep.filter((r) => r.res === 'L').length, W: withRep.filter((r) => r.res === 'W').length };
+    document.querySelectorAll('#gw-res button').forEach((b) => { const k = b.dataset.r; b.textContent = (k === 'L' ? 'Lost' : k === 'W' ? 'Won' : 'All') + ' ' + cntR[k]; b.setAttribute('aria-pressed', String(k === WL.res)); });
+    const all = WL.res ? withRep.filter((r) => r.res === WL.res) : withRep;
     WL.all = all;
     if (WL.player && !all.some((r) => r.opp === WL.player)) WL.player = '';
     const list = WL.player ? all.filter((r) => r.opp === WL.player) : all;
@@ -836,14 +842,17 @@
     const cnt = d3.rollups(all, (v) => v.length, (r) => r.opp).sort((a, b) => b[1] - a[1] || d3.ascending(a[0], b[0]));
     const ps = $('gw-player'); ps.replaceChildren(new Option('All players (' + all.length + ')', ''), ...cnt.map(([n, k]) => new Option(n + ' (' + k + ')', n))); ps.value = WL.player; ps.hidden = cnt.length < 2;
     const body = $('gw-body'), pick = $('gw-pick');
-    $('gw-count').textContent = list.length ? list.length + (list.length === 1 ? ' loss' : ' losses') : '';
-    if (!list.length) { stopPlay(); R.rid = null; R.D = null; body.hidden = true; pick.hidden = true; $('sec-garbage').hidden = true; $('gw-select').replaceChildren(); $('gw-list').replaceChildren(); LIST.rid = null; $('gw-sub').textContent = 'No losses to replay here. Choose a version or opponent that lost a game, or reset the filters.'; return; }
-    body.hidden = false; pick.hidden = false;
+    $('gw-count').textContent = list.length ? list.length + (list.length === 1 ? ' game' : ' games') : '';
+    pick.hidden = !withRep.length;
+    if (!list.length) { stopPlay(); R.rid = null; R.D = null; body.hidden = true; $('sec-garbage').hidden = true; $('gw-select').replaceChildren(); $('gw-list').replaceChildren(); LIST.rid = null;
+      $('gw-sub').textContent = withRep.length ? 'No ' + (WL.res === 'L' ? 'lost' : 'won') + ' games here. Choose All.' : 'No replays for this selection. Choose another version or opponent, or reset the filters.'; return; }
+    body.hidden = false;
     $('gw-select').replaceChildren(...list.map((r) => new Option(lossLabel(r), r.replay)));
     if (!list.some((r) => r.replay === R.rid)) openReplay(list[0], false);
     syncPick();
   }
-  $('gw-player').addEventListener('change', (e) => { WL.player = e.target.value; updateWatch(WL.all); const r = WL.list.find((x) => x.replay === R.rid) || WL.list[0]; if (r) openReplay(r, false); });
+  $('gw-res').addEventListener('click', (e) => { const b = e.target.closest('button[data-r]'); if (!b) return; WL.res = b.dataset.r; updateWatch(WL.src); });
+  $('gw-player').addEventListener('change', (e) => { WL.player = e.target.value; updateWatch(WL.src); const r = WL.list.find((x) => x.replay === R.rid) || WL.list[0]; if (r) openReplay(r, false); });
   $('gw-select').addEventListener('change', (e) => { const r = WL.list.find((x) => x.replay === e.target.value); if (r) openReplay(r, false); });
   $('gw-newer').addEventListener('click', () => { const i = WL.list.findIndex((r) => r.replay === R.rid); if (i > 0) openReplay(WL.list[i - 1], false); });
   $('gw-older').addEventListener('click', () => { const i = WL.list.findIndex((r) => r.replay === R.rid); if (i >= 0 && i < WL.list.length - 1) openReplay(WL.list[i + 1], false); });

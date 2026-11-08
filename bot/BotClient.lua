@@ -95,6 +95,10 @@ local BotClient = class(function(self, opts)
   -- levelData, which the opponent's character-select reads). Character/stage are
   -- random, like a default client.
   self.level = opts.level or 10 -- corpus + play target is L10
+  -- The level this bot plays at when a set starts. With followUp, a person who takes level 11 in the room makes the bot play 11 for the
+  -- rest of that set (even if they go back down); it returns to baseLevel when the set is closed. Off in fights, where each side's level is set.
+  self.baseLevel = self.level
+  self.followUp = opts.followUp == true
   -- Ranked is a login setting like level and character, and the bot sets it
   -- EXPLICITLY every time: at login and again on every ready. Off unless a
   -- caller opts in -- a bot's games must never move anyone's rating.
@@ -220,6 +224,29 @@ local function countKeys(t)
   return n
 end
 
+-- Change the level this bot plays at. The next ready it sends (playBot sends one every second or so while it waits) carries it.
+function BotClient:setLevel(level, why)
+  if level == self.level then return end
+  self.level = level
+  local st = self.playerStub.settings
+  st.level = level; st.difficulty = level; st.levelData = LevelPresets.getModern(level)
+  logger.info(string.format("bot[%s]: playing level %d (%s)", self.name, level, why))
+  print(string.format("level: %s plays level %d (%s)", self.name, level, why))
+end
+
+local FOLLOW_LEVEL = 11
+-- The other player chose a level: if it is 11, this set is played on 11, whatever they pick next.
+function BotClient:noteOpponentLevel(level)
+  if self.followUp and tonumber(level) == FOLLOW_LEVEL and self.level ~= FOLLOW_LEVEL then
+    self:setLevel(FOLLOW_LEVEL, "the other player chose it: the rest of this set")
+  end
+end
+
+-- The set is closed (the room is gone, or they left): back to the usual level.
+function BotClient:endSet()
+  if self.level ~= self.baseLevel then self:setLevel(self.baseLevel, "the set is over") end
+end
+
 -- Apply one sanitized server-pushed message to our local state.
 function BotClient:dispatch(msg)
   if msg.lobbyStateV2 then
@@ -233,6 +260,9 @@ function BotClient:dispatch(msg)
     logger.info(string.format("bot[%s]: in room %s as slot %s (%d players)",
       self.name, tostring(self.roomNumber), tostring(self.localPlayerNumber),
       countKeys(msg.players)))
+    for pn, pl in pairs(msg.players or {}) do   -- someone already in the room with level 11 chosen
+      if pn ~= self.localPlayerNumber and type(pl) == "table" and type(pl.settings) == "table" then self:noteOpponentLevel(pl.settings.level) end
+    end
   elseif msg.playerJoinedRoom then
     -- incremental notice to existing room members (not a full snapshot)
     local j = msg.playerJoinedRoom
@@ -242,10 +272,12 @@ function BotClient:dispatch(msg)
     }
     logger.info(string.format("bot[%s]: player joined slot %s (%s); now %d players",
       self.name, tostring(j.playerNumber), tostring(j.name), countKeys(self.players)))
+    if type(j.settings) == "table" then self:noteOpponentLevel(j.settings.level) end
   elseif msg.playerLeftRoom and self.players then
     for playerNumber, p in pairs(self.players) do
       if p.publicId == msg.playerLeftRoom.publicId then self.players[playerNumber] = nil end
     end
+    self:endSet()   -- the other player left: the set is closed
   elseif msg.match_start then
     self.matchStart = { replay = msg.replay, startInMs = msg.startInMs, startAtMs = msg.startAtMs }
     logger.info(string.format("bot[%s]: MATCH START (startInMs=%s)",
@@ -335,8 +367,12 @@ function BotClient:dispatch(msg)
     if ch.challengeActive and ch.receiverId == self.publicId and not self.inRoom then
       self:acceptChallenge(ch.senderId, ch.gameModeId)
     end
+  elseif msg.menu_state then
+    local ms = msg.menu_state     -- another player's settings changed (their level, character, ready ...)
+    if type(ms) == "table" and ms.playerNumber and ms.playerNumber ~= self.localPlayerNumber and ms.level then self:noteOpponentLevel(ms.level) end
   elseif msg.leave_room then
     self.inRoom = false
+    self:endSet()
     logger.info("bot[" .. self.name .. "]: left room (" .. tostring(msg.reason) .. ")")
   end
   -- other messages fall through (ignored).
@@ -661,6 +697,7 @@ end
 -- a returning account to its old room).
 function BotClient:leaveRoom()
   pcall(function() self.gameplay:sendRequest(ClientProtocol.leaveRoom()) end)
+  self:endSet()
   self.inRoom = false
   self.roomNumber = nil
   self.players = nil

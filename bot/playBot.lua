@@ -113,7 +113,7 @@ local worstOffSchedule = 0
 while true do
   bot:pump()
   challengeIfFree()
-  if bot.disconnected then print("disconnected from the server"); os.exit(1) end
+  if bot.disconnected then print("disconnected from the server"); os.exit(75) end   -- 75: the workflow logs the bot back in (any other exit ends the run)
 
   -- Stop once no game is running: the file says a stop or a deploy is waiting on this bot
   if STOP_FILE and (bot.match or bot.matchStart) then stopAt = nil end

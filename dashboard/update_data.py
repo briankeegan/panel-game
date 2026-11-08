@@ -89,7 +89,8 @@ if not sha and a.job_log and os.path.exists(a.job_log):      # the commit is onl
         if m: sha = m.group(1)[:8]; break
 if not sha: sha = a.sha[:8]
 m = re.search(r"[_-]p(\d+)[_-]", a.title) or re.search(r"\bp(\d+)\b", a.title)
-bot = "p" + m.group(1) if m else "p?"
+nm = re.search(r"Ranmaru_([A-Za-z0-9]+)_CPU", a.title)
+bot = "p" + m.group(1) if m else (nm.group(1) if nm else "p?")
 date = a.started[:10]
 
 # --- Gambit's decision log, split into games, for the decisions and plans of each loss
@@ -150,10 +151,14 @@ if a.partial and not added:
 # --- the version this run played: a new row, or one more run on the same commit
 vers = load("versions.json", [])
 info = dict(sha=sha, new=False, prev=None, at=[g.get("at") for g in rows[-added:]] if added else [])
-if vers and vers[-1]["sha"] == sha and sha:
-    v = vers[-1]; info["prev"] = dict(v); v["runs"] = v.get("runs", 1) + 1; v["end"] = a.ended or v.get("end")
-    nums = [int(x) for x in re.findall(r"\d+", v["label"]) + re.findall(r"\d+", bot)]
-    v["label"] = "p%d" % min(nums) if min(nums) == max(nums) else "p%d–%d" % (min(nums), max(nums))
+same = next((q for q in vers if sha and q["sha"] == sha), None)
+if same:
+    v = same; info["prev"] = dict(v); v["runs"] = v.get("runs", 1) + 1; v["end"] = max(a.ended or "", v.get("end") or ""); v["start"] = min(a.started, v.get("start") or a.started)
+    labs = re.findall(r"[A-Za-z0-9]+", v["label"].replace("–", " ")) + [bot]
+    if all(re.fullmatch(r"p\d+", q) for q in labs):
+        nums = [int(q[1:]) for q in labs]
+        v["label"] = "p%d" % min(nums) if min(nums) == max(nums) else "p%d–%d" % (min(nums), max(nums))
+    elif bot not in v["label"].replace("–", " ").split(): v["label"] = v["label"] + " + " + bot
 elif sha:
     if not a.subject:                                   # best effort: the commit's first line, if this token may read GameCreator
         try:
@@ -170,7 +175,8 @@ if not a.partial:
             parts = line.split(None, 1)
             if len(parts) == 2 and parts[1].strip().startswith("replay_r"): known.setdefault(parts[1].strip(), int(parts[0]))
     total = sum(known.values()); limit = a.max_mb * 1e6; gone = []
-    for name in sorted(known, key=rnum):
+    when = {("replay_" + r["replay"] + ".json.gz"): (r.get("at") or (r.get("date", "") + "T00:00:00Z")) for r in rows if r.get("replay")}
+    for name in sorted(known, key=lambda n: (when.get(n, ""), rnum(n))):
         if total <= limit: break
         total -= known[name]; gone.append(name)
         fp = os.path.join(a.data, name)
@@ -181,6 +187,8 @@ if not a.partial:
             if r.get("replay") in ids: del r["replay"]
         if a.prune_out: open(a.prune_out, "a").write("".join("data/" + n + "\n" for n in gone))
         print("pruned %d old replays, %.0f MB kept" % (len(gone), total / 1e6))
+rows.sort(key=lambda r: r.get("at") or (r.get("date", "") + "T00:00:00Z"))
+vers.sort(key=lambda q: q.get("start") or "")
 save("games.json", rows); save("versions.json", vers)
 if a.partial: part[a.run_id] = info; save("partial.json", part)
 else: runs.append(a.run_id); save("runs.json", runs); save("partial.json", part)

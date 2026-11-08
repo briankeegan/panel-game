@@ -974,6 +974,9 @@ jobs:
           set -u
           repo="${{ github.repository }}"
           . dashboard/site_git.sh
+          # the games were played on the Panel Attack engine of the bot branch (it follows the live server): replay them on that one, not this branch's older engine
+          engine=""
+          if git fetch -q --depth=1 origin "$UPSTREAM_BOT_REF" && git worktree add -q --detach "$PWD/engine" FETCH_HEAD; then engine="$PWD/engine"; else echo "::warning::could not check out $UPSTREAM_BOT_REF: replays will use this branch's engine"; fi
           done_setup=0
           for attempt in 1 2 3; do
             site_open "$PWD/site" || { echo "no gh-pages branch yet: nothing to update"; exit 0; }
@@ -1007,7 +1010,7 @@ jobs:
                 if [ -n "$url" ]; then curl -sSL "$url" -o "$d/job.log" || true; else gh api "repos/$repo/actions/jobs/$job/logs" > "$d/job.log" || true; fi
                 echo "run $id: job $job, job log $(wc -c < "$d/job.log" 2>/dev/null || echo 0) bytes, Gambit commit line: $(grep -m1 -o 'Gambit built from GameCreator [0-9a-f]*' "$d/job.log" 2>/dev/null || echo NONE)"
               fi
-              python3 dashboard/update_data.py --run-id "$id" --dir "$d" --data site/data --title "$title" --started "$started" --ended "$ended" --job-log "$d/job.log" --sizes site-sizes.txt --prune-out site-prune.txt --max-mb 900 || echo "run $id: update failed"
+              python3 dashboard/update_data.py --run-id "$id" --dir "$d" --data site/data --title "$title" --started "$started" --ended "$ended" --job-log "$d/job.log" --sizes site-sizes.txt --prune-out site-prune.txt --max-mb 900 ${engine:+--engine "$engine"} || echo "run $id: update failed"
               if [ -s site-prune.txt ]; then sed 's#.*/##' site-prune.txt | sort -u > .gone; grep -vFf .gone site-sizes.txt > .sizes && mv .sizes site-sizes.txt; fi
             done <<< "$runs"
             python3 dashboard/make_site.py site

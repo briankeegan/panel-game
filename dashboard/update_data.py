@@ -66,6 +66,8 @@ for line in open(log, errors="ignore"):
         r = "W" if "bot won" in line else "L" if "bot lost" in line else "A"
         games.append(dict(r=r, opp=opp, rep=rep, top=sum(1 for l in cur if l.startswith("opponent topped out")) * 30, land=sum(1 for l in cur if l.startswith("garbage landed"))))
         cur, rep = [], None
+for i_, g_ in enumerate(games): g_["raw"] = i_      # its place among all the games of the run: the decision log has one block per game, in the same order
+n_raw = len(games)
 games = [g for g in games if g["r"] in "WL"]
 times = []
 if a.job_log and os.path.exists(a.job_log):
@@ -107,7 +109,7 @@ if gl:
 rows = load("games.json", [])
 def rnum(name): return int(re.search(r"r(\d+)", name).group(1))
 nrep = max([rnum(os.path.basename(f)) for f in glob.glob(os.path.join(a.data, "replay_r*.json.gz"))] + [rnum(r["replay"]) for r in rows if r.get("replay")] + [0])
-added = 0
+added = 0; jptr = 0
 for gi, g in enumerate(games):
     n = None; x = None
     if g["rep"]:
@@ -126,8 +128,16 @@ for gi, g in enumerate(games):
             fr = json.load(open(out_fr)); os.remove(tmp); os.remove(out_fr)
             dec, plans = [], []
             if gg:
-                dg = min(gg, key=lambda d: abs(d[-1][0] - n)); off = max(0, dg[-1][0] - fr["frames"][-1][0])
-                for c, mode, l in ([] if off > 5 else dg):
+                # the decision log has one block per game the bot played, in order, and may hold extra blocks (a game that was never reported):
+                # take the next block that ends where this replay ends (the bot goes on deciding a few frames after the game is over)
+                fr_end = fr["frames"][-1][0]; best = None
+                for k_ in range(jptr, min(len(gg), jptr + 4)):
+                    df_ = gg[k_][-1][0] - fr_end
+                    if -150 <= df_ <= 60 and (best is None or abs(df_) < best[1]): best = (k_, abs(df_))
+                dg = gg[best[0]] if best else []
+                if best: jptr = best[0] + 1
+                off = 0
+                for c, mode, l in [x_ for x_ in dg if x_[0] <= fr_end]:
                     cc = c - off; en = fld(l, "enemy").split("/")
                     plans.append([cc, fld(l, "seq"), fld(l, "done"), fld(l, "fire"), fld(l, "ats"), fld(l, "broke"), fld(l, "rule"), fld(l, "cat"), fld(l, "tier"), fld(l, "lost"), fld(l, "sooner"), fld(l, "carryBy"), fld(l, "own"), fld(l, "swaps"), fld(l, "w3"), fld(l, "veto")])
                     dec.append([cc, mode, fld(l, "play"), fld(l, "want"), fld(l, "v"), fld(l, "dies"), fld(l, "land"), fld(l, "chain"), fld(l, "combo"), fld(l, "thrown"), en[0] if en else "", en[1] if len(en) > 1 else "", en[2] if len(en) > 2 else "", fld(l, "why"), fld(l, "opts"), fld(l, "allow"), fld(l, "fill")])
@@ -140,7 +150,7 @@ for gi, g in enumerate(games):
                 return "|".join(o)
             frames = [[f[0]] + [v for s in f[1:3] for v in s[:6] + [remap[s[6]], qmap[s[7]], s[8]]] for f in fr["frames"]]
             out = dict(id=rid, opp=g["opp"], bot=bot, sha=sha, date=date, secs=row["secs"], mine=x["mine"], start=0, end=fr["frames"][-1][0],
-                       grids=[squeeze(fr["grids"][u]) for u in used], queues=[fr["queues"][u] for u in qused], frames=frames, dec=dec, plans=plans, fc=fr.get("fc"))
+                       grids=[squeeze(fr["grids"][u]) for u in used], queues=[fr["queues"][u] for u in qused], frames=frames, dec=dec, plans=plans, fc=fr.get("fc"), lv=fr.get("levels"))
             with gzip.open(os.path.join(a.data, "replay_%s.json.gz" % rid), "wt", compresslevel=9) as z: json.dump(out, z, separators=(",", ":"))
             row["replay"] = rid
     rows.append(row); added += 1

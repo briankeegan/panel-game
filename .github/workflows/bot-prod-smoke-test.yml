@@ -964,8 +964,11 @@ jobs:
             grep -q "\"$id\"" site/data/runs.json 2>/dev/null && continue
             d="stats-pulled/$id"; mkdir -p "$d"
             gh run download "$id" -n bot-prod-smoke-log -D "$d" 2>/dev/null || { echo "run $id: no log artifact, skipped"; continue; }
-            job=$(gh api "repos/$repo/actions/runs/$id/jobs" --jq '.jobs[0].id')
-            gh api "repos/$repo/actions/jobs/$job/logs" > "$d/job.log" 2>/dev/null || true
+            job=$(gh api "repos/$repo/actions/runs/$id/jobs" --jq '([.jobs[] | select(.name == "Run the bot")][0] // .jobs[0]).id')
+            # the job log (it names the Gambit commit and has the time of each game): the API answers with a redirect to the log file
+            url=$(curl -sS -o /dev/null -w '%{redirect_url}' -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/$repo/actions/jobs/$job/logs")
+            if [ -n "$url" ]; then curl -sSL "$url" -o "$d/job.log" || true; else gh api "repos/$repo/actions/jobs/$job/logs" > "$d/job.log" || true; fi
+            echo "run $id: job $job, job log $(wc -c < "$d/job.log" 2>/dev/null || echo 0) bytes, Gambit commit line: $(grep -m1 -o 'Gambit built from GameCreator [0-9a-f]*' "$d/job.log" 2>/dev/null || echo NONE)"
             python3 dashboard/update_data.py --run-id "$id" --dir "$d" --data site/data --title "$title" --started "$started" --ended "$ended" --job-log "$d/job.log" || echo "run $id: update failed"
           done <<< "$runs"
           python3 dashboard/make_site.py site

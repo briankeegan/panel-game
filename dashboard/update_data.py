@@ -14,6 +14,9 @@ ap.add_argument("--run-id", required=True); ap.add_argument("--dir", required=Tr
 ap.add_argument("--title", default=""); ap.add_argument("--started", required=True); ap.add_argument("--ended", default="")
 ap.add_argument("--subject", default="")
 ap.add_argument("--job-log", default="", help="the run's job log (it has a time on every line), for the time each game was played")
+ap.add_argument("--partial", action="store_true", help="a run still going: add its finished games without replays; the final call for the run takes them back and does it properly")
+ap.add_argument("--sha", default="", help="the Gambit commit, when the logs do not name it")
+ap.add_argument("--now", default="", help="the time to give a game seen only while the run is going")
 a = ap.parse_args()
 HERE = os.path.dirname(os.path.abspath(__file__))
 LUA = os.path.join(HERE, "replayFrames.lua")
@@ -31,6 +34,17 @@ def save(name, obj):
 runs = load("runs.json", [])
 if a.run_id in runs:
     print("run", a.run_id, "is already in the data"); sys.exit(0)
+# a run that was published while it was going: take that back first, so nothing is counted twice
+part = load("partial.json", {}); prior = part.pop(a.run_id, None)
+if prior:
+    rows0 = load("games.json", []); vers0 = load("versions.json", [])
+    rows0 = [r for r in rows0 if r.get("run") != a.run_id]
+    for v in vers0:
+        if v["sha"] == prior.get("sha"):
+            if prior.get("new"): vers0.remove(v)
+            elif prior.get("prev"): v.clear(); v.update(prior["prev"])
+            break
+    save("games.json", rows0); save("versions.json", vers0)
 log = os.path.join(a.dir, "bot-prod-smoke.log")
 if not os.path.exists(log):
     print("no bot-prod-smoke.log for run", a.run_id); sys.exit(0)
@@ -57,6 +71,8 @@ if a.job_log and os.path.exists(a.job_log):
             m = re.match(r"(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d)", line)
             if ("bot won" in line or "bot lost" in line): times.append(m.group(1) + "Z" if m else None)
 if len(times) != len(games): times = [None] * len(games)
+old_at = (prior or {}).get("at", [])
+times = [t or (old_at[i] if i < len(old_at) else None) or (a.now or None) for i, t in enumerate(times)]
 
 sha = ""
 for f in glob.glob(os.path.join(a.dir, "*.log")):
@@ -68,6 +84,7 @@ if not sha and a.job_log and os.path.exists(a.job_log):      # the commit is onl
     for line in open(a.job_log, errors="ignore"):
         m = re.search(r"Gambit built from GameCreator ([0-9a-f]{7,40})\b", line)
         if m: sha = m.group(1)[:8]; break
+if not sha: sha = a.sha[:8]
 m = re.search(r"[_-]p(\d+)[_-]", a.title) or re.search(r"\bp(\d+)\b", a.title)
 bot = "p" + m.group(1) if m else "p?"
 date = a.started[:10]
@@ -92,8 +109,8 @@ for gi, g in enumerate(games):
         try: x = json.loads(g["rep"]); n = len(x["inputs"][x["mine"] - 1])
         except Exception: x = None
     row = dict(sha=sha, bot=bot, date=date, opp=g["opp"], res=g["r"], secs=round(n / 60) if n else None,
-               top=min(100, round(100 * g["top"] / n)) if n else None, land=g["land"], at=times[gi])
-    if g["r"] == "L" and x and n:
+               top=min(100, round(100 * g["top"] / n)) if n else None, land=g["land"], at=times[gi], run=a.run_id)
+    if g["r"] == "L" and x and n and not a.partial:
         nrep += 1; rid = "r%d" % nrep
         tmp = os.path.join(a.data, rid + "_in.json"); json.dump(x, open(tmp, "w"))
         out_fr = os.path.join(a.data, rid + "_fr.json")
@@ -123,10 +140,14 @@ for gi, g in enumerate(games):
             row["replay"] = rid
     rows.append(row); added += 1
 
+if a.partial and not added:
+    save("partial.json", part); print("run %s: no finished games yet" % a.run_id); sys.exit(0)
+
 # --- the version this run played: a new row, or one more run on the same commit
 vers = load("versions.json", [])
+info = dict(sha=sha, new=False, prev=None, at=[g.get("at") for g in rows[-added:]] if added else [])
 if vers and vers[-1]["sha"] == sha and sha:
-    v = vers[-1]; v["runs"] = v.get("runs", 1) + 1; v["end"] = a.ended or v.get("end")
+    v = vers[-1]; info["prev"] = dict(v); v["runs"] = v.get("runs", 1) + 1; v["end"] = a.ended or v.get("end")
     nums = [int(x) for x in re.findall(r"\d+", v["label"]) + re.findall(r"\d+", bot)]
     v["label"] = "p%d" % min(nums) if min(nums) == max(nums) else "p%d–%d" % (min(nums), max(nums))
 elif sha:
@@ -135,6 +156,8 @@ elif sha:
             r = subprocess.run(["gh", "api", "repos/briankeegan/GameCreator/commits/" + sha, "--jq", ".commit.message"], capture_output=True, text=True, timeout=30)
             if r.returncode == 0: a.subject = r.stdout.strip().split("\n")[0][:200]
         except Exception: pass
-    vers.append(dict(sha=sha, subject=a.subject, start=a.started, end=a.ended or a.started, label=bot, runs=1))
-save("games.json", rows); save("versions.json", vers); runs.append(a.run_id); save("runs.json", runs)
+    vers.append(dict(sha=sha, subject=a.subject, start=a.started, end=a.ended or a.started, label=bot, runs=1)); info["new"] = True
+save("games.json", rows); save("versions.json", vers)
+if a.partial: part[a.run_id] = info; save("partial.json", part)
+else: runs.append(a.run_id); save("runs.json", runs); save("partial.json", part)
 print("run %s: %d games added (%s, %s, %d new replays)" % (a.run_id, added, bot, sha, sum(1 for g in rows[-added:] if g.get("replay"))))

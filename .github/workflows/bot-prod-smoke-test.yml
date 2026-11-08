@@ -359,6 +359,7 @@ jobs:
             gc=$(git -C "$GC_EVAL_DIR" log -1 --format=%h)
             [ -z "${GAMBIT_COMMIT:-}" ] || gc="${GAMBIT_COMMIT:0:8} (gambit_from '${{ env.GAMBIT_FROM }}'; main is $gc)"
             echo "::notice::Gambit built from GameCreator $gc, profile $gp"
+            echo "${gc%% *}" > "$GITHUB_WORKSPACE/gambit-commit.txt"      # for the stats page, which shows games before the run is over
             export GC_GAMBIT_WORDS="$PWD/gambit.words" GC_GAMBIT_LOG="$PWD/gambit-$name.log"
             # the machine as Gambit's training gives it (GameCreator's eval/training.sh): the client on CPU 0, Gambit's own thread alone
             # on a CPU of another core, its four workers (at the idle class) on the CPUs left
@@ -452,6 +453,14 @@ jobs:
                 break
               fi
             done ) &
+          # every 20 minutes the games finished so far go to the stats page (a side job: it never touches the bot and its errors are ignored)
+          if [ "$kind" = gambit ] && [ "${DASH_LIVE:-1}" = 1 ]; then
+            ( parent=$$; sleep 600
+              while kill -0 "$parent" 2>/dev/null; do
+                GH_TOKEN="${{ github.token }}" nice -n 19 bash dashboard/live_publish.sh >> "$RUNNER_TEMP/live-publish.log" 2>&1 || true
+                for _ in $(seq 1 120); do kill -0 "$parent" 2>/dev/null || break; sleep 10; done
+              done ) >/dev/null 2>&1 &
+          fi
           # a player who does not start a game within 60 s is left alone in the room (not for a bot that challenges someone)
           idle=60; [ -z "$target" ] || idle=0
           PA_IDLE_LIMIT="$idle" PA_CHALLENGE="$target" PA_CHALLENGE_GAMES="$games" PA_CHALLENGE_FIRST_TO="$first" PA_ACCEPT_ONLY="$only" PA_DECLINE_MODES="$decline" timeout "$secs" $pin luajit bot/playBot.lua "$BOT_HOST" "$BOT_PORT" "$name" 4 12 "$brain" \

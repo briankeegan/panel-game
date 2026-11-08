@@ -981,7 +981,8 @@ jobs:
           for attempt in 1 2 3; do
             site_open "$PWD/site" || { echo "no gh-pages branch yet: nothing to update"; exit 0; }
             : > site-prune.txt
-            runs=$(gh api "repos/$repo/actions/runs?per_page=100&status=completed" --jq '[.workflow_runs[] | select(.display_title | test("^live · .* · [A-Za-z0-9_]*_p[0-9]+_"))] | sort_by(.created_at) | .[] | [.id, .display_title, .run_started_at, .updated_at] | @tsv')
+            # this workflow's own finished runs (not every workflow's: pushes and page builds would push the bot runs out of the first 100)
+            runs=$(for pg in 1 2 3 4 5; do gh api "repos/$repo/actions/workflows/bot-prod-smoke-test.yml/runs?per_page=100&page=$pg&status=completed" --jq '.workflow_runs[] | select(.display_title | test("^live · .* · [A-Za-z0-9_]*_p[0-9]+_")) | [.id, .display_title, .run_started_at, .updated_at, .created_at] | @tsv'; done | sort -t$'\t' -k5 | cut -f1-4)
             todo=0
             while IFS=$'\t' read -r id title started ended; do
               [ -n "$id" ] || continue

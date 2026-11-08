@@ -18,6 +18,7 @@ site_push() {
   local dir="$1" msg="$2" tree commit
   if [ -s "$dir/../site-prune.txt" ]; then sort -u "$dir/../site-prune.txt" | while read -r f; do git -C "$dir" update-index --force-remove -- "$f"; done; fi
   git -C "$dir" add --sparse -A      # --sparse: the replays are outside the sparse checkout, and without it a new one is silently left out
+  python3 "$(dirname "${BASH_SOURCE[0]}")/site_check.py" "$dir" && git -C "$dir" add --sparse -A
   tree=$(git -C "$dir" write-tree)
   [ "$tree" != "$(git -C "$dir" rev-parse "$SITE_OLD^{tree}")" ] || { echo "nothing new for the page"; return 0; }
   commit=$(git -C "$dir" -c user.name="github-actions" -c user.email="actions@github.com" commit-tree "$tree" -m "$msg") || return 1

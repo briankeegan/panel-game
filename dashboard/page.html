@@ -23,6 +23,13 @@
 .gs-kv { font-family: var(--font-anthropic-serif); font-size: clamp(1.6rem, 5vw, 2rem); line-height: 1.15; font-variant-numeric: tabular-nums; min-height: 1.15em; }
 .gs-kn { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); font-variant-numeric: tabular-nums; min-height: 1.3em; }
 .gs-good { color: var(--color-ok); } .gs-bad { color: var(--color-bad); }
+.cs { position: relative; display: inline-block; min-width: 0; max-width: 100%; }
+.cs-native { position: absolute; opacity: 0; pointer-events: none; width: 1px; height: 1px; }
+.cs-btn { font: inherit; text-align: left; padding: 9px 30px 9px 12px; min-height: 44px; border-radius: 8px; border: 1px solid var(--color-border-line); background: var(--color-panel); color: var(--color-fg); width: 100%; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; position: relative; cursor: pointer; }
+.cs-btn::after { content: "▾"; position: absolute; right: 11px; top: 50%; transform: translateY(-50%); color: var(--color-fg-muted); }
+.cs-list { position: absolute; z-index: 50; left: 0; top: calc(100% + 4px); min-width: 100%; max-width: min(92vw, 520px); max-height: 52vh; overflow-y: auto; -webkit-overflow-scrolling: touch; background: var(--color-panel); border: 1px solid var(--color-border-line); border-radius: 10px; box-shadow: 0 8px 28px rgba(0,0,0,.25); padding: 4px; }
+.cs-list button { display: block; width: 100%; text-align: left; font: inherit; color: var(--color-fg); background: none; border: 0; border-radius: 6px; padding: 11px 10px; min-height: 44px; cursor: pointer; }
+.cs-list button[aria-selected="true"] { background: var(--color-border-line); font-weight: 600; }
 .gs-nav { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: var(--cds-font-size-caption); }
 .gs-nav a { color: var(--color-fg-muted); text-decoration: none; padding: 4px 0; border-bottom: 1px solid var(--color-border-line); }
 .gs-nav a:hover { color: var(--color-fg); }
@@ -1584,5 +1591,25 @@ function projectPlan(G, seq, cursor) {
   });
 
   dash.onData(render);
+  // On touch screens the phone's own picker needs a "Done" tap; this list picks on one tap instead
+  if (window.matchMedia && matchMedia('(pointer: coarse)').matches) document.querySelectorAll('select.dash-select').forEach((sel) => {
+    const wrap = document.createElement('div'), btn = document.createElement('button'), list = document.createElement('div');
+    wrap.className = 'cs'; btn.type = 'button'; btn.className = 'cs-btn'; btn.setAttribute('aria-haspopup', 'listbox'); btn.setAttribute('aria-label', sel.getAttribute('aria-label') || 'Choose');
+    list.className = 'cs-list'; list.hidden = true; list.setAttribute('role', 'listbox');
+    sel.after(wrap); wrap.append(btn, list); sel.classList.add('cs-native'); sel.tabIndex = -1;
+    const label = () => { const t = (sel.options[sel.selectedIndex] || {}).textContent || ''; if (btn.textContent !== t) btn.textContent = t; };
+    const close = () => { list.hidden = true; btn.setAttribute('aria-expanded', 'false'); };
+    const open = () => {
+      list.replaceChildren();
+      Array.from(sel.options).forEach((o, i) => { const b = document.createElement('button'); b.type = 'button'; b.setAttribute('role', 'option'); b.textContent = o.textContent; b.setAttribute('aria-selected', String(i === sel.selectedIndex));
+        b.addEventListener('click', () => { close(); if (sel.selectedIndex !== i) { sel.selectedIndex = i; sel.dispatchEvent(new Event('change', { bubbles: true })); } label(); }); list.appendChild(b); });
+      list.hidden = false; btn.setAttribute('aria-expanded', 'true');
+      const cur = list.querySelector('[aria-selected="true"]'); if (cur) list.scrollTop = Math.max(0, cur.offsetTop - list.clientHeight / 2);
+    };
+    btn.addEventListener('click', () => (list.hidden ? open() : close()));
+    document.addEventListener('click', (e) => { if (!wrap.contains(e.target)) close(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+    label(); setInterval(label, 300);
+  });
 })();
 </script>

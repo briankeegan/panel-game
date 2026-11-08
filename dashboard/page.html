@@ -849,7 +849,7 @@
     }
     x.fill();
   }
-  function drawBoard(cv, gridStr, curRow, curCol, clock, disp, plan) {
+  function drawBoard(cv, gridStr, curRow, curCol, clock, disp, plan, trail) {
     const G = parseGrid(gridStr), n = G.length, H = 12 * CS, bottom = H;
     if (cv.width !== 6 * CS || cv.height !== H) { cv.width = 6 * CS; cv.height = H; }
     const x = cv.getContext('2d');
@@ -905,6 +905,13 @@
       x.restore();
     }
     if (plan) drawPlan(x, plan, bottom, rise, G, curRow, curCol);
+    if (trail && curRow && (trail[0] !== curRow || trail[1] !== curCol)) {    // where the cursor has just moved from, so a move is never silent (what happened, not a plan)
+      const ctr2 = (r, c) => [c * CS, bottom - r * CS - rise + CS / 2], [ax, ay] = ctr2(trail[0], trail[1]), [bx, by] = ctr2(curRow, curCol);
+      x.save(); x.lineCap = 'round'; x.lineJoin = 'round'; x.setLineDash([5, 4]);
+      for (let pass = 0; pass < 2; pass++) { x.strokeStyle = pass ? 'rgba(255,255,255,.95)' : 'rgba(10,8,20,.8)'; x.lineWidth = pass ? 3 : 6; x.beginPath(); x.moveTo(ax, ay); x.lineTo(bx, ay); x.lineTo(bx, by); x.stroke(); }
+      x.setLineDash([]); const horiz = Math.abs(by - ay) < 2, ang = horiz ? (bx > ax ? 0 : Math.PI) : (by > ay ? Math.PI / 2 : -Math.PI / 2);
+      x.fillStyle = 'rgba(255,255,255,.95)'; x.beginPath(); x.moveTo(bx, by); x.lineTo(bx - Math.cos(ang - 0.5) * 11, by - Math.sin(ang - 0.5) * 11); x.lineTo(bx - Math.cos(ang + 0.5) * 11, by - Math.sin(ang + 0.5) * 11); x.closePath(); x.fill(); x.restore();
+    }
     if (curRow) {
       const pulse = 1 + Math.sin(clock * 0.15) * 0.04, w = CS * 2 * pulse, h = CS * pulse;
       const cx = (curCol - 1) * CS, cy = bottom - curRow * CS - rise;
@@ -1091,8 +1098,8 @@ function projectPlan(G, seq, cursor) {
     const pts = []; if (curRow) pts.push([curRow, curCol]); seq.forEach((q) => pts.push(q));
     for (let pass = 0; pass < 2; pass++) for (let k = 1; k < pts.length; k++) {
       const col = STEPC[Math.min(k - 1, STEPC.length - 1)], [ax, ay] = ctr(pts[k - 1][0], pts[k - 1][1]), [bx, by] = ctr(pts[k][0], pts[k][1]); if (Math.hypot(bx - ax, by - ay) < 3) continue;
-      x.strokeStyle = pass === 0 ? 'rgba(10,8,20,.9)' : col; x.lineWidth = pass === 0 ? 9 : 5; x.beginPath(); x.moveTo(ax, ay); x.lineTo(ax, by); x.lineTo(bx, by); x.stroke();
-      if (pass === 1) { const segs = [[ax, ay, ax, by], [ax, by, bx, by]]; segs.forEach(([x0, y0, x1, y1]) => { const len = Math.hypot(x1 - x0, y1 - y0); if (len < 6) return; const ang = Math.atan2(y1 - y0, x1 - x0); head(x0 + (x1 - x0) * (len > 40 ? 0.5 : 1) , y0 + (y1 - y0) * (len > 40 ? 0.5 : 1), ang, col, 13); if (len > 40) head(x1, y1, ang, col, 13); }); }
+      x.strokeStyle = pass === 0 ? 'rgba(10,8,20,.9)' : col; x.lineWidth = pass === 0 ? 9 : 5; x.beginPath(); x.moveTo(ax, ay); x.lineTo(bx, ay); x.lineTo(bx, by); x.stroke();      // the bot's cursor goes sideways first, then up or down
+      if (pass === 1) { const segs = [[ax, ay, bx, ay], [bx, ay, bx, by]]; segs.forEach(([x0, y0, x1, y1]) => { const len = Math.hypot(x1 - x0, y1 - y0); if (len < 6) return; const ang = Math.atan2(y1 - y0, x1 - x0); head(x0 + (x1 - x0) * (len > 40 ? 0.5 : 1) , y0 + (y1 - y0) * (len > 40 ? 0.5 : 1), ang, col, 13); if (len > 40) head(x1, y1, ang, col, 13); }); }
     }
     seq.forEach(([r, c], k) => swapArrow(r, c, STEPC[Math.min(k, STEPC.length - 1)], 1));
     x.restore();
@@ -1123,7 +1130,8 @@ function projectPlan(G, seq, cursor) {
     [[1, mine, 'b1', 'c1', 's1'], [2, o, 'b2', 'c2', 's2']].forEach(([slot, k, fb, fc, fs]) => {
       const st = sOf(k);
       const planNow = k === mine && PLAN.on ? PLAN.current(f[0]) : null;
-      const topped = drawBoard(g$(fc), D.grids[st[6]], st[4], st[5], st[0], st[8], planNow);
+      const pf = k === mine && PLAN.on && R.idx >= 14 ? D.frames[R.idx - 14] : null, trail = pf ? [pf[1 + 9 * (k - 1) + 4], pf[1 + 9 * (k - 1) + 5]] : null;
+      const topped = drawBoard(g$(fc), D.grids[st[6]], st[4], st[5], st[0], st[8], planNow, trail && trail[0] ? trail : null);
       
       showIncoming(g$('i' + slot), D.queues ? D.queues[st[7]] : '', st[0]);
       g$(fb).classList.toggle('topped', topped);

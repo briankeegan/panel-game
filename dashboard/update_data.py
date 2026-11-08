@@ -175,7 +175,17 @@ elif sha:
             r = subprocess.run(["gh", "api", "repos/briankeegan/GameCreator/commits/" + sha, "--jq", ".commit.message"], capture_output=True, text=True, timeout=30)
             if r.returncode == 0: a.subject = r.stdout.strip().split("\n")[0][:200]
         except Exception: pass
-    vers.append(dict(sha=sha, subject=a.subject, start=a.started, end=a.ended or a.started, label=bot, runs=1)); info["new"] = True
+    ver = dict(sha=sha, subject=a.subject, start=a.started, end=a.ended or a.started, label=bot, runs=1)
+    try:      # the full hash, when it was committed, and for a merge the branch it merged (best effort: the page links to them)
+        r = subprocess.run(["gh", "api", "repos/briankeegan/GameCreator/commits/" + sha, "--jq", "[.sha, .commit.committer.date, (.parents | map(.sha) | join(\",\"))] | @tsv"], capture_output=True, text=True, timeout=30)
+        if r.returncode == 0 and r.stdout.strip():
+            full, date, par = (r.stdout.strip().split("\t") + ["", ""])[:3]; c = dict(full=full, date=date); ps = [x for x in par.split(",") if x]
+            if len(ps) > 1:
+                r2 = subprocess.run(["gh", "api", "repos/briankeegan/GameCreator/commits/" + ps[1], "--jq", ".commit.message"], capture_output=True, text=True, timeout=30)
+                c["merged"] = dict(sha=ps[1][:8], subject=(r2.stdout.strip().split("\n")[0][:140] if r2.returncode == 0 else ""))
+            ver["commit"] = c
+    except Exception: pass
+    vers.append(ver); info["new"] = True
 if not a.partial:
     # keep the replays under the size limit: drop the oldest first (their games stay in the statistics)
     known = {}

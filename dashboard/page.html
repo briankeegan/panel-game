@@ -376,7 +376,7 @@
 
   <section class="gs-card" id="sec-garbage" hidden>
     <div class="gw-head"><h2>Garbage sent</h2></div>
-    <p class="gs-note">Every piece of garbage each player sent in this game, drawn as it looks when it lands on the board: width × height cells. The outline shows the kind: combo purple, chain orange, shock grey. "So far" counts up to the moment you are watching. On the timeline the pieces are in the order sent, spaced so none overlap, and faded ones are still to come. Tap it to jump there.</p>
+    <p class="gs-note">Every piece of garbage each player sent in this game, drawn as it looks when it lands on the board: width × height cells. The outline shows the kind: combo purple, chain orange, shock grey. "So far" counts up to the moment you are watching. On the timeline, pieces sent in the same moment are stacked one on the other, the rest are in the order sent, and faded ones are still to come. Tap it to jump there.</p>
     <div class="gc-tblwrap"><table class="gs-tbl gc-tbl" id="gc-tbl"></table></div>
     <div class="gc-scroll" id="gc-scroll"><canvas id="gw-gc" aria-label="Garbage pieces sent over time, one lane per player. Tap to jump."></canvas></div>
   </section>
@@ -1226,6 +1226,8 @@ function projectPlan(G, seq, cursor) {
     const m = D.mine - 1;    // sent by a player = what arrived at the other one
     return (D._gs = { me: ev[1 - m], opp: ev[m] });
   }
+  // pieces sent in the same moment land together, so they are stacked one on the other, like on the board
+  const colsOf = (evs) => { const C = []; evs.forEach((e) => { const c = C[C.length - 1]; if (c && e.i - c.i <= 2) { c.p.push(e); c.w = Math.max(c.w, e.w); c.h += e.h; } else C.push({ i: e.i, w: e.w, h: e.h, p: [e] }); }); return C; };
   const GAP = 7;     // space between pieces, so the small ones can be told apart
   function drawGarbage() {
     const D = R.D, sec = $('sec-garbage'); if (!D || !D.queues) { sec.hidden = true; return; }
@@ -1249,7 +1251,8 @@ function projectPlan(G, seq, cursor) {
     if (rows.length > 1) { const ft = tb.createTFoot().insertRow(); ft.insertCell().textContent = 'All pieces'; cell(ft, tot[0][0], tot[0][1]); cell(ft, tot[1][0], tot[1][1]); }
     }
     // timeline: one lane per player, a square per piece (area = panels), pieces that land together are stacked
-    const cv = g$('gc'), box = $('gc-scroll'), boxW = box.clientWidth || 600, need = 66 + 10 + GAP * Math.max(S.me.length, S.opp.length) + 10 * Math.max(S.me.reduce((t, e) => t + e.w, 0), S.opp.reduce((t, e) => t + e.w, 0));
+    const CM = colsOf(S.me), CO = colsOf(S.opp), sumW = (C) => C.reduce((t, c) => t + c.w, 0);
+    const cv = g$('gc'), box = $('gc-scroll'), boxW = box.clientWidth || 600, need = 66 + 10 + GAP * Math.max(CM.length, CO.length) + 10 * Math.max(sumW(CM), sumW(CO));
     cv.style.width = Math.max(boxW, need) + 'px';
     const w = cv.clientWidth || 600, h = cv.clientHeight || 240, dpr = window.devicePixelRatio || 1;
     if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
@@ -1259,23 +1262,27 @@ function projectPlan(G, seq, cursor) {
     x.font = '12px system-ui, sans-serif'; x.textBaseline = 'middle';
     const secs = n / 60, stepS = [10, 15, 30, 60, 120, 300].find((q) => (secs / q) <= Math.max(3, Math.floor((w - L) / 70))) || 600;
     x.textAlign = 'center'; for (let sc = 0; sc <= secs; sc += stepS) { const X = Math.round(px(Math.min(sc * 60, n - 1))) + 0.5; x.strokeStyle = line; x.beginPath(); x.moveTo(X, T); x.lineTo(X, h - AX); x.stroke(); x.fillStyle = ink; x.fillText(Math.floor(sc / 60) + ':' + String(sc % 60).padStart(2, '0'), Math.min(w - 14, Math.max(L, X)), h - 9); }
-    const allEv = S.me.concat(S.opp), cellsMax = Math.max(S.me.reduce((t, e) => t + e.w, 0), S.opp.reduce((t, e) => t + e.w, 0)), maxH = allEv.reduce((m, e) => Math.max(m, e.h), 1);
-    const cs = Math.max(4, Math.min(14, (laneH - 8) / maxH, (w - L - R2 - GAP * Math.max(S.me.length, S.opp.length)) / Math.max(1, cellsMax)));
+    const maxColH = Math.max(1, ...CM.map((c) => c.h), ...CO.map((c) => c.h));
+    const cs = Math.max(4, Math.min(14, (laneH - 8) / maxColH, (w - L - R2 - GAP * Math.max(CM.length, CO.length)) / Math.max(1, sumW(CM), sumW(CO))));
     const laneNames = [];
-    [[S.me, 'Ranmaru'], [S.opp, oppName]].forEach(([evs, name], lane) => {
+    [[CM, 'Ranmaru'], [CO, oppName]].forEach(([cols, name], lane) => {
       const y0 = T + lane * laneH, yb = y0 + laneH - 4;
       x.strokeStyle = line; x.beginPath(); x.moveTo(L, Math.round(yb) + 0.5); x.lineTo(w - R2, Math.round(yb) + 0.5); x.stroke();
       laneNames.push([name, y0 + laneH / 2]);
-      // each piece drawn as the board draws garbage when it lands: a slab of w x h cells with a face on its middle cell; its outline shows the kind
+      // each piece drawn as the board draws garbage when it lands: a slab of w x h cells with a face on its middle cell; its outline shows the kind.
+      // Pieces sent together are stacked (the first one at the bottom); columns are in the order sent, spaced so none overlap
       const xs = [];
-      evs.forEach((e, k) => { xs.push(Math.max(px(e.i), k ? xs[k - 1] + evs[k - 1].w * cs + GAP : L)); });
-      for (let k = xs.length - 1; k >= 0; k--) xs[k] = Math.min(xs[k], k < xs.length - 1 ? xs[k + 1] - evs[k].w * cs - GAP : w - R2 - evs[k].w * cs);
-      evs.forEach((e, k) => {
-        const sw = e.w * cs, sh = e.h * cs, X = xs[k], Y = yb - sh - 1; x.globalAlpha = e.i <= now ? 1 : 0.4;
-        x.fillStyle = e.k === 'm' ? '#4b5160' : '#4a2f6a'; x.fillRect(X, Y, sw, sh); x.strokeStyle = GCOL[e.k]; x.lineWidth = 2; x.strokeRect(X + 1, Y + 1, sw - 2, sh - 2);
-        if (cs >= 7) { const fx = X + Math.floor((e.w - 1) / 2) * cs, fy = Y + Math.floor((e.h - 1) / 2) * cs, r = Math.max(1, cs * 0.09);
-          x.fillStyle = 'rgba(255,255,255,.8)'; x.beginPath(); x.arc(fx + cs * 0.35, fy + cs * 0.42, r, 0, 7); x.arc(fx + cs * 0.65, fy + cs * 0.42, r, 0, 7); x.fill(); x.fillRect(fx + cs * 0.3, fy + cs * 0.68, cs * 0.4, Math.max(1, cs * 0.07)); }
-        x.globalAlpha = 1;
+      cols.forEach((c, k) => { xs.push(Math.max(px(c.i), k ? xs[k - 1] + cols[k - 1].w * cs + GAP : L)); });
+      for (let k = xs.length - 1; k >= 0; k--) xs[k] = Math.min(xs[k], k < xs.length - 1 ? xs[k + 1] - cols[k].w * cs - GAP : w - R2 - cols[k].w * cs);
+      cols.forEach((c, k) => {
+        let Yb = yb - 1;
+        c.p.forEach((e) => {
+          const sw = e.w * cs, sh = e.h * cs, X = xs[k] + (c.w - e.w) * cs / 2, Y = Yb - sh; Yb = Y; x.globalAlpha = e.i <= now ? 1 : 0.4;
+          x.fillStyle = e.k === 'm' ? '#4b5160' : '#4a2f6a'; x.fillRect(X, Y, sw, sh); x.strokeStyle = GCOL[e.k]; x.lineWidth = 2; x.strokeRect(X + 1, Y + 1, sw - 2, sh - 2);
+          if (cs >= 7) { const fx = X + Math.floor((e.w - 1) / 2) * cs, fy = Y + Math.floor((e.h - 1) / 2) * cs, r = Math.max(1, cs * 0.09);
+            x.fillStyle = 'rgba(255,255,255,.8)'; x.beginPath(); x.arc(fx + cs * 0.35, fy + cs * 0.42, r, 0, 7); x.arc(fx + cs * 0.65, fy + cs * 0.42, r, 0, 7); x.fill(); x.fillRect(fx + cs * 0.3, fy + cs * 0.68, cs * 0.4, Math.max(1, cs * 0.07)); }
+          x.globalAlpha = 1;
+        });
       });
       x.font = '12px system-ui, sans-serif';
     });

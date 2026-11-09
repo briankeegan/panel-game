@@ -2,9 +2,9 @@
 # Called every so often while a bot run is still going: puts the games it has finished so far on the stats page (no replays: those
 # are made once the run is over, by the "Update the Gambit stats page" step). Never fails the run: the caller ignores the exit code.
 set -u
-echo "publishing the games so far ($(grep -c "match over —" bot-prod-smoke-test.log 2>/dev/null || echo 0) finished)"
 cd "$GITHUB_WORKSPACE" || { echo "no workspace"; exit 0; }
 log=bot-prod-smoke.log
+echo "publishing the games so far ($(grep -c "match over —" "$log" 2>/dev/null || echo 0) finished)"
 [ -s "$log" ] || { echo "no log yet"; exit 0; }
 grep -q "match over —" "$log" || { echo "no finished game yet"; exit 0; }
 . dashboard/site_git.sh

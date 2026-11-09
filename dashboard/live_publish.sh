@@ -21,7 +21,7 @@ now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 for attempt in 1 2 3; do
   site_open "$w/site" || { echo "no gh-pages branch"; exit 0; }
   python3 dashboard/update_data.py --run-id "$GITHUB_RUN_ID" --dir "$d" --data "$w/site/data" --title "$title" --started "$started" --partial --sha "$sha" --now "$now" ${eng:+--engine "$eng"} || { echo "update_data.py failed"; exit 0; }
-  python3 dashboard/make_site.py "$w/site" >/dev/null || { echo "make_site.py failed"; exit 0; }
+  # (the page itself is NOT rebuilt here: this checkout is the one the bot started on, and may be older than the page on the site; the update step rebuilds it)
   site_push "$w/site" "Gambit stats: games so far from the run in progress" && { echo "published (attempt $attempt)"; exit 0; }
   echo "push failed (attempt $attempt)"
   sleep $((attempt * 7))

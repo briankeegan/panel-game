@@ -30,6 +30,7 @@ on:
           - versus-player
           - fight
           - bot-handoff
+          - ranmaru-watch
       server:
         description: '2. Server. auto = panelattack.com, or the Bramp server (104.156.250.136) for a fight. Stop / deploy / fight clear it of bots first'
         required: true
@@ -472,9 +473,25 @@ jobs:
           if [ "$kind" = gambit ] && [ "${DASH_LIVE:-1}" = 1 ]; then
             ( parent=$$; sleep 600
               while kill -0 "$parent" 2>/dev/null; do
-                GH_TOKEN="${{ github.token }}" nice -n 19 bash dashboard/live_publish.sh >> "$RUNNER_TEMP/live-publish.log" 2>&1 || true
+                # its lines go to this step's log (prefixed), so a publish that fails is visible there
+                GH_TOKEN="${{ github.token }}" nice -n 19 bash dashboard/live_publish.sh 2>&1 | sed -u 's/^/[publish] /' || true
                 for _ in $(seq 1 120); do kill -0 "$parent" 2>/dev/null || break; sleep 10; done
-              done ) >/dev/null 2>&1 &
+              done ) &
+          fi
+          # THE BOT AND A WATCHER RUN KEEP EACH OTHER UP. A runner can be taken away (the log ends with "The runner has received a shutdown
+          # signal"), and then nothing on that runner can start a replacement. So there is a second run, ranmaru-watch, that only watches:
+          # when no bot run is left on the server it starts a deploy. This bot's half of the deal: if no watcher run exists, start one.
+          if [ "$kind" = gambit ] && [ "$SERVER_EFF" = "$PROD_SERVER" ] && [ "${{ contains(inputs.advanced, 'no-restart') }}" != true ]; then
+            ( parent=$$; sleep 90
+              while kill -0 "$parent" 2>/dev/null && [ ! -e "$RUNNER_TEMP/stop-after-the-game" ]; do
+                w=$(GH_TOKEN="${{ github.token }}" gh api "repos/$GITHUB_REPOSITORY/actions/runs?per_page=100" --jq '.workflow_runs[] | select(.status != "completed") | select(.display_title | startswith("ranmaru-watch · " + env.SERVER_EFF)) | .id' 2>/dev/null | head -n 1) || w=skip
+                if [ -z "$w" ]; then
+                  echo "[watch] no watcher run: starting one"
+                  GH_TOKEN="${{ github.token }}" gh workflow run bot-prod-smoke-test.yml --repo "$GITHUB_REPOSITORY" --ref "${{ github.ref_name }}" -f mode=ranmaru-watch -f server="$SERVER_EFF" || echo "[watch] could not start a watcher"
+                  sleep 120
+                fi
+                for _ in $(seq 1 6); do kill -0 "$parent" 2>/dev/null || break; sleep 10; done
+              done ) &
           fi
           # a player who does not start a game within 60 s is left alone in the room (not for a bot that challenges someone)
           idle=60; [ -z "$target" ] || idle=0
@@ -738,7 +755,7 @@ jobs:
   #                   server and advanced words (Gambit of GameCreator's latest main unless advanced pins one)
   ranmaru:
     name: Stop / deploy / fight
-    if: ${{ startsWith(inputs.mode, 'ranmaru') || (inputs.mode == 'fight' && !contains(inputs.advanced, 'bot_run')) }}
+    if: ${{ (startsWith(inputs.mode, 'ranmaru') && inputs.mode != 'ranmaru-watch') || (inputs.mode == 'fight' && !contains(inputs.advanced, 'bot_run')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 355
     permissions:
@@ -1043,4 +1060,62 @@ jobs:
             python3 dashboard/make_site.py site
             site_push "$PWD/site" "Gambit stats: add finished bot runs" && break
             echo "the page changed while this ran (attempt $attempt): starting over"
+          done
+
+  # ranmaru-watch: the watcher. It starts nothing while a bot run (or a deploy / stop / handoff) is on the server. When two checks a minute
+  # apart find none, it starts a ranmaru-deploy (force) -- unless a ranmaru-stop (not the swap's own, which carries except=) came after the
+  # last bot, which is a stop meant to stay, or the last 40 minutes already saw 4 bots start (a loop). Every bot run starts a watcher when
+  # there is none, so the two keep each other up. Watchers hand over to the next one before the 6-hour cap; the oldest watcher stays when
+  # two are found.
+  watcher:
+    name: Watch the lobby bot
+    if: ${{ inputs.mode == 'ranmaru-watch' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    permissions:
+      actions: write
+      contents: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SERVER: ${{ inputs.server != 'auto' && inputs.server || 'panelattack.com:49569' }}
+      ADVANCED: ${{ inputs.advanced }}
+    steps:
+      - name: Watch
+        run: |
+          set -u
+          repo="$GITHUB_REPOSITORY"; me="$GITHUB_RUN_ID"; ref="${{ github.ref_name }}"; nl=$'\t'
+          prev=""; for w in $ADVANCED; do case "$w" in after=*) prev=${w#after=};; esac; done
+          end=$(( $(date +%s) + 335 * 60 ))
+          gone=0
+          echo "Watching $SERVER (run $me${prev:+, taking over from $prev}). It starts a bot when none is left."
+          while [ "$(date +%s)" -lt "$end" ]; do
+            act=$(gh api "repos/$repo/actions/runs?per_page=100" --jq '.workflow_runs[] | select(.status != "completed") | "\(.id)\t\(.display_title)"' 2>/dev/null) || { echo "could not list the runs: trying again"; sleep 60; continue; }
+            has() { printf '%s\n' "$act" | grep -qF -- "${nl}$1"; }
+            older=$(printf '%s\n' "$act" | awk -F'\t' -v s="ranmaru-watch · $SERVER" -v me="$me" -v prev="$prev" 'index($2,s)==1 && $1<me && $1!=prev {print $1; exit}')
+            if [ -n "$older" ]; then echo "watcher $older is older: this one leaves"; exit 0; fi
+            if has "live · $SERVER · " || has "ranmaru-deploy · $SERVER" || has "ranmaru-stop · $SERVER" || has "bot-handoff · $SERVER"; then
+              gone=0
+            else
+              gone=$((gone + 1))
+              echo "$(date -u +%H:%M:%S) no bot run on $SERVER ($gone)"
+              if [ "$gone" -ge 2 ]; then
+                recent=$(gh api "repos/$repo/actions/workflows/bot-prod-smoke-test.yml/runs?per_page=60" --jq '.workflow_runs[] | "\(.created_at)\t\(.display_title)"' 2>/dev/null) || { sleep 60; continue; }
+                lastlive=$(printf '%s\n' "$recent" | awk -F'\t' -v s="live · $SERVER · " 'index($2,s)==1 {print $1; exit}')
+                stopped=$(printf '%s\n' "$recent" | awk -F'\t' -v s="ranmaru-stop · $SERVER" -v l="${lastlive:-}" 'index($2,s)==1 && $2 !~ /except=/ && $1 > l {print $1; exit}')
+                if [ -n "$stopped" ]; then echo "a stop ($stopped) came after the last bot: leaving it stopped, and this watcher ends"; echo "Stopped on purpose at $stopped: nothing restarted." >> "$GITHUB_STEP_SUMMARY"; exit 0; fi
+                since=$(date -u -d '40 minutes ago' +%Y-%m-%dT%H:%M:%SZ)
+                n=$(printf '%s\n' "$recent" | awk -F'\t' -v s="live · $SERVER · " -v t="$since" 'index($2,s)==1 && $1 > t' | wc -l)
+                if [ "$n" -ge 4 ]; then echo "::warning::$n bots started in the last 40 minutes: not starting another (waiting 10 min)"; gone=0; sleep 600; continue; fi
+                echo "no bot on $SERVER: starting one"
+                gh workflow run bot-prod-smoke-test.yml --repo "$repo" --ref "$ref" -f mode=ranmaru-deploy -f server="$SERVER" -f advanced="force" && echo "A bot was started at $(date -u +%H:%M) UTC: none was running." >> "$GITHUB_STEP_SUMMARY"
+                gone=0; sleep 300; continue
+              fi
+            fi
+            sleep 60
+          done
+          echo "nearly 6 hours: handing over to the next watcher"
+          gh workflow run bot-prod-smoke-test.yml --repo "$repo" --ref "$ref" -f mode=ranmaru-watch -f server="$SERVER" -f advanced="after=$me"
+          for _ in $(seq 1 18); do
+            gh api "repos/$repo/actions/runs?per_page=100" --jq '.workflow_runs[] | select(.status != "completed") | select(.display_title | startswith("ranmaru-watch · " + env.SERVER)) | .id' 2>/dev/null | awk -v me="$me" '$1 > me' | grep -q . && break
+            sleep 10
           done

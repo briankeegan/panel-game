@@ -89,8 +89,9 @@
 .gw-log { font-size: 11px; color: var(--color-fg-muted); font-variant-numeric: tabular-nums; line-height: 1.5; }
 .gw-log div.now { color: var(--color-fg); font-weight: 600; }
 #gw-gc { width: 100%; max-width: 100%; height: 64px; display: block; cursor: pointer; border: 1px solid var(--color-border-line); border-radius: 6px; background: var(--color-bg); }
-.gm-nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
-.gm { display: flex; flex-direction: column; gap: 2px; }
+.gm-nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: nowrap; min-height: 40px; }
+.gm-nav > .gs-note, .gm-nav > .gw-time { flex: 1 1 0; min-width: 0; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }   /* the text changes as you play; the row never changes size */
+.gm { display: flex; flex-direction: column; gap: 2px; overflow-y: auto; overscroll-behavior: contain; position: relative; }   /* a fixed box: taller moments scroll inside it, the page never moves */
 .gm-h, .gm-r { display: grid; grid-template-columns: 46px 1fr 1fr; gap: 6px; padding: 4px 6px; border-radius: 8px; }
 .gm-h { font-weight: 600; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
 .gm-h span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -117,7 +118,7 @@
 .gw-btn { font: inherit; font-size: var(--cds-font-size-caption); padding: 7px 12px; border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); background: transparent; color: var(--color-fg); cursor: pointer; }
 .gw-btn.main { background: var(--color-fg); color: var(--color-bg); border-color: var(--color-fg); min-width: 6.5em; }
 .gw-btn:focus-visible { outline: 2px solid var(--color-fg); outline-offset: 1px; }
-.gw-time { margin-left: auto; font-variant-numeric: tabular-nums; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+.gw-time { margin-left: auto; min-width: 22em; text-align: right; font-variant-numeric: tabular-nums; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
 .gs-watch { font: inherit; font-size: 11px; padding: 3px 9px; border: 1px solid var(--color-fg); border-radius: 999px; background: transparent; color: var(--color-fg); cursor: pointer; }
 .gs-watch:hover { background: var(--color-fg); color: var(--color-bg); }
 @media (max-width: 760px) { .gw-main { grid-template-columns: minmax(0, 1fr); } }
@@ -257,7 +258,7 @@
 .gw-cap .do { font-weight: 700; overflow: hidden; text-overflow: ellipsis; }
 .gw-why { margin: 8px 0; border: 1px solid var(--color-border-line); border-radius: 8px; padding: 8px 10px; }
 .gw-whyh { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; } .gw-whyh b { flex: 1; }
-.gw-whyb { max-height: 13em; overflow-y: auto; margin-top: 6px; font-size: 12.5px; line-height: 1.35; display: flex; flex-direction: column; gap: 3px; }
+.gw-whyb { height: 13em; overflow-y: auto; overscroll-behavior: contain; margin-top: 6px; font-size: 12.5px; line-height: 1.35; display: flex; flex-direction: column; gap: 3px; }
 .gw-whyb > div { overflow-wrap: anywhere; } .gw-whyb .stop { border-left: 3px solid #d9433f; padding-left: 6px; } .gw-whyb .sw { color: var(--color-fg-muted); }
 .gw-whyb .none { color: var(--color-fg-muted); }
 .gw-stops > summary { cursor: pointer; font-size: var(--cds-font-size-caption); padding: 8px 2px; }
@@ -410,6 +411,18 @@
         </div>
         <div class="gw-cap" id="gw-cap" aria-live="off"></div>
         <div class="gw-now" id="gw-now"></div>
+        <!-- the controls sit right under the boards, and the explanation right under the controls: boards, Play and the reason are in view together -->
+        <input type="range" id="gw-scrub" min="0" max="0" value="0" aria-label="Frame">
+        <div class="gw-ctl">
+          <button type="button" class="gw-btn" id="gw-prevd" aria-label="Previous decision" title="Previous decision (,)"><span aria-hidden="true">⏮</span><span class="gw-t"> decision</span></button>
+          <button type="button" class="gw-btn" id="gw-prevf" aria-label="Previous move" title="Previous move: the cursor moves or a swap (← ; shift + ← is one frame)"><span aria-hidden="true">◀</span><span class="gw-t"> move</span></button>
+          <button type="button" class="gw-btn main" id="gw-play" title="Play or pause (space)">Play</button>
+          <button type="button" class="gw-btn" id="gw-nextf" aria-label="Next move" title="Next move: the cursor moves or a swap (→ ; shift + → is one frame)"><span class="gw-t">move </span><span aria-hidden="true">▶</span></button>
+          <button type="button" class="gw-btn" id="gw-nextd" aria-label="Next decision" title="Next decision (.)"><span class="gw-t">decision </span><span aria-hidden="true">⏭</span></button>
+          <button type="button" class="gw-btn" id="gw-back10" title="10 seconds back">−10 s</button>
+          <div class="gs-seg sm" role="group" aria-label="Speed" id="gw-speed"><button type="button" data-sp="1" aria-pressed="true">1×</button><button type="button" data-sp="0.5" aria-pressed="false">½×</button><button type="button" data-sp="0.25" aria-pressed="false">¼×</button><button type="button" data-sp="0.125" aria-pressed="false">⅛×</button></div>
+          <span class="gw-time" id="gw-time"></span>
+        </div>
         <div class="gw-why" id="gw-why"><div class="gw-whyh"><b>Why</b><span class="gs-note" id="gw-copied" role="status"></span><button type="button" class="gw-btn" id="gw-copy" title="Copy this game, frame and decision, with the log lines around it, to paste somewhere">Copy details</button></div><div class="gw-whyb" id="gw-whyb"></div></div>
         <div class="gw-over">
           <button type="button" class="gw-btn" id="gw-plan" aria-pressed="false" title="Draw Ranmaru's plan on its board, and explain it">Show plan</button>
@@ -422,17 +435,6 @@
         <div class="gw-list" id="gw-list" role="list"></div>
         </div>
         <details class="gw-stops" id="gw-stops" hidden><summary id="gw-stops-s">Stops</summary><div class="gw-stl" id="gw-stl"></div></details>
-        <input type="range" id="gw-scrub" min="0" max="0" value="0" aria-label="Frame">
-        <div class="gw-ctl">
-          <button type="button" class="gw-btn" id="gw-prevd" aria-label="Previous decision" title="Previous decision (,)"><span aria-hidden="true">⏮</span><span class="gw-t"> decision</span></button>
-          <button type="button" class="gw-btn" id="gw-prevf" aria-label="Previous move" title="Previous move: the cursor moves or a swap (← ; shift + ← is one frame)"><span aria-hidden="true">◀</span><span class="gw-t"> move</span></button>
-          <button type="button" class="gw-btn main" id="gw-play" title="Play or pause (space)">Play</button>
-          <button type="button" class="gw-btn" id="gw-nextf" aria-label="Next move" title="Next move: the cursor moves or a swap (→ ; shift + → is one frame)"><span class="gw-t">move </span><span aria-hidden="true">▶</span></button>
-          <button type="button" class="gw-btn" id="gw-nextd" aria-label="Next decision" title="Next decision (.)"><span class="gw-t">decision </span><span aria-hidden="true">⏭</span></button>
-          <button type="button" class="gw-btn" id="gw-back10" title="10 seconds back">−10 s</button>
-          <div class="gs-seg sm" role="group" aria-label="Speed" id="gw-speed"><button type="button" data-sp="1" aria-pressed="true">1×</button><button type="button" data-sp="0.5" aria-pressed="false">½×</button><button type="button" data-sp="0.25" aria-pressed="false">¼×</button><button type="button" data-sp="0.125" aria-pressed="false">⅛×</button></div>
-          <span class="gw-time" id="gw-time"></span>
-        </div>
       </div>
     </div>
   </section>
@@ -1373,7 +1375,7 @@ function projectPlan(G, seq, cursor) {
     const key = D.id + '|' + cur + '|' + oppName; const list = $('gm');
     $('gm-pos').textContent = M.length ? (cur < 0 ? 'Before the first garbage' : 'Garbage ' + (cur + 1) + ' of ' + M.length) : '';
     if (list._key !== key) {
-      list._key = key; list.replaceChildren(); list.style.minHeight = (5 * (Math.min(S.rowH, 62) + 2) + 22) + 'px';
+      list._key = key; list.replaceChildren(); list.style.height = (5 * (Math.min(S.rowH, 62) + 2) + 22) + 'px';
       const hd = document.createElement('div'); hd.className = 'gm-h'; ['', 'Ranmaru', oppName].forEach((t) => { const sp = document.createElement('span'); sp.textContent = t; hd.appendChild(sp); }); list.appendChild(hd);
       for (let q = Math.max(0, cur - 1); q < Math.min(M.length, Math.max(0, cur - 1) + 5); q++) {
         const m = M[q], r = document.createElement('div'); r.className = 'gm-r' + (q === cur ? ' cur' : q > cur ? ' fut' : ''); r.dataset.i = m.i; r.setAttribute('role', 'button'); r.tabIndex = 0;
@@ -1383,6 +1385,7 @@ function projectPlan(G, seq, cursor) {
           r.appendChild(c); });
         list.appendChild(r);
       }
+      const cr = list.querySelector('.gm-r.cur'); if (cr) list.scrollTop = Math.max(0, cr.offsetTop - (list.clientHeight - cr.offsetHeight) / 2);      // the moment you are on stays in view
     }
   }
   function drawStrip() {

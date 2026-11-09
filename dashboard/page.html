@@ -1582,27 +1582,28 @@ function projectPlan(G, seq, cursor) {
     const t = document.createElement('div'); t.className = 'whyline goal';
     const cur0 = PLAN.current(clock), mb = 1 + 9 * (R.D.mine - 1), nowF = R.D.frames[R.idx], oldF = R.idx >= 14 ? R.D.frames[R.idx - 14] : null;
     let moving = false; if (oldF) for (let q = R.idx - 13; q <= R.idx && !moving; q++) if (cursorMoved(R.D.frames[q - 1], R.D.frames[q], mb)) moving = true;
-    t.textContent = !seq.length ? (cur0 && cur0.carried ? 'Finishing the plan from ' + fmtClock(cur0.at) : moving ? 'Cursor moving, no plan logged' : 'No swaps planned') : 'Plan: ' + (cur0 && cur0.total ? cur0.total : seq.length) + ((cur0 && cur0.total ? cur0.total : seq.length) === 1 ? ' swap' : ' swaps') + (cur0 && cur0.done ? ', ' + cur0.left + ' left' : '') + (logged.length ? ' to build a ' + logged.join(' + ') : '');
+    t.textContent = !seq.length ? (cur0 && cur0.carried ? 'Finishing the plan from ' + fmtClock(cur0.at) : moving ? 'Cursor moving, no plan logged' : 'No swaps planned') : 'Plan: ' + (cur0 && cur0.total ? cur0.total : seq.length) + ((cur0 && cur0.total ? cur0.total : seq.length) === 1 ? ' swap' : ' swaps') + (cur0 && cur0.done ? ', ' + cur0.left + ' left' : '') + (logged.length ? ' for a ' + logged.join(' + ') : '');
     cap.appendChild(t);
     {
       // the rule that picked this move, and the options it passed on, straight from the log
-      const RULE = { e: 'first on its list for this mode', t: 'the three that breaks garbage', l: 'last resort' };
+      const RULE = { e: 'first on its list', t: 'the three that breaks garbage', l: 'last resort' };
       const lostTxt = (lo) => (lo === 'L' || lo === 'inf') ? 'board never lost' : (numOk(lo) ? 'board lost in ' + fs1(lo) : '');
       const opts = (d[14] || '').split(',').map((q) => q.split(':')).filter((q) => q[0]).map((q) => ({ nm: q[0].replace(/[*~]/g, '').replace(/_/g, ' '), lost: q[1] }));
       const mine0 = opts.find((o) => o.nm === (play || '').replace(/_/g, ' ')), seen = new Set([(play || '').replace(/_/g, ' ')]), others = [];
       opts.forEach((o) => { if (!seen.has(o.nm) && lostTxt(o.lost)) { seen.add(o.nm); others.push(o); } });
-      const why = [mode + ' mode', e && RULE[e[6]] ? 'rule: ' + RULE[e[6]] : '', mine0 ? lostTxt(mine0.lost) : ''].filter(Boolean).join(' · ');
+      const lostSent = mine0 && lostTxt(mine0.lost) ? lostTxt(mine0.lost).replace(/^./, (c) => c.toUpperCase()) + '.' : '';
+      const why = (mode ? ' (' + mode + ')' : '') + (e && RULE[e[6]] ? ': ' + RULE[e[6]] + '.' : '.') + (lostSent ? ' ' + lostSent : '');
       if (seq.length && Number(d[9]) > 0) {          // Ranmaru's forecast for the line it chose: the garbage blocks it expects to send the opponent
-        const gt = document.createElement('div'); gt.className = 'whyline def'; gt.textContent = 'Plan should send ' + Number(d[9]) + (Number(d[9]) === 1 ? ' garbage block' : ' garbage blocks') + ' (forecast)'; cap.appendChild(gt);
+        const gt = document.createElement('div'); gt.className = 'whyline def'; gt.textContent = 'Sends ' + Number(d[9]) + ' garbage (forecast)'; cap.appendChild(gt);
       }
       if (/^\d+$/.test(d[15] || '')) {            // the game lets a bot press only so many keys in any 10 seconds (a held direction counts once); Ranmaru logs how many it may still press
         const lim = D._lim || (D._lim = Math.max(1, ...D.dec.map((q) => Number(q[15]) || 0))), left = Number(d[15]);
         const bd = document.createElement('div'); bd.className = 'budget' + (left <= lim * 0.15 ? ' low' : ''); bd.title = 'At most ' + lim + ' keys per 10 seconds. A held direction counts once.';
-        const bt = document.createElement('span'); bt.append('Key presses left: '); const bb = document.createElement('b'); bb.textContent = left + ' of ' + lim; bt.appendChild(bb); bt.append(' (per 10 s)');
+        const bt = document.createElement('span'); bt.append('Keys left: '); const bb = document.createElement('b'); bb.textContent = left + ' of ' + lim; bt.appendChild(bb); bt.append(' / 10 s');
         const bar = document.createElement('i'); const fill = document.createElement('u'); fill.style.setProperty('--w', Math.round(100 * left / lim) + '%'); bar.appendChild(fill); bd.append(bt, bar); cap.appendChild(bd);
       }
-      const w1 = document.createElement('div'); w1.className = 'whyline def'; w1.textContent = 'Chose "' + (play || 'hold').replace(/_/g, ' ') + '": ' + why; cap.appendChild(w1);
-      if (others.length) { const w2 = document.createElement('div'); w2.className = 'whyline def'; w2.textContent = 'Passed on: ' + others.slice(0, 3).map((o) => o.nm + ' (' + lostTxt(o.lost) + ')').join(', '); cap.appendChild(w2); }
+      const w1 = document.createElement('div'); w1.className = 'whyline def'; w1.textContent = 'Chose "' + (play || 'hold').replace(/_/g, ' ') + '"' + why; cap.appendChild(w1);
+      if (others.length) { const w2 = document.createElement('div'); w2.className = 'whyline def'; w2.textContent = 'Passed on: ' + others.slice(0, 3).map((o) => o.nm).join(', '); w2.title = others.slice(0, 3).map((o) => o.nm + ': ' + lostTxt(o.lost)).join('\n'); cap.appendChild(w2); }
     }
     { const cur0 = PLAN.current(clock); if (cur0 && cur0.dropped) { const g = document.createElement('div'); g.className = 'whyline def'; g.textContent = 'New plan. Grey arrows: the plan it dropped.'; cap.appendChild(g); } }
   }

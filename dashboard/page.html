@@ -190,7 +190,12 @@
 .gw-date { font: inherit; min-height: 36px; padding: 4px 8px; border-radius: 8px; border: 1px solid var(--color-border-line); background: var(--color-panel); color: var(--color-fg); }
 .gw-q { flex: 1 1 12rem; min-width: 0; }
 .gw-sortl { display: inline-flex; align-items: center; gap: 6px; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
-.gw-browse { display: flex; flex-direction: column; gap: 2px; }
+.gw-browse { display: flex; flex-direction: column; gap: 2px; max-height: 21rem; overflow-y: auto; position: relative; margin-top: 8px; }
+.gw-active { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 8px 0; padding: 8px 10px; border: 1px solid var(--color-fg-muted); border-radius: 8px; font-size: var(--cds-font-size-caption); }
+.gw-fchip { font: inherit; color: var(--color-fg); background: none; border: 1px solid var(--color-fg-muted); border-radius: 999px; padding: 4px 10px; cursor: pointer; }
+.gw-fchip::after { content: " ✕"; }
+.gw-fchip:hover, .gw-fchip:focus-visible { background: var(--color-border-line); }
+.gw-active .gw-n { font-weight: 600; margin-left: auto; }
 .gw-day { font-size: var(--cds-font-size-caption); font-weight: 600; color: var(--color-fg-muted); padding: 8px 4px 2px; }
 .gw-row { display: grid; grid-template-columns: 4.6rem 3.2rem 1fr auto auto; gap: 8px; align-items: center; text-align: left; font: inherit; color: var(--color-fg); background: none; border: 1px solid transparent; border-radius: 8px; padding: 9px 8px; min-height: 44px; cursor: pointer; }
 .gw-row:hover { background: var(--color-border-line); }
@@ -380,12 +385,13 @@
         <label class="gw-sortl">Sort <select id="gw-sort" class="dash-select" aria-label="Sort the games"><option value="new">Newest first</option><option value="old">Oldest first</option><option value="long">Longest first</option><option value="short">Shortest first</option></select></label>
         <button type="button" class="gs-link" id="gw-reset" hidden>Reset</button></div>
     </div></details>
-    <div class="gw-browse" id="gw-browse" aria-label="Games to watch"></div>
+    <div class="gw-active" id="gw-active" hidden></div>
     <div class="gw-pager">
       <button type="button" class="gw-btn" id="gw-newer">◀ Previous game</button>
       <span class="gw-pos" id="gw-pos"></span>
       <button type="button" class="gw-btn" id="gw-older">Next game ▶</button>
     </div>
+    <div class="gw-browse" id="gw-browse" aria-label="Games to watch"></div>
     <div id="gw-body">
       <div class="gw-stage" id="gw-stage">
         <div class="gw-seg-row"><div class="gs-seg sm" role="group" aria-label="Part of the game" id="gw-part"><button type="button" data-p="open" aria-pressed="false">Start of game</button><button type="button" data-p="end" aria-pressed="true">End of game</button></div></div>
@@ -867,8 +873,7 @@
   }
   // the games of the current selection that have a replay, found by result, day, length and opponent
   let VLBL = null;
-  const WL = { list: [], src: [], res: '', when: '', date: '', len: '', q: '', sort: 'new', page: 0 };
-  const PAGE = 8;
+  const WL = { list: [], src: [], res: '', when: '', date: '', len: '', q: '', sort: 'new' };
   const resWord = (r) => r.res === 'W' ? 'Won' : 'Lost';
   const playedMs = (r) => r.at ? new Date(r.at).getTime() - (r.secs || 0) * 1000 : new Date(r.date + 'T12:00:00').getTime();
   const dayStart = (t) => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); };
@@ -887,13 +892,13 @@
     $('gw-pos').textContent = i < 0 ? '' : 'Game ' + (i + 1) + ' of ' + WL.list.length;
     document.querySelectorAll('#gw-browse .gw-row').forEach((b) => b.setAttribute('aria-current', String(b.dataset.rid === R.rid)));
   }
+  // keep the game being watched in view inside the scrolling list (the list itself, not the page)
+  function scrollToCur() { const box = $('gw-browse'), row = [...box.querySelectorAll('.gw-row')].find((b) => b.dataset.rid === R.rid); if (row) box.scrollTop = Math.max(0, row.offsetTop - (box.clientHeight - row.offsetHeight) / 2); }
   function renderBrowse() {
-    const box = $('gw-browse'), L = WL.list, pages = Math.max(1, Math.ceil(L.length / PAGE));
-    const cur = L.findIndex((r) => r.replay === R.rid);
-    WL.page = Math.max(0, Math.min(pages - 1, WL.page));
+    const box = $('gw-browse'), L = WL.list;
     box.replaceChildren();
-    const slice = L.slice(WL.page * PAGE, WL.page * PAGE + PAGE); let lastDay = '';
-    slice.forEach((r) => {
+    let lastDay = '';
+    L.forEach((r) => {
       const t = playedMs(r), dn = dayName(t);
       if ((WL.sort === 'new' || WL.sort === 'old') && dn !== lastDay) { const h = document.createElement('div'); h.className = 'gw-day'; h.textContent = dn; box.appendChild(h); lastDay = dn; }
       const b = document.createElement('button'); b.type = 'button'; b.className = 'gw-row'; b.dataset.rid = r.replay;
@@ -904,13 +909,7 @@
       const v = document.createElement('span'); v.className = 'v'; v.textContent = (VLBL ? VLBL(r.sha) : '') || r.bot;
       b.append(tm, rs, o, n, v); b.addEventListener('click', () => openReplay(r, false)); box.appendChild(b);
     });
-    if (pages > 1) {
-      const pg = document.createElement('div'); pg.className = 'gw-pager';
-      const mk = (txt, d, dis) => { const x = document.createElement('button'); x.type = 'button'; x.className = 'gw-btn'; x.textContent = txt; x.disabled = dis; x.addEventListener('click', () => { WL.page += d; renderBrowse(); }); return x; };
-      const info = document.createElement('span'); info.className = 'gw-pos'; info.textContent = 'Showing ' + (WL.page * PAGE + 1) + ' to ' + Math.min(L.length, WL.page * PAGE + PAGE) + ' of ' + L.length;
-      pg.append(mk('◀ Earlier page', -1, WL.page === 0), info, mk('Later page ▶', 1, WL.page >= pages - 1)); box.appendChild(pg);
-    }
-    syncPick();
+    syncPick(); scrollToCur();
   }
   function updateWatch(src) {
     const withRep = src.filter((r) => r.replay); WL.src = withRep;
@@ -925,21 +924,35 @@
     WL.list = list;
     $('gw-reset').hidden = !filtersOn() && WL.sort === 'new';
     const body = $('gw-body'), pick = $('gw-pick');
-    $('gw-count').textContent = list.length ? list.length + (list.length === 1 ? ' game' : ' games') + (filtersOn() ? ' match' : '') : '';
+    $('gw-count').textContent = withRep.length ? (filtersOn() ? list.length + ' of ' + withRep.length : withRep.length) + ' games' : '';
+    { // which filters are on, always visible, each with a way to clear it
+      const box = $('gw-active'), chips = []; box.replaceChildren();
+      const lab = { u1: 'Under 1 min', '1-3': '1 to 3 min', '3-10': '3 to 10 min', '10p': '10+ min' };
+      if (WL.res) chips.push([WL.res === 'L' ? 'Lost' : 'Won', () => { WL.res = ''; }]);
+      if (WL.when) chips.push([WL.when === 'today' ? 'Today' : WL.when === 'yesterday' ? 'Yesterday' : WL.when === 'date' ? WL.date : 'Last ' + WL.when + ' days', () => { WL.when = ''; WL.date = ''; }]);
+      if (WL.len) chips.push([lab[WL.len], () => { WL.len = ''; }]);
+      if (WL.q.trim()) chips.push(['"' + WL.q.trim() + '"', () => { WL.q = ''; $('gw-q').value = ''; }]);
+      box.hidden = !chips.length || !withRep.length;
+      if (!box.hidden) {
+        const l = document.createElement('span'); l.textContent = 'Filtered:'; box.appendChild(l);
+        chips.forEach(([t, clear]) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'gw-fchip'; b.textContent = t; b.setAttribute('aria-label', 'Clear ' + t); b.addEventListener('click', () => { clear(); again(); }); box.appendChild(b); });
+        const n = document.createElement('span'); n.className = 'gw-n'; n.textContent = list.length + ' of ' + withRep.length + ' games'; box.appendChild(n);
+        const c = document.createElement('button'); c.type = 'button'; c.className = 'gs-link'; c.textContent = 'Clear all'; c.addEventListener('click', () => { WL.res = ''; WL.when = ''; WL.date = ''; WL.len = ''; WL.q = ''; $('gw-q').value = ''; again(); }); box.appendChild(c);
+      }
+    }
     pick.hidden = !withRep.length; $('gw-fd').hidden = !withRep.length;
     { const on = []; if (WL.res) on.push(WL.res === 'L' ? 'Lost' : 'Won'); if (WL.when) on.push(WL.when === 'today' ? 'Today' : WL.when === 'yesterday' ? 'Yesterday' : WL.when === 'date' ? WL.date : 'Last ' + WL.when + ' days'); if (WL.len) on.push({ u1: 'Under 1 min', '1-3': '1 to 3 min', '3-10': '3 to 10 min', '10p': '10+ min' }[WL.len]); if (WL.q.trim()) on.push('"' + WL.q.trim() + '"'); if (WL.sort !== 'new') on.push({ old: 'Oldest first', long: 'Longest first', short: 'Shortest first' }[WL.sort]);
-      $('gw-fsum').textContent = 'Find a game: ' + (on.length ? on.join(' · ') : 'all games, newest first'); } $('gw-pager') && 0;
-    $('gw-browse').hidden = !withRep.length; document.querySelector('.gw-pager').hidden = !withRep.length;
+      $('gw-fsum').textContent = on.length ? 'Filters and sort (' + on.length + ' on)' : 'Filters and sort'; }
+    $('gw-browse').hidden = !withRep.length; document.querySelector('.gw-pager').hidden = !withRep.length; if (!withRep.length) $('gw-active').hidden = true;
     if (!list.length) { stopPlay(); R.rid = null; R.D = null; body.hidden = true; $('sec-garbage').hidden = true; $('gw-list').replaceChildren(); LIST.rid = null; $('gw-browse').replaceChildren(); $('gw-pos').textContent = '';
       $('gw-newer').disabled = true; $('gw-older').disabled = true;
       $('gw-sub').textContent = withRep.length ? 'No games match. Reset the filters.' : 'No replays here. Reset the filters.'; return; }
     body.hidden = false;
-    if (!list.some((r) => r.replay === R.rid)) { WL.page = 0; openReplay(list[0], false); }
-    else WL.page = Math.floor(list.findIndex((r) => r.replay === R.rid) / PAGE);
+    if (!list.some((r) => r.replay === R.rid)) openReplay(list[0], false);
     renderBrowse();
   }
   if (window.innerWidth > 760) $('gw-fd').open = true;
-  const again = () => { WL.page = 0; updateWatch(WL.src); };
+  const again = () => updateWatch(WL.src);
   $('gw-res').addEventListener('click', (e) => { const b = e.target.closest('button[data-r]'); if (b) { WL.res = b.dataset.r; again(); } });
   $('gw-when').addEventListener('click', (e) => { const b = e.target.closest('button[data-w]'); if (b) { WL.when = b.dataset.w; again(); } });
   $('gw-date').addEventListener('change', (e) => { WL.date = e.target.value; WL.when = WL.date ? 'date' : ''; again(); });
@@ -947,8 +960,8 @@
   $('gw-q').addEventListener('input', (e) => { WL.q = e.target.value; again(); });
   $('gw-sort').addEventListener('change', (e) => { WL.sort = e.target.value; again(); });
   $('gw-reset').addEventListener('click', () => { Object.assign(WL, { res: '', when: '', date: '', len: '', q: '', sort: 'new' }); $('gw-q').value = ''; $('gw-sort').value = 'new'; again(); });
-  $('gw-newer').addEventListener('click', () => { const i = WL.list.findIndex((r) => r.replay === R.rid); if (i > 0) { openReplay(WL.list[i - 1], false); WL.page = Math.floor((i - 1) / PAGE); renderBrowse(); } });
-  $('gw-older').addEventListener('click', () => { const i = WL.list.findIndex((r) => r.replay === R.rid); if (i >= 0 && i < WL.list.length - 1) { openReplay(WL.list[i + 1], false); WL.page = Math.floor((i + 1) / PAGE); renderBrowse(); } });
+  $('gw-newer').addEventListener('click', () => { const i = WL.list.findIndex((r) => r.replay === R.rid); if (i > 0) { openReplay(WL.list[i - 1], false); scrollToCur(); } });
+  $('gw-older').addEventListener('click', () => { const i = WL.list.findIndex((r) => r.replay === R.rid); if (i >= 0 && i < WL.list.length - 1) { openReplay(WL.list[i + 1], false); scrollToCur(); } });
   function refreshPlayer() {
     if (!R.rid || $('gw-body').hidden) return;
     const r = dash.data(dataId());

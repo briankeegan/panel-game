@@ -1038,7 +1038,12 @@ jobs:
               todo=$((todo + 1))
             done <<< "$runs"
             echo "$todo finished bot runs are not on the stats page yet"
-            [ "$todo" -gt 0 ] || exit 0
+            if [ "$todo" -eq 0 ]; then
+              # no new games, but the page itself may have changed (a new dashboard/page.html): rebuild it and publish only if it differs
+              python3 dashboard/make_site.py site >/dev/null || exit 0
+              site_push "$PWD/site" "Gambit stats: page updated" && exit 0
+              echo "the page changed while this ran (attempt $attempt): starting over"; continue
+            fi
             if [ "$done_setup" = 0 ]; then
               sudo apt-get update -q && sudo apt-get install -y -q luajit luarocks liblua5.1-0-dev build-essential unzip libreadline-dev
               luarocks install --local luasocket --lua-version 5.1 >/dev/null

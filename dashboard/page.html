@@ -673,8 +673,8 @@
     $('k-lg').textContent = longest ? dur(longest.secs) : '—';
     $('k-lg-n').textContent = longest ? (longest.res === 'W' ? 'won' : 'lost') + ' vs ' + longest.opp : '';
 
-    // recent form: the last 60 games of the selection, oldest on the left
-    const recent = fg.slice().sort((a, b) => a.idx - b.idx).slice(-60);
+    // recent form: the last 60 games of the selection, newest on the left (the same order as the game list below)
+    const recent = fg.slice().sort((a, b) => b.idx - a.idx).slice(0, 60);
     const fm = $('form'); fm.replaceChildren();
     recent.forEach((g) => {
       const d = document.createElement('button'); d.type = 'button'; d.className = 'gs-dot' + (g.replay ? (g.res === 'L' ? ' l' : ' w') : '');
@@ -684,7 +684,7 @@
       fm.appendChild(d);
     });
     const rl = recent.filter((g) => g.res === 'L').length;
-    $('form-note').textContent = recent.length ? 'The last ' + recent.length + ' games, oldest on the left: ' + (recent.length - rl) + ' won, ' + rl + ' lost. Green won, red lost, grey has no replay. Click a green or red dot to watch that game.' : 'No games in this selection.';
+    $('form-note').textContent = recent.length ? 'The last ' + recent.length + ' games, newest on the left: ' + (recent.length - rl) + ' won, ' + rl + ' lost. Green won, red lost, grey has no replay. Click a green or red dot to watch that game.' : 'No games in this selection.';
 
     // per-version stats (opponent filter applied)
     const vs = vers.map((v) => Object.assign({}, v, stat(byOpp.filter((g) => g.sha === v.sha)))).filter((v) => v.n > 0 && (v.n >= (opp ? 0 : minn) || v.sha === ver));

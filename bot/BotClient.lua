@@ -211,6 +211,8 @@ end
 
 -- The set is closed (the room is gone): back to the usual level.
 function BotClient:endSet()
+  -- (logged once per set: the stats page is published when the bot is back in the lobby; the room-closed message and our own leaving both land here)
+  if self.inRoom then print("set over: the room is closed, back in the lobby") end
   if self.level ~= self.baseLevel then self:setLevel(self.baseLevel, "the set is over") end
 end
 

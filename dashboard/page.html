@@ -415,6 +415,31 @@
 .gs-bar select.dash-select { border-radius: 10px; }
 .gs a:focus-visible, .gs select:focus-visible { outline: 2px solid var(--color-fg); outline-offset: 2px; border-radius: 4px; }
 ::selection { background: color-mix(in srgb, var(--color-ok) 30%, transparent); }
+/* ---- one view: the picker folds away, and on a wide screen the stage is two columns ---- */
+.gw-pickd { border: 0 !important; padding: 0 !important; background: none !important; box-shadow: none !important; }
+.gw-pickd > summary { cursor: pointer; font-size: var(--cds-font-size-caption); font-weight: 600; padding: 8px 12px; border: 1px dashed var(--color-border-line); border-radius: 10px; list-style: none; color: var(--color-fg); }
+.gw-pickd > summary::before { content: '▸ '; } .gw-pickd[open] > summary::before { content: '▾ '; }
+.gw-pickd > summary:hover { border-color: var(--color-fg-muted); }
+.gw-pickd[open] > summary { margin-bottom: 6px; }
+.gw-pager { margin: 2px 0 4px; }
+.gw-left, .gw-right { display: contents; }   /* phones and tablets: one column, same order as before */
+.gw-stage .gw-seg-row { order: 1; } .gw-stage .gw-boards { order: 2; } .gw-stage .gw-cap { order: 3; } .gw-stage .gw-now { order: 4; }
+.gw-stage #gw-scrub { order: 5; } .gw-stage .gw-ctl { order: 6; } .gw-stage .gw-over { order: 7; } .gw-stage .gw-why, .gw-stage #gw-strip, .gw-stage .gw-lw, .gw-stage .gw-stops { order: 8; }
+@media (min-width: 980px) and (min-height: 600px) {
+  #sec-watch { gap: 6px; }
+  .gw-stage { max-width: none; position: static; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 4px 28px; align-items: start; padding-block: 0; }
+  .gw-left, .gw-right { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .gw-stage .gw-seg-row, .gw-stage .gw-boards, .gw-stage .gw-cap, .gw-stage #gw-scrub, .gw-stage .gw-ctl, .gw-stage .gw-over, .gw-stage .gw-why, .gw-stage #gw-strip, .gw-stage .gw-lw, .gw-stage .gw-stops { order: 0; }
+  .gw-board canvas { height: clamp(240px, calc(100svh - 470px), 440px); }
+  .gw-ctl { gap: 6px; } .gw-ctl .gw-btn { padding: 7px 10px; }
+  .gw-whyb { height: 11em; }
+  .gw-cap { height: 10.5em; }
+  .gw-why { margin: 0; }
+  .gw-list { height: 8.4em; }
+  .gw-time { min-width: 0; flex: 1 1 100%; text-align: left; margin-left: 0; }
+}
+@media (max-width: 760px) { .gw-whyb { height: 9.5em; } .gw-cap { height: 9.5em; } .gw-why { margin: 4px 0; } .gw-stage { gap: 6px; } }
+@media (min-width: 980px) and (max-height: 599px) { .gw-stage { max-width: 680px; } }
 </style>
 
 <div class="gs" id="gs">
@@ -453,6 +478,13 @@
   <section class="gs-card" id="sec-watch">
     <div class="gw-head"><h2 id="gw-title">Watch a game</h2><span class="gs-count" id="gw-count"></span></div>
     <p class="gs-note" id="gw-sub">Replay any game, with Ranmaru's decisions.</p>
+    <div class="gw-pager">
+      <button type="button" class="gw-btn" id="gw-newer">◀ Previous game</button>
+      <span class="gw-pos" id="gw-pos"></span>
+      <button type="button" class="gw-btn" id="gw-older">Next game ▶</button>
+    </div>
+    <div class="gw-active" id="gw-active" hidden></div>
+    <details class="gw-pickd" id="gw-pickd"><summary id="gw-pickd-s">Browse and filter all games</summary>
     <details class="gw-fd" id="gw-fd"><summary id="gw-fsum">Filters</summary>
     <div class="gw-pick" id="gw-pick">
       <div class="gw-ff"><span>Result</span><div class="gs-seg sm" role="group" aria-label="Result" id="gw-res"><button type="button" data-r="" aria-pressed="true">All</button><button type="button" data-r="L" aria-pressed="false">Lost</button><button type="button" data-r="W" aria-pressed="false">Won</button></div></div>
@@ -462,21 +494,15 @@
         <label class="gw-sortl">Sort <select id="gw-sort" class="dash-select" aria-label="Sort the games"><option value="new">Newest first</option><option value="old">Oldest first</option><option value="long">Longest first</option><option value="short">Shortest first</option></select></label>
         <button type="button" class="gs-link" id="gw-reset" hidden>Reset</button></div>
     </div></details>
-    <div class="gw-active" id="gw-active" hidden></div>
-    <div class="gw-pager">
-      <button type="button" class="gw-btn" id="gw-newer">◀ Previous game</button>
-      <span class="gw-pos" id="gw-pos"></span>
-      <button type="button" class="gw-btn" id="gw-older">Next game ▶</button>
-    </div>
     <div class="gw-browse" id="gw-browse" aria-label="Games to watch"></div>
+    </details>
     <div id="gw-body">
-      <div class="gw-stage" id="gw-stage">
+      <div class="gw-stage" id="gw-stage"><div class="gw-left">
         <div class="gw-seg-row"><div class="gs-seg sm" role="group" aria-label="Part of the game" id="gw-part"><button type="button" data-p="open" aria-pressed="false">Start of game</button><button type="button" data-p="end" aria-pressed="true">End of game</button></div></div>
         <div class="gw-boards" id="gw-boards" title="Tap to play or pause. Drag sideways to scrub.">
           <figure class="gw-board" id="gw-b1"><figcaption><b id="gw-n1">Ranmaru</b><span id="gw-t1"></span></figcaption><div class="gw-in" id="gw-i1" aria-label="Garbage on its way"></div><canvas id="gw-c1" aria-label="Ranmaru's board"></canvas><div class="gw-st" id="gw-s1"></div></figure>
           <div class="gw-mid" id="gw-mid" aria-label="Ranmaru's mode"></div><figure class="gw-board" id="gw-b2"><figcaption><b id="gw-n2">Opponent</b><span id="gw-t2"></span></figcaption><div class="gw-in" id="gw-i2" aria-label="Garbage on its way"></div><canvas id="gw-c2" aria-label="The opponent's board"></canvas><div class="gw-st" id="gw-s2"></div></figure>
         </div>
-        <div class="gw-cap" id="gw-cap" aria-live="off"></div>
         <div class="gw-now" id="gw-now"></div>
         <!-- the controls sit right under the boards, and the explanation right under the controls: boards, Play and the reason are in view together -->
         <input type="range" id="gw-scrub" min="0" max="0" value="0" aria-label="Frame">
@@ -495,6 +521,8 @@
           <button type="button" class="gw-btn" id="gw-prevp" aria-label="Previous plan change" title="Jump to the previous plan change" hidden>‹ Plan</button>
           <button type="button" class="gw-btn" id="gw-nextp" aria-label="Next plan change" title="Jump to the next plan change" hidden>Plan ›</button>
         </div>
+        </div><div class="gw-right">
+        <div class="gw-cap" id="gw-cap" aria-live="off"></div>
         <div class="gw-why" id="gw-why"><div class="gw-whyh"><b>Why</b><span class="gs-note" id="gw-copied" role="status"></span><button type="button" class="gw-btn" id="gw-copy" title="Copy this game, frame and decision, with the log lines around it, to paste somewhere">Copy details</button></div><div class="gw-whyb" id="gw-whyb"></div></div>
         <canvas id="gw-strip" aria-label="Timeline of Ranmaru's decisions. Click to jump."></canvas>
         <div class="gw-lw" id="gw-lw">
@@ -502,7 +530,7 @@
         <div class="gw-list" id="gw-list" role="list"></div>
         </div>
         <details class="gw-stops" id="gw-stops" hidden><summary id="gw-stops-s">Stops</summary><div class="gw-stl" id="gw-stl"></div></details>
-      </div>
+      </div></div>
     </div>
   </section>
 
@@ -899,7 +927,7 @@
     syncPick();
     refreshPlayer();
     if (R.pending != null && R.D && R.D === (dash.data(dataId()) || {}).data) { R.idx = idxOfClock(R.pending); R.pending = null; updatePlayer(); }
-    if (scroll) $('sec-watch').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (scroll) (window.innerWidth < 980 ? $('gw-stage') : $('sec-watch')).scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
   // the games of the current selection that have a replay, found by result, day, length and opponent
   let VLBL = null;
@@ -937,7 +965,7 @@
       const o = document.createElement('span'); o.className = 'o'; o.textContent = r.opp;
       const n = document.createElement('span'); n.className = 'n'; n.textContent = dur(r.secs);
       const v = document.createElement('span'); v.className = 'v'; v.textContent = (VLBL ? VLBL(r.sha) : '') || r.bot;
-      b.append(tm, rs, o, n, v); b.addEventListener('click', () => openReplay(r, false)); box.appendChild(b);
+      b.append(tm, rs, o, n, v); b.addEventListener('click', () => { openReplay(r, false); $('gw-pickd').open = false; $('gw-stage').scrollIntoView({ block: 'nearest' }); }); box.appendChild(b);
     });
     syncPick(); scrollToCur();
   }
@@ -973,7 +1001,7 @@
     pick.hidden = !withRep.length; $('gw-fd').hidden = !withRep.length;
     { const on = []; if (WL.res) on.push(WL.res === 'L' ? 'Lost' : 'Won'); if (WL.when) on.push(WL.when === 'today' ? 'Today' : WL.when === 'yesterday' ? 'Yesterday' : WL.when === 'date' ? WL.date : 'Last ' + WL.when + ' days'); if (WL.len) on.push({ u1: 'Under 1 min', '1-3': '1 to 3 min', '3-10': '3 to 10 min', '10p': '10+ min' }[WL.len]); if (WL.q.trim()) on.push('"' + WL.q.trim() + '"'); if (WL.sort !== 'new') on.push({ old: 'Oldest first', long: 'Longest first', short: 'Shortest first' }[WL.sort]);
       $('gw-fsum').textContent = on.length ? 'Filters and sort (' + on.length + ' on)' : 'Filters and sort'; }
-    $('gw-browse').hidden = !withRep.length; document.querySelector('.gw-pager').hidden = !withRep.length; if (!withRep.length) $('gw-active').hidden = true;
+    $('gw-browse').hidden = !withRep.length; $('gw-pickd').hidden = !withRep.length; document.querySelector('.gw-pager').hidden = !withRep.length; if (!withRep.length) $('gw-active').hidden = true;
     if (!list.length) { stopPlay(); R.rid = null; R.D = null; body.hidden = true; $('sec-garbage').hidden = true; $('gw-list').replaceChildren(); LIST.rid = null; $('gw-browse').replaceChildren(); $('gw-pos').textContent = '';
       $('gw-newer').disabled = true; $('gw-older').disabled = true;
       $('gw-sub').textContent = withRep.length ? 'No games match. Reset the filters.' : 'No replays here. Reset the filters.'; return; }
@@ -989,6 +1017,7 @@
   $('gw-q').addEventListener('input', (e) => { WL.q = e.target.value; again(); });
   $('gw-sort').addEventListener('change', (e) => { WL.sort = e.target.value; again(); });
   $('gw-reset').addEventListener('click', () => { Object.assign(WL, { res: '', when: '', date: '', len: '', q: '', sort: 'new' }); $('gw-q').value = ''; $('gw-sort').value = 'new'; again(); });
+  $('gw-pickd').addEventListener('toggle', () => { if ($('gw-pickd').open) scrollToCur(); });
   $('gw-newer').addEventListener('click', () => { const i = WL.list.findIndex((r) => r.replay === R.rid); if (i > 0) { openReplay(WL.list[i - 1], false); scrollToCur(); } });
   $('gw-older').addEventListener('click', () => { const i = WL.list.findIndex((r) => r.replay === R.rid); if (i >= 0 && i < WL.list.length - 1) { openReplay(WL.list[i + 1], false); scrollToCur(); } });
   function refreshPlayer() {

@@ -355,7 +355,7 @@
 
   <section class="gs-card" id="sec-opp">
     <h2>Opponents</h2>
-    <p class="gs-note" id="opp-note">Who Ranmaru plays. Click a row to filter everything on this page to that opponent.</p>
+    <p class="gs-note" id="opp-note">Click an opponent to filter the page.</p>
     <div class="gs-tools"><input id="s-opp" class="gs-search" type="search" placeholder="Search a player…" aria-label="Search a player" autocomplete="off">
       <div class="gs-seg sm" role="group" aria-label="Minimum games" id="m-opp"><button type="button" data-m="0" aria-pressed="true">Any</button><button type="button" data-m="5" aria-pressed="false">5+ games</button><button type="button" data-m="10" aria-pressed="false">10+</button><button type="button" data-m="-1" aria-pressed="false">Beat Ranmaru</button></div>
       <span class="gs-count" id="c-opp"></span></div>
@@ -370,7 +370,7 @@
 
   <section class="gs-card" id="sec-watch">
     <div class="gw-head"><h2 id="gw-title">Watch a game</h2><span class="gs-count" id="gw-count"></span></div>
-    <p class="gs-note" id="gw-sub">Pick a game to replay it frame by frame, with Ranmaru's decisions beside the boards.</p>
+    <p class="gs-note" id="gw-sub">Replay any game, with Ranmaru's decisions.</p>
     <details class="gw-fd" id="gw-fd"><summary id="gw-fsum">Filters</summary>
     <div class="gw-pick" id="gw-pick">
       <div class="gw-ff"><span>Result</span><div class="gs-seg sm" role="group" aria-label="Result" id="gw-res"><button type="button" data-r="" aria-pressed="true">All</button><button type="button" data-r="L" aria-pressed="false">Lost</button><button type="button" data-r="W" aria-pressed="false">Won</button></div></div>
@@ -422,7 +422,7 @@
 
   <section class="gs-card" id="sec-garbage" hidden>
     <div class="gw-head"><h2>Garbage sent</h2></div>
-    <p class="gs-note">What each player sent, by what made it: "Combo 4" is a 4-panel combo, "Chain ×3" a 3-chain. Each has its own colour. "2 of 3" is 2 sent so far out of 3 in the game. The strip shows the whole game (taller tick = more panels); below it is the garbage around the moment you are watching, drawn as it landed, in its column, with its time. Tap a row or the strip to jump.</p>
+    <p class="gs-note">Combo 4 is a 4-panel combo, Chain ×3 a 3-chain. "2 of 3": 2 sent so far, 3 in the game. Tap to jump.</p>
     <div class="gc-tblwrap"><table class="gs-tbl gc-tbl" id="gc-tbl"></table></div>
     <canvas id="gw-gc" aria-label="Every piece of garbage over the whole game, one lane per player. Tap to jump."></canvas>
     <div class="gm-nav"><button type="button" class="gw-btn" id="gm-prev">◀ Earlier</button><span class="gs-note" id="gm-pos"></span><button type="button" class="gw-btn" id="gm-next">Later ▶</button></div>
@@ -433,7 +433,7 @@
 
   <section class="gs-card" id="sec-versions">
     <h2>Win rate by version</h2>
-    <p class="gs-note" id="ch-note">Each dot is one Ranmaru commit, oldest on the left. The line through a dot is the range the true win rate could plausibly be in; a short line means many games. Click a dot to look at that version alone.</p>
+    <p class="gs-note" id="ch-note">One dot per version, oldest on the left. The line is the likely range of the true win rate. Click a dot to filter.</p>
     <div class="gs-legend"><span style="--c: var(--color-fg)">10+ games</span><span class="hollow" style="--c: var(--color-fg)">under 10 games</span><span class="sq" style="--c: var(--cds-chart-muted)">games played</span></div>
     <div class="gs-tools"><div class="gs-f"><span>Versions shown</span>
       <div class="gs-seg" role="group" aria-label="Versions shown" id="f-min">
@@ -447,21 +447,21 @@
 
   <section class="gs-card" id="sec-table">
     <h2>Versions</h2>
-    <p class="gs-note">Click a row to filter everything to that version. Click a column title to sort.</p>
+    <p class="gs-note">Click a row to filter. Click a heading to sort.</p>
     <div class="gs-tools"><input id="s-ver" class="gs-search" type="search" placeholder="Search versions: p49, a commit, a word from the change" aria-label="Search versions" autocomplete="off"><span class="gs-count" id="c-ver"></span></div>
     <div class="gs-scroll" data-source="games versions"><table class="gs-tbl" id="t-ver"></table></div>
   </section>
 
   <section class="gs-card" id="sec-len">
     <h2>How long games last</h2>
-    <p class="gs-note">Games per length, split into wins and losses. Long games are mostly stalemates.</p>
+    <p class="gs-note">Games by length.</p>
     <div class="gs-legend"><span class="sq" style="--c: var(--dash-c0, var(--color-fg))" id="lg-w">Won</span><span class="sq" style="--c: var(--cds-chart-status-critical)">Lost</span></div>
     <div class="gs-chart short dash-skeleton" id="hist" data-source="games"></div>
   </section>
 
   <section class="gs-card" id="sec-loss" hidden>
     <h2 id="loss-h">Losses</h2>
-    <p class="gs-note">Early is under a minute. Stalemate is a game where the opponent sat topped out for 60% or more of it and still did not die. Mid-game is the rest. Newest first.</p>
+    <p class="gs-note">Early: under a minute. Stalemate: the opponent was topped out for 60%+ of it and survived. Mid-game: the rest.</p>
     <div class="gs-tools"><input id="s-loss" class="gs-search" type="search" placeholder="Search losses by opponent or version" aria-label="Search losses" autocomplete="off">
       <div class="gs-seg sm" role="group" aria-label="Type of loss" id="k-loss"><button type="button" data-k="" aria-pressed="true">All</button><button type="button" data-k="Early" aria-pressed="false">Early</button><button type="button" data-k="Stalemate" aria-pressed="false">Stalemate</button><button type="button" data-k="Mid-game" aria-pressed="false">Mid-game</button></div>
       <span class="gs-count" id="c-loss"></span></div>
@@ -471,13 +471,13 @@
   <details>
     <summary>Definitions and what this leaves out</summary>
     <dl>
-      <dt>Version</dt><dd>A Ranmaru commit. Bots p49 and p50 ran the same commit, so they are one version; a redeploy with no Ranmaru change adds games to the same row.</dd>
-      <dt>Win rate</dt><dd>Games won out of games won plus lost, as seen by the lobby bot on panelattack.com. Fights and games on the other server are not here.</dd>
-      <dt>Plausible range</dt><dd>The 95% Wilson interval for the win rate. Two versions whose lines overlap cannot be told apart yet.</dd>
-      <dt>Opponent topped out</dt><dd>Share of the game the opponent had panels or landed garbage in the top row (sampled every half second).</dd>
-      <dt>Commit for older bots</dt><dd>For p13 to p27 the commit is the newest Ranmaru change before the bot started, which can be off by one. From about p28 it is the commit the redeploy was triggered by.</dd>
-      <dt>Missing</dt><dd>Run p30 and the unnumbered Ranmaru run saved no log, so their games are not counted. A bot that is still running shows the games it has finished so far, without replays; replays of its losses come when it is replaced.</dd>
-      <dt>Source</dt><dd>The saved bot logs of each run. The page updates by itself: about every 20 minutes while a bot runs, and fully when it is replaced.</dd>
+      <dt>Version</dt><dd>A Ranmaru commit. Bots on the same commit share a row.</dd>
+      <dt>Win rate</dt><dd>Wins out of games played, on panelattack.com. Fights are not counted.</dd>
+      <dt>Plausible range</dt><dd>95% Wilson interval. Overlapping lines can't be told apart yet.</dd>
+      <dt>Opponent topped out</dt><dd>Share of the game the opponent was in the top row.</dd>
+      <dt>Commit for older bots</dt><dd>p13 to p27: the newest change before the bot started (may be off by one). From p28: the commit that triggered the deploy.</dd>
+      <dt>Missing</dt><dd>p30 and the unnumbered run saved no log, so they are not counted.</dd>
+      <dt>Source</dt><dd>Each run's saved bot log. Updates about every 20 minutes while a bot runs.</dd>
     </dl>
   </details>
 </div>
@@ -684,14 +684,14 @@
       fm.appendChild(d);
     });
     const rl = recent.filter((g) => g.res === 'L').length;
-    $('form-note').textContent = recent.length ? 'The last ' + recent.length + ' games, newest on the left: ' + (recent.length - rl) + ' won, ' + rl + ' lost. Green won, red lost, grey has no replay. Click a green or red dot to watch that game.' : 'No games in this selection.';
+    $('form-note').textContent = recent.length ? 'Last ' + recent.length + ' games, newest first: ' + (recent.length - rl) + ' won, ' + rl + ' lost. Green won, red lost, grey no replay.' : 'No games in this selection.';
 
     // per-version stats (opponent filter applied)
     const vs = vers.map((v) => Object.assign({}, v, stat(byOpp.filter((g) => g.sha === v.sha)))).filter((v) => v.n > 0 && (v.n >= (opp ? 0 : minn) || v.sha === ver));
     const all = stat(byOpp);
     $('ch-note').textContent = opp
-      ? 'Against ' + opp + ' only, so every version that played them is shown, even with few games. Each dot is one Ranmaru commit, oldest on the left; a long line means few games. Click a dot to look at that version alone.'
-      : 'Each dot is one Ranmaru commit, oldest on the left. The line through a dot is the range the true win rate could plausibly be in; a short line means many games. Click a dot to look at that version alone.';
+      ? 'Against ' + opp + ' only. One dot per version, oldest on the left. Click a dot to filter.'
+      : 'One dot per version, oldest on the left. The line is the likely range of the true win rate. Click a dot to filter.';
     drawChart(vs, all, ver);
 
     // versions table
@@ -719,7 +719,7 @@
     const qo = $('s-opp').value.trim().toLowerCase();
     const osShown = os.filter((o) => (oppMin < 0 ? o.l > 0 : o.n >= oppMin) && has(qo, o.opp));
     $('c-opp').textContent = (qo || oppMin ? osShown.length + ' of ' : '') + os.length + (os.length === 1 ? ' opponent' : ' opponents');
-    $('opp-note').textContent = ver ? 'Against ' + (pickedV ? pickedV.label : 'this version') + ' only. Click a row to filter everything to that opponent.' : 'All versions. Click a row to filter everything to that opponent. ';
+    $('opp-note').textContent = ver ? 'Against ' + (pickedV ? pickedV.label : 'this version') + ' only. Click an opponent to filter.' : 'Click an opponent to filter.';
     table($('t-opp'), 'opp', [
       { key: 'opp', label: 'Opponent', val: (r) => r.opp.toLowerCase(), cell: plain((r) => r.opp) },
       { key: 'n', label: 'Games', num: true, val: (r) => r.n, cell: plain((r) => r.n) },
@@ -824,7 +824,7 @@
     box.replaceChildren();
     const withLen = fg.filter((g) => g.secs != null);
     if (!withLen.length) { const p = document.createElement('p'); p.className = 'gs-empty'; p.textContent = 'No games in this selection.'; box.appendChild(p); return; }
-    if (withLen.length < 5) { const p = document.createElement('p'); p.className = 'gs-empty'; p.textContent = 'Only ' + withLen.length + (withLen.length === 1 ? ' game' : ' games') + ' here, too few to show a spread. Reset the filters to see all games.'; box.appendChild(p); return; }
+    if (withLen.length < 5) { const p = document.createElement('p'); p.className = 'gs-empty'; p.textContent = 'Only ' + withLen.length + (withLen.length === 1 ? ' game' : ' games') + ' here: too few for a spread.'; box.appendChild(p); return; }
     const bins = d3.range(0, 11).map((i) => ({ i, lo: i * 30, hi: i === 10 ? Infinity : (i + 1) * 30, w: 0, l: 0 }));
     withLen.forEach((g) => { const b = bins[Math.min(10, Math.floor(g.secs / 30))]; if (g.res === 'W') b.w++; else b.l++; });
     const svg = d3.select(box).append('svg').attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'img').attr('aria-label', 'Games by length');
@@ -932,7 +932,7 @@
     $('gw-browse').hidden = !withRep.length; document.querySelector('.gw-pager').hidden = !withRep.length;
     if (!list.length) { stopPlay(); R.rid = null; R.D = null; body.hidden = true; $('sec-garbage').hidden = true; $('gw-list').replaceChildren(); LIST.rid = null; $('gw-browse').replaceChildren(); $('gw-pos').textContent = '';
       $('gw-newer').disabled = true; $('gw-older').disabled = true;
-      $('gw-sub').textContent = withRep.length ? 'No games match these filters. Loosen one, or press Reset.' : 'No replays for this selection. Choose another version or opponent, or reset the filters.'; return; }
+      $('gw-sub').textContent = withRep.length ? 'No games match. Reset the filters.' : 'No replays here. Reset the filters.'; return; }
     body.hidden = false;
     if (!list.some((r) => r.replay === R.rid)) { WL.page = 0; openReplay(list[0], false); }
     else WL.page = Math.floor(list.findIndex((r) => r.replay === R.rid) / PAGE);
@@ -1541,7 +1541,7 @@ function projectPlan(G, seq, cursor) {
     const setSt = (k, html) => { g$(k).innerHTML = html; };
     cap.replaceChildren(); g$('mid').replaceChildren();
     if (!D.dec.length || i < 0) {
-      const t = document.createElement('div'); t.className = 'why'; t.textContent = D.dec.length ? (clock < 190 ? 'Countdown: the game moves the cursor to its start spot. Ranmaru has not acted yet.' : 'Before the first decision.') : 'No decisions were logged for this game.'; cap.appendChild(t); return;
+      const t = document.createElement('div'); t.className = 'why'; t.textContent = D.dec.length ? (clock < 190 ? 'Countdown. Ranmaru has not acted yet.' : 'Before the first decision.') : 'No decisions were logged for this game.'; cap.appendChild(t); return;
     }
     const d = D.dec[i], [c, mode, play, want, v, dies, land, chain, combo, thrown, eTop, eOut, eStop] = d;
     const L = PLAN.list(), e = L && L[i] && L[i][0] === c ? L[i] : null;
@@ -1569,7 +1569,7 @@ function projectPlan(G, seq, cursor) {
     const t = document.createElement('div'); t.className = 'whyline goal';
     const cur0 = PLAN.current(clock), mb = 1 + 9 * (R.D.mine - 1), nowF = R.D.frames[R.idx], oldF = R.idx >= 14 ? R.D.frames[R.idx - 14] : null;
     let moving = false; if (oldF) for (let q = R.idx - 13; q <= R.idx && !moving; q++) if (cursorMoved(R.D.frames[q - 1], R.D.frames[q], mb)) moving = true;
-    t.textContent = !seq.length ? (cur0 && cur0.carried ? 'Still finishing the plan from ' + fmtClock(cur0.at) + ': the cursor keeps going through "hold"' : moving ? 'Cursor moving, no plan logged for this decision' : 'No swaps planned') : 'Plan: ' + (cur0 && cur0.total ? cur0.total : seq.length) + ((cur0 && cur0.total ? cur0.total : seq.length) === 1 ? ' swap' : ' swaps') + (cur0 && cur0.done ? ', ' + cur0.left + ' left' : '') + (logged.length ? ' to build a ' + logged.join(' + ') : '');
+    t.textContent = !seq.length ? (cur0 && cur0.carried ? 'Finishing the plan from ' + fmtClock(cur0.at) : moving ? 'Cursor moving, no plan logged' : 'No swaps planned') : 'Plan: ' + (cur0 && cur0.total ? cur0.total : seq.length) + ((cur0 && cur0.total ? cur0.total : seq.length) === 1 ? ' swap' : ' swaps') + (cur0 && cur0.done ? ', ' + cur0.left + ' left' : '') + (logged.length ? ' to build a ' + logged.join(' + ') : '');
     cap.appendChild(t);
     {
       // the rule that picked this move, and the options it passed on, straight from the log
@@ -1584,14 +1584,14 @@ function projectPlan(G, seq, cursor) {
       }
       if (/^\d+$/.test(d[15] || '')) {            // the game lets a bot press only so many keys in any 10 seconds (a held direction counts once); Ranmaru logs how many it may still press
         const lim = D._lim || (D._lim = Math.max(1, ...D.dec.map((q) => Number(q[15]) || 0))), left = Number(d[15]);
-        const bd = document.createElement('div'); bd.className = 'budget' + (left <= lim * 0.15 ? ' low' : ''); bd.title = 'The game lets a bot press at most ' + lim + ' keys in any 10 seconds. A held direction counts as one press.';
+        const bd = document.createElement('div'); bd.className = 'budget' + (left <= lim * 0.15 ? ' low' : ''); bd.title = 'At most ' + lim + ' keys per 10 seconds. A held direction counts once.';
         const bt = document.createElement('span'); bt.append('Key presses left: '); const bb = document.createElement('b'); bb.textContent = left + ' of ' + lim; bt.appendChild(bb); bt.append(' (per 10 s)');
         const bar = document.createElement('i'); const fill = document.createElement('u'); fill.style.setProperty('--w', Math.round(100 * left / lim) + '%'); bar.appendChild(fill); bd.append(bt, bar); cap.appendChild(bd);
       }
       const w1 = document.createElement('div'); w1.className = 'whyline def'; w1.textContent = 'Chose "' + (play || 'hold').replace(/_/g, ' ') + '": ' + why; cap.appendChild(w1);
       if (others.length) { const w2 = document.createElement('div'); w2.className = 'whyline def'; w2.textContent = 'Passed on: ' + others.slice(0, 3).map((o) => o.nm + ' (' + lostTxt(o.lost) + ')').join(', '); cap.appendChild(w2); }
     }
-    { const cur0 = PLAN.current(clock); if (cur0 && cur0.dropped) { const g = document.createElement('div'); g.className = 'whyline def'; g.textContent = 'New plan. The grey arrows are the plan it just dropped.'; cap.appendChild(g); } }
+    { const cur0 = PLAN.current(clock); if (cur0 && cur0.dropped) { const g = document.createElement('div'); g.className = 'whyline def'; g.textContent = 'New plan. Grey arrows: the plan it dropped.'; cap.appendChild(g); } }
   }
   // the list of Ranmaru's choices: each plan it made or threw away, tap one to jump there
   const LIST = { rid: null, mode: 'chg', rows: [] };

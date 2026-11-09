@@ -20,6 +20,7 @@ ap.add_argument("--now", default="", help="the time to give a game seen only whi
 ap.add_argument("--engine", default="", help="a checkout whose game engine plays the replays back (the one the games were played on); this repo's own when blank")
 ap.add_argument("--max-mb", type=float, default=900, help="keep the replays under this size: the oldest go first")
 ap.add_argument("--sizes", default="", help="a file of 'bytes name' lines for the replays already on the page, when they are not all on disk")
+ap.add_argument("--redo", action="store_true", help="process a run that is already on the page again: its games and replays are replaced (the games keep their times)")
 ap.add_argument("--gc", default="", help="a GameCreator checkout, to read rank.c at the log's commit (the rule a decision names); the GitHub API is used when blank")
 ap.add_argument("--prune-out", default="", help="a file to list the replays that were removed but were not on disk")
 a = ap.parse_args()
@@ -39,6 +40,23 @@ def save(name, obj):
     json.dump(obj, open(os.path.join(a.data, name), "w"), separators=(",", ":"))
 
 runs = load("runs.json", [])
+redo_at = None
+if a.redo and a.run_id in runs:
+    # take the run back out first (its rows, its replays, one run off its version), keep the times of its games, and go on as for a new run
+    rows0 = load("games.json", []); vers0 = load("versions.json", [])
+    mine = [r for r in rows0 if r.get("run") == a.run_id]
+    redo_at = [r.get("at") for r in mine]
+    if mine and not a.sha: a.sha = mine[0].get("sha", "")      # the commit it already had, when the logs do not name one
+    gone0 = ["replay_%s.json.gz" % r["replay"] for r in mine if r.get("replay")]
+    for n in gone0:
+        f = os.path.join(a.data, n)
+        if os.path.exists(f): os.remove(f)
+    if a.prune_out and gone0: open(a.prune_out, "a").write("".join("data/" + n + "\n" for n in gone0))
+    for v in vers0:
+        if mine and v["sha"] == mine[0].get("sha") and v.get("runs", 1) > 1: v["runs"] -= 1
+    save("games.json", [r for r in rows0 if r.get("run") != a.run_id]); save("versions.json", vers0)
+    runs.remove(a.run_id); save("runs.json", runs)
+    print("run %s: taken back (%d games, %d replays) to be processed again" % (a.run_id, len(mine), len(gone0)))
 if a.run_id in runs:
     print("run", a.run_id, "is already in the data"); sys.exit(0)
 # a run that was published while it was going: take that back first, so nothing is counted twice
@@ -82,7 +100,7 @@ if a.job_log and os.path.exists(a.job_log):
             m = re.match(r"(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d)", line)
             if ("bot won" in line or "bot lost" in line): times.append(m.group(1) + "Z" if m else None)
 if len(times) != len(games): times = [None] * len(games)
-old_at = (prior or {}).get("at", [])
+old_at = (prior or {}).get("at", []) or (redo_at or [])
 times = [t or (old_at[i] if i < len(old_at) else None) or (a.now or None) for i, t in enumerate(times)]
 
 sha = ""
@@ -196,7 +214,8 @@ same = next((q for q in vers if sha and q["sha"] == sha), None)
 if same:
     v = same; info["prev"] = dict(v); v["runs"] = v.get("runs", 1) + 1; v["end"] = max(a.ended or "", v.get("end") or ""); v["start"] = min(a.started, v.get("start") or a.started)
     labs = re.findall(r"[A-Za-z0-9]+", v["label"].replace("–", " ")) + [bot]
-    if all(re.fullmatch(r"p\d+", q) for q in labs):
+    if redo_at is not None: pass                                   # a run processed again is already in its version's label
+    elif all(re.fullmatch(r"p\d+", q) for q in labs):
         nums = [int(q[1:]) for q in labs]
         v["label"] = "p%d" % min(nums) if min(nums) == max(nums) else "p%d–%d" % (min(nums), max(nums))
     elif bot not in v["label"].replace("–", " ").split(): v["label"] = v["label"] + " + " + bot

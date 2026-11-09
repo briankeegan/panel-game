@@ -1026,12 +1026,17 @@ jobs:
           for attempt in 1 2 3; do
             site_open "$PWD/site" || { echo "no gh-pages branch yet: nothing to update"; exit 0; }
             : > site-prune.txt
+            # runs to process again (dashboard/redo.txt, one run id a line): taken back and ingested afresh, once (data/redone.json remembers them)
+            redo_ids=""
+            for rid in $(grep -E '^[0-9]+$' dashboard/redo.txt 2>/dev/null); do
+              if grep -q "\"$rid\"" site/data/runs.json 2>/dev/null && ! grep -q "\"$rid\"" site/data/redone.json 2>/dev/null; then redo_ids="$redo_ids $rid"; fi
+            done
             # this workflow's own finished runs (not every workflow's: pushes and page builds would push the bot runs out of the first 100)
             runs=$(for pg in 1 2 3 4 5; do gh api "repos/$repo/actions/workflows/bot-prod-smoke-test.yml/runs?per_page=100&page=$pg&status=completed" --jq '.workflow_runs[] | select(.display_title | test("^live · .* · [A-Za-z0-9_]*_p[0-9]+_")) | [.id, .display_title, .run_started_at, .updated_at, .created_at] | @tsv'; done | sort -t$'\t' -k5 | cut -f1-4)
             todo=0
             while IFS=$'\t' read -r id title started ended; do
               [ -n "$id" ] || continue
-              grep -q "\"$id\"" site/data/runs.json 2>/dev/null && continue
+              if grep -q "\"$id\"" site/data/runs.json 2>/dev/null; then case " $redo_ids " in *" $id "*) ;; *) continue;; esac; fi
               todo=$((todo + 1))
             done <<< "$runs"
             echo "$todo finished bot runs are not on the stats page yet"
@@ -1051,7 +1056,7 @@ jobs:
             eval "$(luarocks path --local --lua-version 5.1)"
             while IFS=$'\t' read -r id title started ended; do
               [ -n "$id" ] || continue
-              grep -q "\"$id\"" site/data/runs.json 2>/dev/null && continue
+              redo=""; if grep -q "\"$id\"" site/data/runs.json 2>/dev/null; then case " $redo_ids " in *" $id "*) redo="--redo";; *) continue;; esac; fi
               d="stats-pulled/$id"; mkdir -p "$d"
               [ -s "$d/bot-prod-smoke.log" ] || gh run download "$id" -n bot-prod-smoke-log -D "$d" 2>/dev/null || { echo "run $id: no log artifact, skipped"; continue; }
               if [ ! -s "$d/job.log" ]; then
@@ -1061,7 +1066,8 @@ jobs:
                 if [ -n "$url" ]; then curl -sSL "$url" -o "$d/job.log" || true; else gh api "repos/$repo/actions/jobs/$job/logs" > "$d/job.log" || true; fi
                 echo "run $id: job $job, job log $(wc -c < "$d/job.log" 2>/dev/null || echo 0) bytes, Gambit commit line: $(grep -m1 -o 'Gambit built from GameCreator [0-9a-f]*' "$d/job.log" 2>/dev/null || echo NONE)"
               fi
-              python3 dashboard/update_data.py --run-id "$id" --dir "$d" --data site/data --title "$title" --started "$started" --ended "$ended" --job-log "$d/job.log" --sizes site-sizes.txt --prune-out site-prune.txt --max-mb 900 ${engine:+--engine "$engine"} || echo "run $id: update failed"
+              python3 dashboard/update_data.py --run-id "$id" --dir "$d" --data site/data --title "$title" --started "$started" --ended "$ended" --job-log "$d/job.log" --sizes site-sizes.txt --prune-out site-prune.txt --max-mb 900 ${engine:+--engine "$engine"} $redo || echo "run $id: update failed"
+              if [ -n "$redo" ] && grep -q "\"$id\"" site/data/runs.json 2>/dev/null; then python3 -c 'import json,os,sys; p="site/data/redone.json"; l=json.load(open(p)) if os.path.exists(p) else []; l.append(sys.argv[1]) if sys.argv[1] not in l else None; json.dump(l, open(p, "w"))' "$id"; fi
               if [ -s site-prune.txt ]; then sed 's#.*/##' site-prune.txt | sort -u > .gone; grep -vFf .gone site-sizes.txt > .sizes && mv .sizes site-sizes.txt; fi
             done <<< "$runs"
             python3 dashboard/make_site.py site

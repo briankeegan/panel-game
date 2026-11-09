@@ -1,0 +1,3 @@
+# Runs to take back and ingest again, one run id a line (the stats update does it once and records it in data/redone.json).
+# 42561401447: Ranmaru_p72_CPU -- its games r693 to r695 were matched to the wrong decision blocks (fixed in update_data.py).
+42561401447

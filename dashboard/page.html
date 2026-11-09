@@ -370,6 +370,7 @@
 .gs-nav::-webkit-scrollbar { display: none; }
 .gs-nav a { flex: 0 0 auto; padding: 7px 14px; border: 1px solid var(--color-border-line); border-radius: 999px; background: var(--color-panel); color: var(--color-fg-muted); transition: background .15s, color .15s, border-color .15s; }
 .gs-nav a:hover { color: var(--color-fg); border-color: var(--color-fg-muted); }
+.gs-nav a[hidden] { display: none; }
 .gs-nav a[aria-current=true] { background: var(--color-fg); color: var(--color-bg); border-color: var(--color-fg); }
 .gs-nav .gs-link { flex: 0 0 auto; margin-left: auto; white-space: nowrap; padding: 7px 12px; border: 1px dashed var(--color-border-line); border-radius: 999px; text-decoration: none; color: var(--color-fg-muted); }
 .gs-nav .gs-link:hover { color: var(--color-fg); border-color: var(--color-fg-muted); }
@@ -439,16 +440,9 @@
     <div class="gs-kpi"><div class="gs-kl">Longest game</div><div class="gs-kv" id="k-lg" data-source="games">—</div><div class="gs-kn" id="k-lg-n"></div></div>
   </section>
 
-  <nav class="gs-nav" aria-label="Sections"><a href="#sec-opp">Opponents</a><a href="#sec-watch">Watch a game</a><a href="#sec-garbage">Garbage sent</a><a href="#sec-table">Versions</a><a href="#sec-len">Game length</a><button type="button" class="gs-link" id="copy-link" title="Copy a link that opens this exact view">Copy link to this view</button></nav>
+  <nav class="gs-nav" aria-label="Sections"><a href="#sec-form">Recent</a><a href="#sec-watch">Watch a game</a><a href="#sec-garbage">Garbage sent</a><a href="#sec-opp">Opponents</a><a href="#sec-table">Versions</a><a href="#sec-len">Game length</a><button type="button" class="gs-link" id="copy-link" title="Copy a link that opens this exact view">Copy link to this view</button></nav>
 
-  <section class="gs-card" id="sec-opp">
-    <h2>Opponents</h2>
-    <p class="gs-note" id="opp-note">Click an opponent to filter the page.</p>
-    <div class="gs-tools"><input id="s-opp" class="gs-search" type="search" placeholder="Search a player…" aria-label="Search a player" autocomplete="off">
-      <div class="gs-seg sm" role="group" aria-label="Minimum games" id="m-opp"><button type="button" data-m="0" aria-pressed="true">Any</button><button type="button" data-m="5" aria-pressed="false">5+ games</button><button type="button" data-m="10" aria-pressed="false">10+</button><button type="button" data-m="-1" aria-pressed="false">Beat Ranmaru</button></div>
-      <span class="gs-count" id="c-opp"></span></div>
-    <div class="gs-scroll tall" data-source="games"><table class="gs-tbl" id="t-opp"></table></div>
-  </section>
+  
 
   <section class="gs-card" id="sec-form">
     <h2>Recent games</h2>
@@ -524,6 +518,15 @@
   </section>
 
   <div class="gs-tip" id="tip"></div>
+
+  <section class="gs-card" id="sec-opp">
+    <h2>Opponents</h2>
+    <p class="gs-note" id="opp-note">Click an opponent to filter the page.</p>
+    <div class="gs-tools"><input id="s-opp" class="gs-search" type="search" placeholder="Search a player…" aria-label="Search a player" autocomplete="off">
+      <div class="gs-seg sm" role="group" aria-label="Minimum games" id="m-opp"><button type="button" data-m="0" aria-pressed="true">Any</button><button type="button" data-m="5" aria-pressed="false">5+ games</button><button type="button" data-m="10" aria-pressed="false">10+</button><button type="button" data-m="-1" aria-pressed="false">Beat Ranmaru</button></div>
+      <span class="gs-count" id="c-opp"></span></div>
+    <div class="gs-scroll tall" data-source="games"><table class="gs-tbl" id="t-opp"></table></div>
+  </section>
 
   <section class="gs-card" id="sec-table">
     <h2>Versions</h2>
@@ -770,7 +773,7 @@
       fm.appendChild(d);
     });
     const rl = recent.filter((g) => g.res === 'L').length;
-    $('form-note').textContent = recent.length ? 'Last ' + recent.length + ' games, newest first: ' + (recent.length - rl) + ' won, ' + rl + ' lost. Green won, red lost, grey no replay.' : 'No games in this selection.';
+    $('form-note').textContent = recent.length ? 'Last ' + recent.length + ' games, newest first: ' + (recent.length - rl) + ' won, ' + rl + ' lost. Green won, red lost, grey no replay. Click a dot to watch that game.' : 'No games in this selection.';
 
     // per-version stats (opponent filter applied)
     const vs = vers.map((v) => Object.assign({}, v, stat(byOpp.filter((g) => g.sha === v.sha)))).filter((v) => v.n > 0 && (v.n >= (opp ? 0 : minn) || v.sha === ver));
@@ -1932,6 +1935,7 @@ function projectPlan(G, seq, cursor) {
     const nav = document.querySelector('.gs-nav'); if (!nav) return;
     const links = [].slice.call(nav.querySelectorAll('a[href^="#sec-"]'));
     const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    links.forEach((a) => { const t = document.getElementById(a.getAttribute('href').slice(1)); if (!t) return; const sync = () => { a.hidden = t.hidden; }; sync(); new MutationObserver(sync).observe(t, { attributes: true, attributeFilter: ['hidden'] }); });
     links.forEach((a) => a.addEventListener('click', (e) => { const t = document.getElementById(a.getAttribute('href').slice(1)); if (!t) return; e.preventDefault(); t.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' }); }));
     if (!('IntersectionObserver' in window)) return;
     const vis = {};

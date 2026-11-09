@@ -61,7 +61,13 @@ if a.run_id in runs:
     print("run", a.run_id, "is already in the data"); sys.exit(0)
 # a run that was published while it was going: take that back first, so nothing is counted twice
 part = load("partial.json", {}); prior = part.pop(a.run_id, None)
-if prior:
+# a partial publish after the first one goes on from where the last stopped: the games it published (with their replays) stay, only the new ones are made
+resume = bool(a.partial and prior and "n" in prior and not a.redo)
+if prior and not resume:
+    for n_ in prior.get("replays", []):              # replays a partial publish made: taken back with its rows (the final update makes them again)
+        fp_ = os.path.join(a.data, n_)
+        if os.path.exists(fp_): os.remove(fp_)
+        if a.prune_out: open(a.prune_out, "a").write("data/" + n_ + "\n")
     rows0 = load("games.json", []); vers0 = load("versions.json", [])
     rows0 = [r for r in rows0 if r.get("run") != a.run_id]
     for v in vers0:
@@ -146,15 +152,16 @@ if gl:
 rows = load("games.json", [])
 def rnum(name): return int(re.search(r"r(\d+)", name).group(1))
 nrep = max([rnum(os.path.basename(f)) for f in glob.glob(os.path.join(a.data, "replay_r*.json.gz"))] + [rnum(r["replay"]) for r in rows if r.get("replay")] + [0])
-added = 0; jptr = 0
+added = 0; jptr = prior["jptr"] if resume else 0; skip = prior["n"] if resume else 0; made = []
 for gi, g in enumerate(games):
+    if gi < skip: continue
     n = None; x = None
     if g["rep"]:
         try: x = json.loads(g["rep"]); n = len(x["inputs"][x["mine"] - 1])
         except Exception: x = None
     row = dict(sha=sha, bot=bot, date=date, opp=g["opp"], res=g["r"], secs=round(n / 60) if n else None,
                top=min(100, round(100 * g["top"] / n)) if n else None, land=g["land"], at=times[gi], run=a.run_id)
-    if x and n and not a.partial:
+    if x and n and (not a.partial or a.engine):         # (a run still going makes its replays too, on the engine the bot plays on)
         nrep += 1; rid = "r%d" % nrep
         tmp = os.path.join(a.data, rid + "_in.json"); json.dump(x, open(tmp, "w"))
         out_fr = os.path.join(a.data, rid + "_fr.json")
@@ -201,41 +208,45 @@ for gi, g in enumerate(games):
             for k_, v_ in (("sw", sw), ("gu", gu), ("fl", fl), ("rl", rl)):
                 if v_: out[k_] = v_
             with gzip.open(os.path.join(a.data, "replay_%s.json.gz" % rid), "wt", compresslevel=9) as z: json.dump(out, z, separators=(",", ":"))
-            row["replay"] = rid
+            row["replay"] = rid; made.append("replay_%s.json.gz" % rid)
     rows.append(row); added += 1
 
 if a.partial and not added:
+    if resume: part[a.run_id] = prior
     save("partial.json", part); print("run %s: no finished games yet" % a.run_id); sys.exit(0)
 
 # --- the version this run played: a new row, or one more run on the same commit
 vers = load("versions.json", [])
-info = dict(sha=sha, new=False, prev=None, at=[g.get("at") for g in rows[-added:]] if added else [])
-same = next((q for q in vers if sha and q["sha"] == sha), None)
-if same:
-    v = same; info["prev"] = dict(v); v["runs"] = v.get("runs", 1) + 1; v["end"] = max(a.ended or "", v.get("end") or ""); v["start"] = min(a.started, v.get("start") or a.started)
-    labs = re.findall(r"[A-Za-z0-9]+", v["label"].replace("–", " ")) + [bot]
-    if redo_at is not None: pass                                   # a run processed again is already in its version's label
-    elif all(re.fullmatch(r"p\d+", q) for q in labs):
-        nums = [int(q[1:]) for q in labs]
-        v["label"] = "p%d" % min(nums) if min(nums) == max(nums) else "p%d–%d" % (min(nums), max(nums))
-    elif bot not in v["label"].replace("–", " ").split(): v["label"] = v["label"] + " + " + bot
-elif sha:
-    if not a.subject:                                   # best effort: the commit's first line, if this token may read GameCreator
-        try:
-            r = subprocess.run(["gh", "api", "repos/briankeegan/GameCreator/commits/" + sha, "--jq", ".commit.message"], capture_output=True, text=True, timeout=30)
-            if r.returncode == 0: a.subject = r.stdout.strip().split("\n")[0][:200]
+if resume:
+    info = dict(prior); info["at"] = list(prior.get("at", [])) + [g.get("at") for g in rows[-added:]]
+else:
+    info = dict(sha=sha, new=False, prev=None, at=[g.get("at") for g in rows[-added:]] if added else [])
+    same = next((q for q in vers if sha and q["sha"] == sha), None)
+    if same:
+        v = same; info["prev"] = dict(v); v["runs"] = v.get("runs", 1) + 1; v["end"] = max(a.ended or "", v.get("end") or ""); v["start"] = min(a.started, v.get("start") or a.started)
+        labs = re.findall(r"[A-Za-z0-9]+", v["label"].replace("–", " ")) + [bot]
+        if redo_at is not None: pass                                   # a run processed again is already in its version's label
+        elif all(re.fullmatch(r"p\d+", q) for q in labs):
+            nums = [int(q[1:]) for q in labs]
+            v["label"] = "p%d" % min(nums) if min(nums) == max(nums) else "p%d–%d" % (min(nums), max(nums))
+        elif bot not in v["label"].replace("–", " ").split(): v["label"] = v["label"] + " + " + bot
+    elif sha:
+        if not a.subject:                                   # best effort: the commit's first line, if this token may read GameCreator
+            try:
+                r = subprocess.run(["gh", "api", "repos/briankeegan/GameCreator/commits/" + sha, "--jq", ".commit.message"], capture_output=True, text=True, timeout=30)
+                if r.returncode == 0: a.subject = r.stdout.strip().split("\n")[0][:200]
+            except Exception: pass
+        ver = dict(sha=sha, subject=a.subject, start=a.started, end=a.ended or a.started, label=bot, runs=1)
+        try:      # the full hash, when it was committed, and for a merge the branch it merged (best effort: the page links to them)
+            r = subprocess.run(["gh", "api", "repos/briankeegan/GameCreator/commits/" + sha, "--jq", "[.sha, .commit.committer.date, (.parents | map(.sha) | join(\",\"))] | @tsv"], capture_output=True, text=True, timeout=30)
+            if r.returncode == 0 and r.stdout.strip():
+                full, date, par = (r.stdout.strip().split("\t") + ["", ""])[:3]; c = dict(full=full, date=date); ps = [x for x in par.split(",") if x]
+                if len(ps) > 1:
+                    r2 = subprocess.run(["gh", "api", "repos/briankeegan/GameCreator/commits/" + ps[1], "--jq", ".commit.message"], capture_output=True, text=True, timeout=30)
+                    c["merged"] = dict(sha=ps[1][:8], subject=(r2.stdout.strip().split("\n")[0][:140] if r2.returncode == 0 else ""))
+                ver["commit"] = c
         except Exception: pass
-    ver = dict(sha=sha, subject=a.subject, start=a.started, end=a.ended or a.started, label=bot, runs=1)
-    try:      # the full hash, when it was committed, and for a merge the branch it merged (best effort: the page links to them)
-        r = subprocess.run(["gh", "api", "repos/briankeegan/GameCreator/commits/" + sha, "--jq", "[.sha, .commit.committer.date, (.parents | map(.sha) | join(\",\"))] | @tsv"], capture_output=True, text=True, timeout=30)
-        if r.returncode == 0 and r.stdout.strip():
-            full, date, par = (r.stdout.strip().split("\t") + ["", ""])[:3]; c = dict(full=full, date=date); ps = [x for x in par.split(",") if x]
-            if len(ps) > 1:
-                r2 = subprocess.run(["gh", "api", "repos/briankeegan/GameCreator/commits/" + ps[1], "--jq", ".commit.message"], capture_output=True, text=True, timeout=30)
-                c["merged"] = dict(sha=ps[1][:8], subject=(r2.stdout.strip().split("\n")[0][:140] if r2.returncode == 0 else ""))
-            ver["commit"] = c
-    except Exception: pass
-    vers.append(ver); info["new"] = True
+        vers.append(ver); info["new"] = True
 if not a.partial:
     # keep the replays under the size limit: drop the oldest first (their games stay in the statistics)
     known = {}
@@ -260,6 +271,7 @@ if not a.partial:
 rows.sort(key=lambda r: r.get("at") or (r.get("date", "") + "T00:00:00Z"))
 vers.sort(key=lambda q: q.get("start") or "")
 save("games.json", rows); save("versions.json", vers)
+info["n"] = len(games); info["jptr"] = jptr; info["replays"] = (prior.get("replays", []) if resume else []) + made
 if a.partial: part[a.run_id] = info; save("partial.json", part)
 else: runs.append(a.run_id); save("runs.json", runs); save("partial.json", part)
 print("run %s: %d games added (%s, %s, %d new replays)" % (a.run_id, added, bot, sha, sum(1 for g in rows[-added:] if g.get("replay"))))

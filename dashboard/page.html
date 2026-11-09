@@ -356,7 +356,7 @@
     <div class="gs-kpi"><div class="gs-kl">Longest game</div><div class="gs-kv" id="k-lg" data-source="games">—</div><div class="gs-kn" id="k-lg-n"></div></div>
   </section>
 
-  <nav class="gs-nav" aria-label="Sections"><a href="#sec-opp">Opponents</a><a href="#sec-watch">Watch a game</a><a href="#sec-garbage">Garbage sent</a><a href="#sec-versions">Versions</a><a href="#sec-len">Game length</a></nav>
+  <nav class="gs-nav" aria-label="Sections"><a href="#sec-opp">Opponents</a><a href="#sec-watch">Watch a game</a><a href="#sec-garbage">Garbage sent</a><a href="#sec-table">Versions</a><a href="#sec-len">Game length</a></nav>
 
   <section class="gs-card" id="sec-opp">
     <h2>Opponents</h2>
@@ -437,23 +437,17 @@
     <div class="gm-nav"><button type="button" class="gw-btn main" id="gm-play">Play</button><span class="gw-time" id="gm-time"></span></div>
   </section>
 
-  <section class="gs-card" id="sec-versions">
-    <h2>Win rate by version</h2>
-    <p class="gs-note" id="ch-note">One dot per version, oldest on the left. The line is the likely range of the true win rate. Click a dot to filter.</p>
-    <div class="gs-legend"><span style="--c: var(--color-fg)">10+ games</span><span class="hollow" style="--c: var(--color-fg)">under 10 games</span><span class="sq" style="--c: var(--cds-chart-muted)">games played</span></div>
+  <div class="gs-tip" id="tip"></div>
+
+  <section class="gs-card" id="sec-table">
+    <h2>Versions</h2>
+    <p class="gs-note">Click a row to filter. Click a heading to sort.</p>
     <div class="gs-tools"><div class="gs-f"><span>Versions shown</span>
       <div class="gs-seg" role="group" aria-label="Versions shown" id="f-min">
         <button type="button" data-min="0" aria-pressed="false">All</button>
         <button type="button" data-min="10" aria-pressed="false">10+ games</button>
         <button type="button" data-min="30" aria-pressed="false">30+ games</button>
       </div></div></div>
-    <div class="gs-chart dash-skeleton" id="chart" data-source="games versions"></div>
-    <div class="gs-tip" id="tip"></div>
-  </section>
-
-  <section class="gs-card" id="sec-table">
-    <h2>Versions</h2>
-    <p class="gs-note">Click a row to filter. Click a heading to sort.</p>
     <div class="gs-tools"><input id="s-ver" class="gs-search" type="search" placeholder="Search versions: p49, a commit, a word from the change" aria-label="Search versions" autocomplete="off"><span class="gs-count" id="c-ver"></span></div>
     <div class="gs-scroll" data-source="games versions"><table class="gs-tbl" id="t-ver"></table></div>
   </section>
@@ -596,7 +590,7 @@
   function render() {
     const gd = dash.data('games'), vd = dash.data('versions');
     const ready = gd.status === 'ok' && vd.status === 'ok';
-    ['chart', 'hist'].forEach((id) => $(id).classList.toggle('dash-skeleton', !ready));
+    ['hist'].forEach((id) => $(id).classList.toggle('dash-skeleton', !ready));
     if (!ready) { if (gd.status === 'error' || vd.status === 'error') $('gs-take').textContent = 'The game data did not load.'; return; }
 
     const P = dash.params();
@@ -695,10 +689,6 @@
     // per-version stats (opponent filter applied)
     const vs = vers.map((v) => Object.assign({}, v, stat(byOpp.filter((g) => g.sha === v.sha)))).filter((v) => v.n > 0 && (v.n >= (opp ? 0 : minn) || v.sha === ver));
     const all = stat(byOpp);
-    $('ch-note').textContent = opp
-      ? 'Against ' + opp + ' only. One dot per version, oldest on the left. Click a dot to filter.'
-      : 'One dot per version, oldest on the left. The line is the likely range of the true win rate. Click a dot to filter.';
-    drawChart(vs, all, ver);
 
     // versions table
     const vcols = [
@@ -766,61 +756,6 @@
     document.querySelectorAll('#t-loss tbody tr').forEach((tr) => { tr.style.cursor = 'default'; });
     updateWatch(fg);
     refreshPlayer();
-  }
-
-  function drawChart(vs, all, ver) {
-    const box = $('chart');
-    const W = Math.max(320, box.clientWidth || 640);
-    const m = { l: 46, r: 14, t: 12, b: 38 }, h1 = 220, gap = 44, h2 = 64;
-    const H = m.t + h1 + gap + h2 + m.b;
-    box.replaceChildren();
-    box.style.minHeight = vs.length ? '' : '0';
-    if (!vs.length) { const p = document.createElement('p'); p.className = 'gs-empty'; p.textContent = 'No versions to show. Try "All" under versions shown.'; box.appendChild(p); return; }
-    const svg = d3.select(box).append('svg').attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'img').attr('aria-label', 'Win rate by version');
-    const x = d3.scaleBand(vs.map((v) => v.sha), [m.l, W - m.r]).padding(0.25);
-    const y1 = d3.scaleLinear([0.4, 1], [m.t + h1, m.t]);
-    const bandTop = m.t + h1 + gap;
-    const y2 = d3.scaleLinear([0, d3.max(vs, (v) => v.n)], [bandTop + h2, bandTop]).nice();
-    const col = dash.colors[0];
-    // grid
-    [0.4, 0.6, 0.8, 1].forEach((t) => {
-      svg.append('line').attr('x1', m.l).attr('x2', W - m.r).attr('y1', y1(t)).attr('y2', y1(t)).attr('stroke', 'var(--cds-chart-grid)');
-      svg.append('text').attr('x', m.l - 8).attr('y', y1(t) + 4).attr('text-anchor', 'end').text(fmtPct(t));
-    });
-    if (all.rate != null) {
-      svg.append('line').attr('x1', m.l).attr('x2', W - m.r).attr('y1', y1(all.rate)).attr('y2', y1(all.rate)).attr('stroke', 'var(--cds-chart-reference)').attr('stroke-dasharray', '4 4');
-      svg.append('text').attr('x', W - m.r).attr('y', y1(all.rate) - 5).attr('text-anchor', 'end').style('paint-order', 'stroke').style('stroke', 'var(--color-panel)').style('stroke-width', '4px').style('font-weight', 600).text('all versions ' + fmtPct(all.rate));
-    }
-    // bars
-    svg.append('text').attr('x', m.l - 8).attr('y', y2(y2.domain()[1]) + 9).attr('text-anchor', 'end').text(y2.domain()[1]);
-    svg.append('text').attr('x', m.l - 8).attr('y', y2(0)).attr('text-anchor', 'end').text('0');
-    svg.append('text').attr('x', m.l - 8).attr('y', bandTop - 6).attr('text-anchor', 'end').text('games');
-    svg.selectAll('rect.b').data(vs).join('rect').attr('class', 'b').attr('x', (v) => x(v.sha)).attr('width', x.bandwidth()).attr('y', (v) => y2(v.n)).attr('height', (v) => y2(0) - y2(v.n)).attr('rx', 2)
-      .attr('fill', (v) => v.sha === ver ? col : 'var(--cds-chart-muted)').attr('opacity', (v) => ver && v.sha !== ver ? 0.5 : 1);
-    // whiskers + dots
-    const g = svg.selectAll('g.d').data(vs).join('g').attr('class', 'd').attr('opacity', (v) => ver && v.sha !== ver ? 0.45 : 1);
-    g.append('line').attr('x1', (v) => x(v.sha) + x.bandwidth() / 2).attr('x2', (v) => x(v.sha) + x.bandwidth() / 2)
-      .attr('y1', (v) => y1(Math.max(0.4, wilson(v.w, v.n)[0]))).attr('y2', (v) => y1(wilson(v.w, v.n)[1]))
-      .attr('stroke', col).attr('stroke-width', 2).attr('stroke-linecap', 'round').attr('opacity', 0.55);
-    g.append('circle').attr('cx', (v) => x(v.sha) + x.bandwidth() / 2).attr('cy', (v) => y1(Math.max(0.4, v.rate))).attr('r', (v) => v.sha === ver ? 6 : 4.5)
-      .attr('fill', (v) => v.n >= 10 ? col : 'var(--color-bg)').attr('stroke', col).attr('stroke-width', 2);
-    // x labels (thinned)
-    const step = Math.max(1, Math.ceil(34 / x.step()));
-    svg.selectAll('text.xl').data(vs.filter((v, i) => i % step === 0 || v.sha === ver)).join('text').attr('class', 'xl')
-      .attr('x', (v) => x(v.sha) + x.bandwidth() / 2).attr('y', bandTop + h2 + 16).attr('text-anchor', 'middle')
-      .style('font-weight', (v) => v.sha === ver ? 700 : 400).text((v) => v.label.split('–')[0]);
-    // hit areas
-    svg.selectAll('rect.hit').data(vs).join('rect').attr('class', 'hit').attr('x', (v) => x(v.sha) - x.step() * 0.125).attr('width', x.step()).attr('y', m.t).attr('height', h1 + gap + h2)
-      .attr('fill', 'transparent').style('cursor', 'pointer').attr('tabindex', 0).attr('role', 'button')
-      .attr('aria-label', (v) => v.label + ', ' + v.n + ' games, ' + fmtPct(v.rate) + ' won')
-      .on('mousemove', (e, v) => {
-        const [lo, hi] = wilson(v.w, v.n);
-        const html = '<div class="t1"><b>' + v.label + '</b> · ' + v.sha + '</div><div>' + v.n + ' games · ' + v.w + '–' + v.l + ' · ' + fmtPct(v.rate) + '</div><div class="t3">plausible ' + fmtPct(lo) + ' to ' + fmtPct(hi) + '</div><div class="t3">' + v.subject.slice(0, 110) + '</div>';
-        showTip(box, html, x(v.sha) + x.bandwidth() / 2, y1(Math.max(0.4, v.rate)));
-      })
-      .on('mouseleave', hideTip).on('blur', hideTip)
-      .on('click', (e, v) => toggle('ver', v.sha))
-      .on('keydown', (e, v) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle('ver', v.sha); } });
   }
 
   function drawHist(fg) {

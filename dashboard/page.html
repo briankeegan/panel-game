@@ -342,10 +342,83 @@
 .gs details dt { color: var(--color-fg); } .gs details dd { margin: 0; max-width: 70ch; }
 @media (max-width: 640px) { .gs-tbl .hide-s { display: none; } .gs-tbl td, .gs-tbl th { white-space: normal; } .gs-tbl td { padding: 7px 5px; } .gs-th { padding: 8px 5px; } .gs-wr i { display: none; } .gs-tbl .gw-t { display: none; } .gs-watch { padding: 5px 10px; font-size: 13px; } .gs-chip { padding: 1px 6px; } .gs-tbl td { padding: 7px 4px; overflow-wrap: anywhere; } .gs h1 { font-size: 1.4rem; } .gs-bar { position: static; } }
 @media (prefers-reduced-motion: no-preference) { .gs-kv, .gs-take { transition: opacity var(--cds-dur-slow) var(--cds-ease-out); } }
+/* ---- polish pass ---- */
+.gs { --gs-shadow: 0 1px 2px rgba(20,24,40,.05), 0 6px 18px -10px rgba(20,24,40,.18); gap: 22px; }
+@media (prefers-color-scheme: dark) { .gs { --color-ok: #3fbf7a; --color-warn: #e3a936; --color-bad: #ef6a66; --gs-shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 22px -12px rgba(0,0,0,.6); } }
+.gs-hero { padding-top: 22px; }
+.gs-eyebrow { display: inline-flex; align-items: center; gap: 8px; font-size: 11.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--color-fg-muted); margin-bottom: 8px; }
+.gs-pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--color-ok); box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-ok) 50%, transparent); }
+@media (prefers-reduced-motion: no-preference) { .gs-pulse { animation: gs-pulse 2.4s ease-out infinite; } }
+@keyframes gs-pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-ok) 55%, transparent); } 70%,100% { box-shadow: 0 0 0 8px transparent; } }
+.gs h1 { font-size: clamp(1.9rem, 5.5vw, 2.6rem); letter-spacing: -.01em; }
+.gs-take { font-size: 15.5px; line-height: 1.5; max-width: 62ch; }
+.gs-bar { padding: 10px 14px; border-radius: 14px; box-shadow: var(--gs-shadow); align-self: flex-start; max-width: 100%; }
+@media (max-width: 520px) { .gs-bar { align-self: stretch; } .gs h1 { font-size: 1.7rem; } }
+.gs details.gw-fd { box-shadow: none; }
+.gs-kpi, .gs-card { border-radius: 14px; box-shadow: var(--gs-shadow); }
+.gs-kpi { padding: 14px 18px 12px; transition: transform .15s ease, box-shadow .15s ease; }
+.gs-kl { font-size: 11.5px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; }
+.gs-kv { font-size: clamp(1.8rem, 5vw, 2.3rem); margin: 2px 0; }
+@media (max-width: 520px) { .gs-kpis > .gs-kpi:first-child { grid-column: 1 / -1; } }
+.gs-card { padding: 20px 22px; gap: 8px; }
+@media (max-width: 520px) { .gs-card { padding: 16px; } }
+.gs h2 { font-size: 1.15rem; font-weight: 600; letter-spacing: -.005em; }
+.gs-note { line-height: 1.45; }
+
+/* nav: one row of pills, scrolls sideways instead of wrapping */
+.gs-nav { flex-wrap: nowrap; overflow-x: auto; gap: 6px; padding: 2px 0 6px; scrollbar-width: none; -webkit-overflow-scrolling: touch; align-items: center; }
+.gs-nav::-webkit-scrollbar { display: none; }
+.gs-nav a { flex: 0 0 auto; padding: 7px 14px; border: 1px solid var(--color-border-line); border-radius: 999px; background: var(--color-panel); color: var(--color-fg-muted); transition: background .15s, color .15s, border-color .15s; }
+.gs-nav a:hover { color: var(--color-fg); border-color: var(--color-fg-muted); }
+.gs-nav a[aria-current=true] { background: var(--color-fg); color: var(--color-bg); border-color: var(--color-fg); }
+.gs-nav .gs-link { flex: 0 0 auto; margin-left: auto; white-space: nowrap; padding: 7px 12px; border: 1px dashed var(--color-border-line); border-radius: 999px; text-decoration: none; color: var(--color-fg-muted); }
+.gs-nav .gs-link:hover { color: var(--color-fg); border-color: var(--color-fg-muted); }
+.gs-nav a:focus-visible { outline: 2px solid var(--color-fg); outline-offset: 2px; }
+
+/* buttons: one feel everywhere */
+.gw-btn, .gs-seg button, .gs-fchip, .gs-watch, .gw-fchip { transition: background .12s, color .12s, border-color .12s, transform .08s; }
+.gw-btn:hover:not(:disabled):not(.main):not([aria-pressed=true]) { background: color-mix(in srgb, var(--color-fg) 7%, transparent); border-color: var(--color-fg-muted); }
+.gw-btn.main:hover { filter: brightness(1.25); }
+.gw-btn:active:not(:disabled), .gs-seg button:active { transform: scale(.97); }
+.gs-seg button:hover:not([aria-pressed=true]) { background: color-mix(in srgb, var(--color-fg) 7%, transparent); color: var(--color-fg); }
+.gw-btn.main { font-weight: 600; }
+.gw-ctl .gw-btn { padding: 8px 13px; }
+
+/* tables */
+.gs-tbl th { font-size: 11.5px; letter-spacing: .04em; text-transform: uppercase; }
+.gs-tbl td { padding: 9px 10px; }
+.gs-tbl tbody tr { transition: background .1s; }
+.gs-wr i { width: 64px; height: 7px; }
+.gs-search { border-radius: 999px; padding: 9px 14px; }
+.gs-search::placeholder { color: var(--color-fg-muted); opacity: .8; }
+
+/* recent games dots */
+.gs-form { gap: 6px; }
+.gs-dot.w, .gs-dot.l { transition: transform .12s; }
+.gs-dot.w:hover, .gs-dot.l:hover { transform: scale(1.35); }
+
+/* watch a game */
+.gw-row { transition: background .1s; }
+.gw-row .o { font-weight: 500; }
+.gw-res { font-size: 11px; letter-spacing: .03em; min-width: 3.4em; }
+.gw-board canvas { box-shadow: 0 6px 20px -10px rgba(0,0,0,.5); }
+.gw-board.topped canvas { box-shadow: 0 0 0 2px var(--cds-chart-status-critical), 0 6px 20px -10px rgba(0,0,0,.5); }
+.gw-why { border-radius: 12px; background: color-mix(in srgb, var(--color-fg) 3%, transparent); }
+.gw-whyh b { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--color-fg-muted); }
+.gw-stage { border-radius: 12px; }
+#gw-scrub { accent-color: var(--color-fg); }
+#gw-strip, #gw-gc { border-radius: 8px; }
+.gs details { border-radius: 14px; box-shadow: var(--gs-shadow); background: var(--color-panel); }
+.gs details > summary { font-weight: 500; }
+.gs-chip, .gw-opts .cat { letter-spacing: .02em; }
+.gs-bar select.dash-select { border-radius: 10px; }
+.gs a:focus-visible, .gs select:focus-visible { outline: 2px solid var(--color-fg); outline-offset: 2px; border-radius: 4px; }
+::selection { background: color-mix(in srgb, var(--color-ok) 30%, transparent); }
 </style>
 
 <div class="gs" id="gs">
-  <header>
+  <header class="gs-hero">
+    <div class="gs-eyebrow"><span class="gs-pulse" aria-hidden="true"></span>Live stats · updates itself after every set</div>
     <h1 id="gs-title">Ranmaru on panelattack.com</h1>
     <p class="gs-take" id="gs-take" data-source="games versions"></p>
     <p class="gs-take gs-dep" id="gs-dep" data-source="versions" hidden></p>
@@ -583,7 +656,7 @@
   const rateCell = (td, r) => {
     const w = document.createElement('span'); w.className = 'gs-wr';
     const bar = document.createElement('i'); const b = document.createElement('b');
-    b.style.setProperty('--w', (r.rate == null ? 0 : r.rate * 100) + '%'); bar.appendChild(b);
+    b.style.setProperty('--w', (r.rate == null ? 0 : r.rate * 100) + '%'); b.style.setProperty('--bar', r.rate == null ? 'transparent' : r.rate >= .9 ? 'var(--color-ok)' : r.rate >= .7 ? 'var(--color-warn)' : 'var(--color-bad)'); bar.appendChild(b);
     w.append(bar, document.createTextNode(r.rate == null ? '—' : fmtPct(r.rate)));
     if (r.n) { const [lo, hi] = wilson(r.w, r.n); w.title = r.w + ' of ' + r.n + ' · plausible range ' + fmtPct(lo) + ' to ' + fmtPct(hi); }
     td.appendChild(w);
@@ -671,7 +744,7 @@
     }
 
     // KPIs
-    $('k-wr').textContent = S.n ? fmtPct(S.rate) : '—';
+    $('k-wr').textContent = S.n ? fmtPct(S.rate) : '—'; $('k-wr').style.color = !S.n ? '' : S.rate >= .9 ? 'var(--color-ok)' : S.rate >= .7 ? 'var(--color-warn)' : 'var(--color-bad)';
     const wrn = $('k-wr-n'); wrn.className = 'gs-kn'; wrn.textContent = S.n ? S.w + ' won · ' + S.l + ' lost' : '';
     if (pickedV && S.n) {
       const rest = stat(byOpp.filter((g) => g.sha !== ver));
@@ -905,8 +978,7 @@
     if (!list.some((r) => r.replay === R.rid)) openReplay(list[0], false);
     renderBrowse();
   }
-  if (window.innerWidth > 760) $('gw-fd').open = true;
-  const again = () => updateWatch(WL.src);
+    const again = () => updateWatch(WL.src);
   $('gw-res').addEventListener('click', (e) => { const b = e.target.closest('button[data-r]'); if (b) { WL.res = b.dataset.r; again(); } });
   $('gw-when').addEventListener('click', (e) => { const b = e.target.closest('button[data-w]'); if (b) { WL.when = b.dataset.w; again(); } });
   $('gw-date').addEventListener('change', (e) => { WL.date = e.target.value; WL.when = WL.date ? 'date' : ''; again(); });
@@ -1854,6 +1926,20 @@ function projectPlan(G, seq, cursor) {
     return U;
   })();
   URLSTATE.apply(location.hash, true);
+  
+  // section nav: smooth scroll without touching the URL (the hash carries the view), and the section in view lit up
+  (function () {
+    const nav = document.querySelector('.gs-nav'); if (!nav) return;
+    const links = [].slice.call(nav.querySelectorAll('a[href^="#sec-"]'));
+    const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    links.forEach((a) => a.addEventListener('click', (e) => { const t = document.getElementById(a.getAttribute('href').slice(1)); if (!t) return; e.preventDefault(); t.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' }); }));
+    if (!('IntersectionObserver' in window)) return;
+    const vis = {};
+    const io = new IntersectionObserver((es) => { es.forEach((en) => { vis[en.target.id] = en.isIntersecting; });
+      let on = null; links.forEach((a) => { if (!on && vis[a.getAttribute('href').slice(1)]) on = a; });
+      links.forEach((a) => { if (a === on) a.setAttribute('aria-current', 'true'); else a.removeAttribute('aria-current'); }); }, { rootMargin: '-15% 0px -60% 0px' });
+    links.forEach((a) => { const t = document.getElementById(a.getAttribute('href').slice(1)); if (t) io.observe(t); });
+  })();
   dash.onData(render);
   // On touch screens the phone's own picker needs a "Done" tap; this list picks on one tap instead
   if (window.matchMedia && matchMedia('(pointer: coarse)').matches) document.querySelectorAll('select.dash-select').forEach((sel) => {

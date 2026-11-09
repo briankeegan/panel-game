@@ -352,8 +352,16 @@
 @keyframes gs-pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-ok) 55%, transparent); } 70%,100% { box-shadow: 0 0 0 8px transparent; } }
 .gs h1 { font-size: clamp(1.9rem, 5.5vw, 2.6rem); letter-spacing: -.01em; }
 .gs-take { font-size: 15.5px; line-height: 1.5; max-width: 62ch; }
-.gs-bar { padding: 10px 14px; border-radius: 14px; box-shadow: var(--gs-shadow); align-self: flex-start; max-width: 100%; }
-@media (max-width: 520px) { .gs-bar { align-self: stretch; } .gs h1 { font-size: 1.7rem; } }
+@media (max-width: 520px) { .gs h1 { font-size: 1.7rem; } }
+.gs-bar { padding: 14px 16px; border-radius: 14px; box-shadow: var(--gs-shadow); flex-direction: column; align-items: stretch; gap: 12px; }
+.gf-row { display: flex; flex-wrap: wrap; gap: 12px 22px; align-items: flex-end; }
+.gf-dates { display: flex; align-items: center; gap: 6px; } .gf-dates b { font-weight: 400; color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); }
+.gf-count { margin: 0; }
+.gs-bar .gs-search { width: min(100%, 15rem); }
+.gs details.gs-filters { border: 0; padding: 0; background: none; box-shadow: none; }
+.gs-filters > summary { font-size: var(--cds-font-size-caption); font-weight: 600; padding: 9px 14px; border: 1px solid var(--color-border-line); border-radius: 999px; background: var(--color-panel); list-style: none; cursor: pointer; display: inline-block; margin-bottom: 8px; box-shadow: var(--gs-shadow); }
+.gs-filters > summary::before { content: '▸ '; } .gs-filters[open] > summary::before { content: '▾ '; }
+.gw-sortrow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; }
 .gs details.gw-fd { box-shadow: none; }
 .gs-kpi, .gs-card { border-radius: 14px; box-shadow: var(--gs-shadow); }
 .gs-kpi { padding: 14px 18px 12px; transition: transform .15s ease, box-shadow .15s ease; }
@@ -450,12 +458,23 @@
     <p class="gs-take gs-dep" id="gs-dep" data-source="versions" hidden></p>
   </header>
 
+  <details class="gs-filters" id="gs-filters"><summary id="gs-fsum">Filters</summary>
   <section class="gs-bar" aria-label="Filters">
-    <label class="gs-f"><span>Version (Ranmaru commit)</span><select id="f-ver" class="dash-select"></select></label>
+    <div class="gf-row">
+      <label class="gs-f"><span>Version (Ranmaru commit)</span><select id="f-ver" class="dash-select"></select></label>
+      <label class="gs-f"><span>Opponent</span><input type="search" id="gw-q" list="gw-names" class="gs-search" placeholder="Any player: type a name" autocomplete="off"><datalist id="gw-names"></datalist></label>
+      <div class="gs-f"><span>Result</span><div class="gs-seg sm" role="group" aria-label="Result" id="gw-res"><button type="button" data-r="" aria-pressed="true">All</button><button type="button" data-r="L" aria-pressed="false">Lost</button><button type="button" data-r="W" aria-pressed="false">Won</button></div></div>
+      <div class="gs-f"><span>Length</span><div class="gs-seg sm" role="group" aria-label="Length of the game" id="gw-len"><button type="button" data-l="" aria-pressed="true">Any</button><button type="button" data-l="u1" aria-pressed="false">Under 1 min</button><button type="button" data-l="1-3" aria-pressed="false">1 to 3</button><button type="button" data-l="3-10" aria-pressed="false">3 to 10</button><button type="button" data-l="10p" aria-pressed="false">10+ min</button></div></div>
+    </div>
+    <div class="gf-row">
+      <div class="gs-f"><span>When</span><div class="gs-seg sm" role="group" aria-label="When it was played" id="gw-when"><button type="button" data-w="" aria-pressed="true">Any time</button><button type="button" data-w="today" aria-pressed="false">Today</button><button type="button" data-w="yesterday" aria-pressed="false">Yesterday</button><button type="button" data-w="7" aria-pressed="false">7 days</button><button type="button" data-w="30" aria-pressed="false">30 days</button></div></div>
+      <div class="gs-f"><span>Or a date range</span><div class="gf-dates"><input type="date" id="gw-from" class="gw-date" aria-label="From date"><b aria-hidden="true">to</b><input type="date" id="gw-to" class="gw-date" aria-label="To date"></div></div>
+      <button type="button" class="gs-link" id="f-reset" hidden>Reset all filters</button>
+    </div>
     <p class="gs-note" id="f-vinfo" hidden></p>
     <div class="gs-f" id="f-chips-wrap" hidden><span>Showing only</span><div class="gs-chips" id="f-chips"></div></div>
-    <button type="button" class="gs-link" id="f-reset" hidden>Reset filters</button>
-  </section>
+    <p class="gs-note gf-count" id="f-count" role="status"></p>
+  </section></details>
 
   <section class="gs-kpis" aria-label="Summary">
     <div class="gs-kpi"><div class="gs-kl">Win rate</div><div class="gs-kv" id="k-wr" data-source="games">—</div><div class="gs-kn" id="k-wr-n"></div></div>
@@ -483,17 +502,8 @@
       <span class="gw-pos" id="gw-pos"></span>
       <button type="button" class="gw-btn" id="gw-older">Next game ▶</button>
     </div>
-    <div class="gw-active" id="gw-active" hidden></div>
     <details class="gw-pickd" id="gw-pickd"><summary id="gw-pickd-s">Browse and filter all games</summary>
-    <details class="gw-fd" id="gw-fd"><summary id="gw-fsum">Filters</summary>
-    <div class="gw-pick" id="gw-pick">
-      <div class="gw-ff"><span>Result</span><div class="gs-seg sm" role="group" aria-label="Result" id="gw-res"><button type="button" data-r="" aria-pressed="true">All</button><button type="button" data-r="L" aria-pressed="false">Lost</button><button type="button" data-r="W" aria-pressed="false">Won</button></div></div>
-      <div class="gw-ff"><span>When</span><div class="gs-seg sm" role="group" aria-label="When it was played" id="gw-when"><button type="button" data-w="" aria-pressed="true">Any time</button><button type="button" data-w="today" aria-pressed="false">Today</button><button type="button" data-w="yesterday" aria-pressed="false">Yesterday</button><button type="button" data-w="7" aria-pressed="false">7 days</button><button type="button" data-w="30" aria-pressed="false">30 days</button></div><input type="date" id="gw-date" class="gw-date" aria-label="Pick a day"></div>
-      <div class="gw-ff"><span>Length</span><div class="gs-seg sm" role="group" aria-label="Length of the game" id="gw-len"><button type="button" data-l="" aria-pressed="true">Any</button><button type="button" data-l="u1" aria-pressed="false">Under 1 min</button><button type="button" data-l="1-3" aria-pressed="false">1 to 3</button><button type="button" data-l="3-10" aria-pressed="false">3 to 10</button><button type="button" data-l="10p" aria-pressed="false">10+ min</button></div></div>
-      <div class="gw-ff"><span>Opponent</span><input type="search" id="gw-q" list="gw-names" class="gs-search gw-q" placeholder="Any player: type to search" autocomplete="off" aria-label="Opponent"><datalist id="gw-names"></datalist>
-        <label class="gw-sortl">Sort <select id="gw-sort" class="dash-select" aria-label="Sort the games"><option value="new">Newest first</option><option value="old">Oldest first</option><option value="long">Longest first</option><option value="short">Shortest first</option></select></label>
-        <button type="button" class="gs-link" id="gw-reset" hidden>Reset</button></div>
-    </div></details>
+    <div class="gw-sortrow"><label class="gw-sortl">Sort <select id="gw-sort" class="dash-select" aria-label="Sort the games"><option value="new">Newest first</option><option value="old">Oldest first</option><option value="long">Longest first</option><option value="short">Shortest first</option></select></label> <span class="gs-note">The filters at the top of the page decide which games are here.</span></div>
     <div class="gw-browse" id="gw-browse" aria-label="Games to watch"></div>
     </details>
     <div id="gw-body">
@@ -701,7 +711,7 @@
   $('k-loss').addEventListener('click', (e) => { const b = e.target.closest('button[data-k]'); if (b) { lossKind = b.dataset.k; render(); } });
   const has = (q, ...f) => !q || f.join(' ').toLowerCase().includes(q);
   $('f-min').addEventListener('click', (e) => { const b = e.target.closest('button[data-min]'); if (b) dash.setParams({ minn: Number(b.dataset.min) }); });
-  $('f-reset').addEventListener('click', () => dash.resetParams());
+  $('f-reset').addEventListener('click', () => resetAll());
   const toggle = (name, val) => dash.setParams({ [name]: (dash.params()[name] || '') === val ? '' : val });
 
   function render() {
@@ -725,27 +735,48 @@
     fv.value = ver;
     const oppCounts = Array.from(d3.rollup(games, (a) => a.length, (g) => g.opp)).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
     document.querySelectorAll('#f-min button').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.min) === minn)));
-    $('f-reset').hidden = !(ver || opp || minn !== 10);
+    $('f-reset').hidden = !(ver || opp || minn !== 10 || WL.res || WL.when || WL.len);
     const chips = $('f-chips'); chips.replaceChildren();
     { const vi = $('f-vinfo'); vi.replaceChildren(); vi.hidden = !pickedV;
       if (pickedV) { vi.append(document.createTextNode(pickedV.label + ' was built from commit ')); linkTo(vi, pickedV.sha); const mg = pickedV.commit && pickedV.commit.merged; if (mg) { vi.append(document.createTextNode(' (a merge; the branch it merged ends at ')); linkTo(vi, mg.sha); vi.append(document.createTextNode(')')); } if (pickedV.subject) vi.append(document.createTextNode(': ' + pickedV.subject)); vi.append(document.createTextNode(' ')); } }
-    [[ver && pickedV ? 'Version ' + pickedV.label : '', 'ver'], [opp ? 'Player ' + opp : '', 'opp']].forEach(([label, name]) => {
-      if (!label) return;
+    const whenLabel = WL.when === 'today' ? 'Today' : WL.when === 'yesterday' ? 'Yesterday' : WL.when === 'range' ? (WL.from && WL.to ? (WL.from === WL.to ? WL.from : WL.from + ' to ' + WL.to) : WL.from ? 'From ' + WL.from : 'Until ' + WL.to) : WL.when ? 'Last ' + WL.when + ' days' : '';
+    const lenLabel = { u1: 'Under 1 min', '1-3': '1 to 3 min', '3-10': '3 to 10 min', '10p': '10+ min' }[WL.len] || '';
+    const active = [[ver && pickedV ? 'Version ' + pickedV.label : '', () => dash.setParams({ ver: '' })], [opp ? 'Player ' + opp : '', () => dash.setParams({ opp: '' })],
+      [WL.res ? (WL.res === 'L' ? 'Lost only' : 'Won only') : '', () => { WL.res = ''; render(); }], [whenLabel, () => { WL.when = ''; WL.from = WL.to = ''; render(); }], [lenLabel, () => { WL.len = ''; render(); }]].filter((x) => x[0]);
+    active.forEach(([label, clear]) => {
       const b = document.createElement('button'); b.type = 'button'; b.className = 'gs-fchip'; b.textContent = label + '  ×';
-      b.setAttribute('aria-label', 'Remove filter: ' + label); b.addEventListener('click', () => dash.setParams({ [name]: '' })); chips.appendChild(b);
+      b.setAttribute('aria-label', 'Remove filter: ' + label); b.addEventListener('click', clear); chips.appendChild(b);
     });
     $('f-chips-wrap').hidden = !chips.children.length;
     document.querySelectorAll('#m-opp button').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.m) === oppMin)));
     document.querySelectorAll('#k-loss button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.k === lossKind)));
 
     // slices
-    const byOpp = opp ? games.filter((g) => g.opp === opp) : games;        // chart + versions table
-    const byVer = ver ? games.filter((g) => g.sha === ver) : games;        // opponents table
-    const fg = byOpp.filter((g) => !ver || g.sha === ver);                 // KPIs, histogram, losses
+    // one set of filters (version, opponent, result, length, date) decides every number, chart, table and the replay list
+    const oq = opp.trim().toLowerCase(), nameSet = new Set(games.map((g) => g.opp.toLowerCase()));
+    const oppPass = (g) => !oq || (nameSet.has(oq) ? g.opp.toLowerCase() === oq : g.opp.toLowerCase().includes(oq));
+    const extPass = (g, skip) => (skip === 'res' || !WL.res || g.res === WL.res) && (skip === 'when' || whenOk(g, WL.when, WL.from, WL.to)) && (skip === 'len' || lenOk(g, WL.len));
+    const byOpp = games.filter((g) => extPass(g) && oppPass(g));           // versions table
+    const byVer = games.filter((g) => extPass(g) && (!ver || g.sha === ver));   // opponents table (it is where you pick an opponent, so the opponent filter does not narrow it)
+    const fg = byOpp.filter((g) => !ver || g.sha === ver);                 // KPIs, histogram, losses, recent, replays
+    const narrow = !!(oq || WL.res || WL.when || WL.len);
+    { // the switches count the games each would leave, with the other filters applied
+      const cnt = (skip) => games.filter((g) => extPass(g, skip) && oppPass(g) && (!ver || g.sha === ver));
+      const bR = cnt('res'); document.querySelectorAll('#gw-res button').forEach((b) => { const k = b.dataset.r; b.textContent = (k === 'L' ? 'Lost ' : k === 'W' ? 'Won ' : 'All ') + (k ? bR.filter((g) => g.res === k).length : bR.length); b.setAttribute('aria-pressed', String(k === WL.res)); });
+      const bW = cnt('when'); document.querySelectorAll('#gw-when button').forEach((b) => { const k = b.dataset.w; b.setAttribute('aria-pressed', String(k === (WL.when === 'range' ? '#' : WL.when))); b.title = bW.filter((g) => whenOk(g, k, '', '')).length + ' games'; });
+      const bL = cnt('len'); document.querySelectorAll('#gw-len button').forEach((b) => { const k = b.dataset.l; b.setAttribute('aria-pressed', String(k === WL.len)); b.title = bL.filter((g) => lenOk(g, k)).length + ' games'; });
+      const ds = games.map((g) => g.date).sort(), fr = $('gw-from'), to = $('gw-to');
+      fr.min = to.min = ds[0] || ''; fr.max = to.max = ds[ds.length - 1] || '';
+      if (document.activeElement !== fr) fr.value = WL.when === 'range' ? WL.from : ''; if (document.activeElement !== to) to.value = WL.when === 'range' ? WL.to : '';
+      const q = $('gw-q'); if (document.activeElement !== q) q.value = opp;
+      const names = [...nameSet].length, dl = $('gw-names'); if (dl.childElementCount !== names) dl.replaceChildren(...Array.from(new Set(games.map((g) => g.opp))).sort((a, b) => a.localeCompare(b)).map((n) => { const o = document.createElement('option'); o.value = n; return o; }));
+    }
     const S = stat(fg);
+    $('gs-fsum').textContent = 'Filters' + (active.length ? ' (' + active.length + ' on)' : '') + ' · ' + (active.length ? fg.length + ' of ' + games.length : games.length) + ' games';
+    $('f-count').textContent = active.length ? fg.length + ' of ' + games.length + ' games match. Every number, chart, table and replay on this page uses them.' : 'No filters on: all ' + games.length + ' games. Every number, chart, table and replay on this page follows these.';
 
     // headline sentence
-    const scope = (pickedV ? pickedV.label + ' (' + pickedV.sha + ')' : 'All versions') + (opp ? ' against ' + opp : '');
+    const scope = (pickedV ? pickedV.label + ' (' + pickedV.sha + ')' : 'All versions') + (opp ? ' against ' + opp : '') + [WL.res ? (WL.res === 'L' ? 'losses only' : 'wins only') : '', whenLabel.toLowerCase(), lenLabel.toLowerCase()].filter(Boolean).map((x) => ', ' + x).join('');
     { const dep = $('gs-dep'); dep.replaceChildren(); dep.hidden = !pickedV;
       if (pickedV && pickedV.start) {
         const f = (t) => new Date(t).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
@@ -758,7 +789,7 @@
     if (!S.n) { take.textContent = scope + ': no games yet.'; }
     else {
       const b = document.createElement('b'); b.textContent = scope;
-      take.append(b, document.createTextNode(': won ' + S.w + ' of ' + S.n + ' games (' + fmtPct(S.rate) + ')'));
+      take.append(b, document.createTextNode(': won ' + S.w + ' of ' + S.n + (S.n === 1 ? ' game (' : ' games (') + fmtPct(S.rate) + ')'));
       if (pickedV) {
         const rest = stat(byOpp.filter((g) => g.sha !== ver));
         if (rest.n) {
@@ -801,10 +832,10 @@
       fm.appendChild(d);
     });
     const rl = recent.filter((g) => g.res === 'L').length;
-    $('form-note').textContent = recent.length ? 'Last ' + recent.length + ' games, newest first: ' + (recent.length - rl) + ' won, ' + rl + ' lost. Green won, red lost, grey no replay. Click a dot to watch that game.' : 'No games in this selection.';
+    $('form-note').textContent = recent.length ? (recent.length === 1 ? 'The only game' : 'Last ' + recent.length + ' games') + ', newest first: ' + (recent.length - rl) + ' won, ' + rl + ' lost. Green won, red lost, grey no replay. Click a dot to watch that game.' : 'No games in this selection.';
 
     // per-version stats (opponent filter applied)
-    const vs = vers.map((v) => Object.assign({}, v, stat(byOpp.filter((g) => g.sha === v.sha)))).filter((v) => v.n > 0 && (v.n >= (opp ? 0 : minn) || v.sha === ver));
+    const vs = vers.map((v) => Object.assign({}, v, stat(byOpp.filter((g) => g.sha === v.sha)))).filter((v) => v.n > 0 && (v.n >= (narrow ? 0 : minn) || v.sha === ver));
     const all = stat(byOpp);
 
     // versions table
@@ -843,7 +874,7 @@
       { key: 'avgL', label: 'Avg loss', num: true, cls: 'hide-s', val: (r) => r.avgL, cell: plain((r) => dur(r.avgL)) },
       { key: 'max', label: 'Longest', num: true, cls: 'hide-s', val: (r) => r.max, cell: plain((r) => dur(r.max)) },
       { key: 'last', label: 'Last played', num: true, cls: 'hide-s', val: (r) => r.last, cell: plain((r) => d3.utcFormat('%b %-d')(new Date(r.last))) },
-    ], osShown, (r) => r.opp === opp, (r) => toggle('opp', r.opp));
+    ], osShown, (r) => r.opp.toLowerCase() === oq, (r) => toggle('opp', r.opp));
 
     drawHist(fg);
 
@@ -872,10 +903,9 @@
     ], lsShown, null, null);
     document.querySelectorAll('#t-loss tbody tr').forEach((tr) => { tr.style.cursor = 'default'; });
     const PD = URLSTATE.pending;       // a link to a game: show it even when the selection would hide it
-    if (PD && !URLSTATE.reset && !fg.some((g) => g.replay === PD.rid) && games.some((g) => g.replay === PD.rid)) { URLSTATE.reset = true; dash.resetParams(); return; }
+    if (PD && !URLSTATE.reset && !fg.some((g) => g.replay === PD.rid) && games.some((g) => g.replay === PD.rid)) { URLSTATE.reset = true; resetAll(); return; }
     updateWatch(fg);
     if (PD) { let row = WL.list.find((g) => g.replay === PD.rid);
-      if (!row) { Object.assign(WL, { res: '', when: '', date: '', len: '', q: '' }); updateWatch(fg); row = WL.list.find((g) => g.replay === PD.rid); }
       if (row) { R.pending = PD.frame; openReplay(row, true); R.part = PD.part; if (R.D) syncPart(); } URLSTATE.pending = null; }
     refreshPlayer();
   }
@@ -931,19 +961,20 @@
   }
   // the games of the current selection that have a replay, found by result, day, length and opponent
   let VLBL = null;
-  const WL = { list: [], src: [], res: '', when: '', date: '', len: '', q: '', sort: 'new' };
+  const WL = { list: [], src: [], res: '', when: '', from: '', to: '', len: '', sort: 'new' };
   const resWord = (r) => r.res === 'W' ? 'Won' : 'Lost';
   const playedMs = (r) => r.at ? new Date(r.at).getTime() - (r.secs || 0) * 1000 : new Date(r.date + 'T12:00:00').getTime();
   const dayStart = (t) => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); };
   const dayName = (t) => { const today = dayStart(Date.now()), d = dayStart(t), diff = Math.round((today - d) / 864e5); return diff === 0 ? 'Today' : diff === 1 ? 'Yesterday' : new Date(t).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }); };
   const lenOk = (r, k) => { const m = (r.secs || 0) / 60; return !k || (k === 'u1' ? m < 1 : k === '1-3' ? m >= 1 && m < 3 : k === '3-10' ? m >= 3 && m < 10 : m >= 10); };
-  const whenOk = (r, w, date) => {
+  const dayKey = (t) => { const d = new Date(t); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+  const whenOk = (r, w, from, to) => {
     if (!w) return true; const t = playedMs(r), today = dayStart(Date.now());
     if (w === 'today') return dayStart(t) === today; if (w === 'yesterday') return dayStart(t) === today - 864e5;
-    if (w === 'date') return !date || dayStart(t) === dayStart(new Date(date + 'T12:00:00').getTime());
+    if (w === 'range') { const k = dayKey(t); return (!from || k >= from) && (!to || k <= to); }
     return t >= today - (Number(w) - 1) * 864e5;
   };
-  const filtersOn = () => !!(WL.res || WL.when || WL.len || WL.q);
+  const resetAll = () => { Object.assign(WL, { res: '', when: '', from: '', to: '', len: '' }); dash.resetParams(); };
   function syncPick() {
     const i = WL.list.findIndex((r) => r.replay === R.rid);
     $('gw-newer').disabled = i <= 0; $('gw-older').disabled = i < 0 || i >= WL.list.length - 1;
@@ -971,52 +1002,27 @@
   }
   function updateWatch(src) {
     const withRep = src.filter((r) => r.replay); WL.src = withRep;
-    // each switch counts the games it would leave, with the other filters applied
-    const q = WL.q.trim().toLowerCase(), base = (skip) => withRep.filter((r) => (skip === 'res' || !WL.res || r.res === WL.res) && (skip === 'when' || whenOk(r, WL.when, WL.date)) && (skip === 'len' || lenOk(r, WL.len)) && (!q || r.opp.toLowerCase().includes(q)));
-    const bR = base('res'); document.querySelectorAll('#gw-res button').forEach((b) => { const k = b.dataset.r, n = k ? bR.filter((r) => r.res === k).length : bR.length; b.textContent = (k === 'L' ? 'Lost' : k === 'W' ? 'Won' : 'All') + ' ' + n; b.setAttribute('aria-pressed', String(k === WL.res)); });
-    const bW = base('when'); document.querySelectorAll('#gw-when button').forEach((b) => { const k = b.dataset.w; b.setAttribute('aria-pressed', String(k === WL.when)); b.title = bW.filter((r) => whenOk(r, k, '')).length + ' games'; });
-    document.querySelectorAll('#gw-len button').forEach((b) => { const k = b.dataset.l; b.setAttribute('aria-pressed', String(k === WL.len)); b.title = base('len').filter((r) => lenOk(r, k)).length + ' games'; });
-    $('gw-date').value = WL.when === 'date' ? WL.date : '';
-    const names = [...new Set(withRep.map((r) => r.opp))].sort((a, b) => a.localeCompare(b)); const dl = $('gw-names'); if (dl.childElementCount !== names.length) dl.replaceChildren(...names.map((n) => { const o = document.createElement('option'); o.value = n; return o; }));
-    const list = base('').slice().sort((a, b) => WL.sort === 'old' ? playedMs(a) - playedMs(b) : WL.sort === 'long' ? (b.secs || 0) - (a.secs || 0) : WL.sort === 'short' ? (a.secs || 0) - (b.secs || 0) : playedMs(b) - playedMs(a));
+    const list = withRep.slice().sort((a, b) => WL.sort === 'old' ? playedMs(a) - playedMs(b) : WL.sort === 'long' ? (b.secs || 0) - (a.secs || 0) : WL.sort === 'short' ? (a.secs || 0) - (b.secs || 0) : playedMs(b) - playedMs(a));
     WL.list = list;
-    $('gw-reset').hidden = !filtersOn() && WL.sort === 'new';
-    const body = $('gw-body'), pick = $('gw-pick');
-    $('gw-count').textContent = withRep.length ? (filtersOn() ? list.length + ' of ' + withRep.length : withRep.length) + ' games' : '';
-    { // which filters are on, always visible, each with a way to clear it
-      const box = $('gw-active'), chips = []; box.replaceChildren();
-      const lab = { u1: 'Under 1 min', '1-3': '1 to 3 min', '3-10': '3 to 10 min', '10p': '10+ min' };
-      if (WL.res) chips.push([WL.res === 'L' ? 'Lost' : 'Won', () => { WL.res = ''; }]);
-      if (WL.when) chips.push([WL.when === 'today' ? 'Today' : WL.when === 'yesterday' ? 'Yesterday' : WL.when === 'date' ? WL.date : 'Last ' + WL.when + ' days', () => { WL.when = ''; WL.date = ''; }]);
-      if (WL.len) chips.push([lab[WL.len], () => { WL.len = ''; }]);
-      if (WL.q.trim()) chips.push(['"' + WL.q.trim() + '"', () => { WL.q = ''; $('gw-q').value = ''; }]);
-      box.hidden = !chips.length || !withRep.length;
-      if (!box.hidden) {
-        const l = document.createElement('span'); l.textContent = 'Filtered:'; box.appendChild(l);
-        chips.forEach(([t, clear]) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'gw-fchip'; b.textContent = t; b.setAttribute('aria-label', 'Clear ' + t); b.addEventListener('click', () => { clear(); again(); }); box.appendChild(b); });
-        const n = document.createElement('span'); n.className = 'gw-n'; n.textContent = list.length + ' of ' + withRep.length + ' games'; box.appendChild(n);
-        const c = document.createElement('button'); c.type = 'button'; c.className = 'gs-link'; c.textContent = 'Clear all'; c.addEventListener('click', () => { WL.res = ''; WL.when = ''; WL.date = ''; WL.len = ''; WL.q = ''; $('gw-q').value = ''; again(); }); box.appendChild(c);
-      }
-    }
-    pick.hidden = !withRep.length; $('gw-fd').hidden = !withRep.length;
-    { const on = []; if (WL.res) on.push(WL.res === 'L' ? 'Lost' : 'Won'); if (WL.when) on.push(WL.when === 'today' ? 'Today' : WL.when === 'yesterday' ? 'Yesterday' : WL.when === 'date' ? WL.date : 'Last ' + WL.when + ' days'); if (WL.len) on.push({ u1: 'Under 1 min', '1-3': '1 to 3 min', '3-10': '3 to 10 min', '10p': '10+ min' }[WL.len]); if (WL.q.trim()) on.push('"' + WL.q.trim() + '"'); if (WL.sort !== 'new') on.push({ old: 'Oldest first', long: 'Longest first', short: 'Shortest first' }[WL.sort]);
-      $('gw-fsum').textContent = on.length ? 'Filters and sort (' + on.length + ' on)' : 'Filters and sort'; }
-    $('gw-browse').hidden = !withRep.length; $('gw-pickd').hidden = !withRep.length; document.querySelector('.gw-pager').hidden = !withRep.length; if (!withRep.length) $('gw-active').hidden = true;
+    const body = $('gw-body');
+    $('gw-count').textContent = withRep.length ? withRep.length + (withRep.length === 1 ? ' game' : ' games') + ' with a replay' : '';
+    $('gw-pickd').hidden = !withRep.length; document.querySelector('.gw-pager').hidden = !withRep.length; $('gw-browse').hidden = !withRep.length;
     if (!list.length) { stopPlay(); R.rid = null; R.D = null; body.hidden = true; $('sec-garbage').hidden = true; $('gw-list').replaceChildren(); LIST.rid = null; $('gw-browse').replaceChildren(); $('gw-pos').textContent = '';
       $('gw-newer').disabled = true; $('gw-older').disabled = true;
-      $('gw-sub').textContent = withRep.length ? 'No games match. Reset the filters.' : 'No replays here. Reset the filters.'; return; }
+      $('gw-sub').textContent = 'No games with a replay match the filters at the top. Reset them to see games.'; return; }
     body.hidden = false;
     if (!list.some((r) => r.replay === R.rid)) openReplay(list[0], false);
     renderBrowse();
   }
     const again = () => updateWatch(WL.src);
-  $('gw-res').addEventListener('click', (e) => { const b = e.target.closest('button[data-r]'); if (b) { WL.res = b.dataset.r; again(); } });
-  $('gw-when').addEventListener('click', (e) => { const b = e.target.closest('button[data-w]'); if (b) { WL.when = b.dataset.w; again(); } });
-  $('gw-date').addEventListener('change', (e) => { WL.date = e.target.value; WL.when = WL.date ? 'date' : ''; again(); });
-  $('gw-len').addEventListener('click', (e) => { const b = e.target.closest('button[data-l]'); if (b) { WL.len = b.dataset.l; again(); } });
-  $('gw-q').addEventListener('input', (e) => { WL.q = e.target.value; again(); });
+  $('gw-res').addEventListener('click', (e) => { const b = e.target.closest('button[data-r]'); if (b) { WL.res = b.dataset.r; render(); } });
+  $('gw-when').addEventListener('click', (e) => { const b = e.target.closest('button[data-w]'); if (b) { WL.when = b.dataset.w; WL.from = WL.to = ''; render(); } });
+  const rangeChanged = () => { WL.from = $('gw-from').value; WL.to = $('gw-to').value; if (WL.from && WL.to && WL.from > WL.to) { const t = WL.from; WL.from = WL.to; WL.to = t; } WL.when = (WL.from || WL.to) ? 'range' : ''; render(); };
+  $('gw-from').addEventListener('change', rangeChanged); $('gw-to').addEventListener('change', rangeChanged);
+  $('gw-len').addEventListener('click', (e) => { const b = e.target.closest('button[data-l]'); if (b) { WL.len = b.dataset.l; render(); } });
+  $('gw-q').addEventListener('input', (e) => dash.setParams({ opp: e.target.value }));
   $('gw-sort').addEventListener('change', (e) => { WL.sort = e.target.value; again(); });
-  $('gw-reset').addEventListener('click', () => { Object.assign(WL, { res: '', when: '', date: '', len: '', q: '', sort: 'new' }); $('gw-q').value = ''; $('gw-sort').value = 'new'; again(); });
+  if (window.innerWidth > 760) $('gs-filters').open = true;
   $('gw-pickd').addEventListener('toggle', () => { if ($('gw-pickd').open) scrollToCur(); });
   $('gw-newer').addEventListener('click', () => { const i = WL.list.findIndex((r) => r.replay === R.rid); if (i > 0) { openReplay(WL.list[i - 1], false); scrollToCur(); } });
   $('gw-older').addEventListener('click', () => { const i = WL.list.findIndex((r) => r.replay === R.rid); if (i >= 0 && i < WL.list.length - 1) { openReplay(WL.list[i + 1], false); scrollToCur(); } });
@@ -1924,7 +1930,7 @@ function projectPlan(G, seq, cursor) {
       add('oq', $('s-opp').value.trim()); add('om', oppMin, 0); add('os', sortStr(sortState.opp), 'n:-1'); if (expanded.opp) o.oall = '1';
       add('vq', $('s-ver').value.trim()); add('vs', sortStr(sortState.ver), 'order:-1'); if (expanded.ver) o.vall = '1';
       add('lq', $('s-loss').value.trim()); add('lk', lossKind); add('ls', sortStr(sortState.loss), 'idx:-1'); if (expanded.loss) o.lall = '1';
-      add('res', WL.res); add('when', WL.when); if (WL.when === 'date') add('date', WL.date); add('len', WL.len); add('q', WL.q.trim()); add('sort', WL.sort, 'new');
+      add('res', WL.res); add('when', WL.when); if (WL.when === 'range') { add('from', WL.from); add('to', WL.to); } add('len', WL.len); add('sort', WL.sort, 'new');
       if (R.rid) { o.game = R.rid; if (R.D && R.D.frames && R.D.frames[R.idx]) o.frame = String(R.D.frames[R.idx][0]); add('part', R.part, 'end'); }
       if (!PLAN.on) o.plan = '0';
       add('lm', LIST.mode, 'chg'); add('speed', R.speed, 1);
@@ -1941,15 +1947,18 @@ function projectPlan(G, seq, cursor) {
       oppMin = num(p.om, 0); $('s-opp').value = p.oq || ''; Object.assign(sortState.opp, srt(p.os, { key: 'n', dir: -1 })); expanded.opp = p.oall === '1';
       $('s-ver').value = p.vq || ''; Object.assign(sortState.ver, srt(p.vs, { key: 'order', dir: -1 })); expanded.ver = p.vall === '1';
       $('s-loss').value = p.lq || ''; lossKind = p.lk || ''; Object.assign(sortState.loss, srt(p.ls, { key: 'idx', dir: -1 })); expanded.loss = p.lall === '1';
-      WL.res = one(p.res, ['W', 'L'], ''); WL.when = one(p.when, ['today', 'yesterday', '7', '30', 'date'], ''); WL.date = /^\d{4}-\d\d-\d\d$/.test(p.date || '') ? p.date : ''; if (WL.when === 'date' && !WL.date) WL.when = '';
-      WL.len = one(p.len, ['u1', '1-3', '3-10', '10p'], ''); WL.q = p.q || ''; WL.sort = one(p.sort, ['new', 'old', 'long', 'short'], 'new');
-      $('gw-q').value = WL.q; $('gw-sort').value = WL.sort;
+      const dt = (v) => /^\d{4}-\d\d-\d\d$/.test(v || '') ? v : '';
+      WL.res = one(p.res, ['W', 'L'], ''); WL.when = one(p.when, ['today', 'yesterday', '7', '30', 'range', 'date'], ''); WL.from = dt(p.from); WL.to = dt(p.to);
+      if (WL.when === 'date') { WL.when = 'range'; WL.from = WL.to = dt(p.date); }      // the older single-day links
+      if (WL.when === 'range' && !WL.from && !WL.to) WL.when = ''; if (WL.when !== 'range') WL.from = WL.to = '';
+      WL.len = one(p.len, ['u1', '1-3', '3-10', '10p'], ''); WL.sort = one(p.sort, ['new', 'old', 'long', 'short'], 'new');
+      $('gw-sort').value = WL.sort;
       LIST.mode = one(p.lm, ['chg', 'all'], 'chg'); document.querySelectorAll('#gw-lmode button').forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.m === LIST.mode))); LIST.rid = null;
       R.part = p.part === 'open' ? 'open' : 'end';
       const sp = num(p.speed, 1); if ([1, 0.5, 0.25, 0.125].includes(sp)) setSpeed(sp);
       if (p.plan === '0') (init ? setTimeout : (f) => f())(() => setPlan(false), 0);
       U.pending = /^r\d+$/.test(p.game || '') ? { rid: p.game, frame: p.frame !== undefined && /^\d+$/.test(p.frame) ? Number(p.frame) : null, part: p.part === 'open' ? 'open' : 'end' } : null; U.reset = false;
-      dash.setParams({ ver: /^[0-9a-f]{4,40}$/.test(p.ver || '') ? p.ver : '', opp: p.opp || '', minn: num(p.min, 10) });    // last: this draws the page
+      dash.setParams({ ver: /^[0-9a-f]{4,40}$/.test(p.ver || '') ? p.ver : '', opp: p.opp || p.q || '', minn: num(p.min, 10) });    // last: this draws the page
     };
     setInterval(() => { if (!R.playing) U.flush(); }, 700);
     document.addEventListener('visibilitychange', () => { if (document.hidden) U.flush(); });

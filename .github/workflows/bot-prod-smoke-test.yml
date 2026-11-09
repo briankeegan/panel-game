@@ -469,14 +469,11 @@ jobs:
                 break
               fi
             done ) &
-          # every 20 minutes the games finished so far go to the stats page (a side job: it never touches the bot and its errors are ignored)
+          # the games finished so far go to the stats page when a set seems over (no game has finished for 90 s; never twice within 6 minutes,
+          # and at least every 20 minutes while games keep coming): dashboard/live_loop.sh. A side job that never touches the bot; its lines
+          # reach this step's log prefixed [publish], so a publish that fails is visible there
           if [ "$kind" = gambit ] && [ "${DASH_LIVE:-1}" = 1 ]; then
-            ( parent=$$; sleep 600
-              while kill -0 "$parent" 2>/dev/null; do
-                # its lines go to this step's log (prefixed), so a publish that fails is visible there
-                GH_TOKEN="${{ github.token }}" nice -n 19 bash "$GITHUB_WORKSPACE/dashboard/live_publish.sh" 2>&1 | sed -u 's/^/[publish] /' || true
-                for _ in $(seq 1 120); do kill -0 "$parent" 2>/dev/null || break; sleep 10; done
-              done ) &
+            GH_TOKEN="${{ github.token }}" nice -n 19 bash "$GITHUB_WORKSPACE/dashboard/live_loop.sh" "$$" &
           fi
           # THE BOT AND A WATCHER RUN KEEP EACH OTHER UP. A runner can be taken away (the log ends with "The runner has received a shutdown
           # signal"), and then nothing on that runner can start a replacement. So there is a second run, ranmaru-watch, that only watches:

@@ -474,7 +474,7 @@ jobs:
             ( parent=$$; sleep 600
               while kill -0 "$parent" 2>/dev/null; do
                 # its lines go to this step's log (prefixed), so a publish that fails is visible there
-                GH_TOKEN="${{ github.token }}" nice -n 19 bash dashboard/live_publish.sh 2>&1 | sed -u 's/^/[publish] /' || true
+                GH_TOKEN="${{ github.token }}" nice -n 19 bash "$GITHUB_WORKSPACE/dashboard/live_publish.sh" 2>&1 | sed -u 's/^/[publish] /' || true
                 for _ in $(seq 1 120); do kill -0 "$parent" 2>/dev/null || break; sleep 10; done
               done ) &
           fi

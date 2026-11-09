@@ -20,9 +20,12 @@ ap.add_argument("--now", default="", help="the time to give a game seen only whi
 ap.add_argument("--engine", default="", help="a checkout whose game engine plays the replays back (the one the games were played on); this repo's own when blank")
 ap.add_argument("--max-mb", type=float, default=900, help="keep the replays under this size: the oldest go first")
 ap.add_argument("--sizes", default="", help="a file of 'bytes name' lines for the replays already on the page, when they are not all on disk")
+ap.add_argument("--gc", default="", help="a GameCreator checkout, to read rank.c at the log's commit (the rule a decision names); the GitHub API is used when blank")
 ap.add_argument("--prune-out", default="", help="a file to list the replays that were removed but were not on disk")
 a = ap.parse_args()
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+import gambit_log as GL        # the newer log lines (per-swap, given-up lines, the frame loop's notes, the rule a decision names)
 LUA = os.path.join(HERE, "replayFrames.lua")
 # the repo's own libraries first, then whatever luarocks (or the system) provides: in CI that comes from `luarocks path` in the environment
 ENV = dict(os.environ,
@@ -57,16 +60,18 @@ def fld(l, k):
     m = re.search(r" %s=(\S+)" % k, l); return m.group(1) if m else ""
 
 # --- the games of this run, in order
-games, cur, opp, rep = [], [], "?", None
+games, cur, opp, rep, notes = [], [], "?", None, []
 for line in open(log, errors="ignore"):
     if line.startswith("REPLAY "): rep = line[7:]
+    nt = GL.note(line)
+    if nt: notes.append(nt)
     m = re.match(r"match against: (.*)", line)
     if m: opp = m.group(1).strip()
     cur.append(line)
     if "match over —" in line:
         r = "W" if "bot won" in line else "L" if "bot lost" in line else "A"
-        games.append(dict(r=r, opp=opp, rep=rep, top=sum(1 for l in cur if l.startswith("opponent topped out")) * 30, land=sum(1 for l in cur if l.startswith("garbage landed"))))
-        cur, rep = [], None
+        games.append(dict(r=r, opp=opp, rep=rep, top=sum(1 for l in cur if l.startswith("opponent topped out")) * 30, land=sum(1 for l in cur if l.startswith("garbage landed")), fl=notes))
+        cur, rep, notes = [], None, []
 for i_, g_ in enumerate(games): g_["raw"] = i_      # its place among all the games of the run: the decision log has one block per game, in the same order
 n_raw = len(games)
 games = [g for g in games if g["r"] in "WL"]
@@ -98,14 +103,27 @@ date = a.started[:10]
 
 # --- Gambit's decision log, split into games, for the decisions and plans of each loss
 gl = [c for c in glob.glob(os.path.join(a.dir, "gambit-*.log")) if "build" not in c and "save-id" not in c]
-gg, prev = [], None
+gg, prev, gx = [], None, []      # gx: for each block of decisions, its swaps (GAMBITM), given-up lines (GAMBITE) and the frame loop's notes
 if gl:
+    pend = dict(sw=[], gu=[], fl=[])
     for l in open(gl[0], errors="ignore"):
         m = re.match(r"GAMBITD (\d+) ([a-z ]+?) play=", l)
         if m:
             c = int(m.group(1))
-            if prev is None or c < prev - 500: gg.append([])
+            if prev is None or c < prev - 500:
+                gg.append([]); gx.append(dict(sw=[], gu=[], fl=[]))
+                if len(gx) > 1:      # the first lines of the new game were read before its first decision: they came after the last block's end
+                    for k_ in ("sw", "gu", "fl"):
+                        early = [e for e in gx[-2][k_] if e[0] <= c and e[0] < prev - 500]
+                        gx[-2][k_] = [e for e in gx[-2][k_] if e not in early]; gx[-1][k_] += early
+                else:
+                    for k_ in pend: gx[-1][k_] += pend[k_]
             prev = c; gg[-1].append((c, m.group(2), l))
+            continue
+        e_ = None
+        for k_, f_ in (("sw", GL.swap), ("gu", GL.gave_up), ("fl", GL.note)):
+            e_ = f_(l)
+            if e_: (gx[-1][k_] if gx else pend[k_]).append(e_); break
 
 rows = load("games.json", [])
 def rnum(name): return int(re.search(r"r(\d+)", name).group(1))
@@ -131,17 +149,27 @@ for gi, g in enumerate(games):
             if gg:
                 # the decision log has one block per game the bot played, in order, and may hold extra blocks (a game that was never reported):
                 # take the next block that ends where this replay ends (the bot goes on deciding a few frames after the game is over)
+                # the FIRST block in order that ends there (not the closest: two games of nearly the same length would swap blocks, and
+                # every game after them would be out of step)
                 fr_end = fr["frames"][-1][0]; best = None
                 for k_ in range(jptr, min(len(gg), jptr + 4)):
                     df_ = gg[k_][-1][0] - fr_end
-                    if -150 <= df_ <= 60 and (best is None or abs(df_) < best[1]): best = (k_, abs(df_))
+                    if -150 <= df_ <= 60: best = (k_, abs(df_)); break
                 dg = gg[best[0]] if best else []
                 if best: jptr = best[0] + 1
                 off = 0
                 for c, mode, l in [x_ for x_ in dg if x_[0] <= fr_end]:
                     cc = c - off; en = fld(l, "enemy").split("/")
                     plans.append([cc, fld(l, "seq"), fld(l, "done"), fld(l, "fire"), fld(l, "ats"), fld(l, "broke"), fld(l, "rule"), fld(l, "cat"), fld(l, "tier"), fld(l, "lost"), fld(l, "sooner"), fld(l, "carryBy"), fld(l, "own"), fld(l, "swaps"), fld(l, "w3"), fld(l, "veto")])
-                    dec.append([cc, mode, fld(l, "play"), fld(l, "want"), fld(l, "v"), fld(l, "dies"), fld(l, "land"), fld(l, "chain"), fld(l, "combo"), fld(l, "thrown"), en[0] if en else "", en[1] if len(en) > 1 else "", en[2] if len(en) > 2 else "", fld(l, "why"), fld(l, "opts"), fld(l, "allow"), fld(l, "fill")])
+                    dec.append([cc, mode, fld(l, "play"), fld(l, "want"), fld(l, "v"), fld(l, "dies"), fld(l, "land"), fld(l, "chain"), fld(l, "combo"), fld(l, "thrown"), en[0] if en else "", en[1] if len(en) > 1 else "", en[2] if len(en) > 2 else "", fld(l, "why"), fld(l, "opts"), fld(l, "allow"), fld(l, "fill"), l.rstrip("\n")])
+            # the newer log's own sections (none in a log from before GameCreator 8ddcfb47: then these stay empty and are left out)
+            ex = gx[best[0]] if (gg and best) else dict(sw=[], gu=[], fl=[])
+            sw = sorted([e for e in ex["sw"] if e[0] <= fr["frames"][-1][0]], key=lambda e: e[0])
+            gu = sorted([e for e in ex["gu"] if e[0] <= fr["frames"][-1][0]], key=lambda e: e[0])
+            fl = []
+            for e in sorted(g.get("fl", []) + ex["fl"], key=lambda e: e[0]):
+                if e[0] <= fr["frames"][-1][0] and e not in fl: fl.append(e)
+            rl = GL.rank_rules(sha, a.gc, GL.wanted_lines([d_[17] for d_ in dec if len(d_) > 17], sw, gu))
             used = sorted({s[6] for f in fr["frames"] for s in f[1:3]}); remap = {u: i for i, u in enumerate(used)}
             qused = sorted({s[7] for f in fr["frames"] for s in f[1:3]}); qmap = {u: i for i, u in enumerate(qused)}
             def squeeze(gr):
@@ -152,6 +180,8 @@ for gi, g in enumerate(games):
             frames = [[f[0]] + [v for s in f[1:3] for v in s[:6] + [remap[s[6]], qmap[s[7]], s[8]]] for f in fr["frames"]]
             out = dict(id=rid, opp=g["opp"], bot=bot, sha=sha, date=date, secs=row["secs"], mine=x["mine"], start=0, end=fr["frames"][-1][0],
                        grids=[squeeze(fr["grids"][u]) for u in used], queues=[fr["queues"][u] for u in qused], frames=frames, dec=dec, plans=plans, fc=fr.get("fc"), lv=fr.get("levels"))
+            for k_, v_ in (("sw", sw), ("gu", gu), ("fl", fl), ("rl", rl)):
+                if v_: out[k_] = v_
             with gzip.open(os.path.join(a.data, "replay_%s.json.gz" % rid), "wt", compresslevel=9) as z: json.dump(out, z, separators=(",", ":"))
             row["replay"] = rid
     rows.append(row); added += 1

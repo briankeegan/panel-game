@@ -365,7 +365,7 @@
     <div class="gs-kpi"><div class="gs-kl">Longest game</div><div class="gs-kv" id="k-lg" data-source="games">—</div><div class="gs-kn" id="k-lg-n"></div></div>
   </section>
 
-  <nav class="gs-nav" aria-label="Sections"><a href="#sec-opp">Opponents</a><a href="#sec-watch">Watch a game</a><a href="#sec-garbage">Garbage sent</a><a href="#sec-table">Versions</a><a href="#sec-len">Game length</a></nav>
+  <nav class="gs-nav" aria-label="Sections"><a href="#sec-opp">Opponents</a><a href="#sec-watch">Watch a game</a><a href="#sec-garbage">Garbage sent</a><a href="#sec-table">Versions</a><a href="#sec-len">Game length</a><button type="button" class="gs-link" id="copy-link" title="Copy a link that opens this exact view">Copy link to this view</button></nav>
 
   <section class="gs-card" id="sec-opp">
     <h2>Opponents</h2>
@@ -765,10 +765,12 @@
       { key: 'kind', label: 'Type', val: (r) => kind(r), cell: (td, r) => { const k = kind(r); txt(td, 'gs-chip' + (k === 'Stalemate' ? ' stalemate' : ''), k); } },
     ], lsShown, null, null);
     document.querySelectorAll('#t-loss tbody tr').forEach((tr) => { tr.style.cursor = 'default'; });
-    if (DEEP.rid && !DEEP.reset && !fg.some((g) => g.replay === DEEP.rid) && games.some((g) => g.replay === DEEP.rid)) { DEEP.reset = true; dash.resetParams(); return; }   // a selection hides it: show everything
-    if (DEEP.rid) Object.assign(WL, { res: '', when: '', date: '', len: '', q: '' });
+    const PD = URLSTATE.pending;       // a link to a game: show it even when the selection would hide it
+    if (PD && !URLSTATE.reset && !fg.some((g) => g.replay === PD.rid) && games.some((g) => g.replay === PD.rid)) { URLSTATE.reset = true; dash.resetParams(); return; }
     updateWatch(fg);
-    if (DEEP.rid) { const row = WL.list.find((g) => g.replay === DEEP.rid); if (row) { R.pending = DEEP.frame; openReplay(row, true); } DEEP.rid = null; }
+    if (PD) { let row = WL.list.find((g) => g.replay === PD.rid);
+      if (!row) { Object.assign(WL, { res: '', when: '', date: '', len: '', q: '' }); updateWatch(fg); row = WL.list.find((g) => g.replay === PD.rid); }
+      if (row) { R.pending = PD.frame; openReplay(row, true); R.part = PD.part; if (R.D) syncPart(); } URLSTATE.pending = null; }
     refreshPlayer();
   }
 
@@ -1566,7 +1568,7 @@ function projectPlan(G, seq, cursor) {
     const D = R.D, row = R.row || {}, clock = D.frames[R.idx][0], i = decAt(clock), d = i >= 0 ? D.dec[i] : null, W = 180;
     const near = (f) => Math.abs(f - clock) <= W;
     const L = [];
-    L.push('Ranmaru stats page: ' + location.origin + location.pathname + '#game=' + R.rid + '&frame=' + clock);
+    URLSTATE.flush(); L.push('Ranmaru stats page: ' + location.href);
     L.push('Game: ' + R.rid + ' · ' + (VLBL ? VLBL(D.sha) : '') + ' (GameCreator ' + D.sha + ') · ' + (row.res === 'W' ? 'won' : 'lost') + ' vs ' + D.opp + ' · ' + (row.at || row.date || '') + ' · ' + dur(row.secs) + (row.run ? ' · run ' + row.run : '') + ' · bot ' + D.bot);
     L.push('At: frame ' + clock + ' (' + fmtClock(clock) + ' of ' + fmtClock(D.end) + ')');
     if (d) {
@@ -1590,8 +1592,6 @@ function projectPlan(G, seq, cursor) {
   g$('copy').addEventListener('click', async () => {
     if (!R.D) return; const ok = await copyText(detailsText()), n = g$('copied'); n.textContent = ok ? 'Copied' : 'Could not copy'; clearTimeout(copiedT); copiedT = setTimeout(() => { n.textContent = ''; }, 2500);
   });
-  // a link to a game and frame: #game=r123&frame=1234
-  const DEEP = (() => { const m = /[#&]game=(r\d+)(?:&frame=(\d+))?/.exec(location.hash || ''); return m ? { rid: m[1], frame: m[2] != null ? Number(m[2]) : null, reset: false } : { rid: null }; })();
   function showDecision(clock) {
     const D = R.D, cap = g$('cap');
     const i = decAt(clock);
@@ -1802,6 +1802,55 @@ function projectPlan(G, seq, cursor) {
     else if (e.key === '[' || e.key === ']') { const sp = [1, .5, .25, .125]; const k = sp.indexOf(R.speed); setSpeed(sp[Math.max(0, Math.min(3, k + (e.key === '[' ? 1 : -1)))]); }
   });
 
+  // ---- THE LINK: every setting on the page is kept in the address (#key=value&key=value), so any view can be shared. Values that are the default are left out.
+  //   ver opp min      version (commit), opponent, minimum games a version needs
+  //   oq om os oall    opponents table: search, minimum games ("-1" = beat Ranmaru), sort (column:1 or :-1), show all
+  //   vq vs vall       versions table: search, sort, show all           lq lk ls lall    losses table: search, kind, sort, show all
+  //   res when date len q sort    Watch a game filters: result W|L, today|yesterday|7|30|date (+date), u1|1-3|3-10|10p, opponent text, new|old|long|short
+  //   game frame part plan lm speed    the game (rN), its frame, start|end, plan off (plan=0), decision list (chg|all), playback speed
+  const URLSTATE = (() => {
+    const enc = encodeURIComponent, U = { pending: null, reset: false };
+    const sortStr = (x) => x.key + ':' + x.dir;
+    function state() {
+      const o = {}, P = dash.params(), add = (k, v, def) => { if (v !== undefined && v !== null && String(v) !== String(def === undefined ? '' : def)) o[k] = String(v); };
+      add('ver', P.ver); add('opp', P.opp); add('min', P.minn ?? 10, 10);
+      add('oq', $('s-opp').value.trim()); add('om', oppMin, 0); add('os', sortStr(sortState.opp), 'n:-1'); if (expanded.opp) o.oall = '1';
+      add('vq', $('s-ver').value.trim()); add('vs', sortStr(sortState.ver), 'order:-1'); if (expanded.ver) o.vall = '1';
+      add('lq', $('s-loss').value.trim()); add('lk', lossKind); add('ls', sortStr(sortState.loss), 'idx:-1'); if (expanded.loss) o.lall = '1';
+      add('res', WL.res); add('when', WL.when); if (WL.when === 'date') add('date', WL.date); add('len', WL.len); add('q', WL.q.trim()); add('sort', WL.sort, 'new');
+      if (R.rid) { o.game = R.rid; if (R.D && R.D.frames && R.D.frames[R.idx]) o.frame = String(R.D.frames[R.idx][0]); add('part', R.part, 'end'); }
+      if (!PLAN.on) o.plan = '0';
+      add('lm', LIST.mode, 'chg'); add('speed', R.speed, 1);
+      return o;
+    }
+    const hashOf = (o) => { const k = Object.keys(o); return k.length ? '#' + k.map((x) => x + '=' + enc(o[x])).join('&') : ''; };
+    U.flush = () => { const h = hashOf(state()); if (h !== (location.hash || '')) { try { history.replaceState(null, '', h || (location.pathname + location.search)); } catch (e) {} } };
+    U.apply = (hash, init) => {
+      const p = {};
+      (hash || '').replace(/^#/, '').split('&').forEach((kv) => { const i = kv.indexOf('='); if (i > 0) { try { p[kv.slice(0, i)] = decodeURIComponent(kv.slice(i + 1)); } catch (e) {} } });
+      const num = (v, d) => (v !== undefined && v !== '' && !isNaN(Number(v))) ? Number(v) : d;
+      const one = (v, list, d) => list.includes(v) ? v : d;
+      const srt = (v, d) => { const m = /^([A-Za-z0-9_]+):(-?1)$/.exec(v || ''); return m ? { key: m[1], dir: Number(m[2]) } : d; };
+      oppMin = num(p.om, 0); $('s-opp').value = p.oq || ''; Object.assign(sortState.opp, srt(p.os, { key: 'n', dir: -1 })); expanded.opp = p.oall === '1';
+      $('s-ver').value = p.vq || ''; Object.assign(sortState.ver, srt(p.vs, { key: 'order', dir: -1 })); expanded.ver = p.vall === '1';
+      $('s-loss').value = p.lq || ''; lossKind = p.lk || ''; Object.assign(sortState.loss, srt(p.ls, { key: 'idx', dir: -1 })); expanded.loss = p.lall === '1';
+      WL.res = one(p.res, ['W', 'L'], ''); WL.when = one(p.when, ['today', 'yesterday', '7', '30', 'date'], ''); WL.date = /^\d{4}-\d\d-\d\d$/.test(p.date || '') ? p.date : ''; if (WL.when === 'date' && !WL.date) WL.when = '';
+      WL.len = one(p.len, ['u1', '1-3', '3-10', '10p'], ''); WL.q = p.q || ''; WL.sort = one(p.sort, ['new', 'old', 'long', 'short'], 'new');
+      $('gw-q').value = WL.q; $('gw-sort').value = WL.sort;
+      LIST.mode = one(p.lm, ['chg', 'all'], 'chg'); document.querySelectorAll('#gw-lmode button').forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.m === LIST.mode))); LIST.rid = null;
+      R.part = p.part === 'open' ? 'open' : 'end';
+      const sp = num(p.speed, 1); if ([1, 0.5, 0.25, 0.125].includes(sp)) setSpeed(sp);
+      if (p.plan === '0') (init ? setTimeout : (f) => f())(() => setPlan(false), 0);
+      U.pending = /^r\d+$/.test(p.game || '') ? { rid: p.game, frame: p.frame !== undefined && /^\d+$/.test(p.frame) ? Number(p.frame) : null, part: p.part === 'open' ? 'open' : 'end' } : null; U.reset = false;
+      dash.setParams({ ver: /^[0-9a-f]{4,40}$/.test(p.ver || '') ? p.ver : '', opp: p.opp || '', minn: num(p.min, 10) });    // last: this draws the page
+    };
+    setInterval(() => { if (!R.playing) U.flush(); }, 700);
+    document.addEventListener('visibilitychange', () => { if (document.hidden) U.flush(); });
+    window.addEventListener('hashchange', () => U.apply(location.hash, false));
+    $('copy-link').addEventListener('click', async () => { U.flush(); const ok = await copyText(location.href), b = $('copy-link'), t0 = 'Copy link to this view'; b.textContent = ok ? 'Link copied' : 'Could not copy'; setTimeout(() => { b.textContent = t0; }, 2200); });
+    return U;
+  })();
+  URLSTATE.apply(location.hash, true);
   dash.onData(render);
   // On touch screens the phone's own picker needs a "Done" tap; this list picks on one tap instead
   if (window.matchMedia && matchMedia('(pointer: coarse)').matches) document.querySelectorAll('select.dash-select').forEach((sel) => {

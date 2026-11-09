@@ -1017,6 +1017,11 @@ jobs:
           set -u
           repo="${{ github.repository }}"
           . dashboard/site_git.sh
+          # logs kept in the repo for runs whose artifact never got uploaded (the runner was taken away): see dashboard/recovered/README.md
+          for r in dashboard/recovered/*/bot-prod-smoke.log; do
+            [ -s "$r" ] || continue
+            rid=$(basename "$(dirname "$r")"); mkdir -p "stats-pulled/$rid"; [ -s "stats-pulled/$rid/bot-prod-smoke.log" ] || cp "$r" "stats-pulled/$rid/"
+          done
           # the games were played on the Panel Attack engine of the bot branch (it follows the live server): replay them on that one, not this branch's older engine
           engine=""
           if git fetch -q --depth=1 origin "$UPSTREAM_BOT_REF" && git worktree add -q --detach "$PWD/engine" FETCH_HEAD; then engine="$PWD/engine"; else echo "::warning::could not check out $UPSTREAM_BOT_REF: replays will use this branch's engine"; fi

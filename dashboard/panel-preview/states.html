@@ -1,0 +1,257 @@
+<!doctype html><html><head><meta charset='utf-8'><style>
+body{margin:0;background:#15181f;padding:14px;display:inline-block}
+canvas{display:block}
+</style></head><body><canvas id='c' width='1760' height='900'></canvas>
+<script>
+const PAL=[null, '#bf2836', '#bee54a', '#0fe39c', '#a388ff', '#e28200', '#2536f0', null, '#8a93a6']; const SHAPE=[null,'square','star','circle','triangle','bolt','hourglass',null,'exclaim']; const SHP={"circle":[[[0.8,0.0],[0.796,0.0784],[0.7848,0.156],[0.7656,0.232],[0.7392,0.3064],[0.7056,0.3768],[0.6648,0.4448],[0.6184,0.5072],[0.5656,0.5656],[0.5072,0.6184],[0.4448,0.6648],[0.3768,0.7056],[0.3064,0.7392],[0.232,0.7656],[0.156,0.7848],[0.0784,0.796],[0.0,0.8],[-0.0784,0.796],[-0.156,0.7848],[-0.232,0.7656],[-0.3064,0.7392],[-0.3768,0.7056],[-0.4448,0.6648],[-0.5072,0.6184],[-0.5656,0.5656],[-0.6184,0.5072],[-0.6648,0.4448],[-0.7056,0.3768],[-0.7392,0.3064],[-0.7656,0.232],[-0.7848,0.156],[-0.796,0.0784],[-0.8,0.0],[-0.796,-0.0784],[-0.7848,-0.156],[-0.7656,-0.232],[-0.7392,-0.3064],[-0.7056,-0.3768],[-0.6648,-0.4448],[-0.6184,-0.5072],[-0.5656,-0.5656],[-0.5072,-0.6184],[-0.4448,-0.6648],[-0.3768,-0.7056],[-0.3064,-0.7392],[-0.232,-0.7656],[-0.156,-0.7848],[-0.0784,-0.796],[-0.0,-0.8],[0.0784,-0.796],[0.156,-0.7848],[0.232,-0.7656],[0.3064,-0.7392],[0.3768,-0.7056],[0.4448,-0.6648],[0.5072,-0.6184],[0.5656,-0.5656],[0.6184,-0.5072],[0.6648,-0.4448],[0.7056,-0.3768],[0.7392,-0.3064],[0.7656,-0.232],[0.7848,-0.156],[0.796,-0.0784]]],"triangle":[[[0,-1],[1,1],[-1,1]]],"diamond":[[[0,-1],[1,0],[0,1],[-1,0]]],"square":[[[-0.8,-0.8],[0.8,-0.8],[0.8,0.8],[-0.8,0.8]]],"star":[[[0.0,-1.0],[0.265,-0.364],[0.951,-0.309],[0.428,0.139],[0.588,0.809],[0.0,0.45],[-0.588,0.809],[-0.428,0.139],[-0.951,-0.309],[-0.265,-0.364]]],"plus":[[[-0.34,-1],[0.34,-1],[0.34,-0.34],[1,-0.34],[1,0.34],[0.34,0.34],[0.34,1],[-0.34,1],[-0.34,0.34],[-1,0.34],[-1,-0.34],[-0.34,-0.34]]],"exclaim":[[[-0.25,-0.66],[0.25,-0.66],[0.25,0.2],[-0.25,0.2]],[[-0.25,0.42],[0.25,0.42],[0.25,0.74],[-0.25,0.74]]],"hexagon":[[[0.0,-1.0],[0.866,-0.5],[0.866,0.5],[0.0,1.0],[-0.866,0.5],[-0.866,-0.5]]],"crescent":[[[0.625,0.781],[0.534,0.846],[0.435,0.9],[0.332,0.943],[0.224,0.975],[0.113,0.994],[0.001,1.0],[-0.111,0.994],[-0.221,0.975],[-0.329,0.944],[-0.433,0.901],[-0.531,0.847],[-0.623,0.782],[-0.707,0.708],[-0.781,0.624],[-0.846,0.532],[-0.901,0.434],[-0.944,0.331],[-0.975,0.223],[-0.994,0.112],[-1.0,0.0],[-0.994,-0.112],[-0.975,-0.223],[-0.944,-0.331],[-0.901,-0.434],[-0.846,-0.532],[-0.781,-0.624],[-0.707,-0.708],[-0.623,-0.782],[-0.531,-0.847],[-0.433,-0.901],[-0.329,-0.944],[-0.221,-0.975],[-0.111,-0.994],[0.001,-1.0],[0.113,-0.994],[0.224,-0.975],[0.332,-0.943],[0.435,-0.9],[0.534,-0.846],[0.625,-0.781],[0.625,-0.781],[0.554,-0.793],[0.483,-0.799],[0.411,-0.799],[0.34,-0.792],[0.27,-0.779],[0.201,-0.76],[0.134,-0.735],[0.069,-0.704],[0.008,-0.667],[-0.05,-0.624],[-0.104,-0.577],[-0.153,-0.525],[-0.198,-0.469],[-0.237,-0.41],[-0.271,-0.346],[-0.299,-0.281],[-0.321,-0.212],[-0.337,-0.143],[-0.347,-0.072],[-0.35,0.0],[-0.347,0.072],[-0.337,0.143],[-0.321,0.212],[-0.299,0.281],[-0.271,0.346],[-0.237,0.41],[-0.198,0.469],[-0.153,0.525],[-0.104,0.577],[-0.05,0.624],[0.008,0.667],[0.069,0.704],[0.134,0.735],[0.201,0.76],[0.27,0.779],[0.34,0.792],[0.411,0.799],[0.483,0.799],[0.554,0.793],[0.625,0.781]]],"hourglass":[[[-0.9,-0.9],[0.9,-0.9],[0,0],[0.9,0.9],[-0.9,0.9],[0,0]]],"bolt":[[[0.3,-1],[-0.6,0.15],[-0.05,0.15],[-0.3,1],[0.65,-0.2],[0.08,-0.2]]]};   // outlines in a unit circle, as the picker showed them;
+function path(x,shape,cx,cy,r){ const P=SHP[shape]||SHP.plus; x.beginPath(); P.forEach(poly=>{poly.forEach(([a,b],i)=>x[i?'lineTo':'moveTo'](cx+a*r,cy+b*r)); x.closePath();}); }
+function shade(hex,amt){ const n=parseInt(hex.slice(1),16); let r=n>>16,g=(n>>8)&255,b=n&255; const f=v=>Math.max(0,Math.min(255,Math.round(v+amt*255))); return 'rgb('+f(r)+','+f(g)+','+f(b)+')'; }
+const c=document.getElementById('c'), x=c.getContext('2d');
+const T=92, G=12, order=[1,2,3,4,5,6,8];
+// shade by lightness only (HSL), so the hue and saturation stay the same: no black or white mixed in
+function hsl(hex,dl){
+  const n=parseInt(hex.slice(1),16); let r=(n>>16)/255,g=((n>>8)&255)/255,b=(n&255)/255;
+  const mx=Math.max(r,g,b),mn=Math.min(r,g,b); let h=0,sat=0,l=(mx+mn)/2;
+  if(mx!==mn){ const d=mx-mn; sat=l>0.5?d/(2-mx-mn):d/(mx+mn);
+    if(mx===r) h=((g-b)/d+(g<b?6:0)); else if(mx===g) h=(b-r)/d+2; else h=(r-g)/d+4; h/=6; }
+  l=Math.max(0.12,Math.min(0.88,l+dl));
+  const q=l<0.5?l*(1+sat):l+sat-l*sat, p=2*l-q;
+  const f=t=>{ t=(t+1)%1; if(t<1/6) return p+(q-p)*6*t; if(t<1/2) return q; if(t<2/3) return p+(q-p)*(2/3-t)*6; return p; };
+  return 'rgb('+[f(h+1/3),f(h),f(h-1/3)].map(v=>Math.round(v*255)).join(',')+')';
+}
+let MODE=0.2;
+// bolder, evenly weighted shapes; the exclamation mark is drawn thick enough to read at board size
+const WEIGHT={1:0.9,2:1.2,3:1.08,4:1.0,5:1.3,6:1.11,8:1.25}; // scaled so each shape covers about the same area
+function bang(cx,cy,r){ // the shock panel: an exclamation mark, a long rounded bar and a round dot
+  const w=0.34*r, top=cy-r*0.9, bot=cy+r*0.2, dotY=cy+r*0.62, dotR=w*0.95;
+  x.beginPath(); x.roundRect(cx-w,top,2*w,bot-top,w*0.7);
+  x.moveTo(cx+dotR,dotY); x.arc(cx,dotY,dotR,0,Math.PI*2);
+}
+const STATES=['normal','landing','swap','flash','face','pop','hover','fall','dim','dead','danger','pop-out','bounce','flash2'];
+const LABELS=['Normal','Landing','Swapping','Flash (matched)','Face','Popping','Hovering','Falling','Dimmed','Dead','Danger','Garbage pop','Garbage bounce','Flash (frame 2)'];
+// one expression per state, so every state reads differently
+const EXPR={
+  'normal':  {eyes:'dot',    brows:'none',    mouth:'smile',  blush:false, sweat:false, zz:false},
+  'landing': {eyes:'squint', brows:'none',    mouth:'oof',    blush:false, sweat:false, zz:false},
+  'swap':    {eyes:'glance', brows:'none',    mouth:'smirk',  blush:false, sweat:false, zz:false},
+  'flash':   {eyes:'wide',   brows:'raised',  mouth:'grin',   blush:false, sweat:false, zz:false},
+  'face':    {eyes:'wide',   brows:'raised',  mouth:'o',      blush:false, sweat:false, zz:false},
+  'pop':     {eyes:'closed', brows:'none',    mouth:'grin',   blush:true,  sweat:false, zz:false},
+  'hover':   {eyes:'up',     brows:'none',    mouth:'wavy',   blush:false, sweat:true,  zz:false},
+  'fall':    {eyes:'shut',   brows:'none',    mouth:'scream', blush:false, sweat:false, zz:false},
+  'dim':     {eyes:'sleepy', brows:'none',    mouth:'flat',   blush:false, sweat:false, zz:true},
+  'dead':    {eyes:'x',      brows:'sad',     mouth:'frown',  blush:false, sweat:false, zz:false},
+  'danger':  {eyes:'dot',    brows:'worried', mouth:'wavy',   blush:false, sweat:true,  zz:false},
+  'pop-out': {eyes:'closed', brows:'none',    mouth:'grin',   blush:true,  sweat:false, zz:false},
+  'flash2':  {eyes:'wide',   brows:'raised', mouth:'grin',   blush:false, sweat:false, zz:false},
+  'bounce':  {eyes:'wink',   brows:'none',    mouth:'tongue', blush:true,  sweat:false, zz:false}
+};
+// each shape is a different character: its own eye height and spacing, eye size, brow angle, mouth height and width.
+// the emotion (EXPR) decides the expression; the character decides how it sits on the face
+// one face per shape, from the shape itself. Rules:
+//  eyes follow the outline (rect for square edges, round otherwise)
+//  brows follow the corners (sharp corners slant, flat sides go flat, round shapes have none)
+//  eye spacing follows the widest part of the shape (narrow shapes have closer eyes)
+//  eye height follows the visual weight (heavy base sits low, the star's points sit high)
+const CHAR={
+  1:{ey:-0.02, ex:0.34, es:1.0,  brow:'flat',  my:0.26, mw:0.9,  eyeKind:'rect',  blush:false, lidTilt:0},   // square: square edges, flat sides, wide
+  2:{ey:-0.10, ex:0.26, es:1.2,  brow:'arch',  my:0.18, mw:1.3,  eyeKind:'round', blush:false, lidTilt:0},   // star: points up, expressive arched brows, wide grin
+  3:{ey:0.0,   ex:0.42, es:0.8,  brow:'none',  my:0.22, mw:0.75, eyeKind:'round', blush:true,  lidTilt:0},   // circle: no corners, widest, soft, always blushing
+  4:{ey:0.08,  ex:0.16, es:0.9,  brow:'slant', my:0.34, mw:0.7,  eyeKind:'round', blush:false, lidTilt:0},   // triangle: narrow tip, heavy base, sharp slanted brows
+  5:{ey:-0.04, ex:0.24, es:1.0,  brow:'slant', my:0.22, mw:1.1,  eyeKind:'round', blush:false, lidTilt:0.35},// bolt: sharp corners, angled lids, zigzag
+  6:{ey:0.02,  ex:0.22, es:0.9,  brow:'flat',  my:0.26, mw:0.7,  eyeKind:'round', blush:false, lidTilt:0},   // hourglass: narrow waist, flat sides, heavy lids
+  8:{ey:-0.02, ex:0.2, es:0.8,  brow:'none',  my:0.3,  mw:0.7,  eyeKind:'round', blush:false, lidTilt:0}    // exclamation mark: narrow bar, two eyes, small mouth
+};
+function drawFace(k,st,cx,cy,r,base,alpha,shapeAlpha){
+  const C=CHAR[k]||CHAR[3];
+  const E0=EXPR[st]||EXPR.normal;
+  // the same emotion, each shape's own way of showing it
+  const SM={
+    1:{mouth:{smile:'flat',grin:'smirk',o:'o',frown:'flat'}, eyes:{dot:'dot',wide:'dot'}},
+    2:{mouth:{smile:'grin',grin:'grin',flat:'smile'}, eyes:{dot:'wide',closed:'closed'}},
+    3:{mouth:{smile:'tongue',grin:'smile',o:'smile'}, eyes:{dot:'dot',wide:'dot'}},
+    4:{mouth:{smile:'smirk',grin:'smirk',flat:'smirk'}, eyes:{dot:'glance'}},
+    5:{mouth:{smile:'wavy',grin:'wavy'}, eyes:{dot:'squint',wide:'squint'}},
+    6:{mouth:{smile:'flat',grin:'flat',o:'flat'}, eyes:{dot:'sleepy',wide:'sleepy',closed:'sleepy'}}
+  }[k]||{mouth:{},eyes:{}};
+  const E={...E0, mouth:(SM.mouth[E0.mouth]||E0.mouth), eyes:(SM.eyes[E0.eyes]||E0.eyes)};
+  const ink=hsl(base,-0.62), hi=hsl(base,0.85), lw=Math.max(1.3,r*0.075);
+  const ex=r*C.ex, ey=cy+r*C.ey, es=C.es, my=cy+r*C.my;
+  x.save(); x.globalAlpha=alpha*shapeAlpha; x.strokeStyle=ink; x.fillStyle=ink; x.lineWidth=lw; x.lineCap='round'; x.lineJoin='round';
+  const dotEye=(px_,py_,rx,ry,hl)=>{ x.fillStyle=ink; x.beginPath();
+    if(C.eyeKind==='rect'){ x.roundRect(px_-rx*es,py_-ry*es,rx*2*es,ry*2*es,rx*0.4); } else { x.ellipse(px_,py_,rx*es,ry*es,0,0,Math.PI*2); }
+    x.fill();
+    if(hl){ x.fillStyle=hi; x.beginPath(); x.arc(px_+rx*0.35,py_-ry*0.35,Math.max(0.9,rx*0.3),0,Math.PI*2); x.fill(); x.fillStyle=ink; }
+    if(C.lidTilt && E.eyes!=='closed'){ x.beginPath(); x.moveTo(px_-rx*1.4,py_-ry*1.1); x.lineTo(px_+rx*1.1,py_-ry*(1.1+C.lidTilt)); x.stroke(); }
+  };
+  const closedEye=(px_)=>{ x.beginPath(); x.moveTo(px_-r*0.11*es,ey+r*0.04); x.quadraticCurveTo(px_,ey-r*0.12*es,px_+r*0.11*es,ey+r*0.04); x.stroke(); };
+  [-1,1].forEach(sd=>{ const px_=cx+sd*ex;
+    if(E.eyes==='dot'){ dotEye(px_,ey,r*0.08,r*0.11,true); }
+    else if(E.eyes==='wide'){ dotEye(px_,ey,r*0.11,r*0.14,true); }
+    else if(E.eyes==='closed'){ closedEye(px_); }
+    else if(E.eyes==='shut'){ x.beginPath(); x.moveTo(px_-r*0.12,ey-r*0.02); x.lineTo(px_+r*0.12,ey-r*0.02); x.stroke(); x.beginPath(); x.moveTo(px_-r*0.1,ey+r*0.04); x.lineTo(px_+r*0.1,ey+r*0.04); x.stroke(); }
+    else if(E.eyes==='x'){ const q=r*0.09*es; x.beginPath(); x.moveTo(px_-q,ey-q); x.lineTo(px_+q,ey+q); x.moveTo(px_+q,ey-q); x.lineTo(px_-q,ey+q); x.stroke(); }
+    else if(E.eyes==='glance'){ dotEye(px_+r*0.05,ey,r*0.08,r*0.11,false); }
+    else if(E.eyes==='up'){ dotEye(px_,ey-r*0.05,r*0.08,r*0.11,true); }
+    else if(E.eyes==='squint'){ x.beginPath(); x.moveTo(px_-r*0.12*es,ey); x.lineTo(px_+r*0.12*es,ey); x.stroke(); }
+    else if(E.eyes==='sleepy'){ x.beginPath(); x.ellipse(px_,ey+r*0.02,r*0.08*es,r*0.09*es,0,0,Math.PI*2); x.fill(); x.beginPath(); x.moveTo(px_-r*0.11*es,ey-r*0.07); x.lineTo(px_+r*0.11*es,ey-r*0.07); x.stroke(); }
+    else if(E.eyes==='wink'){ if(sd<0){ dotEye(px_,ey,r*0.08,r*0.11,true); } else { closedEye(px_); } }
+  });
+  // brows: each character's own brow, lifted for surprise and angled for worry or sadness
+  const lift = E.brows==='raised' ? -0.12 : 0;
+  if(C.brow!=='none' && E.brows!=='none'){
+    [-1,1].forEach(sd=>{ const px_=cx+sd*ex; const by=ey-r*(0.3+lift);
+      x.beginPath();
+      if(C.brow==='arch' || E.brows==='raised'){ x.moveTo(px_-r*0.16,by+r*0.02); x.quadraticCurveTo(px_,by-r*0.14,px_+r*0.16,by+r*0.02); }   // surprise is always a gentle arch, on every shape
+      else if(C.brow==='flat'){ x.moveTo(px_-r*0.14,by); x.lineTo(px_+r*0.14,by); }
+      else if(C.brow==='slant'){ const t=(E.brows==='sad'||E.brows==='worried')?1:-1; x.moveTo(px_-sd*r*0.02-r*0.14,by+t*r*0.06*(-sd)); x.lineTo(px_+sd*r*0.14,by-t*r*0.06*(-sd)); }
+      x.stroke(); });
+  }
+  if(E.brows==='sad' || E.brows==='worried'){ /* tilt already applied per character */ }
+  // blush: happy characters always, or the emotion asks for it
+  if(E.blush || C.blush){ x.save(); x.globalAlpha=alpha*shapeAlpha*0.55; x.fillStyle=hsl(base,0.35); [-1,1].forEach(sd=>{ x.beginPath(); x.ellipse(cx+sd*ex*1.35,ey+r*0.2,r*0.07,r*0.04,0,0,Math.PI*2); x.fill(); }); x.restore(); }
+  // mouth, squeezed or stretched to the character's width around its own centre
+  x.save(); x.translate(cx,my); x.scale(C.mw,1); x.translate(-cx,-my);
+  x.beginPath();
+  if(E.mouth==='smile'){ x.moveTo(cx-r*0.12,my); x.quadraticCurveTo(cx,my+r*0.1,cx+r*0.12,my); x.stroke(); }
+  else if(E.mouth==='grin'){ x.moveTo(cx-r*0.18,my-r*0.02); x.quadraticCurveTo(cx,my+r*0.2,cx+r*0.18,my-r*0.02); x.stroke(); }
+  else if(E.mouth==='flat'){ x.moveTo(cx-r*0.1,my); x.lineTo(cx+r*0.1,my); x.stroke(); }
+  else if(E.mouth==='frown'){ x.moveTo(cx-r*0.12,my+r*0.08); x.quadraticCurveTo(cx,my-r*0.06,cx+r*0.12,my+r*0.08); x.stroke(); }
+  else if(E.mouth==='o'){ x.beginPath(); x.ellipse(cx,my,r*0.08,r*0.1,0,0,Math.PI*2); x.fill(); }
+  else if(E.mouth==='scream'){ x.beginPath(); x.ellipse(cx,my+r*0.02,r*0.1,r*0.14,0,0,Math.PI*2); x.fill(); }
+  else if(E.mouth==='oof'){ x.beginPath(); x.ellipse(cx,my,r*0.07,r*0.05,0,0,Math.PI*2); x.fill(); }
+  else if(E.mouth==='smirk'){ x.moveTo(cx-r*0.1,my); x.quadraticCurveTo(cx+r*0.04,my+r*0.08,cx+r*0.14,my-r*0.06); x.stroke(); }
+  else if(E.mouth==='wavy'){ x.moveTo(cx-r*0.14,my); x.quadraticCurveTo(cx-r*0.07,my-r*0.06,cx,my); x.quadraticCurveTo(cx+r*0.07,my+r*0.06,cx+r*0.14,my); x.stroke(); }
+  else if(E.mouth==='tongue'){ x.moveTo(cx-r*0.12,my); x.quadraticCurveTo(cx,my+r*0.1,cx+r*0.12,my); x.stroke(); x.fillStyle=hsl(base,0.25); x.beginPath(); x.ellipse(cx+r*0.02,my+r*0.09,r*0.05,r*0.06,0,0,Math.PI*2); x.fill(); }
+  x.restore();
+  if(st==='dead'){ x.fillStyle=hsl(base,0.6); x.beginPath(); x.moveTo(cx+ex+r*0.1,ey+r*0.12); x.quadraticCurveTo(cx+ex+r*0.16,ey+r*0.3,cx+ex+r*0.1,ey+r*0.33); x.quadraticCurveTo(cx+ex+r*0.04,ey+r*0.3,cx+ex+r*0.1,ey+r*0.12); x.fill(); }
+  if(E.sweat){ x.fillStyle=hsl(base,0.6); const sx_=cx+ex+r*0.2, sy_=cy-r*0.36; x.beginPath(); x.moveTo(sx_,sy_-r*0.09); x.quadraticCurveTo(sx_+r*0.08,sy_+r*0.02,sx_,sy_+r*0.05); x.quadraticCurveTo(sx_-r*0.08,sy_+r*0.02,sx_,sy_-r*0.09); x.fill(); }
+  if(E.zz){ x.fillStyle=ink; x.font='bold '+Math.round(r*0.32)+'px system-ui,sans-serif'; x.textAlign='left'; x.fillText('z', cx+r*0.36, cy-r*0.22); x.font='bold '+Math.round(r*0.22)+'px system-ui,sans-serif'; x.fillText('z', cx+r*0.52, cy-r*0.4); }
+  if(k===1){ x.save(); x.globalAlpha=alpha*shapeAlpha; x.strokeStyle=ink; x.lineWidth=Math.max(1,r*0.06); [-1,1].forEach(sd=>{ x.beginPath(); x.arc(cx+sd*ex,ey,r*0.2*es,0,Math.PI*2); x.stroke(); }); x.beginPath(); x.moveTo(cx-ex+r*0.2*es,ey); x.lineTo(cx+ex-r*0.2*es,ey); x.stroke(); x.restore(); }
+  x.restore();
+}
+// hue and saturation of a palette colour, and back to a colour at an absolute lightness (Simple's lightness, our hue)
+function hueSat(hex){ const n=parseInt(hex.slice(1),16); let r=(n>>16)/255,g=((n>>8)&255)/255,b=(n&255)/255;
+  const mx=Math.max(r,g,b),mn=Math.min(r,g,b); let h=0,sat=0; const l=(mx+mn)/2;
+  if(mx!==mn){ const d=mx-mn; sat=l>0.5?d/(2-mx-mn):d/(mx+mn);
+    if(mx===r) h=((g-b)/d+(g<b?6:0)); else if(mx===g) h=(b-r)/d+2; else h=(r-g)/d+4; h/=6; }
+  return {h,s:sat}; }
+function hslAbs(hs,L){ const {h,s}=hs; const q=L<0.5?L*(1+s):L+s-L*s, p=2*L-q;
+  const f=t=>{ t=(t+1)%1; if(t<1/6) return p+(q-p)*6*t; if(t<1/2) return q; if(t<2/3) return p+(q-p)*(2/3-t)*6; return p; };
+  return 'rgb('+[f(h+1/3),f(h),f(h-1/3)].map(v=>Math.round(v*255)).join(',')+')'; }
+// a shade of a palette colour: mixed toward black by t (0 = the exact colour)
+// a tint of a palette colour: mixed toward white by t (0 = the exact colour)
+function tintOf(hex,t){ const v=hex.slice(1).match(/../g).map(h=>Math.round(parseInt(h,16)+(255-parseInt(h,16))*Math.min(0.95,t))); return 'rgb('+v.join(',')+')'; }
+function shadeOf(hex,t){ const v=hex.slice(1).match(/../g).map(h=>Math.round(parseInt(h,16)*(1-Math.min(0.9,t)))); return 'rgb('+v.join(',')+')'; }
+// contrast against the tile: lighter for dark palette colours, darker for light ones
+// one decision per colour, by hand: lighter tint or darker shade against the tile
+const CONTRAST_DECISION={'#bf2836':'lighter','#bee54a':'darker','#0fe39c':'lighter','#a388ff':'lighter','#e28200':'lighter','#2536f0':'lighter','#8a93a6':'lighter'};
+function contrastOf(hex,t){ const d=CONTRAST_DECISION[hex.toLowerCase()]||'lighter'; return d==='darker' ? shadeOf(hex,t) : tintOf(hex,t); }
+function bhs(base,k,sat){ if(k===8) return {h:0,s:0.04}; const hs=hueSat(base); return {h:hs.h, s:sat}; }
+function drawTile(k,px,py,st){
+  const base=PAL[k], R=18, I=7, P=T-2*I;
+  const LT=(d,extra)=>hsl(base,d+(extra||0));
+  let dy=0, sx=1, sy=1, alpha=1, shadow=0.35, plateDark=0, rimBoost=0, outlineOnly=false, glow=0, pivotBottom=false, dimOverlay=0;
+  if(st==='landing'){ sx=1.08; sy=0.9; pivotBottom=true; }
+  if(st==='swap'){ sx=0.94; sy=0.94; }
+  if(st==='hover'){ dy=-6; shadow=0.5; }
+  if(st==='dim'){ plateDark=0.25; dimOverlay=0.42; }
+  if(st==='pop'){ sx=0.85; sy=0.85; alpha=0.95; }
+  if(st==='dead'){ plateDark=0.1; }
+  if(st==='danger'){ rimBoost=0.2; }
+  if(st==='flash'){ rimBoost=0.6; glow=34; }
+  if(st==='flash2'){ rimBoost=0.3; glow=12; }
+  if(st==='pop-out'){ plateDark=0.05; glow=10; }
+  if(st==='bounce'){ sx=1.06; sy=0.92; pivotBottom=true; }
+  const pivot = pivotBottom ? [px+T/2, py+T] : [px+T/2, py+T/2];
+  x.save(); x.globalAlpha=alpha;
+  x.translate(pivot[0], pivot[1]+dy); x.scale(sx,sy); x.translate(-pivot[0], -pivot[1]);
+  const ox=px, oy=py, cx=ox+T/2, cy=oy+T/2;
+  if(st==='pop'){ // popping: just the shape
+    x.save(); x.shadowColor=hsl(base,0.3); x.shadowBlur=8; const rr=T*0.3*WEIGHT[k];
+    x.fillStyle=hsl(base,0.22); x.strokeStyle=hsl(base,-0.3); x.lineWidth=1.5;
+    if(k===8){ bang(cx,cy,rr); } else { path(x,SHAPE[k],cx,cy,rr); }
+    x.fill('evenodd'); x.shadowBlur=0; x.stroke(); x.restore();
+    drawFace(k,'pop',cx,cy-(k===8?0.35*rr:0),rr,base,1,1); x.restore(); return; }
+  if(false){ x.save(); x.strokeStyle=hsl(base,0.5); x.lineWidth=3; x.lineCap='round';
+    for(let a=0;a<8;a++){ const t=a*Math.PI/4; x.beginPath(); x.moveTo(cx+Math.cos(t)*T*0.62,cy+Math.sin(t)*T*0.62); x.lineTo(cx+Math.cos(t)*T*0.78,cy+Math.sin(t)*T*0.78); x.stroke(); }
+    x.restore(); }
+  if(shadow){ x.save(); x.fillStyle='rgba(0,0,0,'+shadow*0.5+')'; x.beginPath(); x.roundRect(ox+4,oy+8,T-8,T-6,R); x.fill(); x.restore(); }
+  if(glow){ x.save(); x.shadowColor=hsl(base,0.45); x.shadowBlur=glow; x.fillStyle=hsl(base,0.2); x.beginPath(); x.roundRect(ox,oy,T,T,R); x.fill(); x.restore(); }
+  if(st==='flash'){ // a bright halo and sparkle ticks at the corners, so the flash is unmistakable
+    x.save(); x.strokeStyle=hsl(base,0.6); x.lineWidth=4; x.beginPath(); x.roundRect(ox-3,oy-3,T+6,T+6,R+3); x.stroke();
+    x.strokeStyle=hsl(base,0.75); x.lineWidth=2.5; x.lineCap='round';
+    [[ox-8,oy-8],[ox+T+8,oy-8],[ox-8,oy+T+8],[ox+T+8,oy+T+8]].forEach(([qx,qy])=>{ const dx=qx<cx?-1:1, dy=qy<cy?-1:1; x.beginPath(); x.moveTo(qx,qy); x.lineTo(qx+dx*6,qy+dy*6); x.moveTo(qx+dx*6,qy); x.lineTo(qx,qy+dy*6); x.stroke(); });
+    x.restore(); }
+  // Simple-style edge: black outline, bright lit edge, dark recessed centre
+  // border: Simple's own tile (outline, lit edge and plate), recoloured to this panel's hue
+  const SP={1:[1,0],2:[4,15],3:[3,-20],4:[5,-40],5:[4,-30],6:[6,-10],8:[8,0]}[k];
+  // outer tile: a fade, lit top-left and falling to shade bottom-right
+  // outer fade, sampled from the currently served sheet: top about #ef1b17 (lightness 0.5), bottom about #750603 (lightness 0.22), our hue
+  const fhs=bhs(base,k,0.92);
+  const cg=x.createLinearGradient(ox,oy,ox,oy+T);
+  cg.addColorStop(0,tintOf(base,0.22)); cg.addColorStop(0.5,base); cg.addColorStop(1,shadeOf(base,0.3+plateDark));
+  x.fillStyle=cg; x.beginPath(); x.roundRect(ox,oy,T,T,R); x.fill();
+  // step 2: a border-only box, the same rounded shape as the outer tile, pushed into the bottom-right corner. Stroke only, no fill.
+  const bl=7+3.5, bt=7+3.5, bx0=ox+bl, by0=oy+bt, bx1=ox+T-3.5, by1=oy+T-3.5;
+  // the border: a richer tone of the hue. Top-left is strongest; the top edge fades out toward the top-right,
+  // the left edge fades out well before the bottom-left; a short quicker dash sits in the bottom-right corner.
+  { const sC=contrastOf(base,(CONTRAST_DECISION[base.toLowerCase()]==='darker'?0.6:0.3)).slice(4,-1);   // pinker: saturated, lighter tone of the hue
+    const bwid=bx1-bx0, bhei=by1-by0, rr=Math.max(2,R-7);
+    x.lineWidth=7; x.lineCap='butt';
+    const FD=Math.min(bwid,bhei)*0.8, FDt=bwid, FDl=bhei;   // each edge fades out at its far corner
+    const tg=x.createLinearGradient(bx0,by0,bx0+FDt,by0);
+    tg.addColorStop(0,'rgba('+sC+',1)'); tg.addColorStop(0.2,'rgba('+sC+',1)'); tg.addColorStop(0.45,'rgba('+sC+',0.6)'); tg.addColorStop(0.75,'rgba('+sC+',0.15)'); tg.addColorStop(1,'rgba('+sC+',0)');
+    x.strokeStyle=tg; x.beginPath(); x.moveTo(bx0+rr,by0); x.lineTo(bx0+FDt,by0); x.stroke();
+    const lg=x.createLinearGradient(bx0,by0,bx0,by0+FDl);
+    lg.addColorStop(0,'rgba('+sC+',1)'); lg.addColorStop(0.2,'rgba('+sC+',1)'); lg.addColorStop(0.45,'rgba('+sC+',0.6)'); lg.addColorStop(0.75,'rgba('+sC+',0.15)'); lg.addColorStop(1,'rgba('+sC+',0)');
+    x.strokeStyle=lg; x.beginPath(); x.moveTo(bx0,by0+rr); x.lineTo(bx0,by0+FDl); x.stroke();
+    // the rounded top-left corner itself, in full colour
+    x.strokeStyle='rgba('+sC+',1)'; x.beginPath(); x.arc(bx0+rr,by0+rr,rr,Math.PI,1.5*Math.PI); x.stroke();
+    // the top-left corner itself, which the two edge strokes leave out: fully opaque, fading out quickly
+    const cgc=x.createRadialGradient(bx0,by0,0,bx0,by0,rr*2.2);
+    cgc.addColorStop(0,'rgba('+sC+',1)'); cgc.addColorStop(1,'rgba('+sC+',0)');
+    x.strokeStyle=cgc; x.beginPath(); x.roundRect(bx0,by0,bwid,bhei,rr); x.stroke();
+    const fr2=Math.min(bwid,bhei)*0.4;
+    const wg2=x.createRadialGradient(bx1,by1,0,bx1,by1,fr2);
+    wg2.addColorStop(0,'rgba('+sC+',1)'); wg2.addColorStop(0.5,'rgba('+sC+',0.6)'); wg2.addColorStop(1,'rgba('+sC+',0)');
+    x.strokeStyle=wg2; x.beginPath(); x.roundRect(bx0,by0,bwid,bhei,rr); x.stroke(); }
+  // this shape and its face sit a few pixels lower for the star, bolt and exclamation mark
+  x.save(); x.translate(0,({2:4,5:4,8:4}[k]||0));
+  const r=T*0.3*WEIGHT[k];
+  if(st==='pop-out'){ // garbage pop: the shape breaks out with a glow and sparkles
+    x.save(); x.shadowColor=hsl(base,0.35); x.shadowBlur=12; x.fillStyle=hsl(base,0.2); if(k===8){ bang(cx,cy,r); } else { path(x,SHAPE[k],cx,cy,r); } x.fill('evenodd'); x.restore();
+    x.save(); x.fillStyle=hsl(base,0.4); for(let a=0;a<6;a++){ const t=a*Math.PI/3+0.3; const d=T*0.4; x.beginPath(); x.arc(cx+Math.cos(t)*d,cy+Math.sin(t)*d,2.2,0,Math.PI*2); x.fill(); } x.restore();
+  }
+  else {
+    x.save(); x.shadowColor='rgba(0,0,0,0.35)'; x.shadowBlur=4; x.shadowOffsetY=1.5;
+    const sg=x.createLinearGradient(cx,cy-r,cx,cy+r); const pinkC=contrastOf(base,0.5); sg.addColorStop(0,pinkC); sg.addColorStop(1,pinkC);   // same colour as the border
+    x.fillStyle=sg;
+    if(k===8){ bang(cx,cy,r); } else { path(x,SHAPE[k],cx,cy,r); }
+    x.fill('evenodd'); x.shadowBlur=0;   // no outline around the shape
+    x.restore();
+  }
+  if(k===8 && !outlineOnly){ drawFace(k,st,cx,cy-0.35*r,r,base,alpha,1); }
+  if(!outlineOnly && k!==8){
+    const sa=(st==='face'||st==='pop'||st==='flash')?1:(st==='dim'?0.6:1);
+    drawFace(k,st,cx,cy,r,base,1,sa);
+  }
+  x.restore();
+  if(dimOverlay){ x.fillStyle='rgba(0,0,0,'+dimOverlay+')'; x.beginPath(); x.roundRect(ox,oy,T,T,R); x.fill(); }
+  x.restore();
+}
+const COLS=STATES.length, CW=96, GAP=14, LEFT=110;
+const rows=[1,2,3,4,5,6,8];
+const SIMG={}; let loadedN=0; const need=[1,2,3,4,5,6,8];
+function renderAll(){
+  x.clearRect(0,0,c.width,c.height);
+  x.fillStyle='#e8ebf3'; x.font='13px system-ui,sans-serif'; x.textAlign='center';
+  LABELS.forEach((l,i)=>{ x.fillText(l, LEFT+i*(CW+GAP)+CW/2, 30); });
+  rows.forEach((k,ri)=>{
+    const y=50+ri*(CW+GAP);
+    x.fillStyle='#8a93a6'; x.textAlign='left'; x.fillText(['Red','Yellow-green','Green','Purple','Orange','Blue','Shock'][ri], 8, y+CW/2+4);
+    STATES.forEach((st,ci)=>{ drawTile(k, LEFT+ci*(CW+GAP), y, st); });
+  });
+}
+need.forEach(n=>{ const im=new Image(); im.onload=()=>{ SIMG[n]=im; if(++loadedN===need.length) renderAll(); }; im.onerror=()=>{ if(++loadedN===need.length) renderAll(); }; im.src='simple'+n+'.png'; });
+</script></body></html>

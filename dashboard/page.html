@@ -448,6 +448,13 @@
 }
 @media (max-width: 760px) { .gw-whyb { height: 9.5em; } .gw-cap { height: 9.5em; } .gw-why { margin: 4px 0; } .gw-stage { gap: 6px; } }
 @media (min-width: 980px) and (max-height: 599px) { .gw-stage { max-width: 680px; } }
+.gw-cap .goalline { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: nowrap; }
+.gw-cap .gl-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gw-cap .planprog { display: inline-flex; align-items: center; gap: 4px; flex: 0 0 auto; font-size: 12px; font-weight: 500; color: var(--color-fg-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.gw-cap .planprog i { width: 10px; height: 10px; border-radius: 50%; border: 2px solid #ffd166; box-sizing: border-box; margin-right: 0; }
+.gw-cap .planprog i.done { background: var(--color-fg-muted); border-color: var(--color-fg-muted); }
+.gw-cap .planprog i.next { background: #ffd166; }
+.gw-cap .planprog i + i:last-of-type { margin-right: 4px; }
 </style>
 
 <div class="gs" id="gs">
@@ -1739,7 +1746,20 @@ function projectPlan(G, seq, cursor) {
     const t = document.createElement('div'); t.className = 'whyline goal';
     const cur0 = PLAN.current(clock), mb = 1 + 9 * (R.D.mine - 1), nowF = R.D.frames[R.idx], oldF = R.idx >= 14 ? R.D.frames[R.idx - 14] : null;
     let moving = false; if (oldF) for (let q = R.idx - 13; q <= R.idx && !moving; q++) if (cursorMoved(R.D.frames[q - 1], R.D.frames[q], mb)) moving = true;
-    t.textContent = !seq.length ? (cur0 && cur0.carried ? 'Finishing the plan from ' + fmtClock(cur0.at) : moving ? 'Cursor moving, no plan logged' : 'No swaps planned') : 'Plan: ' + (cur0 && cur0.total ? cur0.total : seq.length) + ((cur0 && cur0.total ? cur0.total : seq.length) === 1 ? ' swap' : ' swaps') + (cur0 && cur0.done ? ', ' + cur0.left + ' left' : '') + (logged.length ? ' for a ' + logged.join(' + ') : '');
+    if (!seq.length) { t.textContent = cur0 && cur0.carried ? 'Finishing the plan from ' + fmtClock(cur0.at) : moving ? 'Cursor moving, no plan logged' : 'No swaps planned'; }
+    else {
+      // two separate facts: what the plan is FOR (its goal) and how far along it is (dots + words), so neither reads as part of the other
+      const total = cur0 && cur0.total ? cur0.total : seq.length, left = cur0 && cur0.done ? cur0.left : total, madeN = Math.max(0, total - left);
+      const an = (n) => (n === 8 || n === 11 || n === 18 || (n >= 80 && n < 90)) ? 'an ' : 'a ';
+      const goal = []; if (Number(combo) >= 4) goal.push(an(Number(combo)) + combo + '-panel combo'); else if (Number(combo) === 3) goal.push('a plain 3-match'); if (Number(chain) > 0) goal.push(an(Number(chain)) + chain + '-chain');
+      t.classList.add('goalline');
+      const gt = document.createElement('span'); gt.className = 'gl-t'; gt.textContent = goal.length ? 'Aiming for ' + goal.join(' and ') : 'Plan: ' + total + (total === 1 ? ' swap' : ' swaps'); t.appendChild(gt);
+      const pg = document.createElement('span'); pg.className = 'planprog';
+      if (total <= 8) for (let q = 0; q < total; q++) { const dot = document.createElement('i'); dot.className = q < madeN ? 'done' : q === madeN ? 'next' : ''; pg.appendChild(dot); }
+      pg.append(left === 0 ? 'all made' : madeN === 0 ? total + (total === 1 ? ' swap' : ' swaps') : left + ' of ' + total + ' left');
+      t.appendChild(pg);
+      t.title = 'The plan is ' + total + (total === 1 ? ' swap' : ' swaps') + ' in all' + (madeN ? '; ' + madeN + ' made, ' + left + ' still to make' : '') + (goal.length ? '. It is aiming for ' + goal.join(' and ') + '.' : '.');
+    }
     cap.appendChild(t);
     {
       // the rule that picked this move, and the options it passed on, straight from the log

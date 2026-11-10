@@ -1783,10 +1783,12 @@ function projectPlan(G, seq, cursor) {
       const total = cur0 && cur0.total ? cur0.total : seq.length, left = cur0 && cur0.done ? cur0.left : total, madeN = Math.max(0, total - left);
       const goal = []; if (Number(combo) > 0) goal.push('Combo ' + combo); if (Number(chain) > 0) goal.push('Chain ×' + chain);   // the same names as the Garbage sent table
       t.classList.add('goalline');
-      const gt = document.createElement('span'); gt.className = 'gl-t'; gt.textContent = goal.length ? goal.join(' + ') : 'Plan: ' + total + (total === 1 ? ' swap' : ' swaps'); t.appendChild(gt);
+      const gt = document.createElement('span'); gt.className = 'gl-t'; const mv = String(play || '').replace(/_/g, ' '), mvName = mv ? mv.charAt(0).toUpperCase() + mv.slice(1) : '';
+      // a goal when the log names one; otherwise the move's own name (one swap with no goal is a move, not a plan)
+      gt.textContent = goal.length ? goal.join(' + ') : mvName ? mvName : (total === 1 ? 'One swap' : total + ' swaps'); t.appendChild(gt);
       const pg = document.createElement('span'); pg.className = 'planprog';
       if (total <= 8) for (let q = 0; q < total; q++) { const dot = document.createElement('i'); dot.className = q < madeN ? 'done' : q === madeN ? 'next' : ''; pg.appendChild(dot); }
-      pg.append(left === 0 ? 'all made' : madeN === 0 ? total + (total === 1 ? ' swap' : ' swaps') : left + ' of ' + total + ' left');
+      pg.append(left === 0 ? 'done' : madeN === 0 ? (total === 1 ? '1 swap' : total + ' swaps') : left + ' of ' + total + ' left');
       t.appendChild(pg);
       t.title = 'The plan is ' + total + (total === 1 ? ' swap' : ' swaps') + ' in all' + (madeN ? '; ' + madeN + ' made, ' + left + ' still to make' : '') + (goal.length ? '. Goal: ' + goal.join(' + ').toLowerCase() + '.' : '.');
     }
@@ -1829,7 +1831,7 @@ function projectPlan(G, seq, cursor) {
       const find = (n) => opts.find((o) => o.nm === n);
       if (st.kind === 'new') {
         kind = pseq.length ? 'drop' : 'neu';
-        head = (pseq.length ? 'Changed its plan: ' : 'New plan: ') + seq.length + (seq.length === 1 ? ' swap' : ' swaps');
+        head = seq.length === 1 ? 'One swap: ' + nm(d[2]) : (pseq.length ? 'Changed its plan: ' : 'New plan: ') + seq.length + ' swaps';
         const mine = find(nm(d[2])); const bits = ['chose "' + nm(d[2]) + '"' + (mine && lostTxt(mine.lo) ? ' (' + lostTxt(mine.lo) + ')' : '')];
         if (pseq.length) { const old = find(nm(D.dec[i - 1][2])); bits.unshift('dropped "' + nm(D.dec[i - 1][2]) + '"' + (old && lostTxt(old.lo) ? ' (' + lostTxt(old.lo) + ' now)' : '')); }
         why = bits.join(' → ');

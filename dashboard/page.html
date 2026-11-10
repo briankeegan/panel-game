@@ -476,6 +476,13 @@
 .gw-cap { height: 13.4em; }
 @media (min-width: 980px) and (min-height: 600px) { .gw-cap { height: 12.2em; } }
 @media (max-width: 760px) { .gw-cap { height: 11.2em; } }
+.gw-optsb { display: flex; flex-direction: column; gap: 2px; max-height: 16em; overflow-y: auto; font-size: 12.5px; }
+.gw-optsb .gw-note2 { color: var(--color-fg-muted); padding: 2px 2px 6px; line-height: 1.4; }
+.gw-opt { display: grid; grid-template-columns: 1.6em 1fr auto; gap: 2px 8px; padding: 4px 6px; border-radius: 6px; align-items: baseline; }
+.gw-opt b { color: var(--color-fg-muted); font-weight: 500; text-align: right; }
+.gw-opt .or { grid-column: 2 / 3; color: var(--color-fg-muted); } .gw-opt .ol { font-weight: 500; }
+.gw-opt i { font-style: normal; font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 999px; background: color-mix(in srgb, var(--color-fg) 12%, transparent); grid-column: 3; grid-row: 1; }
+.gw-opt.pick { background: color-mix(in srgb, var(--color-ok) 14%, transparent); } .gw-opt.pick i { background: var(--color-ok); color: #fff; }
 </style>
 
 <div class="gs" id="gs">
@@ -567,6 +574,7 @@
         <div class="gw-lh"><b>Ranmaru's choices</b><div class="gs-seg sm" role="group" aria-label="Which decisions" id="gw-lmode"><button type="button" data-m="chg" aria-pressed="true">Plan changes</button><button type="button" data-m="all" aria-pressed="false">Every decision</button></div></div>
         <div class="gw-list" id="gw-list" role="list"></div>
         </div>
+        <details class="gw-stops" id="gw-opts" hidden><summary id="gw-opts-s">All the options it weighed</summary><div class="gw-optsb" id="gw-optsb"></div></details>
         <details class="gw-stops" id="gw-stops" hidden><summary id="gw-stops-s">Stops</summary><div class="gw-stl" id="gw-stl"></div></details>
       </div></div>
     </div>
@@ -1675,8 +1683,55 @@ function projectPlan(G, seq, cursor) {
     'hold': ['Waiting', 'No swap beats leaving the board alone.'],
     'zip': ['Spreading colours for later', 'Spreads colours so one swap can fire an attack later.'],
     'cut': ['Cutting a link out of a chain', 'Takes a link out from under a chain.'],
+    'raise': ['Raising the stack', 'Pushes the stack up a row so fresh panels come up.'],
   };
   const playWhy = (n) => PLAYWHY[String(n || '').replace(/_/g, ' ').toLowerCase()] || null;
+  // EVERY OPTION it weighed at a decision. The log keeps the best 8 of the candidates, in rank order (answer.c: opts=name[*][~]:lost:broke[:n][:bN]),
+  // and says how many candidates there were and of which kinds (live=a/b, cands=kind:count)
+  // THE REASON IN ONE SENTENCE, from the options it compared (how long each one leaves the board alive, and what it breaks): a person wants
+  // "why this one", not the rule's name
+  function becauseOf(d) {
+    const list = (d && d[14] || '').split(',').map((q) => q.split(':')).filter((q) => q[0]).map((q) => ({ nm: q[0].replace(/[*~]/g, '').replace(/_/g, ' '), v: (q[1] === 'L' || q[1] === 'inf') ? Infinity : Number(q[1]), br: Number(q[2]) || 0 }));
+    if (list.length < 2) return '';
+    const pick = String(d[2] || 'hold').replace(/_/g, ' '), me = list.find((o) => o.nm === pick) || list[0];
+    if (isNaN(me.v)) return '';
+    const others = list.filter((o) => o !== me && !isNaN(o.v)); if (!others.length) return '';
+    const sec = (v) => fs1(v), best = Math.max(...others.map((o) => o.v)), worse = others.filter((o) => o.v < me.v).length;
+    let t;
+    if (me.v === Infinity) t = worse ? 'It keeps the board alive, and ' + worse + ' of the other ' + others.length + ' options it compared would lose it.' : 'The board survives whichever it picks, so it takes the first choice on its priority list.';
+    else if (others.every((o) => o.v === me.v)) t = 'Whatever it does, the board is lost in ' + sec(me.v) + ', so it takes the first choice on its priority list.';
+    else if (me.v >= best) t = 'Every option loses the board; this one holds out longest (' + sec(me.v) + ').';
+    else t = 'It follows its priority list for this mode, even though another option keeps the board alive longer (' + sec(best) + ' against ' + sec(me.v) + ').';
+    if (me.br > 0) t += ' It also breaks ' + me.br + ' garbage.';
+    return t;
+  }
+  let OPTS_KEY = null;
+  function renderOpts(d) {
+    const box = g$('optsb'), det = g$('opts'), raw = d && d[17] || '';
+    const list = (d && d[14] || '').split(',').map((q) => q.split(':')).filter((q) => q[0]);
+    if (!list.length) { det.hidden = true; OPTS_KEY = null; return; }
+    det.hidden = false; const key = R.rid + ':' + d[0]; if (key === OPTS_KEY) return; OPTS_KEY = key;
+    box.replaceChildren();
+    const lt = (lo) => (lo === 'L' || lo === 'inf') ? 'board never lost' : (numOk(lo) ? 'board lost in ' + fs1(lo) : '');
+    const total = (/^\d+\/(\d+)$/.exec(kvOf(raw, 'live')) || [])[1];
+    const kinds = (kvOf(raw, 'cands') || '').split(',').map((c) => /^(.+?):(\d+)/.exec(c)).filter(Boolean).map((m) => m[2] + ' ' + kName(m[1]));
+    const pick = String((d[2] || 'hold')).replace(/_/g, ' '), seen = {};
+    const head = document.createElement('div'); head.className = 'gw-note2';
+    head.textContent = (total ? total + ' moves were weighed' : 'Moves weighed') + '; the log keeps the best ' + list.length + ', best first.' + (kinds.length ? ' Kinds: ' + kinds.join(', ') + '.' : '');
+    box.appendChild(head);
+    list.forEach((q, n) => {
+      const nm = q[0].replace(/[*~]/g, '').replace(/_/g, ' '), inProg = q[0].includes('*'), first = !seen[nm]; seen[nm] = (seen[nm] || 0) + 1;
+      const row = document.createElement('div'); row.className = 'gw-opt' + (n === 0 && nm === pick ? ' pick' : '');
+      const rk = document.createElement('b'); rk.textContent = String(n + 1); const lb = document.createElement('span'); lb.className = 'ol'; lb.textContent = kName(nm) + (seen[nm] > 1 ? ' (another line, ' + seen[nm] + ')' : '');
+      const bits = []; if (lt(q[1])) bits.push(lt(q[1])); const br = Number(q[2]); if (br > 0) bits.push('breaks ' + br + ' garbage'); const bl = q.slice(3).map((x) => /^b(\d+)$/.exec(x)).filter(Boolean)[0]; if (bl) bits.push('sends ' + bl[1] + (bl[1] === '1' ? ' block' : ' blocks'));
+      const rs = document.createElement('span'); rs.className = 'or'; rs.textContent = bits.join(' · ');
+      row.append(rk, lb, rs);
+      if (n === 0 && nm === pick) { const t = document.createElement('i'); t.textContent = 'chosen'; row.appendChild(t); }
+      else if (inProg) { const t = document.createElement('i'); t.textContent = 'already under way'; row.appendChild(t); }
+      box.appendChild(row);
+    });
+    g$('opts-s').textContent = 'All the options it weighed' + (total ? ' (' + total + ')' : ' (' + list.length + ')');
+  }
   const CATWHY = { lives: 'Board stays alive', plan: 'Follows its plan', breaks: 'Breaks garbage', ready: 'Ready for the next block', buys: 'Buys the most time', dies: 'Lost either way, this lasts longest' };
   const CIRC = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨'];
   const fs1 = (f) => (Number(f) / 60).toFixed(1) + ' s';
@@ -1798,6 +1853,7 @@ function projectPlan(G, seq, cursor) {
     if (PLAN.on && e) { const st = PLAN.status(i), sc = document.createElement('span'); sc.className = 'chip ' + st.kind; const m2 = /swap (\d+) of (\d+)/.exec(st.text);
       sc.textContent = st.kind === 'new' ? 'New plan · ' + seq.length + (seq.length === 1 ? ' swap' : ' swaps') : st.kind === 'same' ? (m2 ? (Number(m2[2]) - Number(m2[1]) + 1) + (Number(m2[2]) - Number(m2[1]) === 0 ? ' swap left' : ' swaps left') : 'Same plan') : (play === 'raise' ? 'Raising' : 'Waiting'); l1.appendChild(sc); }
     { const cp = PLAN.on ? PLAN.current(clock) : null; if (cp && cp.total) { let c2 = l1.querySelector('.chip.new, .chip.same, .chip.wait'); if (!c2) { c2 = document.createElement('span'); l1.appendChild(c2); } c2.className = 'chip ' + (cp.left ? (cp.done ? 'same' : 'new') : 'wait'); c2.textContent = cp.left ? cp.left + ' of ' + cp.total + (cp.total === 1 ? ' swap left' : ' swaps left') : 'Plan done'; } }
+    renderOpts(d);
     const dn = document.createElement('span'); dn.className = 'do'; dn.textContent = doing;
     if (!PLAN.on) { cap.appendChild(dn); return; }
     const logged = []; if (seq.length && Number(combo) > 0) logged.push('combo of ' + combo); if (seq.length && Number(chain) > 0) logged.push('chain of ' + chain);
@@ -1851,8 +1907,7 @@ function projectPlan(G, seq, cursor) {
         const bt = document.createElement('span'); bt.append('Keys left: '); const bb = document.createElement('b'); bb.textContent = left + ' of ' + lim; bt.appendChild(bb); bt.append(' / 10 s');
         const bar = document.createElement('i'); const fill = document.createElement('u'); fill.style.setProperty('--w', Math.round(100 * left / lim) + '%'); bar.appendChild(fill); bd.append(bt, bar); cap.appendChild(bd);
       }
-      const w1 = document.createElement('div'); w1.className = 'whyline def'; w1.textContent = whyParts.join(' · '); w1.title = 'The move Gambit calls "' + (play || 'hold').replace(/_/g, ' ') + '"'; if (whyParts.length) cap.appendChild(w1);
-      if (others.length) { const w2 = document.createElement('div'); w2.className = 'whyline def'; w2.textContent = 'Also considered: ' + others.slice(0, 3).map((o) => kName(o.nm)).join(', '); w2.title = others.slice(0, 3).map((o) => kName(o.nm) + ': ' + lostTxt(o.lost)).join('\n'); cap.appendChild(w2); }
+      const w1 = document.createElement('div'); w1.className = 'whyline def'; const bc = becauseOf(d); w1.textContent = bc || whyParts.join(' · '); w1.title = whyParts.join(' · ') + ' · Gambit calls this move "' + (play || 'hold').replace(/_/g, ' ') + '"'; if (w1.textContent) cap.appendChild(w1);
     }
     { const cur0 = PLAN.current(clock); if (cur0 && cur0.dropped) { const g = document.createElement('div'); g.className = 'whyline def'; g.textContent = 'New plan. Grey arrows: the plan it dropped.'; cap.appendChild(g); } }
   }
@@ -1876,8 +1931,8 @@ function projectPlan(G, seq, cursor) {
         if (pseq.length) { const old = find(nm(D.dec[i - 1][2])); bits.unshift('dropped ' + pn(D.dec[i - 1][2]) + (old && lostTxt(old.lo) ? ' (' + lostTxt(old.lo) + ' now)' : '')); }
         why = bits.join(' → ');
       } else if (st.kind === 'wait' && pseq.length) {
-        kind = 'drop'; head = 'Plan ended, now ' + pn(d[2]);
-        const old = find(nm(D.dec[i - 1][2])); why = 'dropped ' + pn(D.dec[i - 1][2]) + (old && lostTxt(old.lo) ? ' (' + lostTxt(old.lo) + ' now)' : '');
+        kind = 'drop'; head = pn(d[2]).charAt(0).toUpperCase() + pn(d[2]).slice(1);
+        const cur = find(nm(d[2])); why = 'after ' + pn(D.dec[i - 1][2]) + (cur && lostTxt(cur.lo) ? ' · ' + lostTxt(cur.lo) : '');
       } else if (LIST.mode === 'all') { head = pn(d[2]); const mine = find(nm(d[2])); why = mine && lostTxt(mine.lo) ? lostTxt(mine.lo) : ''; }
       else continue;
       const b = document.createElement('button'); b.type = 'button'; b.className = 'gw-li ' + kind; b.dataset.clock = d[0]; b.dataset.i = i; b.setAttribute('role', 'listitem');

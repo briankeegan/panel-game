@@ -12,7 +12,7 @@ body{margin:0;background:var(--color-bg);color:var(--color-fg);font:14px system-
 select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px solid var(--color-border-line);background:var(--color-panel);color:var(--color-fg)}
 .dash-skeleton{background:#e4e7ee}@media (prefers-color-scheme:dark){.dash-skeleton{background:#262b3a}}</style>"""
 html = ("<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1,viewport-fit=cover'>"
-        "<title>Ranmaru stats</title>" + css +
+        "<meta name='robots' content='noindex,nofollow'><meta name='referrer' content='no-referrer'><title>Ranmaru stats</title>" + css +
         "<script src='https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js'></script><script>" + loader + "</script></head>"
         "<body><div id='dash-root'>" + page + "</div></body></html>")
 open(os.path.join(out, "index.html"), "w").write(html)

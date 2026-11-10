@@ -22,5 +22,14 @@ site_push() {
   tree=$(git -C "$dir" write-tree)
   [ "$tree" != "$(git -C "$dir" rev-parse "$SITE_OLD^{tree}")" ] || { echo "nothing new for the page"; return 0; }
   commit=$(git -C "$dir" -c user.name="github-actions" -c user.email="actions@github.com" commit-tree "$tree" -m "$msg") || return 1
-  git push -q --force-with-lease="gh-pages:$SITE_OLD" origin "$commit:refs/heads/gh-pages"
+  git push -q --force-with-lease="gh-pages:$SITE_OLD" origin "$commit:refs/heads/gh-pages" || return 1
+  site_copy
+}
+# site_copy: when CF_PAGES_PROJECT is set, ask for the Cloudflare Pages copy (the `ranmaru-site` mode runs on its own runner; this is one API call).
+site_copy() {
+  [ -n "${CF_PAGES_PROJECT:-}" ] || return 0
+  command -v gh >/dev/null 2>&1 || return 0
+  gh workflow run bot-prod-smoke-test.yml --repo "${GITHUB_REPOSITORY:-}" --ref "${GITHUB_REF_NAME:-bramp/multi-player}" -f mode=ranmaru-site >/dev/null 2>&1 \
+    && echo "asked for the Cloudflare Pages copy" || echo "could not ask for the Cloudflare Pages copy (the next publish will)"
+  return 0
 }

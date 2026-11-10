@@ -31,6 +31,7 @@ on:
           - fight
           - bot-handoff
           - ranmaru-watch
+          - ranmaru-site
       server:
         description: '2. Server. auto = panelattack.com, or the Bramp server (104.156.250.136) for a fight. Stop / deploy / fight clear it of bots first'
         required: true
@@ -107,6 +108,8 @@ on:
 # garbage/death/display messages). Its bot lives in bot/ on this branch of
 # THIS repo, built to run on an unmodified upstream checkout:
 env:
+  # the name of the Cloudflare Pages project the stats page is also published to (a repository VARIABLE; blank = not published there). See dashboard/CLOUDFLARE.md
+  CF_PAGES_PROJECT: ${{ vars.CF_PAGES_PROJECT }}
   # versus-player is `live` under another name
   MODE: ${{ inputs.mode == 'versus-player' && 'live' || inputs.mode }}
   # the server picked, 'auto' resolved: the Bramp server for a fight, panelattack.com otherwise
@@ -752,7 +755,7 @@ jobs:
   #                   server and advanced words (Gambit of GameCreator's latest main unless advanced pins one)
   ranmaru:
     name: Stop / deploy / fight
-    if: ${{ (startsWith(inputs.mode, 'ranmaru') && inputs.mode != 'ranmaru-watch') || (inputs.mode == 'fight' && !contains(inputs.advanced, 'bot_run')) }}
+    if: ${{ (startsWith(inputs.mode, 'ranmaru') && inputs.mode != 'ranmaru-watch' && inputs.mode != 'ranmaru-site') || (inputs.mode == 'fight' && !contains(inputs.advanced, 'bot_run')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 355
     permissions:
@@ -1132,3 +1135,34 @@ jobs:
             gh api "repos/$repo/actions/runs?per_page=100" --jq '.workflow_runs[] | select(.status != "completed") | select(.display_title | startswith("ranmaru-watch · " + env.SERVER)) | .id' 2>/dev/null | awk -v me="$me" '$1 > me' | grep -q . && break
             sleep 10
           done
+
+  # ranmaru-site: copy the stats page (the gh-pages branch) to Cloudflare Pages. Asked for by dashboard/site_git.sh after every publish when the
+  # repository variable CF_PAGES_PROJECT is set; a run on its own runner, so the bot's runner does none of the work. Newest request wins.
+  site-sync:
+    name: Publish the stats page to Cloudflare Pages
+    if: ${{ inputs.mode == 'ranmaru-site' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    concurrency:
+      group: ranmaru-site-sync
+      cancel-in-progress: true
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      PROJECT: ${{ vars.CF_PAGES_PROJECT || 'ranmaru-stats' }}
+    steps:
+      - name: Publish
+        shell: bash
+        run: |
+          set -u
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::notice::CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID are not set as repository secrets: nothing to publish (see dashboard/CLOUDFLARE.md)"; exit 0
+          fi
+          git clone -q --depth 1 --branch gh-pages "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" site
+          rm -rf site/.git
+          # (the project is made once; this says "already exists" afterwards, which is fine)
+          npx --yes wrangler@3 pages project create "$PROJECT" --production-branch main || true
+          npx --yes wrangler@3 pages deploy site --project-name "$PROJECT" --branch main --commit-dirty=true
+          echo "Published to https://$PROJECT.pages.dev" >> "$GITHUB_STEP_SUMMARY"

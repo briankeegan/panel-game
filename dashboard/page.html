@@ -5,7 +5,7 @@
 .gs h2 { font-size: var(--cds-font-size-heading); font-weight: var(--cds-font-weight-medium); margin: 0; }
 .gs p { margin: 0; }
 .gs-take { margin-top: 6px !important; color: var(--color-fg-muted); font-size: var(--cds-font-size-body); max-width: 70ch; min-height: 1.4em; }
-.gs-commit { color: var(--color-fg); text-decoration: underline; text-underline-offset: 2px; }
+.gs-commit { color: var(--color-fg); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .92em; }
 .gs-take b { color: var(--color-fg); font-weight: 600; }
 .gs-bar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--cds-gap-md); padding: var(--cds-pad-md); border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); background: var(--color-panel); }
 .gs-f { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
@@ -689,8 +689,7 @@
     tip.style.top = Math.max(0, y - tip.offsetHeight - 10) + 'px';
   }
   const hideTip = () => { tip.style.display = 'none'; };
-  const commitUrl = (sha) => sha ? 'https://github.com/briankeegan/GameCreator/commit/' + sha : '';   // the Ranmaru (GameCreator) commit a version was built from; GitHub shows the merge it came in with
-  const linkTo = (parent, sha, text) => { const a = document.createElement('a'); a.href = commitUrl(sha); a.target = '_blank'; a.rel = 'noopener'; a.textContent = text || sha; a.className = 'gs-commit'; parent.appendChild(a); return a; };
+  const linkTo = (parent, sha, text) => { const a = document.createElement('span'); a.textContent = text || sha; a.className = 'gs-commit'; parent.appendChild(a); return a; };   // plain text: the page links nowhere outside itself
   const txt = (parent, cls, text) => { const s = document.createElement('span'); if (cls) s.className = cls; s.textContent = text; parent.appendChild(s); return s; };
 
   function table(el, key, cols, rows, selKey, onPick) {
@@ -902,7 +901,7 @@
     const vcols = [
       { key: 'order', label: 'Version', cls: '', val: (r) => r.order, cell: (td, r) => { td.textContent = r.label; td.style.fontWeight = '600'; } },
       { key: 'start', label: 'Started', cls: 'hide-s', val: (r) => r.start, cell: plain((r) => d3.utcFormat('%b %-d')(new Date(r.start))) },
-      { key: 'sha', label: 'Commit', cls: 'hide-s', val: (r) => r.sha, cell: (td, r) => { const a = linkTo(td, r.sha); a.classList.add('mono'); a.title = (r.subject || 'Open the commit on GitHub') + (r.commit && r.commit.merged ? ' · merges ' + r.commit.merged.sha + ': ' + r.commit.merged.subject : '') + ' (opens GitHub)'; a.addEventListener('click', (e) => e.stopPropagation()); } },
+      { key: 'sha', label: 'Commit', cls: 'hide-s', val: (r) => r.sha, cell: (td, r) => { const a = linkTo(td, r.sha); a.classList.add('mono'); a.title = (r.subject || r.sha) + (r.commit && r.commit.merged ? ' · merges ' + r.commit.merged.sha + ': ' + r.commit.merged.subject : '') + ' (opens GitHub)'; a.addEventListener('click', (e) => e.stopPropagation()); } },
       { key: 'subject', label: 'What changed', cls: 'sub hide-s', val: (r) => r.subject, cell: (td, r) => { td.textContent = r.subject; td.title = r.subject; } },
       { key: 'n', label: 'Games', num: true, val: (r) => r.n, cell: plain((r) => r.n) },
       { key: 'w', label: 'Won', num: true, val: (r) => r.w, cell: plain((r) => r.w) },

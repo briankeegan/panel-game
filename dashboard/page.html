@@ -770,7 +770,7 @@
     const games = gd.data.map((g, i) => Object.assign({ idx: i }, g));
     const vers = vd.data.map((v, i) => Object.assign({ order: i }, v));
     const vBy = new Map(vers.map((v) => [v.sha, v]));
-    const vLabel = (sha) => (vBy.get(sha) || {}).label || sha; VLBL = vLabel;
+    const vLabel = (sha) => (vBy.get(sha) || {}).label || sha; VLBL = vLabel; VFULL = (sha) => ((vBy.get(sha) || {}).commit || {}).full || sha;
     const pickedV = vBy.get(ver);
 
     // filter controls
@@ -1019,7 +1019,7 @@
     if (scroll) (window.innerWidth < 980 ? $('gw-stage') : $('sec-watch')).scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
   // the games of the current selection that have a replay, found by result, day, length and opponent
-  let VLBL = null;
+  let VFULL = null, VLBL = null;
   const WL = { list: [], src: [], res: '', when: '', from: '', to: '', len: '', sort: 'new' };
   const resWord = (r) => r.res === 'W' ? 'Won' : 'Lost';
   const playedMs = (r) => r.at ? new Date(r.at).getTime() - (r.secs || 0) * 1000 : new Date(r.date + 'T12:00:00').getTime();
@@ -1810,9 +1810,17 @@ function projectPlan(G, seq, cursor) {
     const D = R.D, row = R.row || {}, clock = D.frames[R.idx][0], i = decAt(clock), d = i >= 0 ? D.dec[i] : null, W = 180;
     const near = (f) => Math.abs(f - clock) <= W;
     const L = [];
-    URLSTATE.flush(); L.push('Ranmaru stats page: ' + location.href);
-    L.push('Game: ' + R.rid + ' · ' + (VLBL ? VLBL(D.sha) : '') + ' (GameCreator ' + D.sha + ') · ' + (row.res === 'W' ? 'won' : 'lost') + ' vs ' + D.opp + ' · ' + (row.at || row.date || '') + ' · ' + dur(row.secs) + (row.run ? ' · run ' + row.run : '') + ' · bot ' + D.bot);
+    URLSTATE.flush();
+    L.push('Ranmaru decision to review');
+    L.push('Link (opens this exact moment): ' + location.href);
+    L.push('Replay data (gzipped JSON, the whole game): ' + new URL('data/replay_' + R.rid + '.json.gz', location.href.split('#')[0]).href);
+    L.push('Game: ' + R.rid + ' · ' + (VLBL ? VLBL(D.sha) : '') + ' (GameCreator ' + (VFULL ? VFULL(D.sha) : D.sha) + ') · ' + (row.res === 'W' ? 'won' : 'lost') + ' vs ' + D.opp + ' · ' + (row.at || row.date || '') + ' · ' + dur(row.secs) + (row.run ? ' · run ' + row.run : '') + ' · bot ' + D.bot);
     L.push('At: frame ' + clock + ' (' + fmtClock(clock) + ' of ' + fmtClock(D.end) + ')');
+    { // what the page shows for this moment, in its own words
+      const cp = g$('cap'), gt = cp.querySelector('.gl-t'), pg = cp.querySelector('.planprog'), wy = cp.querySelector('.why1');
+      const shown = [gt ? gt.textContent + (pg ? ' (' + pg.textContent + ')' : '') : '', wy ? wy.textContent : ''].filter(Boolean).join(' · ');
+      if (shown) L.push('On the page: ' + shown);
+    }
     if (d) {
       L.push('Decision at frame ' + d[0] + (d[0] !== clock ? ' (the latest at or before this frame)' : '') + ':');
       L.push(d[17] || ('GAMBITD ' + d[0] + ' ' + d[1] + ' play=' + d[2] + ' want=' + d[3] + ' v=' + d[4] + ' dies=' + d[5] + ' land=' + d[6] + ' chain=' + d[7] + ' combo=' + d[8] + ' thrown=' + d[9] + '   (rebuilt from the page: this game has no raw log line)'));

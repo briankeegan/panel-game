@@ -307,7 +307,7 @@
 .gw-cap .legend { display: flex; flex-wrap: wrap; gap: 3px 12px; font-size: 11.5px; color: var(--color-fg-muted); }
 .gw-cap .lgi { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
 .gw-cap .sw { display: inline-flex; width: 15px; height: 15px; border-radius: 4px; align-items: center; justify-content: center; font-style: normal; font-size: 10px; box-sizing: border-box; }
-.gw-cap .sw.here { background: linear-gradient(135deg, #ff6b81 0 25%, #ffe066 25% 50%, #0fa3b1 50% 75%, #6c3bd1 75%); border: 2px solid #fff; }
+.gw-cap .sw.here { background: linear-gradient(135deg, #bf2836 0 25%, #bee54a 25% 50%, #0fe39c 50% 75%, #a388ff 75%); border: 2px solid #fff; }
 .gw-cap .sw.cursor { width: 24px; background: #14101c; border: 2px solid #fff; box-shadow: 0 0 0 1px #14101c; }
 .gw-cap .sw.gone { background: #fff; border: 1.5px solid #9aa3b8; }
 .gw-cap .sw.dim { background: #2a2540; border: 1px solid #4a4466; }
@@ -1000,8 +1000,10 @@
 
   // ---- replay player
   // the board as GameCreator's own game draws it: coloured panels with a shape each, shock panels in steel, garbage as slabs with a face
-  const PAL = [null, '#ff6b81', '#0fa3b1', '#ffe066', '#6c3bd1', '#e8650a', '#1b8a4a', null, '#8a93a6'];   // light/dark alternating, so neighbours differ in brightness as well as hue
-  const SHAPE = [null, 'circle', 'triangle', 'diamond', 'star', 'square', 'cross', null, 'bolt'];
+  // red, lime, teal-green, lilac, orange, royal blue: one colour from each family, measured to stay apart for red-green colour blindness and in greyscale
+  const PAL = [null, '#bf2836', '#bee54a', '#0fe39c', '#a388ff', '#e28200', '#2536f0', null, '#8a93a6'];
+  // a shape for each colour, chosen so the colours that are hardest to separate get the most different shapes; the steel shock panel is a hexagon, so a bolt only ever means orange
+  const SHAPE = [null, 'square', 'crescent', 'triangle', 'hourglass', 'bolt', 'star', null, 'hexagon'];
   const CS = 28;
   const R = { rid: null, row: null, D: null, idx: 0, playing: false, speed: 1, last: 0, acc: 0, raf: 0, seg: 'end', part: 'end' };
   const dataId = () => 'replay_' + R.rid;
@@ -1126,18 +1128,12 @@
   }
   function rrect(x, px, py, w, h, r) { x.beginPath(); if (x.roundRect) x.roundRect(px, py, w, h, r); else x.rect(px, py, w, h); }
   function lighten(hex, amt) { const n = parseInt(hex.slice(1), 16); const c = (v) => Math.min(255, v + Math.round(255 * amt)); return 'rgb(' + c((n >> 16) & 255) + ',' + c((n >> 8) & 255) + ',' + c(n & 255) + ')'; }
+  const SHP = {"circle":[[[1.0,0.0],[0.995,0.098],[0.981,0.195],[0.957,0.29],[0.924,0.383],[0.882,0.471],[0.831,0.556],[0.773,0.634],[0.707,0.707],[0.634,0.773],[0.556,0.831],[0.471,0.882],[0.383,0.924],[0.29,0.957],[0.195,0.981],[0.098,0.995],[0.0,1.0],[-0.098,0.995],[-0.195,0.981],[-0.29,0.957],[-0.383,0.924],[-0.471,0.882],[-0.556,0.831],[-0.634,0.773],[-0.707,0.707],[-0.773,0.634],[-0.831,0.556],[-0.882,0.471],[-0.924,0.383],[-0.957,0.29],[-0.981,0.195],[-0.995,0.098],[-1.0,0.0],[-0.995,-0.098],[-0.981,-0.195],[-0.957,-0.29],[-0.924,-0.383],[-0.882,-0.471],[-0.831,-0.556],[-0.773,-0.634],[-0.707,-0.707],[-0.634,-0.773],[-0.556,-0.831],[-0.471,-0.882],[-0.383,-0.924],[-0.29,-0.957],[-0.195,-0.981],[-0.098,-0.995],[-0.0,-1.0],[0.098,-0.995],[0.195,-0.981],[0.29,-0.957],[0.383,-0.924],[0.471,-0.882],[0.556,-0.831],[0.634,-0.773],[0.707,-0.707],[0.773,-0.634],[0.831,-0.556],[0.882,-0.471],[0.924,-0.383],[0.957,-0.29],[0.981,-0.195],[0.995,-0.098]]],"triangle":[[[0,-1],[1,1],[-1,1]]],"diamond":[[[0,-1],[1,0],[0,1],[-1,0]]],"square":[[[-0.8,-0.8],[0.8,-0.8],[0.8,0.8],[-0.8,0.8]]],"star":[[[0.0,-1.0],[0.265,-0.364],[0.951,-0.309],[0.428,0.139],[0.588,0.809],[0.0,0.45],[-0.588,0.809],[-0.428,0.139],[-0.951,-0.309],[-0.265,-0.364]]],"plus":[[[-0.34,-1],[0.34,-1],[0.34,-0.34],[1,-0.34],[1,0.34],[0.34,0.34],[0.34,1],[-0.34,1],[-0.34,0.34],[-1,0.34],[-1,-0.34],[-0.34,-0.34]]],"hexagon":[[[0.0,-1.0],[0.866,-0.5],[0.866,0.5],[0.0,1.0],[-0.866,0.5],[-0.866,-0.5]]],"crescent":[[[0.625,0.781],[0.534,0.846],[0.435,0.9],[0.332,0.943],[0.224,0.975],[0.113,0.994],[0.001,1.0],[-0.111,0.994],[-0.221,0.975],[-0.329,0.944],[-0.433,0.901],[-0.531,0.847],[-0.623,0.782],[-0.707,0.708],[-0.781,0.624],[-0.846,0.532],[-0.901,0.434],[-0.944,0.331],[-0.975,0.223],[-0.994,0.112],[-1.0,0.0],[-0.994,-0.112],[-0.975,-0.223],[-0.944,-0.331],[-0.901,-0.434],[-0.846,-0.532],[-0.781,-0.624],[-0.707,-0.708],[-0.623,-0.782],[-0.531,-0.847],[-0.433,-0.901],[-0.329,-0.944],[-0.221,-0.975],[-0.111,-0.994],[0.001,-1.0],[0.113,-0.994],[0.224,-0.975],[0.332,-0.943],[0.435,-0.9],[0.534,-0.846],[0.625,-0.781],[0.625,-0.781],[0.554,-0.793],[0.483,-0.799],[0.411,-0.799],[0.34,-0.792],[0.27,-0.779],[0.201,-0.76],[0.134,-0.735],[0.069,-0.704],[0.008,-0.667],[-0.05,-0.624],[-0.104,-0.577],[-0.153,-0.525],[-0.198,-0.469],[-0.237,-0.41],[-0.271,-0.346],[-0.299,-0.281],[-0.321,-0.212],[-0.337,-0.143],[-0.347,-0.072],[-0.35,0.0],[-0.347,0.072],[-0.337,0.143],[-0.321,0.212],[-0.299,0.281],[-0.271,0.346],[-0.237,0.41],[-0.198,0.469],[-0.153,0.525],[-0.104,0.577],[-0.05,0.624],[0.008,0.667],[0.069,0.704],[0.134,0.735],[0.201,0.76],[0.27,0.779],[0.34,0.792],[0.411,0.799],[0.483,0.799],[0.554,0.793],[0.625,0.781]]],"hourglass":[[[-0.9,-0.9],[0.9,-0.9],[0,0],[0.9,0.9],[-0.9,0.9],[0,0]]],"bolt":[[[0.3,-1],[-0.6,0.15],[-0.05,0.15],[-0.3,1],[0.65,-0.2],[0.08,-0.2]]]};   // outlines in a unit circle, as the picker showed them
   function drawShape(x, shape, cx, cy, r, tint) {
-    x.fillStyle = tint || 'rgba(255,255,255,0.85)'; x.beginPath();
-    switch (shape) {
-      case 'circle': x.arc(cx, cy, r, 0, Math.PI * 2); break;
-      case 'triangle': x.moveTo(cx, cy - r); x.lineTo(cx + r, cy + r); x.lineTo(cx - r, cy + r); break;
-      case 'diamond': x.moveTo(cx, cy - r); x.lineTo(cx + r, cy); x.lineTo(cx, cy + r); x.lineTo(cx - r, cy); break;
-      case 'star': for (let i = 0; i < 10; i++) { const ang = (Math.PI / 5) * i - Math.PI / 2, rad = i % 2 === 0 ? r : r * 0.45; x[i === 0 ? 'moveTo' : 'lineTo'](cx + Math.cos(ang) * rad, cy + Math.sin(ang) * rad); } break;
-      case 'square': x.rect(cx - r * 0.8, cy - r * 0.8, r * 1.6, r * 1.6); break;
-      case 'bolt': x.moveTo(cx + r * 0.3, cy - r); x.lineTo(cx - r * 0.6, cy + r * 0.15); x.lineTo(cx - r * 0.05, cy + r * 0.15); x.lineTo(cx - r * 0.3, cy + r); x.lineTo(cx + r * 0.6, cy - r * 0.15); x.lineTo(cx + r * 0.05, cy - r * 0.15); break;
-      default: x.rect(cx - r, cy - r * 0.34, r * 2, r * 0.68); x.rect(cx - r * 0.34, cy - r, r * 0.68, r * 2);
-    }
-    x.fill();
+    const P = SHP[shape] || SHP.plus;
+    x.fillStyle = tint || 'rgba(255,255,255,0.88)'; x.beginPath();
+    P.forEach((poly) => { poly.forEach(([a, b], i) => x[i ? 'lineTo' : 'moveTo'](cx + a * r, cy + b * r)); x.closePath(); });
+    x.fill('evenodd');
   }
   function drawBoard(cv, gridStr, curRow, curCol, clock, disp, plan, trail, gm) {
     const G = parseGrid(gridStr), n = G.length, H = 12 * CS, bottom = H;
@@ -1207,7 +1203,7 @@
       const gr = x.createLinearGradient(qx, qy, qx, qy + w); gr.addColorStop(0, lighten(color, 0.25)); gr.addColorStop(1, color);
       x.fillStyle = gr; rrect(x, qx, qy, w, w, Math.max(2, CS * 0.16)); x.fill();
       x.strokeStyle = 'rgba(0,0,0,0.35)'; x.lineWidth = 1; x.stroke();
-      drawShape(x, SHAPE[Number(k.col)], qx + w / 2, qy + w / 2, w * 0.26);
+      drawShape(x, SHAPE[Number(k.col)], qx + w / 2, qy + w / 2, w * 0.3);
       x.restore();
     }
     if (plan) drawPlan(x, plan, bottom, rise, G, curRow, curCol);
@@ -1324,7 +1320,7 @@ function projectPlan(G, seq, cursor) {
       const isPop = pop.has(row + ',' + c), inset = Math.max(1, Math.round(CS * 0.06)), w = CS - inset * 2, color = v.col === '8' ? '#8a93a6' : (PAL[Number(v.col)] || '#888');
       x.globalAlpha = st.kind === 'pop' && !isPop ? 0.4 : 1;
       if (isPop) { x.save(); x.shadowColor = POPC[Math.min(st.link, 4)]; x.shadowBlur = 10; x.fillStyle = POPC[Math.min(st.link, 4)]; rrect(x, px + inset, py + inset, w, w, Math.max(2, CS * 0.16)); x.fill(); x.restore(); drawShape(x, SHAPE[Number(v.col)], px + CS / 2, py + CS / 2, w * 0.3, st.link > 1 ? '#14101c' : color); }
-      else { const gr = x.createLinearGradient(px, py, px, py + CS); gr.addColorStop(0, lighten(color, 0.25)); gr.addColorStop(1, color); x.fillStyle = gr; rrect(x, px + inset, py + inset, w, w, Math.max(2, CS * 0.16)); x.fill(); drawShape(x, SHAPE[Number(v.col)], px + CS / 2, py + CS / 2, w * 0.26); }
+      else { const gr = x.createLinearGradient(px, py, px, py + CS); gr.addColorStop(0, lighten(color, 0.25)); gr.addColorStop(1, color); x.fillStyle = gr; rrect(x, px + inset, py + inset, w, w, Math.max(2, CS * 0.16)); x.fill(); drawShape(x, SHAPE[Number(v.col)], px + CS / 2, py + CS / 2, w * 0.3); }
       x.globalAlpha = 1;
     }
     const pill = (txt, col, tx, ty) => { x.font = '700 10px system-ui, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; const wd = x.measureText(txt).width + 12; const lx = Math.max(2, Math.min(6 * CS - wd - 2, tx - wd / 2)); x.fillStyle = col; rrect(x, lx, ty, wd, 16, 8); x.fill(); x.fillStyle = '#14101c'; x.fillText(txt, lx + wd / 2, ty + 8.5); };
@@ -1357,7 +1353,7 @@ function projectPlan(G, seq, cursor) {
       const inset = Math.max(1, Math.round(CS * 0.06)), w = CS - inset * 2, color = v.col === '8' ? '#8a93a6' : (PAL[Number(v.col)] || '#888');
       x.globalAlpha = lk ? 1 : 0.38;
       const gr = x.createLinearGradient(px, py, px, py + CS); gr.addColorStop(0, lighten(color, 0.25)); gr.addColorStop(1, color);
-      x.fillStyle = gr; rrect(x, px + inset, py + inset, w, w, Math.max(2, CS * 0.16)); x.fill(); drawShape(x, SHAPE[Number(v.col)], px + CS / 2, py + CS / 2, w * 0.26);
+      x.fillStyle = gr; rrect(x, px + inset, py + inset, w, w, Math.max(2, CS * 0.16)); x.fill(); drawShape(x, SHAPE[Number(v.col)], px + CS / 2, py + CS / 2, w * 0.3);
       x.globalAlpha = 1;
       if (lk) { x.save(); x.shadowColor = POPC[Math.min(lk, 4)]; x.shadowBlur = 8; x.strokeStyle = POPC[Math.min(lk, 4)]; x.lineWidth = 3; rrect(x, px + 1.5, py + 1.5, CS - 3, CS - 3, 6); x.stroke(); x.restore(); }
     }
@@ -1378,7 +1374,7 @@ function projectPlan(G, seq, cursor) {
       if (v.g) { x.fillStyle = '#4a2f6a'; x.fillRect(px, py, CS, CS); continue; }
       const inset = Math.max(1, Math.round(CS * 0.06)), w = CS - inset * 2, color = v.col === '8' ? '#8a93a6' : (PAL[Number(v.col)] || '#888');
       const gr = x.createLinearGradient(px, py, px, py + CS); gr.addColorStop(0, lighten(color, 0.25)); gr.addColorStop(1, color);
-      x.fillStyle = gr; rrect(x, px + inset, py + inset, w, w, Math.max(2, CS * 0.16)); x.fill(); drawShape(x, SHAPE[Number(v.col)], px + CS / 2, py + CS / 2, w * 0.26);
+      x.fillStyle = gr; rrect(x, px + inset, py + inset, w, w, Math.max(2, CS * 0.16)); x.fill(); drawShape(x, SHAPE[Number(v.col)], px + CS / 2, py + CS / 2, w * 0.3);
     }
     x.fillStyle = 'rgba(10,8,20,.88)'; rrect(x, 6, 6, 6 * CS - 12, 22, 8); x.fill(); x.fillStyle = '#4de3ff'; x.font = '700 12px system-ui, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('PROJECTED RESULT', 3 * CS, 17);
   }
@@ -1391,7 +1387,7 @@ function projectPlan(G, seq, cursor) {
       const Bd = ov.build.board, kk = ov.build.k, pc = new Set(ov.build.cells.map(([r, c]) => r + ',' + c));
       for (let row = 1; row < Bd.length; row++) for (let c = 0; c < 6; c++) { const v = Bd[row][c]; if (!v || v.g) continue; const dr = row + kk, cur = atG(dr, c), qx = c * CS, qy = bottom - dr * CS - rise, pops = pc.has(row + ',' + c);
         if (cur && cur.col === v.col && !pops) continue;
-        const inset = 3, w = CS - inset * 2; x.save(); x.globalAlpha = 0.62; x.fillStyle = v.col === '8' ? '#8a93a6' : (PAL[Number(v.col)] || '#888'); rrect(x, qx + inset, qy + inset, w, w, 5); x.fill(); drawShape(x, SHAPE[Number(v.col)], qx + CS / 2, qy + CS / 2, w * 0.26); x.globalAlpha = 1;
+        const inset = 3, w = CS - inset * 2; x.save(); x.globalAlpha = 0.62; x.fillStyle = v.col === '8' ? '#8a93a6' : (PAL[Number(v.col)] || '#888'); rrect(x, qx + inset, qy + inset, w, w, 5); x.fill(); drawShape(x, SHAPE[Number(v.col)], qx + CS / 2, qy + CS / 2, w * 0.3); x.globalAlpha = 1;
         if (pops) { x.strokeStyle = '#ffffff'; x.lineWidth = 2.5; rrect(x, qx + 1.5, qy + 1.5, CS - 3, CS - 3, 6); x.stroke(); } x.restore(); }
     }
     const inG = new Set(grp.map(([r, c]) => r + ',' + c));
@@ -1897,6 +1893,11 @@ function projectPlan(G, seq, cursor) {
       // a goal when the log names one; otherwise the move's own name (one swap with no goal is a move, not a plan)
       const pw1 = playWhy(play); gt.textContent = goal.length ? goal.join(' + ') : pw1 ? pw1[0] : nice(play) ? nice(play) : (total === 1 ? 'One swap' : total + ' swaps'); t.appendChild(gt);
       if (pw1 && goal.length) t.dataset.expl = 'via ' + pw1[0].toLowerCase(); if (pw1) t.dataset.tip = pw1[1];
+      if (String(play || '').replace(/_/g, ' ') === 'survive') {      // the emergency move: say what it buys, from the log's own numbers
+        const ol = (d[14] || '').split(',').map((q) => q.split(':')).filter((q) => q[0]).map((q) => ({ nm: q[0].replace(/[*~]/g, '').replace(/_/g, ' '), v: (q[1] === 'L' || q[1] === 'inf') ? Infinity : Number(q[1]) }));
+        const mine1 = ol.find((o) => o.nm === 'survive') || ol[0], hold1 = ol.find((o) => o.nm === 'hold');
+        if (mine1 && !isNaN(mine1.v)) t.dataset.expl = (total + (total === 1 ? ' swap' : ' swaps')) + ': ' + (mine1.v === Infinity ? 'the board stays alive' : 'the board lasts ' + fs1(mine1.v)) + (hold1 && !isNaN(hold1.v) && hold1.v !== Infinity ? (Math.round(hold1.v / 6) === Math.round(mine1.v / 6) ? ', no better than doing nothing' : ' instead of ' + fs1(hold1.v) + ' if it did nothing') : '');
+      }
       t.appendChild(progress(total, left));
       t.title = (t.dataset.tip ? t.dataset.tip + ' ' : '') + 'The plan is ' + total + (total === 1 ? ' swap' : ' swaps') + ' in all' + (madeN ? '; ' + madeN + ' made, ' + left + ' still to make' : '') + (goal.length ? '. Goal: ' + goal.join(' + ').toLowerCase() + '.' : '.');
     }

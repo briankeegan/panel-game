@@ -1168,14 +1168,15 @@ jobs:
           echo "Published to https://$PROJECT.pages.dev" >> "$GITHUB_STEP_SUMMARY"
           # only the newest deployment stays: Cloudflare keeps every older one at its own address, and an older one may hold data that has since been taken off the page
           python3 - <<'PY' || echo "could not clean up old deployments"
-          import json, os, urllib.request
+          import json, os, urllib.request, urllib.error
           acct, proj, tok = os.environ['CLOUDFLARE_ACCOUNT_ID'], os.environ['PROJECT'], os.environ['CLOUDFLARE_API_TOKEN']
           def call(method, path):
               r = urllib.request.Request('https://api.cloudflare.com/client/v4' + path, method=method, headers={'Authorization': 'Bearer ' + tok})
-              return json.load(urllib.request.urlopen(r, timeout=60))
+              try: return json.load(urllib.request.urlopen(r, timeout=60))
+              except urllib.error.HTTPError as e: raise RuntimeError('%s %s -> %s %s' % (method, path.split('?')[0], e.code, e.read()[:300]))
           gone = 0
           for _ in range(6):
-              d = call('GET', '/accounts/%s/pages/projects/%s/deployments?per_page=50' % (acct, proj))['result']
+              d = call('GET', '/accounts/%s/pages/projects/%s/deployments?per_page=25' % (acct, proj))['result']
               d.sort(key=lambda x: x['created_on'], reverse=True)
               old = d[1:]
               if not old: break

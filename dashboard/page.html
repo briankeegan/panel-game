@@ -1698,18 +1698,17 @@ function projectPlan(G, seq, cursor) {
   // THE REASON IN ONE SENTENCE, from the options it compared (how long each one leaves the board alive, and what it breaks): a person wants
   // "why this one", not the rule's name
   function becauseOf(d) {
-    const list = (d && d[14] || '').split(',').map((q) => q.split(':')).filter((q) => q[0]).map((q) => ({ nm: q[0].replace(/[*~]/g, '').replace(/_/g, ' '), v: (q[1] === 'L' || q[1] === 'inf') ? Infinity : Number(q[1]), br: Number(q[2]) || 0 }));
-    if (list.length < 2) return '';
+    // only what the log records: how many of the options weighed keep the board alive (live=a/b), the chosen line's own outcome, and what it breaks
+    const raw = d && d[17] || '';
+    const list = (d && d[14] || '').split(',').map((q) => q.split(':')).filter((q) => q[0]).map((q) => ({ nm: q[0].replace(/[*~]/g, '').replace(/_/g, ' '), v: (q[1] === 'L' || q[1] === 'inf') ? Infinity : Number(q[1]) }));
+    if (!list.length) return '';
     const pick = String(d[2] || 'hold').replace(/_/g, ' '), me = list.find((o) => o.nm === pick) || list[0];
     if (isNaN(me.v)) return '';
-    const others = list.filter((o) => o !== me && !isNaN(o.v)); if (!others.length) return '';
-    const sec = (v) => fs1(v), tenth = (v) => v === Infinity ? v : Math.round(v / 6), best = Math.max(...others.map((o) => o.v)), worse = others.filter((o) => tenth(o.v) < tenth(me.v)).length;
+    const lv = /^(\d+)\/(\d+)$/.exec(kvOf(raw, 'live')), a = lv ? Number(lv[1]) : null, b = lv ? Number(lv[2]) : null;
     let t;
-    if (me.v === Infinity) t = worse && worse === others.length ? 'Only option that keeps the board alive' : worse ? 'Keeps the board alive (' + worse + ' of ' + others.length + ' others lose it)' : 'Board safe either way; first on its list';
-    else if (others.every((o) => tenth(o.v) === tenth(me.v))) t = 'Board lost in ' + sec(me.v) + ' whatever it does';
-    else if (tenth(me.v) >= tenth(best)) t = 'Holds out longest (' + sec(me.v) + ')';
-    else t = 'Its priority list, not survival (' + sec(me.v) + ' vs ' + sec(best) + ')';
-    if (me.br > 0) t += ' · breaks ' + me.br;
+    if (me.v === Infinity) t = a == null ? 'Keeps the board alive' : a === 1 ? 'The only one of ' + b + ' options that keeps the board alive' : 'Keeps the board alive (' + a + ' of ' + b + ' options do)';
+    else t = a == null ? 'Board lost in ' + fs1(me.v) : a === 0 ? 'None of ' + b + ' options keeps the board alive (lost in ' + fs1(me.v) + ' with this one)' : a + ' of ' + b + ' options keep the board alive, but its priority list picked this one (lost in ' + fs1(me.v) + ')';
+    const br = Number(kvOf(raw, 'broke')); if (br > 0) t += ' · breaks ' + br;
     return t;
   }
   let OPTS_KEY = null;

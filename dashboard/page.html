@@ -1001,7 +1001,7 @@
   // ---- replay player
   // the board as GameCreator's own game draws it: coloured panels with a shape each, shock panels in steel, garbage as slabs with a face
   // red, lime, teal-green, lilac, orange, royal blue: one colour from each family, measured to stay apart for red-green colour blindness and in greyscale
-  const PAL = [null, '#bf2836', '#bee54a', '#0fe39c', '#a388ff', '#e28200', '#2536f0', null, '#8a93a6'];
+  const PAL = [null, '#d01010', '#d0d008', '#08d0d0', '#08d008', '#e07010', '#2850d0', null, '#b0b0b0'];
   // a shape for each colour, chosen so the colours that are hardest to separate get the most different shapes; the steel shock panel is an exclamation mark, so a bolt only ever means orange
   const SHAPE = [null, 'square', 'circle', 'triangle', 'hourglass', 'bolt', 'star', null, 'exclaim'];
   const CS = 28;
@@ -1190,7 +1190,7 @@
         continue;
       }
       const dimmed = row === 0 || k.st === 'd';
-      let color = k.col === '8' ? '#8a93a6' : (PAL[Number(k.col)] || '#888'), alpha = 1, scale = 1;
+      let color = k.col === '8' ? '#b0b0b0' : (PAL[Number(k.col)] || '#888'), alpha = 1, scale = 1;
       if (k.st === 'm') { if (k.tm > 10 && k.tm % 6 < 3) color = '#ffffff'; }           // flashes white, then shows its face before it pops
       else if (k.st === 'p') { scale = 1 + 0.12 * Math.sin(k.tm * 0.6); color = '#ffffff'; }
       else if (k.st === 'x') alpha = 0.15;
@@ -1317,7 +1317,7 @@ function projectPlan(G, seq, cursor) {
     for (let row = 1; row <= 12 && row < st.board.length; row++) for (let c = 0; c < 6; c++) {
       const v = st.board[row][c]; if (!v) continue; const px = c * CS, py = H - row * CS;
       if (v.g) { x.fillStyle = '#4a2f6a'; x.fillRect(px, py, CS, CS); continue; }
-      const isPop = pop.has(row + ',' + c), inset = Math.max(1, Math.round(CS * 0.06)), w = CS - inset * 2, color = v.col === '8' ? '#8a93a6' : (PAL[Number(v.col)] || '#888');
+      const isPop = pop.has(row + ',' + c), inset = Math.max(1, Math.round(CS * 0.06)), w = CS - inset * 2, color = v.col === '8' ? '#b0b0b0' : (PAL[Number(v.col)] || '#888');
       x.globalAlpha = st.kind === 'pop' && !isPop ? 0.4 : 1;
       if (isPop) { x.save(); x.shadowColor = POPC[Math.min(st.link, 4)]; x.shadowBlur = 10; x.fillStyle = POPC[Math.min(st.link, 4)]; rrect(x, px + inset, py + inset, w, w, Math.max(2, CS * 0.16)); x.fill(); x.restore(); drawShape(x, SHAPE[Number(v.col)], px + CS / 2, py + CS / 2, w * 0.3, st.link > 1 ? '#14101c' : color); }
       else { const gr = x.createLinearGradient(px, py, px, py + CS); gr.addColorStop(0, lighten(color, 0.25)); gr.addColorStop(1, color); x.fillStyle = gr; rrect(x, px + inset, py + inset, w, w, Math.max(2, CS * 0.16)); x.fill(); drawShape(x, SHAPE[Number(v.col)], px + CS / 2, py + CS / 2, w * 0.3); }
@@ -1350,7 +1350,7 @@ function projectPlan(G, seq, cursor) {
     for (let row = 1; row <= 12 && row < B.grid.length; row++) for (let c = 0; c < 6; c++) {
       const v = B.grid[row][c]; if (!v) continue; const px = c * CS, py = H - row * CS, lk = v.id != null ? B.link.get(v.id) : 0;
       if (v.g) { x.globalAlpha = .4; x.fillStyle = '#4a2f6a'; x.fillRect(px, py, CS, CS); x.globalAlpha = 1; continue; }
-      const inset = Math.max(1, Math.round(CS * 0.06)), w = CS - inset * 2, color = v.col === '8' ? '#8a93a6' : (PAL[Number(v.col)] || '#888');
+      const inset = Math.max(1, Math.round(CS * 0.06)), w = CS - inset * 2, color = v.col === '8' ? '#b0b0b0' : (PAL[Number(v.col)] || '#888');
       x.globalAlpha = lk ? 1 : 0.38;
       const gr = x.createLinearGradient(px, py, px, py + CS); gr.addColorStop(0, lighten(color, 0.25)); gr.addColorStop(1, color);
       x.fillStyle = gr; rrect(x, px + inset, py + inset, w, w, Math.max(2, CS * 0.16)); x.fill(); drawShape(x, SHAPE[Number(v.col)], px + CS / 2, py + CS / 2, w * 0.3);
@@ -1372,7 +1372,7 @@ function projectPlan(G, seq, cursor) {
     for (let row = 1; row <= 12 && row < F.length; row++) for (let c = 0; c < 6; c++) {
       const v = F[row][c]; if (!v) continue; const px = c * CS, py = H - row * CS;
       if (v.g) { x.fillStyle = '#4a2f6a'; x.fillRect(px, py, CS, CS); continue; }
-      const inset = Math.max(1, Math.round(CS * 0.06)), w = CS - inset * 2, color = v.col === '8' ? '#8a93a6' : (PAL[Number(v.col)] || '#888');
+      const inset = Math.max(1, Math.round(CS * 0.06)), w = CS - inset * 2, color = v.col === '8' ? '#b0b0b0' : (PAL[Number(v.col)] || '#888');
       const gr = x.createLinearGradient(px, py, px, py + CS); gr.addColorStop(0, lighten(color, 0.25)); gr.addColorStop(1, color);
       x.fillStyle = gr; rrect(x, px + inset, py + inset, w, w, Math.max(2, CS * 0.16)); x.fill(); drawShape(x, SHAPE[Number(v.col)], px + CS / 2, py + CS / 2, w * 0.3);
     }
@@ -1387,7 +1387,7 @@ function projectPlan(G, seq, cursor) {
       const Bd = ov.build.board, kk = ov.build.k, pc = new Set(ov.build.cells.map(([r, c]) => r + ',' + c));
       for (let row = 1; row < Bd.length; row++) for (let c = 0; c < 6; c++) { const v = Bd[row][c]; if (!v || v.g) continue; const dr = row + kk, cur = atG(dr, c), qx = c * CS, qy = bottom - dr * CS - rise, pops = pc.has(row + ',' + c);
         if (cur && cur.col === v.col && !pops) continue;
-        const inset = 3, w = CS - inset * 2; x.save(); x.globalAlpha = 0.62; x.fillStyle = v.col === '8' ? '#8a93a6' : (PAL[Number(v.col)] || '#888'); rrect(x, qx + inset, qy + inset, w, w, 5); x.fill(); drawShape(x, SHAPE[Number(v.col)], qx + CS / 2, qy + CS / 2, w * 0.3); x.globalAlpha = 1;
+        const inset = 3, w = CS - inset * 2; x.save(); x.globalAlpha = 0.62; x.fillStyle = v.col === '8' ? '#b0b0b0' : (PAL[Number(v.col)] || '#888'); rrect(x, qx + inset, qy + inset, w, w, 5); x.fill(); drawShape(x, SHAPE[Number(v.col)], qx + CS / 2, qy + CS / 2, w * 0.3); x.globalAlpha = 1;
         if (pops) { x.strokeStyle = '#ffffff'; x.lineWidth = 2.5; rrect(x, qx + 1.5, qy + 1.5, CS - 3, CS - 3, 6); x.stroke(); } x.restore(); }
     }
     const inG = new Set(grp.map(([r, c]) => r + ',' + c));
@@ -1526,7 +1526,7 @@ function projectPlan(G, seq, cursor) {
     const cv = g$('gc'), w = cv.clientWidth || 600, h = cv.clientHeight || 64, dpr = window.devicePixelRatio || 1;
     if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
     const x = cv.getContext('2d'); x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, w, h);
-    const css = getComputedStyle(document.documentElement), cv_ = (k, d) => css.getPropertyValue(k).trim() || d, ink = cv_('--color-fg-muted', '#8a93a6'), line = cv_('--color-border-line', '#3a4050'), fg = cv_('--color-fg', '#e8eaf0');
+    const css = getComputedStyle(document.documentElement), cv_ = (k, d) => css.getPropertyValue(k).trim() || d, ink = cv_('--color-fg-muted', '#b0b0b0'), line = cv_('--color-border-line', '#3a4050'), fg = cv_('--color-fg', '#e8eaf0');
     const L = 8, R2 = 8, px = (i) => L + (i / Math.max(1, n - 1)) * (w - L - R2), mid = h / 2 - 2, maxP = Math.max(8, ...S.me.concat(S.opp).map((e) => e.w * e.h));
     x.strokeStyle = line; x.lineWidth = 1; x.beginPath(); x.moveTo(L, Math.round(mid) + 0.5); x.lineTo(w - R2, Math.round(mid) + 0.5); x.stroke();
     [[S.me, -1], [S.opp, 1]].forEach(([evs, dir]) => evs.forEach((e) => { const bh = 3 + (e.w * e.h / maxP) * (mid - 6); x.fillStyle = gcol(e).fill; x.globalAlpha = e.i <= now ? 1 : 0.45; x.fillRect(px(e.i) - 1.5, dir < 0 ? mid - bh - 1 : mid + 2, 3, bh); x.globalAlpha = 1; }));

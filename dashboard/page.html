@@ -488,6 +488,11 @@
 @media (min-width: 980px) and (min-height: 600px) { .gw-cap { height: 10em; } }
 @media (max-width: 760px) { .gw-cap { height: 9.6em; } }
 .gw-cap .whyline.why1 { color: var(--color-fg); font-size: 12.5px; }
+.gs-pop { position: fixed; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); z-index: 60; max-height: 40vh; overflow-y: auto; padding: 12px 14px; border-radius: 12px; background: var(--color-panel); color: var(--color-fg); border: 1px solid var(--color-fg-muted); box-shadow: 0 10px 30px rgba(0,0,0,.35); font-size: 14px; line-height: 1.4; font-family: var(--font-anthropic-sans, system-ui, sans-serif); }
+@media (hover: none) {
+  .gw-cap .goalline .gl-t::after, .gw-cap .why1::after, .gw-note2[title]::after { content: ' ⓘ'; color: var(--color-fg-muted); font-weight: 400; }
+  .gw-cap .goalline, .gw-cap .why1, .gw-cap .budget { cursor: pointer; }
+}
 </style>
 
 <div class="gs" id="gs">
@@ -1675,8 +1680,8 @@ function projectPlan(G, seq, cursor) {
     'break search': ['Breaking the garbage', 'Looks for swaps that make a match against the garbage.'],
     'lineup break': ['Lining up to break garbage', 'Lines up colours under the garbage so it breaks.'],
     'lineup': ['Lining up a chain', 'Lines up the colours the garbage turns into, for a chain.'],
-    'carry': ['Finishing its line of swaps', 'Swaps to finish the line it already started.'],
-    'carry wait': ['Finishing its line of swaps', 'Keeps its started line going, waiting between swaps.'],
+    'carry': ['Finishing its swaps', 'Swaps to finish the line it already started.'],
+    'carry wait': ['Finishing its swaps', 'Keeps its started line going, waiting between swaps.'],
     'clear': ['Clearing to keep the stack low', 'Swaps to clear panels and keep the stack low.'],
     'extend': ['Making its chain longer', 'Swaps while panels fall to make its chain longer.'],
     'toward': ['Walking toward an attack', 'Moves the cursor toward an attack it cannot fire yet.'],
@@ -1701,11 +1706,11 @@ function projectPlan(G, seq, cursor) {
     const pick = String(d[2] || 'hold').replace(/_/g, ' '), me = list.find((o) => o.nm === pick) || list[0];
     if (isNaN(me.v)) return '';
     const others = list.filter((o) => o !== me && !isNaN(o.v)); if (!others.length) return '';
-    const sec = (v) => fs1(v), best = Math.max(...others.map((o) => o.v)), worse = others.filter((o) => o.v < me.v).length;
+    const sec = (v) => fs1(v), tenth = (v) => v === Infinity ? v : Math.round(v / 6), best = Math.max(...others.map((o) => o.v)), worse = others.filter((o) => tenth(o.v) < tenth(me.v)).length;
     let t;
     if (me.v === Infinity) t = worse && worse === others.length ? 'Only option that keeps the board alive' : worse ? 'Keeps the board alive (' + worse + ' of ' + others.length + ' others lose it)' : 'Board safe either way; first on its list';
-    else if (others.every((o) => o.v === me.v)) t = 'Board lost in ' + sec(me.v) + ' whatever it does';
-    else if (me.v >= best) t = 'Holds out longest (' + sec(me.v) + ')';
+    else if (others.every((o) => tenth(o.v) === tenth(me.v))) t = 'Board lost in ' + sec(me.v) + ' whatever it does';
+    else if (tenth(me.v) >= tenth(best)) t = 'Holds out longest (' + sec(me.v) + ')';
     else t = 'Its priority list, not survival (' + sec(me.v) + ' vs ' + sec(best) + ')';
     if (me.br > 0) t += ' · breaks ' + me.br;
     return t;
@@ -1875,7 +1880,7 @@ function projectPlan(G, seq, cursor) {
     if (!seq.length && cur0 && cur0.carried && cur0.total) {
       // no new plan at this decision, but the cursor is still working through swaps of an earlier one: say which, and how far it has got
       t.classList.add('goalline');
-      const gt = document.createElement('span'); gt.className = 'gl-t'; const pw0 = playWhy(cur0.name); gt.textContent = (pw0 ? pw0[0] : 'Carrying on') + ' (planned at ' + fmtClock(cur0.at) + ')'; t.appendChild(gt);
+      const gt = document.createElement('span'); gt.className = 'gl-t'; const pw0 = playWhy(cur0.name); gt.textContent = pw0 ? pw0[0] : 'Carrying on'; t.appendChild(gt);
       t.appendChild(progress(cur0.total, cur0.left));
       t.title = 'This decision made no new plan. The cursor is still making the swaps of the plan it chose at ' + fmtClock(cur0.at) + ': ' + (cur0.total - cur0.left) + ' of ' + cur0.total + ' made.';
     }
@@ -2132,6 +2137,24 @@ function projectPlan(G, seq, cursor) {
       let on = null; links.forEach((a) => { if (!on && vis[a.getAttribute('href').slice(1)]) on = a; });
       links.forEach((a) => { if (a === on) a.setAttribute('aria-current', 'true'); else a.removeAttribute('aria-current'); }); }, { rootMargin: '-15% 0px -60% 0px' });
     links.forEach((a) => { const t = document.getElementById(a.getAttribute('href').slice(1)); if (t) io.observe(t); });
+  })();
+
+  // PHONES HAVE NO HOVER: a tap on a line that carries a longer explanation (its title) opens it as a note at the bottom of the screen; a tap anywhere closes it
+  (function () {
+    if (!(window.matchMedia && matchMedia('(hover: none)').matches)) return;
+    let pop = null, openFor = null; const hide = () => { if (pop) { pop.remove(); pop = null; } openFor = null; };
+    const SEL = '#gs :is(.goalline, .why1, .budget, .gs-wr, .gw-whyb > div, .gw-note2, .gw-opt)[title]';
+    document.addEventListener('click', (e) => {
+      if (pop && pop.contains(e.target)) { hide(); return; }
+      const el = e.target.closest && e.target.closest(SEL);
+      if (pop && el === openFor) { hide(); return; }           // a second tap on the same line closes it
+      hide(); if (!el) return;
+      const txt = el.getAttribute('title'); if (!txt) return;
+      pop = document.createElement('div'); pop.className = 'gs-pop'; pop.setAttribute('role', 'note'); openFor = el;
+      txt.split('\n').forEach((l) => { const d = document.createElement('div'); d.textContent = l; pop.appendChild(d); });
+      document.body.appendChild(pop);
+    });
+    window.addEventListener('scroll', hide, { passive: true });
   })();
   dash.onData(render);
   // On touch screens the phone's own picker needs a "Done" tap; this list picks on one tap instead

@@ -1153,6 +1153,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       PROJECT: ${{ vars.CF_PAGES_PROJECT || 'ranmaru-stats' }}
     steps:
+      - uses: actions/checkout@v4
       - name: Publish
         shell: bash
         run: |
@@ -1162,6 +1163,8 @@ jobs:
           fi
           git clone -q --depth 1 --branch gh-pages "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" site
           rm -rf site/.git
+          # the copy must not point back to the repository: commit hashes become opaque tokens, run ids go (dashboard/public_copy.py)
+          python3 dashboard/public_copy.py site
           # (the project is made once; this says "already exists" afterwards, which is fine)
           npx --yes wrangler@3 pages project create "$PROJECT" --production-branch main || true
           npx --yes wrangler@3 pages deploy site --project-name "$PROJECT" --branch main --commit-dirty=true

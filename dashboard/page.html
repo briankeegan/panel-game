@@ -1687,7 +1687,7 @@ function projectPlan(G, seq, cursor) {
     'ready': ['Getting ready for the garbage', 'Makes the board ready to break the garbage that is coming, before it lands.'],
     'level': ['Levelling the stack', 'Clears nothing, but leaves fewer holes under the garbage and a flatter stack.'],
     'setup': ['Setting up an attack', 'Builds toward an attack; nothing is ready to fire yet.'],
-    'survive': ['Emergency: buying time', 'Nothing else keeps the board alive, so it picks swaps that lower the stack and delay the garbage drop.'],
+    'survive': ['Emergency: buying time', 'Nothing else keeps the board alive. It looks for swaps that leave the board still standing a few seconds from now: lowering the stack and pushing the next garbage drop later, with as few key presses as it can.'],
     'convert': ['Chaining off the broken garbage', 'Matches the row the broken garbage turns into, linking a chain.'],
     'hold': ['Waiting', 'No swap beats leaving the board alone.'],
     'zip': ['Spreading colours for later', 'Spreads colours so one swap can fire an attack later.'],

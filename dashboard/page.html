@@ -1750,8 +1750,7 @@ function projectPlan(G, seq, cursor) {
     else {
       // two separate facts: what the plan is FOR (its goal) and how far along it is (dots + words), so neither reads as part of the other
       const total = cur0 && cur0.total ? cur0.total : seq.length, left = cur0 && cur0.done ? cur0.left : total, madeN = Math.max(0, total - left);
-      const an = (n) => (n === 8 || n === 11 || n === 18 || (n >= 80 && n < 90)) ? 'an ' : 'a ';
-      const goal = []; if (Number(combo) >= 4) goal.push(an(Number(combo)) + combo + '-panel combo'); else if (Number(combo) === 3) goal.push('a plain 3-match'); if (Number(chain) > 0) goal.push(an(Number(chain)) + chain + '-chain');
+      const goal = []; if (Number(combo) > 0) goal.push('combo ' + combo); if (Number(chain) > 0) goal.push('chain ×' + chain);   // the same names as the Garbage sent table
       t.classList.add('goalline');
       const gt = document.createElement('span'); gt.className = 'gl-t'; gt.textContent = goal.length ? 'Aiming for ' + goal.join(' and ') : 'Plan: ' + total + (total === 1 ? ' swap' : ' swaps'); t.appendChild(gt);
       const pg = document.createElement('span'); pg.className = 'planprog';

@@ -16,6 +16,8 @@ site_open() {
 }
 site_push() {
   local dir="$1" msg="$2" tree commit
+  # players who do not share their games publicly stay off the page (dashboard/privacy.py); if the check cannot be made, nothing is published
+  python3 "$(dirname "${BASH_SOURCE[0]}")/privacy.py" "$dir" || return 1
   if [ -s "$dir/../site-prune.txt" ]; then sort -u "$dir/../site-prune.txt" | while read -r f; do git -C "$dir" update-index --force-remove -- "$f"; done; fi
   git -C "$dir" add --sparse -A      # --sparse: the replays are outside the sparse checkout, and without it a new one is silently left out
   python3 "$(dirname "${BASH_SOURCE[0]}")/site_check.py" "$dir" && git -C "$dir" add --sparse -A

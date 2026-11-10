@@ -1166,3 +1166,21 @@ jobs:
           npx --yes wrangler@3 pages project create "$PROJECT" --production-branch main || true
           npx --yes wrangler@3 pages deploy site --project-name "$PROJECT" --branch main --commit-dirty=true
           echo "Published to https://$PROJECT.pages.dev" >> "$GITHUB_STEP_SUMMARY"
+          # only the newest deployment stays: Cloudflare keeps every older one at its own address, and an older one may hold data that has since been taken off the page
+          python3 - <<'PY' || echo "could not clean up old deployments"
+          import json, os, urllib.request
+          acct, proj, tok = os.environ['CLOUDFLARE_ACCOUNT_ID'], os.environ['PROJECT'], os.environ['CLOUDFLARE_API_TOKEN']
+          def call(method, path):
+              r = urllib.request.Request('https://api.cloudflare.com/client/v4' + path, method=method, headers={'Authorization': 'Bearer ' + tok})
+              return json.load(urllib.request.urlopen(r, timeout=60))
+          gone = 0
+          for _ in range(6):
+              d = call('GET', '/accounts/%s/pages/projects/%s/deployments?per_page=50' % (acct, proj))['result']
+              d.sort(key=lambda x: x['created_on'], reverse=True)
+              old = d[1:]
+              if not old: break
+              for x in old:
+                  try: call('DELETE', '/accounts/%s/pages/projects/%s/deployments/%s?force=true' % (acct, proj, x['id'])); gone += 1
+                  except Exception as e: print('could not delete one:', e)
+          print('deleted %d old deployments' % gone)
+          PY

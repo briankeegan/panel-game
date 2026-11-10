@@ -549,6 +549,10 @@ local function tickTraining()
   end
   if not (e and e.clock) then return end
   local cap = tonumber(os.getenv("PA_TRAINING_FRAMES") or "") or 10800
+  -- (a bot may end the game sooner, alive: GC_TRAINING_STOP_AT, the frame it set -- Gambit's opener measured to its handover and the
+  -- seconds after, nothing past them)
+  local stopAt = rawget(_G, "GC_TRAINING_STOP_AT")
+  if stopAt and stopAt < cap then cap = stopAt end
   local over = e.game_over_clock and e.game_over_clock > 0
   if over or e.clock >= cap then
     writeOut(string.format("training %s frames=%d %s", over and "lost" or "survived", over and e.game_over_clock or e.clock, budgetText()))

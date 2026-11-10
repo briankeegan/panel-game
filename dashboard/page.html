@@ -1,7 +1,7 @@
 <style>
-.gs { max-width: 1100px; margin-inline: auto; display: flex; flex-direction: column; gap: var(--cds-gap-lg); font-family: var(--font-anthropic-sans); color: var(--color-fg); }
+.gs { max-width: 1100px; margin-inline: auto; display: flex; flex-direction: column; gap: var(--cds-gap-lg); font-family: var(--font-sans); color: var(--color-fg); }
 .gs * { box-sizing: border-box; }
-.gs h1 { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: 1.75rem; margin: 0; line-height: 1.15; }
+.gs h1 { font-family: var(--font-serif); font-weight: 400; font-size: 1.75rem; margin: 0; line-height: 1.15; }
 .gs h2 { font-size: var(--cds-font-size-heading); font-weight: var(--cds-font-weight-medium); margin: 0; }
 .gs p { margin: 0; }
 .gs-take { margin-top: 6px !important; color: var(--color-fg-muted); font-size: var(--cds-font-size-body); max-width: 70ch; min-height: 1.4em; }
@@ -22,7 +22,7 @@
 .gs-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 8.75rem), 1fr)); gap: var(--cds-gap-md); }
 .gs-kpi { padding: var(--cds-pad-md) var(--cds-pad-lg); border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); background: var(--color-panel); min-width: 0; }
 .gs-kl { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
-.gs-kv { font-family: var(--font-anthropic-serif); font-size: clamp(1.6rem, 5vw, 2rem); line-height: 1.15; font-variant-numeric: tabular-nums; min-height: 1.15em; }
+.gs-kv { font-family: var(--font-serif); font-size: clamp(1.6rem, 5vw, 2rem); line-height: 1.15; font-variant-numeric: tabular-nums; min-height: 1.15em; }
 .gs-kn { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); font-variant-numeric: tabular-nums; min-height: 1.3em; }
 .gs-good { color: var(--color-ok); } .gs-bad { color: var(--color-bad); }
 .cs { position: relative; display: inline-block; min-width: 0; max-width: 100%; }
@@ -42,7 +42,7 @@
 .gs-chart { min-height: 320px; width: 100%; position: relative; }
 .gs-chart.short { min-height: 220px; }
 .gs-chart svg { display: block; width: 100%; height: auto; overflow: visible; }
-.gs-chart text { font-family: var(--font-anthropic-sans); fill: var(--color-fg-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.gs-chart text { font-family: var(--font-sans); fill: var(--color-fg-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
 .gs-tip { position: absolute; pointer-events: none; z-index: 6; background: var(--cds-surface-popover); border: 1px solid var(--cds-border); border-radius: var(--cds-radius); box-shadow: var(--cds-shadow-popover); padding: var(--cds-pad-xs) var(--cds-pad-sm); font-size: var(--cds-font-size-caption); max-width: 20rem; display: none; }
 .gs-tip .t1 { color: var(--cds-text-secondary); } .gs-tip .t3 { color: var(--color-fg-muted); margin-top: 2px; }
 .gs-scroll { overflow-x: auto; overflow-y: visible; border-top: 1px solid var(--color-border-line); }
@@ -488,7 +488,7 @@
 @media (min-width: 980px) and (min-height: 600px) { .gw-cap { height: 10em; } }
 @media (max-width: 760px) { .gw-cap { height: 9.6em; } }
 .gw-cap .whyline.why1 { color: var(--color-fg); font-size: 12.5px; }
-.gs-pop { position: fixed; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); z-index: 60; max-height: 40vh; overflow-y: auto; padding: 12px 14px; border-radius: 12px; background: var(--color-panel); color: var(--color-fg); border: 1px solid var(--color-fg-muted); box-shadow: 0 10px 30px rgba(0,0,0,.35); font-size: 14px; line-height: 1.4; font-family: var(--font-anthropic-sans, system-ui, sans-serif); }
+.gs-pop { position: fixed; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); z-index: 60; max-height: 40vh; overflow-y: auto; padding: 12px 14px; border-radius: 12px; background: var(--color-panel); color: var(--color-fg); border: 1px solid var(--color-fg-muted); box-shadow: 0 10px 30px rgba(0,0,0,.35); font-size: 14px; line-height: 1.4; font-family: var(--font-sans, system-ui, sans-serif); }
 @media (hover: none) {
   .gw-cap .goalline .gl-t::after, .gw-cap .why1::after, .gw-note2[title]::after { content: ' ⓘ'; color: var(--color-fg-muted); font-weight: 400; }
   .gw-cap .goalline, .gw-cap .why1, .gw-cap .budget { cursor: pointer; }
@@ -506,7 +506,7 @@
   <details class="gs-filters" id="gs-filters"><summary id="gs-fsum">Filters</summary>
   <section class="gs-bar" aria-label="Filters">
     <div class="gf-row">
-      <label class="gs-f"><span>Version (Ranmaru commit)</span><select id="f-ver" class="dash-select"></select></label>
+      <label class="gs-f"><span>Version</span><select id="f-ver" class="dash-select"></select></label>
       <label class="gs-f"><span>Opponent</span><input type="search" id="gw-q" list="gw-names" class="gs-search" placeholder="Any player: type a name" autocomplete="off"><datalist id="gw-names"></datalist></label>
       <div class="gs-f"><span>Result</span><div class="gs-seg sm" role="group" aria-label="Result" id="gw-res"><button type="button" data-r="" aria-pressed="true">All</button><button type="button" data-r="L" aria-pressed="false">Lost</button><button type="button" data-r="W" aria-pressed="false">Won</button></div></div>
       <div class="gs-f"><span>Length</span><div class="gs-seg sm" role="group" aria-label="Length of the game" id="gw-len"><button type="button" data-l="" aria-pressed="true">Any</button><button type="button" data-l="u1" aria-pressed="false">Under 1 min</button><button type="button" data-l="1-3" aria-pressed="false">1 to 3</button><button type="button" data-l="3-10" aria-pressed="false">3 to 10</button><button type="button" data-l="10p" aria-pressed="false">10+ min</button></div></div>
@@ -621,7 +621,7 @@
         <button type="button" data-min="10" aria-pressed="false">10+ games</button>
         <button type="button" data-min="30" aria-pressed="false">30+ games</button>
       </div></div></div>
-    <div class="gs-tools"><input id="s-ver" class="gs-search" type="search" placeholder="Search versions: p49, a commit, a word from the change" aria-label="Search versions" autocomplete="off"><span class="gs-count" id="c-ver"></span></div>
+    <div class="gs-tools"><input id="s-ver" class="gs-search" type="search" placeholder="Search versions: p49, a word from the change" aria-label="Search versions" autocomplete="off"><span class="gs-count" id="c-ver"></span></div>
     <div class="gs-scroll" data-source="games versions"><table class="gs-tbl" id="t-ver"></table></div>
   </section>
 
@@ -644,11 +644,10 @@
   <details>
     <summary>Definitions and what this leaves out</summary>
     <dl>
-      <dt>Version</dt><dd>A Ranmaru commit. Bots on the same commit share a row.</dd>
+      <dt>Version</dt><dd>A build of Ranmaru. Bots on the same build share a row.</dd>
       <dt>Win rate</dt><dd>Wins out of games played, on panelattack.com. Fights are not counted.</dd>
       <dt>Plausible range</dt><dd>95% Wilson interval. Overlapping lines can't be told apart yet.</dd>
       <dt>Opponent topped out</dt><dd>Share of the game the opponent was in the top row.</dd>
-      <dt>Commit for older bots</dt><dd>p13 to p27: the newest change before the bot started (may be off by one). From p28: the commit that triggered the deploy.</dd>
       <dt>Missing</dt><dd>p30 and the unnumbered run saved no log, so they are not counted.</dd>
       <dt>Source</dt><dd>Each run's saved bot log. Updates when a set ends while a bot runs.</dd>
     </dl>
@@ -770,20 +769,20 @@
     const games = gd.data.map((g, i) => Object.assign({ idx: i }, g));
     const vers = vd.data.map((v, i) => Object.assign({ order: i }, v));
     const vBy = new Map(vers.map((v) => [v.sha, v]));
-    const vLabel = (sha) => (vBy.get(sha) || {}).label || sha; VLBL = vLabel; VFULL = (sha) => ((vBy.get(sha) || {}).commit || {}).full || sha;
+    const vLabel = (sha) => (vBy.get(sha) || {}).label || sha; VLBL = vLabel; VSTART = (sha) => (vBy.get(sha) || {}).start || '';
     const pickedV = vBy.get(ver);
 
     // filter controls
     const counts = d3.rollup(games, (a) => a.length, (g) => g.sha);
     const fv = $('f-ver');
-    fv.replaceChildren(new Option('All versions', ''), ...vers.slice().reverse().filter((v) => counts.get(v.sha)).map((v) => new Option(v.label + ' · ' + v.sha + ' · ' + counts.get(v.sha) + ' games', v.sha)));
+    fv.replaceChildren(new Option('All versions', ''), ...vers.slice().reverse().filter((v) => counts.get(v.sha)).map((v) => new Option(v.label + ' · ' + counts.get(v.sha) + ' games', v.sha)));
     fv.value = ver;
     const oppCounts = Array.from(d3.rollup(games, (a) => a.length, (g) => g.opp)).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
     document.querySelectorAll('#f-min button').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.min) === minn)));
     $('f-reset').hidden = !(ver || opp || minn !== 10 || WL.res || WL.when || WL.len);
     const chips = $('f-chips'); chips.replaceChildren();
     { const vi = $('f-vinfo'); vi.replaceChildren(); vi.hidden = !pickedV;
-      if (pickedV) { vi.append(document.createTextNode(pickedV.label + ' was built from commit ')); linkTo(vi, pickedV.sha); const mg = pickedV.commit && pickedV.commit.merged; if (mg) { vi.append(document.createTextNode(' (a merge; the branch it merged ends at ')); linkTo(vi, mg.sha); vi.append(document.createTextNode(')')); } if (pickedV.subject) vi.append(document.createTextNode(': ' + pickedV.subject)); vi.append(document.createTextNode(' ')); } }
+      if (pickedV) { vi.append(document.createTextNode(pickedV.label + (pickedV.subject ? ': ' + pickedV.subject : '') + ' ')); } }
     const whenLabel = WL.when === 'today' ? 'Today' : WL.when === 'yesterday' ? 'Yesterday' : WL.when === 'range' ? (WL.from && WL.to ? (WL.from === WL.to ? WL.from : WL.from + ' to ' + WL.to) : WL.from ? 'From ' + WL.from : 'Until ' + WL.to) : WL.when ? 'Last ' + WL.when + ' days' : '';
     const lenLabel = { u1: 'Under 1 min', '1-3': '1 to 3 min', '3-10': '3 to 10 min', '10p': '10+ min' }[WL.len] || '';
     const active = [[ver && pickedV ? 'Version ' + pickedV.label : '', () => dash.setParams({ ver: '' })], [opp ? 'Player ' + opp : '', () => dash.setParams({ opp: '' })],
@@ -846,7 +845,7 @@
       take.append(document.createTextNode('.'));
       if (!pickedV) {
         const lv = vers.slice().reverse().map((v) => Object.assign({}, v, stat(byOpp.filter((g) => g.sha === v.sha)))).find((v) => v.n > 0);
-        if (lv) { take.append(document.createTextNode(' The newest version (' + lv.label + ', commit ')); linkTo(take, lv.sha); take.append(document.createTextNode(') has won ' + lv.w + ' of ' + lv.n + ' (' + fmtPct(lv.rate) + ').')); }
+        if (lv) { take.append(document.createTextNode(' The newest version (' + lv.label + ') has won ' + lv.w + ' of ' + lv.n + ' (' + fmtPct(lv.rate) + ').')); }
       }
     }
 
@@ -901,7 +900,6 @@
     const vcols = [
       { key: 'order', label: 'Version', cls: '', val: (r) => r.order, cell: (td, r) => { td.textContent = r.label; td.style.fontWeight = '600'; } },
       { key: 'start', label: 'Started', cls: 'hide-s', val: (r) => r.start, cell: plain((r) => d3.utcFormat('%b %-d')(new Date(r.start))) },
-      { key: 'sha', label: 'Commit', cls: 'hide-s', val: (r) => r.sha, cell: (td, r) => { const a = linkTo(td, r.sha); a.classList.add('mono'); a.title = (r.subject || r.sha) + (r.commit && r.commit.merged ? ' · merges ' + r.commit.merged.sha + ': ' + r.commit.merged.subject : ''); a.addEventListener('click', (e) => e.stopPropagation()); } },
       { key: 'subject', label: 'What changed', cls: 'sub hide-s', val: (r) => r.subject, cell: (td, r) => { td.textContent = r.subject; td.title = r.subject; } },
       { key: 'n', label: 'Games', num: true, val: (r) => r.n, cell: plain((r) => r.n) },
       { key: 'w', label: 'Won', num: true, val: (r) => r.w, cell: plain((r) => r.w) },
@@ -1019,7 +1017,7 @@
     if (scroll) (window.innerWidth < 980 ? $('gw-stage') : $('sec-watch')).scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
   // the games of the current selection that have a replay, found by result, day, length and opponent
-  let VFULL = null, VLBL = null;
+  let VSTART = null, VLBL = null;
   const WL = { list: [], src: [], res: '', when: '', from: '', to: '', len: '', sort: 'new' };
   const resWord = (r) => r.res === 'W' ? 'Won' : 'Lost';
   const playedMs = (r) => r.at ? new Date(r.at).getTime() - (r.secs || 0) * 1000 : new Date(r.date + 'T12:00:00').getTime();
@@ -1814,7 +1812,7 @@ function projectPlan(G, seq, cursor) {
     L.push('Ranmaru decision to review');
     L.push('Link (opens this exact moment): ' + location.href);
     L.push('Replay data (gzipped JSON, the whole game): ' + new URL('data/replay_' + R.rid + '.json.gz', location.href.split('#')[0]).href);
-    L.push('Game: ' + R.rid + ' · ' + (VLBL ? VLBL(D.sha) : '') + ' (GameCreator ' + (VFULL ? VFULL(D.sha) : D.sha) + ') · ' + (row.res === 'W' ? 'won' : 'lost') + ' vs ' + D.opp + ' · ' + (row.at || row.date || '') + ' · ' + dur(row.secs) + (row.run ? ' · run ' + row.run : '') + ' · bot ' + D.bot);
+    L.push('Game: ' + R.rid + ' · ' + (VLBL ? VLBL(D.sha) : '') + (VSTART && VSTART(D.sha) ? ' (deployed ' + VSTART(D.sha) + ')' : '') + ' · ' + (row.res === 'W' ? 'won' : 'lost') + ' vs ' + D.opp + ' · ' + (row.at || row.date || '') + ' · ' + dur(row.secs) + ' · bot ' + D.bot);
     L.push('At: frame ' + clock + ' (' + fmtClock(clock) + ' of ' + fmtClock(D.end) + ')');
     { // what the page shows for this moment, in its own words
       const cp = g$('cap'), gt = cp.querySelector('.gl-t'), pg = cp.querySelector('.planprog'), wy = cp.querySelector('.why1');
@@ -1826,7 +1824,7 @@ function projectPlan(G, seq, cursor) {
       L.push(d[17] || ('GAMBITD ' + d[0] + ' ' + d[1] + ' play=' + d[2] + ' want=' + d[3] + ' v=' + d[4] + ' dies=' + d[5] + ' land=' + d[6] + ' chain=' + d[7] + ' combo=' + d[8] + ' thrown=' + d[9] + '   (rebuilt from the page: this game has no raw log line)'));
       const ex = whyLines(d).map((l) => '- ' + l[1]); if (ex.length) { L.push('In words:'); ex.forEach((x) => L.push(x)); }
       const ks = new Set(); ((d[17] || '').match(/[=:]k(\d+)/g) || []).forEach((m) => ks.add(m.replace(/\D/g, ''))); const rl = [...ks].filter((k) => D.rl && D.rl[k]);
-      if (rl.length) { L.push('Rules it names (rank.c at ' + D.sha + '):'); rl.forEach((k) => L.push('- k' + k + ': ' + D.rl[k])); }
+      if (rl.length) { L.push('Rules it names (Gambit rank.c, this version):'); rl.forEach((k) => L.push('- k' + k + ': ' + D.rl[k])); }
       const mine = (D.sw || []).filter((s) => s[9] === d[0]); if (mine.length) { L.push('Swaps played for this decision (q=' + d[0] + '):'); mine.forEach((s) => L.push('- ' + s[0] + ' ' + s[1] + ',' + s[2] + ' ' + s[3] + ' ' + (OUTCOME[s[4]] || s[4]) + ' ' + s[5] + '/' + s[6] + ' keys=' + s[7] + ' ended=' + s[8])); }
     } else L.push('No decision was logged at or before this frame (' + (D.dec.length ? 'before the first decision' : 'this game has no decision log') + ').');
     const k = swapIdx(clock); if (k >= 0) L.push('Last swap before this frame: ' + swapTxt(D.sw[k]));

@@ -1750,14 +1750,14 @@ function projectPlan(G, seq, cursor) {
     else {
       // two separate facts: what the plan is FOR (its goal) and how far along it is (dots + words), so neither reads as part of the other
       const total = cur0 && cur0.total ? cur0.total : seq.length, left = cur0 && cur0.done ? cur0.left : total, madeN = Math.max(0, total - left);
-      const goal = []; if (Number(combo) > 0) goal.push('combo ' + combo); if (Number(chain) > 0) goal.push('chain ×' + chain);   // the same names as the Garbage sent table
+      const goal = []; if (Number(combo) > 0) goal.push('Combo ' + combo); if (Number(chain) > 0) goal.push('Chain ×' + chain);   // the same names as the Garbage sent table
       t.classList.add('goalline');
-      const gt = document.createElement('span'); gt.className = 'gl-t'; gt.textContent = goal.length ? 'Aiming for ' + goal.join(' and ') : 'Plan: ' + total + (total === 1 ? ' swap' : ' swaps'); t.appendChild(gt);
+      const gt = document.createElement('span'); gt.className = 'gl-t'; gt.textContent = goal.length ? goal.join(' + ') : 'Plan: ' + total + (total === 1 ? ' swap' : ' swaps'); t.appendChild(gt);
       const pg = document.createElement('span'); pg.className = 'planprog';
       if (total <= 8) for (let q = 0; q < total; q++) { const dot = document.createElement('i'); dot.className = q < madeN ? 'done' : q === madeN ? 'next' : ''; pg.appendChild(dot); }
       pg.append(left === 0 ? 'all made' : madeN === 0 ? total + (total === 1 ? ' swap' : ' swaps') : left + ' of ' + total + ' left');
       t.appendChild(pg);
-      t.title = 'The plan is ' + total + (total === 1 ? ' swap' : ' swaps') + ' in all' + (madeN ? '; ' + madeN + ' made, ' + left + ' still to make' : '') + (goal.length ? '. It is aiming for ' + goal.join(' and ') + '.' : '.');
+      t.title = 'The plan is ' + total + (total === 1 ? ' swap' : ' swaps') + ' in all' + (madeN ? '; ' + madeN + ' made, ' + left + ' still to make' : '') + (goal.length ? '. Goal: ' + goal.join(' + ').toLowerCase() + '.' : '.');
     }
     cap.appendChild(t);
     {

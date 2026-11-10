@@ -255,7 +255,7 @@
 .gw-mid .chip.new { background: #4ea8ff; color: #0b1a2b; } .gw-mid .chip.same { background: color-mix(in srgb, var(--color-fg) 16%, transparent); color: var(--color-fg); } .gw-mid .chip.wait { background: transparent; color: var(--color-fg-muted); outline: 1px dashed var(--color-fg-muted); outline-offset: -1px; }
 .gw-cap .chip { flex: 0 0 auto; font-size: 10px; font-weight: 700; letter-spacing: .03em; padding: 2px 8px; border-radius: 999px; text-transform: uppercase; color: #fff; background: var(--mc, #6b7488); }
 .gw-cap .chip.new { background: #4ea8ff; color: #0b1a2b; } .gw-cap .chip.same { background: color-mix(in srgb, var(--color-fg) 16%, transparent); color: var(--color-fg); } .gw-cap .chip.wait { background: transparent; color: var(--color-fg-muted); outline: 1px dashed var(--color-fg-muted); outline-offset: -1px; }
-.gw-cap .do { font-weight: 700; overflow: hidden; text-overflow: ellipsis; }
+.gw-cap .do { font-weight: 700; overflow-wrap: anywhere; }
 .gw-why { margin: 8px 0; border: 1px solid var(--color-border-line); border-radius: 8px; padding: 8px 10px; }
 .gw-whyh { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; } .gw-whyh b { flex: 1; }
 .gw-whyb { height: 13em; overflow-y: auto; overscroll-behavior: contain; margin-top: 6px; font-size: 12.5px; line-height: 1.35; display: flex; flex-direction: column; gap: 3px; }
@@ -448,8 +448,8 @@
 }
 @media (max-width: 760px) { .gw-whyb { height: 9.5em; } .gw-cap { height: 9.5em; } .gw-why { margin: 4px 0; } .gw-stage { gap: 6px; } }
 @media (min-width: 980px) and (max-height: 599px) { .gw-stage { max-width: 680px; } }
-.gw-cap .goalline { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: nowrap; }
-.gw-cap .gl-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gw-cap .goalline { display: flex; align-items: center; justify-content: space-between; gap: 4px 10px; flex-wrap: wrap; }   /* wraps rather than cutting the plan's name short */
+.gw-cap .gl-t { min-width: 0; overflow-wrap: anywhere; }
 .gw-cap .planprog { display: inline-flex; align-items: center; gap: 4px; flex: 0 0 auto; font-size: 12px; font-weight: 500; color: var(--color-fg-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .gw-cap .planprog i { width: 10px; height: 10px; border-radius: 50%; border: 2px solid #ffd166; box-sizing: border-box; margin-right: 0; }
 .gw-cap .planprog i.done { background: var(--color-fg-muted); border-color: var(--color-fg-muted); }
@@ -1693,6 +1693,20 @@ function projectPlan(G, seq, cursor) {
   // and says how many candidates there were and of which kinds (live=a/b, cands=kind:count)
   // THE REASON IN ONE SENTENCE, from the options it compared (how long each one leaves the board alive, and what it breaks): a person wants
   // "why this one", not the rule's name
+  // every option loses the board: say so, and how long the chosen one lasts against the others (only said as "the longest" when the log shows it)
+  const ruleName = (n) => {      // the rule's own short name from rank.c (its CAPITALS heading, else its first clause), never cut off with an ellipsis; the full words stay on hover and in Copy details
+    const w = ruleFull(n); if (!w) return 'rank.c line ' + n;
+    const m = /([A-Z][A-Z0-9'’ ,.\-]{6,}[A-Z])/.exec(w);
+    let t = m ? m[1] : w.replace(/^[\d'a-z.]+\s+/, '').replace(/^\(+/, '').split(/ -- |: | \(|\)/)[0];
+    t = t.replace(/^\d+[a-z']*\.\s*/i, '').trim(); t = t.charAt(0).toUpperCase() + (m ? t.slice(1).toLowerCase() : t.slice(1));
+    if (t.length > 60) { t = t.slice(0, 60); t = t.slice(0, t.lastIndexOf(' ')); }
+    return '"' + t + '"';
+  };
+  function lastsLongest(list, me, b, d) {
+    const all = list.length >= b, top = list.every((o) => isNaN(o.v) || o.v <= me.v), tie = list.filter((o) => o !== me && o.v === me.v).length > 0;
+    const w = /^k(\d+):/.exec(kvOf(d && d[17] || '', 'won'));
+    return (b > 1 ? 'All ' + b + ' lose the board' : 'It loses the board either way') + '; ' + (b > 1 ? 'this one lasts ' : 'it lasts ') + fs1(me.v) + (top && b > 1 ? (all ? (tie ? ', as long as the best' : ', the longest') : ', the longest of the ' + list.length + ' shown') : '') + (w ? ' · decided by: ' + ruleName(w[1]) : '');
+  }
   function becauseOf(d) {
     // only what the log records: how many of the options weighed keep the board alive (live=a/b), the chosen line's own outcome, and what it breaks
     const raw = d && d[17] || '';
@@ -1703,7 +1717,7 @@ function projectPlan(G, seq, cursor) {
     const lv = /^(\d+)\/(\d+)$/.exec(kvOf(raw, 'live')), a = lv ? Number(lv[1]) : null, b = lv ? Number(lv[2]) : null;
     let t;
     if (me.v === Infinity) t = a == null ? 'Keeps the board alive' : a === 1 ? 'The only one of ' + b + ' options that keeps the board alive' : 'Keeps the board alive (' + a + ' of ' + b + ' options do)';
-    else t = a == null ? 'Board lost in ' + fs1(me.v) : a === 0 ? 'None of ' + b + ' options keeps the board alive (lost in ' + fs1(me.v) + ' with this one)' : a + ' of ' + b + ' options keep the board alive, but its priority list picked this one (lost in ' + fs1(me.v) + ')';
+    else t = a == null ? 'Board lost in ' + fs1(me.v) : a === 0 ? lastsLongest(list, me, b, d) : a + ' of ' + b + ' options keep the board alive, but its priority list picked this one (lost in ' + fs1(me.v) + ')';
     const br = Number(kvOf(raw, 'broke')); if (br > 0) t += ' · breaks ' + br;
     return t;
   }
@@ -1744,7 +1758,7 @@ function projectPlan(G, seq, cursor) {
   const kvOf = (raw, k) => { const m = new RegExp(' ' + k + '=(\\S+)').exec(raw || ''); return m ? m[1] : ''; };
   const kName = (s) => { const w = playWhy(s); return w ? w[0].toLowerCase() : (s || '').replace(/_/g, ' '); };   // the move in plain words (Gambit's own names, like "ready" or "cut", mean nothing to a reader)
   const ruleFull = (n) => (R.D && R.D.rl && R.D.rl[n]) || '';
-  const ruleTxt = (n) => { const w = ruleFull(n); return w ? '"' + (w.length > 56 ? w.slice(0, 53).trimEnd() + '…' : w) + '"' : 'rank.c line ' + n; };   // the full words are on hover and in the copy
+  const ruleTxt = (n) => ruleName(n);   // short name; the full words are on hover (ruleFull) and in the copy
   const OUTCOME = { c: 'cleared', s: 'set up', b: 'broke garbage', n: 'came to nothing' };
   // why a line ended: 1 and 2 carried on / held over; 4 to 6 the frame loop found the line no longer fits; 10 to 14 the key presser dropped it; 16 to 24 why no line in progress was offered; a rank.c line is the rule that put it down
   const ENDED = { 1: 'carried on', 2: 'held over', 3: 'not carried on', 4: 'its anchor panel is gone', 5: 'a step of it is no longer legal', 6: 'the break it was for is not made', 7: 'a raise', 10: 'the mode changed', 11: 'no board could be predicted', 12: 'no keys press it', 13: 'its keys do not fit the input allowance', 14: 'its walk is over the allowance', 16: 'none was carried by the last answer', 17: 'the frame loop was on another line', 18: 'every swap of it was pressed', 19: 'the judge gave no judgement of it', 20: 'it wastes a three the save did not confirm', 21: 'the mode asks nothing of it', 22: 'it had waited out', 23: 'it was begun in another mode', 24: 'a 2x was dropped' };
@@ -1752,12 +1766,26 @@ function projectPlan(G, seq, cursor) {
   const CARRYDROP = { 1: 'its anchor panel is no longer on the board', 2: 'a step of it is no longer legal', 3: 'the break it was begun for is no longer made', 5: 'the entry it was begun for is no longer met' };
   const noteTxt = (n) => { const t = n[2], m = /: (.*)$/.exec(t); return n[1] === 'dropped' ? 'A planned line was abandoned: ' + (m ? m[1] : t) : n[1] === 'refused' ? 'A decision could not be keyed: ' + (m ? m[1] : t) : n[1] === 'guarded' ? 'Keys did not fit the input allowance: ' + (m ? m[1] : t) : n[1] === 'late' ? 'The answer came too late to press: ' + (m ? m[1] : t) : 'A swap was pressed later than planned: ' + (m ? m[1] : t); };
   // the lines of one decision: [class, text]
-  function whyLines(d) {
+  function whyLines(d, cl) {
     const raw = d[17] || '', out = []; if (!raw) return out;
     const num = (k) => { const v = kvOf(raw, k); return v === '' ? null : Number(v); };
     const forw = []; if (num('broke') > 0) forw.push('breaks ' + num('broke') + ' garbage'); if (num('thrown') > 0) forw.push('sends ' + num('thrown') + (num('thrown') === 1 ? ' block' : ' blocks'));
     if (forw.length) out.push(['for', 'For: ' + forw.join(' · ')]);
-    const from = /^(\d+):(.+)$/.exec(kvOf(raw, 'from')); if (from) out.push(['from', 'Line in progress, begun at ' + fmtClock(Number(from[1])) + ' as "' + kName(from[2]) + '"']);
+    const from = /^(\d+):(.+)$/.exec(kvOf(raw, 'from'));
+    const fr3 = (k) => { const m = /^(\d+)\/(\d+)\/(\d+)$/.exec(kvOf(raw, k)); return m ? { c: Number(m[1]), x: Number(m[2]), b: Number(m[3]) } : null; };
+    const fo = fr3('for'), mk = fr3('makes');
+    if (from && fo && mk) {
+      // a carried line: what it was judged to make when it began (for=C/X/B) and what its remaining swaps make now (makes=C/X/B); older logs have neither and keep the plain line below
+      const kind = fo.b > 0 ? 'break' : fo.x > 0 ? 'chain' : fo.c > 0 ? 'combo' : 'line';
+      const say = (v) => { const r = []; if (v.c > 0) r.push('a combo of ' + v.c); if (v.x > 0) r.push('a chain of ' + v.x); if (v.b > 0) r.push(v.b + ' garbage ' + (v.b === 1 ? 'cell' : 'cells')); return r; };
+      const verb = fo.b > 0 ? 'breaks ' : 'makes ', same = say(fo).join(' + ') === say(mk).join(' + ');
+      const nm = from[2].replace(/_/g, ' '), org = nm === 'survive' ? 'survival' : kName(from[2]);
+      const left = Math.max(0, (cl != null && PLAN.on && PLAN.current(cl) ? PLAN.current(cl).left : 0));
+      const part = left === 1 ? 'this last swap' : left > 1 ? 'its ' + left + ' remaining swaps' : 'what is left';
+      const gone = !say(mk).length;
+      out.push(['from', 'Finishing a ' + kind + ' begun at ' + fmtClock(Number(from[1])) + ' (' + org + '): ' + (say(fo).length ? verb + say(fo).join(' + ') : 'judged to make nothing') + '; ' + part + (gone ? ' now makes nothing' : same ? ' still ' + (fo.b > 0 ? 'breaks ' : 'makes ') + (mk.b > 0 && !mk.c && !mk.x ? mk.b : say(mk).join(' + ')) : ' now ' + (mk.b > 0 && fo.b > 0 ? 'breaks ' : 'makes ') + (mk.b > 0 && !mk.c && !mk.x ? mk.b : say(mk).join(' + ')))]);
+    }
+    else if (from) out.push(['from', 'Line in progress, begun at ' + fmtClock(Number(from[1])) + ' as "' + kName(from[2]) + '"']);
     const won = /^k(\d+):(.+)$/.exec(kvOf(raw, 'won')); if (won) out.push(['won', 'Chosen over "' + kName(won[2]) + '": ' + ruleTxt(won[1]), '', ruleFull(won[1])]);
     const so = /^(.+?):(L|-?\d+):k(\d+)$/.exec(kvOf(raw, 'sooner')); if (so) out.push(['sooner', 'Passed over "' + kName(so[1]) + '", ' + (so[2] === 'L' ? 'whose board survives' : 'whose board is lost later (at frame ' + so[2] + ')') + ': ' + ruleTxt(so[3]), '', ruleFull(so[3])]);
     const rf = /^([or-]):(-?\d+):(-?\d+):([01])$/.exec(kvOf(raw, 'raiseFor')); if (rf) out.push(['raise', 'Raise asked' + (rf[1] === 'o' ? ' (the opening raise)' : rf[1] === 'r' ? ' (the floor\'s refill)' : '') + ': to ' + rf[2] + ' rows, ' + rf[3] + ' short; ' + (rf[4] === '1' ? 'it could raise now' : 'a cascade held it')]);
@@ -1777,7 +1805,7 @@ function projectPlan(G, seq, cursor) {
     const key = R.rid + '|' + (d ? d[0] : '-') + '|' + k; if (key === WHY_KEY) return; WHY_KEY = key;
     box.replaceChildren();
     const add = (cls, txt, tip) => { const e = document.createElement('div'); e.className = cls; e.textContent = txt; if (tip) e.title = tip; box.appendChild(e); };
-    if (d) whyLines(d).forEach(([c, t, , tip]) => add(c, t, tip));
+    if (d) whyLines(d, clock).forEach(([c, t, , tip]) => add(c, t, tip));
     if (d) { const mine = (D.sw || []).filter((s) => s[9] === d[0] && s[0] <= clock); if (mine.length) add('sw', 'Its swaps so far: ' + mine.map((s) => s[1] + ',' + s[2] + ' ' + (OUTCOME[s[4]] || s[4])).join(' · ')); }
     if (k >= 0) { const s = D.sw[k]; add('sw', 'Last swap, at ' + fmtClock(s[0]) + ': ' + swapTxt(s).replace(/ · decided at .*$/, '') + (s[9] != null && s[9] >= 0 && (!d || s[9] !== d[0]) ? ' · decided at ' + fmtClock(s[9]) : '') + (s[8] >= 2 && s[5] === s[6] ? ' · its line ended: ' + endedTxt(s[8]) : '')); }
     if (!box.firstChild) { const e = document.createElement('div'); e.className = 'none'; e.textContent = d ? 'Nothing more was logged for this decision.' : 'No decision yet.'; box.appendChild(e); }
@@ -1848,7 +1876,10 @@ function projectPlan(G, seq, cursor) {
     const seq = e ? PLAN.seqOf(e) : [];
     const doing = (play || 'hold').replace(/_/g, ' ');
     // numbers sit under the board they describe
-    const mine = '<div>' + (v === 'dies' && numOk(dies) ? '<span class="bad">Board lost in ' + fs1(dies) + '</span>' : '<span class="ok">Board safe</span>') + '</div>'
+    // v is how the board ends up WITH the move it chose, not how it stands now: say so, and say what waiting would have cost (the log's hold option)
+    const hold0 = (d[14] || '').split(',').map((q) => q.split(':')).find((q) => q[0].replace(/[*~]/g, '') === 'hold'), holdLost = hold0 && numOk(hold0[1]) ? Number(hold0[1]) : null;
+    const mine = '<div>' + (v === 'dies' && numOk(dies) ? '<span class="bad">Lost in ' + fs1(dies) + ' even with this move</span>' : '<span class="ok">Safe with this move</span>') + '</div>'
+      + (v !== 'dies' && holdLost != null ? '<div><span class="bad">Lost in ' + fs1(holdLost) + ' if it waited</span></div>' : '')
       + '<div>' + (numOk(land) && Number(land) > 0 ? 'Garbage in ' + fs1(land) : 'No garbage coming') + '</div>';
     const theirs = '<div>Stack ' + (eTop || '?') + ' rows' + (eOut === '1' ? ' <span class="bad">· topped out</span>' : '') + '</div>'
       + '<div>' + (numOk(eStop) && Number(eStop) > 0 ? 'Frozen for ' + fs1(eStop) : 'Not frozen') + '</div>';
@@ -1896,7 +1927,7 @@ function projectPlan(G, seq, cursor) {
       if (String(play || '').replace(/_/g, ' ') === 'survive') {      // the emergency move: say what it buys, from the log's own numbers
         const ol = (d[14] || '').split(',').map((q) => q.split(':')).filter((q) => q[0]).map((q) => ({ nm: q[0].replace(/[*~]/g, '').replace(/_/g, ' '), v: (q[1] === 'L' || q[1] === 'inf') ? Infinity : Number(q[1]) }));
         const mine1 = ol.find((o) => o.nm === 'survive') || ol[0], hold1 = ol.find((o) => o.nm === 'hold');
-        if (mine1 && !isNaN(mine1.v)) t.dataset.expl = (total + (total === 1 ? ' swap' : ' swaps')) + ': ' + (mine1.v === Infinity ? 'the board stays alive' : 'the board lasts ' + fs1(mine1.v)) + (hold1 && !isNaN(hold1.v) && hold1.v !== Infinity ? (Math.round(hold1.v / 6) === Math.round(mine1.v / 6) ? ', no better than doing nothing' : ' instead of ' + fs1(hold1.v) + ' if it did nothing') : '');
+        if (mine1 && !isNaN(mine1.v)) t.dataset.expl = (total + (total === 1 ? ' swap' : ' swaps')) + ': ' + (mine1.v === Infinity ? 'the board stays alive' : 'the board lasts ' + fs1(mine1.v)) + (hold1 && !isNaN(hold1.v) && hold1.v !== Infinity ? (Math.round(hold1.v / 6) === Math.round(mine1.v / 6) ? ', no better than doing nothing' : '; doing nothing, it would be lost in ' + fs1(hold1.v)) : '');
       }
       t.appendChild(progress(total, left));
       t.title = (t.dataset.tip ? t.dataset.tip + ' ' : '') + 'The plan is ' + total + (total === 1 ? ' swap' : ' swaps') + ' in all' + (madeN ? '; ' + madeN + ' made, ' + left + ' still to make' : '') + (goal.length ? '. Goal: ' + goal.join(' + ').toLowerCase() + '.' : '.');

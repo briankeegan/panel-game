@@ -459,6 +459,19 @@
 .gs-latest .lt { font-size: 11.5px; color: var(--color-fg-muted); }
 .gs-latest .lw { color: var(--color-fg); }
 @media (max-width: 640px) { .gs-latest .gs-watch { padding: 6px 12px; font-size: 14px; } .gs-latest td, .gs-latest th { padding-inline: 5px !important; } }
+/* a card whose whole body folds away: the header row is the button */
+.gs details.gs-card { padding: 0; color: var(--color-fg); font-size: inherit; display: block; }
+.gs-collapse > summary { display: flex; align-items: center; gap: 12px; padding: 18px 22px; cursor: pointer; list-style: none; border-radius: 14px; }
+.gs-collapse > summary::-webkit-details-marker { display: none; }
+.gs-collapse > summary::before { content: '▸'; color: var(--color-fg-muted); width: 1em; transition: transform .15s; }
+.gs-collapse[open] > summary::before { transform: rotate(90deg); }
+.gs-collapse > summary:hover { background: color-mix(in srgb, var(--color-fg) 4%, transparent); }
+.gs-collapse > summary:focus-visible { outline: 2px solid var(--color-fg); outline-offset: -2px; }
+.gs-collapse > summary h2 { flex: 0 0 auto; }
+.gs-collapse > summary .gs-count { margin-left: auto; text-align: right; }
+.gs-collapse > :not(summary) { margin-inline: 22px; }
+.gs-collapse > :last-child { margin-bottom: 18px; }
+@media (max-width: 520px) { .gs-collapse > summary { padding: 14px 16px; } .gs-collapse > :not(summary) { margin-inline: 16px; } .gs-collapse > :last-child { margin-bottom: 14px; } }
 </style>
 
 <div class="gs" id="gs">
@@ -499,11 +512,11 @@
 
   
 
-  <section class="gs-card" id="sec-form">
-    <h2>Latest results</h2>
+  <details class="gs-card gs-collapse" id="sec-form" open>
+    <summary><h2>Latest results</h2><span class="gs-count" id="form-sum"></span></summary>
     <p class="gs-note" id="form-note"></p>
     <div id="form" data-source="games"></div>
-  </section>
+  </details>
 
   <section class="gs-card" id="sec-watch">
     <div class="gw-head"><h2 id="gw-title">Watch a game</h2><span class="gs-count" id="gw-count"></span></div>
@@ -856,7 +869,8 @@
       if (recentAll.length > 10) { const m = document.createElement('button'); m.type = 'button'; m.className = 'gs-more'; m.textContent = recentMore ? 'Show fewer' : 'Show more'; m.addEventListener('click', () => { recentMore = !recentMore; render(); }); fm.appendChild(m); }
     }
     const rl = recent.filter((g) => g.res === 'L').length;
-    $('form-note').textContent = recent.length ? 'Newest first: ' + (recent.length - rl) + ' won, ' + rl + ' lost. Click a game to watch it.' : 'No games in this selection.';
+    $('form-note').textContent = recent.length ? 'Newest first. Click a game to watch it.' : 'No games in this selection.';
+    $('form-sum').textContent = recent.length ? (recent.length === 1 ? 'the latest game' : 'latest ' + recent.length) + ': ' + (recent.length - rl) + ' won, ' + rl + ' lost' : '';
 
     // per-version stats (opponent filter applied)
     const vs = vers.map((v) => Object.assign({}, v, stat(byOpp.filter((g) => g.sha === v.sha)))).filter((v) => v.n > 0 && (v.n >= (narrow ? 0 : minn) || v.sha === ver));

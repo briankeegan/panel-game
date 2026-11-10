@@ -483,6 +483,11 @@
 .gw-opt .or { grid-column: 2 / 3; color: var(--color-fg-muted); } .gw-opt .ol { font-weight: 500; }
 .gw-opt i { font-style: normal; font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 999px; background: color-mix(in srgb, var(--color-fg) 12%, transparent); grid-column: 3; grid-row: 1; }
 .gw-opt.pick { background: color-mix(in srgb, var(--color-ok) 14%, transparent); } .gw-opt.pick i { background: var(--color-ok); color: #fff; }
+.gw-cap .whyline.expl { color: var(--color-fg-muted); font-size: 12.5px; }
+.gw-cap { height: 11em; }
+@media (min-width: 980px) and (min-height: 600px) { .gw-cap { height: 10em; } }
+@media (max-width: 760px) { .gw-cap { height: 9.6em; } }
+.gw-cap .whyline.why1 { color: var(--color-fg); font-size: 12.5px; }
 </style>
 
 <div class="gs" id="gs">
@@ -1698,11 +1703,11 @@ function projectPlan(G, seq, cursor) {
     const others = list.filter((o) => o !== me && !isNaN(o.v)); if (!others.length) return '';
     const sec = (v) => fs1(v), best = Math.max(...others.map((o) => o.v)), worse = others.filter((o) => o.v < me.v).length;
     let t;
-    if (me.v === Infinity) t = worse ? 'It keeps the board alive, and ' + worse + ' of the other ' + others.length + ' options it compared would lose it.' : 'The board survives whichever it picks, so it takes the first choice on its priority list.';
-    else if (others.every((o) => o.v === me.v)) t = 'Whatever it does, the board is lost in ' + sec(me.v) + ', so it takes the first choice on its priority list.';
-    else if (me.v >= best) t = 'Every option loses the board; this one holds out longest (' + sec(me.v) + ').';
-    else t = 'It follows its priority list for this mode, even though another option keeps the board alive longer (' + sec(best) + ' against ' + sec(me.v) + ').';
-    if (me.br > 0) t += ' It also breaks ' + me.br + ' garbage.';
+    if (me.v === Infinity) t = worse && worse === others.length ? 'Only option that keeps the board alive' : worse ? 'Keeps the board alive (' + worse + ' of ' + others.length + ' others lose it)' : 'Board safe either way; first on its list';
+    else if (others.every((o) => o.v === me.v)) t = 'Board lost in ' + sec(me.v) + ' whatever it does';
+    else if (me.v >= best) t = 'Holds out longest (' + sec(me.v) + ')';
+    else t = 'Its priority list, not survival (' + sec(me.v) + ' vs ' + sec(best) + ')';
+    if (me.br > 0) t += ' · breaks ' + me.br;
     return t;
   }
   let OPTS_KEY = null;
@@ -1717,7 +1722,7 @@ function projectPlan(G, seq, cursor) {
     const kinds = (kvOf(raw, 'cands') || '').split(',').map((c) => /^(.+?):(\d+)/.exec(c)).filter(Boolean).map((m) => m[2] + ' ' + kName(m[1]));
     const pick = String((d[2] || 'hold')).replace(/_/g, ' '), seen = {};
     const head = document.createElement('div'); head.className = 'gw-note2';
-    head.textContent = (total ? total + ' moves were weighed' : 'Moves weighed') + '; the log keeps the best ' + list.length + ', best first.' + (kinds.length ? ' Kinds: ' + kinds.join(', ') + '.' : '');
+    head.textContent = (total ? total + ' options weighed' : 'Options weighed') + ' · best ' + list.length + ' shown'; if (kinds.length) head.title = 'Kinds: ' + kinds.join(', ');
     box.appendChild(head);
     list.forEach((q, n) => {
       const nm = q[0].replace(/[*~]/g, '').replace(/_/g, ' '), inProg = q[0].includes('*'), first = !seen[nm]; seen[nm] = (seen[nm] || 0) + 1;
@@ -1730,7 +1735,7 @@ function projectPlan(G, seq, cursor) {
       else if (inProg) { const t = document.createElement('i'); t.textContent = 'already under way'; row.appendChild(t); }
       box.appendChild(row);
     });
-    g$('opts-s').textContent = 'All the options it weighed' + (total ? ' (' + total + ')' : ' (' + list.length + ')');
+    g$('opts-s').textContent = 'Options weighed (' + (total || list.length) + ')';
   }
   const CATWHY = { lives: 'Board stays alive', plan: 'Follows its plan', breaks: 'Breaks garbage', ready: 'Ready for the next block', buys: 'Buys the most time', dies: 'Lost either way, this lasts longest' };
   const CIRC = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨'];
@@ -1742,7 +1747,7 @@ function projectPlan(G, seq, cursor) {
   const kvOf = (raw, k) => { const m = new RegExp(' ' + k + '=(\\S+)').exec(raw || ''); return m ? m[1] : ''; };
   const kName = (s) => { const w = playWhy(s); return w ? w[0].toLowerCase() : (s || '').replace(/_/g, ' '); };   // the move in plain words (Gambit's own names, like "ready" or "cut", mean nothing to a reader)
   const ruleFull = (n) => (R.D && R.D.rl && R.D.rl[n]) || '';
-  const ruleTxt = (n) => { const w = ruleFull(n); return w ? '"' + (w.length > 110 ? w.slice(0, 107).trimEnd() + '…' : w) + '"' : 'rank.c line ' + n; };   // the full words are on hover and in the copy
+  const ruleTxt = (n) => { const w = ruleFull(n); return w ? '"' + (w.length > 56 ? w.slice(0, 53).trimEnd() + '…' : w) + '"' : 'rank.c line ' + n; };   // the full words are on hover and in the copy
   const OUTCOME = { c: 'cleared', s: 'set up', b: 'broke garbage', n: 'came to nothing' };
   // why a line ended: 1 and 2 carried on / held over; 4 to 6 the frame loop found the line no longer fits; 10 to 14 the key presser dropped it; 16 to 24 why no line in progress was offered; a rank.c line is the rule that put it down
   const ENDED = { 1: 'carried on', 2: 'held over', 3: 'not carried on', 4: 'its anchor panel is gone', 5: 'a step of it is no longer legal', 6: 'the break it was for is not made', 7: 'a raise', 10: 'the mode changed', 11: 'no board could be predicted', 12: 'no keys press it', 13: 'its keys do not fit the input allowance', 14: 'its walk is over the allowance', 16: 'none was carried by the last answer', 17: 'the frame loop was on another line', 18: 'every swap of it was pressed', 19: 'the judge gave no judgement of it', 20: 'it wastes a three the save did not confirm', 21: 'the mode asks nothing of it', 22: 'it had waited out', 23: 'it was begun in another mode', 24: 'a 2x was dropped' };
@@ -1872,7 +1877,6 @@ function projectPlan(G, seq, cursor) {
       t.classList.add('goalline');
       const gt = document.createElement('span'); gt.className = 'gl-t'; const pw0 = playWhy(cur0.name); gt.textContent = (pw0 ? pw0[0] : 'Carrying on') + ' (planned at ' + fmtClock(cur0.at) + ')'; t.appendChild(gt);
       t.appendChild(progress(cur0.total, cur0.left));
-      t.dataset.expl = 'No new plan at this moment: the cursor is still making the swaps it planned at ' + fmtClock(cur0.at) + '. ' + (pw0 ? pw0[1] : '');
       t.title = 'This decision made no new plan. The cursor is still making the swaps of the plan it chose at ' + fmtClock(cur0.at) + ': ' + (cur0.total - cur0.left) + ' of ' + cur0.total + ' made.';
     }
     else if (!seq.length) { t.textContent = cur0 && cur0.carried ? 'Carrying on a plan from ' + fmtClock(cur0.at) : moving ? 'Cursor moving, no plan logged' : 'No swaps planned'; }
@@ -1883,9 +1887,9 @@ function projectPlan(G, seq, cursor) {
       const gt = document.createElement('span'); gt.className = 'gl-t';
       // a goal when the log names one; otherwise the move's own name (one swap with no goal is a move, not a plan)
       const pw1 = playWhy(play); gt.textContent = goal.length ? goal.join(' + ') : pw1 ? pw1[0] : nice(play) ? nice(play) : (total === 1 ? 'One swap' : total + ' swaps'); t.appendChild(gt);
-      if (pw1) t.dataset.expl = (goal.length ? 'Why: ' : '') + pw1[1];
+      if (pw1 && goal.length) t.dataset.expl = 'via ' + pw1[0].toLowerCase(); if (pw1) t.dataset.tip = pw1[1];
       t.appendChild(progress(total, left));
-      t.title = 'The plan is ' + total + (total === 1 ? ' swap' : ' swaps') + ' in all' + (madeN ? '; ' + madeN + ' made, ' + left + ' still to make' : '') + (goal.length ? '. Goal: ' + goal.join(' + ').toLowerCase() + '.' : '.');
+      t.title = (t.dataset.tip ? t.dataset.tip + ' ' : '') + 'The plan is ' + total + (total === 1 ? ' swap' : ' swaps') + ' in all' + (madeN ? '; ' + madeN + ' made, ' + left + ' still to make' : '') + (goal.length ? '. Goal: ' + goal.join(' + ').toLowerCase() + '.' : '.');
     }
     cap.appendChild(t);
     if (t.dataset.expl) { const ex = document.createElement('div'); ex.className = 'whyline expl'; ex.textContent = t.dataset.expl; cap.appendChild(ex); }
@@ -1907,9 +1911,9 @@ function projectPlan(G, seq, cursor) {
         const bt = document.createElement('span'); bt.append('Keys left: '); const bb = document.createElement('b'); bb.textContent = left + ' of ' + lim; bt.appendChild(bb); bt.append(' / 10 s');
         const bar = document.createElement('i'); const fill = document.createElement('u'); fill.style.setProperty('--w', Math.round(100 * left / lim) + '%'); bar.appendChild(fill); bd.append(bt, bar); cap.appendChild(bd);
       }
-      const w1 = document.createElement('div'); w1.className = 'whyline def'; const bc = becauseOf(d); w1.textContent = bc || whyParts.join(' · '); w1.title = whyParts.join(' · ') + ' · Gambit calls this move "' + (play || 'hold').replace(/_/g, ' ') + '"'; if (w1.textContent) cap.appendChild(w1);
+      const w1 = document.createElement('div'); w1.className = 'whyline def why1'; const bc = becauseOf(d); w1.textContent = bc || whyParts.join(' · '); w1.title = whyParts.join(' · ') + ' · Gambit calls this move "' + (play || 'hold').replace(/_/g, ' ') + '"'; if (w1.textContent) cap.appendChild(w1);
     }
-    { const cur0 = PLAN.current(clock); if (cur0 && cur0.dropped) { const g = document.createElement('div'); g.className = 'whyline def'; g.textContent = 'New plan. Grey arrows: the plan it dropped.'; cap.appendChild(g); } }
+    { const cur0 = PLAN.current(clock); if (cur0 && cur0.dropped) { const g = document.createElement('div'); g.className = 'whyline def'; g.textContent = 'Grey arrows: the dropped plan'; cap.appendChild(g); } }
   }
   // the list of Ranmaru's choices: each plan it made or threw away, tap one to jump there
   const LIST = { rid: null, mode: 'chg', rows: [] };

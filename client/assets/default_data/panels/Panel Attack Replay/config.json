@@ -59,7 +59,7 @@
     },
     "panic": {
       "row": 14,
-      "durationPerFrame": 2,
+      "durationPerFrame": 4,
       "frames": 6
     }
   }

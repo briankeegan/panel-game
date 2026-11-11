@@ -511,7 +511,7 @@
 </style>
 
 <div class="gs" id="gs">
-  <section class="gs-card pod-card" id="sec-podium"><h2>Leaderboard</h2><ol class="pod" id="pod"></ol></section>
+  <section class="gs-card pod-card" id="sec-podium"><h2>Leaderboard</h2><p class="gs-note">Share of games each opponent won against Ranmaru</p><ol class="pod" id="pod"></ol></section>
   <section class="gs-card pod-card" id="sec-last"><h2>Last kill</h2><button type="button" class="pod-kill" id="pod-last"></button></section>
   <header class="gs-hero">
     <div class="gs-eyebrow"><span class="gs-pulse" aria-hidden="true"></span>Live stats · updates itself after every set</div>
@@ -935,8 +935,8 @@
 
     {
       const byOpp = d3.group(games, (g) => g.opp);
-      const ranked = Array.from(byOpp, ([o, a]) => { const n = a.length, w = a.filter((g) => g.res === 'W').length; return { opp: o, n, w, rate: n ? w / n : 0 }; })
-        .sort((a, b) => a.rate - b.rate || b.n - a.n || a.opp.localeCompare(b.opp)).slice(0, 3);
+      const ranked = Array.from(byOpp, ([o, a]) => { const n = a.length, w = a.filter((g) => g.res === 'W').length, beat = n - w; return { opp: o, n, beat, share: n ? beat / n : 0 }; })
+        .sort((a, b) => b.share - a.share || b.n - a.n || a.opp.localeCompare(b.opp)).slice(0, 3);
       const pod = $('pod'); pod.replaceChildren();
       [['🥇', 'gold'], ['🥈', 'silver'], ['🥉', 'bronze']].forEach(([emo, cls], i) => {
         const r = ranked[i]; if (!r) return;
@@ -944,9 +944,9 @@
         const lab = document.createElement('span'); lab.className = 'pod-m'; lab.textContent = emo;
         const info = document.createElement('div'); info.style.minWidth = '0';
         const nm = document.createElement('b'); nm.className = 'pod-name'; nm.textContent = r.opp;
-        const sub = document.createElement('span'); sub.className = 'pod-sub'; sub.textContent = r.w + ' won · ' + (r.n - r.w) + ' lost · ' + r.n + ' games';
+        const sub = document.createElement('span'); sub.className = 'pod-sub'; sub.textContent = 'Beat Ranmaru in ' + r.beat + ' of ' + r.n + ' games';
         info.append(nm, sub);
-        const pct = document.createElement('span'); pct.className = 'pod-p'; pct.textContent = Math.round(r.rate * 100) + '%';
+        const pct = document.createElement('span'); pct.className = 'pod-p'; pct.textContent = Math.round(r.share * 100) + '%';
         li.append(lab, info, pct); pod.appendChild(li);
       });
       const lk = $('pod-last'); lk.replaceChildren();

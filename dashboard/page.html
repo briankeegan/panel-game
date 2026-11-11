@@ -944,8 +944,7 @@
         const lab = document.createElement('span'); lab.className = 'pod-m'; lab.textContent = emo;
         const info = document.createElement('div'); info.style.minWidth = '0';
         const nm = document.createElement('b'); nm.className = 'pod-name'; nm.textContent = r.opp;
-        const sub = document.createElement('span'); sub.className = 'pod-sub'; sub.textContent = 'Beat Ranmaru in ' + r.beat + ' of ' + r.n + ' games';
-        info.append(nm, sub);
+        info.append(nm);
         const pct = document.createElement('span'); pct.className = 'pod-p'; pct.textContent = Math.round(r.share * 100) + '%';
         li.append(lab, info, pct); pod.appendChild(li);
       });

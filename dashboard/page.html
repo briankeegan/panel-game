@@ -494,11 +494,18 @@
   .gw-cap .goalline, .gw-cap .why1, .gw-cap .budget { cursor: pointer; }
 }
 .pod{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
-.pod li{display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:10px;border:2px solid;background:var(--color-panel);min-width:0}
-.pod li .pod-m{flex:0 0 auto;width:4.5em;font-size:.85em;opacity:.85}
-.pod li b{flex:1 1 auto;min-width:0;overflow-wrap:anywhere}
-.pod li .pod-r{flex:0 0 auto;font-size:.9em;opacity:.8;text-align:right}
-.pod-gold{border-color:#d4af37}.pod-silver{border-color:#b8bcc4}.pod-bronze{border-color:#cd7f32}
+.pod li{display:grid;grid-template-columns:2.2em minmax(0,1fr) auto;align-items:center;gap:12px;padding:12px 14px;border-radius:12px;background:var(--color-panel);border:1px solid var(--color-border-line);border-left:4px solid var(--pod-c,transparent)}
+.pod-gold{--pod-c:#d4af37}.pod-silver{--pod-c:#b8bcc4}.pod-bronze{--pod-c:#cd7f32}
+.pod .pod-m{font-size:1.7em;line-height:1;text-align:center}
+.pod .pod-name{font-weight:700;overflow-wrap:anywhere;min-width:0}
+.pod .pod-sub{display:block;font-size:.8em;font-weight:400;opacity:.7;margin-top:2px}
+.pod .pod-p{font-size:1.3em;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.pod-kill{display:flex;width:100%;align-items:center;justify-content:space-between;gap:12px;text-align:left;padding:12px 14px;border-radius:12px;border:1px solid var(--color-border-line);background:var(--color-panel);color:inherit;font:inherit;cursor:pointer}
+.pod-kill:not(:disabled):hover{filter:brightness(1.08)}
+.pod-kill:disabled{cursor:default}
+.pod-kill .pod-kn{font-weight:700;overflow-wrap:anywhere;min-width:0}
+.pod-kill .pod-kd{display:block;font-size:.8em;font-weight:400;opacity:.7;margin-top:2px}
+.pod-kill .pod-go{flex:0 0 auto;font-weight:700;white-space:nowrap}
 </style>
 
 <div class="gs" id="gs">
@@ -537,8 +544,8 @@
 
   <nav class="gs-nav" aria-label="Sections"><a href="#sec-form">Recent</a><a href="#sec-watch">Watch a game</a><a href="#sec-garbage">Garbage sent</a><a href="#sec-opp">Opponents</a><a href="#sec-table">Versions</a><a href="#sec-len">Game length</a><button type="button" class="gs-link" id="copy-link" title="Copy a link that opens this exact view">Copy link to this view</button></nav>
 
-  <section class="gs-card pod-card" id="sec-podium"><h2>Who beats Ranmaru most</h2><ol class="pod" id="pod"></ol></section>
-  <section class="gs-card" id="sec-last"><h2>Last kill</h2><p class="gs-note" id="pod-last"></p></section>
+  <section class="gs-card pod-card" id="sec-podium"><h2>Leaderboard</h2><ol class="pod" id="pod"></ol></section>
+  <section class="gs-card pod-card" id="sec-last"><h2>Last kill</h2><button type="button" class="pod-kill" id="pod-last"></button></section>
 
   
 
@@ -929,16 +936,29 @@
       const ranked = Array.from(byOpp, ([o, a]) => { const n = a.length, w = a.filter((g) => g.res === 'W').length; return { opp: o, n, w, rate: n ? w / n : 0 }; })
         .sort((a, b) => a.rate - b.rate || b.n - a.n || a.opp.localeCompare(b.opp)).slice(0, 3);
       const pod = $('pod'); pod.replaceChildren();
-      ['Gold', 'Silver', 'Bronze'].forEach((m, i) => {
+      [['🥇', 'gold'], ['🥈', 'silver'], ['🥉', 'bronze']].forEach(([emo, cls], i) => {
         const r = ranked[i]; if (!r) return;
-        const li = document.createElement('li'); li.className = 'pod-' + m.toLowerCase();
-        const lab = document.createElement('span'); lab.className = 'pod-m'; lab.textContent = m;
-        const nm = document.createElement('b'); nm.textContent = r.opp;
-        const det = document.createElement('span'); det.className = 'pod-r'; det.textContent = 'Ranmaru won ' + Math.round(r.rate * 100) + '% (' + r.w + ' of ' + r.n + ')';
-        li.append(lab, nm, det); pod.appendChild(li);
+        const li = document.createElement('li'); li.className = 'pod-' + cls;
+        const lab = document.createElement('span'); lab.className = 'pod-m'; lab.textContent = emo;
+        const info = document.createElement('div'); info.style.minWidth = '0';
+        const nm = document.createElement('b'); nm.className = 'pod-name'; nm.textContent = r.opp;
+        const sub = document.createElement('span'); sub.className = 'pod-sub'; sub.textContent = r.w + ' won · ' + (r.n - r.w) + ' lost · ' + r.n + ' games';
+        info.append(nm, sub);
+        const pct = document.createElement('span'); pct.className = 'pod-p'; pct.textContent = Math.round(r.rate * 100) + '%';
+        li.append(lab, info, pct); pod.appendChild(li);
       });
+      const lk = $('pod-last'); lk.replaceChildren();
       const lastLoss = d3.greatest(games.filter((g) => g.res === 'L'), (g) => g.date);
-      $('pod-last').textContent = lastLoss ? lastLoss.opp + ' on ' + d3.utcFormat('%b %-d, %Y')(new Date(lastLoss.date)) : 'No kills yet.';
+      if (lastLoss) {
+        const info = document.createElement('span'); info.style.minWidth = '0';
+        const who = document.createElement('b'); who.className = 'pod-kn'; who.textContent = lastLoss.opp;
+        const when = document.createElement('span'); when.className = 'pod-kd'; when.textContent = d3.utcFormat('%b %-d, %Y')(new Date(lastLoss.date));
+        info.append(who, when);
+        const go = document.createElement('span'); go.className = 'pod-go'; go.textContent = lastLoss.replay ? 'Watch ▶' : 'No replay';
+        lk.append(info, go);
+        lk.disabled = !lastLoss.replay;
+        lk.onclick = lastLoss.replay ? () => openReplay(lastLoss, true) : null;
+      } else { lk.textContent = 'No kills yet'; lk.disabled = true; lk.onclick = null; }
     }
     // opponents table (version filter applied)
     const os = Array.from(d3.group(byVer, (g) => g.opp), ([o, a]) => Object.assign({ opp: o, last: d3.max(a, (g) => g.date) }, stat(a)));

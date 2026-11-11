@@ -59,8 +59,8 @@
     },
     "panic": {
       "row": 14,
-      "durationPerFrame": 3,
-      "frames": 2
+      "durationPerFrame": 2,
+      "frames": 6
     }
   }
 }

@@ -500,6 +500,8 @@
 .pod .pod-name{font-weight:700;overflow-wrap:anywhere;min-width:0}
 .pod .pod-sub{display:block;font-size:.8em;font-weight:400;opacity:.7;margin-top:2px}
 .pod .pod-p{font-size:1.3em;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.gs-copy{position:absolute;top:10px;right:12px;z-index:2;font:inherit;font-size:.78em;padding:3px 9px;border-radius:999px;border:1px solid var(--color-border-line);background:var(--color-panel);color:inherit;cursor:pointer;opacity:.8}
+.gs-copy:hover{opacity:1}
 .pod-kill{display:flex;width:100%;align-items:center;justify-content:space-between;gap:12px;text-align:left;padding:12px 14px;border-radius:12px;border:1px solid var(--color-border-line);background:var(--color-panel);color:inherit;font:inherit;cursor:pointer}
 .pod-kill:not(:disabled):hover{filter:brightness(1.08)}
 .pod-kill:disabled{cursor:default}
@@ -1008,7 +1010,7 @@
     if (PD && !URLSTATE.reset && !fg.some((g) => g.replay === PD.rid) && games.some((g) => g.replay === PD.rid)) { URLSTATE.reset = true; resetAll(); return; }
     updateWatch(fg);
     if (PD) { let row = WL.list.find((g) => g.replay === PD.rid);
-      if (row) { R.pending = PD.frame; openReplay(row, true); R.part = PD.part; if (R.D) syncPart(); } URLSTATE.pending = null; }
+      if (row) { R.pending = PD.frame; openReplay(row, false); R.part = PD.part; if (R.D) syncPart(); } URLSTATE.pending = null; }
     refreshPlayer();
   }
 
@@ -2175,7 +2177,7 @@ function projectPlan(G, seq, cursor) {
     const hashOf = (o) => { const k = Object.keys(o); return k.length ? '#' + k.map((x) => x + '=' + enc(o[x])).join('&') : ''; };
     U.flush = () => { const h = hashOf(state(false)); if (h !== (location.hash || '')) { try { history.replaceState(null, '', h || (location.pathname + location.search)); } catch (e) {} } };
     // the link to share: the filters and the open game (and moment), for someone else to open
-    U.link = () => location.origin + location.pathname + location.search + hashOf(state(true));
+    U.link = (sec) => location.origin + location.pathname + location.search + hashOf(Object.assign(state(true), sec ? { sec } : {}));
     U.apply = (hash, init) => {
       const p = {};
       (hash || '').replace(/^#/, '').split('&').forEach((kv) => { const i = kv.indexOf('='); if (i > 0) { try { p[kv.slice(0, i)] = decodeURIComponent(kv.slice(i + 1)); } catch (e) {} } });
@@ -2205,6 +2207,21 @@ function projectPlan(G, seq, cursor) {
     return U;
   })();
   URLSTATE.apply(location.hash, true);
+  {
+    const sec = new URLSearchParams(location.hash.replace(/^#/, '')).get('sec');
+    if (sec && document.getElementById(sec)) setTimeout(() => document.getElementById(sec).scrollIntoView({ block: 'start' }), 500);
+  }
+  document.querySelectorAll('.gs-card[id]').forEach((el) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'gs-copy'; b.textContent = 'Copy link'; b.title = 'Copy a link to this section';
+    b.addEventListener('click', async (e) => {
+      e.preventDefault(); e.stopPropagation();
+      const ok = await copyText(URLSTATE.link(el.id));
+      b.textContent = ok ? 'Copied' : 'Could not copy';
+      setTimeout(() => { b.textContent = 'Copy link'; }, 1800);
+    });
+    el.appendChild(b);
+  });
   
   // section nav: smooth scroll without touching the URL (the hash carries the view), and the section in view lit up
   (function () {

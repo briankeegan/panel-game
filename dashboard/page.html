@@ -934,8 +934,10 @@
     table($('t-ver'), 'ver', vcols, vsShown, (r) => r.sha === ver, (r) => toggle('ver', r.sha));
 
     {
-      const byOpp = d3.group(games, (g) => g.opp);
-      const ranked = Array.from(byOpp, ([o, a]) => { const n = a.length, w = a.filter((g) => g.res === 'W').length, beat = n - w; return { opp: o, n, beat, share: n ? beat / n : 0 }; })
+      // one player = one account (pid, from the bot log when the game has it); older games have no pid and group by name.
+      // the name shown is the one this account used most.
+      const byOpp = d3.group(games, (g) => g.pid || g.opp);
+      const ranked = Array.from(byOpp, ([, a]) => { const n = a.length, w = a.filter((g) => g.res === 'W').length, beat = n - w; const names = d3.rollup(a, (v) => v.length, (g) => g.opp); const opp = Array.from(names).sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0]))[0][0]; return { opp, n, beat, share: n ? beat / n : 0 }; })
         .sort((a, b) => b.share - a.share || b.n - a.n || a.opp.localeCompare(b.opp)).slice(0, 3);
       const pod = $('pod'); pod.replaceChildren();
       [['🥇', 'gold'], ['🥈', 'silver'], ['🥉', 'bronze']].forEach(([emo, cls], i) => {

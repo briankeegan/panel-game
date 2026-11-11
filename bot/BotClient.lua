@@ -345,7 +345,16 @@ function BotClient:dispatch(msg)
       end
       -- og: its outgoing garbage as its client shows it (the telegraph a player sees at the top), and the stopWatch this stack saw the
       -- board on -- the forecast of a wired opponent's garbage (GameCreator's GambitNative viewTelegraph)
-      self.oppView = { top = top, out = out, over = over, seen = self.myStack.clock, seenSW = self.myStack.stopWatch, clock = snap.f,
+      -- top4: the row four of its six columns reach -- most of the board, not its one tall column (GameCreator's GambitNative reads it
+      -- as the enemy's height)
+      local hs = {}
+      for col = 1, width do
+        local h = 0
+        for row = height, 1, -1 do if counts(cache[row * width + col]) then h = row break end end
+        hs[#hs + 1] = h
+      end
+      table.sort(hs, function(a, b) return a > b end)
+      self.oppView = { top = top, top4 = hs[4] or 0, out = out, over = over, seen = self.myStack.clock, seenSW = self.myStack.stopWatch, clock = snap.f,
                        stop = (snap.st or 0) + (snap.ps or 0), og = snap.og }
       self._yCount = (self._yCount or 0) + 1
       if self._yCount == 1 or self._yCount % 400 == 0 then

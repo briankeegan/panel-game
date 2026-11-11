@@ -32,6 +32,7 @@ on:
           - bot-handoff
           - ranmaru-watch
           - ranmaru-site
+          - stats-rebuild
       server:
         description: '2. Server. auto = panelattack.com, or the Bramp server (104.156.250.136) for a fight. Stop / deploy / fight clear it of bots first'
         required: true
@@ -130,7 +131,7 @@ env:
 jobs:
   bot-vs-bot:
     name: Run the bot
-    if: ${{ !startsWith(inputs.mode, 'ranmaru') && inputs.mode != 'bot-handoff' && (inputs.mode != 'fight' || contains(inputs.advanced, 'bot_run')) }}
+    if: ${{ !startsWith(inputs.mode, 'ranmaru') && inputs.mode != 'bot-handoff' && inputs.mode != 'stats-rebuild' && (inputs.mode != 'fight' || contains(inputs.advanced, 'bot_run')) }}
     runs-on: ubuntu-latest
     # A beta-server run commits a newly registered bot's account id back to
     # UPSTREAM_BOT_REF so the name can be reused (see "Save the account id").
@@ -1136,6 +1137,31 @@ jobs:
             sleep 10
           done
 
+  # stats-rebuild: rebuild the stats page from dashboard/page.html and publish it to gh-pages, using the same site_open/site_push as a bot run.
+  # No bot and no server is touched. Dispatch with ref bramp/multi-player.
+  stats-rebuild:
+    name: Rebuild the stats page
+    if: ${{ inputs.mode == 'stats-rebuild' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Rebuild and publish the page
+        shell: bash
+        env:
+          CF_PAGES_PROJECT: ''
+        run: |
+          set -eu
+          . dashboard/site_git.sh
+          site_open "$PWD/site" || { echo "no gh-pages branch yet: nothing to publish"; exit 1; }
+          : > site-prune.txt
+          python3 dashboard/make_site.py site >/dev/null
+          site_push "$PWD/site" "Stats page: rebuilt from dashboard/page.html" || { echo "::error::the stats page was not published"; exit 1; }
+          echo "Stats page published to gh-pages" >> "$GITHUB_STEP_SUMMARY"
   # ranmaru-site: copy the stats page (the gh-pages branch) to Cloudflare Pages. Asked for by dashboard/site_git.sh after every publish when the
   # repository variable CF_PAGES_PROJECT is set; a run on its own runner, so the bot's runner does none of the work. Newest request wins.
   site-sync:

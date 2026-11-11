@@ -1154,13 +1154,19 @@ jobs:
         shell: bash
         env:
           CF_PAGES_PROJECT: ''
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
         run: |
           set -eu
-          . dashboard/site_git.sh
-          site_open "$PWD/site" || { echo "no gh-pages branch yet: nothing to publish"; exit 1; }
-          : > site-prune.txt
+          # the page is built from dashboard/page.html alone (index.html), so only index.html is fetched from gh-pages: no game data
+          rm -rf site
+          git clone -q --depth 1 --single-branch --branch gh-pages --sparse --filter=blob:none "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" site
+          git -C site sparse-checkout set index.html .nojekyll
           python3 dashboard/make_site.py site >/dev/null
-          site_push "$PWD/site" "Stats page: rebuilt from dashboard/page.html" || { echo "::error::the stats page was not published"; exit 1; }
+          git -C site add index.html
+          if git -C site diff --cached --quiet; then echo "the page did not change"; exit 0; fi
+          git -C site -c user.name="github-actions" -c user.email="actions@github.com" commit -q -m "Stats page: rebuilt from dashboard/page.html"
+          git -C site push -q origin HEAD:gh-pages
           echo "Stats page published to gh-pages" >> "$GITHUB_STEP_SUMMARY"
   # ranmaru-site: copy the stats page (the gh-pages branch) to Cloudflare Pages. Asked for by dashboard/site_git.sh after every publish when the
   # repository variable CF_PAGES_PROJECT is set; a run on its own runner, so the bot's runner does none of the work. Newest request wins.

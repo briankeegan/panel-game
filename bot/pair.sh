@@ -32,7 +32,11 @@
 #                                     and taking any challenge: WasmAgro_CPU (bot/profiles/agro.wasm.json) and
 #                                     WasmDefense_CPU (GameCreator's own default profile). Each cancels only its
 #                                     own earlier run. HOURS default 3.
-#   bot/pair.sh ranmaru-vs OPPONENT [GAMES] [HOURS]
+#   bot/pair.sh ranmaru-100 [HOURS]   Ranmaru_100_CPU on the real server: GameCreator's gambit-w100 build (gambit_from), plain lobby,
+#                                     accepts anyone, no target. HOURS default 3.
+#   bot/pair.sh ranmaru-test [HOURS]  Ranmaru_TEST_CPU on the real server: Gambit of GameCreator main, always the latest (pin with
+#                                     PA_GAMBIT_FROM=<commit|name>), plain lobby, accepts anyone. HOURS default 5.
+#   bot/pair.sh ranmaru-vs OPPONENT [GAMES|firstN] [HOURS]   (first10: a series, first to 10 wins, then it accepts anyone)
 #                                     Ranmaru_CPU (Gambit) on the real server: challenges OPPONENT for GAMES finished
 #                                     games (default 3), then leaves the room and sits in the lobby accepting whoever
 #                                     challenges, until HOURS (default 3) are up.
@@ -102,11 +106,11 @@ dispatch() {   # a JSON object of the workflow's inputs
     | gh api -X POST "repos/$REPO/actions/workflows/$WORKFLOW/dispatches" --input - > /dev/null
 }
 dispatch_bitbot() {
-  dispatch "{\"mode\":\"fight\",\"bot\":\"bitbot\",\"opponent\":\"you\",\"name\":\"BitBot\",\"hours\":\"$HOURS\",\"server\":\"$SERVER\"}"
+  dispatch "{\"mode\":\"fight\",\"bot\":\"bitbot\",\"player\":\"you\",\"name\":\"BitBot\",\"hours\":\"$HOURS\",\"server\":\"$SERVER\"}"
   echo "pair: BitBot queued (sits in the lobby)"
 }
 dispatch_wasm() {
-  dispatch "{\"mode\":\"fight\",\"bot\":\"wasm\",\"opponent\":\"challenge\",\"name\":\"WasmSurvivor_Bot,BitBot\",\"hours\":\"$HOURS\",\"profile\":\"$PROFILE\",\"server\":\"$SERVER\"}"
+  dispatch "{\"mode\":\"fight\",\"bot\":\"wasm\",\"player\":\"challenge\",\"name\":\"WasmSurvivor_Bot,BitBot\",\"hours\":\"$HOURS\",\"advanced\":\"profile=$PROFILE\",\"server\":\"$SERVER\"}"
   echo "pair: WasmSurvivor_Bot queued (challenges BitBot)"
 }
 
@@ -157,9 +161,9 @@ wasm_vs() {   # LP CP
   lp=$(profile_path "$lp"); cp=$(profile_path "$cp")
   stop_and_wait "· $lobby \\(wasm\\) vs you|· $chal,$lobby \\(wasm\\)"
   claim "$lobby"; claim "$chal"
-  dispatch "{\"mode\":\"fight\",\"bot\":\"wasm\",\"opponent\":\"you\",\"name\":\"$lobby\",\"hours\":\"$HOURS\",\"profile\":\"$lp\",\"server\":\"$SERVER\"}"
+  dispatch "{\"mode\":\"fight\",\"bot\":\"wasm\",\"player\":\"you\",\"name\":\"$lobby\",\"hours\":\"$HOURS\",\"advanced\":\"profile=$lp\",\"server\":\"$SERVER\"}"
   echo "pair: $lobby ($lp) queued (sits in the lobby)"
-  dispatch "{\"mode\":\"fight\",\"bot\":\"wasm\",\"opponent\":\"challenge\",\"name\":\"$chal,$lobby\",\"hours\":\"$HOURS\",\"profile\":\"$cp\",\"server\":\"$SERVER\"}"
+  dispatch "{\"mode\":\"fight\",\"bot\":\"wasm\",\"player\":\"challenge\",\"name\":\"$chal,$lobby\",\"hours\":\"$HOURS\",\"advanced\":\"profile=$cp\",\"server\":\"$SERVER\"}"
   echo "pair: $chal ($cp) queued (challenges $lobby)"
 }
 
@@ -168,7 +172,7 @@ WASM_RUN='\(wasm\) vs challenge'
 
 dispatch_beta() {   # BOT NAME HOURS PROFILE
   local ref=${PA_UPSTREAM_REF:-}
-  dispatch "{\"mode\":\"live\",\"server\":\"${PA_UPSTREAM_SERVER:-panelattack.com:49569}\",\"bot\":\"$1\",\"name\":\"$2\",\"hours\":\"$3\",\"profile\":\"$4\",\"upstream_ref\":\"$ref\"}"
+  dispatch "{\"mode\":\"versus-player\",\"server\":\"${PA_UPSTREAM_SERVER:-panelattack.com:49569}\",\"bot\":\"$1\",\"name\":\"$2\",\"hours\":\"$3\",\"advanced\":\"profile=$4 upstream_ref=$ref gambit_from=${PA_GAMBIT_FROM:-}\"}"
   echo "pair: $2 ($1) queued on ${PA_UPSTREAM_SERVER:-panelattack.com:49569} (upstream Panel Attack; the server assigns its account id)"
 }
 # the profile a bot plays by default
@@ -195,6 +199,12 @@ case "${1:-}" in
                 stop_and_wait "(betaserver|panelattack\.com).* WasmDefense_CPU(,|\$)"
                 dispatch_beta wasm WasmAgro_CPU "$h" bot/profiles/agro.wasm.json
                 dispatch_beta wasm WasmDefense_CPU "$h" default ;;
+  ranmaru-100)  # Ranmaru_100_CPU: the gambit-w100 build (100 actions per 10 s window), plain lobby, accepts anyone
+                stop_and_wait "(betaserver|panelattack\.com).* Ranmaru_100_CPU(,|\$)"
+                PA_GAMBIT_FROM=gambit-w100 dispatch_beta gambit Ranmaru_100_CPU "${2:-3}" "$(beta_profile gambit)" ;;
+  ranmaru-test) # Ranmaru_TEST_CPU: a pinned GameCreator commit (PA_GAMBIT_FROM, default below), plain lobby, accepts anyone
+                stop_and_wait "(betaserver|panelattack\.com).* Ranmaru_TEST_CPU(,|\$)"
+                PA_GAMBIT_FROM=${PA_GAMBIT_FROM:-main} dispatch_beta gambit Ranmaru_TEST_CPU "${2:-5}" "$(beta_profile gambit)" ;;
   ranmaru-vs)  opp=${2:?the opponent\'s lobby name}; games=${3:-3}   # GAMES 0 or all: keeps challenging OPPONENT whenever it is free
                 stop_and_wait "(betaserver|panelattack\.com).* Ranmaru_CPU(,|\$)"
                 case "$games" in 0|all|"") tail="";; *) tail=",$games";; esac

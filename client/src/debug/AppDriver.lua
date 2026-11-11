@@ -25,7 +25,7 @@
 --      f2                  screenshot via the real F2 shortcut
 --      scene               report the current scene name to the out file
 --      trainingpattern <n> on the Training menu, set the garbage pattern by name
---                          (combo_storm, factory, large_garbage, endless); reports the block size, "endless" for none
+--                          (combo_storm, factory, large_garbage); reports the block size
 --      where               report the focused menu item (see above)
 --      run <MACRO>         expand a named macro (TO_MENU / VS_SELF / REPLAYS ...)
 --      challengeloop       Challenge Mode stage after stage: Ready on the
@@ -430,16 +430,10 @@ end
 -- input from a bot instead of the keyboard -- one byte a frame, asked with the
 -- board as that frame starts. PA_BOT picks it: "wasm" (the default),
 -- GameCreator's WasmSurvivor (survivor.js on PA_SURVIVOR_PORT, through
--- bot/SurvivalLink.lua), "bitbot", GameCreator's BitBot in this process
--- (bot/BitBotNative.lua, GC_EVAL_DIR), or "gambit", GameCreator's Gambit in
--- this process (its gambit/lua/GambitNative.lua, beside GC_EVAL_DIR). Each
--- stack gets a bot of its own.
+-- bot/SurvivalLink.lua), or "bitbot", GameCreator's BitBot in this process
+-- (bot/BitBotNative.lua, GC_EVAL_DIR). Each stack gets a bot of its own.
 local function newBot()
   if os.getenv("PA_BOT") == "bitbot" then return require("bot.BitBotNative").new({}) end
-  if os.getenv("PA_BOT") == "gambit" then
-    package.loaded["gambit.native"] = package.loaded["gambit.native"] or dofile(os.getenv("GC_EVAL_DIR") .. "/../gambit/lua/GambitNative.lua")
-    return package.loaded["gambit.native"].new({})
-  end
   return require("bot.SurvivalLink").new({})
 end
 -- The thinking and input budgets the bot has used, over every match so far (the link of each
@@ -549,17 +543,11 @@ local function tickTraining()
   end
   if not (e and e.clock) then return end
   local cap = tonumber(os.getenv("PA_TRAINING_FRAMES") or "") or 10800
-  -- (a bot may end the game sooner, alive: GC_TRAINING_STOP_AT, the frame it set -- Gambit's opener measured to its handover and the
-  -- seconds after, nothing past them)
-  local stopAt = rawget(_G, "GC_TRAINING_STOP_AT")
-  if stopAt and stopAt < cap then cap = stopAt end
   local over = e.game_over_clock and e.game_over_clock > 0
   if over or e.clock >= cap then
     writeOut(string.format("training %s frames=%d %s", over and "lost" or "survived", over and e.game_over_clock or e.clock, budgetText()))
     doShoot(over and "training_lost" or "training_survived")
-    -- (the bot's match ended too: it writes what it keeps for the end -- its stats, the last boards it decided on)
-    if st.survivorLink and st.survivorLink.endMatch then pcall(function() st.survivorLink:endMatch() end) end
-    st.training = nil; st.quitting = { frames = 30 }; require("client.src.CustomRun").unpaced = false
+    st.training = nil; st.quitting = { frames = 30 }
   end
 end
 
@@ -582,9 +570,7 @@ local function execCommand(c)
     writeOut("texts[" .. tostring(sceneName()) .. "]: " .. table.concat(sceneTexts(), " | "))
   elseif op == "wait" then st.busy = tonumber(args[1]) or 30
   elseif op == "challengeloop" then st.challenge = {}; writeOut("challengeloop on")
-  elseif op == "trainingloop" then
-    -- (PA_UNPACED=1: the game's frames back to back, unslept, while it plays -- a bot that waits on its own answers, Gambit's lockstep)
-    st.training = {}; require("client.src.CustomRun").unpaced = os.getenv("PA_UNPACED") == "1"; writeOut("trainingloop on")
+  elseif op == "trainingloop" then st.training = {}; writeOut("trainingloop on")
   elseif op == "trainingpattern" then
     -- trainingpattern <name>: the Training menu's garbage pattern set by name; reports the block it sends, width x height
     local s = scene()
@@ -593,14 +579,7 @@ local function execCommand(c)
     if i then stp:setState(i) end
     local v = stp and stp.value
     local a = v and v.attackPatterns and v.attackPatterns[1]
-    writeOut("trainingpattern " .. rest .. " -> " .. tostring(stp and stp.selectedIndex) .. " " .. (v and v.endless and "endless" or a and (a.width .. "x" .. a.height) or "custom"))
-  elseif op == "level" then
-    -- level <n>: the local player's modern level and its level data, as the level slider sets them; reports what the player now holds
-    local LevelPresets = require("common.data.LevelPresets")
-    local n, p = tonumber(args[1]), GAME.localPlayer
-    if n and n >= 1 and n <= LevelPresets.modernPresetCount then p:setLevel(n); p:setLevelData(LevelPresets.getModern(n)) end
-    local ld = p.settings.levelData
-    writeOut("level " .. tostring(p.settings.level) .. " speed " .. tostring(ld and ld.startingSpeed) .. " health " .. tostring(ld and ld.maxHealth))
+    writeOut("trainingpattern " .. rest .. " -> " .. tostring(stp and stp.selectedIndex) .. " " .. (a and (a.width .. "x" .. a.height) or "custom"))
   elseif op == "scene" then writeOut("scene=" .. tostring(sceneName()))
   elseif op == "click" then
     local s = scene()

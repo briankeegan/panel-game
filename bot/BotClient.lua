@@ -16,6 +16,7 @@ local ClientProtocol = require("common.network.ClientProtocol")
 local NetworkProtocol = require("common.network.NetworkProtocol")
 local KeyDataEncoding = require("common.data.KeyDataEncoding")
 local consts = require("common.engine.consts")
+local PanelStateCodes = require("client.src.network.PanelStateCodes")
 local ServerMessages = require("client.src.network.ServerMessages") -- toServerMenuState (the canonical ready builder)
 local LevelPresets = require("common.data.LevelPresets")
 local GameModes = require("common.data.GameModes")
@@ -94,6 +95,10 @@ local BotClient = class(function(self, opts)
   -- levelData, which the opponent's character-select reads). Character/stage are
   -- random, like a default client.
   self.level = opts.level or 10 -- corpus + play target is L10
+  -- The level this bot plays at when a set starts. With followUp, a person who takes level 11 in the room makes the bot play 11 for the
+  -- rest of that set (even if they go back down); it returns to baseLevel when the set is closed. Off in fights, where each side's level is set.
+  self.baseLevel = self.level
+  self.followUp = opts.followUp == true
   -- Ranked is a login setting like level and character, and the bot sets it
   -- EXPLICITLY every time: at login and again on every ready. Off unless a
   -- caller opts in -- a bot's games must never move anyone's rating.
@@ -219,6 +224,29 @@ local function countKeys(t)
   return n
 end
 
+-- Change the level this bot plays at. The next ready it sends (playBot sends one every second or so while it waits) carries it.
+function BotClient:setLevel(level, why)
+  if level == self.level then return end
+  self.level = level
+  local st = self.playerStub.settings
+  st.level = level; st.difficulty = level; st.levelData = LevelPresets.getModern(level)
+  logger.info(string.format("bot[%s]: playing level %d (%s)", self.name, level, why))
+  print(string.format("level: %s plays level %d (%s)", self.name, level, why))
+end
+
+local FOLLOW_LEVEL = 11
+-- The other player chose a level: if it is 11, this set is played on 11, whatever they pick next.
+function BotClient:noteOpponentLevel(level)
+  if self.followUp and tonumber(level) == FOLLOW_LEVEL and self.level ~= FOLLOW_LEVEL then
+    self:setLevel(FOLLOW_LEVEL, "the other player chose it: the rest of this set")
+  end
+end
+
+-- The set is closed (the room is gone, or they left): back to the usual level.
+function BotClient:endSet()
+  if self.level ~= self.baseLevel then self:setLevel(self.baseLevel, "the set is over") end
+end
+
 -- Apply one sanitized server-pushed message to our local state.
 function BotClient:dispatch(msg)
   if msg.lobbyStateV2 then
@@ -232,6 +260,9 @@ function BotClient:dispatch(msg)
     logger.info(string.format("bot[%s]: in room %s as slot %s (%d players)",
       self.name, tostring(self.roomNumber), tostring(self.localPlayerNumber),
       countKeys(msg.players)))
+    for pn, pl in pairs(msg.players or {}) do   -- someone already in the room with level 11 chosen
+      if pn ~= self.localPlayerNumber and type(pl) == "table" and type(pl.settings) == "table" then self:noteOpponentLevel(pl.settings.level) end
+    end
   elseif msg.playerJoinedRoom then
     -- incremental notice to existing room members (not a full snapshot)
     local j = msg.playerJoinedRoom
@@ -241,10 +272,12 @@ function BotClient:dispatch(msg)
     }
     logger.info(string.format("bot[%s]: player joined slot %s (%s); now %d players",
       self.name, tostring(j.playerNumber), tostring(j.name), countKeys(self.players)))
+    if type(j.settings) == "table" then self:noteOpponentLevel(j.settings.level) end
   elseif msg.playerLeftRoom and self.players then
     for playerNumber, p in pairs(self.players) do
       if p.publicId == msg.playerLeftRoom.publicId then self.players[playerNumber] = nil end
     end
+    self:endSet()   -- the other player left: the set is closed
   elseif msg.match_start then
     self.matchStart = { replay = msg.replay, startInMs = msg.startInMs, startAtMs = msg.startAtMs }
     logger.info(string.format("bot[%s]: MATCH START (startInMs=%s)",
@@ -289,11 +322,15 @@ function BotClient:dispatch(msg)
         if v == true then v = cache[idx] end
         cache[idx] = v
       end
+      -- (a cell counts as the engine's Panel:dangerous counts it, and as GambitNative reads a stack played here: garbage still falling
+      -- is not the stack's height, and does not top it out -- the block an attack sends falls in above the top row)
+      local FALLING = PanelStateCodes.codes.falling
+      local function counts(cell) return cell and ((cell.g and cell.s ~= FALLING) or (not cell.g and (cell.c or 0) ~= 0)) end
       local top, out = 0, (snap.go or 0) > 0
       for row = height, 1, -1 do
         for col = 1, width do
           local cell = cache[row * width + col]
-          if cell and ((cell.c or 0) ~= 0 or cell.g) then
+          if counts(cell) then
             if top == 0 then top = row end
             if row == height then out = true end
           end
@@ -304,9 +341,21 @@ function BotClient:dispatch(msg)
       local over = false
       for col = 1, width do
         local cell = cache[(height + 1) * width + col]
-        if cell and cell.g then over = true end
+        if cell and cell.g and cell.s ~= FALLING then over = true end
       end
-      self.oppView = { top = top, out = out, over = over, seen = self.myStack.clock, clock = snap.f, stop = (snap.st or 0) + (snap.ps or 0) }
+      -- og: its outgoing garbage as its client shows it (the telegraph a player sees at the top), and the stopWatch this stack saw the
+      -- board on -- the forecast of a wired opponent's garbage (GameCreator's GambitNative viewTelegraph)
+      -- top4: the row four of its six columns reach -- most of the board, not its one tall column (GameCreator's GambitNative reads it
+      -- as the enemy's height)
+      local hs = {}
+      for col = 1, width do
+        local h = 0
+        for row = height, 1, -1 do if counts(cache[row * width + col]) then h = row break end end
+        hs[#hs + 1] = h
+      end
+      table.sort(hs, function(a, b) return a > b end)
+      self.oppView = { top = top, top4 = hs[4] or 0, out = out, over = over, seen = self.myStack.clock, seenSW = self.myStack.stopWatch, clock = snap.f,
+                       stop = (snap.st or 0) + (snap.ps or 0), og = snap.og }
       self._yCount = (self._yCount or 0) + 1
       if self._yCount == 1 or self._yCount % 400 == 0 then
         logger.info(string.format("bot[%s]: opponent board #%d at its frame %s: top %d, topped out %s", self.name, self._yCount, tostring(snap.f), top, tostring(out)))
@@ -327,8 +376,12 @@ function BotClient:dispatch(msg)
     if ch.challengeActive and ch.receiverId == self.publicId and not self.inRoom then
       self:acceptChallenge(ch.senderId, ch.gameModeId)
     end
+  elseif msg.menu_state then
+    local ms = msg.menu_state     -- another player's settings changed (their level, character, ready ...)
+    if type(ms) == "table" and ms.playerNumber and ms.playerNumber ~= self.localPlayerNumber and ms.level then self:noteOpponentLevel(ms.level) end
   elseif msg.leave_room then
     self.inRoom = false
+    self:endSet()
     logger.info("bot[" .. self.name .. "]: left room (" .. tostring(msg.reason) .. ")")
   end
   -- other messages fall through (ignored).
@@ -653,6 +706,7 @@ end
 -- a returning account to its old room).
 function BotClient:leaveRoom()
   pcall(function() self.gameplay:sendRequest(ClientProtocol.leaveRoom()) end)
+  self:endSet()
   self.inRoom = false
   self.roomNumber = nil
   self.players = nil

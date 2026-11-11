@@ -25,18 +25,7 @@ leftover_time = desiredLeftOverTime
 
 -- Sleeps just the right amount of time to make our next update step be one frame long.
 -- If we have leftover time that hasn't been run yet, it will sleep less to catchup.
-CustomRun.UNPACED_DRAW = 60
--- (PA_DRAW_EVERY=N: paced, a frame drawn in N -- the game played at its own pace, the picture drawn less: a bot's harness on a
--- software renderer gives the bot the CPU a headless bot on the server has. 1, every frame, by default)
-CustomRun.DRAW_EVERY = math.max(1, tonumber(os.getenv("PA_DRAW_EVERY") or "") or 1)
-local unpacedFrame
 function CustomRun.sleep()
-  -- (unpaced: the next frame at once, as fast as the machine plays it -- AppDriver's trainingloop under PA_UNPACED=1)
-  if CustomRun.unpaced then
-    CustomRun.runMetrics.previousSleepEnd = love.timer.getTime()
-    CustomRun.runMetrics.sleepDuration = 0
-    return
-  end
   local targetDelay = CustomRun.FRAME_RATE
   -- We want leftover time to be above 0 but less than a quarter frame.
   -- If it goes above that, only wait enough to get it down to that.
@@ -142,10 +131,7 @@ function CustomRun.innerRun()
     CustomRun.runMetrics.updateMemAlloc = mem - prevMem
   end
 
-  -- (unpaced: a frame drawn in UNPACED_DRAW -- nobody watches a training game, and the software renderer is half a core; enough is
-  -- drawn for the game's last screenshot)
-  unpacedFrame = (unpacedFrame or 0) + 1
-  local graphicsActive = love.graphics and love.graphics.isActive() and unpacedFrame % (CustomRun.unpaced and CustomRun.UNPACED_DRAW or CustomRun.DRAW_EVERY) == 0
+  local graphicsActive = love.graphics and love.graphics.isActive()
   if graphicsActive then
     love.graphics.origin()
     love.graphics.clear(love.graphics.getBackgroundColor())

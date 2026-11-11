@@ -30,6 +30,7 @@ local bot = BotClient({
   ip = ip, port = port, name = name, cursorSpeed = cursorSpeed,
   brain = brain,
   level = tonumber(os.getenv("PA_LEVEL")),   -- (the modern level it plays; BotClient's default when unset)
+  followUp = os.getenv("PA_LEVEL") == nil,   -- (a fight sets each side's level, so only a lobby bot with no level set follows a player up to 11)
   searchProfile = (brain == "search" or brain == "weighted") and os.getenv("PA_SEARCH_PROFILE") or nil,
 })
 

@@ -1876,9 +1876,8 @@ function projectPlan(G, seq, cursor) {
     const D = R.D, row = R.row || {}, clock = D.frames[R.idx][0], i = decAt(clock), d = i >= 0 ? D.dec[i] : null, W = 180;
     const near = (f) => Math.abs(f - clock) <= W;
     const L = [];
-    URLSTATE.flush();
     L.push('Ranmaru decision to review');
-    L.push('Link (opens this exact moment): ' + location.href);
+    L.push('Link (opens this exact moment): ' + URLSTATE.link());
     L.push('Replay data (gzipped JSON, the whole game): ' + new URL('data/replay_' + R.rid + '.json.gz', location.href.split('#')[0]).href);
     L.push('Game: ' + R.rid + ' · ' + (VLBL ? VLBL(D.sha) : '') + (VSTART && VSTART(D.sha) ? ' (deployed ' + VSTART(D.sha) + ')' : '') + ' · ' + (row.res === 'W' ? 'won' : 'lost') + ' vs ' + D.opp + ' · ' + (row.at || row.date || '') + ' · ' + dur(row.secs) + ' · bot ' + D.bot);
     L.push('At: frame ' + clock + ' (' + fmtClock(clock) + ' of ' + fmtClock(D.end) + ')');
@@ -2161,20 +2160,22 @@ function projectPlan(G, seq, cursor) {
   const URLSTATE = (() => {
     const enc = encodeURIComponent, U = { pending: null, reset: false };
     const sortStr = (x) => x.key + ':' + x.dir;
-    function state() {
+    function state(share) {
       const o = {}, P = dash.params(), add = (k, v, def) => { if (v !== undefined && v !== null && String(v) !== String(def === undefined ? '' : def)) o[k] = String(v); };
       add('ver', P.ver); add('opp', P.opp); add('min', P.minn ?? 10, 10);
       add('oq', $('s-opp').value.trim()); add('om', oppMin, 0); add('os', sortStr(sortState.opp), 'n:-1'); if (expanded.opp) o.oall = '1';
       add('vq', $('s-ver').value.trim()); add('vs', sortStr(sortState.ver), 'order:-1'); if (expanded.ver) o.vall = '1';
       add('lq', $('s-loss').value.trim()); add('lk', lossKind); add('ls', sortStr(sortState.loss), 'idx:-1'); if (expanded.loss) o.lall = '1';
       add('res', WL.res); add('when', WL.when); if (WL.when === 'range') { add('from', WL.from); add('to', WL.to); } add('len', WL.len); add('sort', WL.sort, 'new');
-      if (R.rid) { o.game = R.rid; if (R.D && R.D.frames && R.D.frames[R.idx]) o.frame = String(R.D.frames[R.idx][0]); add('part', R.part, 'end'); }
+      if (share && R.rid) { o.game = R.rid; if (R.D && R.D.frames && R.D.frames[R.idx]) o.frame = String(R.D.frames[R.idx][0]); add('part', R.part, 'end'); }
       if (!PLAN.on) o.plan = '0';
       add('lm', LIST.mode, 'chg'); add('speed', R.speed, 1);
       return o;
     }
     const hashOf = (o) => { const k = Object.keys(o); return k.length ? '#' + k.map((x) => x + '=' + enc(o[x])).join('&') : ''; };
-    U.flush = () => { const h = hashOf(state()); if (h !== (location.hash || '')) { try { history.replaceState(null, '', h || (location.pathname + location.search)); } catch (e) {} } };
+    U.flush = () => { const h = hashOf(state(false)); if (h !== (location.hash || '')) { try { history.replaceState(null, '', h || (location.pathname + location.search)); } catch (e) {} } };
+    // the link to share: the filters and the open game (and moment), for someone else to open
+    U.link = () => location.origin + location.pathname + location.search + hashOf(state(true));
     U.apply = (hash, init) => {
       const p = {};
       (hash || '').replace(/^#/, '').split('&').forEach((kv) => { const i = kv.indexOf('='); if (i > 0) { try { p[kv.slice(0, i)] = decodeURIComponent(kv.slice(i + 1)); } catch (e) {} } });
@@ -2200,7 +2201,7 @@ function projectPlan(G, seq, cursor) {
     setInterval(() => { if (!R.playing) U.flush(); }, 700);
     document.addEventListener('visibilitychange', () => { if (document.hidden) U.flush(); });
     window.addEventListener('hashchange', () => U.apply(location.hash, false));
-    $('copy-link').addEventListener('click', async () => { U.flush(); const ok = await copyText(location.href), b = $('copy-link'), t0 = 'Copy link to this view'; b.textContent = ok ? 'Link copied' : 'Could not copy'; setTimeout(() => { b.textContent = t0; }, 2200); });
+    $('copy-link').addEventListener('click', async () => { const ok = await copyText(U.link()), b = $('copy-link'), t0 = 'Copy link to this view'; b.textContent = ok ? 'Link copied' : 'Could not copy'; setTimeout(() => { b.textContent = t0; }, 2200); });
     return U;
   })();
   URLSTATE.apply(location.hash, true);

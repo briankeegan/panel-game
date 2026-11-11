@@ -493,6 +493,11 @@
   .gw-cap .goalline .gl-t::after, .gw-cap .why1::after, .gw-note2[title]::after { content: ' ⓘ'; color: var(--color-fg-muted); font-weight: 400; }
   .gw-cap .goalline, .gw-cap .why1, .gw-cap .budget { cursor: pointer; }
 }
+.pod{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}
+.pod li{display:flex;flex-direction:column;gap:2px;padding:12px 14px;border-radius:10px;border:2px solid;background:var(--color-panel);min-width:0}
+.pod li b{font-size:1.05em;overflow-wrap:anywhere}
+.pod li span{font-size:.9em;opacity:.8}
+.pod-gold{border-color:#d4af37}.pod-silver{border-color:#b8bcc4}.pod-bronze{border-color:#cd7f32}
 </style>
 
 <div class="gs" id="gs">
@@ -530,6 +535,8 @@
   </section>
 
   <nav class="gs-nav" aria-label="Sections"><a href="#sec-form">Recent</a><a href="#sec-watch">Watch a game</a><a href="#sec-garbage">Garbage sent</a><a href="#sec-opp">Opponents</a><a href="#sec-table">Versions</a><a href="#sec-len">Game length</a><button type="button" class="gs-link" id="copy-link" title="Copy a link that opens this exact view">Copy link to this view</button></nav>
+
+  <section class="gs-card pod-card" id="sec-podium"><h2>Who beats Ranmaru most</h2><ol class="pod" id="pod"></ol><p class="gs-note" id="pod-last"></p></section>
 
   
 
@@ -915,6 +922,22 @@
     $('c-ver').textContent = (qv ? vsShown.length + ' of ' : '') + vs.length + (vs.length === 1 ? ' version' : ' versions');
     table($('t-ver'), 'ver', vcols, vsShown, (r) => r.sha === ver, (r) => toggle('ver', r.sha));
 
+    {
+      const byOpp = d3.group(games, (g) => g.opp);
+      const ranked = Array.from(byOpp, ([o, a]) => { const n = a.length, w = a.filter((g) => g.res === 'W').length; return { opp: o, n, w, rate: n ? w / n : 0 }; })
+        .sort((a, b) => a.rate - b.rate || b.n - a.n || a.opp.localeCompare(b.opp)).slice(0, 3);
+      const pod = $('pod'); pod.replaceChildren();
+      ['Gold', 'Silver', 'Bronze'].forEach((m, i) => {
+        const r = ranked[i]; if (!r) return;
+        const li = document.createElement('li'); li.className = 'pod-' + m.toLowerCase();
+        const lab = document.createElement('span'); lab.textContent = m;
+        const nm = document.createElement('b'); nm.textContent = r.opp;
+        const det = document.createElement('span'); det.textContent = 'Ranmaru won ' + Math.round(r.rate * 100) + '% (' + r.w + ' of ' + r.n + ')';
+        li.append(lab, nm, det); pod.appendChild(li);
+      });
+      const lastLoss = d3.greatest(games.filter((g) => g.res === 'L'), (g) => g.date);
+      $('pod-last').textContent = lastLoss ? 'Last kill: ' + lastLoss.opp + ' on ' + d3.utcFormat('%b %-d, %Y')(new Date(lastLoss.date)) : 'No kills yet.';
+    }
     // opponents table (version filter applied)
     const os = Array.from(d3.group(byVer, (g) => g.opp), ([o, a]) => Object.assign({ opp: o, last: d3.max(a, (g) => g.date) }, stat(a)));
     const qo = $('s-opp').value.trim().toLowerCase();

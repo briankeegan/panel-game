@@ -933,7 +933,9 @@
         const lab = document.createElement('span'); lab.textContent = m;
         const nm = document.createElement('b'); nm.textContent = r.opp;
         const det = document.createElement('span'); det.textContent = 'Ranmaru won ' + Math.round(r.rate * 100) + '% (' + r.w + ' of ' + r.n + ')';
-        li.append(lab, nm, det); pod.appendChild(li);
+        const theirKill = d3.greatest(byOpp.get(r.opp).filter((g) => g.res === 'L'), (g) => g.date);
+        const kl = document.createElement('span'); kl.textContent = theirKill ? 'Last kill: ' + d3.utcFormat('%b %-d, %Y')(new Date(theirKill.date)) : 'No kills yet';
+        li.append(lab, nm, det, kl); pod.appendChild(li);
       });
       const lastLoss = d3.greatest(games.filter((g) => g.res === 'L'), (g) => g.date);
       $('pod-last').textContent = lastLoss ? 'Last kill: ' + lastLoss.opp + ' on ' + d3.utcFormat('%b %-d, %Y')(new Date(lastLoss.date)) : 'No kills yet.';

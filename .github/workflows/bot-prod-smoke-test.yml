@@ -1161,7 +1161,7 @@ jobs:
           # the page is built from dashboard/page.html alone (index.html), so only index.html is fetched from gh-pages: no game data
           rm -rf site
           git clone -q --depth 1 --single-branch --branch gh-pages --sparse --filter=blob:none "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" site
-          git -C site sparse-checkout set index.html .nojekyll
+          git -C site sparse-checkout set --no-cone /index.html /.nojekyll
           python3 dashboard/make_site.py site >/dev/null
           git -C site add index.html
           if git -C site diff --cached --quiet; then echo "the page did not change"; exit 0; fi

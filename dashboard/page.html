@@ -456,6 +456,8 @@
 .gw-cap .planprog i.next { background: #ffd166; }
 .gw-cap .planprog i + i:last-of-type { margin-right: 4px; }
 .gs-latest td { white-space: nowrap !important; vertical-align: middle; }
+.gw-plain { display: grid; gap: 4px; margin: 8px 0; font-size: 14px; }
+.gw-plainr b { display: inline-block; min-width: 92px; color: var(--color-fg-muted); font-weight: 600; }
 .gs-latest-box { max-height: 460px; overflow-y: auto; }
 .gs-latest thead th { position: sticky; top: 0; background: var(--color-panel); z-index: 1; }
 .gs-latest .lt { font-size: 11.5px; color: var(--color-fg-muted); }
@@ -604,6 +606,7 @@
         <div class="gw-lh"><b>Ranmaru's choices</b><div class="gs-seg sm" role="group" aria-label="Which decisions" id="gw-lmode"><button type="button" data-m="chg" aria-pressed="true">Plan changes</button><button type="button" data-m="all" aria-pressed="false">Every decision</button></div></div>
         <div class="gw-list" id="gw-list" role="list"></div>
         </div>
+        <div class="gw-plain" id="gw-plain" hidden></div>
         <details class="gw-stops" id="gw-opts" hidden><summary id="gw-opts-s">All the options it weighed</summary><div class="gw-optsb" id="gw-optsb"></div></details>
         <details class="gw-stops" id="gw-stops" hidden><summary id="gw-stops-s">Stops</summary><div class="gw-stl" id="gw-stl"></div></details>
       </div></div>
@@ -1779,6 +1782,23 @@ function projectPlan(G, seq, cursor) {
     return t;
   }
   let OPTS_KEY = null;
+  // the decision in plain words: what it does, what it is for, what happens to the board and the garbage, and why
+  function renderPlain(d) {
+    const el = g$('plain'); if (!d) { el.hidden = true; return; }
+    const play = String(d[2] || '').replace(/_/g, ' '), want = d[3], chain = Number(d[7]) || 0, combo = Number(d[8]) || 0;
+    const broke = Number(kvOf(d[17] || '', 'broke')) || 0, sent = Number(d[6]) || 0, why = String(kvOf(d[17] || '', 'why') || '').replace(/_/g, ' ');
+    const lines = [];
+    const pw = playWhy(play); lines.push(['Doing', pw ? pw[0] : nice(play) || play]);
+    const goal = []; if (combo > 0) goal.push('a combo of ' + combo); if (chain > 0) goal.push('a chain of ' + chain);
+    if (goal.length) lines.push(['Aiming for', goal.join(' and ') + (want && want !== '-' ? ' at cell ' + want : '')]);
+    else if (want && want !== '-') lines.push(['Aiming for', 'cell ' + want]);
+    lines.push(['Board', d[4] === 'lives' ? 'stays alive' : 'is lost either way']);
+    if (broke > 0 || sent > 0) lines.push(['Garbage', (broke > 0 ? 'breaks ' + broke + ' cell' + (broke === 1 ? '' : 's') : 'breaks none') + (sent > 0 ? ', sends ' + sent : '')]);
+    if (why) lines.push(['Why', why]);
+    el.replaceChildren();
+    lines.forEach(([k, v]) => { const r = document.createElement('div'); r.className = 'gw-plainr'; const kb = document.createElement('b'); kb.textContent = k; const vs = document.createElement('span'); vs.textContent = v; r.append(kb, vs); el.appendChild(r); });
+    el.hidden = false;
+  }
   function renderOpts(d) {
     const box = g$('optsb'), det = g$('opts'), raw = d && d[17] || '';
     const list = (d && d[14] || '').split(',').map((q) => q.split(':')).filter((q) => q[0]);
@@ -1950,7 +1970,7 @@ function projectPlan(G, seq, cursor) {
     if (PLAN.on && e) { const st = PLAN.status(i), sc = document.createElement('span'); sc.className = 'chip ' + st.kind; const m2 = /swap (\d+) of (\d+)/.exec(st.text);
       sc.textContent = st.kind === 'new' ? 'New plan · ' + seq.length + (seq.length === 1 ? ' swap' : ' swaps') : st.kind === 'same' ? (m2 ? (Number(m2[2]) - Number(m2[1]) + 1) + (Number(m2[2]) - Number(m2[1]) === 0 ? ' swap left' : ' swaps left') : 'Same plan') : (play === 'raise' ? 'Raising' : 'Waiting'); l1.appendChild(sc); }
     { const cp = PLAN.on ? PLAN.current(clock) : null; if (cp && cp.total) { let c2 = l1.querySelector('.chip.new, .chip.same, .chip.wait'); if (!c2) { c2 = document.createElement('span'); l1.appendChild(c2); } c2.className = 'chip ' + (cp.left ? (cp.done ? 'same' : 'new') : 'wait'); c2.textContent = cp.left ? cp.left + ' of ' + cp.total + (cp.total === 1 ? ' swap left' : ' swaps left') : 'Plan done'; } }
-    renderOpts(d);
+    renderOpts(d); renderPlain(d);
     const dn = document.createElement('span'); dn.className = 'do'; dn.textContent = doing;
     if (!PLAN.on) { cap.appendChild(dn); return; }
     const logged = []; if (seq.length && Number(combo) > 0) logged.push('combo of ' + combo); if (seq.length && Number(chain) > 0) logged.push('chain of ' + chain);

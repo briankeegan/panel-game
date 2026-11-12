@@ -937,9 +937,11 @@
       // one player = one account (pid, from the bot log when the game has it); older games have no pid and group by name.
       // the name shown is the one this account used most.
       // a name that has an id in any game takes that id, so its older games (no id) join the same player
-      const idOfName = new Map(); d3.rollup(games.filter((g) => g.pid), (v) => d3.rollup(v, (x) => x.length, (x) => x.pid), (g) => g.opp)
+      // only games where both players were level 10 (lv = [bot level, opponent level], from the replay)
+      const lvGames = games.filter((g) => Array.isArray(g.lv) && g.lv[0] === 10 && g.lv[1] === 10);
+      const idOfName = new Map(); d3.rollup(lvGames.filter((g) => g.pid), (v) => d3.rollup(v, (x) => x.length, (x) => x.pid), (g) => g.opp)
         .forEach((ids, name) => { const best = Array.from(ids).sort((a, b) => b[1] - a[1])[0]; idOfName.set(name, best[0]); });
-      const byOpp = d3.group(games, (g) => g.pid || idOfName.get(g.opp) || g.opp);
+      const byOpp = d3.group(lvGames, (g) => g.pid || idOfName.get(g.opp) || g.opp);
       const ranked = Array.from(byOpp, ([, a]) => { const n = a.length, w = a.filter((g) => g.res === 'W').length, beat = n - w; const names = d3.rollup(a, (v) => v.length, (g) => g.opp); const opp = Array.from(names).sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0]))[0][0]; return { opp, n, beat, share: n ? beat / n : 0 }; })
         .sort((a, b) => b.share - a.share || b.n - a.n || a.opp.localeCompare(b.opp)).slice(0, 3);
       const pod = $('pod'); pod.replaceChildren();
@@ -954,7 +956,7 @@
         li.append(lab, info, pct); pod.appendChild(li);
       });
       const lk = $('pod-last'); lk.replaceChildren();
-      const lastLoss = d3.greatest(games.filter((g) => g.res === 'L'), (g) => g.at || g.date);   // full time when a game has one, so two losses on the same day sort correctly
+      const lastLoss = d3.greatest(lvGames.filter((g) => g.res === 'L'), (g) => g.at || g.date);   // full time when a game has one, so two losses on the same day sort correctly
       if (lastLoss) {
         const info = document.createElement('span'); info.style.minWidth = '0';
         const who = document.createElement('b'); who.className = 'pod-kn'; who.textContent = lastLoss.opp;

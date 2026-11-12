@@ -161,7 +161,7 @@ for gi, g in enumerate(games):
     if g["rep"]:
         try: x = json.loads(g["rep"]); n = len(x["inputs"][x["mine"] - 1])
         except Exception: x = None
-    row = dict(sha=sha, bot=bot, date=date, opp=g["opp"], res=g["r"], secs=round(n / 60) if n else None,
+    row = dict(sha=sha, bot=bot, date=date, opp=g["opp"], mode=g.get("mode"), res=g["r"], secs=round(n / 60) if n else None,
                top=min(100, round(100 * g["top"] / n)) if n else None, land=g["land"], at=times[gi], run=a.run_id)
     if x and n and (not a.partial or a.engine):         # (a run still going makes its replays too, on the engine the bot plays on)
         nrep += 1; rid = "r%d" % nrep

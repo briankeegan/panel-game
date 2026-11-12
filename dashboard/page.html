@@ -954,7 +954,7 @@
         li.append(lab, info, pct); pod.appendChild(li);
       });
       const lk = $('pod-last'); lk.replaceChildren();
-      const lastLoss = d3.greatest(games.filter((g) => g.res === 'L'), (g) => g.date);
+      const lastLoss = d3.greatest(games.filter((g) => g.res === 'L'), (g) => g.at || g.date);   // full time when a game has one, so two losses on the same day sort correctly
       if (lastLoss) {
         const info = document.createElement('span'); info.style.minWidth = '0';
         const who = document.createElement('b'); who.className = 'pod-kn'; who.textContent = lastLoss.opp;

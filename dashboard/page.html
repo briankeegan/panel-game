@@ -456,6 +456,8 @@
 .gw-cap .planprog i.next { background: #ffd166; }
 .gw-cap .planprog i + i:last-of-type { margin-right: 4px; }
 .gs-latest td { white-space: nowrap !important; vertical-align: middle; }
+.gs-latest-box { max-height: 460px; overflow-y: auto; }
+.gs-latest thead th { position: sticky; top: 0; background: var(--color-panel); z-index: 1; }
 .gs-latest .lt { font-size: 11.5px; color: var(--color-fg-muted); }
 .gs-latest .lw { color: var(--color-fg); }
 @media (max-width: 640px) { .gs-latest .gs-watch { padding: 6px 12px; font-size: 14px; } .gs-latest td, .gs-latest th { padding-inline: 5px !important; } }
@@ -884,11 +886,11 @@
     $('k-lg-n').textContent = longest ? (longest.res === 'W' ? 'won' : 'lost') + ' vs ' + longest.opp : '';
 
     // latest results: the newest games of the selection as a table; a row with a replay opens it
-    const recentAll = fg.slice().sort((a, b) => b.idx - a.idx), recent = recentAll.slice(0, recentMore ? 30 : 10);
+    const recentAll = fg.slice().sort((a, b) => b.idx - a.idx), recent = recentMore ? recentAll : recentAll.slice(0, 10);
     const fm = $('form'); fm.replaceChildren();
     if (recent.length) {
       const tbl = document.createElement('table'); tbl.className = 'gs-tbl gs-latest';
-      const hr = tbl.createTHead().insertRow(); [['When', ''], ['Result', ''], ['Opponent', ''], ['Length', 'n'], ['Version', 'hide-s'], ['', 'n']].forEach(([h, c]) => { const th = document.createElement('th'); th.textContent = h; th.className = c; th.style.padding = '8px 10px'; hr.appendChild(th); });
+      const hr = tbl.createTHead().insertRow(); [['When', ''], ['Result', ''], ['Opponent', ''], ['Levels', 'hide-s'], ['Length', 'n'], ['Garbage', 'n hide-s'], ['Version', 'hide-s'], ['', 'n']].forEach(([h, c]) => { const th = document.createElement('th'); th.textContent = h; th.className = c; th.style.padding = '8px 10px'; hr.appendChild(th); });
       const tb = tbl.createTBody();
       recent.forEach((g) => {
         const tr = tb.insertRow(), t = playedMs(g);
@@ -897,14 +899,16 @@
         if (g.at) { const d2 = document.createElement('div'); d2.className = 'lt'; d2.textContent = new Date(t).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }); wcell.appendChild(d2); }
         const rc = tr.insertCell(), pill = document.createElement('span'); pill.className = 'gw-res ' + (g.res === 'W' ? 'w' : 'l'); pill.textContent = g.res === 'W' ? 'Won' : 'Lost'; rc.appendChild(pill);
         const oc = tr.insertCell(); oc.textContent = g.opp; oc.style.fontWeight = '500';
+        const evc = tr.insertCell(); evc.className = 'hide-s'; evc.textContent = Array.isArray(g.lv) ? g.lv[0] + ' v ' + g.lv[1] : '—';
         const lc = tr.insertCell(); lc.className = 'n'; lc.textContent = dur(g.secs);
+        const gbc = tr.insertCell(); gbc.className = 'n hide-s'; gbc.textContent = g.land != null ? g.land : '—';
         const vc = tr.insertCell(); vc.className = 'hide-s'; vc.textContent = vLabel(g.sha); vc.style.color = 'var(--color-fg-muted)';
         const wc = tr.insertCell(); wc.className = 'n';
         if (g.replay) { const wb = document.createElement('button'); wb.type = 'button'; wb.className = 'gs-watch'; wb.append('▶'); { const x = document.createElement('span'); x.className = 'gw-t'; x.textContent = ' Watch'; wb.appendChild(x); } wb.setAttribute('aria-label', 'Watch the game against ' + g.opp); wb.addEventListener('click', (e) => { e.stopPropagation(); openReplay(g, true); }); wc.appendChild(wb); tr.style.cursor = 'pointer'; tr.addEventListener('click', () => openReplay(g, true)); }
         else { wc.textContent = 'no replay'; wc.style.color = 'var(--color-fg-muted)'; }
       });
-      const wrap = document.createElement('div'); wrap.className = 'gs-scroll'; wrap.appendChild(tbl); fm.appendChild(wrap);
-      if (recentAll.length > 10) { const m = document.createElement('button'); m.type = 'button'; m.className = 'gs-more'; m.textContent = recentMore ? 'Show fewer' : 'Show more'; m.addEventListener('click', () => { recentMore = !recentMore; render(); }); fm.appendChild(m); }
+      const wrap = document.createElement('div'); wrap.className = recentMore ? 'gs-scroll gs-latest-box' : 'gs-scroll'; wrap.appendChild(tbl); fm.appendChild(wrap);
+      if (recentAll.length > 10) { const m = document.createElement('button'); m.type = 'button'; m.className = 'gs-more'; m.textContent = recentMore ? 'Show fewer' : 'Show all (' + recentAll.length + ')'; m.addEventListener('click', () => { recentMore = !recentMore; render(); }); fm.appendChild(m); }
     }
     const rl = recent.filter((g) => g.res === 'L').length;
     $('form-note').textContent = recent.length ? 'Newest first. Click a game to watch it.' : 'No games in this selection.';

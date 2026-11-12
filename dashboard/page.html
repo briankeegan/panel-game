@@ -2217,7 +2217,7 @@ function projectPlan(G, seq, cursor) {
     const sec = new URLSearchParams(location.hash.replace(/^#/, '')).get('sec');
     if (sec && document.getElementById(sec)) setTimeout(() => document.getElementById(sec).scrollIntoView({ block: 'start' }), 500);
   }
-  document.querySelectorAll('.gs-card[id]').forEach((el) => {
+  document.querySelectorAll('.gs-card[id]:not(#sec-podium):not(#sec-last)').forEach((el) => {
     const b = document.createElement('button');
     b.type = 'button'; b.className = 'gs-copy'; b.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" d="M10 13a5 5 0 0 0 7.07 0l2.83-2.83a5 5 0 0 0-7.07-7.07L11 5"/><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" d="M14 11a5 5 0 0 0-7.07 0L4.1 13.83a5 5 0 0 0 7.07 7.07L13 19"/></svg>'; b.title = 'Copy a link to this section'; b.setAttribute('aria-label', 'Copy a link to this section');
     b.addEventListener('click', async (e) => {

@@ -84,17 +84,19 @@ def fld(l, k):
     m = re.search(r" %s=(\S+)" % k, l); return m.group(1) if m else ""
 
 # --- the games of this run, in order
-games, cur, opp, rep, notes = [], [], "?", None, []
+games, cur, opp, rep, notes, mode = [], [], "?", None, [], None
 for line in open(log, errors="ignore"):
     if line.startswith("REPLAY "): rep = line[7:]
     nt = GL.note(line)
     if nt: notes.append(nt)
     m = re.match(r"match against: (.*)", line)
     if m: opp = m.group(1).strip()
+    mm = re.match(r"match mode: (.*)", line)
+    if mm: mode = mm.group(1).strip()
     cur.append(line)
     if "match over —" in line:
         r = "W" if "bot won" in line else "L" if "bot lost" in line else "A"
-        games.append(dict(r=r, opp=opp, rep=rep, top=sum(1 for l in cur if l.startswith("opponent topped out")) * 30, land=sum(1 for l in cur if l.startswith("garbage landed")), fl=notes))
+        games.append(dict(r=r, opp=opp, mode=mode, rep=rep, top=sum(1 for l in cur if l.startswith("opponent topped out")) * 30, land=sum(1 for l in cur if l.startswith("garbage landed")), fl=notes))
         cur, rep, notes = [], None, []
 for i_, g_ in enumerate(games): g_["raw"] = i_      # its place among all the games of the run: the decision log has one block per game, in the same order
 n_raw = len(games)

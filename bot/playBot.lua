@@ -142,6 +142,9 @@ while true do
       bot:startMatch()
       nextFrame = bot.scheduledStartMs / 1000 -- first frame at the aligned start
       print("both ready — match starting")
+      -- the game mode the server put this room in, so the stats can tell time attack from versus
+      local gm = bot.gameMode or {}
+      print("match mode: " .. tostring(gm.id or gm.name or "unknown"))
     end
 
     if bot.match and not bot.matchEnded and nextFrame then

@@ -346,11 +346,12 @@ function BotClient:dispatch(msg)
       -- og: its outgoing garbage as its client shows it (the telegraph a player sees at the top), and the stopWatch this stack saw the
       -- board on -- the forecast of a wired opponent's garbage (GameCreator's GambitNative viewTelegraph)
       -- top4: the row four of its six columns reach -- most of the board, not its one tall column (GameCreator's GambitNative reads it
-      -- as the enemy's height)
+      -- as the enemy's height). A column's height is the cells it holds, as if the board had settled: a slab resting on one tall column
+      -- over empty ones is not the others' height
       local hs = {}
       for col = 1, width do
         local h = 0
-        for row = height, 1, -1 do if counts(cache[row * width + col]) then h = row break end end
+        for row = 1, height do if counts(cache[row * width + col]) then h = h + 1 end end
         hs[#hs + 1] = h
       end
       table.sort(hs, function(a, b) return a > b end)

@@ -172,7 +172,7 @@
   .gw-ctl .gw-t { display: none; }
   #gw-prevd { grid-area: 1 / 1 / 2 / 2; } #gw-prevf { grid-area: 1 / 2 / 2 / 3; } #gw-play { grid-area: 1 / 3 / 2 / 5; font-size: 16px; }
   #gw-nextf { grid-area: 1 / 5 / 2 / 6; } #gw-nextd { grid-area: 1 / 6 / 2 / 7; }
-  #gw-back10 { grid-area: 2 / 1 / 3 / 2; font-size: 12px !important; }
+  #gw-back10 { grid-area: 2 / 1 / 3 / 2; font-size: 12px !important; white-space: nowrap; }
   #gw-speed { grid-area: 2 / 2 / 3 / 7; display: grid; grid-template-columns: repeat(4, 1fr); }
   #gw-speed button { min-height: 40px; font-size: 14px; }
   .gw-time { display: none; }
@@ -492,7 +492,7 @@
 .gw-cap .whyline.expl { color: var(--color-fg-muted); font-size: 12.5px; }
 .gw-cap { height: 11em; }
 @media (min-width: 980px) and (min-height: 600px) { .gw-cap { height: 10em; } }
-@media (max-width: 760px) { .gw-cap { height: 9.6em; } }
+@media (max-width: 760px) { .gw-cap { height: 7.4em; } }
 .gw-cap .whyline.why1 { color: var(--color-fg); font-size: 12.5px; }
 .gs-pop { position: fixed; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); z-index: 60; max-height: 40vh; overflow-y: auto; padding: 12px 14px; border-radius: 12px; background: var(--color-panel); color: var(--color-fg); border: 1px solid var(--color-fg-muted); box-shadow: 0 10px 30px rgba(0,0,0,.35); font-size: 14px; line-height: 1.4; font-family: var(--font-sans, system-ui, sans-serif); }
 @media (hover: none) {
@@ -1779,7 +1779,7 @@ function projectPlan(G, seq, cursor) {
     const lv = /^(\d+)\/(\d+)$/.exec(kvOf(raw, 'live')), a = lv ? Number(lv[1]) : null, b = lv ? Number(lv[2]) : null;
     let t;
     if (me.v === Infinity) t = a == null ? 'Keeps the board alive' : a === 1 ? 'The only one of ' + b + ' options that keeps the board alive' : 'Keeps the board alive (' + a + ' of ' + b + ' options do)';
-    else t = a == null ? 'Board lost in ' + fs1(me.v) : a === 0 ? lastsLongest(list, me, b, d) : a + ' of ' + b + ' options keep the board alive, but its priority list picked this one (lost in ' + fs1(me.v) + ')';
+    else t = a == null ? 'Board lost in ' + fs1(me.v) : a === 0 ? '' : a + ' of ' + b + ' options keep the board alive, but its priority list picked this one (lost in ' + fs1(me.v) + ')';
     const br = Number(kvOf(raw, 'broke')); if (br > 0) t += ' · breaks ' + br;
     return t;
   }
@@ -1896,7 +1896,7 @@ function projectPlan(G, seq, cursor) {
     const add = (cls, txt, tip) => { const e = document.createElement('div'); e.className = cls; e.textContent = txt; if (tip) e.title = tip; box.appendChild(e); };
     if (d) whyLines(d, clock).forEach(([c, t, , tip]) => add(c, t, tip));
     if (d) { const mine = (D.sw || []).filter((s) => s[9] === d[0] && s[0] <= clock); if (mine.length) add('sw', 'Its swaps so far: ' + mine.map((s) => s[1] + ',' + s[2] + ' ' + (OUTCOME[s[4]] || s[4])).join(' · ')); }
-    if (k >= 0) { const s = D.sw[k]; add('sw', 'Last swap, at ' + fmtClock(s[0]) + ': ' + swapTxt(s).replace(/ · decided at .*$/, '') + (s[9] != null && s[9] >= 0 && (!d || s[9] !== d[0]) ? ' · decided at ' + fmtClock(s[9]) : '') + (s[8] >= 2 && s[5] === s[6] ? ' · its line ended: ' + endedTxt(s[8]) : '')); }
+    if (k >= 0) { const s = D.sw[k]; add('sw', 'Last swap, at ' + fmtClock(s[0]) + ': ' + swapTxt(s).replace(/ · decided at .*$/, '') + (s[9] != null && s[9] >= 0 && (!d || s[9] !== d[0]) ? ' · decided at ' + fmtClock(s[9]) : '') + (s[8] >= 2 && s[5] === s[6] ? ' · line over: ' + endedTxt(s[8]) : '')); }
     if (!box.firstChild) { const e = document.createElement('div'); e.className = 'none'; e.textContent = d ? 'Nothing more was logged for this decision.' : 'No decision yet.'; box.appendChild(e); }
   }
   // every stop of the game, in order: a line put down or dropped, keys abandoned

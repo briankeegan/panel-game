@@ -1815,8 +1815,7 @@ function projectPlan(G, seq, cursor) {
     const lineTxt = play === 'hold' ? holdTxt : carrying ? (fromM ? 'continuing the ' + fromM[2].replace(/_/g, ' ') + ' begun at frame ' + fromM[1] : 'finishing a line it already began') : ruleTxt;
     if (lineTxt) lines.push(['Line', lineTxt]);
     const goal = []; if (combo > 0) goal.push('a combo of ' + combo); if (chain > 0) goal.push('a chain of ' + chain);
-    if (goal.length) lines.push(['Aiming for', goal.join(' and ') + (want && want !== '-' ? ' at cell ' + want : '')]);
-    else if (want && want !== '-' && want !== 'hold') lines.push(['Aiming for', 'cell ' + want]);
+    if (goal.length) lines.push(['Aiming for', goal.join(' and ')]);
     lines.push(['Board', d[4] === 'lives' ? 'stays alive' : 'is lost either way']);
     if (broke > 0 || sent > 0) lines.push(['Garbage', (broke > 0 ? 'breaks ' + broke + ' cell' + (broke === 1 ? '' : 's') : 'breaks none') + (sent > 0 ? ', sends ' + sent : '')]);
     if (why) lines.push(['Why', why]);

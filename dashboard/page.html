@@ -1779,7 +1779,7 @@ function projectPlan(G, seq, cursor) {
     const lv = /^(\d+)\/(\d+)$/.exec(kvOf(raw, 'live')), a = lv ? Number(lv[1]) : null, b = lv ? Number(lv[2]) : null;
     let t;
     if (me.v === Infinity) t = a == null ? 'Keeps the board alive' : a === 1 ? 'The only one of ' + b + ' options that keeps the board alive' : 'Keeps the board alive (' + a + ' of ' + b + ' options do)';
-    else t = a == null ? 'Tops out in ' + fs1(me.v) + ' if left alone' : a === 0 ? '' : a + ' of ' + b + ' options keep the board alive, but its priority list picked this one (lost in ' + fs1(me.v) + ')';
+    else t = a == null ? 'Tops out in ' + fs1(me.v) + ' if left alone' : a === 0 ? '' : a + ' of ' + b + ' options keep the board alive, but its priority list picked this one (tops out in ' + fs1(me.v) + ' if left alone)';
     const br = Number(kvOf(raw, 'broke')); if (br > 0) t += ' · breaks ' + br;
     return t;
   }
@@ -1831,7 +1831,7 @@ function projectPlan(G, seq, cursor) {
     if (!list.length) { det.hidden = true; OPTS_KEY = null; return; }
     det.hidden = false; const key = R.rid + ':' + d[0]; if (key === OPTS_KEY) return; OPTS_KEY = key;
     box.replaceChildren();
-    const lt = (lo) => (lo === 'L' || lo === 'inf') ? 'board never lost' : (numOk(lo) ? 'board lost in ' + fs1(lo) : '');
+    const lt = (lo) => (lo === 'L' || lo === 'inf') ? 'board never lost' : (numOk(lo) ? 'tops out in ' + fs1(lo) + ' if left alone' : '');
     const total = (/^\d+\/(\d+)$/.exec(kvOf(raw, 'live')) || [])[1];
     const kinds = (kvOf(raw, 'cands') || '').split(',').map((c) => /^(.+?):(\d+)/.exec(c)).filter(Boolean).map((m) => m[2] + ' ' + kName(m[1]));
     const pick = String((d[2] || 'hold')).replace(/_/g, ' '), seen = {};
@@ -2042,7 +2042,7 @@ function projectPlan(G, seq, cursor) {
     {
       // the rule that picked this move, and the options it passed on, straight from the log
       const RULE = { e: 'first on its list', t: 'the three that breaks garbage', l: 'last resort' };
-      const lostTxt = (lo) => (lo === 'L' || lo === 'inf') ? 'board never lost' : (numOk(lo) ? 'board lost in ' + fs1(lo) : '');
+      const lostTxt = (lo) => (lo === 'L' || lo === 'inf') ? 'board never lost' : (numOk(lo) ? 'tops out in ' + fs1(lo) + ' if left alone' : '');
       const opts = (d[14] || '').split(',').map((q) => q.split(':')).filter((q) => q[0]).map((q) => ({ nm: q[0].replace(/[*~]/g, '').replace(/_/g, ' '), lost: q[1] }));
       const mine0 = opts.find((o) => o.nm === (play || '').replace(/_/g, ' ')), seen = new Set([(play || '').replace(/_/g, ' ')]), others = [];
       opts.forEach((o) => { if (!seen.has(o.nm) && lostTxt(o.lost)) { seen.add(o.nm); others.push(o); } });
@@ -2066,7 +2066,7 @@ function projectPlan(G, seq, cursor) {
   function buildList() {
     const D = R.D, box = g$('list'), L = D.plans; box.replaceChildren(); LIST.rows = [];
     if (!L || !D.dec.length) { box.textContent = 'No decisions were logged for this game.'; return; }
-    const nm = (q) => (q || 'hold').replace(/_/g, ' '), pn = (q) => kName(nm(q)), lostTxt = (lo) => (lo === 'L' || lo === 'inf') ? 'board never lost' : (numOk(lo) ? 'board lost in ' + fs1(lo) : '');
+    const nm = (q) => (q || 'hold').replace(/_/g, ' '), pn = (q) => kName(nm(q)), lostTxt = (lo) => (lo === 'L' || lo === 'inf') ? 'board never lost' : (numOk(lo) ? 'tops out in ' + fs1(lo) + ' if left alone' : '');
     const frag = document.createDocumentFragment();
     for (let i = 0; i < D.dec.length; i++) {
       const d = D.dec[i], e = L[i]; if (!e) continue;

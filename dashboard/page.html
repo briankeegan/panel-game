@@ -1779,7 +1779,7 @@ function projectPlan(G, seq, cursor) {
     const lv = /^(\d+)\/(\d+)$/.exec(kvOf(raw, 'live')), a = lv ? Number(lv[1]) : null, b = lv ? Number(lv[2]) : null;
     let t;
     if (me.v === Infinity) t = a == null ? 'Keeps the board alive' : a === 1 ? 'The only one of ' + b + ' options that keeps the board alive' : 'Keeps the board alive (' + a + ' of ' + b + ' options do)';
-    else t = a == null ? 'Board lost in ' + fs1(me.v) : a === 0 ? '' : a + ' of ' + b + ' options keep the board alive, but its priority list picked this one (lost in ' + fs1(me.v) + ')';
+    else t = a == null ? 'Tops out in ' + fs1(me.v) + ' if left alone' : a === 0 ? '' : a + ' of ' + b + ' options keep the board alive, but its priority list picked this one (lost in ' + fs1(me.v) + ')';
     const br = Number(kvOf(raw, 'broke')); if (br > 0) t += ' · breaks ' + br;
     return t;
   }
@@ -1894,7 +1894,7 @@ function projectPlan(G, seq, cursor) {
     const rf = /^([or-]):(-?\d+):(-?\d+):([01])$/.exec(kvOf(raw, 'raiseFor')); if (rf) out.push(['raise', 'Raise asked' + (rf[1] === 'o' ? ' (the opening raise)' : rf[1] === 'r' ? ' (the floor\'s refill)' : '') + ': to ' + rf[2] + ' rows, ' + rf[3] + ' short; ' + (rf[4] === '1' ? 'it could raise now' : 'a cascade held it')]);
     const pd = /^(.+?):k(\d+)$/.exec(kvOf(raw, 'putDown')); if (pd) out.push(['stop', 'Stopped the line in progress for "' + kName(pd[1]) + '": ' + ruleTxt(pd[2]), 'Put down', ruleFull(pd[2]), 'for "' + kName(pd[1]) + '": ' + ruleTxt(pd[2])]);
     const cd = kvOf(raw, 'carryDrop'); if (cd) { const code = Number(cd.split(':')[0]), nats = /:n(\d+)/.exec(cd); out.push(['stop', 'Dropped the line in progress before ranking: ' + (CARRYDROP[code] || 'reason ' + code) + (code === 2 && nats ? ' (' + nats[1] + ' of its swaps still possible)' : ''), 'Dropped', '', (CARRYDROP[code] || 'reason ' + code) + (code === 2 && nats ? ' (' + nats[1] + ' of its swaps still possible)' : '') + ', before ranking']); }
-    const td = kvOf(raw, 'twoDropped'); if (td) out.push(['two', 'A 2x was dropped (' + td + (kvOf(raw, 'twoWhy') ? ', why ' + kvOf(raw, 'twoWhy') : '') + ')']);
+    const td = kvOf(raw, 'twoDropped'); if (td) out.push(['two', 'A 2x was dropped' + (td === '1' ? '' : ' (' + td + ')')]);
     const sa = /^(-?\d+)\/(\d+):(-?\d+)\/(-?\d+)(\/needed)?$/.exec(kvOf(raw, 'saveAsk')); if (sa) out.push(['save', 'Wasted-three save check: asked ' + sa[2] + ', not needed ' + sa[1] + (sa[5] ? ', a save was needed' : '')]);
     if (kvOf(raw, 'saveBlind')) out.push(['save', 'The wasted-three save check ran blind']);
     return out;

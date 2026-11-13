@@ -1967,7 +1967,7 @@ function projectPlan(G, seq, cursor) {
     // numbers sit under the board they describe
     // v is how the board ends up WITH the move it chose, not how it stands now: say so, and say what waiting would have cost (the log's hold option)
     const hold0 = (d[14] || '').split(',').map((q) => q.split(':')).find((q) => q[0].replace(/[*~]/g, '') === 'hold'), holdLost = hold0 && numOk(hold0[1]) ? Number(hold0[1]) : null;
-    const mine = '<div>' + (v === 'dies' && numOk(dies) ? '<span class="bad">Lost in ' + fs1(dies) + ' even with this move</span>' : '<span class="ok">Safe with this move</span>') + '</div>'
+    const mine = '<div>' + (v === 'dies' && numOk(dies) ? '<span class="bad">Tops out in ' + fs1(dies) + ' if left alone</span>' : '<span class="ok">Safe with this move</span>') + '</div>'
       + (v !== 'dies' && holdLost != null ? '<div><span class="bad">Lost in ' + fs1(holdLost) + ' if it waited</span></div>' : '')
       + '<div>' + (numOk(land) && Number(land) > 0 ? 'Garbage in ' + fs1(land) : 'No garbage coming') + '</div>';
     const theirs = '<div>Stack ' + (eTop || '?') + ' rows' + (eOut === '1' ? ' <span class="bad">· topped out</span>' : '') + '</div>'

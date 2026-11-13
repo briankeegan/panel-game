@@ -1798,7 +1798,8 @@ function projectPlan(G, seq, cursor) {
     const doing = aimTxt && play === 'setup' ? 'Setting up ' + aimTxt : aimTxt && play !== 'setup' ? (pw ? pw[0] : nice(play) || play) + ', toward ' + aimTxt
       : play === 'setup' ? (kind8 ? 'Setting up a combo of 8' : 'Setting up a better board, no combo or chain named') : (pw ? pw[0] : nice(play) || play);
     lines.push(['Doing', doing]);
-    const ruleTxt = { e: 'a line from its list of the best candidates', t: 'a line chosen to break garbage', l: 'a last-resort line: no other line was found', '-': 'no line' }[kvOf(raw0, 'rule')];
+    const ruleKey = kvOf(raw0, 'rule');
+    const ruleTxt = ruleKey === 'l' ? 'no line from its list or breaking garbage was available, so it makes ' + (combo >= 4 ? 'a combo of ' + combo : chain >= 2 ? 'a chain of ' + chain : 'clears panels the list does not ask for') + ', which the list does not ask for' : ({ e: 'a line from its list of the best candidates', t: 'a line chosen to break garbage', '-': 'no line' })[ruleKey];
     if (ruleTxt) lines.push(['Line', ruleTxt]);
     const goal = []; if (combo > 0) goal.push('a combo of ' + combo); if (chain > 0) goal.push('a chain of ' + chain);
     if (goal.length) lines.push(['Aiming for', goal.join(' and ') + (want && want !== '-' ? ' at cell ' + want : '')]);

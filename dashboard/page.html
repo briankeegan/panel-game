@@ -1812,7 +1812,9 @@ function projectPlan(G, seq, cursor) {
     // a carry continues a line begun earlier: name that line, not the class it was judged as when it began
     const fromM = /^(\d+):(.+)$/.exec(kvOf(raw0, 'from'));
     const carrying = /^carry/.test(play);
-    const lineTxt = play === 'hold' ? holdTxt : carrying ? (fromM ? 'continuing the ' + fromM[2].replace(/_/g, ' ') + ' started earlier' : 'finishing a line it already began') : ruleTxt;
+    // a break line says what it breaks and what it builds, in full: the break is the way to the combo or chain it makes
+    const breakTxt = 'breaking ' + broke + ' garbage cell' + (broke === 1 ? '' : 's') + (combo >= 4 || chain >= 2 ? ', making ' + (combo >= 4 ? 'a combo of ' + combo : 'a chain of ' + chain) : '');
+    const lineTxt = play === 'hold' ? holdTxt : carrying ? (fromM ? 'continuing the ' + fromM[2].replace(/_/g, ' ') + ' started earlier' : 'finishing a line it already began') : (ruleKey === 't' && broke > 0 ? breakTxt : ruleTxt);
     if (lineTxt) lines.push(['Line', lineTxt]);
     const goal = []; if (combo > 0) goal.push('a combo of ' + combo); if (chain > 0) goal.push('a chain of ' + chain);
     if (goal.length) lines.push(['Aiming for', goal.join(' and ')]);

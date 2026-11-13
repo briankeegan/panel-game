@@ -429,6 +429,7 @@
 .gw-pickd > summary::before { content: '▸ '; } .gw-pickd[open] > summary::before { content: '▾ '; }
 .gw-pickd > summary:hover { border-color: var(--color-fg-muted); }
 .gw-pickd[open] > summary { margin-bottom: 6px; }
+#gw-pickd { display: none !important; }
 .gw-pager { margin: 2px 0 4px; }
 .gw-left, .gw-right { display: contents; }   /* phones and tablets: one column, same order as before */
 .gw-stage .gw-seg-row { order: 1; } .gw-stage .gw-boards { order: 2; } .gw-stage .gw-cap { order: 3; } .gw-stage .gw-now { order: 4; }
@@ -456,8 +457,9 @@
 .gw-cap .planprog i.next { background: #ffd166; }
 .gw-cap .planprog i + i:last-of-type { margin-right: 4px; }
 .gs-latest td { white-space: nowrap !important; vertical-align: middle; }
-.gw-plain { display: grid; gap: 4px; margin: 8px 0; font-size: 14px; }
+.gw-plain { display: grid; gap: 4px; margin: 8px 0; font-size: 14px; min-height: calc(2 * 2.9em + 4px); }
 .gw-plainr b { display: inline-block; min-width: 92px; color: var(--color-fg-muted); font-weight: 600; }
+.gw-plainr { height: 2.9em; overflow: hidden; }
 .gs-latest-box { max-height: 460px; overflow-y: auto; }
 .gs-latest thead th { position: sticky; top: 0; background: var(--color-panel); z-index: 1; }
 .gs-latest .lt { font-size: 11.5px; color: var(--color-fg-muted); }
@@ -1805,7 +1807,8 @@ function projectPlan(G, seq, cursor) {
     if (broke > 0 || sent > 0) lines.push(['Garbage', (broke > 0 ? 'breaks ' + broke + ' cell' + (broke === 1 ? '' : 's') : 'breaks none') + (sent > 0 ? ', sends ' + sent : '')]);
     if (why) lines.push(['Why', why]);
     el.replaceChildren();
-    lines.forEach(([k, v]) => { const r = document.createElement('div'); r.className = 'gw-plainr'; const kb = document.createElement('b'); kb.textContent = k; const vs = document.createElement('span'); vs.textContent = v; r.append(kb, vs); el.appendChild(r); });
+    const fixed = ['Line', 'Aiming for'].map((k) => [k, (lines.find((l) => l[0] === k) || [k, '—'])[1]]);
+    fixed.forEach(([k, v]) => { const r = document.createElement('div'); r.className = 'gw-plainr'; r.title = v; const kb = document.createElement('b'); kb.textContent = k; const vs = document.createElement('span'); vs.textContent = v; r.append(kb, vs); el.appendChild(r); });
     el.hidden = false;
   }
   function renderOpts(d) {

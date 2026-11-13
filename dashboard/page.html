@@ -1809,11 +1809,14 @@ function projectPlan(G, seq, cursor) {
       : kvOf(raw0, 'deferred') === '1' ? 'holding: its next swap does as well pressed later'
       : (want === 'hold' && /:0$/.test(kvOf(raw0, 'raiseFor'))) ? 'waiting for the raise to open (inferred from the log)'
       : kvOf(raw0, 'cands') === '-' ? 'nothing else was offered' : 'the rank put holding first';
-    const lineTxt = play === 'hold' ? holdTxt : ruleTxt;
+    // a carry continues a line begun earlier: name that line, not the class it was judged as when it began
+    const fromM = /^(\d+):(.+)$/.exec(kvOf(raw0, 'from'));
+    const carrying = /^carry/.test(play);
+    const lineTxt = play === 'hold' ? holdTxt : carrying ? (fromM ? 'continuing the ' + fromM[2].replace(/_/g, ' ') + ' begun at frame ' + fromM[1] : 'finishing a line it already began') : ruleTxt;
     if (lineTxt) lines.push(['Line', lineTxt]);
     const goal = []; if (combo > 0) goal.push('a combo of ' + combo); if (chain > 0) goal.push('a chain of ' + chain);
     if (goal.length) lines.push(['Aiming for', goal.join(' and ') + (want && want !== '-' ? ' at cell ' + want : '')]);
-    else if (want && want !== '-') lines.push(['Aiming for', 'cell ' + want]);
+    else if (want && want !== '-' && want !== 'hold') lines.push(['Aiming for', 'cell ' + want]);
     lines.push(['Board', d[4] === 'lives' ? 'stays alive' : 'is lost either way']);
     if (broke > 0 || sent > 0) lines.push(['Garbage', (broke > 0 ? 'breaks ' + broke + ' cell' + (broke === 1 ? '' : 's') : 'breaks none') + (sent > 0 ? ', sends ' + sent : '')]);
     if (why) lines.push(['Why', why]);

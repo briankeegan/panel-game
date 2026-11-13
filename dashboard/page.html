@@ -1812,7 +1812,7 @@ function projectPlan(G, seq, cursor) {
     // a carry continues a line begun earlier: name that line, not the class it was judged as when it began
     const fromM = /^(\d+):(.+)$/.exec(kvOf(raw0, 'from'));
     const carrying = /^carry/.test(play);
-    const lineTxt = play === 'hold' ? holdTxt : carrying ? (fromM ? 'continuing the ' + fromM[2].replace(/_/g, ' ') + ' begun at frame ' + fromM[1] : 'finishing a line it already began') : ruleTxt;
+    const lineTxt = play === 'hold' ? holdTxt : carrying ? (fromM ? 'continuing the ' + fromM[2].replace(/_/g, ' ') + ' started earlier' : 'finishing a line it already began') : ruleTxt;
     if (lineTxt) lines.push(['Line', lineTxt]);
     const goal = []; if (combo > 0) goal.push('a combo of ' + combo); if (chain > 0) goal.push('a chain of ' + chain);
     if (goal.length) lines.push(['Aiming for', goal.join(' and ')]);
@@ -1886,11 +1886,11 @@ function projectPlan(G, seq, cursor) {
       const left = Math.max(0, (cl != null && PLAN.on && PLAN.current(cl) ? PLAN.current(cl).left : 0));
       const part = left === 1 ? 'this last swap' : left > 1 ? 'its ' + left + ' remaining swaps' : 'what is left';
       const gone = !say(mk).length;
-      out.push(['from', 'Finishing a ' + kind + ' begun at ' + fmtClock(Number(from[1])) + ' (' + org + '): ' + (sayV(fo) || 'judged to make nothing') + '; ' + part + (gone ? ' now makes nothing' : same ? ' still ' + (fo.b > 0 ? 'breaks ' : 'makes ') + (mk.b > 0 && !mk.c && !mk.x ? mk.b : say(mk).join(' + ')) : ' now ' + (mk.b > 0 && fo.b > 0 ? 'breaks ' : 'makes ') + (mk.b > 0 && !mk.c && !mk.x ? mk.b : say(mk).join(' + ')))]);
+      out.push(['from', 'Finishing a ' + kind + ' begun at ' + fmtClock(Number(from[1])) + ' (' + org + '): ' + (sayV(fo) || 'judged to make nothing') + '; ' + part + (gone ? ' now makes nothing' : same ? ' still ' + sayV(mk) : ' now ' + sayV(mk))]);
     }
     else if (from) out.push(['from', 'Line in progress, begun at ' + fmtClock(Number(from[1])) + ' as "' + kName(from[2]) + '"']);
     const won = /^k(\d+):(.+)$/.exec(kvOf(raw, 'won')); if (won) out.push(['won', 'Chosen over "' + kName(won[2]) + '": ' + ruleTxt(won[1]), '', ruleFull(won[1])]);
-    const so = /^(.+?):(L|-?\d+):k(\d+)$/.exec(kvOf(raw, 'sooner')); if (so) out.push(['sooner', 'Passed over "' + kName(so[1]) + '", ' + (so[2] === 'L' ? 'whose board survives' : 'whose board is lost later (at frame ' + so[2] + ')') + ': ' + ruleTxt(so[3]), '', ruleFull(so[3])]);
+    const so = /^(.+?):(L|-?\d+):k(\d+)$/.exec(kvOf(raw, 'sooner')); if (so) out.push(['sooner', 'Passed over "' + kName(so[1]) + '", ' + (so[2] === 'L' ? 'whose board survives' : 'whose board is lost later') + ': ' + ruleTxt(so[3]), '', ruleFull(so[3])]);
     const rf = /^([or-]):(-?\d+):(-?\d+):([01])$/.exec(kvOf(raw, 'raiseFor')); if (rf) out.push(['raise', 'Raise asked' + (rf[1] === 'o' ? ' (the opening raise)' : rf[1] === 'r' ? ' (the floor\'s refill)' : '') + ': to ' + rf[2] + ' rows, ' + rf[3] + ' short; ' + (rf[4] === '1' ? 'it could raise now' : 'a cascade held it')]);
     const pd = /^(.+?):k(\d+)$/.exec(kvOf(raw, 'putDown')); if (pd) out.push(['stop', 'Stopped the line in progress for "' + kName(pd[1]) + '": ' + ruleTxt(pd[2]), 'Put down', ruleFull(pd[2]), 'for "' + kName(pd[1]) + '": ' + ruleTxt(pd[2])]);
     const cd = kvOf(raw, 'carryDrop'); if (cd) { const code = Number(cd.split(':')[0]), nats = /:n(\d+)/.exec(cd); out.push(['stop', 'Dropped the line in progress before ranking: ' + (CARRYDROP[code] || 'reason ' + code) + (code === 2 && nats ? ' (' + nats[1] + ' of its swaps still possible)' : ''), 'Dropped', '', (CARRYDROP[code] || 'reason ' + code) + (code === 2 && nats ? ' (' + nats[1] + ' of its swaps still possible)' : '') + ', before ranking']); }
@@ -2032,7 +2032,7 @@ function projectPlan(G, seq, cursor) {
       if (String(play || '').replace(/_/g, ' ') === 'survive') {      // the emergency move: say what it buys, from the log's own numbers
         const ol = (d[14] || '').split(',').map((q) => q.split(':')).filter((q) => q[0]).map((q) => ({ nm: q[0].replace(/[*~]/g, '').replace(/_/g, ' '), v: (q[1] === 'L' || q[1] === 'inf') ? Infinity : Number(q[1]) }));
         const mine1 = ol.find((o) => o.nm === 'survive') || ol[0], hold1 = ol.find((o) => o.nm === 'hold');
-        if (mine1 && !isNaN(mine1.v)) t.dataset.expl = (total + (total === 1 ? ' swap' : ' swaps')) + ': ' + (mine1.v === Infinity ? 'the board stays alive' : 'the board lasts ' + fs1(mine1.v)) + (hold1 && !isNaN(hold1.v) && hold1.v !== Infinity ? (Math.round(hold1.v / 6) === Math.round(mine1.v / 6) ? ', no better than doing nothing' : '; doing nothing, it would be lost in ' + fs1(hold1.v)) : '');
+        if (mine1 && !isNaN(mine1.v)) t.dataset.expl = (total + (total === 1 ? ' swap' : ' swaps')) + ': ' + (mine1.v === Infinity ? 'the board stays alive' : 'the board lasts ' + fs1(mine1.v)) + '';
       }
       t.appendChild(progress(total, left));
       t.title = (t.dataset.tip ? t.dataset.tip + ' ' : '') + 'The plan is ' + total + (total === 1 ? ' swap' : ' swaps') + ' in all' + (madeN ? '; ' + madeN + ' made, ' + left + ' still to make' : '') + (goal.length ? '. Goal: ' + goal.join(' + ').toLowerCase() + '.' : '.');

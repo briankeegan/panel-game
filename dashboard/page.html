@@ -1780,7 +1780,7 @@ function projectPlan(G, seq, cursor) {
     let t;
     if (me.v === Infinity) t = a == null ? 'Keeps the board alive' : a === 1 ? 'The only one of ' + b + ' options that keeps the board alive' : 'Keeps the board alive (' + a + ' of ' + b + ' options do)';
     else t = a == null ? 'Tops out in ' + fs1(me.v) + ' if left alone' : a === 0 ? '' : a + ' of ' + b + ' options keep the board alive, but its priority list picked this one (tops out in ' + fs1(me.v) + ' if left alone)';
-    const br = Number(kvOf(raw, 'broke')); if (br > 0) t += ' · breaks ' + br;
+    const br = Number(kvOf(raw, 'broke')); if (br > 0) t += (t ? ' · ' : '') + 'breaks ' + br;
     return t;
   }
   let OPTS_KEY = null;
@@ -1805,10 +1805,10 @@ function projectPlan(G, seq, cursor) {
     const holdTxt = heldKey === 'raise' ? 'waiting for the raise to open'
       : heldKey === 'timing' ? 'holding: its next swap does as well pressed later'
       : heldKey === 'nothing' ? 'no other move was offered'
-      : heldKey === 'rank' ? 'the rank put holding first' + (kvOf(raw0, 'won') ? ' (rule: ' + ruleName(/^k(\d+)/.exec(kvOf(raw0, 'won')) ? /^k(\d+)/.exec(kvOf(raw0, 'won'))[1] : '') + ')' : '')
+      : heldKey === 'rank' ? 'holding: the rank put it first' + (kvOf(raw0, 'won') ? ' (rule: ' + ruleName(/^k(\d+)/.exec(kvOf(raw0, 'won')) ? /^k(\d+)/.exec(kvOf(raw0, 'won'))[1] : '') + ')' : '')
       : kvOf(raw0, 'deferred') === '1' ? 'holding: its next swap does as well pressed later'
-      : (want === 'hold' && /:0$/.test(kvOf(raw0, 'raiseFor'))) ? 'waiting for the raise to open (inferred from the log)'
-      : kvOf(raw0, 'cands') === '-' ? 'nothing else was offered' : 'the rank put holding first';
+      : (want === 'hold' && /:0$/.test(kvOf(raw0, 'raiseFor'))) ? 'waiting for the raise to open'
+      : kvOf(raw0, 'cands') === '-' ? 'nothing else was offered' : 'holding: the rank put it first';
     // a carry continues a line begun earlier: name that line, not the class it was judged as when it began
     const fromM = /^(\d+):(.+)$/.exec(kvOf(raw0, 'from'));
     const carrying = /^carry/.test(play);
@@ -1880,12 +1880,13 @@ function projectPlan(G, seq, cursor) {
       // a carried line: what it was judged to make when it began (for=C/X/B) and what its remaining swaps make now (makes=C/X/B); older logs have neither and keep the plain line below
       const kind = fo.b > 0 ? 'break' : fo.x > 0 ? 'chain' : fo.c > 0 ? 'combo' : 'line';
       const say = (v) => { const r = []; if (v.c > 0) r.push('a combo of ' + v.c); if (v.x > 0) r.push('a chain of ' + v.x); if (v.b > 0) r.push(v.b + ' garbage ' + (v.b === 1 ? 'cell' : 'cells')); return r; };
+      const sayV = (v) => { const r = []; if (v.c > 0) r.push('a combo of ' + v.c); if (v.x > 0) r.push('a chain of ' + v.x); let t = r.length ? 'makes ' + r.join(' + ') : ''; if (v.b > 0) t += (t ? ' and ' : '') + 'breaks ' + v.b + ' garbage ' + (v.b === 1 ? 'cell' : 'cells'); return t; };
       const verb = fo.b > 0 ? 'breaks ' : 'makes ', same = say(fo).join(' + ') === say(mk).join(' + ');
       const nm = from[2].replace(/_/g, ' '), org = nm === 'survive' ? 'survival' : kName(from[2]);
       const left = Math.max(0, (cl != null && PLAN.on && PLAN.current(cl) ? PLAN.current(cl).left : 0));
       const part = left === 1 ? 'this last swap' : left > 1 ? 'its ' + left + ' remaining swaps' : 'what is left';
       const gone = !say(mk).length;
-      out.push(['from', 'Finishing a ' + kind + ' begun at ' + fmtClock(Number(from[1])) + ' (' + org + '): ' + (say(fo).length ? verb + say(fo).join(' + ') : 'judged to make nothing') + '; ' + part + (gone ? ' now makes nothing' : same ? ' still ' + (fo.b > 0 ? 'breaks ' : 'makes ') + (mk.b > 0 && !mk.c && !mk.x ? mk.b : say(mk).join(' + ')) : ' now ' + (mk.b > 0 && fo.b > 0 ? 'breaks ' : 'makes ') + (mk.b > 0 && !mk.c && !mk.x ? mk.b : say(mk).join(' + ')))]);
+      out.push(['from', 'Finishing a ' + kind + ' begun at ' + fmtClock(Number(from[1])) + ' (' + org + '): ' + (sayV(fo) || 'judged to make nothing') + '; ' + part + (gone ? ' now makes nothing' : same ? ' still ' + (fo.b > 0 ? 'breaks ' : 'makes ') + (mk.b > 0 && !mk.c && !mk.x ? mk.b : say(mk).join(' + ')) : ' now ' + (mk.b > 0 && fo.b > 0 ? 'breaks ' : 'makes ') + (mk.b > 0 && !mk.c && !mk.x ? mk.b : say(mk).join(' + ')))]);
     }
     else if (from) out.push(['from', 'Line in progress, begun at ' + fmtClock(Number(from[1])) + ' as "' + kName(from[2]) + '"']);
     const won = /^k(\d+):(.+)$/.exec(kvOf(raw, 'won')); if (won) out.push(['won', 'Chosen over "' + kName(won[2]) + '": ' + ruleTxt(won[1]), '', ruleFull(won[1])]);
@@ -1893,7 +1894,7 @@ function projectPlan(G, seq, cursor) {
     const rf = /^([or-]):(-?\d+):(-?\d+):([01])$/.exec(kvOf(raw, 'raiseFor')); if (rf) out.push(['raise', 'Raise asked' + (rf[1] === 'o' ? ' (the opening raise)' : rf[1] === 'r' ? ' (the floor\'s refill)' : '') + ': to ' + rf[2] + ' rows, ' + rf[3] + ' short; ' + (rf[4] === '1' ? 'it could raise now' : 'a cascade held it')]);
     const pd = /^(.+?):k(\d+)$/.exec(kvOf(raw, 'putDown')); if (pd) out.push(['stop', 'Stopped the line in progress for "' + kName(pd[1]) + '": ' + ruleTxt(pd[2]), 'Put down', ruleFull(pd[2]), 'for "' + kName(pd[1]) + '": ' + ruleTxt(pd[2])]);
     const cd = kvOf(raw, 'carryDrop'); if (cd) { const code = Number(cd.split(':')[0]), nats = /:n(\d+)/.exec(cd); out.push(['stop', 'Dropped the line in progress before ranking: ' + (CARRYDROP[code] || 'reason ' + code) + (code === 2 && nats ? ' (' + nats[1] + ' of its swaps still possible)' : ''), 'Dropped', '', (CARRYDROP[code] || 'reason ' + code) + (code === 2 && nats ? ' (' + nats[1] + ' of its swaps still possible)' : '') + ', before ranking']); }
-    const td = kvOf(raw, 'twoDropped'); if (td) out.push(['two', 'A 2x was dropped' + (td === '1' ? '' : ' (' + td + ')')]);
+    const td = kvOf(raw, 'twoDropped'); if (td) out.push(['two', 'A 2x was dropped']);
     const sa = /^(-?\d+)\/(\d+):(-?\d+)\/(-?\d+)(\/needed)?$/.exec(kvOf(raw, 'saveAsk')); if (sa) out.push(['save', 'Wasted-three save check: asked ' + sa[2] + ', not needed ' + sa[1] + (sa[5] ? ', a save was needed' : '')]);
     if (kvOf(raw, 'saveBlind')) out.push(['save', 'The wasted-three save check ran blind']);
     return out;
@@ -1909,7 +1910,7 @@ function projectPlan(G, seq, cursor) {
     const add = (cls, txt, tip) => { const e = document.createElement('div'); e.className = cls; e.textContent = txt; if (tip) e.title = tip; box.appendChild(e); };
     if (d) whyLines(d, clock).forEach(([c, t, , tip]) => add(c, t, tip));
     if (d) { const mine = (D.sw || []).filter((s) => s[9] === d[0] && s[0] <= clock); if (mine.length) add('sw', 'Its swaps so far: ' + mine.map((s) => s[1] + ',' + s[2] + ' ' + (OUTCOME[s[4]] || s[4])).join(' · ')); }
-    if (k >= 0) { const s = D.sw[k]; add('sw', 'Last swap, at ' + fmtClock(s[0]) + ': ' + swapTxt(s).replace(/ · decided at .*$/, '') + (s[9] != null && s[9] >= 0 && (!d || s[9] !== d[0]) ? ' · decided at ' + fmtClock(s[9]) : '') + (s[8] >= 2 && s[5] === s[6] ? ' · line over: ' + endedTxt(s[8]) : '')); }
+    if (k >= 0) { const s = D.sw[k]; add('sw', 'Last swap, at ' + fmtClock(s[0]) + ': ' + swapTxt(s).replace(/ · decided at .*$/, '') + (s[9] != null && s[9] >= 0 && (!d || s[9] !== d[0]) ? ' · decided at ' + fmtClock(s[9]) : '') + ''); }
     if (!box.firstChild) { const e = document.createElement('div'); e.className = 'none'; e.textContent = d ? 'Nothing more was logged for this decision.' : 'No decision yet.'; box.appendChild(e); }
   }
   // every stop of the game, in order: a line put down or dropped, keys abandoned
@@ -2022,7 +2023,7 @@ function projectPlan(G, seq, cursor) {
     else {
       const total = cur0 && cur0.total ? cur0.total : seq.length, left = cur0 && cur0.done ? cur0.left : total, madeN = Math.max(0, total - left);
       const goal = []; if (Number(combo) > 0) goal.push('Combo ' + combo); if (Number(chain) > 0) goal.push('Chain ×' + chain);   // the same names as the Garbage sent table
-      if (!goal.length && String(play || '') === 'setup' && want && want !== '-') goal.push('Aims at cell ' + want);   // a setup with no combo or chain logged: say which cell it is building toward
+         // a setup with no combo or chain logged: say which cell it is building toward
       t.classList.add('goalline');
       const gt = document.createElement('span'); gt.className = 'gl-t';
       // a goal when the log names one; otherwise the move's own name (one swap with no goal is a move, not a plan)
@@ -2058,7 +2059,7 @@ function projectPlan(G, seq, cursor) {
       }
       const w1 = document.createElement('div'); w1.className = 'whyline def why1'; const bc = becauseOf(d); w1.textContent = bc || whyParts.join(' · '); w1.title = whyParts.join(' · ') + ' · Gambit calls this move "' + (play || 'hold').replace(/_/g, ' ') + '"'; if (w1.textContent) cap.appendChild(w1);
     }
-    { const cur0 = PLAN.current(clock); if (cur0 && cur0.dropped) { const g = document.createElement('div'); g.className = 'whyline def'; g.textContent = 'Grey arrows: the dropped plan'; cap.appendChild(g); } }
+    { const cur0 = PLAN.current(clock); if (cur0 && cur0.dropped) { const g = document.createElement('div'); g.className = 'whyline def'; g.textContent = 'Grey arrows: a plan it gave up'; cap.appendChild(g); } }
   }
   // the list of Ranmaru's choices: each plan it made or threw away, tap one to jump there
   const LIST = { rid: null, mode: 'chg', rows: [] };

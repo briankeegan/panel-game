@@ -1821,7 +1821,7 @@ function projectPlan(G, seq, cursor) {
     if (broke > 0 || sent > 0) lines.push(['Garbage', (broke > 0 ? 'breaks ' + broke + ' cell' + (broke === 1 ? '' : 's') : 'breaks none') + (sent > 0 ? ', sends ' + sent : '')]);
     if (why) lines.push(['Why', why]);
     el.replaceChildren();
-    const fixed = ['Line', 'Aiming for'].map((k) => [k, (lines.find((l) => l[0] === k) || [k, '—'])[1]]);
+    const fixed = ['Line', 'Aiming for'].map((k) => [k, (lines.find((l) => l[0] === k) || [k, ''])[1]]);
     fixed.forEach(([k, v]) => { const r = document.createElement('div'); r.className = 'gw-plainr'; r.title = v; const kb = document.createElement('b'); kb.textContent = k; const vs = document.createElement('span'); vs.textContent = v; r.append(kb, vs); el.appendChild(r); });
     el.hidden = false;
   }

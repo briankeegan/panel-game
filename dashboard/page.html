@@ -1790,7 +1790,12 @@ function projectPlan(G, seq, cursor) {
     const lines = [];
     const raw0 = d[17] || '', kind8 = kvOf(raw0, 'twinLo') || kvOf(raw0, 'free8');
     const pw = playWhy(play);
-    lines.push(['Doing', play === 'setup' ? (kind8 ? 'Setting up a combo of 8' : 'Setting up a better board, no combo or chain named') : (pw ? pw[0] : nice(play) || play)]);
+    // aim= (from the agent's build): the attack this line leaves one swap away: x4 a chain of 4, c6 a combo of 6, eight, or none
+    const aimTxt = (() => { const m = /^(x|c)(\d+)|^eight$|^none$/.exec(kvOf(raw0, 'aim') || ''); if (!m) return null;
+      if (m[1] === 'x') return 'a chain of ' + m[2]; if (m[1] === 'c') return 'a combo of ' + m[2]; if (m[0] === 'eight') return 'a combo of 8'; return 'nothing one swap away'; })();
+    const doing = aimTxt && play === 'setup' ? 'Setting up ' + aimTxt : aimTxt && play !== 'setup' ? (pw ? pw[0] : nice(play) || play) + ', toward ' + aimTxt
+      : play === 'setup' ? (kind8 ? 'Setting up a combo of 8' : 'Setting up a better board, no combo or chain named') : (pw ? pw[0] : nice(play) || play);
+    lines.push(['Doing', doing]);
     const ruleTxt = { e: 'a line from its list', t: 'a line that breaks garbage', l: 'a last-resort line', '-': 'no line' }[kvOf(raw0, 'rule')];
     if (ruleTxt) lines.push(['Line', ruleTxt]);
     const goal = []; if (combo > 0) goal.push('a combo of ' + combo); if (chain > 0) goal.push('a chain of ' + chain);

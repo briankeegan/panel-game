@@ -1740,11 +1740,11 @@ function projectPlan(G, seq, cursor) {
     'toward': ['Walking toward an attack', 'Moves the cursor toward an attack it cannot fire yet.'],
     'ready': ['Getting ready for the garbage', 'Makes the board ready to break the garbage that is coming, before it lands.'],
     'level': ['Levelling the stack', 'Clears nothing, but leaves fewer holes under the garbage and a flatter stack.'],
-    'setup': ['Setting up an attack', 'Builds toward an attack; nothing is ready to fire yet.'],
+    'setup': ['Setting up', 'Builds toward a better board; nothing is ready to fire yet.'],
     'survive': ['Emergency: buying time', 'Nothing else keeps the board alive. It looks for swaps that leave the board still standing a few seconds from now: lowering the stack and pushing the next garbage drop later, with as few key presses as it can.'],
     'convert': ['Chaining off the broken garbage', 'Matches the row the broken garbage turns into, linking a chain.'],
     'hold': ['Waiting', 'No swap beats leaving the board alone.'],
-    'zip': ['Spreading colours for later', 'Spreads colours so one swap can fire an attack later.'],
+    'zip': ['Zipper', 'Moves colours to sit one swap apart from each other.'],
     'cut': ['Cutting a link out of a chain', 'Takes a link out from under a chain.'],
     'raise': ['Raising the stack', 'Pushes the stack up a row so fresh panels come up.'],
   };
@@ -1788,7 +1788,11 @@ function projectPlan(G, seq, cursor) {
     const play = String(d[2] || '').replace(/_/g, ' '), want = d[3], chain = Number(d[7]) || 0, combo = Number(d[8]) || 0;
     const broke = Number(kvOf(d[17] || '', 'broke')) || 0, sent = Number(d[6]) || 0, why = String(kvOf(d[17] || '', 'why') || '').replace(/_/g, ' ');
     const lines = [];
-    const pw = playWhy(play); lines.push(['Doing', pw ? pw[0] : nice(play) || play]);
+    const raw0 = d[17] || '', kind8 = kvOf(raw0, 'twinLo') || kvOf(raw0, 'free8');
+    const pw = playWhy(play);
+    lines.push(['Doing', play === 'setup' ? (kind8 ? 'Setting up a combo of 8' : 'Setting up a better board, no combo or chain named') : (pw ? pw[0] : nice(play) || play)]);
+    const ruleTxt = { e: 'a line from its list', t: 'a line that breaks garbage', l: 'a last-resort line', '-': 'no line' }[kvOf(raw0, 'rule')];
+    if (ruleTxt) lines.push(['Line', ruleTxt]);
     const goal = []; if (combo > 0) goal.push('a combo of ' + combo); if (chain > 0) goal.push('a chain of ' + chain);
     if (goal.length) lines.push(['Aiming for', goal.join(' and ') + (want && want !== '-' ? ' at cell ' + want : '')]);
     else if (want && want !== '-') lines.push(['Aiming for', 'cell ' + want]);

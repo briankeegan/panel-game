@@ -1801,7 +1801,12 @@ function projectPlan(G, seq, cursor) {
     const ruleKey = kvOf(raw0, 'rule');
     const ruleTxt = ruleKey === 'l' ? 'no line from its list or breaking garbage was available, so it makes ' + (combo >= 4 ? 'a combo of ' + combo : chain >= 2 ? 'a chain of ' + chain : 'clears panels the list does not ask for') + ', which the list does not ask for' : ({ e: 'a line from its list of the best candidates', t: 'a line chosen to break garbage', '-': 'no line' })[ruleKey];
     // a hold says why it holds, from the handoff's fields: timing, a raise not yet open, nothing offered, or the rank put it first
-    const holdTxt = kvOf(raw0, 'deferred') === '1' ? 'holding: its next swap does as well pressed later'
+    const heldKey = kvOf(raw0, 'held');
+    const holdTxt = heldKey === 'raise' ? 'waiting for the raise to open'
+      : heldKey === 'timing' ? 'holding: its next swap does as well pressed later'
+      : heldKey === 'nothing' ? 'no other move was offered'
+      : heldKey === 'rank' ? 'the rank put holding first' + (kvOf(raw0, 'won') ? ' (rule: ' + ruleName(/^k(\d+)/.exec(kvOf(raw0, 'won')) ? /^k(\d+)/.exec(kvOf(raw0, 'won'))[1] : '') + ')' : '')
+      : kvOf(raw0, 'deferred') === '1' ? 'holding: its next swap does as well pressed later'
       : (want === 'hold' && /:0$/.test(kvOf(raw0, 'raiseFor'))) ? 'waiting for the raise to open (inferred from the log)'
       : kvOf(raw0, 'cands') === '-' ? 'nothing else was offered' : 'the rank put holding first';
     const lineTxt = play === 'hold' ? holdTxt : ruleTxt;

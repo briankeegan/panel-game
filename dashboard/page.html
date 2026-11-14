@@ -1891,7 +1891,9 @@ function projectPlan(G, seq, cursor) {
       out.push(['from', 'Finishing a ' + kind + ' begun at ' + fmtClock(Number(from[1])) + ' (' + org + '): ' + (sayV(fo) || 'judged to make nothing') + '; ' + part + (gone ? ' now makes nothing' : same ? ' still ' + sayV(mk) : ' now ' + sayV(mk))]);
     }
     else if (from) out.push(['from', 'Line in progress, begun at ' + fmtClock(Number(from[1])) + ' as "' + kName(from[2]) + '"']);
+    { const og = kvOf(raw, 'opgrew'); if (og) { const f = og.split('/'); if (Number(f[1]) < 0) out.push(['plan', 'Opener plan: none found']); else out.push(['plan', 'Opener plan: ' + f[1] + ' swaps, chain ×' + f[4] + ' (grown ' + f[0] + ' levels in ' + f[2] + ' ms)' + (f[6] === 'raise' ? '; grown while the stack was being raised, nothing pressed' : '')]); } }
     const won = /^k(\d+):(.+)$/.exec(kvOf(raw, 'won')); if (won) out.push(['won', 'Chosen over "' + kName(won[2]) + '": ' + ruleTxt(won[1]), '', ruleFull(won[1])]);
+    { const wbv = kvOf(raw, 'wonBy'); if (won && wbv) { const side = (x) => { const m = /^(inf|-?\d+)(?:\/(-?\d+))?\/w(\d+)$/.exec(x); return m ? { lives: m[1] === 'inf', lost: m[1], after: m[2], walk: Number(m[3]) } : null; }; const sp = wbv.split(':'); const a = side(sp[0] || ''), b = side(sp[1] || ''); if (a && b) { const one = (x) => x.lives ? 'lives' : 'lost at ' + x.lost + ' frames' + (x.walk && x.after !== undefined ? ' (' + x.after + ' after charging ' + x.walk + (x.walk === 1 ? ' move' : ' moves') + ' of walking)' : ''); out.push(['wonby', 'This line ' + one(a) + '; the other ' + one(b)]); } } }
     const so = /^(.+?):(L|-?\d+):k(\d+)$/.exec(kvOf(raw, 'sooner')); if (so) out.push(['sooner', 'Passed over "' + kName(so[1]) + '", ' + (so[2] === 'L' ? 'whose board survives' : 'whose board is lost later') + ': ' + ruleTxt(so[3]), '', ruleFull(so[3])]);
     const rf = /^([or-]):(-?\d+):(-?\d+):([01])$/.exec(kvOf(raw, 'raiseFor')); if (rf) out.push(['raise', 'Raise asked' + (rf[1] === 'o' ? ' (the opening raise)' : rf[1] === 'r' ? ' (the floor\'s refill)' : '') + ': to ' + rf[2] + ' rows, ' + rf[3] + ' short; ' + (rf[4] === '1' ? 'it could raise now' : 'a cascade held it')]);
     const pd = /^(.+?):k(\d+)$/.exec(kvOf(raw, 'putDown')); if (pd) out.push(['stop', 'Stopped the line in progress for "' + kName(pd[1]) + '": ' + ruleTxt(pd[2]), 'Put down', ruleFull(pd[2]), 'for "' + kName(pd[1]) + '": ' + ruleTxt(pd[2])]);
@@ -1902,6 +1904,8 @@ function projectPlan(G, seq, cursor) {
     return out;
   }
   const swapIdx = (clock) => { const sw = (R.D && R.D.sw) || []; let k = -1; for (let q = 0; q < sw.length; q++) { if (sw[q][0] <= clock) k = q; else break; } return k; };
+  // purpose=: each token is the line judged again without that swap (n, L<frames>, b<cells>, c<links>, d, x, ?)
+  const purposeTxt = (t) => { if (t === 'n') return 'does nothing'; if (t === 'd') return 'without it the board dies'; if (t === '?') return 'no time to judge it'; if (t === 'x') return 'could not be judged without it'; const parts = []; const Lm = /L(-?\d+)/.exec(t); if (Lm) parts.push(Number(Lm[1]) < 0 ? 'without it the line no longer lives' : 'without it, lost ' + (Number(Lm[1]) / 60).toFixed(1) + ' s sooner'); const bm = /b(\d+)/.exec(t); if (bm) parts.push('breaks ' + bm[1] + ' more'); const cm = /c(\d+)/.exec(t); if (cm) parts.push(cm[1] === '1' ? 'one more chain link' : cm[1] + ' more chain links'); return parts.join(', '); };
   const swapTxt = (s) => 'Swap ' + s[5] + ' of ' + s[6] + ' · ' + s[1] + ',' + s[2] + ' · "' + kName(s[3]) + '" · ' + (OUTCOME[s[4]] || s[4]) + ' · ' + s[7] + (s[7] === 1 ? ' key' : ' keys') + (s[9] != null && s[9] >= 0 ? ' · decided at ' + fmtClock(s[9]) : '');
   let WHY_KEY = '';
   function renderWhy(clock) {
@@ -1952,7 +1956,7 @@ function projectPlan(G, seq, cursor) {
       const ex = whyLines(d).map((l) => '- ' + l[1]); if (ex.length) { L.push('In words:'); ex.forEach((x) => L.push(x)); }
       const ks = new Set(); ((d[17] || '').match(/[=:]k(\d+)/g) || []).forEach((m) => ks.add(m.replace(/\D/g, ''))); const rl = [...ks].filter((k) => D.rl && D.rl[k]);
       if (rl.length) { L.push('Rules it names (Gambit rank.c, this version):'); rl.forEach((k) => L.push('- k' + k + ': ' + D.rl[k])); }
-      const mine = (D.sw || []).filter((s) => s[9] === d[0]); if (mine.length) { L.push('Swaps played for this decision (q=' + d[0] + '):'); mine.forEach((s) => L.push('- ' + s[0] + ' ' + s[1] + ',' + s[2] + ' ' + s[3] + ' ' + (OUTCOME[s[4]] || s[4]) + ' ' + s[5] + '/' + s[6] + ' keys=' + s[7] + ' ended=' + s[8])); }
+      const purTok = (kvOf(d[17] || '', 'purpose') || '').split(',').filter(Boolean); const mine = (D.sw || []).filter((s) => s[9] === d[0]); if (mine.length) { L.push('Swaps played for this decision (q=' + d[0] + '):'); mine.forEach((s, mi) => L.push('- ' + s[0] + ' ' + s[1] + ',' + s[2] + ' ' + s[3] + ' ' + (OUTCOME[s[4]] || s[4]) + ' ' + s[5] + '/' + s[6] + ' keys=' + s[7] + ' ended=' + s[8] + (purTok[mi] !== undefined && purposeTxt(purTok[mi]) ? ' · ' + purposeTxt(purTok[mi]) : ''))); }
     } else L.push('No decision was logged at or before this frame (' + (D.dec.length ? 'before the first decision' : 'this game has no decision log') + ').');
     const k = swapIdx(clock); if (k >= 0) L.push('Last swap before this frame: ' + swapTxt(D.sw[k]));
     const st = stopRows().filter((r) => near(r[0])); if (st.length) { L.push('Stops within ' + W + ' frames:'); st.forEach((r) => L.push('- ' + r[0] + ' ' + r[1] + ': ' + r[2] + (r[3] ? ' (' + r[3] + ')' : ''))); }

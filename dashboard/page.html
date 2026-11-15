@@ -894,8 +894,10 @@
     const recentAll = fg.slice().sort((a, b) => b.idx - a.idx), recent = recentMore ? recentAll : recentAll.slice(0, 10);
     const fm = $('form'); fm.replaceChildren();
     if (recent.length) {
+      // the game's mode from the bot's log: time attack (nobody across) or versus; older games have none
+      const modeLabel = (m) => { if (!m) return '—'; const t = String(m).toLowerCase(); if (/time/.test(t)) return 'Time attack'; if (/versus|\bvs\b/.test(t)) return 'Versus'; return String(m); };
       const tbl = document.createElement('table'); tbl.className = 'gs-tbl gs-latest';
-      const hr = tbl.createTHead().insertRow(); [['When', ''], ['Result', ''], ['Opponent', ''], ['Levels', 'hide-s'], ['Length', 'n'], ['Garbage', 'n hide-s'], ['Version', 'hide-s'], ['', 'n']].forEach(([h, c]) => { const th = document.createElement('th'); th.textContent = h; th.className = c; th.style.padding = '8px 10px'; hr.appendChild(th); });
+      const hr = tbl.createTHead().insertRow(); [['When', ''], ['Result', ''], ['Opponent', ''], ['Levels', ''], ['Mode', ''], ['Length', 'n'], ['Garbage', 'n hide-s'], ['Version', 'hide-s'], ['', 'n']].forEach(([h, c]) => { const th = document.createElement('th'); th.textContent = h; th.className = c; th.style.padding = '8px 10px'; hr.appendChild(th); });
       const tb = tbl.createTBody();
       recent.forEach((g) => {
         const tr = tb.insertRow(), t = playedMs(g);
@@ -904,7 +906,8 @@
         if (g.at) { const d2 = document.createElement('div'); d2.className = 'lt'; d2.textContent = new Date(t).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }); wcell.appendChild(d2); }
         const rc = tr.insertCell(), pill = document.createElement('span'); pill.className = 'gw-res ' + (g.res === 'W' ? 'w' : 'l'); pill.textContent = g.res === 'W' ? 'Won' : 'Lost'; rc.appendChild(pill);
         const oc = tr.insertCell(); oc.textContent = g.opp; oc.style.fontWeight = '500';
-        const evc = tr.insertCell(); evc.className = 'hide-s'; evc.textContent = Array.isArray(g.lv) ? g.lv[0] + ' v ' + g.lv[1] : '—';
+        const evc = tr.insertCell(); evc.textContent = Array.isArray(g.lv) ? g.lv[0] + ' v ' + g.lv[1] : '—'; evc.title = 'Ranmaru v opponent';
+        const mdc = tr.insertCell(); mdc.textContent = modeLabel(g.mode);
         const lc = tr.insertCell(); lc.className = 'n'; lc.textContent = dur(g.secs);
         const gbc = tr.insertCell(); gbc.className = 'n hide-s'; gbc.textContent = g.land != null ? g.land : '—';
         const vc = tr.insertCell(); vc.className = 'hide-s'; vc.textContent = vLabel(g.sha); vc.style.color = 'var(--color-fg-muted)';

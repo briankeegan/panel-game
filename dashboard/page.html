@@ -2031,7 +2031,7 @@ function projectPlan(G, seq, cursor) {
       t.textContent = cur0 && cur0.carried ? 'Carrying on a plan' + cgoalTxt + cwant + ' from ' + fmtClock(cur0.at) : moving ? 'Cursor moving, no plan logged' : 'No swaps planned'; }
     else {
       const total = cur0 && cur0.total ? cur0.total : seq.length, left = cur0 && cur0.done ? cur0.left : total, madeN = Math.max(0, total - left);
-      const goal = []; if (Number(combo) > 0) goal.push('Combo ' + combo); if (Number(chain) > 0) goal.push('Chain ×' + chain);   // the same names as the Garbage sent table
+      const goal = []; if (Number(combo) > 0) goal.push('Combo ' + combo); if (Number(chain) > 0) goal.push('Chain ×' + chain);   // the same names as the Garbage sent table if (!goal.length && String(play || '') === 'setup' && want && want !== '-') goal.push('aims at cell ' + want);   // a setup names no combo or chain in the log: its cell is the only target there is
          // a setup with no combo or chain logged: say which cell it is building toward
       t.classList.add('goalline');
       const gt = document.createElement('span'); gt.className = 'gl-t';

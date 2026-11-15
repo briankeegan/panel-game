@@ -212,6 +212,10 @@ for gi, g in enumerate(games):
             with gzip.open(os.path.join(a.data, "replay_%s.json.gz" % rid), "wt", compresslevel=9) as z: json.dump(out, z, separators=(",", ":"))
             row["replay"] = rid; made.append("replay_%s.json.gz" % rid)
             if fr.get("levels"): row["lv"] = fr["levels"]   # [bot level, opponent level], so the stats can count only level-10 games
+            # garbage sent: the blocks each decision throws. No garbage and a 2-minute game is a time attack; garbage sent is a versus game
+            sent = sum(int(d_[9]) for d_ in dec if len(d_) > 9 and str(d_[9]).lstrip("-").isdigit())
+            row["sent"] = sent
+            if not row.get("mode"): row["mode"] = "Time attack" if (sent == 0 and row.get("secs") and 115 <= row["secs"] <= 125) else ("Versus" if sent > 0 else None)
     rows.append(row); added += 1
 
 if a.partial and not added:

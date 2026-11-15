@@ -265,7 +265,7 @@
 .gw-stl { display: flex; flex-direction: column; gap: 2px; max-height: 16em; overflow-y: auto; }
 .gw-st1 { display: grid; grid-template-columns: 3.6rem 1fr; gap: 2px 8px; text-align: left; font: inherit; font-size: 12.5px; color: var(--color-fg); background: none; border: 1px solid transparent; border-radius: 6px; padding: 4px 6px; cursor: pointer; }
 .gw-st1:hover, .gw-st1:focus-visible { background: var(--color-border-line); } .gw-st1 .k { color: var(--color-fg-muted); } .gw-st1 .t { grid-column: 1 / -1; overflow-wrap: anywhere; }
-.gw-cap .route { display: flex; flex-wrap: wrap; gap: 4px 4px; align-items: center; min-height: 3.4em; align-content: flex-start; }
+.gw-cap .route { display: flex; flex-wrap: wrap; gap: 4px 4px; align-items: center; height: 4.4em; overflow: hidden; align-content: flex-start; }
 .gw-cap .route .mv { font-size: 11.5px; color: var(--color-fg-muted); padding: 1px 6px; border-radius: 6px; background: color-mix(in srgb, var(--color-fg) 8%, transparent); white-space: nowrap; }
 .gw-cap .route .sw { font-size: 11.5px; font-weight: 700; padding: 1px 7px; border-radius: 6px; background: #ffd166; color: #2a1d00; white-space: nowrap; }
 .gw-cap .route .dn { font-size: 11.5px; color: var(--color-fg-muted); text-decoration: line-through; padding: 1px 4px; white-space: nowrap; }
@@ -459,7 +459,7 @@
 .gs-latest td { white-space: nowrap !important; vertical-align: middle; }
 .gw-plain { display: grid; gap: 4px; margin: 8px 0; font-size: 14px; min-height: calc(2 * 2.9em + 4px); }
 .gw-plainr b { display: inline-block; min-width: 92px; color: var(--color-fg-muted); font-weight: 600; }
-.gw-plainr { min-height: 2.9em; }
+.gw-plainr { height: 2.9em; overflow: hidden; }
 .gs-latest-box { max-height: 460px; overflow-y: auto; }
 .gs-latest thead th { position: sticky; top: 0; background: var(--color-panel); z-index: 1; }
 .gs-latest .lt { font-size: 11.5px; color: var(--color-fg-muted); }

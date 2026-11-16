@@ -110,9 +110,33 @@ local stopAt = nil
 -- frames. Every frame's input is owed on time; this should stay under 1.
 local worstOffSchedule = 0
 
+-- PA_STATUS_FILE: the bot writes "<unix time> <state>" there about every 2 s. The state is idle (no game),
+-- starting (both players are ready, a game is about to begin) or playing. The workflow's watchdog restarts
+-- the bot only when this file has gone stale while it is idle, never during a game or the moment before one.
+local STATUS_FILE = os.getenv("PA_STATUS_FILE")
+if STATUS_FILE == "" then STATUS_FILE = nil end
+local lastStatusAt, lastStatusState = 0, nil
+local function writeStatus()
+  if not STATUS_FILE then return end
+  local now = socket.gettime()
+  local state
+  if bot.match then state = "playing"
+  elseif bot.matchStart or (bot.inRoom and playerCount() >= 2 and readyNow) then state = "starting"
+  else state = "idle" end
+  if state == "starting" and lastStatusState ~= "starting" then print("game about to start: both players are ready") end
+  if state == lastStatusState and now - lastStatusAt < 2 then return end
+  lastStatusState, lastStatusAt = state, now
+  pcall(function()
+    local tmp = STATUS_FILE .. ".tmp"
+    local f = io.open(tmp, "w")
+    if f then f:write(string.format("%.0f %s\n", now, state)); f:close(); os.rename(tmp, STATUS_FILE) end
+  end)
+end
+
 while true do
   bot:pump()
   challengeIfFree()
+  writeStatus()
   if bot.disconnected then print("disconnected from the server"); os.exit(75) end   -- 75: the workflow logs the bot back in (any other exit ends the run)
 
   -- Stop once no game is running: the file says a stop or a deploy is waiting on this bot

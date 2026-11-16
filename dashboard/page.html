@@ -78,7 +78,7 @@
 .gw-board figcaption b { font-weight: 600; }
 .gw-board canvas { display: block; width: 100%; height: auto; border-radius: 8px; background: #161a24; }
 .gw-board.topped canvas { box-shadow: 0 0 0 2px var(--cds-chart-status-critical); }
-.gw-st { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); font-variant-numeric: tabular-nums; margin-top: 4px; height: 2.7em; line-height: 1.3; overflow: hidden; }
+.gw-st { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); font-variant-numeric: tabular-nums; margin-top: 4px; min-height: 2.7em; line-height: 1.3; }
 .gw-side { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .gw-dec { border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); padding: var(--cds-pad-md); display: flex; flex-direction: column; gap: 8px; min-height: 13rem; font-size: var(--cds-font-size-caption); }
 .gw-dec .row { display: flex; flex-wrap: wrap; gap: 6px 14px; }
@@ -164,7 +164,7 @@
   .gw-li { padding: 5px 9px; }
   .gw-li .w { font-size: 11.5px; }
   .gw-board figcaption { margin-bottom: 2px; }
-  .gw-st { font-size: 11px; height: 2.7em; margin-top: 2px; }
+  .gw-st { font-size: 11px; margin-top: 2px; }
   .gw-now { display: block; }
   #gw-strip { height: 22px; }
   .gw-ctl { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
@@ -245,7 +245,8 @@
 @media (max-width: 760px) { .gw-ov { font-size: 10.5px; padding: 5px 7px; gap: 3px; top: 46px; } .gw-ov .do { font-size: 12px; } .gw-ov .aim { display: none; } .gw-ov .chip { font-size: 9.5px; padding: 1px 6px; } }
 .gw-ov { display: none !important; }
 .gw-now { display: none !important; }
-.gw-cap { height: 11.8em; display: flex; flex-direction: column; gap: 3px; overflow: hidden; font-size: 12.5px; line-height: 1.3; }
+.gw-cap { min-height: 11.8em; display: flex; flex-direction: column; gap: 3px; font-size: 12.5px; line-height: 1.3; }
+.gw-cap > * { flex-shrink: 0; }
 .gw-cap .l1 { display: flex; gap: 6px; align-items: center; white-space: nowrap; overflow: hidden; }
 .gw-minibox { display: none; flex-direction: column; align-items: center; gap: 3px; margin-top: 4px; font-size: 9.5px; line-height: 1.15; color: var(--color-fg-muted); text-transform: uppercase; letter-spacing: .03em; }
 .gw-minibox canvas { width: 54px; height: 108px; border-radius: 5px; background: #14101c; display: block; }
@@ -258,7 +259,7 @@
 .gw-cap .do { font-weight: 700; overflow-wrap: anywhere; }
 .gw-why { margin: 8px 0; border: 1px solid var(--color-border-line); border-radius: 8px; padding: 8px 10px; }
 .gw-whyh { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; } .gw-whyh b { flex: 1; }
-.gw-whyb { height: 13em; overflow-y: auto; overscroll-behavior: contain; margin-top: 6px; font-size: 12.5px; line-height: 1.35; display: flex; flex-direction: column; gap: 3px; }
+.gw-whyb { min-height: 13em; margin-top: 6px; font-size: 12.5px; line-height: 1.35; display: flex; flex-direction: column; gap: 3px; }
 .gw-whyb > div { overflow-wrap: anywhere; } .gw-whyb .stop { border-left: 3px solid #d9433f; padding-left: 6px; } .gw-whyb .sw { color: var(--color-fg-muted); }
 .gw-whyb .none { color: var(--color-fg-muted); }
 .gw-stops > summary { cursor: pointer; font-size: var(--cds-font-size-caption); padding: 8px 2px; }
@@ -330,7 +331,7 @@
 .gw-cap .budget i u { position: absolute; inset: 0 auto 0 0; width: var(--w); background: #4de3ff; }
 .gw-cap .budget.low i u { background: #d9433f; }
 .gw-cap .whyline.goal { font-size: 16px; font-weight: 700; color: var(--color-fg); }
-.gw-cap .whyline { font-size: 12px; color: var(--color-fg-muted); padding-left: 0; white-space: normal; overflow: hidden; }
+.gw-cap .whyline { font-size: 12px; color: var(--color-fg-muted); padding-left: 0; white-space: normal; }
 .gs-empty { color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); padding: var(--cds-pad-md) 0; }
 .gs-legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
 .gs-legend span::before { content: ''; display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; background: var(--c); border: 1.5px solid var(--c); vertical-align: -1px; }
@@ -441,13 +442,11 @@
   .gw-stage .gw-seg-row, .gw-stage .gw-boards, .gw-stage .gw-cap, .gw-stage #gw-scrub, .gw-stage .gw-ctl, .gw-stage .gw-over, .gw-stage .gw-why, .gw-stage #gw-strip, .gw-stage .gw-lw, .gw-stage .gw-stops { order: 0; }
   .gw-board canvas { height: clamp(240px, calc(100svh - 470px), 440px); }
   .gw-ctl { gap: 6px; } .gw-ctl .gw-btn { padding: 7px 10px; }
-  .gw-whyb { height: 11em; }
-  .gw-cap { height: 10.5em; }
   .gw-why { margin: 0; }
   .gw-list { height: 8.4em; }
   .gw-time { min-width: 0; flex: 1 1 100%; text-align: left; margin-left: 0; }
 }
-@media (max-width: 760px) { .gw-whyb { height: 9.5em; } .gw-cap { height: 9.5em; } .gw-why { margin: 4px 0; } .gw-stage { gap: 6px; } }
+@media (max-width: 760px) { .gw-why { margin: 4px 0; } .gw-stage { gap: 6px; } }
 @media (min-width: 980px) and (max-height: 599px) { .gw-stage { max-width: 680px; } }
 .gw-cap .goalline { display: flex; align-items: center; justify-content: space-between; gap: 4px 10px; flex-wrap: wrap; }   /* wraps rather than cutting the plan's name short */
 .gw-cap .gl-t { min-width: 0; overflow-wrap: anywhere; }
@@ -459,7 +458,7 @@
 .gs-latest td { white-space: nowrap !important; vertical-align: middle; }
 .gw-plain { display: grid; gap: 4px; margin: 8px 0; font-size: 14px; min-height: calc(2 * 2.9em + 4px); }
 .gw-plainr b { display: inline-block; min-width: 92px; color: var(--color-fg-muted); font-weight: 600; }
-.gw-plainr { height: 2.9em; overflow: hidden; }
+.gw-plainr { min-height: 2.9em; }
 .gs-latest-box { max-height: 460px; overflow-y: auto; }
 .gs-latest thead th { position: sticky; top: 0; background: var(--color-panel); z-index: 1; }
 .gs-latest .lt { font-size: 11.5px; color: var(--color-fg-muted); }
@@ -479,9 +478,6 @@
 .gs-collapse > :last-child { margin-bottom: 18px; }
 @media (max-width: 520px) { .gs-collapse > summary { padding: 14px 16px; } .gs-collapse > :not(summary) { margin-inline: 16px; } .gs-collapse > :last-child { margin-bottom: 14px; } }
 .gw-cap .whyline.expl { color: var(--color-fg); font-size: 13px; line-height: 1.35; }
-.gw-cap { height: 13.4em; }
-@media (min-width: 980px) and (min-height: 600px) { .gw-cap { height: 12.2em; } }
-@media (max-width: 760px) { .gw-cap { height: 11.2em; } }
 .gw-optsb { display: flex; flex-direction: column; gap: 2px; max-height: 16em; overflow-y: auto; font-size: 12.5px; }
 .gw-optsb .gw-note2 { color: var(--color-fg-muted); padding: 2px 2px 6px; line-height: 1.4; }
 .gw-opt { display: grid; grid-template-columns: 1.6em 1fr auto; gap: 2px 8px; padding: 4px 6px; border-radius: 6px; align-items: baseline; }
@@ -490,9 +486,6 @@
 .gw-opt i { font-style: normal; font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 999px; background: color-mix(in srgb, var(--color-fg) 12%, transparent); grid-column: 3; grid-row: 1; }
 .gw-opt.pick { background: color-mix(in srgb, var(--color-ok) 14%, transparent); } .gw-opt.pick i { background: var(--color-ok); color: #fff; }
 .gw-cap .whyline.expl { color: var(--color-fg-muted); font-size: 12.5px; }
-.gw-cap { height: 11em; }
-@media (min-width: 980px) and (min-height: 600px) { .gw-cap { height: 10em; } }
-@media (max-width: 760px) { .gw-cap { height: 8.2em; } }
 .gw-cap .whyline.why1 { color: var(--color-fg); font-size: 12.5px; }
 .gs-pop { position: fixed; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); z-index: 60; max-height: 40vh; overflow-y: auto; padding: 12px 14px; border-radius: 12px; background: var(--color-panel); color: var(--color-fg); border: 1px solid var(--color-fg-muted); box-shadow: 0 10px 30px rgba(0,0,0,.35); font-size: 14px; line-height: 1.4; font-family: var(--font-sans, system-ui, sans-serif); }
 @media (hover: none) {
@@ -514,6 +507,12 @@
 .pod-kill .pod-kn{font-weight:700;overflow-wrap:anywhere;min-width:0}
 .pod-kill .pod-kd{display:block;font-size:.8em;font-weight:400;opacity:.7;margin-top:2px}
 .pod-kill .pod-go{flex:0 0 auto;font-weight:700;white-space:nowrap}
+/* Explanation boxes: tall enough for their text (measured at 390px over the replays), so nothing is cut off and nothing moves while stepping */
+.gw-cap { min-height: 170px; }
+.gw-whyb { min-height: 470px; }
+#gw-s1.gw-st { min-height: 112px; }
+#gw-s2.gw-st { min-height: 72px; }
+.gw-plainr { min-height: 62px; }
 </style>
 
 <div class="gs" id="gs">
@@ -1486,7 +1485,12 @@ function projectPlan(G, seq, cursor) {
       c.textContent = w + '×' + h + (flag === 'm' ? ' shock' : flag === 'c' ? ' chain' : '') + (eta != null ? ' · ' + (eta / 60).toFixed(1) + 's' : state === 'w' ? ' · waiting' : '');
       el.appendChild(c); shown++;
     });
-    if (items.length > shown) { const m = document.createElement('span'); m.className = 'gw-chip more'; m.textContent = '+' + (items.length - shown); el.appendChild(m); }
+    // the row clips what does not fit on a phone: drop the chips that do not fit, and say how many are left as +N
+    const chipCount = () => el.querySelectorAll('.gw-chip:not(.more)').length;
+    const more = document.createElement('span'); more.className = 'gw-chip more'; el.appendChild(more);
+    const setMore = () => { const left = items.length - chipCount(); more.textContent = left > 0 ? '+' + left : ''; more.style.display = left > 0 ? '' : 'none'; };
+    setMore();
+    while (el.scrollWidth > el.clientWidth + 1 && chipCount() > 0) { const cs = el.querySelectorAll('.gw-chip:not(.more)'); cs[cs.length - 1].remove(); setMore(); }
   }
   // did the cursor move between two frames? When the stack rises a row the cursor's row number goes up by one to ride with it: that is not a move
   const cursorMoved = (a1, b1, mb) => { if (!a1 || !b1 || !a1[mb + 4] || !b1[mb + 4]) return false; const dr = b1[mb + 4] - a1[mb + 4], dc = b1[mb + 5] - a1[mb + 5]; if (dc === 0 && dr === 1 && b1[mb + 8] > a1[mb + 8] + 6) return false; return dr !== 0 || dc !== 0; };

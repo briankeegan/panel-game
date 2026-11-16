@@ -1011,7 +1011,7 @@ jobs:
       # its log is complete, so add every finished lobby bot run that is not on the page yet -- its games, the Gambit commit it played, and a
       # full-game replay of each loss. See dashboard/update_data.py. Never fails the job.
       - name: Update the Gambit stats page
-        if: ${{ always() && startsWith(inputs.mode, 'ranmaru') }}
+        if: ${{ always() && (startsWith(inputs.mode, 'ranmaru') || inputs.mode == 'fight') }}
         continue-on-error: true
         shell: bash
         run: |

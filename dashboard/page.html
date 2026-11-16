@@ -1982,7 +1982,7 @@ function projectPlan(G, seq, cursor) {
     const setSt = (k, html) => { g$(k).innerHTML = html; };
     cap.replaceChildren(); g$('mid').replaceChildren();
     if (!D.dec.length || i < 0) {
-      const t = document.createElement('div'); t.className = 'why'; t.textContent = D.dec.length ? (clock < 190 ? 'Countdown. Ranmaru has not acted yet.' : 'Before the first decision.') : 'No decisions were logged for this game.'; cap.appendChild(t); return;
+      const t = document.createElement('div'); t.className = 'why'; t.textContent = D.dec.length ? (clock < 190 ? 'Countdown. Ranmaru has not acted yet.' : 'Before the first decision.') : 'No decisions were logged for this game.'; cap.appendChild(t); renderPlain(null); return;
     }
     const d = D.dec[i], [c, mode, play, want, v, dies, land, chain, combo, thrown, eTop, eOut, eStop] = d;
     const L = PLAN.list(), e = L && L[i] && L[i][0] === c ? L[i] : null;

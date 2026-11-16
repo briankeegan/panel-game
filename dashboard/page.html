@@ -1800,13 +1800,24 @@ function projectPlan(G, seq, cursor) {
     const raw0 = d[17] || '', kind8 = kvOf(raw0, 'twinLo') || kvOf(raw0, 'free8');
     const pw = playWhy(play);
     // aim= (from the agent's build): the attack this line leaves one swap away: x4 a chain of 4, c6 a combo of 6, eight, or none
-    const aimTxt = (() => { const m = /^(x|c)(\d+)|^eight$|^none$/.exec(kvOf(raw0, 'aim') || ''); if (!m) return null;
-      if (m[1] === 'x') return 'a chain of ' + m[2]; if (m[1] === 'c') return 'a combo of ' + m[2]; if (m[0] === 'eight') return 'a combo of 8'; return 'nothing one swap away'; })();
+    const aimTxt = (() => { const a = kvOf(raw0, 'aim') || '';
+      let m;
+      if ((m = /^x(\d+)$/.exec(a))) return 'a chain of ' + m[1];
+      if ((m = /^c(\d+)$/.exec(a))) return 'a combo of ' + m[1];
+      if (a === 'eight') return 'a combo of 8';
+      if (a === 'none') return 'nothing one swap away';
+      if ((m = /^b(\d+)$/.exec(a))) return 'breaking ' + m[1] + ' garbage cell' + (m[1] === '1' ? '' : 's');
+      if ((m = /^ready-(\d+)$/.exec(a))) return 'a break in reach ' + m[1] + ' swap' + (m[1] === '1' ? '' : 's') + ' sooner';
+      if ((m = /^live\+(\d+)$/.exec(a))) return 'keeping the board alive, ' + m[1] + ' frames longer';
+      if ((m = /^flat(\S+)>(\S+)$/.exec(a))) return 'flattening the stack: bumpiness ' + m[1] + ' to ' + m[2];
+      if ((m = /^zip(\S+)>(\S+)$/.exec(a))) return 'sorting colours together: spread ' + m[1] + ' to ' + m[2];
+      const words = { drop: 'dropping panels', live: 'keeping the board alive', survive: 'surviving, which gains nothing on holding', raise: 'raising the stack', fall: 'letting the chain fall', settle: 'letting the panels settle', keep: 'holding: the rank put it first' };
+      return words[a] || null; })();
     const doing = aimTxt && play === 'setup' ? 'Setting up ' + aimTxt : aimTxt && play !== 'setup' ? (pw ? pw[0] : nice(play) || play) + ', toward ' + aimTxt
       : play === 'setup' ? (kind8 ? 'Setting up a combo of 8' : 'Setting up a better board, no combo or chain named') : (pw ? pw[0] : nice(play) || play);
     lines.push(['Doing', doing]);
     const ruleKey = kvOf(raw0, 'rule');
-    const ruleTxt = ruleKey === 'l' ? 'last resort: ' + (combo >= 4 ? 'a combo of ' + combo : chain >= 2 ? 'a chain of ' + chain : 'clears panels') + ', not on its list' : ({ e: 'a line from its list of the best candidates', t: 'a line chosen to break garbage', '-': 'not from its candidate list' })[ruleKey];
+    const ruleTxt = ruleKey === 'l' ? 'last resort: ' + (combo >= 4 ? 'a combo of ' + combo : chain >= 2 ? 'a chain of ' + chain : 'clears panels') + ', not on its list' : ({ e: 'a line from its list of the best candidates', t: 'a line chosen to break garbage', c: 'a line in progress that meets no entry of the list', n: 'a line that meets no entry of the list, played for its own goal', '-': 'not from its candidate list' })[ruleKey];
     // a hold says why it holds, from the handoff's fields: timing, a raise not yet open, nothing offered, or the rank put it first
     const heldKey = kvOf(raw0, 'held');
     const holdTxt = heldKey === 'raise' ? 'waiting for the raise to open'

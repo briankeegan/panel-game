@@ -157,7 +157,7 @@
 @media (max-width: 760px) {
   .gw-over .gw-btn { min-height: 40px; }
   #gw-body { grid-template-columns: minmax(0, 1fr); gap: 8px; }
-  .gw-stage { border-bottom: 1px solid var(--color-border-line); box-shadow: 0 6px 10px -8px rgba(0,0,0,.35); margin-inline: calc(-1 * var(--cds-pad-lg)); padding-inline: var(--cds-pad-lg); }
+  .gw-stage { position: static; border-bottom: 1px solid var(--color-border-line); box-shadow: 0 6px 10px -8px rgba(0,0,0,.35); margin-inline: calc(-1 * var(--cds-pad-lg)); padding-inline: var(--cds-pad-lg); }
   .gw-boards { gap: 4px; }
   .gw-board canvas { width: auto; max-width: 100%; height: min(20svh, 190px); }
   .gw-list { height: 5.4em; }
@@ -433,8 +433,8 @@
 #gw-pickd { display: none !important; }
 .gw-pager { margin: 2px 0 4px; }
 .gw-left, .gw-right { display: contents; }   /* phones and tablets: one column, same order as before */
-.gw-stage .gw-seg-row { order: 1; } .gw-stage .gw-boards { order: 2; } .gw-stage .gw-cap { order: 3; } .gw-stage .gw-now { order: 4; }
-.gw-stage #gw-scrub { order: 5; } .gw-stage .gw-ctl { order: 6; } .gw-stage .gw-over { order: 7; } .gw-stage .gw-why, .gw-stage #gw-strip, .gw-stage .gw-lw, .gw-stage .gw-stops { order: 8; }
+.gw-stage .gw-seg-row { order: 1; } .gw-stage .gw-boards { order: 2; } .gw-stage .gw-cap { order: 7; } .gw-stage .gw-now { order: 4; }
+.gw-stage #gw-scrub { order: 5; } .gw-stage .gw-ctl { order: 5; } .gw-stage .gw-over { order: 6; } .gw-stage .gw-why, .gw-stage #gw-strip, .gw-stage .gw-lw, .gw-stage .gw-stops { order: 8; }
 @media (min-width: 980px) and (min-height: 600px) {
   #sec-watch { gap: 6px; }
   .gw-stage { max-width: none; position: static; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 4px 28px; align-items: start; padding-block: 0; }
@@ -507,9 +507,9 @@
 .pod-kill .pod-kn{font-weight:700;overflow-wrap:anywhere;min-width:0}
 .pod-kill .pod-kd{display:block;font-size:.8em;font-weight:400;opacity:.7;margin-top:2px}
 .pod-kill .pod-go{flex:0 0 auto;font-weight:700;white-space:nowrap}
-/* Explanation boxes: tall enough for their text (measured at 390px over the replays), so nothing is cut off and nothing moves while stepping */
-.gw-cap { min-height: 170px; }
-.gw-whyb { min-height: 470px; }
+/* Boxes above the controls keep their measured minimum (390px, over the replays), so nothing above them moves; the Why text sits below the controls and fits its own text */
+.gw-cap { min-height: 0; }
+.gw-whyb { min-height: 0; }
 #gw-s1.gw-st { min-height: 112px; }
 #gw-s2.gw-st { min-height: 72px; }
 .gw-plainr { min-height: 62px; }

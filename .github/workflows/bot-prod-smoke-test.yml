@@ -1118,17 +1118,13 @@ jobs:
               gone=$((gone + 1))
               echo "$(date -u +%H:%M:%S) no bot run on $SERVER ($gone)"
               if [ "$gone" -ge 2 ]; then
-                recent=$(gh api "repos/$repo/actions/workflows/bot-prod-smoke-test.yml/runs?per_page=60" --jq '.workflow_runs[] | "\(.created_at)\t\(.display_title)\t\(.conclusion // "")"' 2>/dev/null) || { sleep 60; continue; }
+                recent=$(gh api "repos/$repo/actions/workflows/bot-prod-smoke-test.yml/runs?per_page=60" --jq '.workflow_runs[] | "\(.created_at)\t\(.display_title)"' 2>/dev/null) || { sleep 60; continue; }
                 lastlive=$(printf '%s\n' "$recent" | awk -F'\t' -v s="live · $SERVER · " 'index($2,s)==1 {print $1; exit}')
-                lastlive_end=$(printf '%s\n' "$recent" | awk -F'\t' -v s="live · $SERVER · " 'index($2,s)==1 {print $3; exit}')
-                # A bot run someone cancelled is a stop: it stays stopped.
-                if [ "$lastlive_end" = "cancelled" ]; then echo "the last bot run was cancelled: that is a stop, so nothing is restarted. This watcher ends."; echo "Cancelled on purpose: nothing restarted." >> "$GITHUB_STEP_SUMMARY"; exit 0; fi
                 stopped=$(printf '%s\n' "$recent" | awk -F'\t' -v s="ranmaru-stop · $SERVER" -v l="${lastlive:-}" 'index($2,s)==1 && $2 !~ /except=/ && $1 > l {print $1; exit}')
                 if [ -n "$stopped" ]; then echo "a stop ($stopped) came after the last bot: leaving it stopped, and this watcher ends"; echo "Stopped on purpose at $stopped: nothing restarted." >> "$GITHUB_STEP_SUMMARY"; exit 0; fi
-                # Cooldown: no restart if a bot started in the last 30 minutes.
-                since=$(date -u -d '30 minutes ago' +%Y-%m-%dT%H:%M:%SZ)
+                since=$(date -u -d '40 minutes ago' +%Y-%m-%dT%H:%M:%SZ)
                 n=$(printf '%s\n' "$recent" | awk -F'\t' -v s="live · $SERVER · " -v t="$since" 'index($2,s)==1 && $1 > t' | wc -l)
-                if [ "$n" -ge 1 ]; then echo "a bot started in the last 30 minutes: not restarting yet (waiting 10 min)"; gone=0; sleep 600; continue; fi
+                if [ "$n" -ge 4 ]; then echo "::warning::$n bots started in the last 40 minutes: not starting another (waiting 10 min)"; gone=0; sleep 600; continue; fi
                 echo "no bot on $SERVER: starting one"
                 gh workflow run bot-prod-smoke-test.yml --repo "$repo" --ref "$ref" -f mode=ranmaru-deploy -f server="$SERVER" -f advanced="force" && echo "A bot was started at $(date -u +%H:%M) UTC: none was running." >> "$GITHUB_STEP_SUMMARY"
                 gone=0; sleep 300; continue

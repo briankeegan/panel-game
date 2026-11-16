@@ -173,7 +173,6 @@
   #gw-prevd { grid-area: 1 / 1 / 2 / 2; } #gw-prevf { grid-area: 1 / 2 / 2 / 3; } #gw-play { grid-area: 1 / 3 / 2 / 5; font-size: 16px; }
   #gw-nextf { grid-area: 1 / 5 / 2 / 6; } #gw-nextd { grid-area: 1 / 6 / 2 / 7; }
   #gw-back10 { grid-area: 2 / 1 / 3 / 2; font-size: 11px !important; padding-inline: 2px !important; white-space: nowrap; }
-  #gw-plain[hidden] { display: grid !important; visibility: hidden; }
   #gw-speed { grid-area: 2 / 2 / 3 / 7; display: grid; grid-template-columns: repeat(4, 1fr); }
   #gw-speed button { min-height: 40px; font-size: 14px; }
   .gw-time { display: none; }
@@ -1790,7 +1789,7 @@ function projectPlan(G, seq, cursor) {
   let OPTS_KEY = null;
   // the decision in plain words: what it does, what it is for, what happens to the board and the garbage, and why
   function renderPlain(d) {
-    const el = g$('plain'); if (!d) { el.hidden = true; return; }
+    const el = g$('plain'); if (!d) { el.hidden = false; el.replaceChildren(); ['Line', 'Aiming for'].forEach((k, i) => { const r = document.createElement('div'); r.className = 'gw-plainr'; const kb = document.createElement('b'); kb.textContent = k; const vs = document.createElement('span'); vs.textContent = i === 0 ? 'waiting for the first decision' : ''; r.append(kb, vs); el.appendChild(r); }); return; }
     const play = String(d[2] || '').replace(/_/g, ' '), want = d[3], chain = Number(d[7]) || 0, combo = Number(d[8]) || 0;
     const broke = Number(kvOf(d[17] || '', 'broke')) || 0, sent = Number(d[6]) || 0, why = String(kvOf(d[17] || '', 'why') || '').replace(/_/g, ' ');
     const lines = [];

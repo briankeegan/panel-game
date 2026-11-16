@@ -1806,7 +1806,7 @@ function projectPlan(G, seq, cursor) {
       : play === 'setup' ? (kind8 ? 'Setting up a combo of 8' : 'Setting up a better board, no combo or chain named') : (pw ? pw[0] : nice(play) || play);
     lines.push(['Doing', doing]);
     const ruleKey = kvOf(raw0, 'rule');
-    const ruleTxt = ruleKey === 'l' ? 'last resort: ' + (combo >= 4 ? 'a combo of ' + combo : chain >= 2 ? 'a chain of ' + chain : 'clears panels') + ', not on its list' : ({ e: 'a line from its list of the best candidates', t: 'a line chosen to break garbage', '-': 'no line' })[ruleKey];
+    const ruleTxt = ruleKey === 'l' ? 'last resort: ' + (combo >= 4 ? 'a combo of ' + combo : chain >= 2 ? 'a chain of ' + chain : 'clears panels') + ', not on its list' : ({ e: 'a line from its list of the best candidates', t: 'a line chosen to break garbage', '-': 'not from its candidate list' })[ruleKey];
     // a hold says why it holds, from the handoff's fields: timing, a raise not yet open, nothing offered, or the rank put it first
     const heldKey = kvOf(raw0, 'held');
     const holdTxt = heldKey === 'raise' ? 'waiting for the raise to open'
@@ -1829,7 +1829,7 @@ function projectPlan(G, seq, cursor) {
     if (broke > 0 || sent > 0) lines.push(['Garbage', (broke > 0 ? 'breaks ' + broke + ' cell' + (broke === 1 ? '' : 's') : 'breaks none') + (sent > 0 ? ', sends ' + sent : '')]);
     if (why) lines.push(['Why', why]);
     el.replaceChildren();
-    const fixed = ['Line', 'Aiming for'].map((k) => [k, (lines.find((l) => l[0] === k) || [k, k === 'Aiming for' ? 'no combo or chain planned' : ''])[1]]);
+    const fixed = ['Line', 'Aiming for'].map((k) => [k, (lines.find((l) => l[0] === k) || [k, k === 'Aiming for' ? 'not stated in the log' : ''])[1]]);
     fixed.forEach(([k, v]) => { const r = document.createElement('div'); r.className = 'gw-plainr'; r.title = v; const kb = document.createElement('b'); kb.textContent = k; const vs = document.createElement('span'); vs.textContent = v; r.append(kb, vs); el.appendChild(r); });
     el.hidden = false;
   }

@@ -1836,6 +1836,7 @@ function projectPlan(G, seq, cursor) {
     if (lineTxt) lines.push(['Line', lineTxt]);
     const goal = []; if (combo > 0) goal.push('a combo of ' + combo); if (chain > 0) goal.push('a chain of ' + chain);
     if (goal.length) lines.push(['Aiming for', goal.join(' and ')]);
+    else if (aimTxt) lines.push(['Aiming for', aimTxt]);
     lines.push(['Board', d[4] === 'lives' ? 'stays alive' : 'is lost either way']);
     if (broke > 0 || sent > 0) lines.push(['Garbage', (broke > 0 ? 'breaks ' + broke + ' cell' + (broke === 1 ? '' : 's') : 'breaks none') + (sent > 0 ? ', sends ' + sent : '')]);
     if (why) lines.push(['Why', why]);

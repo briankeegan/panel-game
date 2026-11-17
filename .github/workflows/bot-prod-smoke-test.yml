@@ -482,7 +482,8 @@ jobs:
           # THE BOT AND A WATCHER RUN KEEP EACH OTHER UP. A runner can be taken away (the log ends with "The runner has received a shutdown
           # signal"), and then nothing on that runner can start a replacement. So there is a second run, ranmaru-watch, that only watches:
           # when no bot run is left on the server it starts a deploy. This bot's half of the deal: if no watcher run exists, start one.
-          if [ "$kind" = gambit ] && [ "$SERVER_EFF" = "$PROD_SERVER" ] && [ "${{ contains(inputs.advanced, 'no-restart') }}" != true ]; then
+          # Disabled: this started a watcher that starts deploys (with rotated bot names) by itself. Bots are started only by hand now.
+          if false; then
             ( parent=$$; sleep 90
               while kill -0 "$parent" 2>/dev/null && [ ! -e "$RUNNER_TEMP/stop-after-the-game" ]; do
                 w=$(GH_TOKEN="${{ github.token }}" gh api "repos/$GITHUB_REPOSITORY/actions/runs?per_page=100" --jq '.workflow_runs[] | select(.status != "completed") | select(.display_title | startswith("ranmaru-watch · " + env.SERVER_EFF)) | .id' 2>/dev/null | head -n 1) || w=skip

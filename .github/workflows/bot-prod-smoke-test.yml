@@ -518,6 +518,22 @@ jobs:
                 fi
               done ) &
           fi
+          # Heartbeat (for the agent): every 2 minutes the bot's status is written to the bot-status branch, file status/<bot>.txt,
+          # with the time it was written. A frozen bot shows an old time while the run still looks alive. Never fails the run.
+          if [ "$kind" = gambit ]; then
+            ( parent=$$; export GH_TOKEN="${{ github.token }}"; repo="$GITHUB_REPOSITORY"
+              key=$(printf '%s' "$name" | tr -c 'A-Za-z0-9_-' '_'); path="status/$key.txt"
+              gh api "repos/$repo/git/ref/heads/bot-status" >/dev/null 2>&1 || gh api -X POST "repos/$repo/git/refs" -f ref=refs/heads/bot-status -f sha="${{ github.sha }}" >/dev/null 2>&1 || true
+              while kill -0 "$parent" 2>/dev/null; do
+                st=$(cat "$PA_STATUS_FILE" 2>/dev/null || echo "no status yet")
+                body=$(printf 'run %s\nbot %s\nbot wrote: %s\nsent: %s\n' "$GITHUB_RUN_ID" "$name" "$st" "$(date -u +%Y-%m-%dT%H:%M:%SZ)")
+                sha=$(gh api "repos/$repo/contents/$path?ref=bot-status" --jq .sha 2>/dev/null || true)
+                enc=$(printf '%s' "$body" | base64 -w0)
+                if [ -n "$sha" ]; then gh api -X PUT "repos/$repo/contents/$path" -f message="status: $key" -f content="$enc" -f branch=bot-status -f sha="$sha" >/dev/null 2>&1 || true
+                else gh api -X PUT "repos/$repo/contents/$path" -f message="status: $key" -f content="$enc" -f branch=bot-status >/dev/null 2>&1 || true; fi
+                sleep 120
+              done ) &
+          fi
           deadline=$(( $(date +%s) + secs )); : > "$GITHUB_WORKSPACE/bot-prod-smoke.log"; rc=0
           while :; do
             left=$(( deadline - $(date +%s) )); [ "$left" -gt 60 ] || break

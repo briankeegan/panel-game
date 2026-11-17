@@ -499,8 +499,8 @@ jobs:
           # The server sometimes closes the connection (the bot then exits with 75): log back in and carry on until the hours are up,
           # so a dropped connection does not end the run and leave no bot in the lobby. 0 (a stop or deploy asked it to leave) and 124 (the hours ran out) end it.
           # Watchdog (Gambit only): the bot writes its state to PA_STATUS_FILE every 2 s (idle, starting = a game is about to begin,
-          # playing). If the file has gone stale for 3 minutes while the bot is IDLE, the bot has stopped answering: stop it, and the
-          # loop below logs it back in. It never stops a bot that is starting or playing a game.
+          # playing). If the file has gone stale for 3 minutes while IDLE, or for 10 minutes in any state, the bot has stopped
+          # answering: stop it, and the loop below logs it back in. A live game or a game about to start is never stopped early.
           export PA_STATUS_FILE="$RUNNER_TEMP/bot-status" WD_FLAG="$RUNNER_TEMP/watchdog-restart"; rm -f "$PA_STATUS_FILE" "$WD_FLAG"
           if [ "$kind" = gambit ]; then
             ( parent=$$
@@ -509,7 +509,8 @@ jobs:
                 [ -e "$PA_STATUS_FILE" ] || continue
                 read -r ts st < "$PA_STATUS_FILE" || continue
                 age=$(( $(date +%s) - ${ts%.*} ))
-                if [ "$st" = idle ] && [ "$age" -gt 180 ]; then
+                # a game lasts about a minute: a status that has not moved for 10 minutes is a frozen bot, in any state
+                if { [ "$st" = idle ] && [ "$age" -gt 180 ]; } || [ "$age" -gt 600 ]; then
                   echo "[watchdog] the idle bot has been silent for ${age}s: restarting it"
                   touch "$WD_FLAG"
                   pkill -f "luajit bot/playBot.lua $BOT_HOST $BOT_PORT" || true

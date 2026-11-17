@@ -818,8 +818,9 @@ jobs:
       # A deploy of GameCreator's latest Gambit changes the number only when Gambit changed: if nothing under Gambit's
       # code or profiles is newer than the start of the bot that is running now, nothing is started (`force` overrides).
       # If the lookup fails, it deploys as before.
-      - name: Skip when Gambit has not changed
-        if: ${{ inputs.mode == 'ranmaru-deploy' && env.SKIP != '1' && inputs.bot == 'gambit' && !contains(inputs.advanced, 'force') && !contains(inputs.advanced, 'gambit_from=') && !contains(inputs.advanced, 'profile=') }}
+      # Disabled: this step skipped a deploy whenever a bot run was open, even when nothing was in the lobby. A deploy now always starts a bot.
+      - name: Skip when Gambit has not changed (disabled)
+        if: ${{ false }}
         run: |
           set -u
           repo="${{ github.repository }}"

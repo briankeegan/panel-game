@@ -788,6 +788,8 @@ jobs:
           # a stop, deploy or handoff made since this bot started: someone is replacing it on purpose
           since=$(date -u -d "@${RUN_START:-$(date +%s)}" +%Y-%m-%dT%H:%M:%SZ)
           if printf '%s\n' "$runs" | awk -F'\t' -v me="$mine" -v t="$since" '$1!=me && $3>=t && ($4 ~ /^ranmaru-stop|^ranmaru-deploy|^bot-handoff|^fight/) {f=1} END{exit !f}'; then echo "a stop, deploy or handoff came after this bot started: not restarting"; exit 0; fi
+          # any stop, deploy, watcher, handoff or fight still open, whenever it started: it may be about to start a bot, so wait for it
+          if printf '%s\n' "$runs" | awk -F'\t' -v me="$mine" '$1!=me && $2!="completed" && $4 ~ /^(ranmaru-stop|ranmaru-deploy|ranmaru-watch|bot-handoff|fight)/ {f=1} END{exit !f}'; then echo "a stop, deploy, watcher or handoff is still open: not restarting on top of it"; exit 0; fi
           # another bot in the lobby (a live run still going, other than this one): nothing to do
           if printf '%s\n' "$runs" | awk -F'\t' -v me="$mine" -v s="live · ${SERVER_EFF} · " '$1!=me && $2!="completed" && index($4,s)==1 {f=1} END{exit !f}'; then echo "another bot is already running on ${SERVER_EFF}: not restarting"; exit 0; fi
           # at most one automatic restart every 30 minutes

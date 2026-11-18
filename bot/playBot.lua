@@ -98,8 +98,8 @@ local lastReadyAt = 0
 -- from the last game ending -- is left alone in it. For the last 10 s the bot warns: ready off 1 s, on 1 s, ... up to the
 -- last 3 s, which it holds ready; then it leaves the room, back to the lobby (a player can challenge again)
 local IDLE_LIMIT = tonumber(os.getenv("PA_IDLE_LIMIT") or "") or 0
--- PA_GAME_GAP seconds (default 60): after a game ends, the bot waits this long before it readies for the next one
-local GAME_GAP = tonumber(os.getenv("PA_GAME_GAP") or "") or 60
+-- PA_GAME_GAP seconds (default 0): after a game ends, the bot waits this long before it readies for the next one
+local GAME_GAP = tonumber(os.getenv("PA_GAME_GAP") or "") or 0   -- 0: ready for the rematch as soon as the game ends
 local lastMatchEndAt = nil
 local idleSince, readyNow = nil, nil
 -- PA_STOP_FILE: a file some other process creates to say "stop once no game is running" (a deploy or stop waits on the bot)

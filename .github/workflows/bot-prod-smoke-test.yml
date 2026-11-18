@@ -184,7 +184,10 @@ jobs:
           key=$(printf '%s' "$name" | tr -c 'A-Za-z0-9_-' '_'); path="status/$key.txt"
           while kill -0 "$job_parent" 2>/dev/null; do
             step=$(gh api "repos/$repo/actions/runs/$run/jobs" --jq '[.jobs[] | select(.name=="Run the bot")][0].steps[] | select(.status=="in_progress") | .name' 2>/dev/null | head -n 1)
-            body=$(printf 'run %s\nbot %s\nbot wrote: %s setup\nstep: %s\nsent: %s\n' "$run" "$name" "$(date +%s)" "${step:-none}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)")
+            # the state says where setup is (setup, standby, login); once the bot's own heartbeat takes over (launched), this stops
+            state=$(cat "$RUNNER_TEMP/bot-state" 2>/dev/null || echo setup)
+            [ "$state" = launched ] && break
+            body=$(printf 'run %s\nbot %s\nbot wrote: %s %s\nstep: %s\nsent: %s\n' "$run" "$name" "$(date +%s)" "$state" "${step:-none}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)")
             sha=$(gh api "repos/$repo/contents/$path?ref=bot-status" --jq .sha 2>/dev/null || true)
             enc=$(printf '%s' "$body" | base64 -w0)
             if [ -n "$sha" ]; then gh api -X PUT "repos/$repo/contents/$path" -f message="status: $key (setup)" -f content="$enc" -f branch=bot-status -f sha="$sha" >/dev/null 2>&1 || true
@@ -472,6 +475,8 @@ jobs:
             # (a rename takes over the account of the bot named AFTER; it waits for that one only)
             who="live · $BOT_HOST:$BOT_PORT · ${AFTER:-}"
             echo "standby: built; waiting for the older bots (${AFTER:-all}) on $BOT_HOST:$BOT_PORT to leave"
+            # the status says "standby" (built, not logged in): the deploy reads that as "the new bot is up" and asks the old bots to leave
+            echo standby > "$RUNNER_TEMP/bot-state"
             began=$(date -u +%s)
             while :; do
               out=$(GH_TOKEN="${{ github.token }}" gh api "repos/${{ github.repository }}/actions/runs?per_page=50" --jq "[ ([.workflow_runs[] | select(.status != \"completed\") | select(.id < $GITHUB_RUN_ID) | select(.display_title | startswith(\"$who\"))] | length), ([.workflow_runs[] | select(.display_title == \"bot-handoff · $BOT_HOST:$BOT_PORT\") | select((.created_at | fromdateiso8601) > $began)] | length) ] | @tsv" 2>/dev/null || echo "1 0")
@@ -481,6 +486,7 @@ jobs:
               sleep 2
             done
             echo "standby over: logging in"
+            echo login > "$RUNNER_TEMP/bot-state"
           fi
           # A stop / deploy / fight-start run for this server, made after this bot started, waits on it: the file tells the bot
           # to leave once no game is running (bot/playBot.lua PA_STOP_FILE). Runs made before it started are not about it.
@@ -517,6 +523,7 @@ jobs:
           # so a dropped connection does not end the run and leave no bot in the lobby. 0 (a stop or deploy asked it to leave) and 124 (the hours ran out) end it.
           # where the bot writes its status (the heartbeat below reads it, and the bot gets it from the environment)
           export PA_STATUS_FILE="$RUNNER_TEMP/bot-status"; rm -f "$PA_STATUS_FILE"
+          echo launched > "$RUNNER_TEMP/bot-state"   # the setup status loop stops; the heartbeat below writes the bot's own status
           echo "setup: heartbeat starting"
           # Heartbeat (for the agent): every 2 minutes the bot's status is written to the bot-status branch, file status/<bot>.txt,
           # with the time it was written. A frozen bot shows an old time while the run still looks alive. Never fails the run.
@@ -960,7 +967,7 @@ jobs:
           for _ in $(seq 1 180); do
             read -r e st < <(gh api "repos/$repo/contents/status/$key.txt?ref=bot-status" --jq .content 2>/dev/null | base64 -d 2>/dev/null | sed -n 's/^bot wrote: \([0-9][0-9]*\) \([a-z]*\).*/\1 \2/p')
             now_s=$(date +%s)
-            if [ -n "${e:-}" ] && [ $((now_s - e)) -lt 300 ] && { [ "${st:-}" = idle ] || [ "${st:-}" = starting ]; }; then up=1; break; fi
+            if [ -n "${e:-}" ] && [ $((now_s - e)) -lt 300 ] && { [ "${st:-}" = idle ] || [ "${st:-}" = starting ] || [ "${st:-}" = standby ]; }; then up=1; break; fi
             sleep 10
           done
           [ -n "$up" ] || { echo "::error::$NEWNAME did not come up in the lobby in 30 minutes: the old bots are left alone"; exit 1; }

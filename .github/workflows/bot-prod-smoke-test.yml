@@ -837,6 +837,11 @@ jobs:
   #                   server and advanced words (Gambit of GameCreator's latest main unless advanced pins one)
   ranmaru:
     name: Stop / deploy / fight
+    # One control run at a time per server: deploys and stops queue here instead of racing each other. The live bots are not in
+    # this group, so a bot's own run never waits on a control run.
+    concurrency:
+      group: bot-control-${{ inputs.server != 'auto' && inputs.server || 'panelattack.com:49569' }}
+      cancel-in-progress: false
     if: ${{ (startsWith(inputs.mode, 'ranmaru') && inputs.mode != 'ranmaru-watch' && inputs.mode != 'ranmaru-site') || (inputs.mode == 'fight' && !contains(inputs.advanced, 'bot_run')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 355
@@ -1008,18 +1013,12 @@ jobs:
             case "$t" in "live · "*) if [ "$now" = 0 ]; then waiting="$waiting $id"; continue; fi;; esac
             echo "cancelling $id"; gh api -X POST "repos/$repo/actions/runs/$id/cancel" >/dev/null || true
           done
+          # A stop does not hold open for a game: each lobby bot finishes its game and leaves by itself (it watches for this
+          # run), and uploads its own log. This run only asks, then ends, so control runs never pile up behind a game.
           if [ -n "$waiting" ]; then
-            echo "waiting for the bots to finish their games and leave:$waiting"
-            n=0
-            while :; do
-              left=""
-              for id in $waiting; do
-                [ "$(gh api "repos/$repo/actions/runs/$id" --jq .status)" = completed ] || left="$left $id"
-              done
-              [ -n "$left" ] || break
-              n=$((n + 1)); [ $((n % 20)) -ne 0 ] || echo "still waiting for:$left (put 'now' in Advanced to cancel them)"
-              sleep 15
-            done
+            echo "asked to leave after their games (not waited for):$waiting"
+            echo "Asked to leave after their games (this run does not wait):$waiting" >> "$GITHUB_STEP_SUMMARY"
+            ids=""
           fi
           for id in $ids; do
             for _ in $(seq 1 60); do

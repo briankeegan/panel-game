@@ -371,13 +371,17 @@ function BotClient:startMatch()
       -- over the wire (no LOOSE_SYNC_GARBAGE upstream) off that stack: its garbage on the way, its top row, its stop and shake.
       package.loaded["gambit.native"] = package.loaded["gambit.native"]
         or dofile(assert(os.getenv("GC_EVAL_DIR"), "gambit needs GC_EVAL_DIR") .. "/../gambit/lua/GambitNative.lua")
+      print("match start: gambit: creating the link")
       self.link = package.loaded["gambit.native"].new({})
+      print("match start: gambit: the link is created")
     elseif self.brainKind == "bitbot" then
       self.link = require("bot.BitBotNative").new({})
     else
       self.link = require("bot.SurvivalLink").new({})
     end
+    print("match start: gambit: the link is starting the match")
     self.link:startMatch(self.myStack, self.match)
+    print("match start: gambit: the link has started the match")
   end
   self.matchEnded, self.outcome, self._resultReported = false, nil, false
   logger.info(string.format("bot[%s]: match built; my stack = slot %d", self.name, self.localPlayerNumber))

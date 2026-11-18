@@ -1,8 +1,4 @@
-run 44340697113, as of 2026-11-18T16:30:48Z
-opponent topped out: clock 3120 stopWatch 2932 stop 129 pre-stop 18 shake 70 health 51, top rows r12=gggggg r11=531000 r10=154323
-opponent topped out: clock 3150 stopWatch 2962 stop 117 pre-stop 0 shake 75 health 51, top rows r12=gggggg r11=gggggg r10=531000
-opponent topped out: clock 3180 stopWatch 2992 stop 87 pre-stop 0 shake 45 health 51, top rows r12=gggggg r11=gggggg r10=531000
-garbage landed: our stopWatch 3023 clock 3211, transits in flight before this frame {3023}, opponent copy 5 frames behind, rollbacks so far 0
+run 44340697113, as of 2026-11-18T16:32:51Z
 opponent topped out: clock 3210 stopWatch 3022 stop 57 pre-stop 0 shake 74 health 51, top rows r12=gggggg r11=gggggg r10=gggggg
 opponent topped out: clock 3240 stopWatch 3052 stop 27 pre-stop 0 shake 44 health 51, top rows r12=gggggg r11=gggggg r10=gggggg
 opponent topped out: clock 3270 stopWatch 3082 stop 0 pre-stop 0 shake 14 health 51, top rows r12=gggggg r11=gggggg r10=gggggg
@@ -149,3 +145,7 @@ match against: paneleitor
 match over — bot won (pace: worst 0.28 frames off schedule); waiting for a rematch
 game about to start: both players are ready
 set over: the room is closed, back in the lobby
+game about to start: both players are ready
+match start: building the match (seed nil, stage nil, opponent ?)
+match start: the match is built
+match start: the match is started

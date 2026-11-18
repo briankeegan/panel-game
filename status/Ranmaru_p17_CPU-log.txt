@@ -1,4 +1,4 @@
-run 44359844891, as of 2026-11-18T19:01:05Z
+run 44359844891, as of 2026-11-18T19:03:09Z
 
 === Bot 'Ranmaru_p17_CPU' (gambit, L10, cursor 4/12, unranked) is idle in the lobby on panelattack.com:49569 ===
     Open your client, CHALLENGE 'Ranmaru_p17_CPU' in the lobby, and play — it auto-accepts.
@@ -99,3 +99,31 @@ garbage landed: our stopWatch 1486 clock 1674, transits in flight before this fr
 garbage landed: our stopWatch 1882 clock 2070, transits in flight before this frame {}, opponent copy 2 frames behind, rollbacks so far 0
 garbage landed: our stopWatch 2360 clock 2548, transits in flight before this frame {}, opponent copy 2 frames behind, rollbacks so far 0
 garbage landed: our stopWatch 2467 clock 2655, transits in flight before this frame {2467}, opponent copy 3 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 2946 clock 3134, transits in flight before this frame {}, opponent copy 2 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 3082 clock 3270, transits in flight before this frame {}, opponent copy 2 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 3315 clock 3503, transits in flight before this frame {3351}, opponent copy 2 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 3850 clock 4038, transits in flight before this frame {}, opponent copy 3 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 3854 clock 4042, transits in flight before this frame {}, opponent copy 2 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 4078 clock 4266, transits in flight before this frame {}, opponent copy 3 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 4248 clock 4436, transits in flight before this frame {4248}, opponent copy 3 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 4469 clock 4657, transits in flight before this frame {4507}, opponent copy 3 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 4483 clock 4671, transits in flight before this frame {4507}, opponent copy 3 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 4487 clock 4675, transits in flight before this frame {4507}, opponent copy 3 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 4949 clock 5137, transits in flight before this frame {}, opponent copy 3 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 4966 clock 5154, transits in flight before this frame {}, opponent copy 3 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 4970 clock 5158, transits in flight before this frame {}, opponent copy 3 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 5125 clock 5313, transits in flight before this frame {5167}, opponent copy 3 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 5366 clock 5554, transits in flight before this frame {}, opponent copy 3 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 6057 clock 6245, transits in flight before this frame {6057}, opponent copy 3 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 6445 clock 6633, transits in flight before this frame {}, opponent copy 2 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 6754 clock 6942, transits in flight before this frame {}, opponent copy 2 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 8018 clock 8206, transits in flight before this frame {}, opponent copy 3 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 8926 clock 9114, transits in flight before this frame {8970}, opponent copy 3 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 9488 clock 9676, transits in flight before this frame {}, opponent copy 3 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 9491 clock 9679, transits in flight before this frame {}, opponent copy 3 frames behind, rollbacks so far 0
+opponent topped out: clock 9780 stopWatch 9592 stop 30 pre-stop 96 shake 62 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+REPLAY {"inputs":[["A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","
+engine rolled our stack back 0 times for late garbage this match
+match against: Wyniverse
+match over — bot lost (pace: worst 0.25 frames off schedule); waiting for a rematch
+game about to start: both players are ready

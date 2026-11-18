@@ -919,7 +919,8 @@
     }
     const rl = recent.filter((g) => g.res === 'L').length;
     $('form-note').textContent = recent.length ? 'Newest first. Click a game to watch it.' : 'No games in this selection.';
-    $('form-sum').textContent = recent.length ? (recent.length === 1 ? 'the latest game' : 'latest ' + recent.length) + ': ' + (recent.length - rl) + ' won, ' + rl + ' lost' : '';
+    const sentSum = recent.reduce((t, g) => t + (Number(g.sent) || 0), 0);
+    $('form-sum').textContent = recent.length ? (recent.length === 1 ? 'the latest game' : 'latest ' + recent.length) + ': ' + (recent.length - rl) + ' won, ' + rl + ' lost, ' + sentSum + ' garbage blocks sent' : '';
 
     // per-version stats (opponent filter applied)
     const vs = vers.map((v) => Object.assign({}, v, stat(byOpp.filter((g) => g.sha === v.sha)))).filter((v) => v.n > 0 && (v.n >= (narrow ? 0 : minn) || v.sha === ver));

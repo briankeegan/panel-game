@@ -1,5 +1,13 @@
-run 44340697113, as of 2026-11-18T16:18:26Z
+run 44340697113, as of 2026-11-18T16:20:29Z
 
 === Bot 'Ranmaru_p11_CPU' (gambit, L10, cursor 4/12, unranked) is idle in the lobby on panelattack.com:49569 ===
     Open your client, CHALLENGE 'Ranmaru_p11_CPU' in the lobby, and play — it auto-accepts.
     Ctrl+C to stop.
+
+game about to start: both players are ready
+match start: building the match (seed nil, stage nil, opponent ?)
+match start: the match is built
+match start: the match is started
+both ready — match starting
+garbage landed: our stopWatch 457 clock 645, transits in flight before this frame {}, opponent copy 0 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 932 clock 1120, transits in flight before this frame {}, opponent copy 0 frames behind, rollbacks so far 0

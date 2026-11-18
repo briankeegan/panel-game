@@ -332,7 +332,12 @@ end
 -- client runs -- with our stack local and the opponent's fed by relayed inputs.
 function BotClient:startMatch()
   local Match = require("common.engine.Match")
+  print(string.format("match start: building the match (seed %s, stage %s, opponent %s)",
+    tostring(self.matchStart.replay and self.matchStart.replay.settings and self.matchStart.replay.settings.panelSource and self.matchStart.replay.settings.panelSource.seed),
+    tostring(self.matchStart.replay and self.matchStart.replay.settings and self.matchStart.replay.settings.metadata and self.matchStart.replay.settings.metadata.stageId),
+    tostring(self.oppName or "?")))
   self.match = Match.createFromReplay(self.matchStart.replay)
+  print("match start: the match is built")
   self.myStack = self.match.stacks[self.localPlayerNumber]
   if not self.myStack then
     error("bot[" .. self.name .. "]: no stack at slot " .. tostring(self.localPlayerNumber))
@@ -352,6 +357,7 @@ function BotClient:startMatch()
     if stack ~= self.myStack then self.oppStack, self.oppNumber = stack, i end
   end
   self.match:start()
+  print("match start: the match is started")
   if self.brainKind == "weighted" then
     self.brain = require("bot.WeightedBrain").new({ profile = self.searchProfile })
     self.controller = require("bot.CursorController").new(self.cursorSpeed)

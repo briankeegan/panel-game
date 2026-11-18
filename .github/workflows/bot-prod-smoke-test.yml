@@ -924,6 +924,17 @@ jobs:
             [ -n "$id" ] && break; sleep 5
           done
           [ -n "$id" ] || { echo "::error::the new bot's run did not appear: the old bots are left alone"; exit 1; }
+          # the old bots leave only once the NEW bot is confirmed up: its status says idle or starting, written in the last 5 minutes.
+          # If that never happens, the old bots are left alone (the step fails; nothing is asked to leave).
+          key=$(printf '%s' "$NEWNAME" | tr -c 'A-Za-z0-9_-' '_'); up=""
+          for _ in $(seq 1 180); do
+            read -r e st < <(gh api "repos/$repo/contents/status/$key.txt?ref=bot-status" --jq .content 2>/dev/null | base64 -d 2>/dev/null | sed -n 's/^bot wrote: \([0-9][0-9]*\) \([a-z]*\).*/\1 \2/p')
+            now_s=$(date +%s)
+            if [ -n "${e:-}" ] && [ $((now_s - e)) -lt 300 ] && { [ "${st:-}" = idle ] || [ "${st:-}" = starting ]; }; then up=1; break; fi
+            sleep 10
+          done
+          [ -n "$up" ] || { echo "::error::$NEWNAME did not come up in the lobby in 30 minutes: the old bots are left alone"; exit 1; }
+          echo "$NEWNAME is up (${st}): asking the old bots to leave" >> "$GITHUB_STEP_SUMMARY"
           now=""; case " $ADVANCED " in *" now "*) now=" now";; esac
           gh workflow run bot-prod-smoke-test.yml --repo "$repo" --ref "${{ github.ref_name }}" -f mode=ranmaru-stop -f server="$SERVER" -f advanced="except=$id$now"
           echo "The new bot ($NEWNAME, run $id) is built and waiting. A stop run was started for the old bots on $SERVER (it spares run $id): each leaves after its game, and the new bot logs in when they are gone." >> "$GITHUB_STEP_SUMMARY"

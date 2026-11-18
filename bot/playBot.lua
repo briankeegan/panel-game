@@ -98,6 +98,9 @@ local lastReadyAt = 0
 -- from the last game ending -- is left alone in it. For the last 10 s the bot warns: ready off 1 s, on 1 s, ... up to the
 -- last 3 s, which it holds ready; then it leaves the room, back to the lobby (a player can challenge again)
 local IDLE_LIMIT = tonumber(os.getenv("PA_IDLE_LIMIT") or "") or 0
+-- PA_GAME_GAP seconds (default 60): after a game ends, the bot waits this long before it readies for the next one
+local GAME_GAP = tonumber(os.getenv("PA_GAME_GAP") or "") or 60
+local lastMatchEndAt = nil
 local idleSince, readyNow = nil, nil
 -- PA_STOP_FILE: a file some other process creates to say "stop once no game is running" (a deploy or stop waits on the bot)
 local STOP_FILE = os.getenv("PA_STOP_FILE")
@@ -165,7 +168,8 @@ while true do
 
   -- (Re)ready every 1.5s while in a room with an opponent and no match running;
   -- retrying survives the post-match reset back to character select.
-  if not stopAt and not bot.match and not bot.matchStart and bot.inRoom and playerCount() >= 2 then
+  local gapOver = not lastMatchEndAt or socket.gettime() - lastMatchEndAt >= GAME_GAP
+  if not stopAt and not bot.match and not bot.matchStart and bot.inRoom and playerCount() >= 2 and gapOver then
     local now = socket.gettime()
     idleSince = idleSince or now
     local idle = now - idleSince
@@ -218,6 +222,7 @@ while true do
     print("match against: " .. (#others > 0 and table.concat(others, ", ") or "?"))
     print(string.format("match over — bot %s (pace: worst %.2f frames off schedule); waiting for a rematch",
       tostring(bot.outcome), worstOffSchedule))
+    lastMatchEndAt = socket.gettime()
     local vsTarget = false
     if challengeTarget and bot.players then
       for _, p in pairs(bot.players) do if p.name ~= name and BotClient.nameMatches(challengeTarget, p.name) then vsTarget = true end end

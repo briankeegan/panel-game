@@ -792,7 +792,8 @@ jobs:
       # while another bot is in the lobby, never twice within 30 minutes, and never for a bot that lasted under 10 minutes (it would loop).
       # It starts the same name with versus-player (no deploy, no rename).
       - name: Bring the bot back if it ended on its own
-        if: ${{ always() && env.MODE == 'live' && env.BOT_KIND == 'gambit' && !contains(inputs.advanced, 'no-restart') && !contains(inputs.advanced, 'bot_run') }}
+        # never on a cancel: a cancelled run starts nothing (a cancel is someone stopping it on purpose)
+        if: ${{ always() && !cancelled() && env.MODE == 'live' && env.BOT_KIND == 'gambit' && !contains(inputs.advanced, 'no-restart') && !contains(inputs.advanced, 'bot_run') }}
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}

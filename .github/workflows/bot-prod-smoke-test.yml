@@ -487,6 +487,8 @@ jobs:
           idle=60; [ -z "$target" ] || idle=0
           # The server sometimes closes the connection (the bot then exits with 75): log back in and carry on until the hours are up,
           # so a dropped connection does not end the run and leave no bot in the lobby. 0 (a stop or deploy asked it to leave) and 124 (the hours ran out) end it.
+          # where the bot writes its status (the heartbeat below reads it, and the bot gets it from the environment)
+          export PA_STATUS_FILE="$RUNNER_TEMP/bot-status"; rm -f "$PA_STATUS_FILE"
           # Heartbeat (for the agent): every 2 minutes the bot's status is written to the bot-status branch, file status/<bot>.txt,
           # with the time it was written. A frozen bot shows an old time while the run still looks alive. Never fails the run.
           if [ "$kind" = gambit ]; then

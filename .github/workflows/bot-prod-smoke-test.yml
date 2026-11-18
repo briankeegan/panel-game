@@ -502,6 +502,9 @@ jobs:
                 : > "$RUNNER_TEMP/planned-restart"; touch "$PA_STOP_FILE"; echo "4 hours: leaving after the current game, then starting again"
               fi
               ids=$(GH_TOKEN="${{ github.token }}" gh api "repos/${{ github.repository }}/actions/runs?per_page=30" --jq ".workflow_runs[] | select(.status != \"completed\") | select(.display_title | test(\"^(ranmaru-stop|fight-start) · $BOT_HOST:$BOT_PORT( · .*)?\$\")) | select((.created_at | fromdateiso8601) > $started) | select(((.display_title | capture(\"except=(?<x>[0-9]+)\")? | .x) // \"0\") != \"$GITHUB_RUN_ID\") | .id" 2>/dev/null || true)
+              # the NEWEST live bot on this server is never asked to leave (the one with the latest code): a stop only removes older bots
+              newest=$(GH_TOKEN="${{ github.token }}" gh api "repos/${{ github.repository }}/actions/runs?per_page=50&status=in_progress" --jq "[.workflow_runs[] | select(.display_title | startswith(\"live · $BOT_HOST:$BOT_PORT · \")) | .id] | max // 0" 2>/dev/null || echo 0)
+              if [ -n "$ids" ] && [ "$newest" = "$GITHUB_RUN_ID" ]; then ids=""; fi
               if [ -n "$ids" ]; then
                 touch "$PA_STOP_FILE"
                 # the bot sits out its last seconds after a game; the next bot comes in during them

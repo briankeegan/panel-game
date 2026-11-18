@@ -974,7 +974,7 @@ jobs:
           # If that never happens, the old bots are left alone (the step fails; nothing is asked to leave).
           key=$(printf '%s' "$NEWNAME" | tr -c 'A-Za-z0-9_-' '_'); up=""
           for _ in $(seq 1 180); do
-            read -r e st < <(gh api "repos/$repo/contents/status/$key.txt?ref=bot-status" --jq .content 2>/dev/null | base64 -d 2>/dev/null | sed -n 's/^bot wrote: \([0-9][0-9]*\) \([a-z]*\).*/\1 \2/p')
+            read -r e st < <(gh api "repos/$repo/contents/status/$key.txt?ref=bot-status" --jq .content 2>/dev/null | base64 -d 2>/dev/null | sed -n 's/^bot wrote: \([0-9][0-9]*\) \([a-z]*\).*/\1 \2/p') || true   # no status yet is not an error: the loop keeps waiting
             now_s=$(date +%s)
             if [ -n "${e:-}" ] && [ $((now_s - e)) -lt 300 ] && { [ "${st:-}" = idle ] || [ "${st:-}" = starting ] || [ "${st:-}" = standby ]; }; then up=1; break; fi
             sleep 10

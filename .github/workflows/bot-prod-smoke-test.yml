@@ -177,19 +177,23 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          repo="$GITHUB_REPOSITORY"
-          key=$(printf '%s' "$BOT_NAME" | tr -c 'A-Za-z0-9_-' '_'); path="status/$key.txt"
-          gh api "repos/$repo/git/ref/heads/bot-status" >/dev/null 2>&1 || gh api -X POST "repos/$repo/git/refs" -f ref=refs/heads/bot-status -f sha="${{ github.sha }}" >/dev/null 2>&1 || true
-          ( parent=$$
-            while kill -0 "$parent" 2>/dev/null; do
-              step=$(gh api "repos/$repo/actions/runs/$GITHUB_RUN_ID/jobs" --jq '[.jobs[] | select(.name=="Run the bot")][0].steps[] | select(.status=="in_progress") | .name' 2>/dev/null | head -n 1)
-              body=$(printf 'run %s\nbot %s\nbot wrote: %s setup\nstep: %s\nsent: %s\n' "$GITHUB_RUN_ID" "$BOT_NAME" "$(date +%s)" "${step:-none}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)")
-              sha=$(gh api "repos/$repo/contents/$path?ref=bot-status" --jq .sha 2>/dev/null || true)
-              enc=$(printf '%s' "$body" | base64 -w0)
-              if [ -n "$sha" ]; then gh api -X PUT "repos/$repo/contents/$path" -f message="status: $key (setup)" -f content="$enc" -f branch=bot-status -f sha="$sha" >/dev/null 2>&1 || true
-              else gh api -X PUT "repos/$repo/contents/$path" -f message="status: $key (setup)" -f content="$enc" -f branch=bot-status >/dev/null 2>&1 || true; fi
-              sleep 60
-            done ) &
+          # a separate process (setsid): a background job started in a step is stopped when the step ends, so this must not be one
+          cat > "$RUNNER_TEMP/status-loop.sh" <<'LOOP'
+          #!/usr/bin/env bash
+          repo="$1"; run="$2"; name="$3"; job_parent="$4"
+          key=$(printf '%s' "$name" | tr -c 'A-Za-z0-9_-' '_'); path="status/$key.txt"
+          while kill -0 "$job_parent" 2>/dev/null; do
+            step=$(gh api "repos/$repo/actions/runs/$run/jobs" --jq '[.jobs[] | select(.name=="Run the bot")][0].steps[] | select(.status=="in_progress") | .name' 2>/dev/null | head -n 1)
+            body=$(printf 'run %s\nbot %s\nbot wrote: %s setup\nstep: %s\nsent: %s\n' "$run" "$name" "$(date +%s)" "${step:-none}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)")
+            sha=$(gh api "repos/$repo/contents/$path?ref=bot-status" --jq .sha 2>/dev/null || true)
+            enc=$(printf '%s' "$body" | base64 -w0)
+            if [ -n "$sha" ]; then gh api -X PUT "repos/$repo/contents/$path" -f message="status: $key (setup)" -f content="$enc" -f branch=bot-status -f sha="$sha" >/dev/null 2>&1 || true
+            else gh api -X PUT "repos/$repo/contents/$path" -f message="status: $key (setup)" -f content="$enc" -f branch=bot-status >/dev/null 2>&1 || true; fi
+            sleep 60
+          done
+          LOOP
+          chmod +x "$RUNNER_TEMP/status-loop.sh"
+          setsid nohup "$RUNNER_TEMP/status-loop.sh" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" "$BOT_NAME" "$PPID" >/dev/null 2>&1 < /dev/null &
 
       - name: Install luajit + luarocks
         run: |

@@ -483,18 +483,6 @@ jobs:
           # signal"), and then nothing on that runner can start a replacement. So there is a second run, ranmaru-watch, that only watches:
           # when no bot run is left on the server it starts a deploy. This bot's half of the deal: if no watcher run exists, start one.
           # Disabled: this started a watcher that starts deploys (with rotated bot names) by itself. Bots are started only by hand now.
-          if false; then
-            ( parent=$$; sleep 90
-              while kill -0 "$parent" 2>/dev/null && [ ! -e "$RUNNER_TEMP/stop-after-the-game" ]; do
-                w=$(GH_TOKEN="${{ github.token }}" gh api "repos/$GITHUB_REPOSITORY/actions/runs?per_page=100" --jq '.workflow_runs[] | select(.status != "completed") | select(.display_title | startswith("ranmaru-watch · " + env.SERVER_EFF)) | .id' 2>/dev/null | head -n 1) || w=skip
-                if [ -z "$w" ]; then
-                  echo "[watch] no watcher run: starting one"
-                  GH_TOKEN="${{ github.token }}" gh workflow run bot-prod-smoke-test.yml --repo "$GITHUB_REPOSITORY" --ref "${{ github.ref_name }}" -f mode=ranmaru-watch -f server="$SERVER_EFF" || echo "[watch] could not start a watcher"
-                  sleep 120
-                fi
-                for _ in $(seq 1 6); do kill -0 "$parent" 2>/dev/null || break; sleep 10; done
-              done ) &
-          fi
           # a player who does not start a game within 60 s is left alone in the room (not for a bot that challenges someone)
           idle=60; [ -z "$target" ] || idle=0
           # The server sometimes closes the connection (the bot then exits with 75): log back in and carry on until the hours are up,
@@ -510,8 +498,8 @@ jobs:
                 [ -e "$PA_STATUS_FILE" ] || continue
                 read -r ts st < "$PA_STATUS_FILE" || continue
                 age=$(( $(date +%s) - ${ts%.*} ))
-                # a game lasts about a minute: a status that has not moved for 10 minutes is a frozen bot, in any state
-                if { [ "$st" = idle ] && [ "$age" -gt 180 ]; } || [ "$age" -gt 600 ]; then
+                # only a bot that is idle in the lobby is restarted; a game being played or about to start is never stopped
+                if [ "$st" = idle ] && [ "$age" -gt 180 ]; then
                   echo "[watchdog] the idle bot has been silent for ${age}s: restarting it"
                   touch "$WD_FLAG"
                   pkill -f "luajit bot/playBot.lua $BOT_HOST $BOT_PORT" || true

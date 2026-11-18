@@ -497,6 +497,10 @@ jobs:
           export PA_STOP_FILE="$RUNNER_TEMP/stop-after-the-game"; rm -f "$PA_STOP_FILE" "$PA_STOP_FILE.grace"
           started=$(date -u +%s)
           ( while sleep 10; do
+              # a planned restart at 4 hours (the run is capped at 5): leave after the current game, then the restart step starts it again
+              if [ "$kind" = gambit ] && [ ! -e "$RUNNER_TEMP/planned-restart" ] && [ $(( $(date -u +%s) - started )) -ge 14400 ]; then
+                : > "$RUNNER_TEMP/planned-restart"; touch "$PA_STOP_FILE"; echo "4 hours: leaving after the current game, then starting again"
+              fi
               ids=$(GH_TOKEN="${{ github.token }}" gh api "repos/${{ github.repository }}/actions/runs?per_page=30" --jq ".workflow_runs[] | select(.status != \"completed\") | select(.display_title | test(\"^(ranmaru-stop|fight-start) · $BOT_HOST:$BOT_PORT( · .*)?\$\")) | select((.created_at | fromdateiso8601) > $started) | select(((.display_title | capture(\"except=(?<x>[0-9]+)\")? | .x) // \"0\") != \"$GITHUB_RUN_ID\") | .id" 2>/dev/null || true)
               if [ -n "$ids" ]; then
                 touch "$PA_STOP_FILE"
@@ -799,7 +803,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -u
-          if [ -e "$RUNNER_TEMP/stop-after-the-game" ]; then echo "a stop or deploy asked this bot to leave: nothing to restart"; exit 0; fi
+          if [ -e "$RUNNER_TEMP/stop-after-the-game" ] && [ ! -e "$RUNNER_TEMP/planned-restart" ]; then echo "a stop or deploy asked this bot to leave: nothing to restart"; exit 0; fi
           ran=$(( $(date +%s) - ${RUN_START:-$(date +%s)} ))
           if [ "$ran" -lt 600 ]; then echo "ended after only $ran s: not restarting (it would loop)"; exit 0; fi
           runs=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?per_page=100" --jq '.workflow_runs[] | "\(.id)\t\(.status)\t\(.created_at)\t\(.display_title)"' 2>/dev/null) || { echo "could not list the runs: not restarting"; exit 0; }
@@ -1170,59 +1174,6 @@ jobs:
   # last bot, which is a stop meant to stay, or the last 40 minutes already saw 4 bots start (a loop). Every bot run starts a watcher when
   # there is none, so the two keep each other up. Watchers hand over to the next one before the 6-hour cap; the oldest watcher stays when
   # two are found.
-  watcher:
-    name: Watch the lobby bot
-    if: ${{ inputs.mode == 'ranmaru-watch' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 355
-    permissions:
-      actions: write
-      contents: read
-    env:
-      GH_TOKEN: ${{ github.token }}
-      SERVER: ${{ inputs.server != 'auto' && inputs.server || 'panelattack.com:49569' }}
-      ADVANCED: ${{ inputs.advanced }}
-    steps:
-      - name: Watch
-        run: |
-          set -u
-          repo="$GITHUB_REPOSITORY"; me="$GITHUB_RUN_ID"; ref="${{ github.ref_name }}"; nl=$'\t'
-          prev=""; for w in $ADVANCED; do case "$w" in after=*) prev=${w#after=};; esac; done
-          end=$(( $(date +%s) + 335 * 60 ))
-          gone=0
-          echo "Watching $SERVER (run $me${prev:+, taking over from $prev}). It starts a bot when none is left."
-          while [ "$(date +%s)" -lt "$end" ]; do
-            act=$(gh api "repos/$repo/actions/runs?per_page=100" --jq '.workflow_runs[] | select(.status != "completed") | "\(.id)\t\(.display_title)"' 2>/dev/null) || { echo "could not list the runs: trying again"; sleep 60; continue; }
-            has() { printf '%s\n' "$act" | grep -qF -- "${nl}$1"; }
-            older=$(printf '%s\n' "$act" | awk -F'\t' -v s="ranmaru-watch · $SERVER" -v me="$me" -v prev="$prev" 'index($2,s)==1 && $1<me && $1!=prev {print $1; exit}')
-            if [ -n "$older" ]; then echo "watcher $older is older: this one leaves"; exit 0; fi
-            if has "live · $SERVER · " || has "ranmaru-deploy · $SERVER" || has "ranmaru-stop · $SERVER" || has "bot-handoff · $SERVER"; then
-              gone=0
-            else
-              gone=$((gone + 1))
-              echo "$(date -u +%H:%M:%S) no bot run on $SERVER ($gone)"
-              if [ "$gone" -ge 2 ]; then
-                recent=$(gh api "repos/$repo/actions/workflows/bot-prod-smoke-test.yml/runs?per_page=60" --jq '.workflow_runs[] | "\(.created_at)\t\(.display_title)"' 2>/dev/null) || { sleep 60; continue; }
-                lastlive=$(printf '%s\n' "$recent" | awk -F'\t' -v s="live · $SERVER · " 'index($2,s)==1 {print $1; exit}')
-                stopped=$(printf '%s\n' "$recent" | awk -F'\t' -v s="ranmaru-stop · $SERVER" -v l="${lastlive:-}" 'index($2,s)==1 && $2 !~ /except=/ && $1 > l {print $1; exit}')
-                if [ -n "$stopped" ]; then echo "a stop ($stopped) came after the last bot: leaving it stopped, and this watcher ends"; echo "Stopped on purpose at $stopped: nothing restarted." >> "$GITHUB_STEP_SUMMARY"; exit 0; fi
-                since=$(date -u -d '40 minutes ago' +%Y-%m-%dT%H:%M:%SZ)
-                n=$(printf '%s\n' "$recent" | awk -F'\t' -v s="live · $SERVER · " -v t="$since" 'index($2,s)==1 && $1 > t' | wc -l)
-                if [ "$n" -ge 4 ]; then echo "::warning::$n bots started in the last 40 minutes: not starting another (waiting 10 min)"; gone=0; sleep 600; continue; fi
-                echo "no bot on $SERVER: starting one"
-                gh workflow run bot-prod-smoke-test.yml --repo "$repo" --ref "$ref" -f mode=ranmaru-deploy -f server="$SERVER" -f advanced="force" && echo "A bot was started at $(date -u +%H:%M) UTC: none was running." >> "$GITHUB_STEP_SUMMARY"
-                gone=0; sleep 300; continue
-              fi
-            fi
-            sleep 60
-          done
-          echo "nearly 6 hours: handing over to the next watcher"
-          gh workflow run bot-prod-smoke-test.yml --repo "$repo" --ref "$ref" -f mode=ranmaru-watch -f server="$SERVER" -f advanced="after=$me"
-          for _ in $(seq 1 18); do
-            gh api "repos/$repo/actions/runs?per_page=100" --jq '.workflow_runs[] | select(.status != "completed") | select(.display_title | startswith("ranmaru-watch · " + env.SERVER)) | .id' 2>/dev/null | awk -v me="$me" '$1 > me' | grep -q . && break
-            sleep 10
-          done
-
   # stats-rebuild: rebuild the stats page from dashboard/page.html and publish it to gh-pages, using the same site_open/site_push as a bot run.
   # No bot and no server is touched. Dispatch with ref bramp/multi-player.
   stats-rebuild:

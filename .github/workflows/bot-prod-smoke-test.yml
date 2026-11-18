@@ -401,6 +401,7 @@ jobs:
             [ -f "$GC_EVAL_DIR/$gp" ] || { echo "no Gambit profile $GC_EVAL_DIR/$gp"; exit 1; }
             sh "$G/build.sh" native > gambit-build.log 2>&1 || { cat gambit-build.log; echo "libgambit.so did not build"; exit 1; }
             GC_SURVIVOR_PROFILE="$GC_EVAL_DIR/$gp" node "$G/words.js" > "$PWD/gambit.words" 2>> gambit-build.log || { cat gambit-build.log; echo "Gambit's profile did not encode"; exit 1; }
+            echo "setup: Gambit profile encoded"
             gc=$(git -C "$GC_EVAL_DIR" log -1 --format=%h)
             [ -z "${GAMBIT_COMMIT:-}" ] || gc="${GAMBIT_COMMIT:0:8} (gambit_from '${{ env.GAMBIT_FROM }}'; main is $gc)"
             echo "::notice::Gambit built from GameCreator $gc, profile $gp"
@@ -418,6 +419,7 @@ jobs:
             pin="taskset -c 0"
             echo "::notice::Gambit: the client on CPU 0, Gambit on $gcpu, its 4 workers on ${wcpus:-$gcpu}"
             brain=gambit
+            echo "setup: Gambit ready"
           else
             prof='${{ env.PROFILE }}'
             prof_abs=""
@@ -440,6 +442,7 @@ jobs:
           only=""; [ "$kind" = gambit ] && only="$target"
           decline=""; if [ "$kind" = wasm ]; then case "${prof:-}" in *.wasm.json) ;; *) decline=TWO_PLAYER_TIME_ATTACK ;; esac; fi
           cd "$BOT_DIR"
+          echo "setup: bot directory ready"
           # The server hands a new name its account id at the first login. Save it to the bot branch the
           # moment it is written, not only when the run ends: a run that dies would lose it.
           (
@@ -514,6 +517,7 @@ jobs:
           # so a dropped connection does not end the run and leave no bot in the lobby. 0 (a stop or deploy asked it to leave) and 124 (the hours ran out) end it.
           # where the bot writes its status (the heartbeat below reads it, and the bot gets it from the environment)
           export PA_STATUS_FILE="$RUNNER_TEMP/bot-status"; rm -f "$PA_STATUS_FILE"
+          echo "setup: heartbeat starting"
           # Heartbeat (for the agent): every 2 minutes the bot's status is written to the bot-status branch, file status/<bot>.txt,
           # with the time it was written. A frozen bot shows an old time while the run still looks alive. Never fails the run.
           if [ "$kind" = gambit ]; then
@@ -538,6 +542,7 @@ jobs:
               done ) &
           fi
           deadline=$(( $(date +%s) + secs )); : > "$GITHUB_WORKSPACE/bot-prod-smoke.log"; rc=0
+          echo "setup: launching the bot"
           while :; do
             left=$(( deadline - $(date +%s) )); [ "$left" -gt 60 ] || break
             PA_IDLE_LIMIT="$idle" PA_CHALLENGE="$target" PA_CHALLENGE_GAMES="$games" PA_CHALLENGE_FIRST_TO="$first" PA_ACCEPT_ONLY="$only" PA_DECLINE_MODES="$decline" timeout "$left" $pin luajit bot/playBot.lua "$BOT_HOST" "$BOT_PORT" "$name" 4 12 "$brain" \

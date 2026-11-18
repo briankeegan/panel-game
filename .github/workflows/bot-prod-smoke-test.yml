@@ -767,7 +767,9 @@ jobs:
           if printf '%s\n' "$runs" | awk -F'\t' -v me="$mine" -v t="$cut" '$1!=me && $3>=t && index($4,"live · ")==1 {f=1} END{exit !f}'; then echo "a bot was started in the last 30 minutes: not restarting"; exit 0; fi
           echo "the bot ended on its own after $((ran / 60)) min, and nothing else is up: starting ${BOT_NAME} again"
           # the deploy path gives the NEXT number (Ranmaru_p#_CPU -> p7, p8, ...), so the restart is named by the build's number, not the old name
-          gh workflow run bot-prod-smoke-test.yml --repo "$GITHUB_REPOSITORY" --ref "${{ github.ref_name }}" -f mode=ranmaru-deploy -f server="${SERVER_EFF}" -f bot="${BOT_KIND}" -f name='Ranmaru_p#_CPU' -f advanced=force && echo "Restarted with the next number after it ended on its own." >> "$GITHUB_STEP_SUMMARY"
+          # the same letter and the next number: Ranmaru_q5_CPU -> Ranmaru_q#_CPU (any letter works; the letter changes after 99)
+          tmpl=$(echo "$BOT_NAME" | sed -E 's/([a-z])[0-9]+_/\1#_/')
+          gh workflow run bot-prod-smoke-test.yml --repo "$GITHUB_REPOSITORY" --ref "${{ github.ref_name }}" -f mode=ranmaru-deploy -f server="${SERVER_EFF}" -f bot="${BOT_KIND}" -f name="$tmpl" -f advanced=force && echo "Restarted with the next number after it ended on its own." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Fail if the run failed
         if: steps.smoke.outcome == 'failure' || steps.largegarbage.outcome == 'failure' || steps.live.outcome == 'failure' || steps.fight.outcome == 'failure'

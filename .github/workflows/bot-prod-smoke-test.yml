@@ -770,8 +770,9 @@ jobs:
       # A lobby bot that ends on its own -- the hours ran out, the connection could not be kept, the runner died -- is replaced at once, so
       # the lobby is never left without one. Not when a stop or deploy asked it to leave, and not when it lived under 10 minutes (a bot that
       # cannot stay up must not start itself in a loop). `no-restart` in Advanced turns this off.
-      - name: Bring the bot back if it ended on its own
-        if: ${{ always() && env.MODE == 'live' && env.BOT_KIND == 'gambit' && contains(env.BOT_NAME, '_p') && !contains(inputs.advanced, 'no-restart') && !contains(inputs.advanced, 'bot_run') }}
+      # Disabled: this started a replacement (a forced deploy with a new name) whenever a bot run ended for any reason, even a working bot.
+      - name: Bring the bot back if it ended on its own (disabled)
+        if: ${{ false }}
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}

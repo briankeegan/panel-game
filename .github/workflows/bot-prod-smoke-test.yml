@@ -187,7 +187,8 @@ jobs:
             # the state says where setup is (setup, standby, login); once the bot's own heartbeat takes over (launched), this stops
             state=$(cat "$RUNNER_TEMP/bot-state" 2>/dev/null || echo setup)
             [ "$state" = launched ] && break
-            body=$(printf 'run %s\nbot %s\nbot wrote: %s %s\nstep: %s\nsent: %s\n' "$run" "$name" "$(date +%s)" "$state" "${step:-none}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)")
+            chk=$(cat "$RUNNER_TEMP/standby-check" 2>/dev/null || echo "not waiting")
+            body=$(printf 'run %s\nbot %s\nbot wrote: %s %s\nstep: %s\nwait: %s\nsent: %s\n' "$run" "$name" "$(date +%s)" "$state" "${step:-none}" "$chk" "$(date -u +%Y-%m-%dT%H:%M:%SZ)")
             sha=$(gh api "repos/$repo/contents/$path?ref=bot-status" --jq .sha 2>/dev/null || true)
             enc=$(printf '%s' "$body" | base64 -w0)
             if [ -n "$sha" ]; then gh api -X PUT "repos/$repo/contents/$path" -f message="status: $key (setup)" -f content="$enc" -f branch=bot-status -f sha="$sha" >/dev/null 2>&1 || true
@@ -481,6 +482,9 @@ jobs:
             while :; do
               out=$(GH_TOKEN="${{ github.token }}" gh api "repos/${{ github.repository }}/actions/runs?per_page=50" --jq "[ ([.workflow_runs[] | select(.status != \"completed\") | select(.id < $GITHUB_RUN_ID) | select(.display_title | startswith(\"$who\"))] | length), ([.workflow_runs[] | select(.display_title == \"bot-handoff · $BOT_HOST:$BOT_PORT\") | select((.created_at | fromdateiso8601) > $began)] | length) ] | @tsv" 2>/dev/null || echo "1 0")
               set -- $out; older=${1:-1}; handoff=${2:-0}
+              # every check is visible: the status feed shows it, and the log prints each change
+              printf 'older live bots=%s, handoff seen=%s, checked %s\n' "$older" "$handoff" "$(date -u +%H:%M:%S)" > "$RUNNER_TEMP/standby-check"
+              [ "$out" = "${last:-}" ] || { echo "standby check: older live bots=$older, handoff seen=$handoff"; last="$out"; }
               [ "$older" -eq 0 ] && break
               [ "$handoff" -gt 0 ] && { echo "the old bot has finished its game and is sitting out its last seconds"; break; }
               sleep 2

@@ -502,6 +502,13 @@ jobs:
                 enc=$(printf '%s' "$body" | base64 -w0)
                 if [ -n "$sha" ]; then gh api -X PUT "repos/$repo/contents/$path" -f message="status: $key" -f content="$enc" -f branch=bot-status -f sha="$sha" >/dev/null 2>&1 || true
                 else gh api -X PUT "repos/$repo/contents/$path" -f message="status: $key" -f content="$enc" -f branch=bot-status >/dev/null 2>&1 || true; fi
+                # the bot's recent log (its last 150 lines) goes to status/<bot>-log.txt the same way, so the log can be read while the run goes on
+                lpath="status/$key-log.txt"
+                ltxt=$(tail -n 150 "$GITHUB_WORKSPACE/bot-prod-smoke.log" 2>/dev/null | cut -c1-300 || true)
+                lsha=$(gh api "repos/$repo/contents/$lpath?ref=bot-status" --jq .sha 2>/dev/null || true)
+                lenc=$(printf 'run %s, as of %s\n%s\n' "$GITHUB_RUN_ID" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$ltxt" | base64 -w0)
+                if [ -n "$lsha" ]; then gh api -X PUT "repos/$repo/contents/$lpath" -f message="log: $key" -f content="$lenc" -f branch=bot-status -f sha="$lsha" >/dev/null 2>&1 || true
+                else gh api -X PUT "repos/$repo/contents/$lpath" -f message="log: $key" -f content="$lenc" -f branch=bot-status >/dev/null 2>&1 || true; fi
                 sleep 120
               done ) &
           fi

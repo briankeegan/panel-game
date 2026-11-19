@@ -841,7 +841,10 @@ jobs:
     # One control run at a time per server: deploys and stops queue here instead of racing each other. The live bots are not in
     # this group, so a bot's own run never waits on a control run.
     concurrency:
-      group: bot-control-${{ inputs.server != 'auto' && inputs.server || 'panelattack.com:49569' }}
+      # A deploy's own stop for the old bots (advanced except=<new run>) gets a group of its own: GitHub keeps ONE pending run per group and
+      # cancels the older one, so in the shared group that stop cancelled any deploy queued behind the deploy that made it (a second deploy,
+      # or the auto-redeploy of newer code). It only asks and does not wait, and the newest live bot ignores stops, so it needs no queue.
+      group: ${{ contains(inputs.advanced, 'except=') && format('bot-stop-{0}', github.run_id) || format('bot-control-{0}', inputs.server != 'auto' && inputs.server || 'panelattack.com:49569') }}
       cancel-in-progress: false
     if: ${{ (startsWith(inputs.mode, 'ranmaru') && inputs.mode != 'ranmaru-watch' && inputs.mode != 'ranmaru-site') || (inputs.mode == 'fight' && !contains(inputs.advanced, 'bot_run')) }}
     runs-on: ubuntu-latest

@@ -1,6 +1,6 @@
 run 44547910574
 bot Ranmaru_q37_CPU
-bot wrote: 1795099776 setup
-step: Install luajit + luarocks
+bot wrote: 1795099838 setup
+step: Install lua rocks (luasocket, luafilesystem, luautf8)
 wait: not waiting
-sent: 2026-11-19T14:49:36Z
+sent: 2026-11-19T14:50:38Z

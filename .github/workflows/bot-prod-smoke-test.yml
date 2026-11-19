@@ -503,15 +503,24 @@ jobs:
               # takes -- the new bot builds and waits logged out, the deploy's stop asks this bot to leave after its game, and the new bot
               # logs in during the 8 s grace. No gap, nothing to guess. Only if no stop for this bot has come 40 minutes later (the deploy
               # failed) does it fall back to leaving after its game and letting "Bring the bot back" start one.
-              if [ "$kind" = gambit ] && [ ! -e "$RUNNER_TEMP/restart-deploy" ] && [ $(( $(date -u +%s) - started )) -ge 14400 ]; then
+              # MEMORY: Gambit's heap only grows (its pools reach new peaks and nothing goes back to the system), so a bot whose memory after
+              # a match passes 70% of the machine's RAM hands over the same way, early -- long before the kernel would kill it mid-game.
+              why=""
+              if [ "$kind" = gambit ] && [ ! -e "$RUNNER_TEMP/restart-deploy" ]; then
+                if [ $(( $(date -u +%s) - started )) -ge 14400 ]; then why="4 hours"; fi
+                rss=$(grep 'memory after match: rss' "$GITHUB_WORKSPACE/bot-prod-smoke.log" 2>/dev/null | tail -n 1 | sed -n 's/.*rss \([0-9][0-9]*\) kB.*/\1/p')
+                tot=$(awk '/^MemTotal:/ {print $2}' /proc/meminfo)
+                if [ -n "$rss" ] && [ -n "$tot" ] && [ $(( rss * 100 )) -ge $(( tot * 70 )) ]; then why="memory $((rss / 1024)) MB of $((tot / 1024)) MB"; fi
+              fi
+              if [ -n "$why" ]; then
                 date -u +%s > "$RUNNER_TEMP/restart-deploy"
-                echo "4 hours: starting a deploy of the latest code to take over after the current game"
+                echo "$why: starting a deploy of the latest code to take over after the current game"
                 GH_TOKEN="${{ github.token }}" gh workflow run bot-prod-smoke-test.yml --repo "${{ github.repository }}" --ref "${{ github.ref_name }}" \
                   -f mode=ranmaru-deploy -f server="$BOT_HOST:$BOT_PORT" -f bot=gambit -f name='Ranmaru_p#_CPU' -f advanced=force \
-                  || echo "4 hours: the deploy could not be started (the fallback below takes over in 40 minutes)"
+                  || echo "$why: the deploy could not be started (the fallback below takes over in 40 minutes)"
               fi
               if [ -e "$RUNNER_TEMP/restart-deploy" ] && [ ! -e "$RUNNER_TEMP/planned-restart" ] && [ $(( $(date -u +%s) - $(cat "$RUNNER_TEMP/restart-deploy") )) -ge 2400 ]; then
-                : > "$RUNNER_TEMP/planned-restart"; touch "$PA_STOP_FILE"; echo "4 hours + 40 min and no replacement came: leaving after the current game, then starting again"
+                : > "$RUNNER_TEMP/planned-restart"; touch "$PA_STOP_FILE"; echo "a restart deploy was started 40 min ago and no replacement came: leaving after the current game, then starting again"
               fi
               # one listing serves both checks. A stop counts whether or not it has finished yet (it was made after this bot started),
               # so a stop run quicker than the 30 s between checks is not missed.
@@ -585,7 +594,7 @@ jobs:
               done ) &
           fi
           deadline=$(( $(date +%s) + secs )); : > "$GITHUB_WORKSPACE/bot-prod-smoke.log"; rc=0
-          echo "setup: launching the bot"
+          echo "setup: launching the bot (machine RAM $(awk '/^MemTotal:/ {printf "%d MB", $2/1024}' /proc/meminfo), $(nproc) CPUs)"
           while :; do
             left=$(( deadline - $(date +%s) )); [ "$left" -gt 60 ] || break
             PA_IDLE_LIMIT="$idle" PA_CHALLENGE="$target" PA_CHALLENGE_GAMES="$games" PA_CHALLENGE_FIRST_TO="$first" PA_ACCEPT_ONLY="$only" PA_DECLINE_MODES="$decline" timeout "$left" $pin luajit bot/playBot.lua "$BOT_HOST" "$BOT_PORT" "$name" 4 12 "$brain" \

@@ -1,5 +1,54 @@
-run 44443424317, as of 2026-11-19T02:23:42Z
+run 44443424317, as of 2026-11-19T02:25:45Z
 
 === Bot 'Ranmaru_q33_CPU' (gambit, L10, cursor 4/12, unranked) is idle in the lobby on panelattack.com:49569 ===
     Open your client, CHALLENGE 'Ranmaru_q33_CPU' in the lobby, and play — it auto-accepts.
     Ctrl+C to stop.
+
+game about to start: both players are ready
+match start: building the match (seed nil, stage nil, opponent ?)
+match start: the match is built
+match start: the match is started
+match start: gambit: creating the link
+match start: gambit: the link is created
+match start: gambit: the link is starting the match
+match start: gambit: the link has started the match
+both ready — match starting
+garbage landed: our stopWatch 513 clock 701, transits in flight before this frame {513}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 546 clock 734, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+opponent topped out: clock 780 stopWatch 592 stop 60 pre-stop 32 shake 76 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 810 stopWatch 622 stop 60 pre-stop 2 shake 46 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+garbage landed: our stopWatch 860 clock 1048, transits in flight before this frame {860}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 1884 clock 2072, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 2489 clock 2677, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 3141 clock 3329, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 3479 clock 3667, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 3809 clock 3997, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 3844 clock 4032, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 4237 clock 4425, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 4526 clock 4714, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 4955 clock 5143, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 4959 clock 5147, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 5025 clock 5213, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 5040 clock 5228, transits in flight before this frame {5091}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 5067 clock 5255, transits in flight before this frame {5091}, opponent copy 1 frames behind, rollbacks so far 0
+REPLAY {"mine":1,"settings":{"stacks":[{"inputMethod":"controller","levelData":{"shockFrequency":41,"shockCap":3,"colors":6,"maxHealth":1,"adjacentDenialFrequency":1,"stop":{"coefficient":2,"dangerCoefficient":2,"formula":1,"comboConstant":22,"chainConstant":56,"dangerConstant":88},"frameConstants":
+engine rolled our stack back 0 times for late garbage this match
+match against: CptnRedstone
+match over — bot lost (pace: worst 0.80 frames off schedule); waiting for a rematch
+memory after match: rss 4065024 kB, threads 7, lua 50544 kB
+game about to start: both players are ready
+match start: building the match (seed nil, stage nil, opponent ?)
+match start: the match is built
+match start: the match is started
+match start: gambit: creating the link
+match start: gambit: the link is created
+match start: gambit: the link is starting the match
+match start: gambit: the link has started the match
+both ready — match starting
+garbage landed: our stopWatch 380 clock 568, transits in flight before this frame {380}, opponent copy 1 frames behind, rollbacks so far 0
+REPLAY {"mine":1,"settings":{"stacks":[{"inputMethod":"controller","levelData":{"shockFrequency":41,"shockCap":3,"colors":6,"maxHealth":1,"adjacentDenialFrequency":1,"stop":{"coefficient":2,"dangerCoefficient":2,"formula":1,"comboConstant":22,"chainConstant":56,"dangerConstant":88},"frameConstants":
+engine rolled our stack back 0 times for late garbage this match
+match against: CptnRedstone
+match over — bot lost (pace: worst 0.70 frames off schedule); waiting for a rematch
+memory after match: rss 4382492 kB, threads 7, lua 53419 kB
+game about to start: both players are ready

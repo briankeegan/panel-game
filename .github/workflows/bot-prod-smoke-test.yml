@@ -498,7 +498,11 @@ jobs:
           export PA_STOP_FILE="$RUNNER_TEMP/stop-after-the-game"; rm -f "$PA_STOP_FILE" "$PA_STOP_FILE.grace"
           started=$(date -u +%s)
           # API BUDGET: GITHUB_TOKEN has 1000 REST calls/hour for the whole repo. This loop makes ONE call every 30 s (120/hour).
-          ( while sleep 30; do
+          # THE LOOP MUST NEVER DIE: the step runs under set -e and pipefail, so one command that fails here (a grep that finds nothing
+          # before the first match did, at 41cedfcb) would end the loop silently -- no stop is seen, no restart started. So: +e, and every
+          # lookup guarded.
+          ( set +e +o pipefail
+            while sleep 30; do
               # THE 4-HOUR RESTART IS A DEPLOY (the run is capped at ~6h): at 4h this bot starts a ranmaru-deploy, the same path new code
               # takes -- the new bot builds and waits logged out, the deploy's stop asks this bot to leave after its game, and the new bot
               # logs in during the 8 s grace. No gap, nothing to guess. Only if no stop for this bot has come 40 minutes later (the deploy
@@ -508,8 +512,8 @@ jobs:
               why=""
               if [ "$kind" = gambit ] && [ ! -e "$RUNNER_TEMP/restart-deploy" ]; then
                 if [ $(( $(date -u +%s) - started )) -ge 14400 ]; then why="4 hours"; fi
-                rss=$(grep 'memory after match: rss' "$GITHUB_WORKSPACE/bot-prod-smoke.log" 2>/dev/null | tail -n 1 | sed -n 's/.*rss \([0-9][0-9]*\) kB.*/\1/p')
-                tot=$(awk '/^MemTotal:/ {print $2}' /proc/meminfo)
+                rss=$(grep 'memory after match: rss' "$GITHUB_WORKSPACE/bot-prod-smoke.log" 2>/dev/null | tail -n 1 | sed -n 's/.*rss \([0-9][0-9]*\) kB.*/\1/p' || true)
+                tot=$(awk '/^MemTotal:/ {print $2}' /proc/meminfo 2>/dev/null || true)
                 if [ -n "$rss" ] && [ -n "$tot" ] && [ $(( rss * 100 )) -ge $(( tot * 70 )) ]; then why="memory $((rss / 1024)) MB of $((tot / 1024)) MB"; fi
               fi
               if [ -n "$why" ]; then

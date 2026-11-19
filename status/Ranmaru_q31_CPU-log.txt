@@ -1,5 +1,65 @@
-run 44437796335, as of 2026-11-19T01:34:32Z
+run 44437796335, as of 2026-11-19T01:36:34Z
 
 === Bot 'Ranmaru_q31_CPU' (gambit, L10, cursor 4/12, unranked) is idle in the lobby on panelattack.com:49569 ===
     Open your client, CHALLENGE 'Ranmaru_q31_CPU' in the lobby, and play — it auto-accepts.
     Ctrl+C to stop.
+
+game about to start: both players are ready
+match start: building the match (seed nil, stage nil, opponent ?)
+match start: the match is built
+match start: the match is started
+match start: gambit: creating the link
+match start: gambit: the link is created
+match start: gambit: the link is starting the match
+match start: gambit: the link has started the match
+both ready — match starting
+garbage landed: our stopWatch 406 clock 594, transits in flight before this frame {406}, opponent copy 0 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 510 clock 698, transits in flight before this frame {}, opponent copy 0 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 981 clock 1169, transits in flight before this frame {981}, opponent copy -1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 1287 clock 1475, transits in flight before this frame {}, opponent copy -1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 1349 clock 1537, transits in flight before this frame {1349}, opponent copy 0 frames behind, rollbacks so far 0
+opponent topped out: clock 1560 stopWatch 1372 stop 0 pre-stop 0 shake 53 health 1, top rows r12=gggggg r11=gggggg r10=ggg000
+opponent topped out: clock 1590 stopWatch 1402 stop 0 pre-stop 0 shake 23 health 1, top rows r12=gggggg r11=gggggg r10=ggg000
+REPLAY {"settings":{"metadata":{"completed":false,"ranked":false,"stageId":"panel-attack-magellan-night","stacks":[{"characterId":"pa_characters_dragon","publicId":12078,"stackIndex":1,"name":"Ranmaru_q31_CPU","wins":0,"panelId":"panelhd_basic_mizunoketsuban","level":10},{"characterId":"PA_Magellan"
+engine rolled our stack back 0 times for late garbage this match
+match against: bramp
+match over — bot won (pace: worst 0.17 frames off schedule); waiting for a rematch
+game about to start: both players are ready
+match start: building the match (seed nil, stage nil, opponent ?)
+match start: the match is built
+match start: the match is started
+match start: gambit: creating the link
+match start: gambit: the link is created
+match start: gambit: the link is starting the match
+match start: gambit: the link has started the match
+both ready — match starting
+garbage landed: our stopWatch 516 clock 704, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 740 clock 928, transits in flight before this frame {740}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 1233 clock 1421, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 1672 clock 1860, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+opponent topped out: clock 1950 stopWatch 1762 stop 0 pre-stop 0 shake 62 health 1, top rows r12=gggggg r11=ggg000 r10=gggggg
+opponent topped out: clock 1950 stopWatch 1762 stop 0 pre-stop 0 shake 62 health 1, top rows r12=gggggg r11=ggg000 r10=gggggg
+opponent topped out: clock 1980 stopWatch 1792 stop 60 pre-stop 134 shake 32 health 1, top rows r12=gggggg r11=ggg000 r10=gggggg
+opponent topped out: clock 2010 stopWatch 1822 stop 60 pre-stop 104 shake 2 health 1, top rows r12=gggggg r11=ggg000 r10=gggggg
+opponent topped out: clock 2040 stopWatch 1852 stop 60 pre-stop 74 shake 0 health 1, top rows r12=gggggg r11=ggg000 r10=gggggg
+opponent topped out: clock 2070 stopWatch 1882 stop 60 pre-stop 44 shake 0 health 1, top rows r12=gggggg r11=ggg000 r10=gggggg
+opponent topped out: clock 2100 stopWatch 1912 stop 60 pre-stop 14 shake 0 health 1, top rows r12=gggggg r11=ggg000 r10=gggggg
+garbage landed: our stopWatch 1926 clock 2114, transits in flight before this frame {1926}, opponent copy 1 frames behind, rollbacks so far 0
+opponent topped out: clock 2130 stopWatch 1942 stop 90 pre-stop 50 shake 0 health 1, top rows r12=gggggg r11=ggg000 r10=gggggg
+opponent topped out: clock 2130 stopWatch 1942 stop 90 pre-stop 50 shake 0 health 1, top rows r12=gggggg r11=ggg000 r10=gggggg
+opponent topped out: clock 2130 stopWatch 1942 stop 90 pre-stop 50 shake 0 health 1, top rows r12=gggggg r11=ggg000 r10=gggggg
+opponent topped out: clock 2130 stopWatch 1942 stop 90 pre-stop 50 shake 0 health 1, top rows r12=gggggg r11=ggg000 r10=gggggg
+opponent topped out: clock 2160 stopWatch 1972 stop 90 pre-stop 20 shake 0 health 1, top rows r12=gggggg r11=ggg000 r10=gggggg
+opponent topped out: clock 2190 stopWatch 2002 stop 80 pre-stop 0 shake 0 health 1, top rows r12=gggggg r11=ggg000 r10=gggggg
+opponent topped out: clock 2220 stopWatch 2032 stop 50 pre-stop 0 shake 0 health 1, top rows r12=gggggg r11=ggg000 r10=gggggg
+opponent topped out: clock 2220 stopWatch 2032 stop 50 pre-stop 0 shake 0 health 1, top rows r12=gggggg r11=ggg000 r10=gggggg
+opponent topped out: clock 2250 stopWatch 2062 stop 20 pre-stop 0 shake 39 health 1, top rows r12=gggggg r11=gggggg r10=ggg000
+opponent topped out: clock 2280 stopWatch 2092 stop 0 pre-stop 91 shake 9 health 1, top rows r12=gggggg r11=gggggg r10=ggg000
+opponent topped out: clock 2310 stopWatch 2122 stop 0 pre-stop 61 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=ggg000
+opponent topped out: clock 2370 stopWatch 2182 stop 0 pre-stop 1 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=ggg000
+REPLAY {"settings":{"metadata":{"completed":false,"ranked":false,"stageId":"pa_stages_wind","stacks":[{"characterId":"pa_characters_dragon","publicId":12078,"stackIndex":1,"name":"Ranmaru_q31_CPU","wins":1,"panelId":"panelhd_basic_mizunoketsuban","level":10},{"characterId":"PA_Magellan","publicId":8
+engine rolled our stack back 0 times for late garbage this match
+match against: bramp
+match over — bot won (pace: worst 0.30 frames off schedule); waiting for a rematch
+game about to start: both players are ready
+set over: the room is closed, back in the lobby

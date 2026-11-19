@@ -487,7 +487,8 @@ jobs:
               [ "$out" = "${last:-}" ] || { echo "standby check: older live bots=$older, handoff seen=$handoff"; last="$out"; }
               [ "$older" -eq 0 ] && break
               [ "$handoff" -gt 0 ] && { echo "the old bot has finished its game and is sitting out its last seconds"; break; }
-              sleep 2
+              # every 5 s: inside the old bot's 8 s grace, and a third of the API calls of 2 s (GITHUB_TOKEN: 1000 calls/hour per repo)
+              sleep 5
             done
             echo "standby over: logging in"
             echo login > "$RUNNER_TEMP/bot-state"
@@ -496,7 +497,8 @@ jobs:
           # to leave once no game is running (bot/playBot.lua PA_STOP_FILE). Runs made before it started are not about it.
           export PA_STOP_FILE="$RUNNER_TEMP/stop-after-the-game"; rm -f "$PA_STOP_FILE" "$PA_STOP_FILE.grace"
           started=$(date -u +%s)
-          ( while sleep 10; do
+          # API BUDGET: GITHUB_TOKEN has 1000 REST calls/hour for the whole repo. This loop makes ONE call every 30 s (120/hour).
+          ( while sleep 30; do
               # THE 4-HOUR RESTART IS A DEPLOY (the run is capped at ~6h): at 4h this bot starts a ranmaru-deploy, the same path new code
               # takes -- the new bot builds and waits logged out, the deploy's stop asks this bot to leave after its game, and the new bot
               # logs in during the 8 s grace. No gap, nothing to guess. Only if no stop for this bot has come 40 minutes later (the deploy
@@ -511,9 +513,12 @@ jobs:
               if [ -e "$RUNNER_TEMP/restart-deploy" ] && [ ! -e "$RUNNER_TEMP/planned-restart" ] && [ $(( $(date -u +%s) - $(cat "$RUNNER_TEMP/restart-deploy") )) -ge 2400 ]; then
                 : > "$RUNNER_TEMP/planned-restart"; touch "$PA_STOP_FILE"; echo "4 hours + 40 min and no replacement came: leaving after the current game, then starting again"
               fi
-              ids=$(GH_TOKEN="${{ github.token }}" gh api "repos/${{ github.repository }}/actions/runs?per_page=30" --jq ".workflow_runs[] | select(.status != \"completed\") | select(.display_title | test(\"^(ranmaru-stop|fight-start) · $BOT_HOST:$BOT_PORT( · .*)?\$\")) | select((.created_at | fromdateiso8601) > $started) | select(((.display_title | capture(\"except=(?<x>[0-9]+)\")? | .x) // \"0\") != \"$GITHUB_RUN_ID\") | .id" 2>/dev/null || true)
+              # one listing serves both checks. A stop counts whether or not it has finished yet (it was made after this bot started),
+              # so a stop run quicker than the 30 s between checks is not missed.
+              runsjson=$(GH_TOKEN="${{ github.token }}" gh api "repos/${{ github.repository }}/actions/runs?per_page=50" 2>/dev/null || echo '{"workflow_runs":[]}')
+              ids=$(printf '%s' "$runsjson" | jq -r ".workflow_runs[] | select(.display_title | test(\"^(ranmaru-stop|fight-start) · $BOT_HOST:$BOT_PORT( · .*)?\$\")) | select((.created_at | fromdateiso8601) > $started) | select(((.display_title | capture(\"except=(?<x>[0-9]+)\")? | .x) // \"0\") != \"$GITHUB_RUN_ID\") | .id" 2>/dev/null || true)
               # the NEWEST live bot on this server is never asked to leave (the one with the latest code): a stop only removes older bots
-              newest=$(GH_TOKEN="${{ github.token }}" gh api "repos/${{ github.repository }}/actions/runs?per_page=50&status=in_progress" --jq "[.workflow_runs[] | select(.display_title | startswith(\"live · $BOT_HOST:$BOT_PORT · \")) | .id] | max // 0" 2>/dev/null || echo 0)
+              newest=$(printf '%s' "$runsjson" | jq -r "[.workflow_runs[] | select(.status == \"in_progress\") | select(.display_title | startswith(\"live · $BOT_HOST:$BOT_PORT · \")) | .id] | max // 0" 2>/dev/null || echo 0)
               if [ -n "$ids" ] && [ "$newest" = "$GITHUB_RUN_ID" ]; then ids=""; fi
               if [ -n "$ids" ]; then
                 touch "$PA_STOP_FILE"
@@ -552,20 +557,25 @@ jobs:
             ( parent=$$; export GH_TOKEN="${{ github.token }}"; repo="$GITHUB_REPOSITORY"
               key=$(printf '%s' "$name" | tr -c 'A-Za-z0-9_-' '_'); path="status/$key.txt"
               gh api "repos/$repo/git/ref/heads/bot-status" >/dev/null 2>&1 || gh api -X POST "repos/$repo/git/refs" -f ref=refs/heads/bot-status -f sha="${{ github.sha }}" >/dev/null 2>&1 || true
+              # put FILE CONTENT: write a file on bot-status, reusing the sha the last write returned (2 calls per beat, not 4); only
+              # when that write is refused (no file yet, or the sha moved) is the sha looked up and the write tried once more
+              sha=""; lsha=""
+              put() {   # $1 path, $2 base64 content, $3 known sha; prints the new sha
+                local new
+                new=$(gh api -X PUT "repos/$repo/contents/$1" -f message="status: $key" -f content="$2" -f branch=bot-status ${3:+-f sha="$3"} --jq .content.sha 2>/dev/null) && { echo "$new"; return; }
+                local cur; cur=$(gh api "repos/$repo/contents/$1?ref=bot-status" --jq .sha 2>/dev/null || true)
+                gh api -X PUT "repos/$repo/contents/$1" -f message="status: $key" -f content="$2" -f branch=bot-status ${cur:+-f sha="$cur"} --jq .content.sha 2>/dev/null || true
+              }
               while kill -0 "$parent" 2>/dev/null; do
                 st=$(cat "$PA_STATUS_FILE" 2>/dev/null || echo "no status yet")
-                body=$(printf 'run %s\nbot %s\nbot wrote: %s\nsent: %s\n' "$GITHUB_RUN_ID" "$name" "$st" "$(date -u +%Y-%m-%dT%H:%M:%SZ)")
-                sha=$(gh api "repos/$repo/contents/$path?ref=bot-status" --jq .sha 2>/dev/null || true)
-                enc=$(printf '%s' "$body" | base64 -w0)
-                if [ -n "$sha" ]; then gh api -X PUT "repos/$repo/contents/$path" -f message="status: $key" -f content="$enc" -f branch=bot-status -f sha="$sha" >/dev/null 2>&1 || true
-                else gh api -X PUT "repos/$repo/contents/$path" -f message="status: $key" -f content="$enc" -f branch=bot-status >/dev/null 2>&1 || true; fi
+                # the repo's API budget left this hour (reading it costs nothing): GITHUB_TOKEN allows 1000 calls/hour for the whole repo
+                api=$(gh api rate_limit --jq '.resources.core | "\(.remaining)/\(.limit), resets \(.reset | todate)"' 2>/dev/null || echo unknown)
+                body=$(printf 'run %s\nbot %s\nbot wrote: %s\nsent: %s\napi left: %s\n' "$GITHUB_RUN_ID" "$name" "$st" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$api")
+                sha=$(put "$path" "$(printf '%s' "$body" | base64 -w0)" "$sha")
                 # the bot's recent log (its last 150 lines) goes to status/<bot>-log.txt the same way, so the log can be read while the run goes on
                 lpath="status/$key-log.txt"
                 ltxt=$(tail -n 150 "$GITHUB_WORKSPACE/bot-prod-smoke.log" 2>/dev/null | cut -c1-300 || true)
-                lsha=$(gh api "repos/$repo/contents/$lpath?ref=bot-status" --jq .sha 2>/dev/null || true)
-                lenc=$(printf 'run %s, as of %s\n%s\n' "$GITHUB_RUN_ID" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$ltxt" | base64 -w0)
-                if [ -n "$lsha" ]; then gh api -X PUT "repos/$repo/contents/$lpath" -f message="log: $key" -f content="$lenc" -f branch=bot-status -f sha="$lsha" >/dev/null 2>&1 || true
-                else gh api -X PUT "repos/$repo/contents/$lpath" -f message="log: $key" -f content="$lenc" -f branch=bot-status >/dev/null 2>&1 || true; fi
+                lsha=$(put "$lpath" "$(printf 'run %s, as of %s\n%s\n' "$GITHUB_RUN_ID" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$ltxt" | base64 -w0)" "$lsha")
                 sleep 120
               done ) &
           fi

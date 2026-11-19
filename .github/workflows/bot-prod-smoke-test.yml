@@ -551,7 +551,7 @@ jobs:
           export PA_STATUS_FILE="$RUNNER_TEMP/bot-status"; rm -f "$PA_STATUS_FILE"
           echo launched > "$RUNNER_TEMP/bot-state"   # the setup status loop stops; the heartbeat below writes the bot's own status
           echo "setup: heartbeat starting"
-          # Heartbeat (for the agent): every 2 minutes the bot's status is written to the bot-status branch, file status/<bot>.txt,
+          # Heartbeat (for the agent): every minute the bot's status is written to the bot-status branch, file status/<bot>.txt,
           # with the time it was written. A frozen bot shows an old time while the run still looks alive. Never fails the run.
           if [ "$kind" = gambit ]; then
             ( parent=$$; export GH_TOKEN="${{ github.token }}"; repo="$GITHUB_REPOSITORY"
@@ -559,7 +559,7 @@ jobs:
               gh api "repos/$repo/git/ref/heads/bot-status" >/dev/null 2>&1 || gh api -X POST "repos/$repo/git/refs" -f ref=refs/heads/bot-status -f sha="${{ github.sha }}" >/dev/null 2>&1 || true
               # put FILE CONTENT: write a file on bot-status, reusing the sha the last write returned (2 calls per beat, not 4); only
               # when that write is refused (no file yet, or the sha moved) is the sha looked up and the write tried once more
-              sha=""; lsha=""
+              sha=""; lsha=""; beat=0
               put() {   # $1 path, $2 base64 content, $3 known sha; prints the new sha
                 local new
                 new=$(gh api -X PUT "repos/$repo/contents/$1" -f message="status: $key" -f content="$2" -f branch=bot-status ${3:+-f sha="$3"} --jq .content.sha 2>/dev/null) && { echo "$new"; return; }
@@ -572,11 +572,16 @@ jobs:
                 api=$(gh api rate_limit --jq '.resources.core | "\(.remaining)/\(.limit), resets \(.reset | todate)"' 2>/dev/null || echo unknown)
                 body=$(printf 'run %s\nbot %s\nbot wrote: %s\nsent: %s\napi left: %s\n' "$GITHUB_RUN_ID" "$name" "$st" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$api")
                 sha=$(put "$path" "$(printf '%s' "$body" | base64 -w0)" "$sha")
-                # the bot's recent log (its last 150 lines) goes to status/<bot>-log.txt the same way, so the log can be read while the run goes on
-                lpath="status/$key-log.txt"
-                ltxt=$(tail -n 150 "$GITHUB_WORKSPACE/bot-prod-smoke.log" 2>/dev/null | cut -c1-300 || true)
-                lsha=$(put "$lpath" "$(printf 'run %s, as of %s\n%s\n' "$GITHUB_RUN_ID" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$ltxt" | base64 -w0)" "$lsha")
-                sleep 120
+                # the bot's recent log (its last 150 lines) goes to status/<bot>-log.txt the same way, every OTHER beat (every 2 min)
+                beat=$((beat + 1))
+                if [ $((beat % 2)) = 1 ]; then
+                  lpath="status/$key-log.txt"
+                  ltxt=$(tail -n 150 "$GITHUB_WORKSPACE/bot-prod-smoke.log" 2>/dev/null | cut -c1-300 || true)
+                  lsha=$(put "$lpath" "$(printf 'run %s, as of %s\n%s\n' "$GITHUB_RUN_ID" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$ltxt" | base64 -w0)" "$lsha")
+                fi
+                # STATUS EVERY MINUTE. Each write is a commit, and GitHub allows ~500 commit-making calls/hour (the secondary limit, tighter
+                # than the 5000 calls/hour): status each minute + log every 2 = 90/hour, 180 with two bots in a handover. 30 s would be ~480.
+                sleep 60
               done ) &
           fi
           deadline=$(( $(date +%s) + secs )); : > "$GITHUB_WORKSPACE/bot-prod-smoke.log"; rc=0

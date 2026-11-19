@@ -503,6 +503,8 @@ jobs:
           # lookup guarded.
           ( set +e +o pipefail
             while sleep 30; do
+              # (each pass stamps the time: the status file shows it as "watch loop:", so a loop that stopped shows a stale time)
+              date -u +%H:%M:%S > "$RUNNER_TEMP/watch-alive"
               # THE 4-HOUR RESTART IS A DEPLOY (the run is capped at ~6h): at 4h this bot starts a ranmaru-deploy, the same path new code
               # takes -- the new bot builds and waits logged out, the deploy's stop asks this bot to leave after its game, and the new bot
               # logs in during the 8 s grace. No gap, nothing to guess. Only if no stop for this bot has come 40 minutes later (the deploy
@@ -583,7 +585,7 @@ jobs:
                 st=$(cat "$PA_STATUS_FILE" 2>/dev/null || echo "no status yet")
                 # the repo's API budget left this hour (reading it costs nothing): GITHUB_TOKEN allows 1000 calls/hour for the whole repo
                 api=$(gh api rate_limit --jq '.resources.core | "\(.remaining)/\(.limit), resets \(.reset | todate)"' 2>/dev/null || echo unknown)
-                body=$(printf 'run %s\nbot %s\nbot wrote: %s\nsent: %s\napi left: %s\n' "$GITHUB_RUN_ID" "$name" "$st" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$api")
+                body=$(printf 'run %s\nbot %s\nbot wrote: %s\nsent: %s\napi left: %s\nwatch loop: %s\n' "$GITHUB_RUN_ID" "$name" "$st" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$api" "$(cat "$RUNNER_TEMP/watch-alive" 2>/dev/null || echo 'not started')")
                 sha=$(put "$path" "$(printf '%s' "$body" | base64 -w0)" "$sha")
                 # the bot's recent log (its last 150 lines) goes to status/<bot>-log.txt the same way, every OTHER beat (every 2 min)
                 beat=$((beat + 1))

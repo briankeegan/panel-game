@@ -566,7 +566,6 @@ jobs:
             PA_IDLE_LIMIT="$idle" PA_CHALLENGE="$target" PA_CHALLENGE_GAMES="$games" PA_CHALLENGE_FIRST_TO="$first" PA_ACCEPT_ONLY="$only" PA_DECLINE_MODES="$decline" timeout "$left" $pin luajit bot/playBot.lua "$BOT_HOST" "$BOT_PORT" "$name" 4 12 "$brain" \
               2>&1 | tee -a "$GITHUB_WORKSPACE/bot-prod-smoke.log"
             rc=${PIPESTATUS[0]}
-            if [ -e "$WD_FLAG" ]; then rm -f "$WD_FLAG"; echo "the watchdog stopped a silent bot: logging back in in 20 s"; sleep 20; continue; fi
             if [ "$rc" -eq 75 ]; then echo "the server closed the connection: logging back in in 20 s"; sleep 20; continue; fi
             break
           done
@@ -813,7 +812,9 @@ jobs:
           mine="$GITHUB_RUN_ID"
           # a stop, deploy or handoff made since this bot started: someone is replacing it on purpose
           since=$(date -u -d "@${RUN_START:-$(date +%s)}" +%Y-%m-%dT%H:%M:%SZ)
-          if printf '%s\n' "$runs" | awk -F'\t' -v me="$mine" -v t="$since" '$1!=me && $3>=t && ($4 ~ /^ranmaru-stop|^ranmaru-deploy|^bot-handoff|^fight/) {f=1} END{exit !f}'; then echo "a stop, deploy or handoff came after this bot started: not restarting"; exit 0; fi
+          # Not for the 4-hour planned restart: the auto-redeploy's only-if-running deploys land in those 4 hours without replacing anything, and
+          # a deploy that DID replace this bot left the stop-file (caught above). This check kept the lobby empty after q33's planned restart.
+          if [ ! -e "$RUNNER_TEMP/planned-restart" ] && printf '%s\n' "$runs" | awk -F'\t' -v me="$mine" -v t="$since" '$1!=me && $3>=t && ($4 ~ /^ranmaru-stop|^ranmaru-deploy|^bot-handoff|^fight/) {f=1} END{exit !f}'; then echo "a stop, deploy or handoff came after this bot started: not restarting"; exit 0; fi
           # any stop, deploy, watcher, handoff or fight still open, whenever it started: it may be about to start a bot, so wait for it
           if printf '%s\n' "$runs" | awk -F'\t' -v me="$mine" '$1!=me && $2!="completed" && $4 ~ /^(ranmaru-stop|ranmaru-deploy|ranmaru-watch|bot-handoff|fight)/ {f=1} END{exit !f}'; then echo "a stop, deploy, watcher or handoff is still open: not restarting on top of it"; exit 0; fi
           # another bot in the lobby (a live run still going, other than this one): nothing to do

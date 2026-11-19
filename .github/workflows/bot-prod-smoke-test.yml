@@ -497,9 +497,19 @@ jobs:
           export PA_STOP_FILE="$RUNNER_TEMP/stop-after-the-game"; rm -f "$PA_STOP_FILE" "$PA_STOP_FILE.grace"
           started=$(date -u +%s)
           ( while sleep 10; do
-              # a planned restart at 4 hours (the run is capped at 5): leave after the current game, then the restart step starts it again
-              if [ "$kind" = gambit ] && [ ! -e "$RUNNER_TEMP/planned-restart" ] && [ $(( $(date -u +%s) - started )) -ge 14400 ]; then
-                : > "$RUNNER_TEMP/planned-restart"; touch "$PA_STOP_FILE"; echo "4 hours: leaving after the current game, then starting again"
+              # THE 4-HOUR RESTART IS A DEPLOY (the run is capped at ~6h): at 4h this bot starts a ranmaru-deploy, the same path new code
+              # takes -- the new bot builds and waits logged out, the deploy's stop asks this bot to leave after its game, and the new bot
+              # logs in during the 8 s grace. No gap, nothing to guess. Only if no stop for this bot has come 40 minutes later (the deploy
+              # failed) does it fall back to leaving after its game and letting "Bring the bot back" start one.
+              if [ "$kind" = gambit ] && [ ! -e "$RUNNER_TEMP/restart-deploy" ] && [ $(( $(date -u +%s) - started )) -ge 14400 ]; then
+                date -u +%s > "$RUNNER_TEMP/restart-deploy"
+                echo "4 hours: starting a deploy of the latest code to take over after the current game"
+                GH_TOKEN="${{ github.token }}" gh workflow run bot-prod-smoke-test.yml --repo "${{ github.repository }}" --ref "${{ github.ref_name }}" \
+                  -f mode=ranmaru-deploy -f server="$BOT_HOST:$BOT_PORT" -f bot=gambit -f name='Ranmaru_p#_CPU' -f advanced=force \
+                  || echo "4 hours: the deploy could not be started (the fallback below takes over in 40 minutes)"
+              fi
+              if [ -e "$RUNNER_TEMP/restart-deploy" ] && [ ! -e "$RUNNER_TEMP/planned-restart" ] && [ $(( $(date -u +%s) - $(cat "$RUNNER_TEMP/restart-deploy") )) -ge 2400 ]; then
+                : > "$RUNNER_TEMP/planned-restart"; touch "$PA_STOP_FILE"; echo "4 hours + 40 min and no replacement came: leaving after the current game, then starting again"
               fi
               ids=$(GH_TOKEN="${{ github.token }}" gh api "repos/${{ github.repository }}/actions/runs?per_page=30" --jq ".workflow_runs[] | select(.status != \"completed\") | select(.display_title | test(\"^(ranmaru-stop|fight-start) · $BOT_HOST:$BOT_PORT( · .*)?\$\")) | select((.created_at | fromdateiso8601) > $started) | select(((.display_title | capture(\"except=(?<x>[0-9]+)\")? | .x) // \"0\") != \"$GITHUB_RUN_ID\") | .id" 2>/dev/null || true)
               # the NEWEST live bot on this server is never asked to leave (the one with the latest code): a stop only removes older bots
@@ -810,18 +820,17 @@ jobs:
           if [ "$ran" -lt 600 ]; then echo "ended after only $ran s: not restarting (it would loop)"; exit 0; fi
           runs=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?per_page=100" --jq '.workflow_runs[] | "\(.id)\t\(.status)\t\(.created_at)\t\(.display_title)"' 2>/dev/null) || { echo "could not list the runs: not restarting"; exit 0; }
           mine="$GITHUB_RUN_ID"
-          # a stop, deploy or handoff made since this bot started: someone is replacing it on purpose
-          since=$(date -u -d "@${RUN_START:-$(date +%s)}" +%Y-%m-%dT%H:%M:%SZ)
-          # Not for the 4-hour planned restart: the auto-redeploy's only-if-running deploys land in those 4 hours without replacing anything, and
-          # a deploy that DID replace this bot left the stop-file (caught above). This check kept the lobby empty after q33's planned restart.
-          if [ ! -e "$RUNNER_TEMP/planned-restart" ] && printf '%s\n' "$runs" | awk -F'\t' -v me="$mine" -v t="$since" '$1!=me && $3>=t && ($4 ~ /^ranmaru-stop|^ranmaru-deploy|^bot-handoff|^fight/) {f=1} END{exit !f}'; then echo "a stop, deploy or handoff came after this bot started: not restarting"; exit 0; fi
-          # any stop, deploy, watcher, handoff or fight still open, whenever it started: it may be about to start a bot, so wait for it
-          if printf '%s\n' "$runs" | awk -F'\t' -v me="$mine" '$1!=me && $2!="completed" && $4 ~ /^(ranmaru-stop|ranmaru-deploy|ranmaru-watch|bot-handoff|fight)/ {f=1} END{exit !f}'; then echo "a stop, deploy, watcher or handoff is still open: not restarting on top of it"; exit 0; fi
-          # another bot in the lobby (a live run still going, other than this one): nothing to do
+          # (A deploy or stop that replaced this bot left the stop-file, caught above. Deploys that merely happened while it ran -- the
+          # auto-redeploy's only-if-running ones -- are NOT a reason to stay down: that check kept the lobby empty after q33.)
+          # A deploy, stop, handoff or fight still open may be about to start a bot -- or may decide to start nothing. Wait for it to
+          # finish (up to 20 minutes), then decide on what is actually running.
+          for _ in $(seq 1 40); do
+            printf '%s\n' "$runs" | awk -F'\t' -v me="$mine" '$1!=me && $2!="completed" && $4 ~ /^(ranmaru-stop|ranmaru-deploy|bot-handoff|fight)/ {f=1} END{exit !f}' || break
+            echo "a deploy/stop/handoff is still open: waiting for it before deciding"; sleep 30
+            runs=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?per_page=100" --jq '.workflow_runs[] | "\(.id)\t\(.status)\t\(.created_at)\t\(.display_title)"' 2>/dev/null) || runs=""
+          done
+          # another bot on this server (a live run still going, other than this one): nothing to do
           if printf '%s\n' "$runs" | awk -F'\t' -v me="$mine" -v s="live · ${SERVER_EFF} · " '$1!=me && $2!="completed" && index($4,s)==1 {f=1} END{exit !f}'; then echo "another bot is already running on ${SERVER_EFF}: not restarting"; exit 0; fi
-          # at most one automatic restart every 30 minutes
-          cut=$(date -u -d '30 minutes ago' +%Y-%m-%dT%H:%M:%SZ)
-          if printf '%s\n' "$runs" | awk -F'\t' -v me="$mine" -v t="$cut" '$1!=me && $3>=t && index($4,"live · ")==1 {f=1} END{exit !f}'; then echo "a bot was started in the last 30 minutes: not restarting"; exit 0; fi
           echo "the bot ended on its own after $((ran / 60)) min, and nothing else is up: starting ${BOT_NAME} again"
           # the deploy path gives the NEXT number (Ranmaru_p#_CPU -> p7, p8, ...), so the restart is named by the build's number, not the old name
           # one naming scheme everywhere: Ranmaru_p#_CPU gives the next number (the letter moves to q after 99)

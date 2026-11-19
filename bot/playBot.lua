@@ -223,6 +223,16 @@ while true do
     print(string.format("match over — bot %s (pace: worst %.2f frames off schedule); waiting for a rematch",
       tostring(bot.outcome), worstOffSchedule))
     lastMatchEndAt = socket.gettime()
+    -- memory and threads of this process, after every match (Linux): a steady climb here is what runs out before a crash
+    do
+      local f = io.open("/proc/self/status")
+      if f then
+        local txt = f:read("*a"); f:close()
+        local rss = txt:match("VmRSS:%s*(%d+)") or "?"
+        local thr = txt:match("Threads:%s*(%d+)") or "?"
+        print(string.format("memory after match: rss %s kB, threads %s, lua %d kB", rss, thr, math.floor(collectgarbage("count"))))
+      end
+    end
     local vsTarget = false
     if challengeTarget and bot.players then
       for _, p in pairs(bot.players) do if p.name ~= name and BotClient.nameMatches(challengeTarget, p.name) then vsTarget = true end end

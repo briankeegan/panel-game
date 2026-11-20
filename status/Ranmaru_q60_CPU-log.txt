@@ -1,4 +1,4 @@
-run 44827042204, as of 2026-11-20T22:28:49Z
+run 44827042204, as of 2026-11-20T22:30:53Z
 
 === Bot 'Ranmaru_q60_CPU' (gambit, L10, cursor 4/12, unranked) is idle in the lobby on panelattack.com:49569 ===
     Open your client, CHALLENGE 'Ranmaru_q60_CPU' in the lobby, and play — it auto-accepts.
@@ -130,3 +130,21 @@ opponent topped out: clock 10590 stopWatch 10402 stop 30 pre-stop 72 shake 0 hea
 opponent topped out: clock 10620 stopWatch 10432 stop 30 pre-stop 42 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
 opponent topped out: clock 10650 stopWatch 10462 stop 30 pre-stop 12 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
 garbage landed: our stopWatch 10803 clock 10991, transits in flight before this frame {10831}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 11702 clock 11890, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 11757 clock 11945, transits in flight before this frame {11811}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 12015 clock 12203, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 12423 clock 12611, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 12791 clock 12979, transits in flight before this frame {12802}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 13160 clock 13348, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 13520 clock 13708, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 13565 clock 13753, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+opponent topped out: clock 13830 stopWatch 13642 stop 0 pre-stop 0 shake 41 health 1, top rows r12=ggggg0 r11=0ggggg r10=gggggg
+opponent topped out: clock 13860 stopWatch 13672 stop 0 pre-stop 0 shake 11 health 1, top rows r12=ggggg0 r11=0ggggg r10=gggggg
+REPLAY {"mine":1,"inputs":[["A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A",
+engine rolled our stack back 0 times for late garbage this match
+match against: LAZGamer
+match over — bot won (pace: worst 0.68 frames off schedule); waiting for a rematch
+memory after match: rss 3284960 kB, threads 7, lua 57982 kB
+game about to start: both players are ready
+set over: the room is closed, back in the lobby
+game about to start: both players are ready

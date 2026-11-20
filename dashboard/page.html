@@ -1964,7 +1964,7 @@ function projectPlan(G, seq, cursor) {
     const L = [];
     L.push('Ranmaru decision to review');
     L.push('Link (opens this exact moment): ' + URLSTATE.link());
-    L.push('Replay data (gzipped JSON, the whole game): ' + new URL('data/replay_' + R.rid + '.json.gz', location.href.split('#')[0]).href);
+    L.push('Replay data (gzipped JSON, the whole game): ' + new URL((window.__dataBase || 'data/') + 'replay_' + R.rid + '.json.gz', location.href.split('#')[0]).href);
     L.push('Game: ' + R.rid + ' · ' + (VLBL ? VLBL(D.sha) : '') + (VSTART && VSTART(D.sha) ? ' (deployed ' + VSTART(D.sha) + ')' : '') + ' · ' + (row.res === 'W' ? 'won' : 'lost') + ' vs ' + D.opp + ' · ' + (row.at || row.date || '') + ' · ' + dur(row.secs) + ' · bot ' + D.bot);
     L.push('At: frame ' + clock + ' (' + fmtClock(clock) + ' of ' + fmtClock(D.end) + ')');
     { // what the page shows for this moment, in its own words

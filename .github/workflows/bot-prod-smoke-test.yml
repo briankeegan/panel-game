@@ -1190,10 +1190,8 @@ jobs:
             done <<< "$runs"
             echo "$todo finished bot runs are not on the stats page yet"
             if [ "$todo" -eq 0 ]; then
-              # no new games, but the page itself may have changed (a new dashboard/page.html): rebuild it and publish only if it differs
-              python3 dashboard/make_site.py site >/dev/null || exit 0
-              site_push "$PWD/site" "Gambit stats: page updated" && exit 0
-              echo "the page changed while this ran (attempt $attempt): starting over"; continue
+              # no new games; the page itself may have changed (a new dashboard/page.html): it goes up only if it differs (site_git.sh)
+              page_publish || true; exit 0
             fi
             if [ "$done_setup" = 0 ]; then
               sudo apt-get update -q && sudo apt-get install -y -q luajit luarocks liblua5.1-0-dev build-essential unzip libreadline-dev
@@ -1219,8 +1217,8 @@ jobs:
               if [ -n "$redo" ] && grep -q "\"$id\"" site/data/runs.json 2>/dev/null; then python3 -c 'import json,os,sys; p="site/data/redone.json"; l=json.load(open(p)) if os.path.exists(p) else []; l.append(sys.argv[1]) if sys.argv[1] not in l else None; json.dump(l, open(p, "w"))' "$id"; fi
               if [ -s site-prune.txt ]; then sed 's#.*/##' site-prune.txt | sort -u > .gone; grep -vFf .gone site-sizes.txt > .sizes && mv .sizes site-sizes.txt; fi
             done <<< "$runs"
-            python3 dashboard/make_site.py site
-            site_push "$PWD/site" "Gambit stats: add finished bot runs" && break
+            # the games go to the data branch (and the data's Cloudflare copy); the page only if dashboard/page.html changed
+            site_push "$PWD/site" "Gambit stats: add finished bot runs" && { page_publish || true; break; }
             echo "the page changed while this ran (attempt $attempt): starting over"
           done
 
@@ -1238,6 +1236,7 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: write
+      actions: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -1245,21 +1244,13 @@ jobs:
       - name: Rebuild and publish the page
         shell: bash
         env:
-          CF_PAGES_PROJECT: ''
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
         run: |
-          set -eu
-          # the page is built from dashboard/page.html alone (index.html), so only index.html is fetched from gh-pages: no game data
-          rm -rf site
-          git clone -q --depth 1 --single-branch --branch gh-pages --sparse --filter=blob:none "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" site
-          git -C site sparse-checkout set --no-cone /index.html /.nojekyll
-          python3 dashboard/make_site.py site >/dev/null
-          git -C site add index.html
-          if git -C site diff --cached --quiet; then echo "the page did not change"; exit 0; fi
-          git -C site -c user.name="github-actions" -c user.email="actions@github.com" commit -q -m "Stats page: rebuilt from dashboard/page.html"
-          git -C site push -q origin HEAD:gh-pages
-          echo "Stats page published to gh-pages" >> "$GITHUB_STEP_SUMMARY"
+          set -u
+          # the page alone (index.html, from dashboard/page.html), and only if it changed; its Cloudflare copy follows. No game data.
+          . dashboard/site_git.sh
+          page_publish | tee -a "$GITHUB_STEP_SUMMARY"
   # ranmaru-site: copy the stats page (the gh-pages branch) to Cloudflare Pages. Asked for by dashboard/site_git.sh after every publish when the
   # repository variable CF_PAGES_PROJECT is set; a run on its own runner, so the bot's runner does none of the work. Newest request wins.
   site-sync:
@@ -1270,7 +1261,8 @@ jobs:
     permissions:
       contents: read
     concurrency:
-      group: ranmaru-site-sync
+      # (the data copy and the page copy each have their own: a data copy never cancels a page copy)
+      group: ranmaru-site-sync-${{ inputs.advanced == 'data' && 'data' || inputs.advanced == 'page' && 'page' || 'all' }}
       cancel-in-progress: true
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -1285,30 +1277,56 @@ jobs:
           if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
             echo "::notice::CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID are not set as repository secrets: nothing to publish (see dashboard/CLOUDFLARE.md)"; exit 0
           fi
-          git clone -q --depth 1 --branch gh-pages "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" site
-          rm -rf site/.git
-          # the copy must not point back to the repository: commit hashes become opaque tokens, run ids go (dashboard/public_copy.py)
-          python3 dashboard/public_copy.py site
-          # (the project is made once; this says "already exists" afterwards, which is fine)
-          npx --yes wrangler@3 pages project create "$PROJECT" --production-branch main || true
-          npx --yes wrangler@3 pages deploy site --project-name "$PROJECT" --branch main --commit-dirty=true
-          echo "Published to https://$PROJECT.pages.dev" >> "$GITHUB_STEP_SUMMARY"
+          # TWO PROJECTS: the games in <project>-data (from the stats-data branch, a copy after every publish) and the page in <project> (from
+          # gh-pages, only when the page changed). The page reads the games from the data project's address (data-base.txt beside it), so new
+          # games never republish the page. advanced = data | page; anything else (a run by hand) does both.
+          what='${{ inputs.advanced }}'; case "$what" in data|page) ;; *) what=all;; esac
+          url="https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+          DATA_PROJECT="$PROJECT-data"; deployed=""
+          sub_of() { curl -fsS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/$1" 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin)["result"]["subdomain"])' 2>/dev/null; }
+          deploy_data() {
+            rm -rf dsite; git clone -q --depth 1 --branch stats-data "$url" dsite 2>/dev/null || git clone -q --depth 1 --branch gh-pages "$url" dsite || return 1
+            rm -rf dsite/.git dsite/index.html dsite/.nojekyll
+            # the copy must not point back to the repository: commit hashes become opaque tokens, run ids go (dashboard/public_copy.py)
+            python3 dashboard/public_copy.py dsite
+            # the page (another address) reads these: let it, and never let a browser keep an old games.json
+            printf '/*\n  Access-Control-Allow-Origin: *\n  Cache-Control: no-cache\n' > dsite/_headers
+            npx --yes wrangler@3 pages project create "$DATA_PROJECT" --production-branch main >/dev/null 2>&1 || true
+            npx --yes wrangler@3 pages deploy dsite --project-name "$DATA_PROJECT" --branch main --commit-dirty=true || return 1
+            deployed="$deployed $DATA_PROJECT"; echo "Data published to https://$(sub_of "$DATA_PROJECT")" >> "$GITHUB_STEP_SUMMARY"
+          }
+          deploy_page() {
+            sub=$(sub_of "$DATA_PROJECT")
+            if [ -z "$sub" ]; then deploy_data || return 1; sub=$(sub_of "$DATA_PROJECT"); fi
+            [ -n "$sub" ] || { echo "::error::the data project has no address: the page would show no games"; return 1; }
+            rm -rf psite; git clone -q --depth 1 --branch gh-pages --sparse --filter=blob:none "$url" psite || return 1
+            git -C psite sparse-checkout set --no-cone /index.html /.nojekyll; rm -rf psite/.git psite/data
+            printf 'https://%s/data/\n' "$sub" > psite/data-base.txt
+            npx --yes wrangler@3 pages project create "$PROJECT" --production-branch main >/dev/null 2>&1 || true
+            npx --yes wrangler@3 pages deploy psite --project-name "$PROJECT" --branch main --commit-dirty=true || return 1
+            deployed="$deployed $PROJECT"; echo "Page published to https://$PROJECT.pages.dev (its games from https://$sub/data/)" >> "$GITHUB_STEP_SUMMARY"
+          }
+          rc=0
+          case "$what" in data) deploy_data || rc=1;; page) deploy_page || rc=1;; all) deploy_data || rc=1; deploy_page || rc=1;; esac
+          export DEPLOYED="$deployed"
           # only the newest deployment stays: Cloudflare keeps every older one at its own address, and an older one may hold data that has since been taken off the page
           python3 - <<'PY' || echo "could not clean up old deployments"
           import json, os, urllib.request, urllib.error
-          acct, proj, tok = os.environ['CLOUDFLARE_ACCOUNT_ID'], os.environ['PROJECT'], os.environ['CLOUDFLARE_API_TOKEN']
+          acct, tok = os.environ['CLOUDFLARE_ACCOUNT_ID'], os.environ['CLOUDFLARE_API_TOKEN']
           def call(method, path):
               r = urllib.request.Request('https://api.cloudflare.com/client/v4' + path, method=method, headers={'Authorization': 'Bearer ' + tok})
               try: return json.load(urllib.request.urlopen(r, timeout=60))
               except urllib.error.HTTPError as e: raise RuntimeError('%s %s -> %s %s' % (method, path.split('?')[0], e.code, e.read()[:300]))
           gone = 0
-          for _ in range(6):
-              d = call('GET', '/accounts/%s/pages/projects/%s/deployments?per_page=25' % (acct, proj))['result']
-              d.sort(key=lambda x: x['created_on'], reverse=True)
-              old = d[1:]
-              if not old: break
-              for x in old:
-                  try: call('DELETE', '/accounts/%s/pages/projects/%s/deployments/%s?force=true' % (acct, proj, x['id'])); gone += 1
-                  except Exception as e: print('could not delete one:', e)
+          for proj in os.environ.get('DEPLOYED', '').split():
+              for _ in range(6):
+                  d = call('GET', '/accounts/%s/pages/projects/%s/deployments?per_page=25' % (acct, proj))['result']
+                  d.sort(key=lambda x: x['created_on'], reverse=True)
+                  old = d[1:]
+                  if not old: break
+                  for x in old:
+                      try: call('DELETE', '/accounts/%s/pages/projects/%s/deployments/%s?force=true' % (acct, proj, x['id'])); gone += 1
+                      except Exception as e: print('could not delete one:', e)
           print('deleted %d old deployments' % gone)
           PY
+          exit "$rc"

@@ -1,10 +1,14 @@
-// Stand-in for the artifact "dash" object: loads data files from ./data and runs the page's onData callbacks when they arrive.
+// Stand-in for the artifact "dash" object: loads data files and runs the page's onData callbacks when they arrive.
+// THE DATA IS NOT PART OF THE PAGE: it lives at its own address (the data project, <project>-data.pages.dev), named in data-base.txt beside
+// the page (a URL, else ignored: Pages answers a missing file with the page), so new games reach the page without the page being published again. No data-base.txt (a local copy): ./data.
 (function () {
   const P = { ver: '', opp: '', minn: 10 }, fns = [], cache = {};
-  const URLS = (id) => (id === 'games' || id === 'versions') ? 'data/' + id + '.json' : 'data/' + id + '.json.gz';
+  const base = fetch('data-base.txt', { cache: 'no-store' }).then((r) => (r.ok ? r.text() : '')).then((t) => (/^https:\/\/[^\s<]+$/.test(t.trim()) ? t.trim().replace(/\/?$/, '/') : 'data/')).catch(() => 'data/');
+  const name = (id) => (id === 'games' || id === 'versions') ? id + '.json' : id + '.json.gz';
   async function load(id) {
     try {
-      const url = URLS(id), r = await fetch(url); if (!r.ok) throw new Error(url + ' ' + r.status);
+      // (no-store: a game finished a minute ago is on the page at the next load, not after a cache expires)
+      const url = (await base) + name(id), r = await fetch(url, { cache: 'no-store' }); if (!r.ok) throw new Error(url + ' ' + r.status);
       let text;
       if (url.endsWith('.gz') && r.headers.get('content-encoding') !== 'gzip' && window.DecompressionStream) text = await new Response(r.body.pipeThrough(new DecompressionStream('gzip'))).text();
       else text = await r.text();
@@ -19,5 +23,7 @@
     resetParams: () => { Object.assign(P, { ver: '', opp: '', minn: 10 }); fns.forEach((f) => f()); },
     data: (id) => { if (!cache[id]) { cache[id] = { status: 'loading', data: [] }; load(id); } return cache[id]; },
     onData: (f) => { fns.push(f); f(); }, setLink() {}, refresh() {},
+    dataBase: () => base,
   };
+  base.then((b) => { window.__dataBase = b; });   // (for the page's own links to a replay file)
 })();

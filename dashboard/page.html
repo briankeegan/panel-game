@@ -204,7 +204,7 @@
 .gw-row .t, .gw-row .n, .gw-row .v { font-variant-numeric: tabular-nums; color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); }
 .gw-row .o { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gw-res { font-size: 12px; font-weight: 700; border-radius: 999px; padding: 3px 9px; text-align: center; color: #fff; }
-.gw-res.w { background: #2f9e57; } .gw-res.l { background: #d9433f; }
+.gw-res.w { background: #2f9e57; } .gw-res.l { background: #d9433f; } .gw-res.o { background: #e0821f; }
 .gw-pager { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 @media (max-width: 560px) { .gw-row { grid-template-columns: 4rem 3rem 1fr auto; } .gw-row .v { display: none; } .gw-ff > span { flex-basis: 100%; } }
 .gw-pick .gw-btn { min-height: 40px; }
@@ -957,7 +957,7 @@
         // the set's own row: who, the record, when it ran; a click opens its games
         const tr = tb.insertRow(); tr.className = 'gs-set' + (open ? ' open' : ''); tr.setAttribute('aria-expanded', open ? 'true' : 'false'); tr.tabIndex = 0;
         whenCell(tr, playedMs(oldest), oldest, newest.at ? new Date(newest.at).getTime() : null);
-        const rc = tr.insertCell(), pill = document.createElement('span'); pill.className = 'gw-res ' + (w >= l ? 'w' : 'l'); pill.innerHTML = '<span class="gs-rec">' + w + '–' + l + '</span>'; pill.title = w + ' won, ' + l + ' lost'; rc.appendChild(pill);
+        const rc = tr.insertCell(), pill = document.createElement('span'); pill.className = 'gw-res ' + (l === 0 ? 'w' : w === 0 ? 'l' : 'o'); pill.innerHTML = '<span class="gs-rec">' + w + '–' + l + '</span>'; pill.title = w + ' won, ' + l + ' lost';   // (green: every game won; red: every game lost; orange: any loss in between) rc.appendChild(pill);
         const oc = tr.insertCell(); oc.textContent = newest.opp;
         const evc = tr.insertCell(); evc.textContent = lvs.length === 1 ? lvs[0] : 'mixed';
         const mdc = tr.insertCell(); mdc.textContent = modes.length === 1 ? modes[0] : 'mixed';

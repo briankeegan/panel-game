@@ -553,6 +553,7 @@ jobs:
           # reach this step's log prefixed [publish], so a publish that fails is visible there
           if [ "$kind" = gambit ] && [ "${DASH_LIVE:-1}" = 1 ]; then
             GH_TOKEN="${{ github.token }}" nice -n 19 bash "$GITHUB_WORKSPACE/dashboard/live_loop.sh" "$$" &
+            livepid=$!
           fi
           # THE BOT AND A WATCHER RUN KEEP EACH OTHER UP. A runner can be taken away (the log ends with "The runner has received a shutdown
           # signal"), and then nothing on that runner can start a replacement. So there is a second run, ranmaru-watch, that only watches:
@@ -609,6 +610,14 @@ jobs:
             if [ "$rc" -eq 75 ]; then echo "the server closed the connection: logging back in in 20 s"; sleep 20; continue; fi
             break
           done
+          # THE LAST PUBLISH: the bot has left the lobby (a handover, a restart, its hours out), so nothing can be cut short any more -- stop the
+          # side job (and an upload it has going) and put every game this run finished on the stats page. A handover used to end the run with
+          # the side job's publish half done, and those games never reached the page.
+          if [ -n "${livepid:-}" ]; then
+            kill "$livepid" 2>/dev/null || true; pkill -TERM -f dashboard/live_publish.sh 2>/dev/null || true; sleep 2
+            echo "[publish] the bot has left: publishing every game it finished"
+            GH_TOKEN="${{ github.token }}" bash "$GITHUB_WORKSPACE/dashboard/live_publish.sh" 2>&1 | sed 's/^/[publish] /' || true
+          fi
           case "$rc" in 0|124|75) : ;; *) exit "$rc";; esac
 
       - name: Sit in the lobby
@@ -1172,7 +1181,7 @@ jobs:
               if grep -q "\"$rid\"" site/data/runs.json 2>/dev/null && ! grep -q "\"$rid\"" site/data/redone.json 2>/dev/null; then redo_ids="$redo_ids $rid"; fi
             done
             # this workflow's own finished runs (not every workflow's: pushes and page builds would push the bot runs out of the first 100)
-            runs=$(for pg in 1 2 3 4 5; do gh api "repos/$repo/actions/workflows/bot-prod-smoke-test.yml/runs?per_page=100&page=$pg&status=completed" --jq '.workflow_runs[] | select(.display_title | test("^live · .* · [A-Za-z0-9_]*_p[0-9]+_")) | [.id, .display_title, .run_started_at, .updated_at, .created_at] | @tsv'; done | sort -t$'\t' -k5 | cut -f1-4)
+            runs=$(for pg in 1 2 3 4 5; do gh api "repos/$repo/actions/workflows/bot-prod-smoke-test.yml/runs?per_page=100&page=$pg&status=completed" --jq '.workflow_runs[] | select(.display_title | test("^live · .* · [A-Za-z0-9_]*_[a-z][0-9]+_")) | [.id, .display_title, .run_started_at, .updated_at, .created_at] | @tsv'; done | sort -t$'\t' -k5 | cut -f1-4)
             todo=0
             while IFS=$'\t' read -r id title started ended; do
               [ -n "$id" ] || continue

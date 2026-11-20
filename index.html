@@ -493,6 +493,17 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
 .gw-plainr b { display: inline-block; min-width: 92px; color: var(--color-fg-muted); font-weight: 600; }
 .gw-plainr { min-height: 2.9em; }
 .gs-latest-box { max-height: 460px; overflow-y: auto; }
+.gs-check { display: inline-flex; align-items: center; gap: 6px; font-size: var(--cds-font-size-body); cursor: pointer; margin: 2px 0 4px; user-select: none; }
+.gs-check input { width: 16px; height: 16px; margin: 0; cursor: pointer; }
+.gs-latest tr.gs-set { cursor: pointer; }
+.gs-latest tr.gs-set td { font-weight: 500; border-top: 1px solid var(--color-border-line); }
+.gs-latest tr.gs-set:hover td { background: color-mix(in srgb, var(--color-fg) 5%, transparent); }
+.gs-latest .gs-chev { display: inline-block; width: 1em; color: var(--color-fg-muted); transition: transform var(--cds-dur-slow) var(--cds-ease-out); }
+.gs-latest tr.gs-set.open .gs-chev { transform: rotate(90deg); }
+.gs-latest tr.gs-in td:first-child { padding-left: 22px !important; }
+.gs-latest tr.gs-in td { background: color-mix(in srgb, var(--color-fg) 3%, transparent); }
+.gs-latest tr.gs-setinfo td { white-space: normal !important; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); padding: 6px 10px 8px 22px !important; background: color-mix(in srgb, var(--color-fg) 3%, transparent); }
+.gs-latest .gs-rec { font-variant-numeric: tabular-nums; }
 .gs-latest thead th { position: sticky; top: 0; background: var(--color-panel); z-index: 1; }
 .gs-latest .lt { font-size: 11.5px; color: var(--color-fg-muted); }
 .gs-latest .lw { color: var(--color-fg); }
@@ -591,6 +602,7 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
 
   <details class="gs-card gs-collapse" id="sec-form" open>
     <summary><h2>Latest results</h2><span class="gs-count" id="form-sum"></span></summary>
+    <label class="gs-check"><input type="checkbox" id="form-sets" checked> Group by set</label>
     <p class="gs-note" id="form-note"></p>
     <div id="form" data-source="games"></div>
   </details>
@@ -807,6 +819,11 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
   // ---- filters (wired once)
   $('f-ver').addEventListener('change', (e) => dash.setParams({ ver: e.target.value }));
   let oppMin = 0, lossKind = '', recentMore = false;
+  // LATEST RESULTS BY SET (the checkbox, on by default; remembered in this browser): off, the table is the plain list of games
+  let groupSets = true; const openSets = new Set();
+  try { if (localStorage.getItem('gs-sets') === '0') groupSets = false; } catch (e) {}
+  $('form-sets').checked = groupSets;
+  $('form-sets').addEventListener('change', (e) => { groupSets = e.target.checked; try { localStorage.setItem('gs-sets', groupSets ? '1' : '0'); } catch (x) {} render(); });
   ['s-ver', 's-opp', 's-loss'].forEach((id) => $(id).addEventListener('input', () => render()));
   $('m-opp').addEventListener('click', (e) => { const b = e.target.closest('button[data-m]'); if (b) { oppMin = Number(b.dataset.m); render(); } });
   $('k-loss').addEventListener('click', (e) => { const b = e.target.closest('button[data-k]'); if (b) { lossKind = b.dataset.k; render(); } });
@@ -923,7 +940,18 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
     $('k-lg-n').textContent = longest ? (longest.res === 'W' ? 'won' : 'lost') + ' vs ' + longest.opp : '';
 
     // latest results: the newest games of the selection as a table; a row with a replay opens it
-    const recentAll = fg.slice().sort((a, b) => b.idx - a.idx), recent = recentMore ? recentAll : recentAll.slice(0, 10);
+    const recentAll = fg.slice().sort((a, b) => b.idx - a.idx);
+    // A SET: games in a row by the same bot against the same opponent, each starting within 10 minutes of the last one's end (a room the two
+    // sat in). Newest set first; its games newest first, as the plain list has them.
+    const sets = [];
+    if (groupSets) {
+      recentAll.forEach((g) => {
+        const s = sets[sets.length - 1], last = s && s.games[s.games.length - 1];
+        const near = last && (g.at && last.at ? playedMs(last) - new Date(g.at).getTime() <= 600e3 : g.date === last.date);
+        if (s && last.opp === g.opp && last.bot === g.bot && near) s.games.push(g); else sets.push({ games: [g] });
+      });
+    }
+    const recent = groupSets ? (recentMore ? sets : sets.slice(0, 10)).flatMap((s) => s.games) : recentMore ? recentAll : recentAll.slice(0, 10);
     const fm = $('form'); fm.replaceChildren();
     if (recent.length) {
       // the game's mode from the bot's log: time attack (nobody across) or versus; older games have none
@@ -931,11 +959,15 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
       const tbl = document.createElement('table'); tbl.className = 'gs-tbl gs-latest';
       const hr = tbl.createTHead().insertRow(); [['When', ''], ['Result', ''], ['Opponent', ''], ['Levels', ''], ['Mode', ''], ['Length', 'n'], ['Garbage', 'n hide-s'], ['Version', 'hide-s'], ['', 'n']].forEach(([h, c]) => { const th = document.createElement('th'); th.textContent = h; th.className = c; th.style.padding = '8px 10px'; hr.appendChild(th); });
       const tb = tbl.createTBody();
-      recent.forEach((g) => {
-        const tr = tb.insertRow(), t = playedMs(g);
+      const whenCell = (tr, t, g, t2) => {
         const wcell = tr.insertCell(); wcell.className = 'lw';
         const d1 = document.createElement('div'); d1.textContent = g.at ? dayName(t) : d3.utcFormat('%b %-d')(new Date(g.date)); wcell.appendChild(d1);
-        if (g.at) { const d2 = document.createElement('div'); d2.className = 'lt'; d2.textContent = new Date(t).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }); wcell.appendChild(d2); }
+        if (g.at) { const d2 = document.createElement('div'); d2.className = 'lt'; const hm = (x) => new Date(x).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }); d2.textContent = hm(t) + (t2 != null && hm(t2) !== hm(t) ? ' – ' + hm(t2) : ''); wcell.appendChild(d2); }
+        return wcell;
+      };
+      const gameRow = (g, cls, hidden) => {
+        const tr = tb.insertRow(), t = playedMs(g); if (cls) tr.className = cls; if (hidden) tr.hidden = true;
+        whenCell(tr, t, g);
         const rc = tr.insertCell(), pill = document.createElement('span'); pill.className = 'gw-res ' + (g.res === 'W' ? 'w' : 'l'); pill.textContent = g.res === 'W' ? 'Won' : 'Lost'; rc.appendChild(pill);
         const oc = tr.insertCell(); oc.textContent = g.opp; oc.style.fontWeight = '500';
         const evc = tr.insertCell(); evc.textContent = Array.isArray(g.lv) ? g.lv[0] + ' v ' + g.lv[1] : '—'; evc.title = 'Ranmaru v opponent';
@@ -946,14 +978,53 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
         const wc = tr.insertCell(); wc.className = 'n';
         if (g.replay) { const wb = document.createElement('button'); wb.type = 'button'; wb.className = 'gs-watch'; wb.append('▶'); { const x = document.createElement('span'); x.className = 'gw-t'; x.textContent = ' Watch'; wb.appendChild(x); } wb.setAttribute('aria-label', 'Watch the game against ' + g.opp); wb.addEventListener('click', (e) => { e.stopPropagation(); openReplay(g, true); }); wc.appendChild(wb); tr.style.cursor = 'pointer'; tr.addEventListener('click', () => openReplay(g, true)); }
         else { wc.textContent = 'no replay'; wc.style.color = 'var(--color-fg-muted)'; }
+        return tr;
+      };
+      if (!groupSets) recent.forEach((g) => gameRow(g));
+      else (recentMore ? sets : sets.slice(0, 10)).forEach((set) => {
+        const gs = set.games, newest = gs[0], oldest = gs[gs.length - 1], n = gs.length, w = gs.filter((g) => g.res === 'W').length, l = n - w;
+        const key = newest.bot + '|' + newest.opp + '|' + (oldest.at || oldest.date) + '|' + oldest.idx, open = openSets.has(key);
+        const timed = gs.filter((g) => g.secs != null), avg = (a) => a.length ? a.reduce((t, g) => t + g.secs, 0) / a.length : null;
+        const sent = gs.reduce((t, g) => t + (Number(g.sent) || 0), 0), land = gs.filter((g) => g.land != null), landSum = land.reduce((t, g) => t + g.land, 0);
+        const lvs = [...new Set(gs.map((g) => Array.isArray(g.lv) ? g.lv[0] + ' v ' + g.lv[1] : '—'))], modes = [...new Set(gs.map((g) => modeLabel(g.mode)))], vs = [...new Set(gs.map((g) => g.sha))];
+        // the set's own row: who, the record, when it ran; a click opens its games
+        const tr = tb.insertRow(); tr.className = 'gs-set' + (open ? ' open' : ''); tr.setAttribute('aria-expanded', open ? 'true' : 'false'); tr.tabIndex = 0;
+        whenCell(tr, playedMs(oldest), oldest, newest.at ? new Date(newest.at).getTime() : null);
+        const rc = tr.insertCell(), pill = document.createElement('span'); pill.className = 'gw-res ' + (w >= l ? 'w' : 'l'); pill.innerHTML = '<span class="gs-rec">' + w + '–' + l + '</span>'; pill.title = w + ' won, ' + l + ' lost'; rc.appendChild(pill);
+        const oc = tr.insertCell(); oc.textContent = newest.opp;
+        const evc = tr.insertCell(); evc.textContent = lvs.length === 1 ? lvs[0] : 'mixed';
+        const mdc = tr.insertCell(); mdc.textContent = modes.length === 1 ? modes[0] : 'mixed';
+        const lc = tr.insertCell(); lc.className = 'n'; lc.textContent = dur(timed.reduce((t, g) => t + g.secs, 0)); lc.title = 'Time played in the set';
+        const gbc = tr.insertCell(); gbc.className = 'n hide-s'; gbc.textContent = land.length ? landSum : '—';
+        const vc = tr.insertCell(); vc.className = 'hide-s'; vc.textContent = vs.length === 1 ? vLabel(vs[0]) : vs.length + ' versions'; vc.style.color = 'var(--color-fg-muted)';
+        const cc = tr.insertCell(); cc.className = 'n'; cc.innerHTML = '<span class="gs-chev">▸</span> '; cc.append(n + (n === 1 ? ' game' : ' games'));
+        // opened: a line on the set, then its games as the plain list has them
+        const info = tb.insertRow(); info.className = 'gs-setinfo'; info.hidden = !open;
+        const ic = info.insertCell(); ic.colSpan = 9;
+        const wonT = avg(timed.filter((g) => g.res === 'W')), lostT = avg(timed.filter((g) => g.res === 'L')), longest = timed.slice().sort((a, b) => b.secs - a.secs)[0];
+        let streak = 0, best = 0; gs.slice().reverse().forEach((g) => { streak = g.res === 'W' ? streak + 1 : 0; best = Math.max(best, streak); });
+        ic.textContent = [
+          'Won ' + w + ' of ' + n + ' (' + fmtPct(w / n) + ')',
+          timed.length ? 'average game ' + dur(avg(timed)) + (wonT != null && lostT != null ? ' (won ' + dur(wonT) + ', lost ' + dur(lostT) + ')' : '') : '',
+          longest ? 'longest ' + dur(longest.secs) : '',
+          best > 1 ? 'best run ' + best + ' wins in a row' : '',
+          sent ? sent + ' garbage blocks sent (' + (sent / n).toFixed(1) + ' a game)' : '',
+          land.length ? landSum + ' landed on Ranmaru (' + (landSum / land.length).toFixed(1) + ' a game)' : '',
+        ].filter(Boolean).join(' · ');
+        const rows = gs.map((g) => gameRow(g, 'gs-in', !open));
+        const flip = () => { const o = !openSets.has(key); if (o) openSets.add(key); else openSets.delete(key); tr.classList.toggle('open', o); tr.setAttribute('aria-expanded', o ? 'true' : 'false'); info.hidden = !o; rows.forEach((r) => { r.hidden = !o; }); };
+        tr.addEventListener('click', flip);
+        tr.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flip(); } });
       });
       const wrap = document.createElement('div'); wrap.className = recentMore ? 'gs-scroll gs-latest-box' : 'gs-scroll'; wrap.appendChild(tbl); fm.appendChild(wrap);
-      if (recentAll.length > 10) { const m = document.createElement('button'); m.type = 'button'; m.className = 'gs-more'; m.textContent = recentMore ? 'Show fewer' : 'Show all (' + recentAll.length + ')'; m.addEventListener('click', () => { recentMore = !recentMore; render(); }); fm.appendChild(m); }
+      const total = groupSets ? sets.length : recentAll.length, unit = groupSets ? (total === 1 ? ' set' : ' sets') : '';
+      if (total > 10) { const m = document.createElement('button'); m.type = 'button'; m.className = 'gs-more'; m.textContent = recentMore ? 'Show fewer' : 'Show all (' + total + unit + ')'; m.addEventListener('click', () => { recentMore = !recentMore; render(); }); fm.appendChild(m); }
     }
     const rl = recent.filter((g) => g.res === 'L').length;
-    $('form-note').textContent = recent.length ? 'Newest first. Click a game to watch it.' : 'No games in this selection.';
+    $('form-note').textContent = !recent.length ? 'No games in this selection.' : groupSets ? 'Newest set first. Click a set to see its games; click a game to watch it.' : 'Newest first. Click a game to watch it.';
     const sentSum = recent.reduce((t, g) => t + (Number(g.sent) || 0), 0);
-    $('form-sum').textContent = recent.length ? (recent.length === 1 ? 'the latest game' : 'latest ' + recent.length) + ': ' + (recent.length - rl) + ' won, ' + rl + ' lost, ' + sentSum + ' garbage blocks sent' : '';
+    const shownSets = groupSets ? (recentMore ? sets.length : Math.min(10, sets.length)) : 0;
+    $('form-sum').textContent = !recent.length ? '' : (groupSets ? (shownSets === 1 ? 'the latest set' : 'latest ' + shownSets + ' sets') + ' (' + recent.length + (recent.length === 1 ? ' game)' : ' games)') : recent.length === 1 ? 'the latest game' : 'latest ' + recent.length) + ': ' + (recent.length - rl) + ' won, ' + rl + ' lost, ' + sentSum + ' garbage blocks sent';
 
     // per-version stats (opponent filter applied)
     const vs = vers.map((v) => Object.assign({}, v, stat(byOpp.filter((g) => g.sha === v.sha)))).filter((v) => v.n > 0 && (v.n >= (narrow ? 0 : minn) || v.sha === ver));

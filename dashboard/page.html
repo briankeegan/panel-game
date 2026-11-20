@@ -957,7 +957,8 @@
         // the set's own row: who, the record, when it ran; a click opens its games
         const tr = tb.insertRow(); tr.className = 'gs-set' + (open ? ' open' : ''); tr.setAttribute('aria-expanded', open ? 'true' : 'false'); tr.tabIndex = 0;
         whenCell(tr, playedMs(oldest), oldest, newest.at ? new Date(newest.at).getTime() : null);
-        const rc = tr.insertCell(), pill = document.createElement('span'); pill.className = 'gw-res ' + (l === 0 ? 'w' : w === 0 ? 'l' : 'o'); pill.innerHTML = '<span class="gs-rec">' + w + '–' + l + '</span>'; pill.title = w + ' won, ' + l + ' lost';   // (green: every game won; red: every game lost; orange: any loss in between) rc.appendChild(pill);
+        const rc = tr.insertCell(), pill = document.createElement('span'); pill.className = 'gw-res ' + (l === 0 ? 'w' : l > w ? 'l' : 'o'); pill.innerHTML = '<span class="gs-rec">' + w + '–' + l + '</span>'; pill.title = w + ' won, ' + l + ' lost' + (l === 0 ? ': a sweep' : l > w ? ': lost the set' : ': won the set, dropped games'); rc.appendChild(pill);
+        // (the set pill: green a sweep; orange won or tied but dropped games; red lost the set. Not blue or purple: those are the charts' version colours)
         const oc = tr.insertCell(); oc.textContent = newest.opp;
         const evc = tr.insertCell(); evc.textContent = lvs.length === 1 ? lvs[0] : 'mixed';
         const mdc = tr.insertCell(); mdc.textContent = modes.length === 1 ? modes[0] : 'mixed';

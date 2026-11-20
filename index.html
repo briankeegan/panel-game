@@ -2,13 +2,17 @@
 @media (prefers-color-scheme:dark){:root{--color-fg:#e8ebf3;--color-fg-muted:#9aa4b8;--color-bg:#12151d;--color-panel:#1a1e29;--color-border-line:#2b3142;--cds-chart-grid:#2b3142;--cds-chart-muted:#3b4358;--cds-chart-reference:#7b859b;--cds-surface-popover:#1a1e29;--cds-border:#2b3142;--cds-text-secondary:#9aa4b8}}
 body{margin:0;background:var(--color-bg);color:var(--color-fg);font:14px system-ui,-apple-system,Segoe UI,sans-serif;padding:0 24px 40px}
 select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px solid var(--color-border-line);background:var(--color-panel);color:var(--color-fg)}
-.dash-skeleton{background:#e4e7ee}@media (prefers-color-scheme:dark){.dash-skeleton{background:#262b3a}}</style><script src='https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js'></script><script>// Stand-in for the artifact "dash" object: loads data files from ./data and runs the page's onData callbacks when they arrive.
+.dash-skeleton{background:#e4e7ee}@media (prefers-color-scheme:dark){.dash-skeleton{background:#262b3a}}</style><script src='https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js'></script><script>// Stand-in for the artifact "dash" object: loads data files and runs the page's onData callbacks when they arrive.
+// THE DATA IS NOT PART OF THE PAGE: it lives at its own address (the data project, <project>-data.pages.dev), named in data-base.txt beside
+// the page (a URL, else ignored: Pages answers a missing file with the page), so new games reach the page without the page being published again. No data-base.txt (a local copy): ./data.
 (function () {
   const P = { ver: '', opp: '', minn: 10 }, fns = [], cache = {};
-  const URLS = (id) => (id === 'games' || id === 'versions') ? 'data/' + id + '.json' : 'data/' + id + '.json.gz';
+  const base = fetch('data-base.txt', { cache: 'no-store' }).then((r) => (r.ok ? r.text() : '')).then((t) => (/^https:\/\/[^\s<]+$/.test(t.trim()) ? t.trim().replace(/\/?$/, '/') : 'data/')).catch(() => 'data/');
+  const name = (id) => (id === 'games' || id === 'versions') ? id + '.json' : id + '.json.gz';
   async function load(id) {
     try {
-      const url = URLS(id), r = await fetch(url); if (!r.ok) throw new Error(url + ' ' + r.status);
+      // (no-store: a game finished a minute ago is on the page at the next load, not after a cache expires)
+      const url = (await base) + name(id), r = await fetch(url, { cache: 'no-store' }); if (!r.ok) throw new Error(url + ' ' + r.status);
       let text;
       if (url.endsWith('.gz') && r.headers.get('content-encoding') !== 'gzip' && window.DecompressionStream) text = await new Response(r.body.pipeThrough(new DecompressionStream('gzip'))).text();
       else text = await r.text();
@@ -23,7 +27,9 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
     resetParams: () => { Object.assign(P, { ver: '', opp: '', minn: 10 }); fns.forEach((f) => f()); },
     data: (id) => { if (!cache[id]) { cache[id] = { status: 'loading', data: [] }; load(id); } return cache[id]; },
     onData: (f) => { fns.push(f); f(); }, setLink() {}, refresh() {},
+    dataBase: () => base,
   };
+  base.then((b) => { window.__dataBase = b; });   // (for the page's own links to a replay file)
 })();
 </script></head><body><div id='dash-root'><style>
 .gs { max-width: 1100px; margin-inline: auto; display: flex; flex-direction: column; gap: var(--cds-gap-lg); font-family: var(--font-sans); color: var(--color-fg); }
@@ -1991,7 +1997,7 @@ function projectPlan(G, seq, cursor) {
     const L = [];
     L.push('Ranmaru decision to review');
     L.push('Link (opens this exact moment): ' + URLSTATE.link());
-    L.push('Replay data (gzipped JSON, the whole game): ' + new URL('data/replay_' + R.rid + '.json.gz', location.href.split('#')[0]).href);
+    L.push('Replay data (gzipped JSON, the whole game): ' + new URL((window.__dataBase || 'data/') + 'replay_' + R.rid + '.json.gz', location.href.split('#')[0]).href);
     L.push('Game: ' + R.rid + ' · ' + (VLBL ? VLBL(D.sha) : '') + (VSTART && VSTART(D.sha) ? ' (deployed ' + VSTART(D.sha) + ')' : '') + ' · ' + (row.res === 'W' ? 'won' : 'lost') + ' vs ' + D.opp + ' · ' + (row.at || row.date || '') + ' · ' + dur(row.secs) + ' · bot ' + D.bot);
     L.push('At: frame ' + clock + ' (' + fmtClock(clock) + ' of ' + fmtClock(D.end) + ')');
     { // what the page shows for this moment, in its own words

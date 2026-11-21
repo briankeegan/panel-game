@@ -1114,6 +1114,8 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
       Array.from($('lb-tabs').children).forEach((b) => b.setAttribute('aria-selected', b.dataset.p === lbPeriod ? 'true' : 'false'));
       const newestOrder = vers.length ? d3.max(vers, (v) => v.order) : 0;
       const gamesTxt = (k) => k + (k === 1 ? ' game played' : ' games played');
+      // a record holder who has never beaten Ranmaru says so: 'never beat Ranmaru in 31 games' rather than '31 games played'
+      const recTxt = (p) => p.beat ? gamesTxt(p.n) : 'never beat Ranmaru' + (p.n === 1 ? ' in their 1 game' : ' in ' + p.n + ' games');
       // a board: the players of the games `keep` lets through, each category's top `topN`, into `box`; `since`: say versions since each played
       const board = (box, keep, topN, since, noneTxt, boxKey) => {
         const players = Array.from(byOpp, ([, all]) => {
@@ -1135,10 +1137,10 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
         const cats = [
           { t: 'Most Wins', how: 'games won against Ranmaru', rows: players.filter((p) => p.beat > 0).sort((a, b) => b.beat - a.beat || b.rate - a.rate || b.n - a.n), v: (p) => p.beat, s: (p) => 'in ' + gamesTxt(p.n) + ' · ' + Math.round(p.rate * 100) + '%' },
           { t: 'Best Win Rate', how: 'at least 20 games', rows: players.filter((p) => p.n >= 20 && p.beat > 0).sort((a, b) => b.rate - a.rate || b.n - a.n), v: (p) => Math.round(p.rate * 100) + '%', s: (p) => p.beat + (p.beat === 1 ? ' win' : ' wins') + ' in ' + gamesTxt(p.n) },
-          { t: 'Last Panel Standing', how: 'longest single game against Ranmaru', rows: players.filter((p) => p.longest).sort((a, b) => b.longest.secs - a.longest.secs), v: (p) => dur(p.longest.secs), s: (p) => (p.longest.res === 'L' ? 'won that game' : 'lost that game') + ' · ' + gamesTxt(p.n), g: (p) => p.longest },
-          { t: 'Biggest Chain', how: 'longest chain thrown at Ranmaru', rows: players.filter((p) => p.chain).sort((a, b) => b.chain.gch - a.chain.gch || b.chain.gr - a.chain.gr), v: (p) => '×' + p.chain.gch, s: (p) => (p.chain.res === 'L' ? 'won that game' : 'lost that game') + ' · ' + gamesTxt(p.n), g: (p) => p.chain },
-          { t: 'Most Combos', how: 'combo pieces thrown at Ranmaru in one game', rows: players.filter((p) => p.combos).sort((a, b) => b.combos.gk - a.combos.gk || b.combos.gr - a.combos.gr), v: (p) => p.combos.gk, s: (p) => (p.combos.res === 'L' ? 'won that game' : 'lost that game') + ' · ' + gamesTxt(p.n), g: (p) => p.combos },
-          { t: 'Most Garbage', how: 'how high the garbage thrown at Ranmaru in one game stacks up, in rows', rows: players.filter((p) => p.rows && p.rows.gr > 0).sort((a, b) => b.rows.gr - a.rows.gr), v: (p) => Math.round(p.rows.gr) + ' rows', s: (p) => gamesTxt(p.n), g: (p) => p.rows },
+          { t: 'Last Panel Standing', how: 'longest single game against Ranmaru', rows: players.filter((p) => p.longest).sort((a, b) => b.longest.secs - a.longest.secs), v: (p) => dur(p.longest.secs), s: (p) => (p.longest.res === 'L' ? 'won that game' : 'lost that game') + ' · ' + recTxt(p), g: (p) => p.longest },
+          { t: 'Biggest Chain', how: 'longest chain thrown at Ranmaru', rows: players.filter((p) => p.chain).sort((a, b) => b.chain.gch - a.chain.gch || b.chain.gr - a.chain.gr), v: (p) => '×' + p.chain.gch, s: (p) => (p.chain.res === 'L' ? 'won that game' : 'lost that game') + ' · ' + recTxt(p), g: (p) => p.chain },
+          { t: 'Most Combos', how: 'combo pieces thrown at Ranmaru in one game', rows: players.filter((p) => p.combos).sort((a, b) => b.combos.gk - a.combos.gk || b.combos.gr - a.combos.gr), v: (p) => p.combos.gk, s: (p) => (p.combos.res === 'L' ? 'won that game' : 'lost that game') + ' · ' + recTxt(p), g: (p) => p.combos },
+          { t: 'Most Garbage', how: 'how high the garbage thrown at Ranmaru in one game stacks up, in rows', rows: players.filter((p) => p.rows && p.rows.gr > 0).sort((a, b) => b.rows.gr - a.rows.gr), v: (p) => Math.round(p.rows.gr) + ' rows', s: (p) => recTxt(p), g: (p) => p.rows },
         ];
         box.replaceChildren();
         const medal = ['🥇', '🥈', '🥉'];

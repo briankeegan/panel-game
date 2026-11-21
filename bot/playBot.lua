@@ -220,6 +220,12 @@ while true do
     for _, p in pairs(bot.players or {}) do if p.name ~= name then others[#others + 1] = tostring(p.name) end end
     table.sort(others)
     print("match against: " .. (#others > 0 and table.concat(others, ", ") or "?"))
+    -- and their account ids (the server's publicId: public, the same for an account whatever name it goes by), so the stats count
+    -- one player per account when someone changes their name
+    local ids = {}
+    for _, p in pairs(bot.players or {}) do if p.name ~= name and p.publicId then ids[#ids + 1] = tostring(p.publicId) end end
+    table.sort(ids)
+    if #ids > 0 then print("match against id: " .. table.concat(ids, ", ")) end
     print(string.format("match over — bot %s (pace: worst %.2f frames off schedule); waiting for a rematch",
       tostring(bot.outcome), worstOffSchedule))
     lastMatchEndAt = socket.gettime()

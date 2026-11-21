@@ -7,17 +7,25 @@ pieces of a game are the distinct in-transit entries (two identical pieces landi
 most of them any one queue holds).
 
   stats(queues) -> dict(gr=..., gch=..., gk=...)
-    gr  : garbage height -- the area of every piece in full rows of 6 (a 6x2 chain slab is 2 rows, a 3x1 combo piece half a row)
+    gr  : garbage height -- how high the pieces pile up as the engine drops them (common/engine/Stack.lua dropGarbage): a piece narrower
+          than the board falls in the next column of its width's list (garbageSizeDropColumnMaps: 3 wide alternates columns 1 and 4,
+          4 wide 1/2/3, 5 wide 1/2), each width keeping its own place in its list, and lands on whatever garbage is under those columns.
+          So two 3-wide pieces in a row sit side by side (one row), two 5-wide pieces stack (two rows), a 6x3 chain slab adds 3. The
+          pile is measured on a flat floor: Ranmaru's own panels under it, and what it clears, are left out.
     gch : the biggest chain thrown -- a chain's slab is one row shorter than the chain (a 4-chain sends 6x3), so tallest slab + 1; 0: none
     gk  : combo pieces -- pieces narrower than the board, the garbage a combo of 4 or more sends
 """
 import re
 
 PIECE = re.compile(r"^t(-?\d+):(\d+)x(\d+)([cpm])$")
+WIDTH = 6
+# common/engine/Stack.lua garbageSizeDropColumnMaps: the columns (1-based) each width of garbage may fall in, in turn
+DROP_COLUMNS = {1: [1, 2, 3, 4, 5, 6], 2: [1, 3, 5], 3: [1, 4], 4: [1, 2, 3], 5: [1, 2], 6: [1]}
 
 
-def stats(queues):
-    most = {}
+def pieces(queues):
+    """The game's pieces in the order they land: (landing frame, width, height, kind), identical pieces on one frame kept apart."""
+    most, order = {}, {}
     for q in queues:
         if not q:
             continue
@@ -26,19 +34,38 @@ def stats(queues):
             m = PIECE.match(e)
             if m:
                 seen[e] = seen.get(e, 0) + 1
+                order.setdefault(e, len(order))
         for e, n in seen.items():
             if n > most.get(e, 0):
                 most[e] = n
-    cells, chain, combos = 0, 0, 0
-    for e, n in most.items():
-        _, w, h, kind = PIECE.match(e).groups()
-        w, h = int(w), int(h)
-        cells += w * h * n
-        if kind == "c":
-            chain = max(chain, h + 1)
-        elif kind == "p":
-            combos += n
-    return dict(gr=round(cells / 6, 1), gch=chain, gk=combos)
+    out = []
+    for e in sorted(most, key=lambda e: (int(PIECE.match(e).group(1)), order[e])):
+        at, w, h, kind = PIECE.match(e).groups()
+        out += [(int(at), int(w), int(h), kind)] * most[e]
+    return out
+
+
+def pile_height(ps):
+    """How high the pieces pile up when dropped as the engine drops them, on a flat floor."""
+    top = [0] * WIDTH
+    nxt = {w: 0 for w in DROP_COLUMNS}
+    for _, w, h, _ in ps:
+        w = max(1, min(WIDTH, w))
+        cols = DROP_COLUMNS[w]
+        c0 = cols[nxt[w] % len(cols)] - 1
+        nxt[w] += 1
+        span = range(c0, min(WIDTH, c0 + w))
+        base = max(top[c] for c in span)
+        for c in span:
+            top[c] = base + h
+    return max(top)
+
+
+def stats(queues):
+    ps = pieces(queues)
+    chain = max([h + 1 for _, _, h, k in ps if k == "c"] or [0])
+    combos = sum(1 for _, w, _, k in ps if k == "p")
+    return dict(gr=pile_height(ps), gch=chain, gk=combos)
 
 
 def from_replay(rep):

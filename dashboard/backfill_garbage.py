@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""backfill_garbage.py SITE_DIR REPLAY_BASE  --  adds gr/gch/gk (garbage.py) to every game in SITE_DIR/data/games.json that has a replay
+"""backfill_garbage.py SITE_DIR REPLAY_BASE [--all]  --  adds gr/gch/gk (garbage.py) to every game in SITE_DIR/data/games.json that has a replay
 and lacks them, reading each replay from REPLAY_BASE (a directory, or a URL such as https://<project>-data.pages.dev/data/). New games get
 them at ingest (update_data.py); this is for the games made before. Idempotent: a game that has gr is left alone."""
 import gzip, io, json, os, sys, urllib.request
@@ -11,7 +11,8 @@ import garbage as GB
 site, base = sys.argv[1], sys.argv[2].rstrip("/")
 path = os.path.join(site, "data", "games.json")
 games = json.load(open(path))
-todo = [g for g in games if g.get("replay") and "gr" not in g]
+force = "--all" in sys.argv[3:]   # --all: compute every game again (after garbage.py changes how a number is measured)
+todo = [g for g in games if g.get("replay") and (force or "gr" not in g)]
 
 
 def get(rid):

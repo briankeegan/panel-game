@@ -1071,7 +1071,7 @@
       $('lb-note').textContent = 'Level 10 v 10 only · ' + (lbPeriod === 'week' ? 'this week, from Monday ' + fmtDay(nowWk) + ' (UTC)' : lbPeriod === 'last' ? 'last week, ' + fmtDay(nowWk - 7 * 864e5) + ' to ' + fmtDay(nowWk - 864e5) + ' (UTC)' : 'all time, with the versions of Ranmaru released since each player last played');
       Array.from($('lb-tabs').children).forEach((b) => b.setAttribute('aria-selected', b.dataset.p === lbPeriod ? 'true' : 'false'));
       const newestOrder = vers.length ? d3.max(vers, (v) => v.order) : 0;
-      const gamesTxt = (k) => k + (k === 1 ? ' game' : ' games');
+      const gamesTxt = (k) => k + (k === 1 ? ' game played' : ' games played');
       // a board: the players of the games `keep` lets through, each category's top `topN`, into `box`; `since`: say versions since each played
       const board = (box, keep, topN, since, noneTxt, boxKey) => {
         const players = Array.from(byOpp, ([, all]) => {
@@ -1089,13 +1089,13 @@
           t.textContent = p.since === 0 ? 'on the newest' : p.since + (p.since === 1 ? ' version ago' : ' versions ago');
           t.title = p.since === 0 ? 'Played the newest version of Ranmaru' : 'Last played ' + p.since + (p.since === 1 ? ' version' : ' versions') + ' ago: Ranmaru has changed since'; return t; };
         const cats = [
-          { t: 'Bot Toppler', how: 'most wins vs Ranmaru: made it top out the most', rows: players.filter((p) => p.beat > 0).sort((a, b) => b.beat - a.beat || b.rate - a.rate || b.n - a.n), v: (p) => p.beat, s: (p) => gamesTxt(p.n) + ' · ' + Math.round(p.rate * 100) + '%' },
-          { t: 'Top of the Stack', how: 'best win rate · at least 20 games', rows: players.filter((p) => p.n >= 20 && p.beat > 0).sort((a, b) => b.rate - a.rate || b.n - a.n), v: (p) => Math.round(p.rate * 100) + '%', s: (p) => p.beat + ' of ' + gamesTxt(p.n) },
-          { t: 'Last Panel Standing', how: 'longest single game against Ranmaru', rows: players.filter((p) => p.longest).sort((a, b) => b.longest.secs - a.longest.secs), v: (p) => dur(p.longest.secs), s: (p) => (p.longest.res === 'L' ? 'beat it' : 'lost') + ' · ' + gamesTxt(p.n), g: (p) => p.longest },
+          { t: 'Bot Toppler', how: 'most wins vs Ranmaru: made it top out the most', rows: players.filter((p) => p.beat > 0).sort((a, b) => b.beat - a.beat || b.rate - a.rate || b.n - a.n), v: (p) => p.beat, s: (p) => 'in ' + gamesTxt(p.n) + ' · ' + Math.round(p.rate * 100) + '%' },
+          { t: 'Top of the Stack', how: 'best win rate · at least 20 games', rows: players.filter((p) => p.n >= 20 && p.beat > 0).sort((a, b) => b.rate - a.rate || b.n - a.n), v: (p) => Math.round(p.rate * 100) + '%', s: (p) => p.beat + (p.beat === 1 ? ' win' : ' wins') + ' in ' + gamesTxt(p.n) },
+          { t: 'Last Panel Standing', how: 'longest single game against Ranmaru', rows: players.filter((p) => p.longest).sort((a, b) => b.longest.secs - a.longest.secs), v: (p) => dur(p.longest.secs), s: (p) => (p.longest.res === 'L' ? 'won that game' : 'lost that game') + ' · ' + gamesTxt(p.n), g: (p) => p.longest },
           { t: 'Garbage Day', how: 'most garbage blocks landed on Ranmaru in one game', rows: players.filter((p) => p.hardest && p.hardest.land > 0).sort((a, b) => b.hardest.land - a.hardest.land), v: (p) => p.hardest.land, s: (p) => gamesTxt(p.n), g: (p) => p.hardest },
           { t: 'Trash Talker', how: 'most garbage per game on average · at least 5 games', rows: players.filter((p) => p.nLanded >= 5).sort((a, b) => b.avgLand - a.avgLand), v: (p) => p.avgLand.toFixed(1), s: (p) => gamesTxt(p.n) },
           { t: 'Marathon Stacker', how: 'longest games on average · at least 5 games', rows: players.filter((p) => p.nTimed >= 5).sort((a, b) => b.avgLen - a.avgLen), v: (p) => dur(p.avgLen), s: (p) => gamesTxt(p.n) },
-          { t: 'Rise and Grind', how: 'most games played against Ranmaru', rows: players.slice().sort((a, b) => b.n - a.n || b.beat - a.beat), v: (p) => p.n, s: (p) => p.beat + (p.beat === 1 ? ' win' : ' wins') },
+          { t: 'Rise and Grind', how: 'most games played against Ranmaru', rows: players.slice().sort((a, b) => b.n - a.n || b.beat - a.beat), v: (p) => p.n, s: (p) => p.beat ? 'beat Ranmaru ' + (p.beat === 1 ? 'once' : p.beat + ' times') : 'never beat Ranmaru' },
         ];
         box.replaceChildren();
         const medal = ['🥇', '🥈', '🥉'];

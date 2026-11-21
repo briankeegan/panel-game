@@ -555,6 +555,13 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
 .lb-card .lb-s{display:block;font-weight:400;font-size:var(--cds-font-size-caption);color:var(--color-fg-muted)}
 .lb-card .lb-v{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
 .lb-card li.lb-1 .lb-r{color:#d4af37}.lb-card li.lb-2 .lb-r{color:#9aa0aa}.lb-card li.lb-3 .lb-r{color:#cd7f32}
+.lb-past{margin-top:12px}
+.lb-past>summary{cursor:pointer;font-weight:600;padding:6px 0}
+.lb-week{border-top:1px solid var(--color-border-line)}
+.lb-week>summary{cursor:pointer;padding:8px 0;list-style-position:outside;font-size:var(--cds-font-size-body)}
+.lb-week>summary .lb-wk{font-weight:600;margin-right:6px}
+.lb-week>summary .lb-ws{color:var(--color-fg-muted);font-size:var(--cds-font-size-caption)}
+.lb-week .lb-grid{margin:2px 0 12px}
 .lb-card .lb-none{font-size:var(--cds-font-size-caption);color:var(--color-fg-muted);padding:6px 0}
 .pod .pod-m{font-size:1.7em;line-height:1;text-align:center}
 .pod .pod-name{font-weight:700;overflow-wrap:anywhere;min-width:0}
@@ -577,7 +584,7 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
 </style>
 
 <div class="gs" id="gs">
-  <section class="gs-card pod-card" id="sec-podium"><div class="lb-head"><h2>Leaderboard</h2><div class="lb-tabs" id="lb-tabs" role="tablist"><button type="button" data-p="week" role="tab">This week</button><button type="button" data-p="last" role="tab">Last week</button><button type="button" data-p="all" role="tab">All time</button></div></div><p class="gs-note" id="lb-note"></p><div class="lb-grid" id="lb"></div></section>
+  <section class="gs-card pod-card" id="sec-podium"><div class="lb-head"><h2>Leaderboard</h2><div class="lb-tabs" id="lb-tabs" role="tablist"><button type="button" data-p="week" role="tab">This week</button><button type="button" data-p="last" role="tab">Last week</button><button type="button" data-p="all" role="tab">All time</button></div></div><p class="gs-note" id="lb-note"></p><div class="lb-grid" id="lb"></div><details class="lb-past" id="lb-past"><summary id="lb-past-s">Past weeks</summary><div id="lb-weeks"></div></details></section>
   <section class="gs-card pod-card" id="sec-last"><h2>Last kill</h2><p class="gs-note">Level 10 v 10</p><button type="button" class="pod-kill" id="pod-last"></button></section>
   <header class="gs-hero">
     <div class="gs-eyebrow"><span class="gs-pulse" aria-hidden="true"></span>Live stats · updates itself after every set</div>
@@ -1088,50 +1095,77 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
       $('lb-note').textContent = 'Level 10 v 10 only · ' + (lbPeriod === 'week' ? 'this week, from Monday ' + fmtDay(nowWk) + ' (UTC)' : lbPeriod === 'last' ? 'last week, ' + fmtDay(nowWk - 7 * 864e5) + ' to ' + fmtDay(nowWk - 864e5) + ' (UTC)' : 'all time, with the versions of Ranmaru released since each player last played');
       Array.from($('lb-tabs').children).forEach((b) => b.setAttribute('aria-selected', b.dataset.p === lbPeriod ? 'true' : 'false'));
       const newestOrder = vers.length ? d3.max(vers, (v) => v.order) : 0;
-      const players = Array.from(byOpp, ([, all]) => {
-        const a = all.filter(inPeriod); if (!a.length) return null;
-        const names = d3.rollup(a, (v) => v.length, (g) => g.opp); const opp = Array.from(names).sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0]))[0][0];
-        const n = a.length, beat = a.filter((g) => g.res === 'L').length, timed = a.filter((g) => g.secs != null), landed = a.filter((g) => g.land != null);
-        const lastOrder = d3.max(all, (g) => (vBy.get(g.sha) || {}).order ?? -1);
-        const since = lastOrder >= 0 ? newestOrder - lastOrder : null;
-        const longest = d3.greatest(timed, (g) => g.secs), hardest = d3.greatest(landed, (g) => g.land);
-        return { opp, n, beat, rate: beat / n, longest, hardest, avgLen: timed.length ? d3.mean(timed, (g) => g.secs) : null, nTimed: timed.length,
-          avgLand: landed.length ? d3.mean(landed, (g) => g.land) : null, nLanded: landed.length, since };
-      }).filter(Boolean);
       const gamesTxt = (k) => k + (k === 1 ? ' game' : ' games');
-      const sinceTxt = (p) => lbPeriod !== 'all' || p.since == null ? '' : p.since === 0 ? ' · played the newest version' : ' · ' + p.since + (p.since === 1 ? ' version' : ' versions') + ' since';
-      const cats = [
-        { t: 'Most wins vs Ranmaru', how: 'games won against it', rows: players.filter((p) => p.beat > 0).sort((a, b) => b.beat - a.beat || b.rate - a.rate || b.n - a.n), v: (p) => p.beat, s: (p) => gamesTxt(p.n) + ' · ' + Math.round(p.rate * 100) + '%' },
-        { t: 'Best win rate', how: 'at least 20 games', rows: players.filter((p) => p.n >= 20 && p.beat > 0).sort((a, b) => b.rate - a.rate || b.n - a.n), v: (p) => Math.round(p.rate * 100) + '%', s: (p) => p.beat + ' of ' + gamesTxt(p.n) },
-        { t: 'Longest game', how: 'longest single game against it', rows: players.filter((p) => p.longest).sort((a, b) => b.longest.secs - a.longest.secs), v: (p) => dur(p.longest.secs), s: (p) => (p.longest.res === 'L' ? 'beat it' : 'lost') + ' · ' + gamesTxt(p.n), g: (p) => p.longest },
-        { t: 'Hardest hitter', how: 'most garbage blocks landed on Ranmaru in one game', rows: players.filter((p) => p.hardest && p.hardest.land > 0).sort((a, b) => b.hardest.land - a.hardest.land), v: (p) => p.hardest.land, s: (p) => gamesTxt(p.n), g: (p) => p.hardest },
-        { t: 'Average garbage', how: 'landed on Ranmaru per game · at least 5 games', rows: players.filter((p) => p.nLanded >= 5).sort((a, b) => b.avgLand - a.avgLand), v: (p) => p.avgLand.toFixed(1), s: (p) => gamesTxt(p.n) },
-        { t: 'Average game length', how: 'at least 5 games', rows: players.filter((p) => p.nTimed >= 5).sort((a, b) => b.avgLen - a.avgLen), v: (p) => dur(p.avgLen), s: (p) => gamesTxt(p.n) },
-        { t: 'Most games played', how: 'games against Ranmaru', rows: players.slice().sort((a, b) => b.n - a.n || b.beat - a.beat), v: (p) => p.n, s: (p) => p.beat + (p.beat === 1 ? ' win' : ' wins') },
-      ];
-      const lb = $('lb'); lb.replaceChildren();
-      cats.forEach((c) => {
-        const card = document.createElement('div'); card.className = 'lb-card';
-        const h = document.createElement('h3'); h.textContent = c.t; const how = document.createElement('p'); how.className = 'lb-how'; how.textContent = c.how; card.append(h, how);
-        const top = c.rows.slice(0, 5);
-        if (!top.length) { const none = document.createElement('div'); none.className = 'lb-none'; none.textContent = lbPeriod === 'all' ? 'No one yet' : 'No one yet ' + (lbPeriod === 'week' ? 'this week' : 'last week'); card.appendChild(none); }
-        else {
-          const ol = document.createElement('ol');
-          top.forEach((p, i) => {
-            const li = document.createElement('li'); li.className = 'lb-' + (i + 1);
-            const r = document.createElement('span'); r.className = 'lb-r'; r.textContent = (i + 1) + '.';
-            const nm = document.createElement('span'); nm.className = 'lb-n'; nm.textContent = p.opp;
-            const sub = document.createElement('span'); sub.className = 'lb-s'; sub.textContent = c.s(p) + sinceTxt(p); nm.appendChild(sub);
-            const v = document.createElement('span'); v.className = 'lb-v'; v.textContent = c.v(p);
-            li.append(r, nm, v);
-            // a single-game record opens that game
-            const gm = c.g && c.g(p); if (gm && gm.replay) { li.style.cursor = 'pointer'; li.title = 'Watch this game'; li.addEventListener('click', () => openReplay(gm, true)); }
-            ol.appendChild(li);
-          });
-          card.appendChild(ol);
-        }
-        lb.appendChild(card);
-      });
+      // a board: the players of the games `keep` lets through, each category's top `topN`, into `box`; `since`: say versions since each played
+      const board = (box, keep, topN, since, noneTxt) => {
+        const players = Array.from(byOpp, ([, all]) => {
+          const a = all.filter(keep); if (!a.length) return null;
+          const names = d3.rollup(a, (v) => v.length, (g) => g.opp); const opp = Array.from(names).sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0]))[0][0];
+          const n = a.length, beat = a.filter((g) => g.res === 'L').length, timed = a.filter((g) => g.secs != null), landed = a.filter((g) => g.land != null);
+          const lastOrder = d3.max(all, (g) => (vBy.get(g.sha) || {}).order ?? -1);
+          return { opp, n, beat, rate: beat / n, longest: d3.greatest(timed, (g) => g.secs), hardest: d3.greatest(landed, (g) => g.land),
+            avgLen: timed.length ? d3.mean(timed, (g) => g.secs) : null, nTimed: timed.length, avgLand: landed.length ? d3.mean(landed, (g) => g.land) : null, nLanded: landed.length,
+            since: lastOrder >= 0 ? newestOrder - lastOrder : null };
+        }).filter(Boolean);
+        const sinceTxt = (p) => !since || p.since == null ? '' : p.since === 0 ? ' · played the newest version' : ' · ' + p.since + (p.since === 1 ? ' version' : ' versions') + ' since';
+        const cats = [
+          { t: 'Most wins vs Ranmaru', how: 'games won against it', rows: players.filter((p) => p.beat > 0).sort((a, b) => b.beat - a.beat || b.rate - a.rate || b.n - a.n), v: (p) => p.beat, s: (p) => gamesTxt(p.n) + ' · ' + Math.round(p.rate * 100) + '%' },
+          { t: 'Best win rate', how: 'at least 20 games', rows: players.filter((p) => p.n >= 20 && p.beat > 0).sort((a, b) => b.rate - a.rate || b.n - a.n), v: (p) => Math.round(p.rate * 100) + '%', s: (p) => p.beat + ' of ' + gamesTxt(p.n) },
+          { t: 'Longest game', how: 'longest single game against it', rows: players.filter((p) => p.longest).sort((a, b) => b.longest.secs - a.longest.secs), v: (p) => dur(p.longest.secs), s: (p) => (p.longest.res === 'L' ? 'beat it' : 'lost') + ' · ' + gamesTxt(p.n), g: (p) => p.longest },
+          { t: 'Hardest hitter', how: 'most garbage blocks landed on Ranmaru in one game', rows: players.filter((p) => p.hardest && p.hardest.land > 0).sort((a, b) => b.hardest.land - a.hardest.land), v: (p) => p.hardest.land, s: (p) => gamesTxt(p.n), g: (p) => p.hardest },
+          { t: 'Average garbage', how: 'landed on Ranmaru per game · at least 5 games', rows: players.filter((p) => p.nLanded >= 5).sort((a, b) => b.avgLand - a.avgLand), v: (p) => p.avgLand.toFixed(1), s: (p) => gamesTxt(p.n) },
+          { t: 'Average game length', how: 'at least 5 games', rows: players.filter((p) => p.nTimed >= 5).sort((a, b) => b.avgLen - a.avgLen), v: (p) => dur(p.avgLen), s: (p) => gamesTxt(p.n) },
+          { t: 'Most games played', how: 'games against Ranmaru', rows: players.slice().sort((a, b) => b.n - a.n || b.beat - a.beat), v: (p) => p.n, s: (p) => p.beat + (p.beat === 1 ? ' win' : ' wins') },
+        ];
+        box.replaceChildren();
+        cats.forEach((c) => {
+          const card = document.createElement('div'); card.className = 'lb-card';
+          const h = document.createElement('h3'); h.textContent = c.t; const how = document.createElement('p'); how.className = 'lb-how'; how.textContent = c.how; card.append(h, how);
+          const top = c.rows.slice(0, topN);
+          if (!top.length) { const none = document.createElement('div'); none.className = 'lb-none'; none.textContent = noneTxt; card.appendChild(none); }
+          else {
+            const ol = document.createElement('ol');
+            top.forEach((p, i) => {
+              const li = document.createElement('li'); li.className = 'lb-' + (i + 1);
+              const r = document.createElement('span'); r.className = 'lb-r'; r.textContent = (i + 1) + '.';
+              const nm = document.createElement('span'); nm.className = 'lb-n'; nm.textContent = p.opp;
+              const sub = document.createElement('span'); sub.className = 'lb-s'; sub.textContent = c.s(p) + sinceTxt(p); nm.appendChild(sub);
+              const v = document.createElement('span'); v.className = 'lb-v'; v.textContent = c.v(p);
+              li.append(r, nm, v);
+              // a click goes somewhere: a single-game record opens that game; any other entry shows that player's stats (the page's player
+              // filter, as the Opponents table does) and goes to their latest results
+              const gm = c.g && c.g(p); li.style.cursor = 'pointer';
+              if (gm && gm.replay) { li.title = 'Watch this game'; li.addEventListener('click', () => openReplay(gm, true)); }
+              else { li.title = 'Show ' + p.opp + "'s games and stats"; li.addEventListener('click', () => { dash.setParams({ opp: p.opp }); const f = $('sec-form'); if (f) { f.open = true; f.scrollIntoView({ behavior: 'smooth', block: 'start' }); } }); }
+              ol.appendChild(li);
+            });
+            card.appendChild(ol);
+          }
+          box.appendChild(card);
+        });
+        return players;
+      };
+      board($('lb'), inPeriod, 5, lbPeriod === 'all', lbPeriod === 'all' ? 'No one yet' : 'No one yet ' + (lbPeriod === 'week' ? 'this week' : 'last week'));
+      // PAST WEEKS: every finished week, newest first, each one line until opened, then its top 3 per category (built when opened)
+      {
+        const firstT = d3.min(lvGames, tOf), weeksBox = $('lb-weeks'), weeks = [];
+        if (firstT != null) for (let w = nowWk - 7 * 864e5; w >= weekStart(firstT); w -= 7 * 864e5) weeks.push(w);
+        $('lb-past-s').textContent = 'Past weeks (' + weeks.length + ')';
+        weeksBox.replaceChildren();
+        weeks.forEach((w) => {
+          const keep = (g) => tOf(g) >= w && tOf(g) < w + 7 * 864e5, wg = lvGames.filter(keep);
+          const d = document.createElement('details'); d.className = 'lb-week';
+          const sm = document.createElement('summary');
+          const nm = document.createElement('span'); nm.className = 'lb-wk'; nm.textContent = fmtDay(w) + ' – ' + fmtDay(w + 6 * 864e5);
+          const beatBy = d3.rollups(wg.filter((g) => g.res === 'L'), (v) => v.length, (g) => g.opp).sort((a, b) => b[1] - a[1]);
+          const st = document.createElement('span'); st.className = 'lb-ws';
+          st.textContent = gamesTxt(wg.length) + ' · ' + new Set(wg.map((g) => g.pid || g.opp)).size + ' players · ' + (beatBy.length ? 'most wins: ' + beatBy[0][0] + ' (' + beatBy[0][1] + ')' : 'no one beat Ranmaru');
+          sm.append(nm, st); d.appendChild(sm);
+          const grid = document.createElement('div'); grid.className = 'lb-grid'; d.appendChild(grid);
+          d.addEventListener('toggle', () => { if (d.open && !grid.childElementCount) board(grid, keep, 3, false, 'No one that week'); });
+          weeksBox.appendChild(d);
+        });
+      }
       const lk = $('pod-last'); lk.replaceChildren();
       const lastLoss = d3.greatest(lvGames.filter((g) => g.res === 'L'), (g) => g.at || g.date);   // full time when a game has one, so two losses on the same day sort correctly
       if (lastLoss) {

@@ -26,6 +26,7 @@ ap.add_argument("--prune-out", default="", help="a file to list the replays that
 a = ap.parse_args()
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
+import garbage as GB           # the garbage thrown at Ranmaru, from the replay's queues (height, biggest chain, combo pieces)
 import gambit_log as GL        # the newer log lines (per-swap, given-up lines, the frame loop's notes, the rule a decision names)
 LUA = os.path.join(HERE, "replayFrames.lua")
 # the repo's own libraries first, then whatever luarocks (or the system) provides: in CI that comes from `luarocks path` in the environment
@@ -212,6 +213,9 @@ for gi, g in enumerate(games):
             with gzip.open(os.path.join(a.data, "replay_%s.json.gz" % rid), "wt", compresslevel=9) as z: json.dump(out, z, separators=(",", ":"))
             row["replay"] = rid; made.append("replay_%s.json.gz" % rid)
             if fr.get("levels"): row["lv"] = fr["levels"]   # [bot level, opponent level], so the stats can count only level-10 games
+            # the garbage the opponent threw at Ranmaru: gr rows of 6 (by area: a 3x1 combo piece is half a row), gch the biggest chain, gk combo pieces
+            try: row.update(GB.from_frames(fr, x["mine"]))
+            except Exception as e_: print("garbage stats failed for", rid, e_)
             # garbage sent: the blocks each decision throws. No garbage and a 2-minute game is a time attack; garbage sent is a versus game
             sent = sum(int(d_[9]) for d_ in dec if len(d_) > 9 and str(d_[9]).lstrip("-").isdigit())
             row["sent"] = sent

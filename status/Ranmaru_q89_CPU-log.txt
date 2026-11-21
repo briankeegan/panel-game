@@ -1,5 +1,40 @@
-run 44959087192, as of 2026-11-21T22:57:43Z
+run 44959087192, as of 2026-11-21T22:59:47Z
 
 === Bot 'Ranmaru_q89_CPU' (gambit, L10, cursor 4/12, unranked) is idle in the lobby on panelattack.com:49569 ===
     Open your client, CHALLENGE 'Ranmaru_q89_CPU' in the lobby, and play — it auto-accepts.
     Ctrl+C to stop.
+
+game about to start: both players are ready
+match start: building the match (seed nil, stage nil, opponent ?)
+match start: the match is built
+match start: the match is started
+match start: gambit: creating the link
+match start: gambit: the link is created
+match start: gambit: the link is starting the match
+match start: gambit: the link has started the match
+both ready — match starting
+garbage landed: our stopWatch 689 clock 877, transits in flight before this frame {689}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 852 clock 1040, transits in flight before this frame {889}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 889 clock 1077, transits in flight before this frame {889}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 906 clock 1094, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+opponent topped out: clock 1110 stopWatch 922 stop 21 pre-stop 40 shake 74 health 1, top rows r12=gggggg r11=gggggg r10=400003
+opponent topped out: clock 1140 stopWatch 952 stop 21 pre-stop 10 shake 44 health 1, top rows r12=gggggg r11=gggggg r10=400003
+opponent topped out: clock 1170 stopWatch 982 stop 19 pre-stop 41 shake 14 health 1, top rows r12=gggggg r11=gggggg r10=400003
+opponent topped out: clock 1200 stopWatch 1012 stop 19 pre-stop 11 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=000003
+opponent topped out: clock 1230 stopWatch 1042 stop 0 pre-stop 0 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=000003
+opponent topped out: clock 1260 stopWatch 1072 stop 0 pre-stop 0 shake 67 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 1290 stopWatch 1102 stop 0 pre-stop 0 shake 37 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 1320 stopWatch 1132 stop 0 pre-stop 0 shake 56 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 1350 stopWatch 1162 stop 0 pre-stop 30 shake 26 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 1380 stopWatch 1192 stop 0 pre-stop 0 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 1410 stopWatch 1222 stop 0 pre-stop 0 shake 54 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 1440 stopWatch 1252 stop 0 pre-stop 0 shake 24 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 1470 stopWatch 1282 stop 0 pre-stop 33 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 1500 stopWatch 1312 stop 0 pre-stop 3 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+REPLAY {"mine":1,"inputs":[["A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A",
+engine rolled our stack back 0 times for late garbage this match
+match against: atomic_payaso
+match against id: 12134
+match over — bot won (pace: worst 0.13 frames off schedule); waiting for a rematch
+memory after match: rss 1715820 kB, threads 7, lua 45130 kB
+game about to start: both players are ready

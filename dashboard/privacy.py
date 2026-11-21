@@ -86,7 +86,7 @@ def main(site):
         else:
             hidden[g["opp"]] = hidden.get(g["opp"], 0) + 1
             if g["opp"] not in label: label[g["opp"]] = "%s %d" % (ANON, nxt); nxt += 1
-            g["opp"] = label[g["opp"]]; g["pv"] = 0
+            g["opp"] = label[g["opp"]]; g["pv"] = 0; g.pop("pid", None)   # no account id either: it would tie the hidden games to the player
             r = g.pop("replay", None)
             if r: dropped.append("replay_%s.json.gz" % r)
     for n in dropped:

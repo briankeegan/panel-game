@@ -559,6 +559,14 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
 .lb-card .lb-s{display:block;font-weight:400;font-size:var(--cds-font-size-caption);color:var(--color-fg-muted)}
 .lb-card .lb-v{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
 
+/* closed: compact tiles, two side by side on a phone */
+.lb-grid.compact{grid-template-columns:repeat(auto-fill,minmax(min(calc(50% - 6px),170px),1fr));gap:8px}
+.lb-grid.compact .lb-card{padding:7px 10px 6px}
+.lb-grid.compact .lb-card h3{font-size:var(--cds-font-size-caption);font-weight:500;color:var(--color-fg-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lb-grid.compact .lb-win{grid-template-columns:1.3em minmax(0,1fr);gap:4px 6px;padding-top:3px}
+.lb-grid.compact .lb-win .lb-n{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lb-grid.compact .lb-win .lb-v{grid-column:2;font-size:1.05em}
+.lb-grid.compact .lb-win .lb-age{display:none}
 .lb-more{font:inherit;font-size:var(--cds-font-size-caption);padding:6px 12px;border-radius:999px;border:1px solid var(--color-border-line);background:none;color:var(--color-fg);cursor:pointer}
 .lb-card .lb-age{display:inline-block;font-size:11px;font-weight:600;padding:0 6px;border-radius:999px;background:color-mix(in srgb,#e0821f 18%,transparent);color:#b4610e;white-space:nowrap}
 .lb-card .lb-age.new{background:color-mix(in srgb,#2f9e57 18%,transparent);color:#22804a}
@@ -620,7 +628,7 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
     <div class="gs-kpi"><div class="gs-kl">Longest game</div><div class="gs-kv" id="k-lg" data-source="games">—</div><div class="gs-kn" id="k-lg-n"></div></div>
   </section>
 
-  <nav class="gs-nav" aria-label="Sections"><a href="#sec-form">Recent</a><a href="#sec-watch">Watch a game</a><a href="#sec-garbage">Garbage sent</a><a href="#sec-opp">Opponents</a><a href="#sec-table">Versions</a><a href="#sec-len">Game length</a><button type="button" class="gs-link" id="copy-link" title="Copy a link that opens this exact view">Copy link to this view</button></nav>
+  <nav class="gs-nav" aria-label="Sections"><a href="#sec-form">Recent</a><a href="#sec-watch">Watch a game</a><a href="#sec-garbage">Garbage sent</a><a href="#sec-opp">Opponents</a><a href="#sec-table">Versions</a><a href="#sec-len">Game length</a><a href="#sec-thrown">Garbage thrown</a><button type="button" class="gs-link" id="copy-link" title="Copy a link that opens this exact view">Copy link to this view</button></nav>
 
 
   
@@ -724,6 +732,13 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
     <p class="gs-note">Games by length.</p>
     <div class="gs-legend"><span class="sq" style="--c: var(--dash-c0, var(--color-fg))" id="lg-w">Won</span><span class="sq" style="--c: var(--cds-chart-status-critical)">Lost</span></div>
     <div class="gs-chart short dash-skeleton" id="hist" data-source="games"></div>
+  </section>
+
+  <section class="gs-card" id="sec-thrown">
+    <h2>Garbage thrown at Ranmaru</h2>
+    <p class="gs-note" id="th-note">Games by the biggest chain the opponent threw.</p>
+    <div class="gs-legend"><span class="sq" style="--c: var(--dash-c0, var(--color-fg))" id="lg-w2">Ranmaru won</span><span class="sq" style="--c: var(--cds-chart-status-critical)">Ranmaru lost</span></div>
+    <div class="gs-chart short dash-skeleton" id="thrown" data-source="games"></div>
   </section>
 
   <section class="gs-card" id="sec-loss" hidden>
@@ -848,7 +863,7 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
   let groupSets = true; const openSets = new Set();
   // LEADERBOARD PERIOD: this week (Monday 00:00 UTC on), last week, or all time
   let lbPeriod = 'week', lbAll = false;   // lbAll: the WHOLE leaderboard expanded (every card's top 3 and details), not one card at a time
-  const lbSync = () => { document.querySelectorAll('#sec-podium .lb-card').forEach((c) => { c.open = lbAll; }); const b = $('lb-more'); b.textContent = lbAll ? 'Show winners only ▴' : 'Show top 3 & details ▾'; b.setAttribute('aria-expanded', lbAll ? 'true' : 'false'); };
+  const lbSync = () => { document.querySelectorAll('#sec-podium .lb-card').forEach((c) => { c.open = lbAll; }); $('lb').classList.toggle('compact', !lbAll); const b = $('lb-more'); b.textContent = lbAll ? 'Show winners only ▴' : 'Show top 3 & details ▾'; b.setAttribute('aria-expanded', lbAll ? 'true' : 'false'); };
   $('lb-more').addEventListener('click', () => { lbAll = !lbAll; lbSync(); });
   $('lb-tabs').addEventListener('click', (e) => { const b = e.target.closest('button[data-p]'); if (b) { lbPeriod = b.dataset.p; render(); } });
   try { if (localStorage.getItem('gs-sets') === '0') groupSets = false; } catch (e) {}
@@ -865,7 +880,7 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
   function render() {
     const gd = dash.data('games'), vd = dash.data('versions');
     const ready = gd.status === 'ok' && vd.status === 'ok';
-    ['hist'].forEach((id) => $(id).classList.toggle('dash-skeleton', !ready));
+    ['hist', 'thrown'].forEach((id) => $(id).classList.toggle('dash-skeleton', !ready));
     if (!ready) { if (gd.status === 'error' || vd.status === 'error') $('gs-take').textContent = 'The game data did not load.'; return; }
 
     const P = dash.params();
@@ -987,7 +1002,7 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
       // the game's mode from the bot's log: time attack (nobody across) or versus; older games have none
       const modeLabel = (m) => { if (!m) return '—'; const t = String(m).toLowerCase(); if (/time/.test(t)) return 'Time attack'; if (/versus|\bvs\b/.test(t)) return 'Versus'; return String(m); };
       const tbl = document.createElement('table'); tbl.className = 'gs-tbl gs-latest';
-      const hr = tbl.createTHead().insertRow(); [['When', ''], ['Result', ''], ['Opponent', ''], ['Levels', ''], ['Mode', ''], ['Length', 'n'], ['Garbage', 'n hide-s'], ['Version', 'hide-s'], ['', 'n']].forEach(([h, c]) => { const th = document.createElement('th'); th.textContent = h; th.className = c; th.style.padding = '8px 10px'; hr.appendChild(th); });
+      const hr = tbl.createTHead().insertRow(); [['When', ''], ['Result', ''], ['Opponent', ''], ['Levels', ''], ['Mode', ''], ['Length', 'n'], ['Garbage', 'n hide-s', 'Rows of garbage thrown at Ranmaru (hover a game for chains and combos)'], ['Version', 'hide-s'], ['', 'n']].forEach(([h, c, ti]) => { const th = document.createElement('th'); th.textContent = h; th.className = c; if (ti) th.title = ti; th.style.padding = '8px 10px'; hr.appendChild(th); });
       const tb = tbl.createTBody();
       const whenCell = (tr, t, g, t2) => {
         const wcell = tr.insertCell(); wcell.className = 'lw';
@@ -995,6 +1010,9 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
         if (g.at) { const d2 = document.createElement('div'); d2.className = 'lt'; const hm = (x) => new Date(x).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }); d2.textContent = hm(t) + (t2 != null && hm(t2) !== hm(t) ? ' – ' + hm(t2) : ''); wcell.appendChild(d2); }
         return wcell;
       };
+      // GARBAGE THROWN AT RANMARU: rows of 6 (by area), with the biggest chain and the combo pieces; games from before it was read show pieces landed
+      const garbTxt = (g) => g.gr != null ? String(Math.round(g.gr)) : g.land != null ? g.land + ' pcs' : '—';
+      const garbTitle = (g) => [g.gr != null ? g.gr + ' rows of garbage thrown at Ranmaru' : '', g.gch ? 'biggest chain ×' + g.gch : '', g.gk != null ? g.gk + ' combo pieces' : '', g.land != null ? g.land + ' pieces landed' : ''].filter(Boolean).join(' · ');
       const gameRow = (g, cls, hidden) => {
         const tr = tb.insertRow(), t = playedMs(g); if (cls) tr.className = cls; if (hidden) tr.hidden = true;
         whenCell(tr, t, g);
@@ -1003,7 +1021,7 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
         const evc = tr.insertCell(); evc.textContent = Array.isArray(g.lv) ? g.lv[0] + ' v ' + g.lv[1] : '—'; evc.title = 'Ranmaru v opponent';
         const mdc = tr.insertCell(); mdc.textContent = modeLabel(g.mode);
         const lc = tr.insertCell(); lc.className = 'n'; lc.textContent = dur(g.secs);
-        const gbc = tr.insertCell(); gbc.className = 'n hide-s'; gbc.textContent = g.land != null ? g.land : '—';
+        const gbc = tr.insertCell(); gbc.className = 'n hide-s'; gbc.textContent = garbTxt(g); gbc.title = garbTitle(g);
         const vc = tr.insertCell(); vc.className = 'hide-s'; vc.textContent = vLabel(g.sha); vc.style.color = 'var(--color-fg-muted)';
         const wc = tr.insertCell(); wc.className = 'n';
         if (g.replay) { const wb = document.createElement('button'); wb.type = 'button'; wb.className = 'gs-watch'; wb.append('▶'); { const x = document.createElement('span'); x.className = 'gw-t'; x.textContent = ' Watch'; wb.appendChild(x); } wb.setAttribute('aria-label', 'Watch the game against ' + g.opp); wb.addEventListener('click', (e) => { e.stopPropagation(); openReplay(g, true); }); wc.appendChild(wb); tr.style.cursor = 'pointer'; tr.addEventListener('click', () => openReplay(g, true)); }
@@ -1016,6 +1034,7 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
         const key = newest.bot + '|' + newest.opp + '|' + (oldest.at || oldest.date) + '|' + oldest.idx, open = openSets.has(key);
         const timed = gs.filter((g) => g.secs != null), avg = (a) => a.length ? a.reduce((t, g) => t + g.secs, 0) / a.length : null;
         const sent = gs.reduce((t, g) => t + (Number(g.sent) || 0), 0), land = gs.filter((g) => g.land != null), landSum = land.reduce((t, g) => t + g.land, 0);
+        const rowed = gs.filter((g) => g.gr != null), rowSum = rowed.reduce((t, g) => t + g.gr, 0), bigChain = d3.max(gs, (g) => g.gch || 0), comboSum = gs.reduce((t, g) => t + (g.gk || 0), 0);
         const lvs = [...new Set(gs.map((g) => Array.isArray(g.lv) ? g.lv[0] + ' v ' + g.lv[1] : '—'))], modes = [...new Set(gs.map((g) => modeLabel(g.mode)))], vs = [...new Set(gs.map((g) => g.sha))];
         // the set's own row: who, the record, when it ran; a click opens its games
         const tr = tb.insertRow(); tr.className = 'gs-set' + (open ? ' open' : ''); tr.setAttribute('aria-expanded', open ? 'true' : 'false'); tr.tabIndex = 0;
@@ -1026,7 +1045,7 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
         const evc = tr.insertCell(); evc.textContent = lvs.length === 1 ? lvs[0] : 'mixed';
         const mdc = tr.insertCell(); mdc.textContent = modes.length === 1 ? modes[0] : 'mixed';
         const lc = tr.insertCell(); lc.className = 'n'; lc.textContent = dur(timed.reduce((t, g) => t + g.secs, 0)); lc.title = 'Time played in the set';
-        const gbc = tr.insertCell(); gbc.className = 'n hide-s'; gbc.textContent = land.length ? landSum : '—';
+        const gbc = tr.insertCell(); gbc.className = 'n hide-s'; gbc.textContent = rowed.length ? String(Math.round(rowSum)) : land.length ? landSum + ' pcs' : '—'; gbc.title = rowed.length ? Math.round(rowSum) + ' rows of garbage thrown at Ranmaru in the set' : '';
         const vc = tr.insertCell(); vc.className = 'hide-s'; vc.textContent = vs.length === 1 ? vLabel(vs[0]) : vs.length + ' versions'; vc.style.color = 'var(--color-fg-muted)';
         const cc = tr.insertCell(); cc.className = 'n'; cc.innerHTML = '<span class="gs-chev">▸</span> '; cc.append(n + (n === 1 ? ' game' : ' games'));
         // opened: a line on the set, then its games as the plain list has them
@@ -1040,7 +1059,9 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
           longest ? 'longest ' + dur(longest.secs) : '',
           best > 1 ? 'best run ' + best + ' wins in a row' : '',
           sent ? sent + ' garbage blocks sent (' + (sent / n).toFixed(1) + ' a game)' : '',
-          land.length ? landSum + ' landed on Ranmaru (' + (landSum / land.length).toFixed(1) + ' a game)' : '',
+          rowed.length ? Math.round(rowSum) + ' rows of garbage thrown at Ranmaru (' + (rowSum / rowed.length).toFixed(1) + ' a game)' : land.length ? landSum + ' pieces landed on Ranmaru' : '',
+          bigChain ? 'biggest chain ×' + bigChain : '',
+          rowed.length ? comboSum + ' combo pieces' : '',
         ].filter(Boolean).join(' · ');
         const rows = gs.map((g) => gameRow(g, 'gs-in', !open));
         const flip = () => { const o = !openSets.has(key); if (o) openSets.add(key); else openSets.delete(key); tr.classList.toggle('open', o); tr.setAttribute('aria-expanded', o ? 'true' : 'false'); info.hidden = !o; rows.forEach((r) => { r.hidden = !o; }); };
@@ -1106,7 +1127,9 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
           const names = d3.rollup(a, (v) => v.length, (g) => g.opp); const opp = Array.from(names).sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0]))[0][0];
           const n = a.length, beat = a.filter((g) => g.res === 'L').length, timed = a.filter((g) => g.secs != null), landed = a.filter((g) => g.land != null);
           const lastOrder = d3.max(all, (g) => (vBy.get(g.sha) || {}).order ?? -1);
+          const rowed = a.filter((g) => g.gr != null), chained = a.filter((g) => g.gch);
           return { opp, n, beat, rate: beat / n, longest: d3.greatest(timed, (g) => g.secs), hardest: d3.greatest(landed, (g) => g.land),
+            rows: d3.greatest(rowed, (g) => g.gr), chain: d3.greatest(chained, (g) => g.gch),
             avgLen: timed.length ? d3.mean(timed, (g) => g.secs) : null, nTimed: timed.length, avgLand: landed.length ? d3.mean(landed, (g) => g.land) : null, nLanded: landed.length,
             since: lastOrder >= 0 ? newestOrder - lastOrder : null };
         }).filter(Boolean);
@@ -1117,11 +1140,10 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
           t.title = p.since === 0 ? 'Played the newest version of Ranmaru' : 'Last played ' + p.since + (p.since === 1 ? ' version' : ' versions') + ' ago: Ranmaru has changed since'; return t; };
         const cats = [
           { t: 'Most Wins', how: 'games won against Ranmaru', rows: players.filter((p) => p.beat > 0).sort((a, b) => b.beat - a.beat || b.rate - a.rate || b.n - a.n), v: (p) => p.beat, s: (p) => 'in ' + gamesTxt(p.n) + ' · ' + Math.round(p.rate * 100) + '%' },
-          { t: 'Top of the Stack', how: 'best win rate · at least 20 games', rows: players.filter((p) => p.n >= 20 && p.beat > 0).sort((a, b) => b.rate - a.rate || b.n - a.n), v: (p) => Math.round(p.rate * 100) + '%', s: (p) => p.beat + (p.beat === 1 ? ' win' : ' wins') + ' in ' + gamesTxt(p.n) },
+          { t: 'Best Win Rate', how: 'at least 20 games', rows: players.filter((p) => p.n >= 20 && p.beat > 0).sort((a, b) => b.rate - a.rate || b.n - a.n), v: (p) => Math.round(p.rate * 100) + '%', s: (p) => p.beat + (p.beat === 1 ? ' win' : ' wins') + ' in ' + gamesTxt(p.n) },
           { t: 'Last Panel Standing', how: 'longest single game against Ranmaru', rows: players.filter((p) => p.longest).sort((a, b) => b.longest.secs - a.longest.secs), v: (p) => dur(p.longest.secs), s: (p) => (p.longest.res === 'L' ? 'won that game' : 'lost that game') + ' · ' + gamesTxt(p.n), g: (p) => p.longest },
-          { t: 'Most Garbage in a Game', how: 'garbage pieces landed on Ranmaru in one game', rows: players.filter((p) => p.hardest && p.hardest.land > 0).sort((a, b) => b.hardest.land - a.hardest.land), v: (p) => p.hardest.land, s: (p) => gamesTxt(p.n), g: (p) => p.hardest },
-          { t: 'Most Garbage per Game', how: 'garbage pieces landed on Ranmaru, on average · at least 5 games', rows: players.filter((p) => p.nLanded >= 5).sort((a, b) => b.avgLand - a.avgLand), v: (p) => p.avgLand.toFixed(1), s: (p) => gamesTxt(p.n) },
-          { t: 'Longest Games on Average', how: 'at least 5 games', rows: players.filter((p) => p.nTimed >= 5).sort((a, b) => b.avgLen - a.avgLen), v: (p) => dur(p.avgLen), s: (p) => gamesTxt(p.n) },
+          { t: 'Biggest Chain', how: 'longest chain thrown at Ranmaru', rows: players.filter((p) => p.chain).sort((a, b) => b.chain.gch - a.chain.gch || b.chain.gr - a.chain.gr), v: (p) => '×' + p.chain.gch, s: (p) => (p.chain.res === 'L' ? 'won that game' : 'lost that game') + ' · ' + gamesTxt(p.n), g: (p) => p.chain },
+          { t: 'Most Garbage', how: 'rows of garbage thrown at Ranmaru in one game (a full-width row is 1)', rows: players.filter((p) => p.rows && p.rows.gr > 0).sort((a, b) => b.rows.gr - a.rows.gr), v: (p) => Math.round(p.rows.gr) + ' rows', s: (p) => gamesTxt(p.n), g: (p) => p.rows },
           { t: 'Most Games Played', how: 'games against Ranmaru', rows: players.slice().sort((a, b) => b.n - a.n || b.beat - a.beat), v: (p) => p.n, s: (p) => p.beat ? 'beat Ranmaru ' + (p.beat === 1 ? 'once' : p.beat + ' times') : 'never beat Ranmaru' },
         ];
         box.replaceChildren();
@@ -1159,6 +1181,7 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
         });
         return players;
       };
+      $('lb').classList.toggle('compact', !lbAll);
       board($('lb'), inPeriod, 3, lbPeriod === 'all', lbPeriod === 'all' ? 'No one yet' : 'No one yet ' + (lbPeriod === 'week' ? 'this week' : 'last week'), lbPeriod);
       const lk = $('pod-last'); lk.replaceChildren();
       const lastLoss = d3.greatest(lvGames.filter((g) => g.res === 'L'), (g) => g.at || g.date);   // full time when a game has one, so two losses on the same day sort correctly
@@ -1192,6 +1215,7 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
     ], osShown, (r) => r.opp.toLowerCase() === oq, (r) => toggle('opp', r.opp));
 
     drawHist(fg);
+    drawThrown(fg);
 
     // losses
     const ls = fg.filter((g) => g.res === 'L');
@@ -1255,6 +1279,35 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
     $('lg-w').style.setProperty('--c', c);
   }
 
+
+  // GARBAGE THROWN AT RANMARU: the games of the selection by the biggest chain thrown at it (none, ×2 ... ×12+), won and lost; the note gives
+  // the averages a game (rows by area, biggest chain, combo pieces). Games from before the garbage was read have none and are left out.
+  function drawThrown(fg) {
+    const box = $('thrown'), note = $('th-note');
+    const W = Math.max(280, box.clientWidth || 520), m = { l: 34, r: 8, t: 8, b: 30 }, H = 220;
+    box.replaceChildren();
+    const gs = fg.filter((g) => g.gr != null);
+    if (gs.length < 5) { const p = document.createElement('p'); p.className = 'gs-empty'; p.textContent = gs.length ? 'Only ' + gs.length + (gs.length === 1 ? ' game' : ' games') + ' here: too few for a spread.' : 'No games in this selection.'; box.appendChild(p); note.textContent = 'Games by the biggest chain the opponent threw.'; return; }
+    const avg = (f) => d3.mean(gs, f);
+    note.textContent = 'Games by the biggest chain the opponent threw. A game on average: ' + avg((g) => g.gr).toFixed(1) + ' rows of garbage, biggest chain ×' + avg((g) => g.gch || 0).toFixed(1) + ', ' + avg((g) => g.gk || 0).toFixed(1) + ' combo pieces (' + gs.length + ' games).';
+    const bins = d3.range(0, 12).map((i) => ({ i, k: i === 0 ? 0 : i + 1, w: 0, l: 0 }));   // i 0: no chain; i 1..10: ×2..×11; i 11: ×12 or more
+    gs.forEach((g) => { const c = g.gch || 0, i = c < 2 ? 0 : Math.min(11, c - 1); if (g.res === 'W') bins[i].w++; else bins[i].l++; });
+    const svg = d3.select(box).append('svg').attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'img').attr('aria-label', 'Games by the biggest chain thrown at Ranmaru');
+    const x = d3.scaleBand(bins.map((b) => b.i), [m.l, W - m.r]).padding(0.12);
+    const y = d3.scaleLinear([0, d3.max(bins, (b) => b.w + b.l)], [H - m.b, m.t]).nice();
+    y.ticks(4).forEach((t) => {
+      svg.append('line').attr('x1', m.l).attr('x2', W - m.r).attr('y1', y(t)).attr('y2', y(t)).attr('stroke', 'var(--cds-chart-grid)');
+      svg.append('text').attr('x', m.l - 6).attr('y', y(t) + 4).attr('text-anchor', 'end').text(t);
+    });
+    const c = dash.colors[0], lab = (b) => b.i === 0 ? 'none' : b.i === 11 ? '×12+' : '×' + b.k;
+    svg.selectAll('rect.w').data(bins).join('rect').attr('class', 'w').attr('x', (b) => x(b.i)).attr('width', x.bandwidth()).attr('y', (b) => y(b.w)).attr('height', (b) => y(0) - y(b.w)).attr('fill', c);
+    svg.selectAll('rect.l').data(bins).join('rect').attr('class', 'l').attr('x', (b) => x(b.i)).attr('width', x.bandwidth()).attr('y', (b) => y(b.w + b.l)).attr('height', (b) => y(b.w) - y(b.w + b.l)).attr('fill', 'var(--cds-chart-status-critical)');
+    svg.selectAll('text.xl').data(bins.filter((b) => b.i % 2 === 0 || b.i === 11)).join('text').attr('class', 'xl').attr('x', (b) => x(b.i)).attr('y', H - 10).text(lab);
+    svg.selectAll('rect.hit').data(bins).join('rect').attr('class', 'hit').attr('x', (b) => x(b.i)).attr('width', x.bandwidth()).attr('y', m.t).attr('height', H - m.t - m.b).attr('fill', 'transparent')
+      .on('mousemove', (e, b) => showTip(box, '<div class="t1">Biggest chain ' + (b.i === 0 ? 'none (no chain thrown)' : b.i === 11 ? '×12 or more' : '×' + b.k) + '</div><div>' + (b.w + b.l) + ' games · Ranmaru won ' + b.w + ', lost ' + b.l + '</div>', x(b.i) + x.bandwidth() / 2, y(b.w + b.l)))
+      .on('mouseleave', hideTip);
+    $('lg-w2').style.setProperty('--c', c);
+  }
 
   // ---- replay player
   // the board as GameCreator's own game draws it: coloured panels with a shape each, shock panels in steel, garbage as slabs with a face

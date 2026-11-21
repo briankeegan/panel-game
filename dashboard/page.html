@@ -595,7 +595,7 @@
     <div class="gs-kpi"><div class="gs-kl">Longest game</div><div class="gs-kv" id="k-lg" data-source="games">—</div><div class="gs-kn" id="k-lg-n"></div></div>
   </section>
 
-  <nav class="gs-nav" aria-label="Sections"><a href="#sec-form">Recent</a><a href="#sec-watch">Watch a game</a><a href="#sec-garbage">Garbage sent</a><a href="#sec-opp">Opponents</a><a href="#sec-table">Versions</a><a href="#sec-len">Game length</a><a href="#sec-thrown">Garbage thrown</a><button type="button" class="gs-link" id="copy-link" title="Copy a link that opens this exact view">Copy link to this view</button></nav>
+  <nav class="gs-nav" aria-label="Sections"><a href="#sec-form">Recent</a><a href="#sec-watch">Watch a game</a><a href="#sec-garbage">Garbage sent</a><a href="#sec-opp">Opponents</a><a href="#sec-table">Versions</a><a href="#sec-len">Game length</a><button type="button" class="gs-link" id="copy-link" title="Copy a link that opens this exact view">Copy link to this view</button></nav>
 
 
   
@@ -699,13 +699,6 @@
     <p class="gs-note">Games by length.</p>
     <div class="gs-legend"><span class="sq" style="--c: var(--dash-c0, var(--color-fg))" id="lg-w">Won</span><span class="sq" style="--c: var(--cds-chart-status-critical)">Lost</span></div>
     <div class="gs-chart short dash-skeleton" id="hist" data-source="games"></div>
-  </section>
-
-  <section class="gs-card" id="sec-thrown">
-    <h2>Garbage thrown at Ranmaru</h2>
-    <p class="gs-note" id="th-note">Games by the biggest chain the opponent threw.</p>
-    <div class="gs-legend"><span class="sq" style="--c: var(--dash-c0, var(--color-fg))" id="lg-w2">Ranmaru won</span><span class="sq" style="--c: var(--cds-chart-status-critical)">Ranmaru lost</span></div>
-    <div class="gs-chart short dash-skeleton" id="thrown" data-source="games"></div>
   </section>
 
   <section class="gs-card" id="sec-loss" hidden>
@@ -847,7 +840,7 @@
   function render() {
     const gd = dash.data('games'), vd = dash.data('versions');
     const ready = gd.status === 'ok' && vd.status === 'ok';
-    ['hist', 'thrown'].forEach((id) => $(id).classList.toggle('dash-skeleton', !ready));
+    ['hist'].forEach((id) => $(id).classList.toggle('dash-skeleton', !ready));
     if (!ready) { if (gd.status === 'error' || vd.status === 'error') $('gs-take').textContent = 'The game data did not load.'; return; }
 
     const P = dash.params();
@@ -1096,7 +1089,7 @@
           const lastOrder = d3.max(all, (g) => (vBy.get(g.sha) || {}).order ?? -1);
           const rowed = a.filter((g) => g.gr != null), chained = a.filter((g) => g.gch);
           return { opp, n, beat, rate: beat / n, longest: d3.greatest(timed, (g) => g.secs), hardest: d3.greatest(landed, (g) => g.land),
-            rows: d3.greatest(rowed, (g) => g.gr), chain: d3.greatest(chained, (g) => g.gch),
+            rows: d3.greatest(rowed, (g) => g.gr), chain: d3.greatest(chained, (g) => g.gch), combos: d3.greatest(a.filter((g) => g.gk), (g) => g.gk),
             avgLen: timed.length ? d3.mean(timed, (g) => g.secs) : null, nTimed: timed.length, avgLand: landed.length ? d3.mean(landed, (g) => g.land) : null, nLanded: landed.length,
             since: lastOrder >= 0 ? newestOrder - lastOrder : null };
         }).filter(Boolean);
@@ -1110,6 +1103,7 @@
           { t: 'Best Win Rate', how: 'at least 20 games', rows: players.filter((p) => p.n >= 20 && p.beat > 0).sort((a, b) => b.rate - a.rate || b.n - a.n), v: (p) => Math.round(p.rate * 100) + '%', s: (p) => p.beat + (p.beat === 1 ? ' win' : ' wins') + ' in ' + gamesTxt(p.n) },
           { t: 'Last Panel Standing', how: 'longest single game against Ranmaru', rows: players.filter((p) => p.longest).sort((a, b) => b.longest.secs - a.longest.secs), v: (p) => dur(p.longest.secs), s: (p) => (p.longest.res === 'L' ? 'won that game' : 'lost that game') + ' · ' + gamesTxt(p.n), g: (p) => p.longest },
           { t: 'Biggest Chain', how: 'longest chain thrown at Ranmaru', rows: players.filter((p) => p.chain).sort((a, b) => b.chain.gch - a.chain.gch || b.chain.gr - a.chain.gr), v: (p) => '×' + p.chain.gch, s: (p) => (p.chain.res === 'L' ? 'won that game' : 'lost that game') + ' · ' + gamesTxt(p.n), g: (p) => p.chain },
+          { t: 'Most Combos', how: 'combo pieces thrown at Ranmaru in one game', rows: players.filter((p) => p.combos).sort((a, b) => b.combos.gk - a.combos.gk || b.combos.gr - a.combos.gr), v: (p) => p.combos.gk, s: (p) => (p.combos.res === 'L' ? 'won that game' : 'lost that game') + ' · ' + gamesTxt(p.n), g: (p) => p.combos },
           { t: 'Most Garbage', how: 'rows of garbage thrown at Ranmaru in one game (a full-width row is 1)', rows: players.filter((p) => p.rows && p.rows.gr > 0).sort((a, b) => b.rows.gr - a.rows.gr), v: (p) => Math.round(p.rows.gr) + ' rows', s: (p) => gamesTxt(p.n), g: (p) => p.rows },
           { t: 'Most Games Played', how: 'games against Ranmaru', rows: players.slice().sort((a, b) => b.n - a.n || b.beat - a.beat), v: (p) => p.n, s: (p) => p.beat ? 'beat Ranmaru ' + (p.beat === 1 ? 'once' : p.beat + ' times') : 'never beat Ranmaru' },
         ];
@@ -1182,7 +1176,6 @@
     ], osShown, (r) => r.opp.toLowerCase() === oq, (r) => toggle('opp', r.opp));
 
     drawHist(fg);
-    drawThrown(fg);
 
     // losses
     const ls = fg.filter((g) => g.res === 'L');
@@ -1246,35 +1239,6 @@
     $('lg-w').style.setProperty('--c', c);
   }
 
-
-  // GARBAGE THROWN AT RANMARU: the games of the selection by the biggest chain thrown at it (none, ×2 ... ×12+), won and lost; the note gives
-  // the averages a game (rows by area, biggest chain, combo pieces). Games from before the garbage was read have none and are left out.
-  function drawThrown(fg) {
-    const box = $('thrown'), note = $('th-note');
-    const W = Math.max(280, box.clientWidth || 520), m = { l: 34, r: 8, t: 8, b: 30 }, H = 220;
-    box.replaceChildren();
-    const gs = fg.filter((g) => g.gr != null);
-    if (gs.length < 5) { const p = document.createElement('p'); p.className = 'gs-empty'; p.textContent = gs.length ? 'Only ' + gs.length + (gs.length === 1 ? ' game' : ' games') + ' here: too few for a spread.' : 'No games in this selection.'; box.appendChild(p); note.textContent = 'Games by the biggest chain the opponent threw.'; return; }
-    const avg = (f) => d3.mean(gs, f);
-    note.textContent = 'Games by the biggest chain the opponent threw. A game on average: ' + avg((g) => g.gr).toFixed(1) + ' rows of garbage, biggest chain ×' + avg((g) => g.gch || 0).toFixed(1) + ', ' + avg((g) => g.gk || 0).toFixed(1) + ' combo pieces (' + gs.length + ' games).';
-    const bins = d3.range(0, 12).map((i) => ({ i, k: i === 0 ? 0 : i + 1, w: 0, l: 0 }));   // i 0: no chain; i 1..10: ×2..×11; i 11: ×12 or more
-    gs.forEach((g) => { const c = g.gch || 0, i = c < 2 ? 0 : Math.min(11, c - 1); if (g.res === 'W') bins[i].w++; else bins[i].l++; });
-    const svg = d3.select(box).append('svg').attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'img').attr('aria-label', 'Games by the biggest chain thrown at Ranmaru');
-    const x = d3.scaleBand(bins.map((b) => b.i), [m.l, W - m.r]).padding(0.12);
-    const y = d3.scaleLinear([0, d3.max(bins, (b) => b.w + b.l)], [H - m.b, m.t]).nice();
-    y.ticks(4).forEach((t) => {
-      svg.append('line').attr('x1', m.l).attr('x2', W - m.r).attr('y1', y(t)).attr('y2', y(t)).attr('stroke', 'var(--cds-chart-grid)');
-      svg.append('text').attr('x', m.l - 6).attr('y', y(t) + 4).attr('text-anchor', 'end').text(t);
-    });
-    const c = dash.colors[0], lab = (b) => b.i === 0 ? 'none' : b.i === 11 ? '×12+' : '×' + b.k;
-    svg.selectAll('rect.w').data(bins).join('rect').attr('class', 'w').attr('x', (b) => x(b.i)).attr('width', x.bandwidth()).attr('y', (b) => y(b.w)).attr('height', (b) => y(0) - y(b.w)).attr('fill', c);
-    svg.selectAll('rect.l').data(bins).join('rect').attr('class', 'l').attr('x', (b) => x(b.i)).attr('width', x.bandwidth()).attr('y', (b) => y(b.w + b.l)).attr('height', (b) => y(b.w) - y(b.w + b.l)).attr('fill', 'var(--cds-chart-status-critical)');
-    svg.selectAll('text.xl').data(bins.filter((b) => b.i % 2 === 0 || b.i === 11)).join('text').attr('class', 'xl').attr('x', (b) => x(b.i)).attr('y', H - 10).text(lab);
-    svg.selectAll('rect.hit').data(bins).join('rect').attr('class', 'hit').attr('x', (b) => x(b.i)).attr('width', x.bandwidth()).attr('y', m.t).attr('height', H - m.t - m.b).attr('fill', 'transparent')
-      .on('mousemove', (e, b) => showTip(box, '<div class="t1">Biggest chain ' + (b.i === 0 ? 'none (no chain thrown)' : b.i === 11 ? '×12 or more' : '×' + b.k) + '</div><div>' + (b.w + b.l) + ' games · Ranmaru won ' + b.w + ', lost ' + b.l + '</div>', x(b.i) + x.bandwidth() / 2, y(b.w + b.l)))
-      .on('mouseleave', hideTip);
-    $('lg-w2').style.setProperty('--c', c);
-  }
 
   // ---- replay player
   // the board as GameCreator's own game draws it: coloured panels with a shape each, shock panels in steel, garbage as slabs with a face

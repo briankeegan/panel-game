@@ -1081,8 +1081,8 @@
       Array.from($('lb-tabs').children).forEach((b) => b.setAttribute('aria-selected', b.dataset.p === lbPeriod ? 'true' : 'false'));
       const newestOrder = vers.length ? d3.max(vers, (v) => v.order) : 0;
       const gamesTxt = (k) => k + (k === 1 ? ' game played' : ' games played');
-      // a record holder who has never beaten Ranmaru says so: 'never beat Ranmaru in 31 games' rather than '31 games played'
-      const recTxt = (p) => p.beat ? gamesTxt(p.n) : 'never beat Ranmaru' + (p.n === 1 ? ' in their 1 game' : ' in ' + p.n + ' games');
+      // a record holder's wins out of their games against Ranmaru: '0/20 games won', '3/32 games won'
+      const recTxt = (p) => p.beat + '/' + p.n + (p.n === 1 ? ' game won' : ' games won');
       // a board: the players of the games `keep` lets through, each category's top `topN`, into `box`; `since`: say versions since each played
       const board = (box, keep, topN, since, noneTxt, boxKey) => {
         const players = Array.from(byOpp, ([, all]) => {

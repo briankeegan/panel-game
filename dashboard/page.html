@@ -529,6 +529,9 @@
 .lb-week>summary .lb-wk{font-weight:600;margin-right:6px}
 .lb-week>summary .lb-ws{color:var(--color-fg-muted);font-size:var(--cds-font-size-caption)}
 .lb-week .lb-grid{margin:2px 0 12px}
+.lb-card .lb-age{display:inline-block;font-size:11px;font-weight:600;padding:0 6px;border-radius:999px;background:color-mix(in srgb,#e0821f 18%,transparent);color:#b4610e;white-space:nowrap}
+.lb-card .lb-age.new{background:color-mix(in srgb,#2f9e57 18%,transparent);color:#22804a}
+@media (prefers-color-scheme:dark){.lb-card .lb-age{color:#f0a24d}.lb-card .lb-age.new{color:#5fcf8a}}
 .lb-card .lb-none{font-size:var(--cds-font-size-caption);color:var(--color-fg-muted);padding:6px 0}
 .pod .pod-m{font-size:1.7em;line-height:1;text-align:center}
 .pod .pod-name{font-weight:700;overflow-wrap:anywhere;min-width:0}
@@ -1074,7 +1077,11 @@
             avgLen: timed.length ? d3.mean(timed, (g) => g.secs) : null, nTimed: timed.length, avgLand: landed.length ? d3.mean(landed, (g) => g.land) : null, nLanded: landed.length,
             since: lastOrder >= 0 ? newestOrder - lastOrder : null };
         }).filter(Boolean);
-        const sinceTxt = (p) => !since || p.since == null ? '' : p.since === 0 ? ' · played the newest version' : ' · ' + p.since + (p.since === 1 ? ' version' : ' versions') + ' since';
+        // ALL TIME, IN CONTEXT: a tag on each entry for how many versions of Ranmaru came out after the player's last game -- amber when they
+        // have not met the newer bot, green when they played the newest
+        const ageTag = (p) => { if (!since || p.since == null) return null; const t = document.createElement('span'); t.className = 'lb-age' + (p.since === 0 ? ' new' : '');
+          t.textContent = p.since === 0 ? 'on the newest' : p.since + (p.since === 1 ? ' version ago' : ' versions ago');
+          t.title = p.since === 0 ? 'Played the newest version of Ranmaru' : 'Last played ' + p.since + (p.since === 1 ? ' version' : ' versions') + ' ago: Ranmaru has changed since'; return t; };
         const cats = [
           { t: 'Combo Breaker', how: 'most wins vs Ranmaru', rows: players.filter((p) => p.beat > 0).sort((a, b) => b.beat - a.beat || b.rate - a.rate || b.n - a.n), v: (p) => p.beat, s: (p) => gamesTxt(p.n) + ' · ' + Math.round(p.rate * 100) + '%' },
           { t: 'Top of the Stack', how: 'best win rate · at least 20 games', rows: players.filter((p) => p.n >= 20 && p.beat > 0).sort((a, b) => b.rate - a.rate || b.n - a.n), v: (p) => Math.round(p.rate * 100) + '%', s: (p) => p.beat + ' of ' + gamesTxt(p.n) },
@@ -1096,7 +1103,7 @@
               const li = document.createElement('li'); li.className = 'lb-' + (i + 1);
               const r = document.createElement('span'); r.className = 'lb-r'; r.textContent = (i + 1) + '.';
               const nm = document.createElement('span'); nm.className = 'lb-n'; nm.textContent = p.opp;
-              const sub = document.createElement('span'); sub.className = 'lb-s'; sub.textContent = c.s(p) + sinceTxt(p); nm.appendChild(sub);
+              const sub = document.createElement('span'); sub.className = 'lb-s'; sub.textContent = c.s(p); const tag = ageTag(p); if (tag) sub.append(' ', tag); nm.appendChild(sub);
               const v = document.createElement('span'); v.className = 'lb-v'; v.textContent = c.v(p);
               li.append(r, nm, v);
               // a click goes somewhere: a single-game record opens that game; any other entry shows that player's stats (the page's player

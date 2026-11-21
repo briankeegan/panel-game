@@ -1138,7 +1138,6 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
           { t: 'Biggest Chain', how: 'longest chain thrown at Ranmaru', rows: players.filter((p) => p.chain).sort((a, b) => b.chain.gch - a.chain.gch || b.chain.gr - a.chain.gr), v: (p) => '×' + p.chain.gch, s: (p) => (p.chain.res === 'L' ? 'won that game' : 'lost that game') + ' · ' + gamesTxt(p.n), g: (p) => p.chain },
           { t: 'Most Combos', how: 'combo pieces thrown at Ranmaru in one game', rows: players.filter((p) => p.combos).sort((a, b) => b.combos.gk - a.combos.gk || b.combos.gr - a.combos.gr), v: (p) => p.combos.gk, s: (p) => (p.combos.res === 'L' ? 'won that game' : 'lost that game') + ' · ' + gamesTxt(p.n), g: (p) => p.combos },
           { t: 'Most Garbage', how: 'how high the garbage thrown at Ranmaru in one game stacks up, in rows', rows: players.filter((p) => p.rows && p.rows.gr > 0).sort((a, b) => b.rows.gr - a.rows.gr), v: (p) => Math.round(p.rows.gr) + ' rows', s: (p) => gamesTxt(p.n), g: (p) => p.rows },
-          { t: 'Most Games Played', how: 'games against Ranmaru', rows: players.slice().sort((a, b) => b.n - a.n || b.beat - a.beat), v: (p) => p.n, s: (p) => p.beat ? 'beat Ranmaru ' + (p.beat === 1 ? 'once' : p.beat + ' times') : 'never beat Ranmaru' },
         ];
         box.replaceChildren();
         const medal = ['🥇', '🥈', '🥉'];

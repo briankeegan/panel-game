@@ -576,7 +576,7 @@
       <label class="gs-f"><span>Version</span><select id="f-ver" class="dash-select"></select></label>
       <label class="gs-f"><span>Opponent</span><input type="search" id="gw-q" list="gw-names" class="gs-search" placeholder="Any player: type a name" autocomplete="off"><datalist id="gw-names"></datalist></label>
       <div class="gs-f"><span>Result</span><div class="gs-seg sm" role="group" aria-label="Result" id="gw-res"><button type="button" data-r="" aria-pressed="true">All</button><button type="button" data-r="L" aria-pressed="false">Lost</button><button type="button" data-r="W" aria-pressed="false">Won</button></div></div>
-      <div class="gs-f"><span>Length</span><div class="gs-seg sm" role="group" aria-label="Length of the game" id="gw-len"><button type="button" data-l="" aria-pressed="true">Any</button><button type="button" data-l="u1" aria-pressed="false">Under 1 min</button><button type="button" data-l="1-3" aria-pressed="false">1 to 3</button><button type="button" data-l="3-10" aria-pressed="false">3 to 10</button><button type="button" data-l="10p" aria-pressed="false">10+ min</button></div></div>
+      <div class="gs-f"><span>Length (min)</span><div class="gs-seg sm" role="group" aria-label="Length of the game, in minutes" id="gw-len"><button type="button" data-l="" aria-pressed="true">Any</button><button type="button" data-l="u1" aria-pressed="false">&lt;1</button><button type="button" data-l="1-3" aria-pressed="false">1–3</button><button type="button" data-l="3p" aria-pressed="false">3+</button><button type="button" data-l="5p" aria-pressed="false">5+</button><button type="button" data-l="10p" aria-pressed="false">10+</button></div></div>
     </div>
     <div class="gf-row">
       <div class="gs-f"><span>When</span><div class="gs-seg sm" role="group" aria-label="When it was played" id="gw-when"><button type="button" data-w="" aria-pressed="true">Any time</button><button type="button" data-w="today" aria-pressed="false">Today</button><button type="button" data-w="yesterday" aria-pressed="false">Yesterday</button><button type="button" data-w="7" aria-pressed="false">7 days</button><button type="button" data-w="30" aria-pressed="false">30 days</button></div></div>
@@ -864,7 +864,7 @@
     { const vi = $('f-vinfo'); vi.replaceChildren(); vi.hidden = !pickedV;
       if (pickedV) { vi.append(document.createTextNode(pickedV.label + (pickedV.subject ? ': ' + pickedV.subject : '') + ' ')); } }
     const whenLabel = WL.when === 'today' ? 'Today' : WL.when === 'yesterday' ? 'Yesterday' : WL.when === 'range' ? (WL.from && WL.to ? (WL.from === WL.to ? WL.from : WL.from + ' to ' + WL.to) : WL.from ? 'From ' + WL.from : 'Until ' + WL.to) : WL.when ? 'Last ' + WL.when + ' days' : '';
-    const lenLabel = { u1: 'Under 1 min', '1-3': '1 to 3 min', '3-10': '3 to 10 min', '10p': '10+ min' }[WL.len] || '';
+    const lenLabel = { u1: 'Under 1 min', '1-3': '1 to 3 min', '3p': '3+ min', '5p': '5+ min', '10p': '10+ min' }[WL.len] || '';
     const active = [[ver && pickedV ? 'Version ' + pickedV.label : '', () => dash.setParams({ ver: '' })], [opp ? 'Player ' + opp : '', () => dash.setParams({ opp: '' })],
       [WL.res ? (WL.res === 'L' ? 'Lost only' : 'Won only') : '', () => { WL.res = ''; render(); }], [whenLabel, () => { WL.when = ''; WL.from = WL.to = ''; render(); }], [lenLabel, () => { WL.len = ''; render(); }]].filter((x) => x[0]);
     active.forEach(([label, clear]) => {
@@ -1270,7 +1270,8 @@
   const playedMs = (r) => r.at ? new Date(r.at).getTime() - (r.secs || 0) * 1000 : new Date(r.date + 'T12:00:00').getTime();
   const dayStart = (t) => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); };
   const dayName = (t) => { const today = dayStart(Date.now()), d = dayStart(t), diff = Math.round((today - d) / 864e5); return diff === 0 ? 'Today' : diff === 1 ? 'Yesterday' : new Date(t).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }); };
-  const lenOk = (r, k) => { const m = (r.secs || 0) / 60; return !k || (k === 'u1' ? m < 1 : k === '1-3' ? m >= 1 && m < 3 : k === '3-10' ? m >= 3 && m < 10 : m >= 10); };
+  // presets, not slices: 3+, 5+ and 10+ overlap on purpose (each is 'at least that long')
+  const lenOk = (r, k) => { const m = (r.secs || 0) / 60; return !k || (k === 'u1' ? m < 1 : k === '1-3' ? m >= 1 && m < 3 : k === '3p' ? m >= 3 : k === '5p' ? m >= 5 : m >= 10); };
   const dayKey = (t) => { const d = new Date(t); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
   const whenOk = (r, w, from, to) => {
     if (!w) return true; const t = playedMs(r), today = dayStart(Date.now());
@@ -2424,7 +2425,7 @@ function projectPlan(G, seq, cursor) {
   //   ver opp min      version (commit), opponent, minimum games a version needs
   //   oq om os oall    opponents table: search, minimum games ("-1" = beat Ranmaru), sort (column:1 or :-1), show all
   //   vq vs vall       versions table: search, sort, show all           lq lk ls lall    losses table: search, kind, sort, show all
-  //   res when date len q sort    Watch a game filters: result W|L, today|yesterday|7|30|date (+date), u1|1-3|3-10|10p, opponent text, new|old|long|short
+  //   res when date len q sort    Watch a game filters: result W|L, today|yesterday|7|30|date (+date), u1|1-3|3p|5p|10p, opponent text, new|old|long|short
   //   game frame part plan lm speed    the game (rN), its frame, start|end, plan off (plan=0), decision list (chg|all), playback speed
   const URLSTATE = (() => {
     const enc = encodeURIComponent, U = { pending: null, reset: false };
@@ -2458,7 +2459,7 @@ function projectPlan(G, seq, cursor) {
       WL.res = one(p.res, ['W', 'L'], ''); WL.when = one(p.when, ['today', 'yesterday', '7', '30', 'range', 'date'], ''); WL.from = dt(p.from); WL.to = dt(p.to);
       if (WL.when === 'date') { WL.when = 'range'; WL.from = WL.to = dt(p.date); }      // the older single-day links
       if (WL.when === 'range' && !WL.from && !WL.to) WL.when = ''; if (WL.when !== 'range') WL.from = WL.to = '';
-      WL.len = one(p.len, ['u1', '1-3', '3-10', '10p'], ''); WL.sort = one(p.sort, ['new', 'old', 'long', 'short'], 'new');
+      WL.len = one(p.len, ['u1', '1-3', '3p', '5p', '10p'], ''); WL.sort = one(p.sort, ['new', 'old', 'long', 'short'], 'new');
       $('gw-sort').value = WL.sort;
       LIST.mode = one(p.lm, ['chg', 'all'], 'chg'); document.querySelectorAll('#gw-lmode button').forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.m === LIST.mode))); LIST.rid = null;
       R.part = p.part === 'open' ? 'open' : 'end';

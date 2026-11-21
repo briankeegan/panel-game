@@ -35,7 +35,13 @@ site_push() {
 # page_publish: builds index.html from dashboard/page.html + loader.js and puts it on gh-pages (index.html alone) ONLY if it differs from the
 # one there, then asks for the page's Cloudflare copy. New games never come through here.
 page_publish() {
-  local here w; here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; w="$(mktemp -d)"
+  local here w src; here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; w="$(mktemp -d)"
+  # the page is built from the branch's NEWEST dashboard/, never from this job's checkout: a job started on older code (a bot run that
+  # finishes hours later) would otherwise put an older page back over a newer one
+  src="$w/src"; mkdir -p "$src"
+  if git fetch -q --depth=1 origin "${PAGE_BRANCH:-bramp/multi-player}" 2>/dev/null \
+     && ( for f in make_site.py page.html loader.js; do git show "FETCH_HEAD:dashboard/$f" > "$src/$f" || exit 1; done ); then here="$src"
+  else echo "page: could not read the newest dashboard/ from ${PAGE_BRANCH:-bramp/multi-player}; not republishing"; return 1; fi
   git fetch -q --depth=1 --filter=blob:none origin gh-pages 2>/dev/null || git fetch -q --depth=1 origin gh-pages || { echo "page: no gh-pages branch"; return 1; }
   git worktree add -q --detach --no-checkout "$w/page" FETCH_HEAD || return 1
   git -C "$w/page" sparse-checkout init --no-cone >/dev/null 2>&1; git -C "$w/page" sparse-checkout set '/index.html' '/.nojekyll' >/dev/null 2>&1

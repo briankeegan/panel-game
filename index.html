@@ -995,7 +995,7 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
       // the game's mode from the bot's log: time attack (nobody across) or versus; older games have none
       const modeLabel = (m) => { if (!m) return '—'; const t = String(m).toLowerCase(); if (/time/.test(t)) return 'Time attack'; if (/versus|\bvs\b/.test(t)) return 'Versus'; return String(m); };
       const tbl = document.createElement('table'); tbl.className = 'gs-tbl gs-latest';
-      const hr = tbl.createTHead().insertRow(); [['When', ''], ['Result', ''], ['Opponent', ''], ['Levels', ''], ['Mode', ''], ['Length', 'n'], ['Garbage', 'n hide-s', 'Rows of garbage thrown at Ranmaru (hover a game for chains and combos)'], ['Version', 'hide-s'], ['', 'n']].forEach(([h, c, ti]) => { const th = document.createElement('th'); th.textContent = h; th.className = c; if (ti) th.title = ti; th.style.padding = '8px 10px'; hr.appendChild(th); });
+      const hr = tbl.createTHead().insertRow(); [['When', ''], ['Result', ''], ['Opponent', ''], ['Levels', ''], ['Mode', ''], ['Length', 'n'], ['Garbage', 'n hide-s', 'How many rows high the garbage thrown at Ranmaru stacks (hover a game for chains and combos)'], ['Version', 'hide-s'], ['', 'n']].forEach(([h, c, ti]) => { const th = document.createElement('th'); th.textContent = h; th.className = c; if (ti) th.title = ti; th.style.padding = '8px 10px'; hr.appendChild(th); });
       const tb = tbl.createTBody();
       const whenCell = (tr, t, g, t2) => {
         const wcell = tr.insertCell(); wcell.className = 'lw';
@@ -1005,7 +1005,7 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
       };
       // GARBAGE THROWN AT RANMARU: rows of 6 (by area), with the biggest chain and the combo pieces; games from before it was read show pieces landed
       const garbTxt = (g) => g.gr != null ? String(Math.round(g.gr)) : g.land != null ? g.land + ' pcs' : '—';
-      const garbTitle = (g) => [g.gr != null ? g.gr + ' rows of garbage thrown at Ranmaru' : '', g.gch ? 'biggest chain ×' + g.gch : '', g.gk != null ? g.gk + ' combo pieces' : '', g.land != null ? g.land + ' pieces landed' : ''].filter(Boolean).join(' · ');
+      const garbTitle = (g) => [g.gr != null ? 'garbage thrown at Ranmaru stacks ' + g.gr + ' rows high' : '', g.gch ? 'biggest chain ×' + g.gch : '', g.gk != null ? g.gk + ' combo pieces' : '', g.land != null ? g.land + ' pieces landed' : ''].filter(Boolean).join(' · ');
       const gameRow = (g, cls, hidden) => {
         const tr = tb.insertRow(), t = playedMs(g); if (cls) tr.className = cls; if (hidden) tr.hidden = true;
         whenCell(tr, t, g);
@@ -1038,7 +1038,7 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
         const evc = tr.insertCell(); evc.textContent = lvs.length === 1 ? lvs[0] : 'mixed';
         const mdc = tr.insertCell(); mdc.textContent = modes.length === 1 ? modes[0] : 'mixed';
         const lc = tr.insertCell(); lc.className = 'n'; lc.textContent = dur(timed.reduce((t, g) => t + g.secs, 0)); lc.title = 'Time played in the set';
-        const gbc = tr.insertCell(); gbc.className = 'n hide-s'; gbc.textContent = rowed.length ? String(Math.round(rowSum)) : land.length ? landSum + ' pcs' : '—'; gbc.title = rowed.length ? Math.round(rowSum) + ' rows of garbage thrown at Ranmaru in the set' : '';
+        const gbc = tr.insertCell(); gbc.className = 'n hide-s'; gbc.textContent = rowed.length ? String(Math.round(rowSum)) : land.length ? landSum + ' pcs' : '—'; gbc.title = rowed.length ? 'the garbage thrown at Ranmaru in the set stacks ' + Math.round(rowSum) + ' rows high, game by game' : '';
         const vc = tr.insertCell(); vc.className = 'hide-s'; vc.textContent = vs.length === 1 ? vLabel(vs[0]) : vs.length + ' versions'; vc.style.color = 'var(--color-fg-muted)';
         const cc = tr.insertCell(); cc.className = 'n'; cc.innerHTML = '<span class="gs-chev">▸</span> '; cc.append(n + (n === 1 ? ' game' : ' games'));
         // opened: a line on the set, then its games as the plain list has them
@@ -1052,7 +1052,7 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
           longest ? 'longest ' + dur(longest.secs) : '',
           best > 1 ? 'best run ' + best + ' wins in a row' : '',
           sent ? sent + ' garbage blocks sent (' + (sent / n).toFixed(1) + ' a game)' : '',
-          rowed.length ? Math.round(rowSum) + ' rows of garbage thrown at Ranmaru (' + (rowSum / rowed.length).toFixed(1) + ' a game)' : land.length ? landSum + ' pieces landed on Ranmaru' : '',
+          rowed.length ? 'garbage thrown at Ranmaru stacks ' + Math.round(rowSum) + ' rows high (' + (rowSum / rowed.length).toFixed(1) + ' a game)' : land.length ? landSum + ' pieces landed on Ranmaru' : '',
           bigChain ? 'biggest chain ×' + bigChain : '',
           rowed.length ? comboSum + ' combo pieces' : '',
         ].filter(Boolean).join(' · ');
@@ -1137,7 +1137,7 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
           { t: 'Last Panel Standing', how: 'longest single game against Ranmaru', rows: players.filter((p) => p.longest).sort((a, b) => b.longest.secs - a.longest.secs), v: (p) => dur(p.longest.secs), s: (p) => (p.longest.res === 'L' ? 'won that game' : 'lost that game') + ' · ' + gamesTxt(p.n), g: (p) => p.longest },
           { t: 'Biggest Chain', how: 'longest chain thrown at Ranmaru', rows: players.filter((p) => p.chain).sort((a, b) => b.chain.gch - a.chain.gch || b.chain.gr - a.chain.gr), v: (p) => '×' + p.chain.gch, s: (p) => (p.chain.res === 'L' ? 'won that game' : 'lost that game') + ' · ' + gamesTxt(p.n), g: (p) => p.chain },
           { t: 'Most Combos', how: 'combo pieces thrown at Ranmaru in one game', rows: players.filter((p) => p.combos).sort((a, b) => b.combos.gk - a.combos.gk || b.combos.gr - a.combos.gr), v: (p) => p.combos.gk, s: (p) => (p.combos.res === 'L' ? 'won that game' : 'lost that game') + ' · ' + gamesTxt(p.n), g: (p) => p.combos },
-          { t: 'Most Garbage', how: 'rows of garbage thrown at Ranmaru in one game (a full-width row is 1)', rows: players.filter((p) => p.rows && p.rows.gr > 0).sort((a, b) => b.rows.gr - a.rows.gr), v: (p) => Math.round(p.rows.gr) + ' rows', s: (p) => gamesTxt(p.n), g: (p) => p.rows },
+          { t: 'Most Garbage', how: 'how high the garbage thrown at Ranmaru in one game stacks up, in rows', rows: players.filter((p) => p.rows && p.rows.gr > 0).sort((a, b) => b.rows.gr - a.rows.gr), v: (p) => Math.round(p.rows.gr) + ' rows', s: (p) => gamesTxt(p.n), g: (p) => p.rows },
           { t: 'Most Games Played', how: 'games against Ranmaru', rows: players.slice().sort((a, b) => b.n - a.n || b.beat - a.beat), v: (p) => p.n, s: (p) => p.beat ? 'beat Ranmaru ' + (p.beat === 1 ? 'once' : p.beat + ' times') : 'never beat Ranmaru' },
         ];
         box.replaceChildren();

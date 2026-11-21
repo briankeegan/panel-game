@@ -533,7 +533,8 @@
 .lb-grid.compact .lb-win{grid-template-columns:1.3em minmax(0,1fr);gap:4px 6px;padding-top:3px}
 .lb-grid.compact .lb-win .lb-n{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .lb-grid.compact .lb-win .lb-v{grid-column:2;font-size:1.05em}
-.lb-grid.compact .lb-win .lb-age{display:none}
+.lb-grid.compact .lb-win .lb-age{grid-column:2;justify-self:start;margin-top:-3px;padding:0;background:none;font-weight:400;font-size:11px;color:var(--color-fg-muted)}
+.lb-grid.compact .lb-win .lb-age.new{color:var(--color-fg-muted)}
 .lb-more{font:inherit;font-size:var(--cds-font-size-caption);padding:6px 12px;border-radius:999px;border:1px solid var(--color-border-line);background:none;color:var(--color-fg);cursor:pointer}
 .lb-card .lb-age{display:inline-block;font-size:11px;font-weight:600;padding:0 6px;border-radius:999px;background:color-mix(in srgb,#e0821f 18%,transparent);color:#b4610e;white-space:nowrap}
 .lb-card .lb-age.new{background:color-mix(in srgb,#2f9e57 18%,transparent);color:#22804a}
@@ -1120,9 +1121,9 @@
             const nm = document.createElement('span'); nm.className = 'lb-n'; nm.textContent = p.opp;
             const tag = ageTag(p);
             if (withSub) { const sub = document.createElement('span'); sub.className = 'lb-s'; sub.textContent = c.s(p); if (tag) sub.append(' ', tag); nm.appendChild(sub); }
-            else if (tag) nm.append(' ', tag);
             const v = document.createElement('span'); v.className = 'lb-v'; v.textContent = c.v(p);
             li.append(r, nm, v);
+            if (!withSub && tag) li.append(tag);   // the closed tile: its own quiet line under the value
             return li;
           };
           // a click goes somewhere: a single-game record opens that game; any other entry shows that player's stats (the page's player filter,

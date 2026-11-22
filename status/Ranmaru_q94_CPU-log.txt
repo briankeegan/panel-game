@@ -1,5 +1,38 @@
-run 45000347923, as of 2026-11-22T08:41:41Z
+run 45000347923, as of 2026-11-22T08:43:46Z
 
 === Bot 'Ranmaru_q94_CPU' (gambit, L10, cursor 4/12, unranked) is idle in the lobby on panelattack.com:49569 ===
     Open your client, CHALLENGE 'Ranmaru_q94_CPU' in the lobby, and play — it auto-accepts.
     Ctrl+C to stop.
+
+game about to start: both players are ready
+match start: building the match (seed nil, stage nil, opponent ?)
+match start: the match is built
+match start: the match is started
+match start: gambit: creating the link
+match start: gambit: the link is created
+match start: gambit: the link is starting the match
+match start: gambit: the link has started the match
+both ready — match starting
+opponent topped out: clock 600 stopWatch 412 stop 62 pre-stop 4 shake 49 health 1, top rows r12=gggggg r11=gggggg r10=640305
+opponent topped out: clock 630 stopWatch 442 stop 60 pre-stop 56 shake 19 health 1, top rows r12=gggggg r11=gggggg r10=600005
+opponent topped out: clock 660 stopWatch 472 stop 60 pre-stop 26 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=600005
+opponent topped out: clock 690 stopWatch 502 stop 56 pre-stop 0 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=600005
+garbage landed: our stopWatch 507 clock 695, transits in flight before this frame {507}, opponent copy 1 frames behind, rollbacks so far 0
+opponent topped out: clock 720 stopWatch 532 stop 26 pre-stop 0 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=600005
+REPLAY {"mine":1,"inputs":[["A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A",
+engine rolled our stack back 0 times for late garbage this match
+match against: BackSlash26
+match against id: 9383
+match over — bot won (pace: worst 0.13 frames off schedule); waiting for a rematch
+memory after match: rss 1366156 kB, threads 7, lua 43491 kB
+game about to start: both players are ready
+match start: building the match (seed nil, stage nil, opponent ?)
+match start: the match is built
+match start: the match is started
+match start: gambit: creating the link
+match start: gambit: the link is created
+match start: gambit: the link is starting the match
+match start: gambit: the link has started the match
+both ready — match starting
+garbage landed: our stopWatch 345 clock 533, transits in flight before this frame {345}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 584 clock 772, transits in flight before this frame {584}, opponent copy 1 frames behind, rollbacks so far 0

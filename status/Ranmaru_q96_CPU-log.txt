@@ -1,4 +1,4 @@
-run 45041212941, as of 2026-11-22T19:00:23Z
+run 45041212941, as of 2026-11-22T19:02:26Z
 
 === Bot 'Ranmaru_q96_CPU' (gambit, L10, cursor 4/12, unranked) is idle in the lobby on panelattack.com:49569 ===
     Open your client, CHALLENGE 'Ranmaru_q96_CPU' in the lobby, and play — it auto-accepts.
@@ -26,3 +26,12 @@ match over — bot won (pace: worst 0.21 frames off schedule); waiting for a rem
 memory after match: rss 1837092 kB, threads 7, lua 45351 kB
 game about to start: both players are ready
 set over: the room is closed, back in the lobby
+game about to start: both players are ready
+match start: building the match (seed nil, stage nil, opponent ?)
+match start: the match is built
+match start: the match is started
+match start: gambit: creating the link
+match start: gambit: the link is created
+match start: gambit: the link is starting the match
+match start: gambit: the link has started the match
+both ready — match starting

@@ -1,4 +1,4 @@
-run 45064061172, as of 2026-11-22T20:40:45Z
+run 45064061172, as of 2026-11-22T20:42:49Z
 
 === Bot 'Ranmaru_q97_CPU' (gambit, L10, cursor 4/12, unranked) is idle in the lobby on panelattack.com:49569 ===
     Open your client, CHALLENGE 'Ranmaru_q97_CPU' in the lobby, and play — it auto-accepts.
@@ -60,3 +60,28 @@ garbage landed: our stopWatch 4199 clock 4387, transits in flight before this fr
 opponent topped out: clock 4860 stopWatch 4672 stop 0 pre-stop 0 shake 61 health 1, top rows r12=gggggg r11=gggggg r10=0ggggg
 opponent topped out: clock 4860 stopWatch 4672 stop 0 pre-stop 0 shake 61 health 1, top rows r12=gggggg r11=gggggg r10=0ggggg
 opponent topped out: clock 4920 stopWatch 4732 stop 0 pre-stop 0 shake 20 health 1, top rows r12=000ggg r11=gggggg r10=gggggg
+garbage landed: our stopWatch 4743 clock 4931, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 4746 clock 4934, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+REPLAY {"inputs":[["A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","
+engine rolled our stack back 0 times for late garbage this match
+match against: Wyniverse
+match against id: 11054
+match over — bot won (pace: worst 0.20 frames off schedule); waiting for a rematch
+memory after match: rss 2571528 kB, threads 7, lua 53109 kB
+game about to start: both players are ready
+set over: the room is closed, back in the lobby
+game about to start: both players are ready
+match start: building the match (seed nil, stage nil, opponent ?)
+match start: the match is built
+match start: the match is started
+match start: gambit: creating the link
+match start: gambit: the link is created
+match start: gambit: the link is starting the match
+match start: gambit: the link has started the match
+both ready — match starting
+garbage landed: our stopWatch 417 clock 605, transits in flight before this frame {417}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 778 clock 966, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+opponent topped out: clock 990 stopWatch 802 stop 66 pre-stop 6 shake 66 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+garbage landed: our stopWatch 899 clock 1087, transits in flight before this frame {899}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 1442 clock 1630, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 2757 clock 2945, transits in flight before this frame {2757}, opponent copy 1 frames behind, rollbacks so far 0

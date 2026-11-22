@@ -1,4 +1,4 @@
-run 45000347923, as of 2026-11-22T10:10:41Z
+run 45000347923, as of 2026-11-22T10:12:45Z
 garbage landed: our stopWatch 13456 clock 13644, transits in flight before this frame {13470}, opponent copy 1 frames behind, rollbacks so far 0
 garbage landed: our stopWatch 13460 clock 13648, transits in flight before this frame {13470,13516}, opponent copy 1 frames behind, rollbacks so far 0
 opponent topped out: clock 13650 stopWatch 13462 stop 30 pre-stop 0 shake 25 health 1, top rows r12=gggg00 r11=000ggg r10=gggggg

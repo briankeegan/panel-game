@@ -1,35 +1,4 @@
-run 44963547332, as of 2026-11-22T03:42:34Z
-opponent topped out: clock 2220 stopWatch 2032 stop 0 pre-stop 223 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 2250 stopWatch 2062 stop 0 pre-stop 193 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 2280 stopWatch 2092 stop 0 pre-stop 163 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
-garbage landed: our stopWatch 2098 clock 2286, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
-opponent topped out: clock 2310 stopWatch 2122 stop 0 pre-stop 133 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 2340 stopWatch 2152 stop 0 pre-stop 103 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 2370 stopWatch 2182 stop 0 pre-stop 73 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 2400 stopWatch 2212 stop 0 pre-stop 43 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 2430 stopWatch 2242 stop 0 pre-stop 53 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
-garbage landed: our stopWatch 2618 clock 2806, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
-REPLAY {"mine":1,"inputs":[["A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A",
-engine rolled our stack back 0 times for late garbage this match
-match against: LAZGamer
-match against id: 8290
-match over — bot won (pace: worst 0.16 frames off schedule); waiting for a rematch
-memory after match: rss 2550576 kB, threads 7, lua 58263 kB
-game about to start: both players are ready
-match start: building the match (seed nil, stage nil, opponent ?)
-match start: the match is built
-match start: the match is started
-match start: gambit: creating the link
-match start: gambit: the link is created
-match start: gambit: the link is starting the match
-match start: gambit: the link has started the match
-both ready — match starting
-garbage landed: our stopWatch 489 clock 677, transits in flight before this frame {489}, opponent copy 1 frames behind, rollbacks so far 0
-garbage landed: our stopWatch 649 clock 837, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
-opponent topped out: clock 930 stopWatch 742 stop 10 pre-stop 0 shake 76 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 960 stopWatch 772 stop 0 pre-stop 294 shake 46 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
-garbage landed: our stopWatch 783 clock 971, transits in flight before this frame {783}, opponent copy 1 frames behind, rollbacks so far 0
-garbage landed: our stopWatch 789 clock 977, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+run 44963547332, as of 2026-11-22T03:44:37Z
 garbage landed: our stopWatch 794 clock 982, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
 opponent topped out: clock 990 stopWatch 802 stop 0 pre-stop 264 shake 16 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
 opponent topped out: clock 1020 stopWatch 832 stop 0 pre-stop 234 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
@@ -149,3 +118,34 @@ game about to start: both players are ready
 set over: the room is closed, back in the lobby
 game about to start: both players are ready
 set over: the room is closed, back in the lobby
+game about to start: both players are ready
+match start: building the match (seed nil, stage nil, opponent ?)
+match start: the match is built
+match start: the match is started
+match start: gambit: creating the link
+match start: gambit: the link is created
+match start: gambit: the link is starting the match
+match start: gambit: the link has started the match
+both ready — match starting
+garbage landed: our stopWatch 552 clock 740, transits in flight before this frame {580}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 562 clock 750, transits in flight before this frame {580}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 580 clock 768, transits in flight before this frame {580}, opponent copy 1 frames behind, rollbacks so far 0
+opponent topped out: clock 840 stopWatch 652 stop 0 pre-stop 0 shake 73 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 870 stopWatch 682 stop 0 pre-stop 0 shake 43 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 900 stopWatch 712 stop 0 pre-stop 34 shake 13 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 930 stopWatch 742 stop 0 pre-stop 4 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+REPLAY {"mine":1,"inputs":[["A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A",
+engine rolled our stack back 0 times for late garbage this match
+match against: ddot
+match against id: 12135
+match over — bot won (pace: worst 0.14 frames off schedule); waiting for a rematch
+memory after match: rss 3111204 kB, threads 7, lua 82929 kB
+game about to start: both players are ready
+match start: building the match (seed nil, stage nil, opponent ?)
+match start: the match is built
+match start: the match is started
+match start: gambit: creating the link
+match start: gambit: the link is created
+match start: gambit: the link is starting the match
+match start: gambit: the link has started the match
+both ready — match starting

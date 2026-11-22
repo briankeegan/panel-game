@@ -1,5 +1,28 @@
-run 45041212941, as of 2026-11-22T17:23:30Z
+run 45041212941, as of 2026-11-22T17:25:34Z
 
 === Bot 'Ranmaru_q96_CPU' (gambit, L10, cursor 4/12, unranked) is idle in the lobby on panelattack.com:49569 ===
     Open your client, CHALLENGE 'Ranmaru_q96_CPU' in the lobby, and play — it auto-accepts.
     Ctrl+C to stop.
+
+game about to start: both players are ready
+match start: building the match (seed nil, stage nil, opponent ?)
+match start: the match is built
+match start: the match is started
+match start: gambit: creating the link
+match start: gambit: the link is created
+match start: gambit: the link is starting the match
+match start: gambit: the link has started the match
+both ready — match starting
+garbage landed: our stopWatch 425 clock 613, transits in flight before this frame {425}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 430 clock 618, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 834 clock 1022, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 1137 clock 1325, transits in flight before this frame {1137}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 1232 clock 1420, transits in flight before this frame {1232}, opponent copy 1 frames behind, rollbacks so far 0
+REPLAY {"settings":{"replayVersion":3,"stacks":[{"stackType":1,"stackBehaviours":{"allowManualRaise":true,"swapStallingMode":1,"swapStallingPunish":4,"passiveRaise":true},"inputs":"","inputMethod":"controller","levelData":{"frameConstants":{"HOVER":6,"GARBAGE_HOVER":4,"FLASH":28,"FACE":10,"POP":7},"
+engine rolled our stack back 0 times for late garbage this match
+match against: bramp
+match against id: 8522
+match over — bot won (pace: worst 0.21 frames off schedule); waiting for a rematch
+memory after match: rss 1837092 kB, threads 7, lua 45351 kB
+game about to start: both players are ready
+set over: the room is closed, back in the lobby

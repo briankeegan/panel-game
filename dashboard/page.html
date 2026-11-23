@@ -128,6 +128,9 @@
 /* reset buttons beside the Filters pill and above Latest results, shown only while a filter is on */
 .gs-freset { font: inherit; font-size: 12px; font-weight: 600; margin-left: 10px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--color-fg); background: transparent; color: var(--color-fg); cursor: pointer; }
 .gs-freset:hover { background: var(--color-fg); color: var(--color-bg); }
+/* closed, the Filters pill and its reset sit side by side; open, the panel takes the row and has its own reset inside */
+.gs-frow { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 0 8px; } .gs-frow > .gs-filters[open] { flex-basis: 100%; }
+.gs-frow > .gs-freset { margin: 5px 0 0; }
 .gs-fon { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; } .gs-fon .gs-freset { margin-left: 0; }
 .gs-form { display: flex; flex-wrap: wrap; gap: 5px; min-height: 22px; }
 .gs-dot { width: 14px; height: 14px; padding: 0; border-radius: 50%; border: 0; background: color-mix(in srgb, var(--color-fg) 28%, transparent); cursor: default; }
@@ -575,7 +578,7 @@
     <p class="gs-take gs-dep" id="gs-dep" data-source="versions" hidden></p>
   </header>
 
-  <details class="gs-filters" id="gs-filters"><summary><span id="gs-fsum">Filters</span><button type="button" class="gs-freset" id="fs-reset" hidden>Reset filters</button></summary>
+  <div class="gs-frow"><details class="gs-filters" id="gs-filters"><summary id="gs-fsum">Filters</summary>
   <section class="gs-bar" aria-label="Filters">
     <div class="gf-row">
       <label class="gs-f"><span>Version</span><select id="f-ver" class="dash-select"></select></label>
@@ -591,7 +594,7 @@
     <p class="gs-note" id="f-vinfo" hidden></p>
     <div class="gs-f" id="f-chips-wrap" hidden><span>Showing only</span><div class="gs-chips" id="f-chips"></div></div>
     <p class="gs-note gf-count" id="f-count" role="status"></p>
-  </section></details>
+  </section></details><button type="button" class="gs-freset" id="fs-reset" hidden>Reset filters</button></div>
 
   <section class="gs-kpis" aria-label="Summary">
     <div class="gs-kpi"><div class="gs-kl">Win rate</div><div class="gs-kv" id="k-wr" data-source="games">—</div><div class="gs-kn" id="k-wr-n"></div></div>
@@ -843,7 +846,9 @@
   $('f-min').addEventListener('click', (e) => { const b = e.target.closest('button[data-min]'); if (b) dash.setParams({ minn: Number(b.dataset.min) }); });
   $('f-reset').addEventListener('click', () => resetAll());
   // the reset in the Filters pill must not open or close the panel
-  $('fs-reset').addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); resetAll(); });
+  $('fs-reset').addEventListener('click', () => resetAll());
+  // the reset beside the pill is for the closed pill; the open panel has its own (and Latest results shows whether a filter is on)
+  $('gs-filters').addEventListener('toggle', () => { $('fs-reset').hidden = $('gs-filters').open || $('form-filters').hidden; });
   $('form-reset').addEventListener('click', () => resetAll());
   const toggle = (name, val) => dash.setParams({ [name]: (dash.params()[name] || '') === val ? '' : val });
 
@@ -882,7 +887,7 @@
     });
     $('f-chips-wrap').hidden = !chips.children.length;
     // (the Versions table's "versions shown" is not a game filter: it changes no result, so it shows no reset here)
-    $('fs-reset').hidden = !active.length; $('form-filters').hidden = !active.length;
+    $('fs-reset').hidden = !active.length || $('gs-filters').open; $('form-filters').hidden = !active.length;
     $('form-filters-t').textContent = 'Filtered: ' + active.map((x) => x[0]).join(' · ');
     document.querySelectorAll('#m-opp button').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.m) === oppMin)));
     document.querySelectorAll('#k-loss button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.k === lossKind)));

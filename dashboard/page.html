@@ -485,6 +485,11 @@
 .gs-latest tr.gs-set.open .gs-chev { transform: rotate(90deg); }
 .gs-latest tr.gs-in td:first-child { padding-left: 22px !important; }
 .gs-latest tr.gs-in2 td:first-child { padding-left: 38px !important; } .gs-latest tr.gs-setinfo.gs-in2 td { padding-left: 38px !important; }
+.gs-latest tr.gs-pinfo td { border-top: 0; padding-top: 0 !important; }
+.gs-pstats { display: flex; flex-wrap: wrap; gap: 4px 14px; } .gs-pstats span { display: inline-flex; flex-direction: column; line-height: 1.25; }
+.gs-pstats i { font-style: normal; font-size: 11px; color: var(--color-fg-muted); } .gs-pstats b { font-weight: 600; color: var(--color-fg); font-size: 13px; }
+/* a set's or player's line stays on the screen while the table scrolls sideways: it wraps at the screen's width and stays put */
+.gs-latest tr.gs-setinfo td > div { position: sticky; left: 22px; max-width: calc(100vw - 118px); }
 .gs-checks { display: flex; flex-wrap: wrap; gap: 4px 18px; }
 .gs-latest tr.gs-in td { background: color-mix(in srgb, var(--color-fg) 3%, transparent); }
 .gs-latest tr.gs-setinfo td { white-space: normal !important; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); padding: 6px 10px 8px 22px !important; background: color-mix(in srgb, var(--color-fg) 3%, transparent); }
@@ -592,7 +597,7 @@
   <section class="gs-bar" aria-label="Filters">
     <div class="gf-row">
       <label class="gs-f"><span>Version</span><select id="f-ver" class="dash-select"></select></label>
-      <label class="gs-f"><span>Opponent</span><input type="search" id="gw-q" list="gw-names" class="gs-search" placeholder="Any player: type a name" autocomplete="off"><datalist id="gw-names"></datalist></label>
+      <label class="gs-f"><span>Opponent</span><input type="search" id="gw-q" list="gw-names" class="gs-search" placeholder="Add a player: type a name, Enter" autocomplete="off"><datalist id="gw-names"></datalist></label>
       <div class="gs-f"><span>Result</span><div class="gs-seg sm" role="group" aria-label="Result" id="gw-res"><button type="button" data-r="" aria-pressed="true">All</button><button type="button" data-r="L" aria-pressed="false">Lost</button><button type="button" data-r="W" aria-pressed="false">Won</button></div></div>
       <div class="gs-f"><span>Length (min)</span><div class="gs-seg sm" role="group" aria-label="Length of the game, in minutes" id="gw-len"><button type="button" data-l="" aria-pressed="true">Any</button><button type="button" data-l="u1" aria-pressed="false">&lt;1</button><button type="button" data-l="1-3" aria-pressed="false">1–3</button><button type="button" data-l="3p" aria-pressed="false">3+</button><button type="button" data-l="5p" aria-pressed="false">5+</button><button type="button" data-l="10p" aria-pressed="false">10+</button></div></div>
     </div>
@@ -936,7 +941,7 @@
       const ds = games.map((g) => g.date).sort(), fr = $('gw-from'), to = $('gw-to');
       fr.min = to.min = ds[0] || ''; fr.max = to.max = ds[ds.length - 1] || '';
       if (document.activeElement !== fr) fr.value = WL.when === 'range' ? WL.from : ''; if (document.activeElement !== to) to.value = WL.when === 'range' ? WL.to : '';
-      const q = $('gw-q'); if (document.activeElement !== q) q.value = opp;
+      // (the box is for adding players: the ones applied show as chips under the filters, and the box is left empty for the next)
       const names = [...nameSet].length, dl = $('gw-names'); if (dl.childElementCount !== names) dl.replaceChildren(...Array.from(new Set(games.map((g) => g.opp))).sort((a, b) => a.localeCompare(b)).map((n) => { const o = document.createElement('option'); o.value = n; return o; }));
     }
     const S = stat(fg);
@@ -1067,7 +1072,7 @@
         const ic = info.insertCell(); ic.colSpan = 9;
         const wonT = avg(timed.filter((g) => g.res === 'W')), lostT = avg(timed.filter((g) => g.res === 'L')), longest = timed.slice().sort((a, b) => b.secs - a.secs)[0];
         let streak = 0, best = 0; gs.slice().reverse().forEach((g) => { streak = g.res === 'W' ? streak + 1 : 0; best = Math.max(best, streak); });
-        ic.textContent = [
+        ic.appendChild(document.createElement('div')).textContent = [
           'Won ' + w + ' of ' + n + ' (' + fmtPct(w / n) + ')',
           timed.length ? 'average game ' + dur(avg(timed)) + (wonT != null && lostT != null ? ' (won ' + dur(wonT) + ', lost ' + dur(lostT) + ')' : '') : '',
           longest ? 'longest ' + dur(longest.secs) : '',
@@ -1104,22 +1109,25 @@
         const vc = tr.insertCell(); vc.className = 'hide-s'; vc.textContent = vs.length === 1 ? vLabel(vs[0]) : vs.length + ' versions'; vc.style.color = 'var(--color-fg-muted)';
         const cc = tr.insertCell(); cc.className = 'n'; cc.innerHTML = '<span class="gs-chev">▸</span> ';
         cc.append(n + (n === 1 ? ' game' : ' games') + (psets && psets.length > 1 ? ', ' + psets.length + ' sets' : ''));
-        const info = tb.insertRow(); info.className = 'gs-setinfo'; info.hidden = !open;
+        // the player's stats sit under their row whether or not it is open: the row says who and the record, this line the rest
+        const info = tb.insertRow(); info.className = 'gs-setinfo gs-pinfo';
         const ic = info.insertCell(); ic.colSpan = 9;
         const wonT = avg(timed.filter((g) => g.res === 'W')), lostT = avg(timed.filter((g) => g.res === 'L')), longest = timed.slice().sort((a, b) => b.secs - a.secs)[0];
         const first = gs[gs.length - 1];
-        ic.textContent = [
-          'Beat Ranmaru ' + l + ' of ' + n + ' (' + fmtPct(l / n) + ')',
-          timed.length ? 'average game ' + dur(avg(timed)) + (wonT != null && lostT != null ? ' (Ranmaru won in ' + dur(wonT) + ', lost in ' + dur(lostT) + ')' : '') : '',
-          longest ? 'longest ' + dur(longest.secs) : '',
-          bigChain ? 'biggest chain ×' + bigChain : '',
-          comboMost ? 'most combos in a game ' + comboMost : '',
-          rowed.length ? 'most garbage ' + Math.round(mostRows) + ' rows' : '',
-          'first played ' + (playedAt(first) || first.date),
-          p.names.length > 1 ? 'also played as ' + p.names.slice(1).join(', ') : '',
-        ].filter(Boolean).join(' · ');
+        // short label-and-number pairs that wrap, easier to scan than a sentence
+        const grid = ic.appendChild(document.createElement('div')); grid.className = 'gs-pstats';
+        [['Beat Ranmaru', l + ' of ' + n + ' (' + fmtPct(l / n) + ')'],
+          ['Avg game', timed.length ? dur(avg(timed)) : ''],
+          ['Longest', longest ? dur(longest.secs) : ''],
+          ['Best chain', bigChain ? '×' + bigChain : ''],
+          ['Most combos', comboMost ? String(comboMost) : ''],
+          ['Most garbage', rowed.length ? Math.round(mostRows) + ' rows' : ''],
+          ['First played', playedAt(first) || first.date],
+          ['Also played as', p.names.length > 1 ? p.names.slice(1).join(', ') : ''],
+        ].filter((x) => x[1]).forEach(([k, v]) => { const d = grid.appendChild(document.createElement('span')); d.appendChild(document.createElement('i')).textContent = k; d.appendChild(document.createElement('b')).textContent = v; });
         const kids = psets ? psets.map((s) => setRows(s, true, open)) : gs.map((g) => { const r = gameRow(g, 'gs-in', !open); return { show: (v) => { r.hidden = !v; } }; });
-        const flip = () => { const o = !openPlayers.has(p.key); if (o) openPlayers.add(p.key); else openPlayers.delete(p.key); tr.classList.toggle('open', o); tr.setAttribute('aria-expanded', o ? 'true' : 'false'); info.hidden = !o; kids.forEach((k) => k.show(o)); };
+        const flip = () => { const o = !openPlayers.has(p.key); if (o) openPlayers.add(p.key); else openPlayers.delete(p.key); tr.classList.toggle('open', o); tr.setAttribute('aria-expanded', o ? 'true' : 'false'); kids.forEach((k) => k.show(o)); };
+        info.style.cursor = 'pointer'; info.addEventListener('click', flip);
         tr.addEventListener('click', flip);
         tr.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flip(); } });
       };
@@ -1131,7 +1139,7 @@
       if (total > 10) { const m = document.createElement('button'); m.type = 'button'; m.className = 'gs-more'; m.textContent = recentMore ? 'Show fewer' : 'Show all (' + total + unit + ')'; m.addEventListener('click', () => { recentMore = !recentMore; render(); }); fm.appendChild(m); }
     }
     const rl = recent.filter((g) => g.res === 'L').length;
-    $('form-note').textContent = !recent.length ? 'No games in this selection.' : groupPlayers ? 'Most recently played first. Click a player for their stats and ' + (groupSets ? 'sets' : 'games') + '; click a game to watch it.' : groupSets ? 'Newest set first. Click a set to see its games; click a game to watch it.' : 'Newest first. Click a game to watch it.';
+    $('form-note').textContent = !recent.length ? 'No games in this selection.' : groupPlayers ? 'Most recently played first, each with their stats. Click a player for their ' + (groupSets ? 'sets' : 'games') + '; click a game to watch it.' : groupSets ? 'Newest set first. Click a set to see its games; click a game to watch it.' : 'Newest first. Click a game to watch it.';
     const sentSum = recent.reduce((t, g) => t + (Number(g.sent) || 0), 0);
     const shownSets = groupSets ? (recentMore ? sets.length : Math.min(10, sets.length)) : 0;
     const shownPlayers = groupPlayers ? (recentMore ? players.length : Math.min(10, players.length)) : 0;
@@ -1436,14 +1444,23 @@
   const rangeChanged = () => { WL.from = $('gw-from').value; WL.to = $('gw-to').value; if (WL.from && WL.to && WL.from > WL.to) { const t = WL.from; WL.from = WL.to; WL.to = t; } WL.when = (WL.from || WL.to) ? 'range' : ''; render(); };
   $('gw-from').addEventListener('change', rangeChanged); $('gw-to').addEventListener('change', rangeChanged);
   $('gw-len').addEventListener('click', (e) => { const b = e.target.closest('button[data-l]'); if (b) { WL.len = b.dataset.l; render(); } });
-  $('gw-q').addEventListener('input', (e) => dash.setParams({ opp: e.target.value }));
-  // a one-line box drops the line breaks of a pasted list (one name per line would run together): paste it with commas instead
+  // ADD PLAYERS. A name goes in when it is picked from the suggestions, on Enter, or pasted (a pasted list, one per line or separated by
+  // spaces or commas, goes in whole); it joins the players already applied and the box empties for the next one.
+  const addPlayers = (text) => {
+    const t = String(text || '').trim(); if (!t) return;
+    const known = new Map([...$('gw-names').options].map((o) => [o.value.toLowerCase(), o.value]));   // every player's name (the suggestions)
+    const add = known.has(t.toLowerCase()) ? [known.get(t.toLowerCase())] : t.split(/[\s,;]+/).filter(Boolean).map((x) => known.get(x.toLowerCase()) || x);
+    const cur = String(dash.params().opp || '').trim(), have = !cur ? [] : /^name not shared/i.test(cur) ? [cur] : cur.split(/[\s,;]+/).filter(Boolean);
+    const seen = new Set(have.map((x) => x.toLowerCase()));
+    add.forEach((x) => { if (!seen.has(x.toLowerCase())) { seen.add(x.toLowerCase()); have.push(x); } });
+    $('gw-q').value = ''; dash.setParams({ opp: have.join(', ') });
+  };
+  // a pick from the suggestion list arrives as one whole replacement, not as typing
+  $('gw-q').addEventListener('input', (e) => { if (!e.inputType || e.inputType === 'insertReplacementText') addPlayers(e.target.value); });
+  $('gw-q').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addPlayers(e.target.value); } });
   $('gw-q').addEventListener('paste', (e) => {
-    const t = (e.clipboardData || window.clipboardData)?.getData('text') || '';
-    if (!/[\r\n\t]/.test(t)) return;
-    e.preventDefault(); const el = e.target, a = el.selectionStart ?? el.value.length, b = el.selectionEnd ?? el.value.length;
-    const ins = t.split(/[\r\n\t]+/).map((x) => x.trim()).filter(Boolean).join(', ');
-    el.value = el.value.slice(0, a) + ins + el.value.slice(b); el.dispatchEvent(new Event('input', { bubbles: true }));
+    const t = (e.clipboardData || window.clipboardData)?.getData('text') || ''; if (!t.trim()) return;
+    e.preventDefault(); addPlayers(t.split(/[\r\n\t]+/).map((x) => x.trim()).filter(Boolean).join(', '));
   });
   $('gw-sort').addEventListener('change', (e) => { WL.sort = e.target.value; again(); });
   if (window.innerWidth > 760) $('gs-filters').open = true;

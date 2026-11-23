@@ -1004,7 +1004,10 @@
     // PLAYERS: one per account (pid; a game without one goes by name), newest-played first; the name shown is the one used most
     const players = [];
     if (groupPlayers) {
-      const by = new Map(); recentAll.forEach((g) => { const k = g.pid ? 'id:' + g.pid : 'n:' + g.opp.toLowerCase(); if (!by.has(k)) { by.set(k, { key: k, games: [] }); players.push(by.get(k)); } by.get(k).games.push(g); });
+      // a game from before ids were recorded has none: it joins the account its name played under most (as the leaderboard does), so a
+      // player's old and new games are one row
+      const idOf = new Map(); d3.rollup(games.filter((g) => g.pid), (v) => d3.rollups(v, (x) => x.length, (x) => x.pid).sort((a, b) => b[1] - a[1])[0][0], (g) => g.opp.toLowerCase()).forEach((id, nm) => idOf.set(nm, id));
+      const by = new Map(); recentAll.forEach((g) => { const id = g.pid || idOf.get(g.opp.toLowerCase()), k = id ? 'id:' + id : 'n:' + g.opp.toLowerCase(); if (!by.has(k)) { by.set(k, { key: k, games: [] }); players.push(by.get(k)); } by.get(k).games.push(g); });
       players.forEach((p) => { const c = d3.rollups(p.games, (v) => v.length, (g) => g.opp).sort((a, b) => b[1] - a[1]); p.name = c[0][0]; p.names = c.map((x) => x[0]); });
     }
     const recent = groupPlayers ? (recentMore ? players : players.slice(0, 10)).flatMap((p) => p.games) : groupSets ? (recentMore ? sets : sets.slice(0, 10)).flatMap((s) => s.games) : recentMore ? recentAll : recentAll.slice(0, 10);

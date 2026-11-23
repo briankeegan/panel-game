@@ -129,7 +129,7 @@
 .gs-freset { font: inherit; font-size: 12px; font-weight: 600; margin-left: 10px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--color-fg); background: transparent; color: var(--color-fg); cursor: pointer; }
 .gs-freset:hover { background: var(--color-fg); color: var(--color-bg); }
 /* closed, the Filters pill and its reset sit side by side; open, the panel takes the row and has its own reset inside */
-.gs-frow { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 0 8px; } .gs-frow > .gs-filters[open] { flex-basis: 100%; }
+.gs-frow { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 0 8px; } .gs-frow > .gs-filters[open] { flex-basis: 100%; min-width: 0; }
 .gs-frow > .gs-freset { margin: 5px 0 0; }
 .gs-fon { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; } .gs-fon .gs-freset { margin-left: 0; }
 .gs-form { display: flex; flex-wrap: wrap; gap: 5px; min-height: 22px; }
@@ -370,6 +370,14 @@
 .gs details.gs-filters { border: 0; padding: 0; background: none; box-shadow: none; }
 .gs-filters > summary { font-size: var(--cds-font-size-caption); font-weight: 600; padding: 9px 14px; border: 1px solid var(--color-border-line); border-radius: 999px; background: var(--color-panel); list-style: none; cursor: pointer; display: inline-block; margin-bottom: 8px; box-shadow: var(--gs-shadow); }
 .gs-filters > summary::before { content: '▸ '; } .gs-filters[open] > summary::before { content: '▾ '; }
+/* OPEN, the pill and its panel are one card: the pill becomes the card's header row and the panel its body, so it reads as the
+   filters it opened (closed, it stays a pill) */
+.gs details.gs-filters[open] { border: 1px solid var(--color-border-line); border-radius: 14px; background: var(--color-panel); box-shadow: var(--gs-shadow); margin-bottom: 8px; min-width: 0; }
+.gs-filters[open] > summary { display: block; border: 0; border-bottom: 1px solid var(--color-border-line); border-radius: 0; box-shadow: none; margin: 0; padding: 11px 16px; }
+.gs-filters[open] > .gs-bar { border: 0; border-radius: 0; box-shadow: none; background: none; }
+/* nothing in the panel may be wider than the card: the version list shrinks to fit, a row of buttons scrolls sideways */
+.gs-filters .gs-bar, .gs-filters .gs-bar > *, .gs-filters .gs-f { min-width: 0; max-width: 100%; }
+.gs-filters .gs-bar select.dash-select { max-width: 100%; } .gs-filters .gs-bar .gs-seg { max-width: 100%; overflow-x: auto; }
 .gw-sortrow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; }
 .gs details.gw-fd { box-shadow: none; }
 .gs-kpi, .gs-card { border-radius: 14px; box-shadow: var(--gs-shadow); }

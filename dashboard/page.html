@@ -1110,16 +1110,15 @@
         const ic = info.insertCell(); ic.colSpan = 9;
         const wonT = avg(timed.filter((g) => g.res === 'W')), lostT = avg(timed.filter((g) => g.res === 'L')), longest = timed.slice().sort((a, b) => b.secs - a.secs)[0];
         let streak = 0, best = 0; gs.slice().reverse().forEach((g) => { streak = g.res === 'W' ? streak + 1 : 0; best = Math.max(best, streak); });
-        ic.appendChild(document.createElement('div')).textContent = [
-          'Won ' + w + ' of ' + n + ' (' + fmtPct(w / n) + ')',
-          timed.length ? 'average game ' + dur(avg(timed)) + (wonT != null && lostT != null ? ' (won ' + dur(wonT) + ', lost ' + dur(lostT) + ')' : '') : '',
-          longest ? 'longest ' + dur(longest.secs) : '',
-          best > 1 ? 'best run ' + best + ' wins in a row' : '',
-          sent ? sent + ' garbage blocks sent (' + (sent / n).toFixed(1) + ' a game)' : '',
-          rowed.length ? 'garbage thrown at Ranmaru stacks ' + Math.round(rowSum) + ' rows high (' + (rowSum / rowed.length).toFixed(1) + ' a game)' : land.length ? landSum + ' pieces landed on Ranmaru' : '',
-          bigChain ? 'biggest chain ×' + bigChain : '',
-          rowed.length ? comboSum + ' combo pieces' : '',
-        ].filter(Boolean).join(' · ');
+        // the set's stats as short label/number pairs, like a player's (the record and total time are on the row already)
+        const grid = ic.appendChild(document.createElement('div')); grid.className = 'gs-pstats';
+        [['Avg game', timed.length ? dur(avg(timed)) : ''],
+          ['Longest', longest ? dur(longest.secs) : ''],
+          ['Win streak', best > 1 ? String(best) : ''],
+          ['Garbage', rowed.length ? Math.round(rowSum) + ' rows' : land.length ? landSum + ' pcs' : ''],
+          ['Best chain', bigChain ? '×' + bigChain : ''],
+          ['Combos', rowed.length && comboSum ? String(comboSum) : ''],
+        ].filter((x) => x[1]).forEach(([k, v]) => { const d = grid.appendChild(document.createElement('span')); d.appendChild(document.createElement('i')).textContent = k; d.appendChild(document.createElement('b')).textContent = v; });
         const rows = gs.map((g) => gameRow(g, inPlayer ? 'gs-in gs-in2' : 'gs-in', !(open && visible)));
         let shown = visible;
         const show = (v) => { shown = v; const o = openSets.has(key); tr.hidden = !v; info.hidden = !(v && o); rows.forEach((r) => { r.hidden = !(v && o); }); };

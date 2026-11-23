@@ -517,6 +517,8 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
 .gs-latest .gs-chev { display: inline-block; width: 1em; color: var(--color-fg-muted); transition: transform var(--cds-dur-slow) var(--cds-ease-out); }
 .gs-latest tr.gs-set.open .gs-chev { transform: rotate(90deg); }
 .gs-latest tr.gs-in td:first-child { padding-left: 22px !important; }
+.gs-latest tr.gs-in2 td:first-child { padding-left: 38px !important; } .gs-latest tr.gs-setinfo.gs-in2 td { padding-left: 38px !important; }
+.gs-checks { display: flex; flex-wrap: wrap; gap: 4px 18px; }
 .gs-latest tr.gs-in td { background: color-mix(in srgb, var(--color-fg) 3%, transparent); }
 .gs-latest tr.gs-setinfo td { white-space: normal !important; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); padding: 6px 10px 8px 22px !important; background: color-mix(in srgb, var(--color-fg) 3%, transparent); }
 .gs-latest .gs-rec { font-variant-numeric: tabular-nums; }
@@ -652,7 +654,7 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
 
   <details class="gs-card gs-collapse" id="sec-form" open>
     <summary><h2>Latest results</h2><span class="gs-count" id="form-sum"></span></summary>
-    <label class="gs-check"><input type="checkbox" id="form-sets" checked> Group by set</label>
+    <div class="gs-checks"><label class="gs-check"><input type="checkbox" id="form-sets" checked> Group by set</label><label class="gs-check"><input type="checkbox" id="form-players"> Group by player</label></div>
     <p class="gs-note gs-fon" id="form-filters" hidden><span id="form-filters-t"></span><button type="button" class="gs-freset" id="form-reset">Reset filters</button></p>
     <p class="gs-note" id="form-note"></p>
     <div id="form" data-source="games"></div>
@@ -880,6 +882,11 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
   try { if (localStorage.getItem('gs-sets') === '0') groupSets = false; } catch (e) {}
   $('form-sets').checked = groupSets;
   $('form-sets').addEventListener('change', (e) => { groupSets = e.target.checked; try { localStorage.setItem('gs-sets', groupSets ? '1' : '0'); } catch (x) {} render(); });
+  // GROUP BY PLAYER (off unless ticked): a row per player with their record; opened, their games, in sets or not as Group by set says
+  let groupPlayers = false; const openPlayers = new Set();
+  try { if (localStorage.getItem('gs-players') === '1') groupPlayers = true; } catch (e) {}
+  $('form-players').checked = groupPlayers;
+  $('form-players').addEventListener('change', (e) => { groupPlayers = e.target.checked; try { localStorage.setItem('gs-players', groupPlayers ? '1' : '0'); } catch (x) {} render(); });
   ['s-ver', 's-opp', 's-loss'].forEach((id) => $(id).addEventListener('input', () => render()));
   $('m-opp').addEventListener('click', (e) => { const b = e.target.closest('button[data-m]'); if (b) { oppMin = Number(b.dataset.m); render(); } });
   $('k-loss').addEventListener('click', (e) => { const b = e.target.closest('button[data-k]'); if (b) { lossKind = b.dataset.k; render(); } });
@@ -1019,15 +1026,21 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
     const recentAll = fg.slice().sort((a, b) => b.idx - a.idx);
     // A SET: games in a row by the same bot against the same opponent, each starting within 10 minutes of the last one's end (a room the two
     // sat in). Newest set first; its games newest first, as the plain list has them.
-    const sets = [];
-    if (groupSets) {
-      recentAll.forEach((g) => {
-        const s = sets[sets.length - 1], last = s && s.games[s.games.length - 1];
+    const setsOf = (list) => { const out = [];
+      list.forEach((g) => {
+        const s = out[out.length - 1], last = s && s.games[s.games.length - 1];
         const near = last && (g.at && last.at ? playedMs(last) - new Date(g.at).getTime() <= 600e3 : g.date === last.date);
-        if (s && last.opp === g.opp && last.bot === g.bot && near) s.games.push(g); else sets.push({ games: [g] });
+        if (s && last.opp === g.opp && last.bot === g.bot && near) s.games.push(g); else out.push({ games: [g] });
       });
+      return out; };
+    const sets = groupSets ? setsOf(recentAll) : [];
+    // PLAYERS: one per account (pid; a game without one goes by name), newest-played first; the name shown is the one used most
+    const players = [];
+    if (groupPlayers) {
+      const by = new Map(); recentAll.forEach((g) => { const k = g.pid ? 'id:' + g.pid : 'n:' + g.opp.toLowerCase(); if (!by.has(k)) { by.set(k, { key: k, games: [] }); players.push(by.get(k)); } by.get(k).games.push(g); });
+      players.forEach((p) => { const c = d3.rollups(p.games, (v) => v.length, (g) => g.opp).sort((a, b) => b[1] - a[1]); p.name = c[0][0]; p.names = c.map((x) => x[0]); });
     }
-    const recent = groupSets ? (recentMore ? sets : sets.slice(0, 10)).flatMap((s) => s.games) : recentMore ? recentAll : recentAll.slice(0, 10);
+    const recent = groupPlayers ? (recentMore ? players : players.slice(0, 10)).flatMap((p) => p.games) : groupSets ? (recentMore ? sets : sets.slice(0, 10)).flatMap((s) => s.games) : recentMore ? recentAll : recentAll.slice(0, 10);
     const fm = $('form'); fm.replaceChildren();
     if (recent.length) {
       // the game's mode from the bot's log: time attack (nobody across) or versus; older games have none
@@ -1059,8 +1072,8 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
         else { wc.textContent = 'no replay'; wc.style.color = 'var(--color-fg-muted)'; }
         return tr;
       };
-      if (!groupSets) recent.forEach((g) => gameRow(g));
-      else (recentMore ? sets : sets.slice(0, 10)).forEach((set) => {
+      // a set's rows: its own row (a click opens it), a line on the set, then its games. show(v) hides or shows the lot (a closed player).
+      const setRows = (set, inPlayer, visible) => {
         const gs = set.games, newest = gs[0], oldest = gs[gs.length - 1], n = gs.length, w = gs.filter((g) => g.res === 'W').length, l = n - w;
         const key = newest.bot + '|' + newest.opp + '|' + (oldest.at || oldest.date) + '|' + oldest.idx, open = openSets.has(key);
         const timed = gs.filter((g) => g.secs != null), avg = (a) => a.length ? a.reduce((t, g) => t + g.secs, 0) / a.length : null;
@@ -1068,7 +1081,7 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
         const rowed = gs.filter((g) => g.gr != null), rowSum = rowed.reduce((t, g) => t + g.gr, 0), bigChain = d3.max(gs, (g) => g.gch || 0), comboSum = gs.reduce((t, g) => t + (g.gk || 0), 0);
         const lvs = [...new Set(gs.map((g) => Array.isArray(g.lv) ? g.lv[0] + ' v ' + g.lv[1] : '—'))], modes = [...new Set(gs.map((g) => modeLabel(g.mode)))], vs = [...new Set(gs.map((g) => g.sha))];
         // the set's own row: who, the record, when it ran; a click opens its games
-        const tr = tb.insertRow(); tr.className = 'gs-set' + (open ? ' open' : ''); tr.setAttribute('aria-expanded', open ? 'true' : 'false'); tr.tabIndex = 0;
+        const tr = tb.insertRow(); tr.className = 'gs-set' + (open ? ' open' : '') + (inPlayer ? ' gs-in' : ''); tr.setAttribute('aria-expanded', open ? 'true' : 'false'); tr.tabIndex = 0; tr.hidden = !visible;
         whenCell(tr, playedMs(oldest), oldest, newest.at ? new Date(newest.at).getTime() : null);
         const rc = tr.insertCell(), pill = document.createElement('span'); pill.className = 'gw-res ' + (l === 0 ? 'w' : l > w ? 'l' : 'o'); pill.innerHTML = '<span class="gs-rec">' + w + '–' + l + '</span>'; pill.title = w + ' won, ' + l + ' lost' + (l === 0 ? ': a sweep' : l > w ? ': lost the set' : ': won the set, dropped games'); rc.appendChild(pill);
         // (the set pill: green a sweep; orange won or tied but dropped games; red lost the set. Not blue or purple: those are the charts' version colours)
@@ -1080,7 +1093,7 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
         const vc = tr.insertCell(); vc.className = 'hide-s'; vc.textContent = vs.length === 1 ? vLabel(vs[0]) : vs.length + ' versions'; vc.style.color = 'var(--color-fg-muted)';
         const cc = tr.insertCell(); cc.className = 'n'; cc.innerHTML = '<span class="gs-chev">▸</span> '; cc.append(n + (n === 1 ? ' game' : ' games'));
         // opened: a line on the set, then its games as the plain list has them
-        const info = tb.insertRow(); info.className = 'gs-setinfo'; info.hidden = !open;
+        const info = tb.insertRow(); info.className = 'gs-setinfo' + (inPlayer ? ' gs-in2' : ''); info.hidden = !(open && visible);
         const ic = info.insertCell(); ic.colSpan = 9;
         const wonT = avg(timed.filter((g) => g.res === 'W')), lostT = avg(timed.filter((g) => g.res === 'L')), longest = timed.slice().sort((a, b) => b.secs - a.secs)[0];
         let streak = 0, best = 0; gs.slice().reverse().forEach((g) => { streak = g.res === 'W' ? streak + 1 : 0; best = Math.max(best, streak); });
@@ -1094,20 +1107,65 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
           bigChain ? 'biggest chain ×' + bigChain : '',
           rowed.length ? comboSum + ' combo pieces' : '',
         ].filter(Boolean).join(' · ');
-        const rows = gs.map((g) => gameRow(g, 'gs-in', !open));
-        const flip = () => { const o = !openSets.has(key); if (o) openSets.add(key); else openSets.delete(key); tr.classList.toggle('open', o); tr.setAttribute('aria-expanded', o ? 'true' : 'false'); info.hidden = !o; rows.forEach((r) => { r.hidden = !o; }); };
+        const rows = gs.map((g) => gameRow(g, inPlayer ? 'gs-in gs-in2' : 'gs-in', !(open && visible)));
+        let shown = visible;
+        const show = (v) => { shown = v; const o = openSets.has(key); tr.hidden = !v; info.hidden = !(v && o); rows.forEach((r) => { r.hidden = !(v && o); }); };
+        const flip = () => { const o = !openSets.has(key); if (o) openSets.add(key); else openSets.delete(key); tr.classList.toggle('open', o); tr.setAttribute('aria-expanded', o ? 'true' : 'false'); show(shown); };
         tr.addEventListener('click', flip);
         tr.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flip(); } });
-      });
+        return { show };
+      };
+      // a player's rows: their row (record, time played, last played), a line of their stats, then their sets or games
+      const playerRow = (p) => {
+        const gs = p.games, n = gs.length, w = gs.filter((g) => g.res === 'W').length, l = n - w, open = openPlayers.has(p.key);
+        const timed = gs.filter((g) => g.secs != null), avg = (a) => a.length ? a.reduce((t, g) => t + g.secs, 0) / a.length : null;
+        const rowed = gs.filter((g) => g.gr != null), bigChain = d3.max(gs, (g) => g.gch || 0), mostRows = d3.max(rowed, (g) => g.gr), comboMost = d3.max(gs, (g) => g.gk || 0);
+        const lvs = [...new Set(gs.map((g) => Array.isArray(g.lv) ? g.lv[0] + ' v ' + g.lv[1] : '—'))], modes = [...new Set(gs.map((g) => modeLabel(g.mode)))], vs = [...new Set(gs.map((g) => g.sha))];
+        const psets = groupSets ? setsOf(gs) : null;
+        const tr = tb.insertRow(); tr.className = 'gs-set gs-player' + (open ? ' open' : ''); tr.setAttribute('aria-expanded', open ? 'true' : 'false'); tr.tabIndex = 0;
+        whenCell(tr, playedMs(gs[0]), gs[0]); tr.cells[0].title = 'Last played';
+        // the record, Ranmaru's: green won every game, orange won most but dropped some, red lost more than it won
+        const rc = tr.insertCell(), pill = document.createElement('span'); pill.className = 'gw-res ' + (l === 0 ? 'w' : l > w ? 'l' : 'o'); pill.innerHTML = '<span class="gs-rec">' + w + '–' + l + '</span>'; pill.title = 'Ranmaru won ' + w + ', lost ' + l; rc.appendChild(pill);
+        const oc = tr.insertCell(); oc.textContent = p.name; if (p.names.length > 1) oc.title = 'Also played as ' + p.names.slice(1).join(', ');
+        const evc = tr.insertCell(); evc.textContent = lvs.length === 1 ? lvs[0] : 'mixed';
+        const mdc = tr.insertCell(); mdc.textContent = modes.length === 1 ? modes[0] : 'mixed';
+        const lc = tr.insertCell(); lc.className = 'n'; lc.textContent = dur(timed.reduce((t, g) => t + g.secs, 0)); lc.title = 'Time played against Ranmaru';
+        const gbc = tr.insertCell(); gbc.className = 'n hide-s'; gbc.textContent = rowed.length ? String(Math.round(mostRows)) : '—'; gbc.title = rowed.length ? 'their most garbage in one game: ' + Math.round(mostRows) + ' rows' : '';
+        const vc = tr.insertCell(); vc.className = 'hide-s'; vc.textContent = vs.length === 1 ? vLabel(vs[0]) : vs.length + ' versions'; vc.style.color = 'var(--color-fg-muted)';
+        const cc = tr.insertCell(); cc.className = 'n'; cc.innerHTML = '<span class="gs-chev">▸</span> ';
+        cc.append(n + (n === 1 ? ' game' : ' games') + (psets && psets.length > 1 ? ', ' + psets.length + ' sets' : ''));
+        const info = tb.insertRow(); info.className = 'gs-setinfo'; info.hidden = !open;
+        const ic = info.insertCell(); ic.colSpan = 9;
+        const wonT = avg(timed.filter((g) => g.res === 'W')), lostT = avg(timed.filter((g) => g.res === 'L')), longest = timed.slice().sort((a, b) => b.secs - a.secs)[0];
+        const first = gs[gs.length - 1];
+        ic.textContent = [
+          'Beat Ranmaru ' + l + ' of ' + n + ' (' + fmtPct(l / n) + ')',
+          timed.length ? 'average game ' + dur(avg(timed)) + (wonT != null && lostT != null ? ' (Ranmaru won in ' + dur(wonT) + ', lost in ' + dur(lostT) + ')' : '') : '',
+          longest ? 'longest ' + dur(longest.secs) : '',
+          bigChain ? 'biggest chain ×' + bigChain : '',
+          comboMost ? 'most combos in a game ' + comboMost : '',
+          rowed.length ? 'most garbage ' + Math.round(mostRows) + ' rows' : '',
+          'first played ' + (playedAt(first) || first.date),
+          p.names.length > 1 ? 'also played as ' + p.names.slice(1).join(', ') : '',
+        ].filter(Boolean).join(' · ');
+        const kids = psets ? psets.map((s) => setRows(s, true, open)) : gs.map((g) => { const r = gameRow(g, 'gs-in', !open); return { show: (v) => { r.hidden = !v; } }; });
+        const flip = () => { const o = !openPlayers.has(p.key); if (o) openPlayers.add(p.key); else openPlayers.delete(p.key); tr.classList.toggle('open', o); tr.setAttribute('aria-expanded', o ? 'true' : 'false'); info.hidden = !o; kids.forEach((k) => k.show(o)); };
+        tr.addEventListener('click', flip);
+        tr.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flip(); } });
+      };
+      if (groupPlayers) (recentMore ? players : players.slice(0, 10)).forEach(playerRow);
+      else if (groupSets) (recentMore ? sets : sets.slice(0, 10)).forEach((set) => setRows(set, false, true));
+      else recent.forEach((g) => gameRow(g));
       const wrap = document.createElement('div'); wrap.className = recentMore ? 'gs-scroll gs-latest-box' : 'gs-scroll'; wrap.appendChild(tbl); fm.appendChild(wrap);
-      const total = groupSets ? sets.length : recentAll.length, unit = groupSets ? (total === 1 ? ' set' : ' sets') : '';
+      const total = groupPlayers ? players.length : groupSets ? sets.length : recentAll.length, unit = groupPlayers ? (total === 1 ? ' player' : ' players') : groupSets ? (total === 1 ? ' set' : ' sets') : '';
       if (total > 10) { const m = document.createElement('button'); m.type = 'button'; m.className = 'gs-more'; m.textContent = recentMore ? 'Show fewer' : 'Show all (' + total + unit + ')'; m.addEventListener('click', () => { recentMore = !recentMore; render(); }); fm.appendChild(m); }
     }
     const rl = recent.filter((g) => g.res === 'L').length;
-    $('form-note').textContent = !recent.length ? 'No games in this selection.' : groupSets ? 'Newest set first. Click a set to see its games; click a game to watch it.' : 'Newest first. Click a game to watch it.';
+    $('form-note').textContent = !recent.length ? 'No games in this selection.' : groupPlayers ? 'Most recently played first. Click a player for their stats and ' + (groupSets ? 'sets' : 'games') + '; click a game to watch it.' : groupSets ? 'Newest set first. Click a set to see its games; click a game to watch it.' : 'Newest first. Click a game to watch it.';
     const sentSum = recent.reduce((t, g) => t + (Number(g.sent) || 0), 0);
     const shownSets = groupSets ? (recentMore ? sets.length : Math.min(10, sets.length)) : 0;
-    $('form-sum').textContent = !recent.length ? '' : (groupSets ? (shownSets === 1 ? 'the latest set' : 'latest ' + shownSets + ' sets') + ' (' + recent.length + (recent.length === 1 ? ' game)' : ' games)') : recent.length === 1 ? 'the latest game' : 'latest ' + recent.length) + ': ' + (recent.length - rl) + ' won, ' + rl + ' lost, ' + sentSum + ' garbage blocks sent';
+    const shownPlayers = groupPlayers ? (recentMore ? players.length : Math.min(10, players.length)) : 0;
+    $('form-sum').textContent = !recent.length ? '' : (groupPlayers ? (shownPlayers === 1 ? 'the latest player' : 'latest ' + shownPlayers + ' players') + ' (' + recent.length + (recent.length === 1 ? ' game)' : ' games)') : groupSets ? (shownSets === 1 ? 'the latest set' : 'latest ' + shownSets + ' sets') + ' (' + recent.length + (recent.length === 1 ? ' game)' : ' games)') : recent.length === 1 ? 'the latest game' : 'latest ' + recent.length) + ': ' + (recent.length - rl) + ' won, ' + rl + ' lost, ' + sentSum + ' garbage blocks sent';
 
     // per-version stats (opponent filter applied)
     const vs = vers.map((v) => Object.assign({}, v, stat(byOpp.filter((g) => g.sha === v.sha)))).filter((v) => v.n > 0 && (v.n >= (narrow ? 0 : minn) || v.sha === ver));

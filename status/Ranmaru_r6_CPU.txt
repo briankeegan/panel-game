@@ -1,6 +1,6 @@
 run 45209858299
 bot Ranmaru_r6_CPU
-bot wrote: 1795449092 setup
-step: Install luajit + luarocks
+bot wrote: 1795449154 setup
+step: Check out the upstream bot
 wait: not waiting
-sent: 2026-11-23T15:51:32Z
+sent: 2026-11-23T15:52:34Z

@@ -1,13 +1,4 @@
-run 45253612876, as of 2026-11-23T21:27:50Z
-opponent topped out: clock 1140 stopWatch 952 stop 156 pre-stop 0 shake 6 health 51, top rows r12=gggggg r11=gggggg r10=gggggg
-garbage landed: our stopWatch 1005 clock 1193, transits in flight before this frame {1005}, opponent copy 2 frames behind, rollbacks so far 0
-opponent topped out: clock 1230 stopWatch 1042 stop 100 pre-stop 43 shake 0 health 51, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 1260 stopWatch 1072 stop 100 pre-stop 13 shake 41 health 51, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 1290 stopWatch 1102 stop 140 pre-stop 73 shake 11 health 51, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 1320 stopWatch 1132 stop 140 pre-stop 43 shake 0 health 51, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 1440 stopWatch 1252 stop 94 pre-stop 54 shake 0 health 51, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 1470 stopWatch 1282 stop 94 pre-stop 24 shake 0 health 51, top rows r12=gggggg r11=gggggg r10=gggggg
-garbage landed: our stopWatch 2765 clock 2953, transits in flight before this frame {}, opponent copy 2 frames behind, rollbacks so far 0
+run 45253612876, as of 2026-11-23T21:29:53Z
 garbage landed: our stopWatch 3011 clock 3199, transits in flight before this frame {3032}, opponent copy 2 frames behind, rollbacks so far 0
 garbage landed: our stopWatch 3351 clock 3539, transits in flight before this frame {}, opponent copy 2 frames behind, rollbacks so far 0
 garbage landed: our stopWatch 3587 clock 3775, transits in flight before this frame {}, opponent copy 2 frames behind, rollbacks so far 0
@@ -149,3 +140,12 @@ match over — bot won (pace: worst 0.69 frames off schedule); waiting for a rem
 memory after match: rss 2069688 kB, threads 8, lua 64377 kB
 game about to start: both players are ready
 set over: the room is closed, back in the lobby
+game about to start: both players are ready
+match start: building the match (seed nil, stage nil, opponent ?)
+match start: the match is built
+match start: the match is started
+match start: gambit: creating the link
+match start: gambit: the link is created
+match start: gambit: the link is starting the match
+match start: gambit: the link has started the match
+both ready — match starting

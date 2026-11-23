@@ -1208,8 +1208,8 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
       if (total > 10) { const m = document.createElement('button'); m.type = 'button'; m.className = 'gs-more'; m.textContent = recentMore ? 'Show fewer' : 'Show all (' + total + unit + ')'; m.addEventListener('click', () => { recentMore = !recentMore; render(); }); fm.appendChild(m); }
     }
     const rl = recent.filter((g) => g.res === 'L').length;
-    const sortNote = latestSort.key === 'when' && latestSort.dir === 'desc' ? '' : ' Sorted by ' + (latestSort.key === 'res' ? (latestSort.dir === 'asc' ? 'result, most Ranmaru losses first' : 'result, most Ranmaru wins first') : ({ when: 'when', opp: 'opponent', lv: 'levels', mode: 'mode', len: 'length', garb: 'garbage', ver: 'version' })[latestSort.key] + (latestSort.dir === 'asc' ? ', lowest first' : ', highest first')) + '.';
-    $('form-note').textContent = (!recent.length ? 'No games in this selection.' : groupPlayers ? 'Most recently played first, each with their stats. Click a player for their ' + (groupSets ? 'sets' : 'games') + '; click a game to watch it.' : groupSets ? 'Newest set first. Click a set to see its games; click a game to watch it.' : 'Newest first. Click a game to watch it.') + (recent.length ? sortNote : '');
+    const byTime = latestSort.key === 'when' && latestSort.dir === 'desc';   // (the order is only named when it is the default)
+    $('form-note').textContent = (!recent.length ? 'No games in this selection.' : groupPlayers ? (byTime ? 'Most recently played first, each with their stats. ' : 'Each with their stats. ') + 'Click a player for their ' + (groupSets ? 'sets' : 'games') + '; click a game to watch it.' : groupSets ? (byTime ? 'Newest set first. ' : '') + 'Click a set to see its games; click a game to watch it.' : (byTime ? 'Newest first. ' : '') + 'Click a game to watch it.');
     const sentSum = recent.reduce((t, g) => t + (Number(g.sent) || 0), 0);
     const shownSets = groupSets ? (recentMore ? sets.length : Math.min(10, sets.length)) : 0;
     const shownPlayers = groupPlayers ? (recentMore ? players.length : Math.min(10, players.length)) : 0;

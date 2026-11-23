@@ -1286,7 +1286,7 @@
       if (lastLoss) {
         const info = document.createElement('span'); info.style.minWidth = '0';
         const who = document.createElement('b'); who.className = 'pod-kn'; who.textContent = lastLoss.opp;
-        const when = document.createElement('span'); when.className = 'pod-kd'; when.textContent = d3.utcFormat('%b %-d, %Y')(new Date(lastLoss.date));
+        const when = document.createElement('span'); when.className = 'pod-kd'; when.textContent = playedAt(lastLoss) || d3.utcFormat('%b %-d, %Y')(new Date(lastLoss.date));   // the viewer's own day and time, as the game itself shows (not the UTC date)
         info.append(who, when);
         const go = document.createElement('span'); go.className = 'pod-go'; go.textContent = lastLoss.replay ? 'Watch ▶' : 'No replay';
         lk.append(info, go);
@@ -1295,7 +1295,7 @@
       } else { lk.textContent = 'No kills yet'; lk.disabled = true; lk.onclick = null; }
     }
     // opponents table (version filter applied)
-    const os = Array.from(d3.group(byVer, (g) => g.opp), ([o, a]) => Object.assign({ opp: o, last: d3.max(a, (g) => g.date) }, stat(a)));
+    const os = Array.from(d3.group(byVer, (g) => g.opp), ([o, a]) => Object.assign({ opp: o, last: d3.max(a, (g) => playedMs(g)) }, stat(a)));
     const qo = $('s-opp').value.trim().toLowerCase();
     const osShown = os.filter((o) => (oppMin < 0 ? o.l > 0 : o.n >= oppMin) && has(qo, o.opp));
     $('c-opp').textContent = (qo || oppMin ? osShown.length + ' of ' : '') + os.length + (os.length === 1 ? ' opponent' : ' opponents');
@@ -1309,7 +1309,7 @@
       { key: 'avgW', label: 'Avg win', num: true, cls: 'hide-s', val: (r) => r.avgW, cell: plain((r) => dur(r.avgW)) },
       { key: 'avgL', label: 'Avg loss', num: true, cls: 'hide-s', val: (r) => r.avgL, cell: plain((r) => dur(r.avgL)) },
       { key: 'max', label: 'Longest', num: true, cls: 'hide-s', val: (r) => r.max, cell: plain((r) => dur(r.max)) },
-      { key: 'last', label: 'Last played', num: true, cls: 'hide-s', val: (r) => r.last, cell: plain((r) => d3.utcFormat('%b %-d')(new Date(r.last))) },
+      { key: 'last', label: 'Last played', num: true, cls: 'hide-s', val: (r) => r.last, cell: plain((r) => d3.timeFormat('%b %-d')(new Date(r.last))) },
     ], osShown, (r) => oTerms.length > 0 && oTerms.some((t) => oneOpp(r.opp.toLowerCase(), t)) && (oTerms.length > 1 || r.opp.toLowerCase() === oq), (r) => toggle('opp', r.opp));
 
     drawHist(fg);

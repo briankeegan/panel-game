@@ -1,15 +1,4 @@
-run 45253612876, as of 2026-11-23T23:38:10Z
-opponent topped out: clock 10740 stopWatch 10552 stop 0 pre-stop 3 shake 0 health 1, top rows r12=gggg00 r11=00gggg r10=gggggg
-opponent topped out: clock 10770 stopWatch 10582 stop 90 pre-stop 79 shake 0 health 1, top rows r12=001600 r11=563562 r10=516154
-opponent topped out: clock 10800 stopWatch 10612 stop 90 pre-stop 49 shake 0 health 1, top rows r12=001600 r11=563562 r10=516154
-opponent topped out: clock 10830 stopWatch 10642 stop 90 pre-stop 19 shake 0 health 1, top rows r12=001600 r11=563562 r10=516154
-opponent topped out: clock 10860 stopWatch 10672 stop 90 pre-stop 86 shake 0 health 1, top rows r12=001600 r11=563562 r10=516514
-opponent topped out: clock 10890 stopWatch 10702 stop 90 pre-stop 56 shake 0 health 1, top rows r12=001600 r11=536562 r10=516514
-opponent topped out: clock 10920 stopWatch 10732 stop 90 pre-stop 54 shake 0 health 1, top rows r12=001000 r11=536062 r10=516014
-opponent topped out: clock 10950 stopWatch 10762 stop 90 pre-stop 24 shake 0 health 1, top rows r12=001000 r11=006000 r10=536062
-garbage landed: our stopWatch 10765 clock 10953, transits in flight before this frame {10800}, opponent copy 1 frames behind, rollbacks so far 0
-opponent topped out: clock 11010 stopWatch 10822 stop 54 pre-stop 0 shake 40 health 1, top rows r12=gggggg r11=gggggg r10=030002
-opponent topped out: clock 11040 stopWatch 10852 stop 24 pre-stop 0 shake 10 health 1, top rows r12=gggggg r11=gggggg r10=000002
+run 45253612876, as of 2026-11-23T23:40:14Z
 opponent topped out: clock 11070 stopWatch 10882 stop 60 pre-stop 66 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=000002
 opponent topped out: clock 11100 stopWatch 10912 stop 60 pre-stop 36 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=000002
 opponent topped out: clock 11130 stopWatch 10942 stop 60 pre-stop 6 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=000002
@@ -149,3 +138,14 @@ match over — bot won (pace: worst 0.24 frames off schedule); waiting for a rem
 memory after match: rss 2495824 kB, threads 8, lua 39183 kB
 game about to start: both players are ready
 set over: the room is closed, back in the lobby
+game about to start: both players are ready
+match start: building the match (seed nil, stage nil, opponent ?)
+match start: the match is built
+match start: the match is started
+match start: gambit: creating the link
+match start: gambit: the link is created
+match start: gambit: the link is starting the match
+match start: gambit: the link has started the match
+both ready — match starting
+garbage landed: our stopWatch 483 clock 671, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 586 clock 774, transits in flight before this frame {586}, opponent copy 1 frames behind, rollbacks so far 0

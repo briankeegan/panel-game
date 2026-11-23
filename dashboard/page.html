@@ -51,6 +51,8 @@
 .gs-tbl th.n, .gs-tbl td.n { text-align: right; }
 .gs-th { font: inherit; color: inherit; background: none; border: 0; padding: 8px 10px; cursor: pointer; width: 100%; text-align: inherit; }
 .gs-th[aria-sort]::after { content: ' ↓'; } .gs-th[aria-sort=ascending]::after { content: ' ↑'; }
+/* Latest results: a faint ↕ on the headings it is not sorted by, so they read as sortable */
+.gs-latest .gs-th:not([aria-sort])::after { content: ' ↕'; opacity: .45; }
 .gs-tbl td { padding: 7px 10px; border-bottom: 1px solid var(--color-border-line); white-space: nowrap; }
 .gs-tbl tbody tr { cursor: pointer; } .gs-tbl tbody tr:hover { background: color-mix(in srgb, var(--color-fg) 5%, transparent); }
 .gs-tbl tbody tr.sel { background: color-mix(in srgb, var(--color-fg) 9%, transparent); box-shadow: inset 3px 0 0 var(--color-fg); }

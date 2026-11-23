@@ -846,6 +846,8 @@
   let oppMin = 0, lossKind = '', recentMore = false;
   // LATEST RESULTS BY SET (the checkbox, on by default; remembered in this browser): off, the table is the plain list of games
   let groupSets = true; const openSets = new Set();
+  // Latest results' sort: a column heading's key and direction; newest first until a heading is clicked
+  let latestSort = { key: 'when', dir: 'desc' };
   // LEADERBOARD PERIOD: this week (from Monday 00:00 US Eastern, daylight saving included), last week, or all time
   let lbPeriod = 'week', lbAll = false;   // lbAll: the WHOLE leaderboard expanded (every card's top 3 and details), not one card at a time
   const lbSync = () => { document.querySelectorAll('#sec-podium .lb-card').forEach((c) => { c.open = lbAll; }); $('lb').classList.toggle('compact', !lbAll); const b = $('lb-more'); b.textContent = lbAll ? 'Show winners only ▴' : 'Show top 3 & details ▾'; b.setAttribute('aria-expanded', lbAll ? 'true' : 'false'); };
@@ -1015,13 +1017,40 @@
       const by = new Map(); recentAll.forEach((g) => { const id = g.pid || idOf.get(g.opp.toLowerCase()), k = id ? 'id:' + id : 'n:' + g.opp.toLowerCase(); if (!by.has(k)) { by.set(k, { key: k, games: [] }); players.push(by.get(k)); } by.get(k).games.push(g); });
       players.forEach((p) => { const c = d3.rollups(p.games, (v) => v.length, (g) => g.opp).sort((a, b) => b[1] - a[1]); p.name = c[0][0]; p.names = c.map((x) => x[0]); });
     }
-    const recent = groupPlayers ? (recentMore ? players : players.slice(0, 10)).flatMap((p) => p.games) : groupSets ? (recentMore ? sets : sets.slice(0, 10)).flatMap((s) => s.games) : recentMore ? recentAll : recentAll.slice(0, 10);
+    // SORT the rows shown (games, sets or players) by a column: a set or player sorts by its own row's value (when it last played, its
+    // win share, total time, garbage). The sets themselves are found in time order first, so sorting never splits one.
+    const sortVal = (gs, k) => {
+      const one = gs.length === 1 ? gs[0] : null, w = gs.filter((g) => g.res === 'W').length, rowed = gs.filter((g) => g.gr != null);
+      if (k === 'when') return d3.max(gs, (g) => playedMs(g));
+      if (k === 'res') return one ? (one.res === 'W' ? 1 : 0) : w / gs.length + gs.length * 1e-6;
+      if (k === 'opp') return (gs[0].opp || '').toLowerCase();
+      if (k === 'lv') return gs.map((g) => Array.isArray(g.lv) ? g.lv[0] * 100 + g.lv[1] : -1).sort((a, b) => b - a)[0];
+      if (k === 'mode') return String(gs[0].mode || '~').toLowerCase();
+      if (k === 'len') return gs.reduce((t, g) => t + (g.secs || 0), 0) || (one && one.secs == null ? -1 : 0);
+      if (k === 'garb') return rowed.length ? (groupPlayers && !one ? d3.max(rowed, (g) => g.gr) : rowed.reduce((t, g) => t + g.gr, 0)) : -1;
+      if (k === 'ver') return d3.max(gs, (g) => g.idx);
+      return 0; };
+    const sortTop = (arr, gsOf) => {
+      const { key, dir } = latestSort; if (key === 'when' && dir === 'desc') return arr;
+      const v = new Map(arr.map((x) => [x, sortVal(gsOf(x), key)])), m = dir === 'asc' ? 1 : -1;
+      return arr.slice().sort((a, b) => { const x = v.get(a), y = v.get(b); return (x < y ? -1 : x > y ? 1 : 0) * m || sortVal(gsOf(b), 'when') - sortVal(gsOf(a), 'when'); }); };
+    const topPlayers = groupPlayers ? sortTop(players, (p) => p.games) : [], topSets = groupSets ? sortTop(sets, (st) => st.games) : [], topGames = sortTop(recentAll, (g) => [g]);
+    const recent = groupPlayers ? (recentMore ? topPlayers : topPlayers.slice(0, 10)).flatMap((p) => p.games) : groupSets ? (recentMore ? topSets : topSets.slice(0, 10)).flatMap((s) => s.games) : recentMore ? topGames : topGames.slice(0, 10);
     const fm = $('form'); fm.replaceChildren();
     if (recent.length) {
       // the game's mode from the bot's log: time attack (nobody across) or versus; older games have none
       const modeLabel = (m) => { if (!m) return '—'; const t = String(m).toLowerCase(); if (/time/.test(t)) return 'Time attack'; if (/versus|\bvs\b/.test(t)) return 'Versus'; return String(m); };
       const tbl = document.createElement('table'); tbl.className = 'gs-tbl gs-latest';
-      const hr = tbl.createTHead().insertRow(); [['When', ''], ['Result', ''], ['Opponent', ''], ['Levels', ''], ['Mode', ''], ['Length', 'n'], ['Garbage', 'n hide-s', 'How many rows high the garbage thrown at Ranmaru stacks (hover a game for chains and combos)'], ['Version', 'hide-s'], ['', 'n']].forEach(([h, c, ti]) => { const th = document.createElement('th'); th.textContent = h; th.className = c; if (ti) th.title = ti; th.style.padding = '8px 10px'; hr.appendChild(th); });
+      // each heading sorts the rows by its column: a click sorts (biggest / newest / A first for names), a second click flips it
+      const hr = tbl.createTHead().insertRow(); [['When', '', '', 'when'], ['Result', '', '', 'res'], ['Opponent', '', '', 'opp'], ['Levels', '', '', 'lv'], ['Mode', '', '', 'mode'], ['Length', 'n', '', 'len'], ['Garbage', 'n hide-s', 'How many rows high the garbage thrown at Ranmaru stacks (hover a game for chains and combos)', 'garb'], ['Version', 'hide-s', '', 'ver'], ['', 'n']].forEach(([h, c, ti, k]) => {
+        const th = document.createElement('th'); th.className = c; if (ti) th.title = ti; hr.appendChild(th);
+        if (!k) { th.style.padding = '8px 10px'; return; }
+        th.style.padding = '0';
+        const b = th.appendChild(document.createElement('button')); b.type = 'button'; b.className = 'gs-th'; b.textContent = h;
+        if (latestSort.key === k) b.setAttribute('aria-sort', latestSort.dir === 'asc' ? 'ascending' : 'descending');
+        b.addEventListener('click', (e) => { e.stopPropagation(); const first = (k === 'opp' || k === 'mode') ? 'asc' : 'desc';
+          latestSort = latestSort.key === k ? { key: k, dir: latestSort.dir === 'asc' ? 'desc' : 'asc' } : { key: k, dir: first }; render(); });
+      });
       const tb = tbl.createTBody();
       const whenCell = (tr, t, g, t2) => {
         const wcell = tr.insertCell(); wcell.className = 'lw';
@@ -1129,15 +1158,16 @@
         tr.addEventListener('click', flip);
         tr.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flip(); } });
       };
-      if (groupPlayers) (recentMore ? players : players.slice(0, 10)).forEach(playerRow);
-      else if (groupSets) (recentMore ? sets : sets.slice(0, 10)).forEach((set) => setRows(set, false, true));
+      if (groupPlayers) (recentMore ? topPlayers : topPlayers.slice(0, 10)).forEach(playerRow);
+      else if (groupSets) (recentMore ? topSets : topSets.slice(0, 10)).forEach((set) => setRows(set, false, true));
       else recent.forEach((g) => gameRow(g));
       const wrap = document.createElement('div'); wrap.className = recentMore ? 'gs-scroll gs-latest-box' : 'gs-scroll'; wrap.appendChild(tbl); fm.appendChild(wrap);
       const total = groupPlayers ? players.length : groupSets ? sets.length : recentAll.length, unit = groupPlayers ? (total === 1 ? ' player' : ' players') : groupSets ? (total === 1 ? ' set' : ' sets') : '';
       if (total > 10) { const m = document.createElement('button'); m.type = 'button'; m.className = 'gs-more'; m.textContent = recentMore ? 'Show fewer' : 'Show all (' + total + unit + ')'; m.addEventListener('click', () => { recentMore = !recentMore; render(); }); fm.appendChild(m); }
     }
     const rl = recent.filter((g) => g.res === 'L').length;
-    $('form-note').textContent = !recent.length ? 'No games in this selection.' : groupPlayers ? 'Most recently played first, each with their stats. Click a player for their ' + (groupSets ? 'sets' : 'games') + '; click a game to watch it.' : groupSets ? 'Newest set first. Click a set to see its games; click a game to watch it.' : 'Newest first. Click a game to watch it.';
+    const sortNote = latestSort.key === 'when' && latestSort.dir === 'desc' ? '' : ' Sorted by ' + ({ when: 'when', res: 'result', opp: 'opponent', lv: 'levels', mode: 'mode', len: 'length', garb: 'garbage', ver: 'version' })[latestSort.key] + (latestSort.dir === 'asc' ? ', lowest first' : ', highest first') + '.';
+    $('form-note').textContent = (!recent.length ? 'No games in this selection.' : groupPlayers ? 'Most recently played first, each with their stats. Click a player for their ' + (groupSets ? 'sets' : 'games') + '; click a game to watch it.' : groupSets ? 'Newest set first. Click a set to see its games; click a game to watch it.' : 'Newest first. Click a game to watch it.') + (recent.length ? sortNote : '');
     const sentSum = recent.reduce((t, g) => t + (Number(g.sent) || 0), 0);
     const shownSets = groupSets ? (recentMore ? sets.length : Math.min(10, sets.length)) : 0;
     const shownPlayers = groupPlayers ? (recentMore ? players.length : Math.min(10, players.length)) : 0;

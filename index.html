@@ -238,6 +238,7 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
 .gw-row .o { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gw-res { font-size: 12px; font-weight: 700; border-radius: 999px; padding: 3px 9px; text-align: center; color: #fff; }
 .gw-res.w { background: #2f9e57; } .gw-res.l { background: #d9433f; } .gw-res.o { background: #e0821f; }
+.gw-subrow { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; } .gw-subrow .gw-subinfo { color: var(--color-fg-muted); }
 .gw-pager { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 @media (max-width: 560px) { .gw-row { grid-template-columns: 4rem 3rem 1fr auto; } .gw-row .v { display: none; } .gw-ff > span { flex-basis: 100%; } }
 .gw-pick .gw-btn { min-height: 40px; }
@@ -1295,7 +1296,15 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
   function openReplay(row, scroll) {
     if (R.rid !== row.replay) { stopPlay(); R.rid = row.replay; R.row = row; R.D = null; R.idx = 0; R.part = 'end'; }
     R.rid = row.replay; markSources();
-    $('gw-sub').textContent = (row.res === 'W' ? 'Won against ' : 'Lost to ') + row.opp + ' in ' + dur(row.secs) + ' (' + row.bot + ', ' + (playedAt(row) || d3.utcFormat('%b %-d')(new Date(row.date))) + ')' + '' + '.';
+    // the game being watched, laid out like a Latest results row: Ranmaru's result as the same Won/Lost tag, then the opponent,
+    // the length, when it was played, what was thrown at Ranmaru and the version
+    { const sub = $('gw-sub'); sub.replaceChildren(); sub.classList.add('gw-subrow');
+      const pill = document.createElement('span'); pill.className = 'gw-res ' + (row.res === 'W' ? 'w' : 'l'); pill.textContent = row.res === 'W' ? 'Won' : 'Lost';
+      const who = document.createElement('b'); who.textContent = 'vs ' + row.opp;
+      const bits = [row.secs != null ? dur(row.secs) + ' long' : '', playedAt(row) || d3.utcFormat('%b %-d')(new Date(row.date)),
+        [row.gch ? 'chain ×' + row.gch : '', row.gr != null ? Math.round(row.gr) + ' rows of garbage' : ''].filter(Boolean).join(', '), 'version ' + row.bot].filter(Boolean);
+      const rest = document.createElement('span'); rest.className = 'gw-subinfo'; rest.textContent = bits.join(' · ');
+      sub.append(pill, ' ', who, ' ', rest); }
     syncPick();
     refreshPlayer();
     if (R.pending != null && R.D && R.D === (dash.data(dataId()) || {}).data) { R.idx = idxOfClock(R.pending); R.pending = null; updatePlayer(); }

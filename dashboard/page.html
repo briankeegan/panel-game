@@ -1034,6 +1034,13 @@
       return 0; };
     const sortTop = (arr, gsOf) => {
       const { key, dir } = latestSort; if (key === 'when' && dir === 'desc') return arr;
+      // RESULT sorts by counts: first click the most Ranmaru wins first, flipped the most Ranmaru LOSSES first (not the lowest win share,
+      // which put one-game losses on top); ties go newest first
+      if (key === 'res') {
+        const wl = new Map(arr.map((x) => { const gs = gsOf(x), w = gs.filter((g) => g.res === 'W').length; return [x, [w, gs.length - w]]; }));
+        return arr.slice().sort((a, b) => { const [wa, la] = wl.get(a), [wb, lb] = wl.get(b);
+          return (dir === 'asc' ? (lb - la) || (wa - wb) : (wb - wa) || (la - lb)) || sortVal(gsOf(b), 'when') - sortVal(gsOf(a), 'when'); });
+      }
       const v = new Map(arr.map((x) => [x, sortVal(gsOf(x), key)])), m = dir === 'asc' ? 1 : -1;
       return arr.slice().sort((a, b) => { const x = v.get(a), y = v.get(b); return (x < y ? -1 : x > y ? 1 : 0) * m || sortVal(gsOf(b), 'when') - sortVal(gsOf(a), 'when'); }); };
     const topPlayers = groupPlayers ? sortTop(players, (p) => p.games) : [], topSets = groupSets ? sortTop(sets, (st) => st.games) : [], topGames = sortTop(recentAll, (g) => [g]);
@@ -1168,7 +1175,7 @@
       if (total > 10) { const m = document.createElement('button'); m.type = 'button'; m.className = 'gs-more'; m.textContent = recentMore ? 'Show fewer' : 'Show all (' + total + unit + ')'; m.addEventListener('click', () => { recentMore = !recentMore; render(); }); fm.appendChild(m); }
     }
     const rl = recent.filter((g) => g.res === 'L').length;
-    const sortNote = latestSort.key === 'when' && latestSort.dir === 'desc' ? '' : ' Sorted by ' + ({ when: 'when', res: 'result', opp: 'opponent', lv: 'levels', mode: 'mode', len: 'length', garb: 'garbage', ver: 'version' })[latestSort.key] + (latestSort.dir === 'asc' ? ', lowest first' : ', highest first') + '.';
+    const sortNote = latestSort.key === 'when' && latestSort.dir === 'desc' ? '' : ' Sorted by ' + (latestSort.key === 'res' ? (latestSort.dir === 'asc' ? 'result, most Ranmaru losses first' : 'result, most Ranmaru wins first') : ({ when: 'when', opp: 'opponent', lv: 'levels', mode: 'mode', len: 'length', garb: 'garbage', ver: 'version' })[latestSort.key] + (latestSort.dir === 'asc' ? ', lowest first' : ', highest first')) + '.';
     $('form-note').textContent = (!recent.length ? 'No games in this selection.' : groupPlayers ? 'Most recently played first, each with their stats. Click a player for their ' + (groupSets ? 'sets' : 'games') + '; click a game to watch it.' : groupSets ? 'Newest set first. Click a set to see its games; click a game to watch it.' : 'Newest first. Click a game to watch it.') + (recent.length ? sortNote : '');
     const sentSum = recent.reduce((t, g) => t + (Number(g.sent) || 0), 0);
     const shownSets = groupSets ? (recentMore ? sets.length : Math.min(10, sets.length)) : 0;

@@ -1113,7 +1113,6 @@
         const info = tb.insertRow(); info.className = 'gs-setinfo gs-pinfo';
         const ic = info.insertCell(); ic.colSpan = 9;
         const wonT = avg(timed.filter((g) => g.res === 'W')), lostT = avg(timed.filter((g) => g.res === 'L')), longest = timed.slice().sort((a, b) => b.secs - a.secs)[0];
-        const first = gs[gs.length - 1];
         // short label-and-number pairs that wrap, easier to scan than a sentence
         const grid = ic.appendChild(document.createElement('div')); grid.className = 'gs-pstats';
         [['Beat Ranmaru', l + ' of ' + n + ' (' + fmtPct(l / n) + ')'],
@@ -1122,7 +1121,6 @@
           ['Best chain', bigChain ? '×' + bigChain : ''],
           ['Most combos', comboMost ? String(comboMost) : ''],
           ['Most garbage', rowed.length ? Math.round(mostRows) + ' rows' : ''],
-          ['First played', playedAt(first) || first.date],
           ['Also played as', p.names.length > 1 ? p.names.slice(1).join(', ') : ''],
         ].filter((x) => x[1]).forEach(([k, v]) => { const d = grid.appendChild(document.createElement('span')); d.appendChild(document.createElement('i')).textContent = k; d.appendChild(document.createElement('b')).textContent = v; });
         const kids = psets ? psets.map((s) => setRows(s, true, open)) : gs.map((g) => { const r = gameRow(g, 'gs-in', !open); return { show: (v) => { r.hidden = !v; } }; });

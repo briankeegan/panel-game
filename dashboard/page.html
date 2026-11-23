@@ -1105,23 +1105,10 @@
         const gbc = tr.insertCell(); gbc.className = 'n hide-s'; gbc.textContent = rowed.length ? String(Math.round(rowSum)) : land.length ? landSum + ' pcs' : '—'; gbc.title = rowed.length ? 'the garbage thrown at Ranmaru in the set stacks ' + Math.round(rowSum) + ' rows high, game by game' : '';
         const vc = tr.insertCell(); vc.className = 'hide-s'; vc.textContent = vs.length === 1 ? vLabel(vs[0]) : vs.length + ' versions'; vc.style.color = 'var(--color-fg-muted)';
         const cc = tr.insertCell(); cc.className = 'n'; cc.innerHTML = '<span class="gs-chev">▸</span> '; cc.append(n + (n === 1 ? ' game' : ' games'));
-        // opened: a line on the set, then its games as the plain list has them
-        const info = tb.insertRow(); info.className = 'gs-setinfo' + (inPlayer ? ' gs-in2' : ''); info.hidden = !(open && visible);
-        const ic = info.insertCell(); ic.colSpan = 9;
-        const wonT = avg(timed.filter((g) => g.res === 'W')), lostT = avg(timed.filter((g) => g.res === 'L')), longest = timed.slice().sort((a, b) => b.secs - a.secs)[0];
-        let streak = 0, best = 0; gs.slice().reverse().forEach((g) => { streak = g.res === 'W' ? streak + 1 : 0; best = Math.max(best, streak); });
-        // the set's stats as short label/number pairs, like a player's (the record and total time are on the row already)
-        const grid = ic.appendChild(document.createElement('div')); grid.className = 'gs-pstats';
-        [['Avg game', timed.length ? dur(avg(timed)) : ''],
-          ['Longest', longest ? dur(longest.secs) : ''],
-          ['Win streak', best > 1 ? String(best) : ''],
-          ['Garbage', rowed.length ? Math.round(rowSum) + ' rows' : land.length ? landSum + ' pcs' : ''],
-          ['Best chain', bigChain ? '×' + bigChain : ''],
-          ['Combos', rowed.length && comboSum ? String(comboSum) : ''],
-        ].filter((x) => x[1]).forEach(([k, v]) => { const d = grid.appendChild(document.createElement('span')); d.appendChild(document.createElement('i')).textContent = k; d.appendChild(document.createElement('b')).textContent = v; });
+        // opened: its games, as the plain list has them (stats are a player's only, not a set's)
         const rows = gs.map((g) => gameRow(g, inPlayer ? 'gs-in gs-in2' : 'gs-in', !(open && visible)));
         let shown = visible;
-        const show = (v) => { shown = v; const o = openSets.has(key); tr.hidden = !v; info.hidden = !(v && o); rows.forEach((r) => { r.hidden = !(v && o); }); };
+        const show = (v) => { shown = v; const o = openSets.has(key); tr.hidden = !v; rows.forEach((r) => { r.hidden = !(v && o); }); };
         const flip = () => { const o = !openSets.has(key); if (o) openSets.add(key); else openSets.delete(key); tr.classList.toggle('open', o); tr.setAttribute('aria-expanded', o ? 'true' : 'false'); show(shown); };
         tr.addEventListener('click', flip);
         tr.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flip(); } });

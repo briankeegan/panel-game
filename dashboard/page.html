@@ -125,6 +125,10 @@
 .gs-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .gs-fchip { font: inherit; font-size: 12px; padding: 6px 10px; border-radius: 999px; border: 1px solid var(--color-fg); background: transparent; color: var(--color-fg); cursor: pointer; }
 .gs-fchip:hover { background: var(--color-fg); color: var(--color-bg); }
+/* reset buttons beside the Filters pill and above Latest results, shown only while a filter is on */
+.gs-freset { font: inherit; font-size: 12px; font-weight: 600; margin-left: 10px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--color-fg); background: transparent; color: var(--color-fg); cursor: pointer; }
+.gs-freset:hover { background: var(--color-fg); color: var(--color-bg); }
+.gs-fon { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; } .gs-fon .gs-freset { margin-left: 0; }
 .gs-form { display: flex; flex-wrap: wrap; gap: 5px; min-height: 22px; }
 .gs-dot { width: 14px; height: 14px; padding: 0; border-radius: 50%; border: 0; background: color-mix(in srgb, var(--color-fg) 28%, transparent); cursor: default; }
 .gs-dot.w, .gs-dot.l { width: 16px; height: 16px; margin: -1px 0; cursor: pointer; }
@@ -571,7 +575,7 @@
     <p class="gs-take gs-dep" id="gs-dep" data-source="versions" hidden></p>
   </header>
 
-  <details class="gs-filters" id="gs-filters"><summary id="gs-fsum">Filters</summary>
+  <details class="gs-filters" id="gs-filters"><summary><span id="gs-fsum">Filters</span><button type="button" class="gs-freset" id="fs-reset" hidden>Reset filters</button></summary>
   <section class="gs-bar" aria-label="Filters">
     <div class="gf-row">
       <label class="gs-f"><span>Version</span><select id="f-ver" class="dash-select"></select></label>
@@ -605,6 +609,7 @@
   <details class="gs-card gs-collapse" id="sec-form" open>
     <summary><h2>Latest results</h2><span class="gs-count" id="form-sum"></span></summary>
     <label class="gs-check"><input type="checkbox" id="form-sets" checked> Group by set</label>
+    <p class="gs-note gs-fon" id="form-filters" hidden><span id="form-filters-t"></span><button type="button" class="gs-freset" id="form-reset">Reset filters</button></p>
     <p class="gs-note" id="form-note"></p>
     <div id="form" data-source="games"></div>
   </details>
@@ -837,6 +842,9 @@
   const has = (q, ...f) => !q || f.join(' ').toLowerCase().includes(q);
   $('f-min').addEventListener('click', (e) => { const b = e.target.closest('button[data-min]'); if (b) dash.setParams({ minn: Number(b.dataset.min) }); });
   $('f-reset').addEventListener('click', () => resetAll());
+  // the reset in the Filters pill must not open or close the panel
+  $('fs-reset').addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); resetAll(); });
+  $('form-reset').addEventListener('click', () => resetAll());
   const toggle = (name, val) => dash.setParams({ [name]: (dash.params()[name] || '') === val ? '' : val });
 
   function render() {
@@ -873,6 +881,9 @@
       b.setAttribute('aria-label', 'Remove filter: ' + label); b.addEventListener('click', clear); chips.appendChild(b);
     });
     $('f-chips-wrap').hidden = !chips.children.length;
+    // (the Versions table's "versions shown" is not a game filter: it changes no result, so it shows no reset here)
+    $('fs-reset').hidden = !active.length; $('form-filters').hidden = !active.length;
+    $('form-filters-t').textContent = 'Filtered: ' + active.map((x) => x[0]).join(' · ');
     document.querySelectorAll('#m-opp button').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.m) === oppMin)));
     document.querySelectorAll('#k-loss button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.k === lossKind)));
 

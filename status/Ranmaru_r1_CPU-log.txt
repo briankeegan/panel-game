@@ -1,12 +1,4 @@
-run 45099910052, as of 2026-11-23T04:41:20Z
-match over — bot won (pace: worst 0.28 frames off schedule); waiting for a rematch
-memory after match: rss 2839820 kB, threads 7, lua 42429 kB
-game about to start: both players are ready
-set over: the room is closed, back in the lobby
-game about to start: both players are ready
-match start: building the match (seed nil, stage nil, opponent ?)
-match start: the match is built
-match start: the match is started
+run 45099910052, as of 2026-11-23T04:43:24Z
 match start: gambit: creating the link
 match start: gambit: the link is created
 match start: gambit: the link is starting the match
@@ -149,3 +141,11 @@ garbage landed: our stopWatch 1580 clock 1768, transits in flight before this fr
 garbage landed: our stopWatch 1846 clock 2034, transits in flight before this frame {}, opponent copy -1 frames behind, rollbacks so far 0
 garbage landed: our stopWatch 2156 clock 2344, transits in flight before this frame {}, opponent copy 0 frames behind, rollbacks so far 0
 garbage landed: our stopWatch 2163 clock 2351, transits in flight before this frame {}, opponent copy 0 frames behind, rollbacks so far 0
+REPLAY {"settings":{"stacks":[{"inputMethod":"controller","levelData":{"frameConstants":{"POP":7,"HOVER":6,"GARBAGE_HOVER":4,"FLASH":28,"FACE":10},"speedIncreaseMode":1,"shockFrequency":41,"shockCap":3,"colors":6,"maxHealth":1,"adjacentDenialFrequency":1,"startingSpeed":32,"stop":{"dangerConstant":8
+engine rolled our stack back 0 times for late garbage this match
+match against: Mastershadow
+match against id: 1086
+match over — bot won (pace: worst 0.23 frames off schedule); waiting for a rematch
+memory after match: rss 2440736 kB, threads 7, lua 56049 kB
+game about to start: both players are ready
+set over: the room is closed, back in the lobby

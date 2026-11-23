@@ -822,7 +822,7 @@
   let oppMin = 0, lossKind = '', recentMore = false;
   // LATEST RESULTS BY SET (the checkbox, on by default; remembered in this browser): off, the table is the plain list of games
   let groupSets = true; const openSets = new Set();
-  // LEADERBOARD PERIOD: this week (Monday 00:00 UTC on), last week, or all time
+  // LEADERBOARD PERIOD: this week (from Monday 00:00 US Eastern, daylight saving included), last week, or all time
   let lbPeriod = 'week', lbAll = false;   // lbAll: the WHOLE leaderboard expanded (every card's top 3 and details), not one card at a time
   const lbSync = () => { document.querySelectorAll('#sec-podium .lb-card').forEach((c) => { c.open = lbAll; }); $('lb').classList.toggle('compact', !lbAll); const b = $('lb-more'); b.textContent = lbAll ? 'Show winners only ▴' : 'Show top 3 & details ▾'; b.setAttribute('aria-expanded', lbAll ? 'true' : 'false'); };
   $('lb-more').addEventListener('click', () => { lbAll = !lbAll; lbSync(); });
@@ -1073,11 +1073,16 @@
       const byOpp = d3.group(lvGames, (g) => g.pid || idOfName.get(g.opp) || g.opp);
       // THE LEADERBOARD: categories for the period, top 5 each. Every entry says how many games it stands on; all time also says how many
       // versions of Ranmaru came out after the player's last game (a win 12 versions ago was against a weaker bot).
-      const weekStart = (t) => { const d = new Date(t); const day = (d.getUTCDay() + 6) % 7; return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - day); };
-      const nowWk = weekStart(Date.now()), tOf = (g) => g.at ? new Date(g.at).getTime() : new Date(g.date + 'T12:00:00Z').getTime();
-      const inPeriod = (g) => lbPeriod === 'all' ? true : lbPeriod === 'week' ? tOf(g) >= nowWk : tOf(g) >= nowWk - 7 * 864e5 && tOf(g) < nowWk;
-      const fmtDay = (t) => d3.utcFormat('%b %-d')(new Date(t));
-      $('lb-note').textContent = 'Level 10 v 10 only · ' + (lbPeriod === 'week' ? 'this week, from Monday ' + fmtDay(nowWk) + ' (UTC)' : lbPeriod === 'last' ? 'last week, ' + fmtDay(nowWk - 7 * 864e5) + ' to ' + fmtDay(nowWk - 864e5) + ' (UTC)' : 'all time, with the versions of Ranmaru released since each player last played');
+      // weeks run Monday 00:00 to Monday 00:00 in US Eastern time (New York), so the board turns over at midnight Sunday night there
+      const ET = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', hourCycle: 'h23', weekday: 'short' });
+      const etParts = (t) => { const o = {}; ET.formatToParts(new Date(t)).forEach((x) => { o[x.type] = x.value; }); return o; };
+      // the instant of midnight Eastern on a calendar day: 05:00 UTC in standard time, 04:00 UTC in daylight time
+      const etMidnight = (y, m, d) => { const t = Date.UTC(y, m - 1, d, 5); return +etParts(t).hour === 1 ? t - 36e5 : t; };
+      const weekStart = (t) => { const o = etParts(t), back = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].indexOf(o.weekday); const c = new Date(Date.UTC(+o.year, +o.month - 1, +o.day - back)); return etMidnight(c.getUTCFullYear(), c.getUTCMonth() + 1, c.getUTCDate()); };
+      const nowWk = weekStart(Date.now()), lastWk = weekStart(nowWk - 864e5), tOf = (g) => g.at ? new Date(g.at).getTime() : new Date(g.date + 'T12:00:00Z').getTime();
+      const inPeriod = (g) => lbPeriod === 'all' ? true : lbPeriod === 'week' ? tOf(g) >= nowWk : tOf(g) >= lastWk && tOf(g) < nowWk;
+      const fmtDay = (t) => new Date(t).toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric' });
+      $('lb-note').textContent = 'Level 10 v 10 only · ' + (lbPeriod === 'week' ? 'this week, from Monday ' + fmtDay(nowWk) + ' (midnight Eastern)' : lbPeriod === 'last' ? 'last week, ' + fmtDay(lastWk) + ' to ' + fmtDay(nowWk - 864e5) + ' (Eastern)' : 'all time, with the versions of Ranmaru released since each player last played');
       Array.from($('lb-tabs').children).forEach((b) => b.setAttribute('aria-selected', b.dataset.p === lbPeriod ? 'true' : 'false'));
       const newestOrder = vers.length ? d3.max(vers, (v) => v.order) : 0;
       const gamesTxt = (k) => k + (k === 1 ? ' game played' : ' games played');

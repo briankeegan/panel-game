@@ -765,10 +765,11 @@
   // RESULTS: W (Ranmaru won), L (lost), D (a draw) or U (the game was cut short: the room closed before it ended). D and U count as
   // games played, neither a win nor a loss.
   const resClass = (r) => r === 'W' ? 'w' : r === 'L' ? 'l' : 'd';
-  const resText = (r) => r === 'W' ? 'Won' : r === 'L' ? 'Lost' : r === 'D' ? 'Draw' : 'Unfinished';
+  const resText = (r) => r === 'W' ? 'Won' : r === 'L' ? 'Lost' : r === 'D' ? 'Draw' : r === 'TW' ? 'TA won' : r === 'TL' ? 'TA lost' : 'Unfinished';
   // a record: won–lost, and –drawn when there were draws or cut-short games (3–0–1); all draws is grey
-  const recTxt3 = (gs) => { const w = gs.filter((g) => g.res === 'W').length, l = gs.filter((g) => g.res === 'L').length, d = gs.length - w - l; return w + '–' + l + (d ? '–' + d : ''); };
-  const stat = (gs) => {
+  const recTxt3 = (gs) => { const w = gs.filter((g) => g.res === 'W').length, l = gs.filter((g) => g.res === 'L').length, d = gs.filter((g) => g.res === 'D' || g.res === 'U').length; return w + '–' + l + (d ? '–' + d : ''); };
+  const stat = (gs0) => {
+    const gs = gs0.filter((g) => g.res !== 'TW' && g.res !== 'TL');   // (time attack is no match: left out of every count here)
     const wins = gs.filter((g) => g.res === 'W'), loss = gs.filter((g) => g.res === 'L');
     const ws = wins.map((g) => g.secs).filter((x) => x != null), ls = loss.map((g) => g.secs).filter((x) => x != null);
     const all = gs.map((g) => g.secs).filter((x) => x != null);
@@ -890,7 +891,11 @@
 
     const P = dash.params();
     const ver = P.ver || '', opp = P.opp || '', minn = Number(P.minn ?? 10);
-    const games = gd.data.map((g, i) => Object.assign({ idx: i }, g));
+    // TIME ATTACK is not a match against Ranmaru (no garbage passes between the boards): its result is kept as TW / TL ("TA won" /
+    // "TA lost"), so it never counts as a win or a loss, in a record, a win rate or the leaderboard. A game the data still calls
+    // Versus is a time attack when it ran the 2-minute clock (118-126 s) and nothing at all was thrown at Ranmaru.
+    const isTA = (g) => g.mode === 'Time attack' || (g.secs >= 118 && g.secs <= 126 && g.gr === 0 && !g.gk && !g.gch);
+    const games = gd.data.map((g, i) => { const o = Object.assign({ idx: i }, g); if (isTA(o)) { o.mode = 'Time attack'; if (o.res === 'W' || o.res === 'L') o.res = 'T' + o.res; } return o; });
     const vers = vd.data.map((v, i) => Object.assign({ order: i }, v));
     const vBy = new Map(vers.map((v) => [v.sha, v]));
     const vLabel = (sha) => (vBy.get(sha) || {}).label || sha; VLBL = vLabel; VSTART = (sha) => (vBy.get(sha) || {}).start || '';
@@ -1202,7 +1207,7 @@
       // the name shown is the one this account used most.
       // a name that has an id in any game takes that id, so its older games (no id) join the same player
       // only games where both players were level 10 (lv = [bot level, opponent level], from the replay)
-      const lvGames = games.filter((g) => Array.isArray(g.lv) && g.lv[0] === 10 && g.lv[1] === 10);
+      const lvGames = games.filter((g) => Array.isArray(g.lv) && g.lv[0] === 10 && g.lv[1] === 10 && g.mode !== 'Time attack');
       const idOfName = new Map(); d3.rollup(lvGames.filter((g) => g.pid), (v) => d3.rollup(v, (x) => x.length, (x) => x.pid), (g) => g.opp)
         .forEach((ids, name) => { const best = Array.from(ids).sort((a, b) => b[1] - a[1])[0]; idOfName.set(name, best[0]); });
       const byOpp = d3.group(lvGames, (g) => g.pid || idOfName.get(g.opp) || g.opp);

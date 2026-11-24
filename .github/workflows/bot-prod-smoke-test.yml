@@ -445,6 +445,9 @@ jobs:
           # Gambit with a target fights ONLY that player: it answers no one else's challenge
           only=""; [ "$kind" = gambit ] && only="$target"
           decline=""; if [ "$kind" = wasm ]; then case "${prof:-}" in *.wasm.json) ;; *) decline=TWO_PLAYER_TIME_ATTACK ;; esac; fi
+          # TIME ATTACK IS OFF FOR NOW (Nov 24): no bot takes a time-attack challenge; the challenge is left unanswered. It counts for
+          # nothing on the stats page anyway. Will enable again when we start working on time attack -- delete these two lines.
+          decline=TWO_PLAYER_TIME_ATTACK
           cd "$BOT_DIR"
           echo "setup: bot directory ready"
           # The server hands a new name its account id at the first login. Save it to the bot branch the

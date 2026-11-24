@@ -228,7 +228,13 @@ for gi, g in enumerate(games):
             # garbage sent: the blocks each decision throws. No garbage and a 2-minute game is a time attack; garbage sent is a versus game
             sent = sum(int(d_[9]) for d_ in dec if len(d_) > 9 and str(d_[9]).lstrip("-").isdigit())
             row["sent"] = sent
-            if not row.get("mode"): row["mode"] = "Time attack" if (sent == 0 and row.get("secs") and 115 <= row["secs"] <= 125) else ("Versus" if sent > 0 else None)
+            # THE MODE, from the game's own settings when it has them: in time attack no garbage passes between the boards (no garbage
+            # flows), in versus each side's garbage goes to the other. Only without them is it guessed (a 2-minute game that sent nothing).
+            st_ = (x.get("settings") or {}) if isinstance(x, dict) else {}
+            gf, mec = st_.get("garbageFlows"), ((st_.get("rules") or {}).get("matchEndConditions") or {})
+            if "TIME_LIMIT" in mec: row["mode"] = "Time attack"      # (upstream's time attack: the game ends on a 2-minute clock)
+            elif isinstance(gf, list): row["mode"] = "Versus" if any(f_.get("recipients") for f_ in gf if isinstance(f_, dict)) else "Time attack"
+            elif not row.get("mode"): row["mode"] = "Time attack" if (sent == 0 and row.get("secs") and 115 <= row["secs"] <= 125) else ("Versus" if sent > 0 else None)
     rows.append(row); added += 1
 
 if a.partial and not added:

@@ -1,5 +1,41 @@
-run 45474617328, as of 2026-11-24T20:00:33Z
+run 45474617328, as of 2026-11-24T20:02:38Z
 
 === Bot 'Ranmaru_r25_CPU' (gambit, L10, cursor 4/12, unranked) is idle in the lobby on panelattack.com:49569 ===
     Open your client, CHALLENGE 'Ranmaru_r25_CPU' in the lobby, and play — it auto-accepts.
     Ctrl+C to stop.
+
+game about to start: both players are ready
+match start: building the match (seed nil, stage nil, opponent ?)
+match start: the match is built
+match start: the match is started
+match start: gambit: creating the link
+match start: gambit: the link is created
+match start: gambit: the link is starting the match
+match start: gambit: the link has started the match
+both ready — match starting
+garbage landed: our stopWatch 651 clock 839, transits in flight before this frame {651}, opponent copy 1 frames behind, rollbacks so far 0
+opponent topped out: clock 1140 stopWatch 952 stop 62 pre-stop 60 shake 75 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 1170 stopWatch 982 stop 62 pre-stop 30 shake 45 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+garbage landed: our stopWatch 993 clock 1181, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+opponent topped out: clock 1200 stopWatch 1012 stop 62 pre-stop 0 shake 15 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 1230 stopWatch 1042 stop 94 pre-stop 37 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 1260 stopWatch 1072 stop 94 pre-stop 7 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 1290 stopWatch 1102 stop 98 pre-stop 53 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 1320 stopWatch 1132 stop 98 pre-stop 23 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 1350 stopWatch 1162 stop 91 pre-stop 0 shake 61 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 1380 stopWatch 1192 stop 85 pre-stop 245 shake 31 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 1410 stopWatch 1222 stop 85 pre-stop 215 shake 1 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 1440 stopWatch 1252 stop 85 pre-stop 185 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 1470 stopWatch 1282 stop 85 pre-stop 155 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 1500 stopWatch 1312 stop 85 pre-stop 125 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 1530 stopWatch 1342 stop 85 pre-stop 95 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 1560 stopWatch 1372 stop 85 pre-stop 65 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 1590 stopWatch 1402 stop 85 pre-stop 35 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 1620 stopWatch 1432 stop 85 pre-stop 5 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+garbage landed: our stopWatch 1520 clock 1708, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 2472 clock 2660, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 2476 clock 2664, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 2895 clock 3083, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 3107 clock 3295, transits in flight before this frame {3161}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 3243 clock 3431, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 3247 clock 3435, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0

@@ -1,10 +1,4 @@
-run 45395701712, as of 2026-11-24T14:04:50Z
-opponent topped out: clock 12210 stopWatch 12022 stop 34 pre-stop 69 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 12240 stopWatch 12052 stop 34 pre-stop 39 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 12270 stopWatch 12082 stop 34 pre-stop 9 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 12300 stopWatch 12112 stop 60 pre-stop 44 shake 53 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 12330 stopWatch 12142 stop 60 pre-stop 14 shake 23 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 12360 stopWatch 12172 stop 59 pre-stop 86 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+run 45395701712, as of 2026-11-24T14:06:55Z
 opponent topped out: clock 12390 stopWatch 12202 stop 59 pre-stop 56 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
 opponent topped out: clock 12420 stopWatch 12232 stop 59 pre-stop 26 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
 garbage landed: our stopWatch 12262 clock 12450, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
@@ -149,3 +143,9 @@ match against id: 10757
 match over — bot won (pace: worst 0.32 frames off schedule); waiting for a rematch
 memory after match: rss 1924772 kB, threads 8, lua 58059 kB
 game about to start: both players are ready
+game about to start: both players are ready
+game about to start: both players are ready
+game about to start: both players are ready
+game about to start: both players are ready
+nobody started a game in 60 s: leaving the room, back to the lobby
+set over: the room is closed, back in the lobby

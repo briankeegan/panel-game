@@ -1,4 +1,4 @@
-run 45490309623, as of 2026-11-24T21:40:03Z
+run 45490309623, as of 2026-11-24T21:42:08Z
 
 === Bot 'Ranmaru_r27_CPU' (gambit, L10, cursor 4/12, unranked) is idle in the lobby on panelattack.com:49569 ===
     Open your client, CHALLENGE 'Ranmaru_r27_CPU' in the lobby, and play — it auto-accepts.
@@ -70,3 +70,26 @@ opponent topped out: clock 1920 stopWatch 1732 stop 7 pre-stop 7 shake 0 health 
 garbage landed: our stopWatch 2154 clock 2342, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
 garbage landed: our stopWatch 2161 clock 2349, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
 garbage landed: our stopWatch 2782 clock 2970, transits in flight before this frame {2782}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 4115 clock 4303, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 5597 clock 5785, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 6480 clock 6668, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 6485 clock 6673, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 6491 clock 6679, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 7005 clock 7193, transits in flight before this frame {7014}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 7304 clock 7492, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 7660 clock 7848, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 7663 clock 7851, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+opponent topped out: clock 7920 stopWatch 7732 stop 34 pre-stop 67 shake 59 health 1, top rows r12=gggggg r11=gggggg r10=0ggggg
+opponent topped out: clock 7950 stopWatch 7762 stop 34 pre-stop 37 shake 29 health 1, top rows r12=gggggg r11=gggggg r10=0ggggg
+opponent topped out: clock 7980 stopWatch 7792 stop 34 pre-stop 7 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=0ggggg
+garbage landed: our stopWatch 8092 clock 8280, transits in flight before this frame {8092}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 8831 clock 9019, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+opponent topped out: clock 9120 stopWatch 8932 stop 11 pre-stop 0 shake 19 health 1, top rows r12=0gggg0 r11=gggggg r10=gggggg
+REPLAY {"inputs":[["A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","A","
+engine rolled our stack back 0 times for late garbage this match
+match against: LAZGamer
+match against id: 8290
+match over — bot won (pace: worst 0.18 frames off schedule); waiting for a rematch
+memory after match: rss 1747200 kB, threads 8, lua 50293 kB
+game about to start: both players are ready
+set over: the room is closed, back in the lobby

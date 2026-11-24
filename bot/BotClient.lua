@@ -246,6 +246,12 @@ function BotClient:dispatch(msg)
     logger.info("bot[" .. self.name .. "]: gameResult received")
   elseif msg.gameAbort then
     self.oppInputs = {}
+    if self.match and not self.matchEnded then
+      -- said out loud (print reaches the run's log): who ended it and how far the game had got, so a cut-off game is explained
+      print(string.format("the server aborted the game mid-game (%s) at our clock %s, the opponent's %s",
+        tostring(msg.gameAbort and msg.gameAbort.reason or msg.reason), tostring(self.myStack and self.myStack.clock), tostring(self.oppStack and self.oppStack.clock)))
+      self.outcome = self.outcome or "unfinished"
+    end
     self.matchEnded = true
     self.outcome = self.outcome or "aborted"
   elseif msg.challengeUpdate then
@@ -276,13 +282,19 @@ function BotClient:dispatch(msg)
     local ms = msg.menu_state     -- another player's settings changed (their level, character, ready ...)
     if type(ms) == "table" and ms.playerNumber and ms.playerNumber ~= self.localPlayerNumber and ms.level then self:noteOpponentLevel(ms.level) end
   elseif msg.leave_room then
+    if self.match and not self.matchEnded then
+      print(string.format("the server closed the room mid-game (%s) at our clock %s, the opponent's %s",
+        tostring(msg.reason), tostring(self.myStack and self.myStack.clock), tostring(self.oppStack and self.oppStack.clock)))
+    end
     self:endSet()
     self.inRoom = false
+    -- who was in the room stays known for the game it cut short (the "match against" line is written after this)
+    self.lastPlayers = self.players or self.lastPlayers
     self.players = nil
     self.roomNumber = nil
     if self.match and not self.matchEnded then
       self.matchEnded = true
-      self.outcome = self.outcome or "aborted"
+      self.outcome = self.outcome or "unfinished"
     end
     logger.info("bot[" .. self.name .. "]: left room (" .. tostring(msg.reason) .. ")")
   end

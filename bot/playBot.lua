@@ -217,13 +217,21 @@ while true do
   if bot.match and bot.matchEnded then
     -- who it played: the other players' names in the room (the lobby ids are all the rest of the log has)
     local others = {}
-    for _, p in pairs(bot.players or {}) do if p.name ~= name then others[#others + 1] = tostring(p.name) end end
+    -- (a room the server closed mid-game is gone by now: its players are the ones it had)
+    local inRoom = bot.players or bot.lastPlayers or {}
+    for _, p in pairs(inRoom) do if p.name ~= name then others[#others + 1] = tostring(p.name) end end
     table.sort(others)
     print("match against: " .. (#others > 0 and table.concat(others, ", ") or "?"))
     -- and their account ids (the server's publicId: public, the same for an account whatever name it goes by), so the stats count
     -- one player per account when someone changes their name
     local ids = {}
-    for _, p in pairs(bot.players or {}) do if p.name ~= name and p.publicId then ids[#ids + 1] = tostring(p.publicId) end end
+    for _, p in pairs(inRoom) do if p.name ~= name and p.publicId then ids[#ids + 1] = tostring(p.publicId) end end
+    -- a game cut short (no winner from the engine) still leaves its replay so far: the stats keep it, and it can be watched
+    if bot.outcome ~= "won" and bot.outcome ~= "lost" and bot.outcome ~= "draw" and bot.match and bot.match.stacks and bot.match.stacks[1] then
+      local ok, enc = pcall(require("common.lib.dkjson").encode, { settings = bot.matchStart and bot.matchStart.replay, mine = bot.localPlayerNumber, partial = true,
+        inputs = { bot.match.stacks[1].confirmedInput, bot.match.stacks[2] and bot.match.stacks[2].confirmedInput } })
+      if ok then print("REPLAY " .. enc) end
+    end
     table.sort(ids)
     if #ids > 0 then print("match against id: " .. table.concat(ids, ", ")) end
     print(string.format("match over — bot %s (pace: worst %.2f frames off schedule); waiting for a rematch",

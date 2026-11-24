@@ -104,15 +104,19 @@ for line in open(log, errors="ignore"):
         cur, rep, notes, pid = [], None, [], None
 for i_, g_ in enumerate(games): g_["raw"] = i_      # its place among all the games of the run: the decision log has one block per game, in the same order
 n_raw = len(games)
-# a cut-short game is kept when it has a replay and an opponent (the bots since this was added write both); older ones had neither
-games = [g for g in games if g["r"] in ("W", "L", "D") or (g["r"] == "U" and g["rep"] and g["opp"] not in ("", "?"))]
-times = []
+# the time of each game: the job log has the same "match over" lines in the same order, each with a time; they are read for EVERY game
+# (kept or not) and then filtered with the games, so a draw or a dropped game cannot shift the times of the ones after it.
+# A cut-short game is kept when it has a replay and an opponent (the bots since this was added write both); older ones had neither.
+times_all = []
 if a.job_log and os.path.exists(a.job_log):
     for line in open(a.job_log, errors="ignore"):
         if "match over —" in line:
             m = re.match(r"(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d)", line)
-            if ("bot won" in line or "bot lost" in line): times.append(m.group(1) + "Z" if m else None)
-if len(times) != len(games): times = [None] * len(games)
+            times_all.append(m.group(1) + "Z" if m else None)
+keep = [g["r"] in ("W", "L", "D") or (g["r"] == "U" and g["rep"] and g["opp"] not in ("", "?")) for g in games]
+times = [t for t, k in zip(times_all, keep) if k] if len(times_all) == len(games) else None
+games = [g for g, k in zip(games, keep) if k]
+if times is None: times = [None] * len(games)
 old_at = (prior or {}).get("at", []) or (redo_at or [])
 times = [t or (old_at[i] if i < len(old_at) else None) or (a.now or None) for i, t in enumerate(times)]
 

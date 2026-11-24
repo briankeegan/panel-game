@@ -246,7 +246,7 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
 .gw-row .t, .gw-row .n, .gw-row .v { font-variant-numeric: tabular-nums; color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); }
 .gw-row .o { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gw-res { font-size: 12px; font-weight: 700; border-radius: 999px; padding: 3px 9px; text-align: center; color: #fff; }
-.gw-res.w { background: #2f9e57; } .gw-res.l { background: #d9433f; } .gw-res.o { background: #e0821f; }
+.gw-res.w { background: #2f9e57; } .gw-res.l { background: #d9433f; } .gw-res.o { background: #e0821f; } .gw-res.d { background: #7a8290; }
 .gw-subrow { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; } .gw-subrow .gw-subinfo { color: var(--color-fg-muted); }
 .gw-pager { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 @media (max-width: 560px) { .gw-row { grid-template-columns: 4rem 3rem 1fr auto; } .gw-row .v { display: none; } .gw-ff > span { flex-basis: 100%; } }
@@ -795,6 +795,12 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
     const c = (p + z * z / (2 * n)) / d, h = z * Math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / d;
     return [Math.max(0, c - h), Math.min(1, c + h)];
   };
+  // RESULTS: W (Ranmaru won), L (lost), D (a draw) or U (the game was cut short: the room closed before it ended). D and U count as
+  // games played, neither a win nor a loss.
+  const resClass = (r) => r === 'W' ? 'w' : r === 'L' ? 'l' : 'd';
+  const resText = (r) => r === 'W' ? 'Won' : r === 'L' ? 'Lost' : r === 'D' ? 'Draw' : 'Unfinished';
+  // a record: won–lost, and –drawn when there were draws or cut-short games (3–0–1); all draws is grey
+  const recTxt3 = (gs) => { const w = gs.filter((g) => g.res === 'W').length, l = gs.filter((g) => g.res === 'L').length, d = gs.length - w - l; return w + '–' + l + (d ? '–' + d : ''); };
   const stat = (gs) => {
     const wins = gs.filter((g) => g.res === 'W'), loss = gs.filter((g) => g.res === 'L');
     const ws = wins.map((g) => g.secs).filter((x) => x != null), ls = loss.map((g) => g.secs).filter((x) => x != null);
@@ -1029,7 +1035,7 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
     $('k-al').textContent = dur(S.avgL); $('k-al-n').textContent = S.medL != null ? 'median ' + dur(S.medL) : (S.n ? 'no losses' : '');
     const longest = fg.filter((g) => g.secs != null).sort((a, b) => b.secs - a.secs)[0];
     $('k-lg').textContent = longest ? dur(longest.secs) : '—';
-    $('k-lg-n').textContent = longest ? (longest.res === 'W' ? 'won' : 'lost') + ' vs ' + longest.opp : '';
+    $('k-lg-n').textContent = longest ? (longest.res === 'W' ? 'won' : longest.res === 'L' ? 'lost' : longest.res === 'D' ? 'drew' : 'cut short') + ' vs ' + longest.opp : '';
 
     // latest results: the newest games of the selection as a table; a row with a replay opens it
     const recentAll = fg.slice().sort((a, b) => b.idx - a.idx);
@@ -1070,7 +1076,7 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
       // RESULT sorts by counts: first click the most Ranmaru wins first, flipped the most Ranmaru LOSSES first (not the lowest win share,
       // which put one-game losses on top); ties go newest first
       if (key === 'res') {
-        const wl = new Map(arr.map((x) => { const gs = gsOf(x), w = gs.filter((g) => g.res === 'W').length; return [x, [w, gs.length - w]]; }));
+        const wl = new Map(arr.map((x) => { const gs = gsOf(x); return [x, [gs.filter((g) => g.res === 'W').length, gs.filter((g) => g.res === 'L').length]]; }));
         return arr.slice().sort((a, b) => { const [wa, la] = wl.get(a), [wb, lb] = wl.get(b);
           return (dir === 'asc' ? (lb - la) || (wa - wb) : (wb - wa) || (la - lb)) || sortVal(gsOf(b), 'when') - sortVal(gsOf(a), 'when'); });
       }
@@ -1106,7 +1112,7 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
       const gameRow = (g, cls, hidden) => {
         const tr = tb.insertRow(), t = playedMs(g); if (cls) tr.className = cls; if (hidden) tr.hidden = true;
         whenCell(tr, t, g);
-        const rc = tr.insertCell(), pill = document.createElement('span'); pill.className = 'gw-res ' + (g.res === 'W' ? 'w' : 'l'); pill.textContent = g.res === 'W' ? 'Won' : 'Lost'; rc.appendChild(pill);
+        const rc = tr.insertCell(), pill = document.createElement('span'); pill.className = 'gw-res ' + resClass(g.res); pill.textContent = resText(g.res); rc.appendChild(pill);
         const oc = tr.insertCell(); oc.textContent = g.opp; oc.style.fontWeight = '500';
         const evc = tr.insertCell(); evc.textContent = Array.isArray(g.lv) ? g.lv[0] + ' v ' + g.lv[1] : '—'; evc.title = 'Ranmaru v opponent';
         const mdc = tr.insertCell(); mdc.textContent = modeLabel(g.mode);
@@ -1120,7 +1126,7 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
       };
       // a set's rows: its own row (a click opens it), a line on the set, then its games. show(v) hides or shows the lot (a closed player).
       const setRows = (set, inPlayer, visible) => {
-        const gs = set.games, newest = gs[0], oldest = gs[gs.length - 1], n = gs.length, w = gs.filter((g) => g.res === 'W').length, l = n - w;
+        const gs = set.games, newest = gs[0], oldest = gs[gs.length - 1], n = gs.length, w = gs.filter((g) => g.res === 'W').length, l = gs.filter((g) => g.res === 'L').length;
         const key = newest.bot + '|' + newest.opp + '|' + (oldest.at || oldest.date) + '|' + oldest.idx, open = openSets.has(key);
         const timed = gs.filter((g) => g.secs != null), avg = (a) => a.length ? a.reduce((t, g) => t + g.secs, 0) / a.length : null;
         const sent = gs.reduce((t, g) => t + (Number(g.sent) || 0), 0), land = gs.filter((g) => g.land != null), landSum = land.reduce((t, g) => t + g.land, 0);
@@ -1129,7 +1135,7 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
         // the set's own row: who, the record, when it ran; a click opens its games
         const tr = tb.insertRow(); tr.className = 'gs-set' + (open ? ' open' : '') + (inPlayer ? ' gs-in' : ''); tr.setAttribute('aria-expanded', open ? 'true' : 'false'); tr.tabIndex = 0; tr.hidden = !visible;
         whenCell(tr, playedMs(oldest), oldest, newest.at ? new Date(newest.at).getTime() : null);
-        const rc = tr.insertCell(), pill = document.createElement('span'); pill.className = 'gw-res ' + (l === 0 ? 'w' : l > w ? 'l' : 'o'); pill.innerHTML = '<span class="gs-rec">' + w + '–' + l + '</span>'; pill.title = w + ' won, ' + l + ' lost' + (l === 0 ? ': a sweep' : l > w ? ': lost the set' : ': won the set, dropped games'); rc.appendChild(pill);
+        const rc = tr.insertCell(), pill = document.createElement('span'); pill.className = 'gw-res ' + (w + l === 0 ? 'd' : l === 0 ? 'w' : l > w ? 'l' : 'o'); pill.innerHTML = '<span class="gs-rec">' + recTxt3(gs) + '</span>'; pill.title = w + ' won, ' + l + ' lost' + (l === 0 ? ': a sweep' : l > w ? ': lost the set' : ': won the set, dropped games'); rc.appendChild(pill);
         // (the set pill: green a sweep; orange won or tied but dropped games; red lost the set. Not blue or purple: those are the charts' version colours)
         const oc = tr.insertCell(); oc.textContent = newest.opp;
         const evc = tr.insertCell(); evc.textContent = lvs.length === 1 ? lvs[0] : 'mixed';
@@ -1149,7 +1155,7 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
       };
       // a player's rows: their row (record, time played, last played), a line of their stats, then their sets or games
       const playerRow = (p) => {
-        const gs = p.games, n = gs.length, w = gs.filter((g) => g.res === 'W').length, l = n - w, open = openPlayers.has(p.key);
+        const gs = p.games, n = gs.length, w = gs.filter((g) => g.res === 'W').length, l = gs.filter((g) => g.res === 'L').length, open = openPlayers.has(p.key);
         const timed = gs.filter((g) => g.secs != null), avg = (a) => a.length ? a.reduce((t, g) => t + g.secs, 0) / a.length : null;
         const rowed = gs.filter((g) => g.gr != null), bigChain = d3.max(gs, (g) => g.gch || 0), mostRows = d3.max(rowed, (g) => g.gr), comboMost = d3.max(gs, (g) => g.gk || 0);
         const lvs = [...new Set(gs.map((g) => Array.isArray(g.lv) ? g.lv[0] + ' v ' + g.lv[1] : '—'))], modes = [...new Set(gs.map((g) => modeLabel(g.mode)))], vs = [...new Set(gs.map((g) => g.sha))];
@@ -1157,7 +1163,7 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
         const tr = tb.insertRow(); tr.className = 'gs-set gs-player' + (open ? ' open' : ''); tr.setAttribute('aria-expanded', open ? 'true' : 'false'); tr.tabIndex = 0;
         whenCell(tr, playedMs(gs[0]), gs[0]); tr.cells[0].title = 'Last played';
         // the record, Ranmaru's: green won every game, orange won most but dropped some, red lost more than it won
-        const rc = tr.insertCell(), pill = document.createElement('span'); pill.className = 'gw-res ' + (l === 0 ? 'w' : l > w ? 'l' : 'o'); pill.innerHTML = '<span class="gs-rec">' + w + '–' + l + '</span>'; pill.title = 'Ranmaru won ' + w + ', lost ' + l; rc.appendChild(pill);
+        const rc = tr.insertCell(), pill = document.createElement('span'); pill.className = 'gw-res ' + (w + l === 0 ? 'd' : l === 0 ? 'w' : l > w ? 'l' : 'o'); pill.innerHTML = '<span class="gs-rec">' + recTxt3(gs) + '</span>'; pill.title = 'Ranmaru won ' + w + ', lost ' + l; rc.appendChild(pill);
         const oc = tr.insertCell(); oc.textContent = p.name; if (p.names.length > 1) oc.title = 'Also played as ' + p.names.slice(1).join(', ');
         const evc = tr.insertCell(); evc.textContent = lvs.length === 1 ? lvs[0] : 'mixed';
         const mdc = tr.insertCell(); mdc.textContent = modes.length === 1 ? modes[0] : 'mixed';
@@ -1199,7 +1205,7 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
     const sentSum = recent.reduce((t, g) => t + (Number(g.sent) || 0), 0);
     const shownSets = groupSets ? (recentMore ? sets.length : Math.min(10, sets.length)) : 0;
     const shownPlayers = groupPlayers ? (recentMore ? players.length : Math.min(10, players.length)) : 0;
-    $('form-sum').textContent = !recent.length ? '' : (groupPlayers ? (shownPlayers === 1 ? 'the latest player' : 'latest ' + shownPlayers + ' players') + ' (' + recent.length + (recent.length === 1 ? ' game)' : ' games)') : groupSets ? (shownSets === 1 ? 'the latest set' : 'latest ' + shownSets + ' sets') + ' (' + recent.length + (recent.length === 1 ? ' game)' : ' games)') : recent.length === 1 ? 'the latest game' : 'latest ' + recent.length) + ': ' + (recent.length - rl) + ' won, ' + rl + ' lost, ' + sentSum + ' garbage blocks sent';
+    $('form-sum').textContent = !recent.length ? '' : (groupPlayers ? (shownPlayers === 1 ? 'the latest player' : 'latest ' + shownPlayers + ' players') + ' (' + recent.length + (recent.length === 1 ? ' game)' : ' games)') : groupSets ? (shownSets === 1 ? 'the latest set' : 'latest ' + shownSets + ' sets') + ' (' + recent.length + (recent.length === 1 ? ' game)' : ' games)') : recent.length === 1 ? 'the latest game' : 'latest ' + recent.length) + ': ' + recent.filter((g) => g.res === 'W').length + ' won, ' + rl + ' lost, ' + (recent.some((g) => g.res !== 'W' && g.res !== 'L') ? recent.filter((g) => g.res !== 'W' && g.res !== 'L').length + ' drawn or cut short, ' : '') + sentSum + ' garbage blocks sent';
 
     // per-version stats (opponent filter applied)
     const vs = vers.map((v) => Object.assign({}, v, stat(byOpp.filter((g) => g.sha === v.sha)))).filter((v) => v.n > 0 && (v.n >= (narrow ? 0 : minn) || v.sha === ver));
@@ -1250,7 +1256,7 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
       const gamesTxt = (k) => k + (k === 1 ? ' game played' : ' games played');
       // under a one-game record: how that game went, then the player's record overall, each saying who won ('lost to Ranmaru · won 3 of 14 games', counted in the tab's period)
       const recTxt = (p) => 'won ' + p.beat + ' of ' + p.n + (p.n === 1 ? ' game' : ' games');
-      const gameTxt = (gm) => (gm.res === 'L' ? 'beat Ranmaru' : 'lost to Ranmaru');
+      const gameTxt = (gm) => (gm.res === 'L' ? 'beat Ranmaru' : gm.res === 'W' ? 'lost to Ranmaru' : gm.res === 'D' ? 'drew with Ranmaru' : 'game cut short');
       // a board: the players of the games `keep` lets through, each category's top `topN`, into `box`; `since`: say versions since each played
       const board = (box, keep, topN, since, noneTxt, boxKey) => {
         const players = Array.from(byOpp, ([, all]) => {
@@ -1427,7 +1433,7 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
     // the game being watched, laid out like a Latest results row: Ranmaru's result as the same Won/Lost tag, then the opponent,
     // the length, when it was played, what was thrown at Ranmaru and the version
     { const sub = $('gw-sub'); sub.replaceChildren(); sub.classList.add('gw-subrow');
-      const pill = document.createElement('span'); pill.className = 'gw-res ' + (row.res === 'W' ? 'w' : 'l'); pill.textContent = row.res === 'W' ? 'Won' : 'Lost';
+      const pill = document.createElement('span'); pill.className = 'gw-res ' + resClass(row.res); pill.textContent = resText(row.res);
       const who = document.createElement('b'); who.textContent = 'vs ' + row.opp;
       const bits = [row.secs != null ? dur(row.secs) + ' long' : '', playedAt(row) || d3.utcFormat('%b %-d')(new Date(row.date)),
         [row.gch ? 'chain ×' + row.gch : '', row.gr != null ? Math.round(row.gr) + ' rows of garbage' : ''].filter(Boolean).join(', '), 'version ' + row.bot].filter(Boolean);
@@ -1441,7 +1447,7 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
   // the games of the current selection that have a replay, found by result, day, length and opponent
   let VSTART = null, VLBL = null;
   const WL = { list: [], src: [], res: '', when: '', from: '', to: '', len: '', sort: 'new' };
-  const resWord = (r) => r.res === 'W' ? 'Won' : 'Lost';
+  const resWord = (r) => resText(r.res);
   const playedMs = (r) => r.at ? new Date(r.at).getTime() - (r.secs || 0) * 1000 : new Date(r.date + 'T12:00:00').getTime();
   const dayStart = (t) => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); };
   const dayName = (t) => { const today = dayStart(Date.now()), d = dayStart(t), diff = Math.round((today - d) / 864e5); return diff === 0 ? 'Today' : diff === 1 ? 'Yesterday' : new Date(t).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }); };
@@ -1472,7 +1478,7 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
       if ((WL.sort === 'new' || WL.sort === 'old') && dn !== lastDay) { const h = document.createElement('div'); h.className = 'gw-day'; h.textContent = dn; box.appendChild(h); lastDay = dn; }
       const b = document.createElement('button'); b.type = 'button'; b.className = 'gw-row'; b.dataset.rid = r.replay;
       const tm = document.createElement('span'); tm.className = 't'; tm.textContent = r.at ? new Date(t).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) : d3.utcFormat('%b %-d')(new Date(r.date));
-      const rs = document.createElement('span'); rs.className = 'gw-res ' + (r.res === 'W' ? 'w' : 'l'); rs.textContent = resWord(r);
+      const rs = document.createElement('span'); rs.className = 'gw-res ' + resClass(r.res); rs.textContent = resWord(r);
       const o = document.createElement('span'); o.className = 'o'; o.textContent = r.opp;
       const n = document.createElement('span'); n.className = 'n'; n.textContent = dur(r.secs);
       const v = document.createElement('span'); v.className = 'v'; v.textContent = (VLBL ? VLBL(r.sha) : '') || r.bot;
@@ -2338,7 +2344,7 @@ function projectPlan(G, seq, cursor) {
     L.push('Ranmaru decision to review');
     L.push('Link (opens this exact moment): ' + URLSTATE.link());
     L.push('Replay data (gzipped JSON, the whole game): ' + new URL((window.__dataBase || 'data/') + 'replay_' + R.rid + '.json.gz', location.href.split('#')[0]).href);
-    L.push('Game: ' + R.rid + ' · ' + (VLBL ? VLBL(D.sha) : '') + (VSTART && VSTART(D.sha) ? ' (deployed ' + VSTART(D.sha) + ')' : '') + ' · ' + (row.res === 'W' ? 'won' : 'lost') + ' vs ' + D.opp + ' · ' + (row.at || row.date || '') + ' · ' + dur(row.secs) + ' · bot ' + D.bot);
+    L.push('Game: ' + R.rid + ' · ' + (VLBL ? VLBL(D.sha) : '') + (VSTART && VSTART(D.sha) ? ' (deployed ' + VSTART(D.sha) + ')' : '') + ' · ' + (row.res === 'W' ? 'won' : row.res === 'L' ? 'lost' : row.res === 'D' ? 'drew' : 'cut short') + ' vs ' + D.opp + ' · ' + (row.at || row.date || '') + ' · ' + dur(row.secs) + ' · bot ' + D.bot);
     L.push('At: frame ' + clock + ' (' + fmtClock(clock) + ' of ' + fmtClock(D.end) + ')');
     { // what the page shows for this moment, in its own words
       const cp = g$('cap'), gt = cp.querySelector('.gl-t'), pg = cp.querySelector('.planprog'), wy = cp.querySelector('.why1');

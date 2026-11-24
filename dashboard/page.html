@@ -2597,6 +2597,9 @@ function projectPlan(G, seq, cursor) {
   //   vq vs vall       versions table: search, sort, show all           lq lk ls lall    losses table: search, kind, sort, show all
   //   res when date len q sort    Watch a game filters: result W|L, today|yesterday|7|30|date (+date), u1|1-3|3p|5p|10p, opponent text, new|old|long|short
   //   game frame part plan lm speed    the game (rN), its frame, start|end, plan off (plan=0), decision list (chg|all), playback speed
+  //   gset gply lsort more              Latest results: group by set (0 = off), group by player (1 = on), the column it is sorted by and
+  //                                     which way (len:asc ...), Show all (1)
+  //   lb lball                          leaderboard: this week | last | all time, the whole board opened (1)
   const URLSTATE = (() => {
     const enc = encodeURIComponent, U = { pending: null, reset: false };
     const sortStr = (x) => x.key + ':' + x.dir;
@@ -2610,6 +2613,8 @@ function projectPlan(G, seq, cursor) {
       if (share && R.rid) { o.game = R.rid; if (R.D && R.D.frames && R.D.frames[R.idx]) o.frame = String(R.D.frames[R.idx][0]); add('part', R.part, 'end'); }
       if (!PLAN.on) o.plan = '0';
       add('lm', LIST.mode, 'chg'); add('speed', R.speed, 1);
+      add('gset', groupSets ? 1 : 0, 1); add('gply', groupPlayers ? 1 : 0, 0); add('lsort', latestSort.key + ':' + latestSort.dir, 'when:desc'); if (recentMore) o.more = '1';
+      add('lb', lbPeriod, 'week'); if (lbAll) o.lball = '1';
       return o;
     }
     const hashOf = (o) => { const k = Object.keys(o); return k.length ? '#' + k.map((x) => x + '=' + enc(o[x])).join('&') : ''; };
@@ -2633,10 +2638,18 @@ function projectPlan(G, seq, cursor) {
       $('gw-sort').value = WL.sort;
       LIST.mode = one(p.lm, ['chg', 'all'], 'chg'); document.querySelectorAll('#gw-lmode button').forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.m === LIST.mode))); LIST.rid = null;
       R.part = p.part === 'open' ? 'open' : 'end';
+      // Latest results and the leaderboard. The two Group by boxes keep the viewer's own choice when the link does not say (it only
+      // names them when they differ from the usual); everything else is the link's or the usual.
+      if (p.gset !== undefined) { groupSets = p.gset !== '0'; $('form-sets').checked = groupSets; }
+      if (p.gply !== undefined) { groupPlayers = p.gply === '1'; $('form-players').checked = groupPlayers; }
+      { const m = /^(when|res|opp|lv|mode|len|garb|ver):(asc|desc)$/.exec(p.lsort || ''); latestSort = m ? { key: m[1], dir: m[2] } : { key: 'when', dir: 'desc' }; }
+      recentMore = p.more === '1';
+      lbPeriod = one(p.lb, ['week', 'last', 'all'], 'week'); lbAll = p.lball === '1';
       const sp = num(p.speed, 1); if ([1, 0.5, 0.25, 0.125].includes(sp)) setSpeed(sp);
       if (p.plan === '0') (init ? setTimeout : (f) => f())(() => setPlan(false), 0);
       U.pending = /^r\d+$/.test(p.game || '') ? { rid: p.game, frame: p.frame !== undefined && /^\d+$/.test(p.frame) ? Number(p.frame) : null, part: p.part === 'open' ? 'open' : 'end' } : null; U.reset = false;
       dash.setParams({ ver: /^[0-9a-f]{4,40}$/.test(p.ver || '') ? p.ver : '', opp: p.opp || p.q || '', minn: num(p.min, 10) });    // last: this draws the page
+      lbSync();   // (the leaderboard's open/closed button follows the link too)
     };
     setInterval(() => { if (!R.playing) U.flush(); }, 700);
     document.addEventListener('visibilitychange', () => { if (document.hidden) U.flush(); });

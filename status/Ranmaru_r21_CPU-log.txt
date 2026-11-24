@@ -1,18 +1,4 @@
-run 45440043592, as of 2026-11-24T17:07:30Z
-opponent topped out: clock 10020 stopWatch 9832 stop 20 pre-stop 253 shake 0 health 1, top rows r12=gggg00 r11=gggggg r10=gggggg
-opponent topped out: clock 10050 stopWatch 9862 stop 20 pre-stop 223 shake 0 health 1, top rows r12=gggg00 r11=gggggg r10=gggggg
-opponent topped out: clock 10080 stopWatch 9892 stop 20 pre-stop 193 shake 0 health 1, top rows r12=gggg00 r11=gggggg r10=gggggg
-opponent topped out: clock 10110 stopWatch 9922 stop 20 pre-stop 163 shake 0 health 1, top rows r12=gggg00 r11=gggggg r10=gggggg
-garbage landed: our stopWatch 9929 clock 10117, transits in flight before this frame {9984}, opponent copy 1 frames behind, rollbacks so far 0
-garbage landed: our stopWatch 9934 clock 10122, transits in flight before this frame {9984}, opponent copy 1 frames behind, rollbacks so far 0
-garbage landed: our stopWatch 9938 clock 10126, transits in flight before this frame {9984}, opponent copy 1 frames behind, rollbacks so far 0
-garbage landed: our stopWatch 9942 clock 10130, transits in flight before this frame {9984}, opponent copy 1 frames behind, rollbacks so far 0
-opponent topped out: clock 10140 stopWatch 9952 stop 20 pre-stop 133 shake 0 health 1, top rows r12=gggg00 r11=gggggg r10=gggggg
-opponent topped out: clock 10170 stopWatch 9982 stop 20 pre-stop 103 shake 0 health 1, top rows r12=gggg00 r11=gggggg r10=gggggg
-opponent topped out: clock 10200 stopWatch 10012 stop 20 pre-stop 73 shake 0 health 1, top rows r12=gggg00 r11=gggggg r10=gggggg
-opponent topped out: clock 10230 stopWatch 10042 stop 20 pre-stop 43 shake 0 health 1, top rows r12=gggg00 r11=gggggg r10=gggggg
-opponent topped out: clock 10260 stopWatch 10072 stop 20 pre-stop 13 shake 0 health 1, top rows r12=gggg00 r11=gggggg r10=gggggg
-opponent topped out: clock 10410 stopWatch 10222 stop 37 pre-stop 0 shake 33 health 1, top rows r12=gggggg r11=612100 r10=gggggg
+run 45440043592, as of 2026-11-24T17:09:34Z
 REPLAY {"settings":{"stacks":[{"stackBehaviours":{"swapStallingMode":1,"swapStallingPunish":4,"passiveRaise":true,"allowManualRaise":true},"inputs":"","stackType":1,"inputMethod":"controller","levelData":{"colors":6,"maxHealth":1,"adjacentDenialFrequency":1,"startingSpeed":32,"frameConstants":{"HOVE
 engine rolled our stack back 0 times for late garbage this match
 match against: Mako
@@ -149,3 +135,17 @@ garbage landed: our stopWatch 979 clock 1167, transits in flight before this fra
 garbage landed: our stopWatch 992 clock 1180, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
 opponent topped out: clock 1260 stopWatch 1072 stop 62 pre-stop 71 shake 54 health 1, top rows r12=gggggg r11=gggggg r10=365130
 opponent topped out: clock 1290 stopWatch 1102 stop 62 pre-stop 41 shake 24 health 1, top rows r12=gggggg r11=gggggg r10=365130
+opponent topped out: clock 1320 stopWatch 1132 stop 62 pre-stop 11 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=365130
+garbage landed: our stopWatch 1488 clock 1676, transits in flight before this frame {1488}, opponent copy 1 frames behind, rollbacks so far 0
+opponent topped out: clock 1710 stopWatch 1522 stop 24 pre-stop 0 shake 10 health 1, top rows r12=0ggggg r11=ggg000 r10=gggggg
+opponent topped out: clock 1740 stopWatch 1552 stop 0 pre-stop 0 shake 22 health 1, top rows r12=gggggg r11=0ggggg r10=ggg000
+opponent topped out: clock 1770 stopWatch 1582 stop 0 pre-stop 46 shake 0 health 1, top rows r12=gggggg r11=0ggggg r10=ggg000
+opponent topped out: clock 1800 stopWatch 1612 stop 0 pre-stop 16 shake 0 health 1, top rows r12=gggggg r11=0ggggg r10=ggg000
+REPLAY {"settings":{"stacks":[{"stackBehaviours":{"swapStallingMode":1,"swapStallingPunish":4,"passiveRaise":true,"allowManualRaise":true},"inputs":"","stackType":1,"inputMethod":"controller","levelData":{"colors":6,"maxHealth":1,"adjacentDenialFrequency":1,"startingSpeed":32,"frameConstants":{"HOVE
+engine rolled our stack back 0 times for late garbage this match
+match against: Mako
+match against id: 8864
+match over — bot won (pace: worst 0.25 frames off schedule); waiting for a rematch
+memory after match: rss 2442784 kB, threads 8, lua 46359 kB
+game about to start: both players are ready
+set over: the room is closed, back in the lobby

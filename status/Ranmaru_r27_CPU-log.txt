@@ -1,4 +1,4 @@
-run 45490309623, as of 2026-11-24T21:46:17Z
+run 45490309623, as of 2026-11-24T21:48:21Z
 
 === Bot 'Ranmaru_r27_CPU' (gambit, L10, cursor 4/12, unranked) is idle in the lobby on panelattack.com:49569 ===
     Open your client, CHALLENGE 'Ranmaru_r27_CPU' in the lobby, and play — it auto-accepts.
@@ -93,3 +93,5 @@ match over — bot won (pace: worst 0.18 frames off schedule); waiting for a rem
 memory after match: rss 1747200 kB, threads 8, lua 50293 kB
 game about to start: both players are ready
 set over: the room is closed, back in the lobby
+stop requested and no game is running: sitting out 8 s without readying, then leaving
+leaving

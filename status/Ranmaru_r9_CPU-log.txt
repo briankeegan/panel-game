@@ -1,13 +1,4 @@
-run 45299571181, as of 2026-11-24T01:31:14Z
-opponent topped out: clock 2010 stopWatch 1822 stop 58 pre-stop 0 shake 54 health 1, top rows r12=0ggggg r11=ggggg0 r10=gggggg
-garbage landed: our stopWatch 2141 clock 2329, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
-garbage landed: our stopWatch 2792 clock 2980, transits in flight before this frame {2842}, opponent copy 1 frames behind, rollbacks so far 0
-opponent topped out: clock 3210 stopWatch 3022 stop 30 pre-stop 28 shake 52 health 1, top rows r12=gggggg r11=gggggg r10=000ggg
-opponent topped out: clock 3240 stopWatch 3052 stop 28 pre-stop 0 shake 22 health 1, top rows r12=gggggg r11=gggggg r10=000121
-garbage landed: our stopWatch 3402 clock 3590, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
-opponent topped out: clock 3600 stopWatch 3412 stop 62 pre-stop 6 shake 56 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 3630 stopWatch 3442 stop 94 pre-stop 43 shake 26 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 3660 stopWatch 3472 stop 94 pre-stop 13 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+run 45299571181, as of 2026-11-24T01:33:18Z
 opponent topped out: clock 3690 stopWatch 3502 stop 98 pre-stop 50 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
 opponent topped out: clock 3720 stopWatch 3532 stop 98 pre-stop 20 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
 opponent topped out: clock 3750 stopWatch 3562 stop 98 pre-stop 57 shake 58 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
@@ -149,3 +140,12 @@ match over — bot won (pace: worst 2.09 frames off schedule); waiting for a rem
 memory after match: rss 2190356 kB, threads 8, lua 38425 kB
 game about to start: both players are ready
 set over: the room is closed, back in the lobby
+game about to start: both players are ready
+match start: building the match (seed nil, stage nil, opponent ?)
+match start: the match is built
+match start: the match is started
+match start: gambit: creating the link
+match start: gambit: the link is created
+match start: gambit: the link is starting the match
+match start: gambit: the link has started the match
+both ready — match starting

@@ -1,4 +1,4 @@
-run 45345383906, as of 2026-11-24T10:25:22Z
+run 45345383906, as of 2026-11-24T10:27:27Z
 
 === Bot 'Ranmaru_r14_CPU' (gambit, L10, cursor 4/12, unranked) is idle in the lobby on panelattack.com:49569 ===
     Open your client, CHALLENGE 'Ranmaru_r14_CPU' in the lobby, and play — it auto-accepts.
@@ -40,3 +40,103 @@ opponent topped out: clock 5010 stopWatch 4822 stop 82 pre-stop 28 shake 5 healt
 opponent topped out: clock 5010 stopWatch 4822 stop 82 pre-stop 28 shake 5 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
 opponent topped out: clock 5040 stopWatch 4852 stop 80 pre-stop 0 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
 garbage landed: our stopWatch 4866 clock 5054, transits in flight before this frame {4866}, opponent copy 2 frames behind, rollbacks so far 0
+opponent topped out: clock 5730 stopWatch 5542 stop 0 pre-stop 123 shake 55 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 5730 stopWatch 5542 stop 0 pre-stop 123 shake 55 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 5730 stopWatch 5542 stop 0 pre-stop 123 shake 55 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 5760 stopWatch 5572 stop 0 pre-stop 93 shake 25 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 5790 stopWatch 5602 stop 0 pre-stop 63 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 5820 stopWatch 5632 stop 0 pre-stop 33 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 5850 stopWatch 5662 stop 0 pre-stop 3 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 5850 stopWatch 5662 stop 0 pre-stop 3 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 5940 stopWatch 5752 stop 0 pre-stop 0 shake 33 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 5940 stopWatch 5752 stop 0 pre-stop 0 shake 33 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 5970 stopWatch 5782 stop 0 pre-stop 0 shake 3 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+REPLAY {"settings":{"engineVersion":"049","stacks":[{"inputMethod":"controller","inputs":"","stackType":1,"levelData":{"startingSpeed":32,"shockFrequency":41,"shockCap":3,"colors":6,"maxHealth":1,"adjacentDenialFrequency":1,"stop":{"dangerConstant":88,"coefficient":2,"dangerCoefficient":2,"formula":
+engine rolled our stack back 0 times for late garbage this match
+match against: MArt1And00m3r
+match against id: 10377
+match over — bot won (pace: worst 0.22 frames off schedule); waiting for a rematch
+memory after match: rss 1625808 kB, threads 8, lua 50965 kB
+game about to start: both players are ready
+match start: building the match (seed nil, stage nil, opponent ?)
+match start: the match is built
+match start: the match is started
+match start: gambit: creating the link
+match start: gambit: the link is created
+match start: gambit: the link is starting the match
+match start: gambit: the link has started the match
+both ready — match starting
+garbage landed: our stopWatch 742 clock 930, transits in flight before this frame {742}, opponent copy 1 frames behind, rollbacks so far 0
+opponent topped out: clock 1800 stopWatch 1612 stop 27 pre-stop 0 shake 19 health 1, top rows r12=ggg000 r11=gggggg r10=614340
+REPLAY {"settings":{"engineVersion":"049","stacks":[{"inputMethod":"controller","inputs":"","stackType":1,"levelData":{"startingSpeed":32,"shockFrequency":41,"shockCap":3,"colors":6,"maxHealth":1,"adjacentDenialFrequency":1,"stop":{"dangerConstant":88,"coefficient":2,"dangerCoefficient":2,"formula":
+engine rolled our stack back 0 times for late garbage this match
+match against: MArt1And00m3r
+match against id: 10377
+match over — bot won (pace: worst 0.22 frames off schedule); waiting for a rematch
+memory after match: rss 1994300 kB, threads 8, lua 54594 kB
+game about to start: both players are ready
+match start: building the match (seed nil, stage nil, opponent ?)
+match start: the match is built
+match start: the match is started
+match start: gambit: creating the link
+match start: gambit: the link is created
+match start: gambit: the link is starting the match
+match start: gambit: the link has started the match
+both ready — match starting
+garbage landed: our stopWatch 614 clock 802, transits in flight before this frame {614}, opponent copy 0 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 1132 clock 1320, transits in flight before this frame {1187}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 1310 clock 1498, transits in flight before this frame {}, opponent copy 2 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 1315 clock 1503, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 1321 clock 1509, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+opponent topped out: clock 1620 stopWatch 1432 stop 7 pre-stop 0 shake 0 health 1, top rows r12=0ggggg r11=ggggg0 r10=000ggg
+REPLAY {"settings":{"engineVersion":"049","stacks":[{"inputMethod":"controller","inputs":"","stackType":1,"levelData":{"startingSpeed":32,"shockFrequency":41,"shockCap":3,"colors":6,"maxHealth":1,"adjacentDenialFrequency":1,"stop":{"dangerConstant":88,"coefficient":2,"dangerCoefficient":2,"formula":
+engine rolled our stack back 0 times for late garbage this match
+match against: MArt1And00m3r
+match against id: 10377
+match over — bot won (pace: worst 0.24 frames off schedule); waiting for a rematch
+memory after match: rss 1833256 kB, threads 8, lua 57724 kB
+game about to start: both players are ready
+match start: building the match (seed nil, stage nil, opponent ?)
+match start: the match is built
+match start: the match is started
+match start: gambit: creating the link
+match start: gambit: the link is created
+match start: gambit: the link is starting the match
+match start: gambit: the link has started the match
+both ready — match starting
+garbage landed: our stopWatch 516 clock 704, transits in flight before this frame {516}, opponent copy 1 frames behind, rollbacks so far 0
+opponent topped out: clock 720 stopWatch 532 stop 0 pre-stop 0 shake 59 health 1, top rows r12=ggggg0 r11=gggggg r10=gggggg
+opponent topped out: clock 750 stopWatch 562 stop 0 pre-stop 0 shake 63 health 1, top rows r12=0ggggg r11=ggggg0 r10=gggggg
+opponent topped out: clock 780 stopWatch 592 stop 60 pre-stop 288 shake 33 health 1, top rows r12=0ggggg r11=ggggg0 r10=gggggg
+opponent topped out: clock 810 stopWatch 622 stop 60 pre-stop 258 shake 3 health 1, top rows r12=0ggggg r11=ggggg0 r10=gggggg
+opponent topped out: clock 840 stopWatch 652 stop 60 pre-stop 228 shake 0 health 1, top rows r12=0ggggg r11=ggggg0 r10=gggggg
+opponent topped out: clock 900 stopWatch 712 stop 60 pre-stop 168 shake 0 health 1, top rows r12=0ggggg r11=ggggg0 r10=gggggg
+opponent topped out: clock 930 stopWatch 742 stop 60 pre-stop 138 shake 0 health 1, top rows r12=0ggggg r11=ggggg0 r10=gggggg
+opponent topped out: clock 960 stopWatch 772 stop 60 pre-stop 108 shake 0 health 1, top rows r12=0ggggg r11=ggggg0 r10=gggggg
+opponent topped out: clock 960 stopWatch 772 stop 60 pre-stop 108 shake 0 health 1, top rows r12=0ggggg r11=ggggg0 r10=gggggg
+opponent topped out: clock 990 stopWatch 802 stop 60 pre-stop 78 shake 0 health 1, top rows r12=0ggggg r11=ggggg0 r10=gggggg
+opponent topped out: clock 1020 stopWatch 832 stop 60 pre-stop 48 shake 0 health 1, top rows r12=0ggggg r11=ggggg0 r10=gggggg
+opponent topped out: clock 1020 stopWatch 832 stop 60 pre-stop 48 shake 0 health 1, top rows r12=0ggggg r11=ggggg0 r10=gggggg
+opponent topped out: clock 1050 stopWatch 862 stop 60 pre-stop 18 shake 0 health 1, top rows r12=0ggggg r11=ggggg0 r10=gggggg
+opponent topped out: clock 1050 stopWatch 862 stop 60 pre-stop 18 shake 0 health 1, top rows r12=0ggggg r11=ggggg0 r10=gggggg
+garbage landed: our stopWatch 1132 clock 1320, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 1140 clock 1328, transits in flight before this frame {}, opponent copy 2 frames behind, rollbacks so far 0
+opponent topped out: clock 1440 stopWatch 1252 stop 40 pre-stop 0 shake 20 health 1, top rows r12=ggggg0 r11=gggggg r10=gggggg
+opponent topped out: clock 1470 stopWatch 1282 stop 10 pre-stop 0 shake 0 health 1, top rows r12=ggggg0 r11=gggggg r10=gggggg
+opponent topped out: clock 1470 stopWatch 1282 stop 10 pre-stop 0 shake 0 health 1, top rows r12=ggggg0 r11=gggggg r10=gggggg
+REPLAY {"settings":{"engineVersion":"049","stacks":[{"inputMethod":"controller","inputs":"","stackType":1,"levelData":{"startingSpeed":32,"shockFrequency":41,"shockCap":3,"colors":6,"maxHealth":1,"adjacentDenialFrequency":1,"stop":{"dangerConstant":88,"coefficient":2,"dangerCoefficient":2,"formula":
+engine rolled our stack back 0 times for late garbage this match
+match against: MArt1And00m3r
+match against id: 10377
+match over — bot won (pace: worst 0.13 frames off schedule); waiting for a rematch
+memory after match: rss 1926480 kB, threads 8, lua 46583 kB
+game about to start: both players are ready
+match start: building the match (seed nil, stage nil, opponent ?)
+match start: the match is built
+match start: the match is started
+match start: gambit: creating the link
+match start: gambit: the link is created
+match start: gambit: the link is starting the match
+match start: gambit: the link has started the match
+both ready — match starting
+garbage landed: our stopWatch 714 clock 902, transits in flight before this frame {714}, opponent copy 1 frames behind, rollbacks so far 0

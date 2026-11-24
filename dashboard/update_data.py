@@ -98,12 +98,14 @@ for line in open(log, errors="ignore"):
     if mm: mode = mm.group(1).strip()
     cur.append(line)
     if "match over —" in line:
-        r = "W" if "bot won" in line else "L" if "bot lost" in line else "A"
+        # W won, L lost, D a draw, U cut short (the room closed or the game was aborted before it ended); A: nothing to keep
+        r = "W" if "bot won" in line else "L" if "bot lost" in line else "D" if "bot draw" in line else "U" if ("bot unfinished" in line or "bot aborted" in line) else "A"
         games.append(dict(r=r, opp=opp, mode=mode, rep=rep, top=sum(1 for l in cur if l.startswith("opponent topped out")) * 30, land=sum(1 for l in cur if l.startswith("garbage landed")), fl=notes, pid=pid))
         cur, rep, notes, pid = [], None, [], None
 for i_, g_ in enumerate(games): g_["raw"] = i_      # its place among all the games of the run: the decision log has one block per game, in the same order
 n_raw = len(games)
-games = [g for g in games if g["r"] in "WL"]
+# a cut-short game is kept when it has a replay and an opponent (the bots since this was added write both); older ones had neither
+games = [g for g in games if g["r"] in ("W", "L", "D") or (g["r"] == "U" and g["rep"] and g["opp"] not in ("", "?"))]
 times = []
 if a.job_log and os.path.exists(a.job_log):
     for line in open(a.job_log, errors="ignore"):

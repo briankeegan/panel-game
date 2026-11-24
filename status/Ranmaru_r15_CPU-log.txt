@@ -1,4 +1,4 @@
-run 45381484351, as of 2026-11-24T11:17:08Z
+run 45381484351, as of 2026-11-24T11:19:13Z
 
 === Bot 'Ranmaru_r15_CPU' (gambit, L10, cursor 4/12, unranked) is idle in the lobby on panelattack.com:49569 ===
     Open your client, CHALLENGE 'Ranmaru_r15_CPU' in the lobby, and play — it auto-accepts.
@@ -19,6 +19,22 @@ match against: MArt1And00m3r
 match against id: 10377
 match over — bot won (pace: worst 0.23 frames off schedule); waiting for a rematch
 memory after match: rss 1892996 kB, threads 8, lua 53197 kB
+game about to start: both players are ready
+match start: building the match (seed nil, stage nil, opponent ?)
+match start: the match is built
+match start: the match is started
+match start: gambit: creating the link
+match start: gambit: the link is created
+match start: gambit: the link is starting the match
+match start: gambit: the link has started the match
+both ready — match starting
+the server closed the room mid-game (MArt1And00m3r logged out) at our clock 3651, the opponent's 3647
+set over: the room is closed, back in the lobby
+match against: MArt1And00m3r
+REPLAY {"mine":1,"partial":true,"settings":{"engineVersion":"049","rules":{"stackOverConditions":{"HEALTH":0},"doCountdown":true,"stackSetupModifications":[],"stackWinConditions":[],"matchWinRuleset":[{"GAME_OVER_CLOCK":"HIGHEST"},{"SCORE":"HIGHEST"}],"matchEndConditions":{"TIME_LIMIT":7200,"STACKS_
+match against id: 10377
+match over — bot unfinished (pace: worst 0.27 frames off schedule); waiting for a rematch
+memory after match: rss 1868892 kB, threads 8, lua 49323 kB
 game about to start: both players are ready
 match start: building the match (seed nil, stage nil, opponent ?)
 match start: the match is built

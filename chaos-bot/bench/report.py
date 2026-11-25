@@ -44,8 +44,8 @@ def main():
         fr = int(r.get("frames", -1))
         if fr > 0:
             played += fr; sent += float(r.get("sentRows", 0))
-        rows.append("game %d pattern %s seed %d frames %s survived %d lostAt %s health %s healthLostTop %s gpm %s late %s diverged %s overruns %s worstMs %s reason %s" % (
-            g["n"], g["pattern"], g["seed"], r.get("frames", -1), ok, r.get("lostAt", -1), r.get("health", -1), r.get("healthLostTop", -1),
+        rows.append("game %d level %s pattern %s seed %d frames %s survived %d lostAt %s health %s healthLostTop %s gpm %s late %s diverged %s overruns %s worstMs %s reason %s" % (
+            g["n"], g.get("level", 9), g["pattern"], g["seed"], r.get("frames", -1), ok, r.get("lostAt", -1), r.get("health", -1), r.get("healthLostTop", -1),
             r.get("gpm", -1), s.get("late", "?"), s.get("diverged", "?"), r.get("overruns", "?"), r.get("worstMs", "?"), r.get("reason", "?")))
     for row in rows:
         print(row)

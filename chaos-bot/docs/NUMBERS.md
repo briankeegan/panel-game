@@ -1,5 +1,13 @@
 # Gambit's numbers to retune for chaos
 
+**THE RULE (the owner, 2026-11-25): every number is dynamic -- read off the level being played, never a constant for one level.**
+The bot will play chaos Level 9 and Level 10, so a retuned number is written as a function of the board's own level data, which the
+engine already holds every frame (`ca.h` Board): `fHOVER`, `fGARBAGE_HOVER`, `fFLASH`, `fFACE`, `fPOP`, `fGARBAGE_POP` (clear and
+fall times), `stopBase` (stop time), `maxHealth`/`health`, `speed` and `caRiseFrames(speed)` (rise), `marginTime`/`marginCounter`,
+`queueType`, `colorCount`. Gambit already does this for its horizons (`outcome.c` `AT_LEVEL`: level-11 frames scaled by the level's
+break time); every change here follows that pattern, and the benchmark is run at Level 9 and Level 10 (`bench/request.txt` LEVEL)
+before a change counts.
+
 Gambit (the frozen copy in `gambit/`) was tuned on vanilla Level 11, where health refills and the server limits inputs. Every number
 below was set for that game. Each is changed **one at a time**, judged on the benchmark by whether its deaths go away
 (`plans/chaos-goal.md` §2). Status: `done` (changed, run named), `next`, `open`.

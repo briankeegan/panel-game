@@ -40,7 +40,8 @@ jobs:
               f = line.split()
               if not f or f[0].startswith("#"): continue
               p, seed, gl, gs, q, frames = f[:6]
-              games.append({"pattern": p, "seed": int(seed), "glevel": int(gl), "gspeed": int(gs), "queue": int(q), "frames": int(frames), "n": len(games) + 1})
+              level = int(f[6]) if len(f) > 6 else 9
+              games.append({"pattern": p, "seed": int(seed), "glevel": int(gl), "gspeed": int(gs), "queue": int(q), "frames": int(frames), "level": level, "n": len(games) + 1})
           assert games, "no games in request.txt"
           print("games=" + json.dumps(games))
           PY
@@ -53,7 +54,7 @@ jobs:
       max-parallel: 8
       matrix:
         game: ${{ fromJSON(needs.plan.outputs.games) }}
-    name: game ${{ matrix.game.n }} ${{ matrix.game.pattern }} seed ${{ matrix.game.seed }}
+    name: game ${{ matrix.game.n }} L${{ matrix.game.level }} ${{ matrix.game.pattern }} seed ${{ matrix.game.seed }}
     steps:
       - uses: actions/checkout@v4
       - name: love, cached
@@ -73,6 +74,7 @@ jobs:
       - name: Play
         env:
           LOVE: /home/runner/love2d/love.AppImage
+          CHAOSBOT_LEVEL: ${{ matrix.game.level }}
         run: |
           g='${{ toJSON(matrix.game) }}'
           bash chaos-bot/bench/play.sh ${{ matrix.game.pattern }} ${{ matrix.game.seed }} ${{ matrix.game.glevel }} ${{ matrix.game.gspeed }} ${{ matrix.game.queue }} ${{ matrix.game.frames }} out

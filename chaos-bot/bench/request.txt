@@ -18,7 +18,11 @@
 #          while the bot cleared every ~14 frames (the modern queue drops only on a quiet board), 47 panels burned to 9, broke=0;
 #          insane_combo_storm lasted 13964 (was 5573)
 # run 8 -- one change: don't stall the queue (decide.c): survived 4/4, health 17/17 each, 16.45 rows a minute, 0 late/diverged
-# run 9 -- no change to the bot: the same 4 at Level 9 again (twice in a row), and the same 4 at Level 10
+# run 9 -- no change to the bot: survived 4/8 -- Level 9 3/4 (insane_combo_storm lost at 3455: the queue rule never fired,
+#          letDrop=0 -- its ceiling test refused every time; 11 rows dropped at once), Level 10 1/4 (combo_storm 10901,
+#          thicc_combo_storm 8894, insane_combo_storm 17916)
+# run 10 -- one change: the queue rule lets garbage drop whenever it lands without topping the board out (was: under the ceiling);
+#          the log shows the queue at each decision (q=)
 combo_storm 1 9 9 2 21600 9
 chain_garbage 1 9 9 1 21600 9
 thicc_combo_storm 1 9 9 3 21600 9

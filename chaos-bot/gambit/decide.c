@@ -32,6 +32,7 @@ static int32_t raiseOpening, raiseTo, raiseRows;
 // break with) nor above the height less CHAOS_BLOCK_ROWS.
 #define CHAOS_BLOCK_ROWS 3
 static int32_t chaosLetDrop;   // (decisions the board was left alone so waiting garbage could drop: the log's letDrop)
+static int32_t chaosWaiting = -1;   // (the rows waiting at the last such test, -1 none: the log's q)
 #define CHAOS_RAISE_MIN 3
 static int32_t chaosRaiseTo(const Board *b) {
   int32_t h = b->height ? b->height : 12, perRow = 16 * caRiseFrames(b->speed ? b->speed : 1);
@@ -2146,7 +2147,10 @@ static Played playOf(const Read *R, int n) {
     int32_t waiting = 0;
     for (int i = 0; i < decQ.b->ninc; i++) waiting += decQ.b->inc[i].height > 0 ? decQ.b->inc[i].height : 1;
     int32_t h = decQ.b->height ? decQ.b->height : 12;
-    if (panelTop(decQ.b) + waiting <= h - CHAOS_BLOCK_ROWS) { P.line = 0; P.deferred = 0; chaosLetDrop++; }
+    // (what waits must land without topping the board out; held back further, it only grows and the panels go -- run 9's insane
+    // combo storm never let it drop under the stricter ceiling test, letDrop=0, and lost at 3455 with 11 rows dropped at once)
+    chaosWaiting = waiting;
+    if (panelTop(decQ.b) + waiting <= h - 1) { P.line = 0; P.deferred = 0; chaosLetDrop++; }
   }
   P.name = P.line ? P.line->k.play : R->up ? -2 : PLAY_HOLD;   // -2: the raise
   for (int i = 0; i < n; i++) if (order[i]->o.lives) P.nlive++;

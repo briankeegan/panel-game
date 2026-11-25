@@ -1,20 +1,4 @@
-run 45646050245, as of 2026-11-25T16:23:02Z
-opponent topped out: clock 1770 stopWatch 1582 stop 0 pre-stop 0 shake 4 health 11, top rows r12=gggggg r11=561636 r10=gggggg
-opponent topped out: clock 1800 stopWatch 1612 stop 0 pre-stop 0 shake 0 health 6, top rows r12=gggggg r11=561636 r10=gggggg
-opponent topped out: clock 1800 stopWatch 1612 stop 0 pre-stop 0 shake 0 health 6, top rows r12=gggggg r11=561636 r10=gggggg
-REPLAY {"settings":{"engineVersion":"049","rules":{"doCountdown":true,"stackSetupModifications":[],"stackWinConditions":[],"matchWinRuleset":[{"GAME_OVER_CLOCK":"HIGHEST"}],"matchEndConditions":{"STACKS_ACTIVE":1},"stackOverConditions":{"HEALTH":0}},"replayVersion":3,"panelSource":{"shockEnabled":tr
-engine rolled our stack back 0 times for late garbage this match
-match against: bramp
-match against id: 8522
-match over — bot won (pace: worst 0.31 frames off schedule); waiting for a rematch
-memory after match: rss 3000688 kB, threads 9, lua 48525 kB
-game about to start: both players are ready
-match start: building the match (seed nil, stage nil, opponent ?)
-match start: the match is built
-match start: the match is started
-match start: gambit: creating the link
-match start: gambit: the link is created
-match start: gambit: the link is starting the match
+run 45646050245, as of 2026-11-25T16:25:08Z
 match start: gambit: the link has started the match
 both ready — match starting
 garbage landed: our stopWatch 441 clock 629, transits in flight before this frame {441}, opponent copy -1 frames behind, rollbacks so far 0
@@ -149,3 +133,19 @@ garbage landed: our stopWatch 405 clock 593, transits in flight before this fram
 garbage landed: our stopWatch 437 clock 625, transits in flight before this frame {}, opponent copy -1 frames behind, rollbacks so far 0
 garbage landed: our stopWatch 768 clock 956, transits in flight before this frame {}, opponent copy -1 frames behind, rollbacks so far 0
 garbage landed: our stopWatch 773 clock 961, transits in flight before this frame {}, opponent copy -1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 1295 clock 1483, transits in flight before this frame {1295}, opponent copy -1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 1380 clock 1568, transits in flight before this frame {1380}, opponent copy 0 frames behind, rollbacks so far 0
+opponent topped out: clock 1860 stopWatch 1672 stop 0 pre-stop 0 shake 42 health 11, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 1890 stopWatch 1702 stop 0 pre-stop 0 shake 12 health 11, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 1920 stopWatch 1732 stop 0 pre-stop 0 shake 39 health 11, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 1920 stopWatch 1732 stop 0 pre-stop 0 shake 39 health 11, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 1950 stopWatch 1762 stop 0 pre-stop 0 shake 9 health 11, top rows r12=gggggg r11=gggggg r10=gggggg
+REPLAY {"settings":{"engineVersion":"049","rules":{"doCountdown":true,"stackSetupModifications":[],"stackWinConditions":[],"matchWinRuleset":[{"GAME_OVER_CLOCK":"HIGHEST"}],"matchEndConditions":{"STACKS_ACTIVE":1},"stackOverConditions":{"HEALTH":0}},"replayVersion":3,"panelSource":{"shockEnabled":tr
+engine rolled our stack back 0 times for late garbage this match
+match against: bramp
+match against id: 8522
+match over — bot won (pace: worst 0.17 frames off schedule); waiting for a rematch
+memory after match: rss 2995012 kB, threads 9, lua 47737 kB
+game about to start: both players are ready
+set over: the room is closed, back in the lobby
+level: Ranmaru_r46_CPU plays level 10 (the set is over)

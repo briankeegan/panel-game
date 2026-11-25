@@ -1,5 +1,3 @@
-# DRAFT -- to live at .github/workflows/chaos-bot-checks.yml once the owner allows a file outside chaos-bot/ (plans/chaos-goal.md §6).
-# Step 1's gate on every push: the C engine (chaos-bot/engine/ca.c) against recordings of the chaos v3 Lua, frame by frame,
 # with every event counted. Runs only on this project's branch and only when chaos-bot/ changes; shares nothing with Gambit's
 # workflows (own name, own concurrency group, own artifact names).
 name: chaos-bot checks

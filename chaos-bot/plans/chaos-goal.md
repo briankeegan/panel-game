@@ -120,6 +120,10 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 15 (2026-11-25 17:19 ET), a chain still building ends one link gap after its last link: survived 4/8.** combo_storm s2
+  (run 14's burst loss) survived; lost thicc_combo_storm s1 14050, insane_combo_storm s1 20962, chain_garbage s2 12885,
+  thicc_combo_storm s2 12138. late 0, diverged 0, overruns 0; 16.33 rows a minute. Run 16: the same bot with the forecast checked
+  in every game (surprises: arrivals with under 60 frames of notice), to see what the forecast still misses.
 - **Run 14 (2026-11-25 17:06 ET), no hold put first by the attack list under a backlog; 8 games: survived 5/8.** Lost
   thicc_combo_storm s1 19194, insane_combo_storm s1 8336, combo_storm s2 6432; late 0, diverged 0, overruns 0; 16.52 rows a minute.
   Kept. The combo_storm s2 loss: board clear and 41 panels, the forecast 260 frames out for 250 frames -- run 11's rule (a chain

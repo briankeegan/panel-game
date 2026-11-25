@@ -38,6 +38,8 @@
 #          survived 5/8 (lost thicc s1 19194, insane s1 8336, combo s2 6432). The combo s2 loss: board clear, forecast 260 frames
 #          out for 250 frames (run 11's chain-end rule kept the burst past the look-ahead), then 17 pieces at once
 # run 15 -- one change: a chain still building ends one link gap after its last link (front.c, GambitNative.lua)
+#          survived 4/8 (combo s2, the burst, survived; lost thicc s1 14050, insane s1 20962, chain_garbage s2 12885, thicc s2 12138)
+# run 16 -- the forecast checked (native.c noticeCheck: surprises/arrivals in the report); no change to the bot's play
 combo_storm 1 9 9 2 21600 10
 chain_garbage 1 9 9 1 21600 10
 thicc_combo_storm 1 9 9 3 21600 10

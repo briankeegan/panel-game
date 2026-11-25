@@ -1,5 +1,10 @@
 # THE GAMES TO PLAY: editing this file and pushing it to this branch starts one run of .github/workflows/chaos-bot-games.yml.
 # One game a line: PATTERN SEED GLEVEL GSPEED QUEUE FRAMES   (lines starting with # are ignored)
 # run 1 -- smoke: client booted, match asked, never started (no controller claimed headless): crash at the timeout
-# run 2 -- smoke again: the launcher claims the controller itself
-combo_storm 1 9 9 2 3600
+# run 2 -- smoke: survived 3600/3600 frames, health 17/17, 16 garbage rows a minute, 0 late, but 25 divergences -- all in the
+#          incoming queue: the telegraph's pieces told on the stopwatch, the game's queue still on the clock (fixed in board.lua)
+# run 3 -- Step 2's gate: 4 whole games (6 minutes or the loss), four patterns, the three queue types
+combo_storm 1 9 9 2 21600
+chain_garbage 1 9 9 1 21600
+thicc_combo_storm 1 9 9 3 21600
+insane_combo_storm 1 9 9 2 21600

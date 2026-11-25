@@ -77,8 +77,10 @@ M.NF = 29
 local EMPTY = {}
 function M.staged(a) return a.incomingGarbage.stagedGarbage end
 -- a queued piece's fields, width height chain metal earned finalized, into the io from x; the index after them
-function M.putIncoming(g, Bd, x)
-  Bd[x], Bd[x + 1], Bd[x + 2], Bd[x + 3], Bd[x + 4] = g.width, g.height, b01(g.isChain), b01(g.isMetal), g.frameEarned
+-- (off: chaos times a piece on the match's clock, ahead of the stack's stopwatch by the countdown; the bot tells every piece on the
+-- stopwatch -- the telegraph's too, GambitNative piece -- so the queue it predicts and the queue the game has carry the same numbers)
+function M.putIncoming(g, Bd, x, off)
+  Bd[x], Bd[x + 1], Bd[x + 2], Bd[x + 3], Bd[x + 4] = g.width, g.height, b01(g.isChain), b01(g.isMetal), g.frameEarned - (off or 0)
   Bd[x + 5] = g.finalized == nil and NUL or b01(g.finalized)
   return x + 6
 end

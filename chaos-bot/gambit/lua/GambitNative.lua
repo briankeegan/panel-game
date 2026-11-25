@@ -183,7 +183,8 @@ function GambitNative:load(a)
     end
   end
   local l3 = ThinkBudget.now()
-  for j = from, #inc do x = B.putIncoming(inc[j], Bd, x) end
+  local off = (a.clock or 0) - (a.stopWatch or a.clock or 0)   -- (chaos: the queue told on the stopwatch, as the telegraph is)
+  for j = from, #inc do x = B.putIncoming(inc[j], Bd, x, off) end
   for i = 1, #stall do x = B.putStall(stall[i], Bd, x) end
   for i = 1, #landed do Bd[x] = landed[i]; x = x + 1 end
   local drop = B.drop(a)

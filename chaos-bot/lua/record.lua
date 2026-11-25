@@ -104,14 +104,16 @@ end
 -- last, so it completes only when that column falls a row. The cells are placed where each column will have fallen to.
 local function buildChain(st)
   clearRows(st)
+  -- the shape: each link's window and the cell (row, column) each of its three panels starts in
   local shift = { 0, 0, 0, 0, 0, 0 }
-  local colour = {}
-  local assigned = {}
-  for c = 1, 6 do assigned[c] = {} end
   local links = 4 + rand(16)
-  local w = 1 + rand(4)
-  local made = 0
-  local prev1, prev2 = 0, 0
+  -- half the staircases follow the windows 1, 3, 4, 2 round and round: the middle columns fall least, the stair goes highest
+  local cycle = rand(2) == 0 and { 1, 3, 4, 2 } or nil
+  local at = rand(4)
+  if cycle then links = 10 + rand(8) end
+  local w = cycle and cycle[at + 1] or 1 + rand(4)
+  local windows, cellOf = {}, {}   -- cellOf[c][r] = the link a starting cell belongs to
+  for c = 1, 6 do cellOf[c] = {} end
   for k = 1, links do
     if k > 1 then
       -- the next window shares a column with this one; mostly the one whose columns have fallen least (taller staircases)
@@ -124,31 +126,73 @@ local function buildChain(st)
         end
       end
       w = rand(4) == 0 and options[1 + rand(#options)] or best
+      if cycle then at = (at + 1) % 4; w = cycle[at + 1] end
     end
     local ok = true
     for c = w, w + 2 do if shift[c] + 1 > 11 then ok = false end end
     if not ok then break end
-    local col
-    repeat col = 1 + rand(5) until col ~= prev1 and col ~= prev2
-    prev2, prev1 = prev1, col
-    for c = w, w + 2 do
-      assigned[c][1 + shift[c]] = { colour = col, first = k == 1 }
-      shift[c] = shift[c] + 1
+    windows[k] = w
+    for c = w, w + 2 do cellOf[c][1 + shift[c]] = k; shift[c] = shift[c] + 1 end
+  end
+  local made = #windows
+  local top = {}
+  for c = 1, 6 do top[c] = 0; for r in pairs(cellOf[c]) do if r > top[c] then top[c] = r end end end
+
+  -- the colours: link colours and fillers, re-drawn until stepping the staircase through (each link's three cleared, the
+  -- columns above them a row lower) finds exactly the next link's three in a line at every stage and nothing else
+  local function lines(g, sh)
+    -- every run of 3+ of one colour, horizontal or vertical, on the stage's board; as a set of "r,c" cells
+    local cells, n = {}, 0
+    local function at(r, c) local v = g[c][r + sh[c]]; return v or 0 end
+    for r = 1, 12 do
+      local c = 1
+      while c <= 6 do
+        local v, e = at(r, c), c
+        while e + 1 <= 6 and at(r, e + 1) == v do e = e + 1 end
+        if v ~= 0 and e - c >= 2 then for x = c, e do if not cells[r .. "," .. x] then cells[r .. "," .. x] = true; n = n + 1 end end end
+        c = e + 1
+      end
     end
-    made = k
+    for c = 1, 6 do
+      local r = 1
+      while r <= 12 do
+        local v, e = at(r, c), r
+        while e + 1 <= 12 and at(e + 1, c) == v do e = e + 1 end
+        if v ~= 0 and e - r >= 2 then for x = r, e do if not cells[x .. "," .. c] then cells[x .. "," .. c] = true; n = n + 1 end end end
+        r = e + 1
+      end
+    end
+    return cells, n
+  end
+  local g
+  for _ = 1, 300 do
+    g = {}
+    for c = 1, 6 do g[c] = {} end
+    local col = {}
+    for k = 1, made do
+      local x
+      repeat x = 1 + rand(5) until x ~= col[k - 1] and x ~= col[k - 2]
+      col[k] = x
+    end
+    for c = 1, 6 do for r = 1, top[c] do g[c][r] = cellOf[c][r] and col[cellOf[c][r]] or 1 + rand(6) end end
+    local sh, good = { 0, 0, 0, 0, 0, 0 }, true
+    for k = 1, made do
+      local cells, n = lines(g, sh)
+      local wk = windows[k]
+      if n ~= 3 or not (cells["1," .. wk] and cells["1," .. (wk + 1)] and cells["1," .. (wk + 2)]) then good = false; break end
+      for c = wk, wk + 2 do sh[c] = sh[c] + 1 end
+    end
+    if good then break end
   end
   for c = 1, 6 do
-    local top = 0
-    for r in pairs(assigned[c]) do if r > top then top = r end end
-    for r = 1, top do
-      local a = assigned[c][r]
-      if a then setCell(st, r, c, a.colour, a.first) else setCell(st, r, c, filler(st, r, c)) end
-    end
+    for r = 1, top[c] do setCell(st, r, c, g[c][r], cellOf[c][r] == 1) end
   end
   return made
 end
 local function buildAllClear(st)
   clearRows(st)
+  -- rows with shock to come, so a shock clear soon after sends the all-clear's pieces
+  st.metalPanelsQueued = st.levelData.shockCap
   local a, b2 = 1 + rand(6), 0
   repeat b2 = 1 + rand(6) until b2 ~= a
   local w = 1 + rand(3)
@@ -193,14 +237,15 @@ if builders[SCENARIO] then
       local m2 = Match(GeneratorSource(SEED, true), rules)
       m2:setCountdown(false)
       local st2 = newStack(m2)
-      buildChain(st2)
+      MADE = buildChain(st2)
       local most = 0
-      for _ = 1, 700 do
+      for _ = 1, 1300 do
         st2:receiveConfirmedInput(KeyDataEncoding.base64encode[1])
         st2:run()
         if st2.chain_counter > most then most = st2.chain_counter end
         if st2:game_ended() then break end
       end
+      if os.getenv("DEBUG_CHAIN") then io.stderr:write("trial made ", tostring(MADE), " chain ", most, "\n") end
       if most > bestChain then bestChain, bestState = most, s0 end
     end
     state = bestState
@@ -299,7 +344,7 @@ local BITS = { right = 1, left = 2, down = 4, up = 8 }
 -- a seeker: a swap that lines up three of a colour (rows 1..height, panels at rest), walked to and pressed
 local function colorAt(r, c)
   local p = stack.panels[r] and stack.panels[r][c]
-  if not p or p.isGarbage or p.color == 0 or p.color == 9 or p.color == 8 then return nil end
+  if not p or p.isGarbage or p.color == 0 or p.color == 9 then return nil end
   if p.state ~= "normal" and p.state ~= "landing" then return false end
   return p.color
 end
@@ -347,6 +392,12 @@ end
 
 local seeking = false
 local function input()
+  -- after an all-clear the board is empty: raise it back quickly
+  if SCENARIO == "allclear" then
+    local rows = 0
+    for r = 1, stack.height do if stack.panels[r][1].color ~= 0 or stack.panels[r][3].color ~= 0 then rows = r end end
+    if rows < 5 and not stack.panels_in_top_row then return 32 end
+  end
   if rand(200) == 0 then seeking = not seeking end
   if seeking or rand(4) > 0 then
     local v = seek()

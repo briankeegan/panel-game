@@ -179,18 +179,20 @@ static void arrivalsOf(const Board *b) {
     w += 6 * ns;
     for (int i = ns - 1; i >= 0; i--) {
       const int32_t *g = g0 + 6 * i;
-      // (CHAOS: a chain the sender is still building ends no sooner than a look-ahead from now (HORIZON, read off the level) -- the
-      // vanilla "at the soonest, next frame" had every piece queued behind it forecast to land ~150 frames out, frame after frame, while
-      // chaos training's chains ran on for seconds (a link up to 5 x 67 frames apart over its target rate) and the sender's staging
-      // (GarbageQueue:processStagedGarbageForClock) held all of it back behind the chain: the bot spent its panels bracing for a block
-      // that had not left (run 10 combo_storm: q=0 and land 20-39 for 600 frames, 47 panels to 17, then 12 pieces at once). Once the
-      // chain ends, staging and landing still give 151 frames: nothing arrives unforeseen.)
-      int32_t chainGoing = g[2] && g[5] != 1 ? sw + HORIZON : 0;
-      ship = imax(ship, imax((g[4] == NUL ? sw : g[4]) + STAGING, chainGoing));
+      // (CHAOS: when a chain the sender is still building ends. Run 10 had it end next frame, as vanilla: chaos training's chains run
+      // on for seconds (links 67 or 335 frames apart) and the sender's staging (GarbageQueue:processStagedGarbageForClock) holds every
+      // piece behind the chain until it is finalized, so the bot braced for 600 frames for blocks that had not left. Run 11 had it end a
+      // look-ahead from now (HORIZON): the burst was never inside the look-ahead -- run 14 combo_storm seed 2, the board clear, the
+      // forecast 260 frames out for 250 frames, then 17 pieces at once, the loss. Now: one link gap after its last link, the gap its last
+      // two links were made at (lua/GambitNative.lua writes it as g[5] = 2 + frames from its first link, g[4]); with one link, the
+      // soonest it can ship (its first link + STAGING). Once finalized a chain ships as soon as its first link + STAGING has passed, so
+      // what is behind it lands LAND frames after it ends.)
+      int32_t chainEnd = g[2] && g[5] >= 2 && g[4] != NUL ? g[4] + g[5] - 2 : 0;
+      ship = imax(ship, imax((g[4] == NUL ? sw : g[4]) + STAGING, chainEnd));
       // (pieces shipped together are one transit, landing together)
       int32_t raw = ship + LAND + offset, at = imax(raw, capped ? free : floor);
       if (capped) { if (raw == lastRaw) at = lastAt; else free = at + 1; lastRaw = raw; lastAt = at; }
-      if (F.narr < MAXARRIVALS) { Arrival *a = &F.arr[F.narr++]; a->at = at; a->capped = capped; a->g = (Incoming){ g[0], g[1], g[2], g[3], g[4], g[5] }; }
+      if (F.narr < MAXARRIVALS) { Arrival *a = &F.arr[F.narr++]; a->at = at; a->capped = capped; a->g = (Incoming){ g[0], g[1], g[2], g[3], g[4], g[5] >= 2 ? 0 : g[5] }; }
     }
   }
   // (sorted by when they arrive, the order they came in kept between equals)

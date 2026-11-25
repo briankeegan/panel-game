@@ -35,6 +35,9 @@
 #          -- run 11's 4/4 did not repeat. Every loss: a backlog of 10-25 pieces carried while digging, garbage always on the board
 # run 14 -- one change: under garbage with more queued, a hold is never put first by the attack list (rank.c key 8).
 #          8 games from now on (owner): 4 patterns x seeds 1 and 2, Level 10; new seeds once 8/8
+#          survived 5/8 (lost thicc s1 19194, insane s1 8336, combo s2 6432). The combo s2 loss: board clear, forecast 260 frames
+#          out for 250 frames (run 11's chain-end rule kept the burst past the look-ahead), then 17 pieces at once
+# run 15 -- one change: a chain still building ends one link gap after its last link (front.c, GambitNative.lua)
 combo_storm 1 9 9 2 21600 10
 chain_garbage 1 9 9 1 21600 10
 thicc_combo_storm 1 9 9 3 21600 10

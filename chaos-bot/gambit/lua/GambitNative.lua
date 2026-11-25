@@ -331,7 +331,18 @@ function GambitNative:telegraph(sources, me, view)
       local staged = q.stagedGarbage or EMPTY
       local keep = math.max(0, math.min(#staged, SOURCE_PIECES - sent))
       T[x] = keep; x = x + 1
-      for i = #staged - keep + 1, #staged do x = piece(T, x, staged[i], off) end
+      for i = #staged - keep + 1, #staged do
+        local g = staged[i]
+        x = piece(T, x, g, off)
+        -- (CHAOS: a chain the sender is still building, with two links or more, carries when it is forecast to end -- one link gap
+        -- after its last link, the gap its last two links were made at -- as 2 + the frames from its first link (front.c arrivalsOf).
+        -- Chaos training ends a chain exactly so: AttackEngine's end comes `chain` frames after the last link)
+        local lt = g.isChain and not g.finalized and g.linkTimes
+        if lt and #lt >= 2 and g.frameEarned then
+          local e = lt[#lt] + (lt[#lt] - lt[#lt - 1])
+          T[x - 1] = 2 + math.max(0, e - g.frameEarned)
+        end
+      end
     end
   end
   T[0] = n

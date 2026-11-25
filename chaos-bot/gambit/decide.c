@@ -285,11 +285,9 @@ static int readBoard_(Read *R) {
     R->saving = savingPanels;
     // (the board fuller than it lives longest with -- the life table's peak -- and not saving: while the owner's band saves panels up,
     // the band decides, never the table)
-    // (CHAOS: off. core/material.h's life by panels was measured on vanilla games, where panels mean height; it calls a board of more
-    // than 33 "full", and a full board ranks every line by the panels it leaves -- so it spends them. In chaos the panels are what a
-    // backlog is dug out with: run 11 chain_garbage spent 54 panels to 18 in ten seconds with 10 pieces queued and none on the board,
-    // broke=0, then the backlog dropped on an empty board)
-    R->full = 0 && !savingPanels && panels > lifePeakOf();
+    // (CHAOS: kept. Run 12 turned it off -- run 11 chain_garbage had spent 54 panels to 18 with 10 pieces queued -- and survival fell
+    // from 6/8 to 4/8: a board kept high has less room for the next block. Back on)
+    R->full = !savingPanels && panels > lifePeakOf();
   }
   if (R->under || R->topped) R->by = NOT_ASKED;
   // (ready: garbage on its way and none on the board -- the frames until the next block lands, 0 for one queued to drop once settled)

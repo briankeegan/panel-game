@@ -28,11 +28,9 @@
 # run 11 -- one change: a chain still building ends no sooner than a look-ahead: survived 6/8 -- Level 10 4/4; Level 9 lost
 #          chain_garbage (14737) and thicc_combo_storm (20277). The chain_garbage loss: board clear, 54 panels, 10 pieces queued --
 #          Gambit's vanilla life table calls >33 panels "full" and spent them, 54 to 18, broke=0, then the backlog dropped
-# run 12 -- one change: the vanilla "full board" drive off (decide.c R->full)
-combo_storm 1 9 9 2 21600 9
-chain_garbage 1 9 9 1 21600 9
-thicc_combo_storm 1 9 9 3 21600 9
-insane_combo_storm 1 9 9 2 21600 9
+# run 12 -- one change: the vanilla "full board" drive off (decide.c R->full): survived 4/8 -- worse. L9 lost chain_garbage
+#          (11033) and thicc (9116), L10 lost thicc (11440) and insane (20686). Reverted.
+# run 13 -- Level 10 only (the target now). No change from run 11: does its 4/4 at Level 10 repeat?
 combo_storm 1 9 9 2 21600 10
 chain_garbage 1 9 9 1 21600 10
 thicc_combo_storm 1 9 9 3 21600 10

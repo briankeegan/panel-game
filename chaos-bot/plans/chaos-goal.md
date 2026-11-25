@@ -110,6 +110,10 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 12 (2026-11-25 16:37 ET), the vanilla full-board drive off: survived 4/8 -- worse.** Level 10 2/4 (combo_storm and
+  chain_garbage survived; lost thicc_combo_storm 11440, insane_combo_storm 20686). Level 9 2/4 (lost chain_garbage 11033,
+  thicc_combo_storm 9116, both sooner than run 11). late 0, diverged 0, overruns 0; 16.03 rows a minute. Reverted. Run 13: Level 10
+  only from now on, run 11's bot unchanged, to see whether its 4/4 repeats.
 - **Run 11 (2026-11-25 16:25 ET), a chain still building ends no sooner than a look-ahead: survived 6/8.** **Level 10 4/4** (health
   13/13 each). Level 9 2/4: combo_storm and insane_combo_storm survived; lost chain_garbage at 14737 and thicc_combo_storm at 20277.
   late 0, diverged 0, overruns 0; 16.72 rows a minute. The chain_garbage loss: a backlog of 5-15 queued pieces carried for minutes

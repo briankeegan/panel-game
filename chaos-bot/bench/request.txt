@@ -60,6 +60,9 @@
 #          (the first push of run 23 left rank.c unchanged -- an edit that failed to apply; that run was cancelled, this is run 23)
 #          survived 7/8 (thicc s4 lived, health 13; lost insane s3 12434: 15 pieces burst in at 8008, 15-18 queued for 4,000 frames)
 # run 24 -- one change: under a backlog, the attack list orders no line at all (run 14 took only the hold out) (rank.c)
+#          survived 5/8 -- worse (lost thicc s3 6129, combo s4 5317, insane s4 2431). Reverted
+# run 25 -- one change: the chaos verdict -- a line lives if the board does not die before the bot's next freeze (a break's time
+#          after it, a stop counting as frozen time) and it leaves fuel for that freeze (outcome.c; docs/CHAOS_RULES.md)
 combo_storm 3 9 9 2 21600 10
 chain_garbage 3 9 9 1 21600 10
 thicc_combo_storm 3 9 9 3 21600 10

@@ -122,6 +122,12 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 24 (2026-11-25 18:54 ET), no attack-list order under a backlog: survived 5/8 -- worse.** Lost thicc_combo_storm s3 6129,
+  combo_storm s4 5317, insane_combo_storm s4 2431. Reverted. And the overarching problem (owner: "it's always about to die -- it just
+  has to not die, not die a little longer"): in every decision of every lost game read (3,833) the verdict was v=dies -- no line
+  ever lived, the ranking ran on its tie-breaks, and each run patched another one. A line was alive only if the board stood ~350 frames
+  left alone, past any stop: at chaos speed none does. Run 25: the chaos verdict -- alive to the bot's next freeze (a break's time
+  after the line, a stop being frozen time), with the fuel for it (a three or a breakable garbage). docs/CHAOS_RULES.md.
 - **Run 23 (2026-11-25 18:43 ET), keep the panels whatever the stop left: survived 7/8 (seeds 3, 4).** thicc_combo_storm s4 lived
   with 13 health; lost insane_combo_storm s3 12434 (it lived in runs 21-22). late 0, diverged 0, overruns 0, surprises 0/780; 16.97
   rows a minute. The loss: 15 pieces burst into the queue at 8008 and it stayed 15-18 for 4,000 frames, the bot never digging it

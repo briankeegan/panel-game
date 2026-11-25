@@ -39,6 +39,17 @@ Health is a one-time budget; after ~4 min with margin on, any topped-out frame w
   the hold, the one move that spends health every frame, could win the tie (run 12 insane_combo_storm: holds while topped to the
   loss). Run 18 plans with the board's real health.
 
+### Garbage and stop time (owner: "doesn't stop time change depending on the amount of garbage?" -- yes, three ways)
+
+- **The queue shrinks stop time under chaos margin**: calculateStopTime multiplies by GetMarginTime() -- with margin_time 4,
+  (base - queued pieces) / base, base 50 (30 with ChaosMode); shake time likewise (GetShakeMargin). Margin Off (the benchmark's
+  training) is a factor of 1. Modoki (3) scales by time instead.
+- **Breaking garbage freezes the stack by its size**: pre_stop = FLASH + FACE + POP x combo + GARBAGE_POP x garbage panels matched
+  on screen (every panel of each piece touched, not only the row that converts) + GARBAGE_HOVER, and the popping garbage keeps panels
+  active (rise_lock). Level 10: a three on a 6x2 block, 20+7+18+60+3 = 108 frames, against 45 for a three of panels -- and the block's
+  row comes back as panels. A combo of panels only spends panels for a stop that only replaces what is left.
+- **A landing shakes the stack** 18 + 2 x width x height frames (18-82), rise-locked.
+
 ## Stop time
 `calculateStopTime` (checkMatches.lua:887):
 - 3 shocks matched alone: `20 * metal`

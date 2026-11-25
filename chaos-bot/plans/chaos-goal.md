@@ -120,6 +120,11 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 19 (2026-11-25 17:59 ET), real health only while topped out with no stop: survived 7/8, surprises 0/760.** Lost
+  thicc_combo_storm s1 19895; survivors' health 13, 2, 13, 3, 13, 2, 13; late 0, diverged 0, overruns 0; 17.43 rows a minute. The
+  loss: survive lines clearing panels at stop 70-127 -- stop is a max, a new award only replaces what is left -- panels 45 to 8, no
+  break in reach, then the top-out. Run 20: stopped longer than a break's time, of two dying lines breaking nothing, the one keeping
+  more panels first unless the other lives a break's time longer.
 - **Run 18 (2026-11-25 17:48 ET), planned with the real health: survived 7/8 -- but spent it.** Survivors ended at 1, 1, 1, 7, 3,
   1, 4 health (run 17: 13 in every one); lost thicc_combo_storm s2 at 4450, a game run 17 lived. Planned with 13, the search walks
   into topped-out states it can stand for 12 frames, and health never refills. Reverted to 1. Run 19: 1, and the real pool only

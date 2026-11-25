@@ -949,6 +949,17 @@ static int compareJudged(const Judge *x, const Judge *y) {
       if (lostOf(other) - lostOf(dig) < rankSave) return (cmpKey = __LINE__, (dig == x ? -1 : 1));
     }
   }
+  // (CHAOS, STOP TIME IS A MAX, NOT A SUM: a new award only replaces what is left (checkMatches.lua awardStopTime), so panels cleared
+  // while stopped buy only the difference. Under garbage and stopped longer than a break's time (rankSave, read off the level), of two
+  // lines that both die and break no garbage, the one keeping more panels first, unless the other lives a break's time longer: the
+  // panels are the next break's material -- run 19 thicc s1: survive lines at stop 70-127, panels 45 to 8, then nothing to break with)
+  if (decF.under && decQ.b->stopTime + decQ.b->preStopTime > rankSave && !x->o.lives && !y->o.lives && x->apBroke <= 0 && y->apBroke <= 0) {
+    int32_t px = panelsLeft(x), py = panelsLeft(y);
+    if (px != py) {
+      const Judge *keep = px > py ? x : y, *sp = keep == x ? y : x;
+      if (lostOf(sp) - lostOf(keep) < rankSave) return (cmpKey = __LINE__, (keep == x ? -1 : 1));
+    }
+  }
   // 1. lives before does not -- the line in progress that lives by the horizon alone beside a line of the mode's first entry lost no sooner
   // than it, the two alike: the mode gives way to survival only (the owner), never to a plan that lives by the horizon alone
   if (lx != ly) {

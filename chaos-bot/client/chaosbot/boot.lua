@@ -97,6 +97,12 @@ local function startMatch()
   assert(GAME.battleRoom, "chaosbot: no battle room")
   player:setAttackEngineSettings(pattern)
   player:setWantsReady(true)
+  -- (readying up claims the first controller with a key held down -- BattleRoom.updateInputConfigurationForPlayer -- and nothing is
+  -- held on a headless runner: the controller is claimed here, the keys come from the bot)
+  if not player.inputConfiguration then
+    player:setInputMethod("controller")
+    player:restrictInputs(GAME.input.inputConfigurations[1])
+  end
   math.randomseed(SEED + 7919)   -- the panels the match deals (BattleRoom:createPanelSource draws its seed from math.random)
   say(string.format("match asked: seed %d pattern %s glevel %d gspeed %d queue %d level %d margin %d", SEED, PATTERN, GLEVEL, GSPEED, QUEUE, LEVEL, MARGIN))
 end

@@ -1,4 +1,5 @@
 # THE GAMES TO PLAY: editing this file and pushing it to this branch starts one run of .github/workflows/chaos-bot-games.yml.
 # One game a line: PATTERN SEED GLEVEL GSPEED QUEUE FRAMES   (lines starting with # are ignored)
-# run 1 -- Step 2 smoke: the whole chain end to end (client boots, match starts, bot attached, the game plays a minute)
+# run 1 -- smoke: client booted, match asked, never started (no controller claimed headless): crash at the timeout
+# run 2 -- smoke again: the launcher claims the controller itself
 combo_storm 1 9 9 2 3600

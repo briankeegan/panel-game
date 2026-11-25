@@ -1,0 +1,126 @@
+{
+ "keep": {
+  "material": ">=40"
+ },
+ "raise": {
+  "to": 11
+ },
+ "underGarbage": "break",
+ "opener": [
+  {
+   "name": "opener",
+   "aims": [
+    {
+     "chain": ">=8"
+    },
+    {
+     "chain": ">=6"
+    },
+    {
+     "chain": ">=4"
+    }
+   ],
+   "by": 600
+  }
+ ],
+ "attack": [
+  {
+   "name": "time attack",
+   "when": {
+    "enemy.none": true
+   },
+   "aims": [
+    {
+     "chain": ">=8"
+    }
+   ]
+  },
+  {
+   "name": "finish them",
+   "when": {
+    "enemy.height": ">=11"
+   },
+   "aims": [
+    {
+     "combo": "==8"
+    },
+    {
+     "combo": "==9"
+    },
+    {
+     "combo": "==10"
+    },
+    {
+     "combo": "==5"
+    },
+    {
+     "combo": "==6"
+    },
+    {
+     "combo": "==4"
+    }
+   ]
+  },
+  {
+   "name": "fill",
+   "when": {
+    "enemy.height": "<11"
+   },
+   "aims": [
+    {
+     "chain": "fill"
+    }
+   ],
+   "by": 600
+  },
+  {
+   "name": "big chain",
+   "when": {
+    "enemy.height": "<5"
+   },
+   "aims": [
+    {
+     "chain": ">=8"
+    },
+    {
+     "chain": ">=4"
+    }
+   ],
+   "by": 600
+  },
+  {
+   "name": "pressure",
+   "when": {
+    "enemy.height": ">=9"
+   },
+   "aims": [
+    {
+     "chain": "==4"
+    },
+    {
+     "chain": "==3"
+    }
+   ],
+   "by": 240
+  },
+  {
+   "name": "build",
+   "when": {
+    "enemy.height": "<9"
+   },
+   "aims": [
+    {
+     "chain": "==5"
+    },
+    {
+     "chain": "==3"
+    },
+    {
+     "chain": "==4"
+    }
+   ],
+   "by": 600
+  }
+ ],
+ "opponents": {}
+}

@@ -1,3 +1,5 @@
+-- (CHAOS-BOT COPY: the chaos v3 client's stack, played by Gambit on the chaos engine; the chaos launcher, client/chaosbot/boot.lua,
+-- gives the stack the fork's names it reads: stopWatch, stopWatchIsRunning, isToppedOut)
 -- GAMBIT IN THE GAME'S OWN PROCESS: a stack of the panel-game client played by Gambit (libgambit.so: the C engine, Gambit and its
 -- frame loop, gambit/native.c). Each frame the stack is written into the C engine's board (board.lua) as the player sees it, with the
 -- garbage the senders' telegraphs show and the input budget's window, and the frame loop gives the keys. Nothing is decided here.
@@ -199,9 +201,11 @@ if JIT_CTL then jit.off(GambitNative.load, true) end
 local SOURCE_PIECES = 160
 local function b01(v) return v and 1 or 0 end
 local EMPTY = {}
-local function piece(T, x, g)
+-- (CHAOS: the chaos build times a piece and its transit on the match's clock, which runs ahead of the stack's stopwatch by the
+-- countdown -- off -- so both are told on the stopwatch the frame loop reads them against)
+local function piece(T, x, g, off)
   T[x], T[x + 1], T[x + 2], T[x + 3] = g.width, g.height, b01(g.isChain), b01(g.isMetal)
-  T[x + 4] = g.frameEarned == nil and NUL or g.frameEarned
+  T[x + 4] = g.frameEarned == nil and NUL or g.frameEarned - (off or 0)
   T[x + 5] = g.finalized == nil and NUL or b01(g.finalized)
   return x + 6
 end
@@ -281,6 +285,7 @@ local function viewTelegraph(self, T, x, view, me)
 end
 function GambitNative:telegraph(sources, me, view)
   local T, x = C.gn_tele(), 1
+  local off = (me.clock or 0) - (me.stopWatch or me.clock or 0)
   local n = 0
   for _, src in ipairs(sources or EMPTY) do
     local q = src.outgoingGarbage
@@ -315,8 +320,8 @@ function GambitNative:telegraph(sources, me, view)
           local t = q.transitTimers[k]
           if t and sent < SOURCE_PIECES and (not w or t > src.stopWatch) then
             local list = q.garbageInTransit[t] or EMPTY
-            T[x], T[x + 1] = t, #list; x = x + 2
-            for i = 1, #list do x = piece(T, x, list[i]) end
+            T[x], T[x + 1] = t - off, #list; x = x + 2
+            for i = 1, #list do x = piece(T, x, list[i], off) end
             nt, sent = nt + 1, sent + #list
           end
         end
@@ -325,7 +330,7 @@ function GambitNative:telegraph(sources, me, view)
       local staged = q.stagedGarbage or EMPTY
       local keep = math.max(0, math.min(#staged, SOURCE_PIECES - sent))
       T[x] = keep; x = x + 1
-      for i = #staged - keep + 1, #staged do x = piece(T, x, staged[i]) end
+      for i = #staged - keep + 1, #staged do x = piece(T, x, staged[i], off) end
     end
   end
   T[0] = n

@@ -1,0 +1,105 @@
+# The chaos bot's games (chaos-bot/plans/chaos-goal.md §2): one job a game in the real chaos v3 client, headless, then a report.
+# Started only by a push to this project's branch that changes chaos-bot/bench/request.txt (the games to play, one a line), so a
+# run is always asked for on purpose. Shares nothing with Gambit's workflows: its own name, concurrency group, artifact names, cache key.
+name: chaos-bot games
+on:
+  push:
+    branches: [ccr-9ee25bfb-744765]
+    paths: ['chaos-bot/bench/request.txt']
+concurrency:
+  group: chaos-bot-games
+  cancel-in-progress: false
+permissions:
+  contents: read
+  actions: read
+jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    outputs:
+      games: ${{ steps.games.outputs.games }}
+    steps:
+      - uses: actions/checkout@v4
+      # (the runners are shared with Gambit: no game starts while a gambit-24 run is in progress -- waits up to an hour)
+      - name: Wait while Gambit's benchmark runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for i in $(seq 1 60); do
+            n=$(curl -fsS -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/briankeegan/GameCreator/actions/workflows/gambit-24.yml/runs?status=in_progress" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("total_count", 0))' || echo 0)
+            [ "$n" = 0 ] && { echo "no gambit-24 run in progress"; exit 0; }
+            echo "gambit-24 in progress ($n): waiting"; sleep 60
+          done
+          echo "::warning::gambit-24 still running after an hour; playing anyway"
+      - id: games
+        run: |
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          games = []
+          for line in open("chaos-bot/bench/request.txt"):
+              f = line.split()
+              if not f or f[0].startswith("#"): continue
+              p, seed, gl, gs, q, frames = f[:6]
+              games.append({"pattern": p, "seed": int(seed), "glevel": int(gl), "gspeed": int(gs), "queue": int(q), "frames": int(frames), "n": len(games) + 1})
+          assert games, "no games in request.txt"
+          print("games=" + json.dumps(games))
+          PY
+  play:
+    needs: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix:
+        game: ${{ fromJSON(needs.plan.outputs.games) }}
+    name: game ${{ matrix.game.n }} ${{ matrix.game.pattern }} seed ${{ matrix.game.seed }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: love, cached
+        uses: actions/cache@v4
+        with:
+          path: /tmp/love.tar.gz
+          key: chaosbot-love-12.0-linux-x86_64
+      - name: xvfb, love, clang
+        run: |
+          APT="-o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o DPkg::Lock::Timeout=120"
+          for i in 1 2 3; do timeout 240 sudo apt-get $APT update && timeout 240 sudo apt-get $APT install -y libfuse2 xvfb clang && break; sleep 10; done
+          mkdir -p ~/love2d
+          [ -s /tmp/love.tar.gz ] || for i in 1 2 3 4 5 6; do curl -fsSL "https://github.com/panel-attack/panel-game/releases/download/love2d-12.0/love-12.0-linux-x86_64.tar.gz" -o /tmp/love.tar.gz && break; sleep $((i * 15)); done
+          tar -xzf /tmp/love.tar.gz -C ~/love2d
+          mv ~/love2d/*.AppImage ~/love2d/love.AppImage
+          chmod +x ~/love2d/love.AppImage
+      - name: Play
+        env:
+          LOVE: /home/runner/love2d/love.AppImage
+        run: |
+          g='${{ toJSON(matrix.game) }}'
+          bash chaos-bot/bench/play.sh ${{ matrix.game.pattern }} ${{ matrix.game.seed }} ${{ matrix.game.glevel }} ${{ matrix.game.gspeed }} ${{ matrix.game.queue }} ${{ matrix.game.frames }} out
+          echo "::notice title=game ${{ matrix.game.n }}::$(cat out/result.txt)"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: chaosbot-game-${{ matrix.game.n }}
+          path: out/
+          if-no-files-found: warn
+          retention-days: 14
+  report:
+    needs: [plan, play]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: chaosbot-game-*
+          path: games
+      - name: Report
+        run: |
+          python3 chaos-bot/bench/report.py games '${{ needs.plan.outputs.games }}' | tee report.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: chaosbot-report
+          path: report.txt

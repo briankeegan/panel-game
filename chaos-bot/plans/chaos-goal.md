@@ -39,6 +39,10 @@ starts with the last benchmark's number (survived x/N, frames lost at, health le
 - **The report prints, every run, as data:** survived x/N; each loss's frame and pattern; health left at the end of each game and
   the health lost to garbage on the top row; garbage sent a minute; the budgets (frames over the think budget, late moves,
   divergences between the board the bot predicted and the one the game made); and the time the run finished, in ET on the 24-hour clock.
+- **The forecast is checked every run (owner: fix it in the infrastructure, 2026-11-25 17:15 ET):** each garbage arrival's notice --
+  frames the bot's telegraph forecast had garbage inside its look-ahead before it came -- is measured (gambit native.c noticeCheck);
+  an arrival with under 60 frames (the fall) is a **surprise**. The report prints surprises/arrivals per game and for the run, and
+  the gambit.log lists each surprise (ARRIVE). A forecast change is judged on surprises going to 0, not guessed from a loss.
 - **N = 8 (the owner, 2026-11-25 16:55 ET):** the 4 patterns (combo_storm, chain_garbage, thicc_combo_storm, insane_combo_storm)
   x seeds 1 and 2, garbage level 9 speed 9, at chaos Level 10. Once a run is 8/8, the seeds change (3 and 4, and so on).
 - **One run per change, judged on whether its deaths go away.** The bot must survive whatever the seed or the runner's timing:

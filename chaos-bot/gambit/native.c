@@ -332,6 +332,30 @@ static void *reapMain(void *arg) {
   }
 }
 static void reapEnd(void) { __atomic_store_n(&reapQuit, 1, __ATOMIC_SEQ_CST); __atomic_fetch_add(&reapWord, 1, __ATOMIC_SEQ_CST); hostFutexWake(&reapWord, -1); }
+// THE FORECAST CHECKED (CHAOS): how much notice the telegraph gave of each garbage arrival. From the first frame the soonest forecast
+// arrival is inside the look-ahead (HORIZON, read off the level) and stays inside it, to the frame the stack's queue grows: under LAND
+// frames (the fall the bot always has once a transit is shipped) the arrival was a surprise -- the forecast did not see it in time to
+// plan for it. Logged (ARRIVE) and counted in the match's stats (arrivals, surprises, noticeMin), so every run says whether the
+// forecast holds, not a loss read by hand.
+static int32_t ncPrevInc = -1, ncWarnedFrom = NUL, ncPrevClock = NUL, ncLogged;
+static void noticeCheck(const Board *b) {
+  int32_t now = b->clock, soonest = NUL;
+  if (ncPrevClock != NUL && now < ncPrevClock) { ncPrevInc = -1; ncWarnedFrom = NUL; ncLogged = 0; F.st.noticeMin = 0; }   // (a new game)
+  ncPrevClock = now;
+  for (int i = 0; i < F.narr; i++) if (soonest == NUL || F.arr[i].at < soonest) soonest = F.arr[i].at;
+  int32_t warnedFrom = ncWarnedFrom;
+  if (ncPrevInc >= 0 && b->ninc > ncPrevInc) {
+    int32_t notice = warnedFrom == NUL ? 0 : now - warnedFrom;
+    F.st.arrivals++;
+    if (F.st.arrivals == 1 || notice < F.st.noticeMin) F.st.noticeMin = notice;
+    if (notice < LAND) {
+      F.st.surprises++;
+      if (ncLogged < 200) { char l[96]; snprintf(l, sizeof l, "ARRIVE clock %d pieces %d notice %d surprise", now, b->ninc - ncPrevInc, notice); flog(l); ncLogged++; }
+    }
+  }
+  ncPrevInc = b->ninc;
+  ncWarnedFrom = soonest != NUL && soonest - now <= HORIZON ? (ncWarnedFrom == NUL ? now : ncWarnedFrom) : NUL;
+}
 int gn_setup(int reaction, int swapGap, int cursor, int ahead, int gap, int jitter, int planHealth, const char *logPath) {
   hostTaps = 1;
   // (the io the host writes every frame, every page of it written once here, before play: a page the kernel maps on its first write cost
@@ -456,6 +480,7 @@ int gn_frame(int limit, int window, int nages, int oppHas, int oppOut, int oppTo
   double t0 = clock_ms();
   arrivalsOf(F.truth);
   double t1 = clock_ms();
+  noticeCheck(F.truth);
   int32_t bits = frontFrame();
   double t2 = clock_ms();
   afterFrame(bits);

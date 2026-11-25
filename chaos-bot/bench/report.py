@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """THE BENCHMARK'S REPORT (plans/chaos-goal.md §2), as data, from each game's artifact:
   result.txt  -- the launcher's RESULT line (survived, frames, health, garbage sent, think budget)
-  gambit.log  -- Gambit's frame loop: its "match over: {...}" stats line (late answers, divergences)
+  gambit.log  -- Gambit's frame loop: its "match over: {...}" stats line (late answers, divergences, and the forecast checked:
+                 garbage arrivals, those with under 60 frames of notice -- surprises -- and the least notice, native.c noticeCheck)
 
   report.py GAMES_DIR 'GAMES_JSON'     (GAMES_JSON: the games asked, as the workflow's plan job wrote them)
 
@@ -32,7 +33,7 @@ def parse_stats(path):
 
 def main():
     games_dir, asked = sys.argv[1], json.loads(sys.argv[2])
-    rows, survived, late, diverged, overruns = [], 0, 0, 0, 0
+    rows, survived, late, diverged, overruns, arrivals, surprises = [], 0, 0, 0, 0, 0, 0
     sent, played = 0.0, 0
     for g in asked:
         d = os.path.join(games_dir, "chaosbot-game-%d" % g["n"])
@@ -40,19 +41,20 @@ def main():
         s = parse_stats(os.path.join(d, "gambit.log")) or {}
         ok = r.get("survived") == "1"
         survived += ok
+        arrivals += int(s.get("arrivals", 0)); surprises += int(s.get("surprises", 0))
         late += int(s.get("late", 0)); diverged += int(s.get("diverged", 0)); overruns += int(r.get("overruns", 0))
         fr = int(r.get("frames", -1))
         if fr > 0:
             played += fr; sent += float(r.get("sentRows", 0))
-        rows.append("game %d level %s pattern %s seed %d frames %s survived %d lostAt %s health %s healthLostTop %s gpm %s late %s diverged %s overruns %s worstMs %s reason %s" % (
+        rows.append("game %d level %s pattern %s seed %d frames %s survived %d lostAt %s health %s healthLostTop %s gpm %s late %s diverged %s overruns %s worstMs %s surprises %s/%s noticeMin %s reason %s" % (
             g["n"], g.get("level", 9), g["pattern"], g["seed"], r.get("frames", -1), ok, r.get("lostAt", -1), r.get("health", -1), r.get("healthLostTop", -1),
-            r.get("gpm", -1), s.get("late", "?"), s.get("diverged", "?"), r.get("overruns", "?"), r.get("worstMs", "?"), r.get("reason", "?")))
+            r.get("gpm", -1), s.get("late", "?"), s.get("diverged", "?"), r.get("overruns", "?"), r.get("worstMs", "?"), s.get("surprises", "?"), s.get("arrivals", "?"), s.get("noticeMin", "?"), r.get("reason", "?")))
     for row in rows:
         print(row)
     from zoneinfo import ZoneInfo
     et = datetime.datetime.now(ZoneInfo("America/New_York"))
-    print("run games %d survived %d/%d late %d diverged %d overruns %d gpm %.2f finished %s ET" % (
-        len(asked), survived, len(asked), late, diverged, overruns, sent * 3600 / played if played else 0, et.strftime("%Y-%m-%d %H:%M")))
+    print("run games %d survived %d/%d late %d diverged %d overruns %d surprises %d/%d gpm %.2f finished %s ET" % (
+        len(asked), survived, len(asked), late, diverged, overruns, surprises, arrivals, sent * 3600 / played if played else 0, et.strftime("%Y-%m-%d %H:%M")))
     if len(rows) != len(asked):
         print("report: read %d games of %d asked" % (len(rows), len(asked)))
         sys.exit(1)

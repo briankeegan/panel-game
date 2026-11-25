@@ -1,6 +1,4 @@
-run 45538326790, as of 2026-11-25T03:27:57Z
-opponent topped out: clock 7980 stopWatch 7792 stop 0 pre-stop 0 shake 0 health 16, top rows r12=gggg00 r11=000ggg r10=gggggg
-opponent topped out: clock 7980 stopWatch 7792 stop 0 pre-stop 0 shake 0 health 16, top rows r12=gggg00 r11=000ggg r10=gggggg
+run 45538326790, as of 2026-11-25T03:30:01Z
 opponent topped out: clock 8010 stopWatch 7822 stop 0 pre-stop 332 shake 0 health 8, top rows r12=gggg00 r11=000ggg r10=gggggg
 opponent topped out: clock 8040 stopWatch 7852 stop 0 pre-stop 302 shake 0 health 8, top rows r12=gggg00 r11=000ggg r10=gggggg
 opponent topped out: clock 8070 stopWatch 7882 stop 0 pre-stop 272 shake 0 health 8, top rows r12=gggg00 r11=000ggg r10=gggggg
@@ -149,3 +147,5 @@ game about to start: both players are ready
 set over: the room is closed, back in the lobby
 game about to start: both players are ready
 set over: the room is closed, back in the lobby
+stop requested and no game is running: sitting out 8 s without readying, then leaving
+leaving

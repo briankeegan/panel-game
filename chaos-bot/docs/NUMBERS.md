@@ -28,7 +28,7 @@ below was set for that game. Each is changed **one at a time**, judged on the be
 | Number | Where | Vanilla | Chaos | Status |
 |---|---|---|---|---|
 | `HORIZON` 240, `REST` 120 (`AT_LEVEL`, scaled by `LEVEL11_BREAK` 97) | `outcome.c` | level-11 frames | Level 9's break time scales them; whether 240 is the right reach under chaos garbage rates is open | open |
-| `planHealth` 1 | profile `setup` | health planned as 1 frame (vanilla refills) | chaos health is permanent: plan with the real health and price what a line spends, or keep 1 | next after run 4 |
+| `planHealth` 1 | profile `setup` | health planned as 1 frame (vanilla refills) | 0 = the board's real health (13 at Level 10, falling as spent): chaos drains it only on idle topped frames, and at 1 every topped line "died" alike, the hold winning the tie | done, run 18 |
 | `core/material.h` | `core/` | the life a board has by its panels, measured on vanilla games; >33 panels "full" | run 12 turned its "full board" drive off (`decide.c R->full`): survival fell 6/8 to 4/8, reverted -- kept on | tried, run 12 |
 
 ## 3. Attack sizes (what a clear sends)

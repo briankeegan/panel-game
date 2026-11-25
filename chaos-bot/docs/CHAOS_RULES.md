@@ -19,6 +19,26 @@ Baseline for diffs: panel-game `bramp/multi-player` (c924107), which is what Gam
 
 Health is a one-time budget; after ~4 min with margin on, any topped-out frame without stop/shake = death.
 
+### What a topped-out frame costs (read again 2026-11-25, owner: "read the engine rules")
+
+- **rise_lock** (Stack.lua:1893) is on while a swap is queued, a garbage shake runs, or any panel is active this frame or last
+  (`hasActivePanels`: swapping, matched, popping, falling panels; garbage not "normal"). Health drains only on a frame topped out
+  with stop_time 0 **and no rise_lock** (Stack.lua:1253). So a topped-out board loses nothing while anything on it moves.
+- **Garbage never drops while topped out** (shouldDropGarbage: `panels_in_top_row` false first; any panel above row 12 too,
+  Stack.lua:1151-1170). Landed garbage in row 12 is "dangerous" (Panel.dangerous: garbage not falling).
+- **Wiggling is charged** (WigglePay.lua): topped out, no stop, no shake, nothing moving but swapping panels -- a swap repeating a
+  pair already swapped to escape costs swapStallingPunish (4) health, or is refused at 4 or under.
+- **Game over** needs health <= 0 *and* no shake running (Stack.lua:1932).
+- **Breaking garbage** turns one row of each touched piece into panels per match (checkMatches.lua convertGarbagePanels);
+  a block 2 tall takes two matches. Stop time only for combos of 4+ or chains, the largest award kept, x1.25 topped out
+  (x1.5625 a chain topped out); a manual raise sets stop_time 0.
+- **Drops by queue type** (shouldDropGarbage): 1 classic and 3 chaos drop only with no panel active (swapping too), or a chain
+  more than 1 tall; 2 modern drops when nothing is matching or chaining, or right after a landing that was not matched.
+- **For the bot:** health is a permanent pool (13 at Level 10), spent only on idle topped frames. Gambit planned every board with
+  health 1 (`planHealth`, vanilla: health refills, so any idle topped frame was the end) -- every topped line then "died" alike and
+  the hold, the one move that spends health every frame, could win the tie (run 12 insane_combo_storm: holds while topped to the
+  loss). Run 18 plans with the board's real health.
+
 ## Stop time
 `calculateStopTime` (checkMatches.lua:887):
 - 3 shocks matched alone: `20 * metal`

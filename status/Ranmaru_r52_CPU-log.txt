@@ -1,15 +1,4 @@
-run 45694482610, as of 2026-11-25T22:15:01Z
-match start: building the match (seed nil, stage nil, opponent ?)
-match start: the match is built
-match start: the match is started
-match start: gambit: creating the link
-match start: gambit: the link is created
-match start: gambit: the link is starting the match
-match start: gambit: the link has started the match
-both ready — match starting
-garbage landed: our stopWatch 316 clock 504, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
-garbage landed: our stopWatch 965 clock 1153, transits in flight before this frame {965}, opponent copy 1 frames behind, rollbacks so far 0
-garbage landed: our stopWatch 2724 clock 2912, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+run 45694482610, as of 2026-11-25T22:17:06Z
 opponent topped out: clock 3000 stopWatch 2812 stop 58 pre-stop 0 shake 56 health 1, top rows r12=gggggg r11=000002 r10=000006
 opponent topped out: clock 3030 stopWatch 2842 stop 28 pre-stop 0 shake 56 health 1, top rows r12=gggggg r11=gggggg r10=000002
 opponent topped out: clock 3060 stopWatch 2872 stop 0 pre-stop 0 shake 66 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
@@ -149,3 +138,14 @@ match over — bot won (pace: worst 0.40 frames off schedule); waiting for a rem
 memory after match: rss 2689220 kB, threads 9, lua 57919 kB
 game about to start: both players are ready
 set over: the room is closed, back in the lobby
+game about to start: both players are ready
+match start: building the match (seed nil, stage nil, opponent ?)
+match start: the match is built
+match start: the match is started
+match start: gambit: creating the link
+match start: gambit: the link is created
+match start: gambit: the link is starting the match
+match start: gambit: the link has started the match
+both ready — match starting
+garbage landed: our stopWatch 413 clock 601, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 1072 clock 1260, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0

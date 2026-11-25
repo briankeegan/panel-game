@@ -107,6 +107,10 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 8 (2026-11-25 15:51 ET), don't stall the queue: survived 4/4** at Level 9 (combo_storm, chain_garbage, thicc_combo_storm,
+  insane_combo_storm, seed 1, garbage level 9 speed 9), every game health 17/17, none lost on the top row; 16.45 rows a minute
+  (18.39 / 18.58 / 10.17 / 18.67); late 0, diverged 0, overruns 0 (worst frame 1.3 ms). First N/N; the gate wants it twice in a row.
+  Run 9: the same 4 at Level 9 again, and the same 4 at Level 10 (the owner: every number dynamic, play on 9 or 10).
 - **Run 7 (2026-11-25 14:47 ET), raise offered only when the game takes it, no floor: survived 2/4.** Survived chain_garbage
   (17.86 rows/min) and thicc_combo_storm. Lost combo_storm at 5692 and insane_combo_storm at 13964 (was 5573; 23.46 rows/min).
   late 0, diverged 0, overruns 0. No raise was ever offered. The combo_storm loss: no garbage ever landed -- chaos drops queued

@@ -17,9 +17,13 @@
 #          offered (never allowed under garbage). Lost combo_storm at 5692: no garbage ever landed -- 13-15 pieces held at the door
 #          while the bot cleared every ~14 frames (the modern queue drops only on a quiet board), 47 panels burned to 9, broke=0;
 #          insane_combo_storm lasted 13964 (was 5573)
-# run 8 -- one change: don't stall the queue (decide.c): with garbage waiting and none on the board, a line that breaks none gives
-#          way to leaving the board alone, while what waits fits under the level's ceiling
-combo_storm 1 9 9 2 21600
-chain_garbage 1 9 9 1 21600
-thicc_combo_storm 1 9 9 3 21600
-insane_combo_storm 1 9 9 2 21600
+# run 8 -- one change: don't stall the queue (decide.c): survived 4/4, health 17/17 each, 16.45 rows a minute, 0 late/diverged
+# run 9 -- no change to the bot: the same 4 at Level 9 again (twice in a row), and the same 4 at Level 10
+combo_storm 1 9 9 2 21600 9
+chain_garbage 1 9 9 1 21600 9
+thicc_combo_storm 1 9 9 3 21600 9
+insane_combo_storm 1 9 9 2 21600 9
+combo_storm 1 9 9 2 21600 10
+chain_garbage 1 9 9 1 21600 10
+thicc_combo_storm 1 9 9 3 21600 10
+insane_combo_storm 1 9 9 2 21600 10

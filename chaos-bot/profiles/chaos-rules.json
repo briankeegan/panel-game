@@ -103,8 +103,5 @@
   }
  ],
  "opponents": {},
- "_chaos": "chaos-bot: gambit-rules.json (copied), changed for chaos: raise to -1 = the ceiling computed from the level being played (decide.c chaosRaiseTo: the board height less the rows the stack rises within the look-ahead and 3 for a block; row 6 at Level 9's start, row 5 at Level 10's, row 3 once the speed climbs); material floor 36 panels (half the board; was 40 with a fixed raise to row 11); no opener",
- "keep": {
-  "material": ">=36"
- }
+ "_chaos": "chaos-bot: gambit-rules.json (copied), changed for chaos: raise to -1 = the ceiling computed from the level being played (decide.c chaosRaiseTo); a raise is an option only when the chaos engine takes one that frame (decide.c chaosRaisable: no swap queued, no shake, nothing moving, nothing in the top row, no raise running) and is never waited for; no material floor; no opener chain"
 }

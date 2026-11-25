@@ -313,7 +313,12 @@ static int readBoard_(Read *R) {
   raiseRefill = refill; raiseOpening = opening; raiseTo = to;
   int32_t rowsUp = to - (opening ? fullTop(decQ.b) : panelTop(decQ.b));
   raiseRows = rowsUp;
-  R->low = to && (opening || refill || taRaise) && rowsUp > 0; R->up = R->low && !cascadeLive(decQ.b) && canRaiseNow;
+  // (CHAOS: A RAISE IS AN OPTION ONLY WHEN THE GAME TAKES ONE -- the owner: the decision is offered only when it is allowed. The chaos
+  // engine raises on the press only with no swap queued, no shake, nothing moving, nothing in the top row and no raise running
+  // (ca.c controls and the manual raise: rise lock, panels_in_top_row, prevent_manual_raise); otherwise no raise is asked or waited for)
+  int chaosRaisable = !swapQueued(decQ.b) && decQ.b->shakeTime == 0 && !hasActivePanels(decQ.b) && !hasPanelsInTopRow(decQ.b) &&
+                      !decQ.b->preventManualRaise && !decQ.b->manualRaise;
+  R->low = to && (opening || refill || taRaise) && rowsUp > 0 && chaosRaisable; R->up = R->low && !cascadeLive(decQ.b) && canRaiseNow;
   refillAsked = refillReady = refillAlive = 0; raiseWait = 0; opRaiseLog[4] = 0;
   // (THE FLOOR'S RAISE, TIMED: a board busy now -- a cascade, panels moving, the shake -- is one the engine would not raise; it is run on,
   // left alone with the garbage shown landing as the game lands it, to the first frame it would (search/ready.c raiseOpenIn), and the
@@ -322,7 +327,7 @@ static int readBoard_(Read *R) {
   // (and THE OPENING'S RAISE, TIMED THE SAME: the owner -- raise up to 11 before the first garbage; a chain begun first holds the raise
   // shut until it ends, and the garbage lands on the board short of it: set 86 combo_storm 5 fill, the raise asked from 192 and never
   // pressed, the chain's links spending the panels 36 to 11, the board lost at 766; the players raise in the first second, then build)
-  if ((refill || opening) && R->low && !R->up && !clockOut()) {
+  if (0 && (refill || opening) && R->low && !R->up && !clockOut()) {   // (chaos: never waited for -- a raise is asked only when taken now)
     if (!raiseWaitBoard) raiseWaitBoard = nb_new();
     int32_t w = raiseWaitBoard ? raiseOpenIn(&decQ, RAISE_WAIT, raiseWaitBoard) : NOT_ASKED;
     if (w > 0) {

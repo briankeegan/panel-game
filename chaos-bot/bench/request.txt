@@ -11,6 +11,9 @@
 #          the floor's raise too (decide.c raises only when `to` > 0)
 # run 5 -- one change: the raise ceiling computed from the level (decide.c chaosRaiseTo) and the material floor back at 36 panels
 #          (cancelled while it waited for Gambit's benchmark; asked again as run 6 with no wait, the same games)
+# run 6 -- survived 2/4 (worse): lost chain_garbage (17483) and insane_combo_storm (5573). The raise was asked ~20 times a game and
+#          never pressed -- under chaos garbage the stack is never still enough to take one; the material floor changed the play
+# run 7 -- run 4's rules (no floor) + a raise offered only when the game takes one that frame, up to the level's ceiling (owner)
 combo_storm 1 9 9 2 21600
 chain_garbage 1 9 9 1 21600
 thicc_combo_storm 1 9 9 3 21600

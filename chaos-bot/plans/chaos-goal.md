@@ -1,8 +1,11 @@
 # The chaos bot's goal
 
-**The target: a bot that survives every game of the chaos benchmark to the end -- 6 minutes (21,600 frames) at chaos Level 9 --
-twice in a row, with 0 divergences, 0 late moves and 0 frames over the think budget. Then as much garbage sent as survival allows.
-Then Level 10.**
+**The target: a bot that survives every game of the chaos benchmark to the end -- 6 minutes (21,600 frames) at chaos Level 10 --
+twice in a row, with 0 divergences, 0 late moves and 0 frames over the think budget. Then as much garbage sent as survival allows.**
+
+*(The owner, 2026-11-25: "just focus on level 10 -- making sure everything is dynamic, so it will work on 9, 8, 7". The benchmark is
+Level 10 only. Every number the bot uses is read off the level being played (docs/NUMBERS.md), never tuned to one level, so the same
+bot plays 9, 8 and 7.)*
 
 Nothing else counts as progress. A plan, a doc or an engine is a step toward this line, never a result. Every report to the owner
 starts with the last benchmark's number (survived x/N, frames lost at, health left), or says plainly that no bot plays yet.
@@ -32,7 +35,7 @@ starts with the last benchmark's number (survived x/N, frames lost at, health le
 - A workflow in this repo plays **N games**: every chaos training pattern on fixed seeds, one job per game, plus a report job. The
   same seeds every run until the bot survives them all; only then new seeds. Write the patterns, N and the seeds into this file
   (section 6) before the first run.
-- Each game is chaos Level 9, ends at frame 21,600 or at the loss, and its job uploads the game's log.
+- Each game is chaos Level 10, ends at frame 21,600 or at the loss, and its job uploads the game's log.
 - **The report prints, every run, as data:** survived x/N; each loss's frame and pattern; health left at the end of each game and
   the health lost to garbage on the top row; garbage sent a minute; the budgets (frames over the think budget, late moves,
   divergences between the board the bot predicted and the one the game made); and the time the run finished, in ET on the 24-hour clock.
@@ -60,7 +63,7 @@ N/N survived, twice in a row, budgets at 0.
 **Step 4 -- attack.** Garbage sent a minute, raised without giving up a single game of Step 3. Every change is checked against
 survival first. *Done when:* the owner says the rate is enough, or names a number.
 
-**Step 5 -- Level 10.** The same benchmark at chaos Level 10, Steps 3 and 4 again.
+**Step 5 -- the lower levels.** The same benchmark at Levels 9, 8 and 7, with no change to the bot: every number is the level's.
 
 ## 4. Chaos rules the bot must respect (from `docs/CHAOS_RULES.md`)
 

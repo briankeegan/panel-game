@@ -6,7 +6,7 @@ engine already holds every frame (`ca.h` Board): `fHOVER`, `fGARBAGE_HOVER`, `fF
 fall times), `stopBase` (stop time), `maxHealth`/`health`, `speed` and `caRiseFrames(speed)` (rise), `marginTime`/`marginCounter`,
 `queueType`, `colorCount`. Gambit already does this for its horizons (`outcome.c` `AT_LEVEL`: level-11 frames scaled by the level's
 break time); every change here follows that pattern, and the benchmark is run at Level 9 and Level 10 (`bench/request.txt` LEVEL)
-before a change counts.
+before a change counts. *(Owner, later: the benchmark is Level 10 only; the numbers stay level-read so 9, 8, 7 work too.)*
 
 Gambit (the frozen copy in `gambit/`) was tuned on vanilla Level 11, where health refills and the server limits inputs. Every number
 below was set for that game. Each is changed **one at a time**, judged on the benchmark by whether its deaths go away

@@ -120,6 +120,12 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 16 (2026-11-25 17:28 ET), run 15's bot with the forecast checked: survived 4/8, surprises 0/632.** Every garbage arrival
+  was foreseen 151 frames or more: the forecast is right. Lost thicc_combo_storm s1 19423, insane_combo_storm s1 7349, combo_storm
+  s2 19613, insane_combo_storm s2 13010; late 0, diverged 0, overruns 0; 17.47 rows a minute. The losses are the dig: insane s1
+  carried 15-24 queued pieces for 1,700 frames, its panels 40 to 7 on survive lines that broke nothing (stop time bought with the
+  next break's panels), no raise. Run 17: under a backlog, of two lines that both die, the one breaking more garbage rows first,
+  unless the other lives a break's time longer.
 - **Run 15 (2026-11-25 17:19 ET), a chain still building ends one link gap after its last link: survived 4/8.** combo_storm s2
   (run 14's burst loss) survived; lost thicc_combo_storm s1 14050, insane_combo_storm s1 20962, chain_garbage s2 12885,
   thicc_combo_storm s2 12138. late 0, diverged 0, overruns 0; 16.33 rows a minute. Run 16: the same bot with the forecast checked

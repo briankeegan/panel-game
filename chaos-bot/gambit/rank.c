@@ -938,6 +938,17 @@ static int compareJudged(const Judge *x, const Judge *y) {
     const Judge *keep = panelsLeft(x) > panelsLeft(y) ? x : y, *sp = keep == x ? y : x;
     if (lostOf(sp) - lostOf(keep) < ((panelsLeft(keep) - panelsLeft(sp)) / 3) * rankSave) return (cmpKey = __LINE__, (keep == x ? -1 : 1));
   }
+  // (CHAOS, DIG THE BACKLOG: under garbage with more queued, of two lines that both die, the one breaking more rows of garbage first,
+  // unless the other lives a break's time (rankSave, read off the level) longer. Garbage broken is panels made and the backlog shrunk;
+  // a life bought with stop time spends the panels the next break needs -- run 16 insane_combo_storm s1: 15-24 pieces queued for 1,700
+  // frames, panels 40 to 7 on survive lines breaking nothing, then the top-out)
+  if (decF.under && decQ.b->ninc > 0 && !x->o.lives && !y->o.lives) {
+    int32_t bx = imax(0, x->apBroke) / W, by = imax(0, y->apBroke) / W;
+    if (bx != by) {
+      const Judge *dig = bx > by ? x : y, *other = dig == x ? y : x;
+      if (lostOf(other) - lostOf(dig) < rankSave) return (cmpKey = __LINE__, (dig == x ? -1 : 1));
+    }
+  }
   // 1. lives before does not -- the line in progress that lives by the horizon alone beside a line of the mode's first entry lost no sooner
   // than it, the two alike: the mode gives way to survival only (the owner), never to a plan that lives by the horizon alone
   if (lx != ly) {

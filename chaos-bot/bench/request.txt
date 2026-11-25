@@ -3,7 +3,10 @@
 # run 1 -- smoke: client booted, match asked, never started (no controller claimed headless): crash at the timeout
 # run 2 -- smoke: survived 3600/3600 frames, health 17/17, 16 garbage rows a minute, 0 late, but 25 divergences -- all in the
 #          incoming queue: the telegraph's pieces told on the stopwatch, the game's queue still on the clock (fixed in board.lua)
-# run 3 -- Step 2's gate: 4 whole games (6 minutes or the loss), four patterns, the three queue types
+# run 3 -- Step 2's gate: 4 whole games, four patterns, the three queue types: survived 2/4, 0 diverged, 0 late. Lost combo_storm
+#          (18583) and insane_combo_storm (8658), 17 health each on the top row. Gambit judged EVERY line dying from frame ~459 in
+#          both: its vanilla rules raise the stack to row 11 and keep 40 panels (the opener raised 10 times by frame 447)
+# run 4 -- one change: the chaos rules (profiles/chaos-rules.json): no raise, no material floor, no opener; same games, same seeds
 combo_storm 1 9 9 2 21600
 chain_garbage 1 9 9 1 21600
 thicc_combo_storm 1 9 9 3 21600

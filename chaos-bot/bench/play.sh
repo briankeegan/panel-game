@@ -16,7 +16,7 @@ gd="$work/gambit"
 mkdir -p "$gd/lua"
 (cd "$here/gambit" && clang -O3 -march=native -pthread -fPIC -shared -Wl,-z,nodelete -DPA_HEAP -w native.c host.c -lm -o "$gd/libgambit.so")
 cp "$here/gambit/lua/GambitNative.lua" "$here/gambit/lua/board.lua" "$gd/lua/"
-cp "$here/profiles/gambit-finish.words" "$gd/gambit.words"
+cp "$here/profiles/${CHAOSBOT_PROFILE:-chaos}.words" "$gd/gambit.words"   # (profiles/<name>.words: chaos by default)
 
 # the game, pinned, with the launcher laid in
 "$here/game/fetch.sh" "$work/build" > /dev/null

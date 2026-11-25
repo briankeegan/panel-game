@@ -1,0 +1,107 @@
+{
+ "raise": {
+  "to": 0
+ },
+ "underGarbage": "break",
+ "attack": [
+  {
+   "name": "time attack",
+   "when": {
+    "enemy.none": true
+   },
+   "aims": [
+    {
+     "chain": ">=8"
+    }
+   ]
+  },
+  {
+   "name": "finish them",
+   "when": {
+    "enemy.height": ">=11"
+   },
+   "aims": [
+    {
+     "combo": "==8"
+    },
+    {
+     "combo": "==9"
+    },
+    {
+     "combo": "==10"
+    },
+    {
+     "combo": "==5"
+    },
+    {
+     "combo": "==6"
+    },
+    {
+     "combo": "==4"
+    }
+   ]
+  },
+  {
+   "name": "fill",
+   "when": {
+    "enemy.height": "<11"
+   },
+   "aims": [
+    {
+     "chain": "fill"
+    }
+   ],
+   "by": 600
+  },
+  {
+   "name": "big chain",
+   "when": {
+    "enemy.height": "<5"
+   },
+   "aims": [
+    {
+     "chain": ">=8"
+    },
+    {
+     "chain": ">=4"
+    }
+   ],
+   "by": 600
+  },
+  {
+   "name": "pressure",
+   "when": {
+    "enemy.height": ">=9"
+   },
+   "aims": [
+    {
+     "chain": "==4"
+    },
+    {
+     "chain": "==3"
+    }
+   ],
+   "by": 240
+  },
+  {
+   "name": "build",
+   "when": {
+    "enemy.height": "<9"
+   },
+   "aims": [
+    {
+     "chain": "==5"
+    },
+    {
+     "chain": "==3"
+    },
+    {
+     "chain": "==4"
+    }
+   ],
+   "by": 600
+  }
+ ],
+ "opponents": {},
+ "_chaos": "chaos-bot: gambit-rules.json (copied) with the vanilla stack-building taken out for chaos Level 9 -- no raise (was to row 11), no material floor (was >=40 panels), no opener (was an 8-chain by frame 600): health never refills in chaos, so the stack is kept low"
+}

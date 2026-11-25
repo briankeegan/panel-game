@@ -1,0 +1,24 @@
+{
+ "name": "ChaosGambit",
+ "planHealth": 1,
+ "weights": "trained.pbt.pbt-r22-s322.0926-142336.g03120.json",
+ "reaction": 12,
+ "swapGap": 12,
+ "cursorMoveFrames": 4,
+ "depth": 2,
+ "ahead": 90,
+ "nativeCands": true,
+ "gambit": {
+  "rules": "survivor-profiles/chaos-rules.json",
+  "ms": 80,
+  "width": 40,
+  "depth": 7,
+  "pool": 250,
+  "mode": "finish them"
+ },
+ "pace": {
+  "gap": 20,
+  "jitter": 16,
+  "slack": true
+ }
+}

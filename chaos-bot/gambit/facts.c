@@ -35,8 +35,8 @@ static double framesToTop(const Board *b) {
   int32_t h = b->height ? b->height : 12, rows = h - fullTop(b), stop = b->stopTime + b->preStopTime;
   if (rows <= 0) return stop;
   int32_t T = SPEED_TO_RISE_TIME[imin(99, imax(1, b->speed ? b->speed : 1)) - 1], disp = imax(1, b->displacement ? b->displacement : 16);
-  // (T is a row's frames: the rise takes T / 16 a pixel, pa.c advancePassiveRaise -- the pixels left of this row, then whole rows)
-  return stop + (b->riseTimer > 0 ? b->riseTimer : 0) + (disp - 1) * T / 16.0 + (rows - 1) * (double)T;
+  // (chaos: T is a step's frames, a row sixteen steps -- ca.c advancePassiveRaise -- the steps left of this row, then whole rows)
+  return stop + (b->riseTimer > 0 ? b->riseTimer : 0) + (disp - 1) * (double)T + (rows - 1) * 16.0 * T;
 }
 // THE GARBAGE A BREAK TAKES: the lowest block and every block touching it -- its top row and its cells on screen (top 0: none)
 static void lowestGroupTop(const Board *b, int H, int32_t *top, int32_t *onScreen) {

@@ -5,8 +5,8 @@
 //
 // No speed-ups yet (pa.c's quiet frames, countdown frames, skipped rows): correctness first, held by the recordings.
 #include "ca.h"
-#include <math.h>
 #include "levels.h"
+// libm through the compiler's builtins (__builtin_ceil, _floor, _pow): the same calls natively, and no system header inside Gambit
 
 static int32_t imax(int32_t a, int32_t b) { return a > b ? a : b; }
 static int32_t imin(int32_t a, int32_t b) { return a < b ? a : b; }
@@ -100,17 +100,35 @@ static void onLand(Board *b, Panel *p) {
     p->f[SHAKETIME] = b->queueType > 1 ? shakeFor(b, p->f[GWIDTH], p->f[GHEIGHT]) : NUL;
   }
 }
+// HOLLOW (pa.c): the empty cells under a garbage cell as it lands, down to what its column holds
+static int hollowUnder(Board *b, const Panel *p) {
+  int c = p->f[COL], n = 0;
+  for (int r = p->f[ROW] - 1; r >= 1; r--) {
+    const Panel *q = P(b, r, c);
+    if (q->f[COLOR] != 0) {
+      if (q->f[ISGARBAGE] && q->f[GARBAGEID] == p->f[GARBAGEID]) return 0;
+      break;
+    }
+    n++;
+  }
+  return n;
+}
 static Panel *fall(Board *b, Panel *p) {
+  if (p->f[ISGARBAGE] && p->f[STATE] != FALLING) b->sHollow -= hollowUnder(b, p);
   Panel *q = below(b, p);
   p = switchPanels(b, p, q);
+  b->rowActive[p->f[ROW]] = -1;
   Panel *above = P(b, p->f[ROW] + 1, p->f[COL]);
   if (p->f[ISGARBAGE]) { above->f[PROPFALL] = 1; above->f[STATECHANGED] = 1; }
-  if (p->f[STATE] != FALLING) { p->f[STATE] = FALLING; p->f[TIMER] = 0; p->f[STATECHANGED] = 1; }
+  if (p->f[STATE] != FALLING) {
+    if (p->f[ISGARBAGE]) b->sFell++;
+    p->f[STATE] = FALLING; p->f[TIMER] = 0; p->f[STATECHANGED] = 1;
+  }
   return p;
 }
 static void land(Board *b, Panel *p) {
   onLand(b, p);
-  if (p->f[ISGARBAGE]) p->f[STATE] = NORMAL;
+  if (p->f[ISGARBAGE]) { b->sHollow += hollowUnder(b, p); p->f[STATE] = NORMAL; }
   else {
     if (SETN(p->f[FELL])) p->f[FELL] = NUL;
     p->f[STATE] = LANDING;
@@ -173,6 +191,7 @@ static void updateSwapping(Board *b, Panel *p) {
   }
 }
 static void updateMatched(Board *b, Panel *p) {
+  if (p->f[ISGARBAGE]) b->popSeen = 1;
   decrementTimer(p);
   if (p->f[ISGARBAGE] && p->f[TIMER] == p->f[POPTIME]) onPop(b, p);
   if (p->f[TIMER] != 0) return;
@@ -339,7 +358,7 @@ static double luaMin(double a, double b);
 static double luaMax(double a, double b);
 static int32_t shakeFor(Board *b, int32_t width, int32_t height) {
   // math.max(18, math.min(82, math.ceil(shake * margin))): the margin is never NaN (shake_margin >= 1)
-  return (int32_t)luaMax(18, luaMin(82, ceil((double)(18 + width * height * 2) * shakeMarginFactor(b))));
+  return (int32_t)luaMax(18, luaMin(82, __builtin_ceil((double)(18 + width * height * 2) * shakeMarginFactor(b))));
 }
 static int garbageMarginBase(Board *b) { return b->incChaos ? 30 : 50; }   // GarbageQueue:GarbageMarginBase
 static double marginTimeFactor(Board *b) {
@@ -347,7 +366,7 @@ static double marginTimeFactor(Board *b) {
     return luaMax(0, (double)(20 - b->marginCounter) / 20.0);
   }
   if (b->marginTime == MARGIN_CHAOS) {
-    double gm = ceil(garbageMarginBase(b) * ((double)(20 - b->marginCounter) / 20.0));
+    double gm = __builtin_ceil(garbageMarginBase(b) * ((double)(20 - b->marginCounter) / 20.0));
     return (gm - (double)b->ninc) / gm;
   }
   return 1.0;
@@ -453,7 +472,7 @@ static int32_t spawnColumn(Board *b, int32_t width) {
   static const int MAP[7][6] = { { 0 }, { 1, 2, 3, 4, 5, 6 }, { 1, 3, 5 }, { 1, 4 }, { 1, 2, 3 }, { 1, 2 }, { 1 } };
   static const int LEN[7] = { 0, 6, 3, 2, 3, 2, 1 };
   int32_t index = b->dropColumnIndex[width], len = b->chaosMode ? 7 - width : LEN[width];
-  int32_t col = b->chaosMode ? index : MAP[width][index - 1];
+  int32_t col = b->chaosMode ? index : MAP[width][index - 1];   // (caSpawnColumn reads the same without turning it)
   b->dropColumnIndex[width] = index + 1 > len ? 1 : index + 1;   // wrap(1, index + 1, #columns)
   return col;
 }
@@ -511,7 +530,7 @@ static void tryDropGarbage(Board *b) {
 // =============================================================== what is sent (Stack:pushGarbage)
 static void sendPiece(Board *b, int32_t w, int32_t h, int32_t metal, int32_t allClear) {
   if (b->nsent >= MAXSENT) { b->err |= ERR_SENT; return; }
-  Sent s = { (int8_t)w, (int8_t)h, (int8_t)metal, (int8_t)allClear, b->clock };
+  CaSent s = { (signed char)w, (signed char)h, (signed char)metal, (signed char)allClear, b->clock };
   b->sent[b->nsent++] = s;
   if (metal && !allClear) b->ev[EV_SHOCKSENT]++;
   if (h > 1) b->ev[EV_TALLSENT]++;
@@ -664,6 +683,7 @@ static void matchGarbagePanels(Board *b, Cells *g, int32_t matchTime, int isChai
     p->f[YOFF] -= 1; p->f[GHEIGHT] -= 1; p->f[STATE] = MATCHED;
     p->f[TIMER] = matchTime + 1; p->f[INITIALTIME] = matchTime;
     p->f[POPTIME] = b->fGARBAGE_POP * (onScreen - (i + 1)); p->f[POPINDEX] = imin(i + 1, 72);
+    if (p->f[YOFF] == -1) b->sBroke++;
   }
   convertGarbagePanels(b, isChain);
 }
@@ -675,7 +695,7 @@ static double calculateStopTime(Board *b, int32_t comboSize, int toppedOut, int 
   int state = toppedOut && isChain ? 3 : toppedOut ? 2 : isChain ? 1 : 0;
   if (comboSize == 3 && metalCount == 3) t = 20 * metalCount;
   else if (comboSize > 3 || isChain) {
-    double v = ceil(b->stopBase * pow(1.05, comboSize - 4 > 0 ? comboSize - 4 : 0) * pow(1.1, chainSize) * pow(1.25, state) * marginTimeFactor(b)) + 20 * metalCount;
+    double v = __builtin_ceil(b->stopBase * __builtin_pow(1.05, comboSize - 4 > 0 ? comboSize - 4 : 0) * __builtin_pow(1.1, chainSize) * __builtin_pow(1.25, state) * marginTimeFactor(b)) + 20 * metalCount;
     t = luaMax(0, luaMin(300, v));
   }
   return t;
@@ -687,9 +707,10 @@ static void awardStopTime(Board *b, int isChain, int32_t comboSize, int32_t meta
   if (t > 0 && m < 1) b->ev[EV_STOPFADED]++;
   if (b->gameMode >= 3) b->stopTime = 0;
   else if (t > b->stopTime) b->stopTime = (int32_t)t;   // NaN is never greater: the stop time stays
+  if (t > b->sEarned) b->sEarned = (int32_t)t;
 }
 // Stack:updateScoreWithBonus (combo, then chain)
-static double scoreModeModifier(Board *b) { return pow(2, 4 - imax(1, b->gameMode - 1)); }
+static double scoreModeModifier(Board *b) { return __builtin_pow(2, 4 - imax(1, b->gameMode - 1)); }
 static void updateScoreWithBonus(Board *b, int32_t comboSize, int isChainLink) {
   int32_t chainBonus = b->chainCounter;   // updateScoreWithChain
   if (chainBonus != 0 && isChainLink) b->score += ((((double)(chainBonus - 1) * chainBonus) / scoreModeModifier(b)) * 100);
@@ -746,6 +767,8 @@ static void checkMatches(Board *b) {
     b->preStopTime = imax(b->preStopTime, preStop);
     awardStopTime(b, isChainLink, comboSize, metalCount);
     if (isChainLink || comboSize > 3 || metalCount > 0) pushGarbage(b, isChainLink, comboSize, metalCount);
+    if (b->sNCombo < MAXCOMBOS) { b->sCombo[b->sNCombo] = comboSize; b->sChainAt[b->sNCombo] = b->chainCounter; b->sLink[b->sNCombo] = isChainLink; b->sTouch[b->sNCombo] = hit; b->sNCombo++; }
+    b->sCleared += comboSize;
     updateScoreWithBonus(b, comboSize, isChainLink);
   }
   clearChainingFlags(b);
@@ -804,7 +827,7 @@ static int canSwapPanels(Board *b, Panel *p1, Panel *p2, int32_t *cost) {
   if (b->swapStallingMode == 1) return wiggleCanSwap(b, p1, p2, cost);
   return 1;
 }
-static int tryQueueSwap(Board *b, Panel *p1, Panel *p2) {
+static int tryQueueSwapPanels(Board *b, Panel *p1, Panel *p2) {
   int32_t cost;
   if (canSwapPanels(b, p1, p2, &cost)) {
     wiggleRegister(b, p1, p2, cost);
@@ -840,7 +863,7 @@ static int checkGameOver(Board *b) {
   if (b->marginTime == MARGIN_OFF && b->ninc >= GARBAGE_LIMIT) return 1;
   return 0;
 }
-static void setGameOver(Board *b) { if (b->gameOverClock > 0) return; b->gameOverClock = b->clock; }
+static void setGameOver(Board *b) { if (b->gameOverClock > 0) return; b->gameOverClock = b->clock; b->gameOver = 1; }
 int caGameEnded(const Board *b) { return b->gameOverClock > 0 && b->clock >= b->gameOverClock; }
 
 // Stack:controls (controller input)
@@ -854,7 +877,7 @@ static void controls(Board *b) {
   else if (in & IN_RIGHT) dir = DIR_RIGHT;
   if (dir == b->cursorDirection) { if (b->curTimer != b->curWaitTime) b->curTimer++; }
   else { b->cursorDirection = dir; b->curTimer = 0; }
-  if (b->swapThisFrame) tryQueueSwap(b, P(b, b->curRow, b->curCol), P(b, b->curRow, b->curCol + 1));
+  if (b->swapThisFrame) tryQueueSwapPanels(b, P(b, b->curRow, b->curCol), P(b, b->curRow, b->curCol + 1));
   if (in & IN_RAISE) {
     if (b->topRow) b->manualRaise = 0;
     else if (!b->preventManualRaise) { b->manualRaise = 1; b->manualRaiseYet = 0; }
@@ -865,14 +888,14 @@ static void updateSpeed(Board *b) {
   if (b->stopWatch != b->nextSpeedIncreaseClock) return;
   b->speed = imin(b->speed + 1, 99);
   b->nextSpeedIncreaseClock += DT_SPEED_INCREASE;
-  if (b->marginTime > 1) b->health = imax(1, (int32_t)floor(b->health * 0.9));
+  if (b->marginTime > 1) b->health = imax(1, (int32_t)__builtin_floor(b->health * 0.9));
   if (b->marginTime == MARGIN_COLORS) {
     b->marginCounter++;
-    if (b->marginCounter > 0 && b->marginCounter % 10 == 0) b->colorCount = imin(8, b->colorCount + 1);
+    if (b->marginCounter > 0 && b->marginCounter % 10 == 0) { b->colorCount = imin(8, b->colorCount + 1); b->colors = b->colorCount; }
   } else if (b->marginTime == MARGIN_MODOKI) b->marginCounter = imin(20, b->marginCounter + 1);
   else if (b->marginTime == MARGIN_CHAOS) {
     b->marginCounter = imin(20, b->marginCounter + 1);
-    b->shakeMargin = imax(1, (int32_t)floor(b->shakeMargin * 0.95));
+    b->shakeMargin = imax(1, (int32_t)__builtin_floor(b->shakeMargin * 0.95));
   }
 }
 // Stack:advancePassiveRaise
@@ -909,12 +932,21 @@ static void updatePanels(Board *b) {
 // Stack.run: controls, then Stack:simulate (past the countdown)
 void caRun(Board *b) {
   if (caGameEnded(b)) return;
+  // a swap the bot pressed for this frame is the frame's swap key
+  int pressed = b->pressSwap || (b->input & IN_SWAP);
+  int32_t queuedBefore = b->swapCount;
+  b->input |= b->pressSwap ? IN_SWAP : 0;
+  b->inputBits = b->input;
+  b->pressSwap = 0;
+  b->swapDenied = 0;
   controls(b);
+  if (pressed && b->swapCount == queuedBefore) b->swapDenied = 1;
   // ---- simulate
   b->nlanded = 0;
   b->matchedThis = 0;
   b->landedLast = b->landedThis; b->landedThis = 0;   // updateGarbageLanded
   b->topRow = hasPanelsInTopRow(b);
+  b->wasToppedOut = b->topRow;
   if (b->swapCount >= b->startTimersWithSwapCount) {
     b->prevShakeTime = b->shakeTime;
     b->shakeTime = imax(b->shakeTime - 1, b->shakeTimeOnFrame);
@@ -957,7 +989,7 @@ void caRun(Board *b) {
     if (hasZeroPanels(b)) {
       b->hasAllClear = 1;
       b->ev[EV_ALLCLEAR]++;
-      b->score += 2500 * pow(2, b->colorCount - 4) * b->clearCounter;
+      b->score += 2500 * __builtin_pow(2, b->colorCount - 4) * b->clearCounter;
     }
     b->clearCounter = 0;
   }
@@ -993,6 +1025,7 @@ void caInit(Board *b, int level, int gameMode, int marginTime, int chaosMode, in
   b->riseTimer = SPEED_TO_RISE_TIME[b->speed - 1];
   b->curWaitTime = 20; b->cursorDirection = CD_NULL; b->curRow = 7; b->curCol = 3; b->topCurRow = 12;
   b->stopWatch = NUL;
+  b->colorCount = b->colors = 6; b->stopWatchIsRunning = 1; b->cursorLock = NUL; b->hi = MAXROWS;
   for (int i = 1; i <= 6; i++) b->dropColumnIndex[i] = 1;
   b->nrows = 13;
   for (int r = 0; r <= 12; r++) for (int c = 1; c <= W; c++) createPanelAt(b, r, c);
@@ -1014,3 +1047,12 @@ int caCanSwap(Board *b, int row, int col) {
   return canSwapPanels(b, P(b, row, col), P(b, row, col + 1), &cost);
 }
 int caRiseFrames(int speed) { return SPEED_TO_RISE_TIME[bound(1, speed, 99) - 1]; }
+
+// the column the next piece `width` wide drops at, without turning the index (Stack.getGarbageSpawnColumn's answer)
+int caSpawnColumn(const Board *b, int width) {
+  static const int MAP[7][6] = { { 0 }, { 1, 2, 3, 4, 5, 6 }, { 1, 3, 5 }, { 1, 4 }, { 1, 2, 3 }, { 1, 2 }, { 1 } };
+  if (width < 1 || width > 6) return 0;
+  return b->chaosMode ? b->dropColumnIndex[width] : MAP[width][b->dropColumnIndex[width] - 1];
+}
+// the shake a piece of `width` x `height` lands with now (dropGarbage, the chaos margin included)
+int caShake(Board *b, int width, int height) { return shakeFor(b, width, height); }

@@ -3,12 +3,15 @@
 // WigglePay,Panel}.lua. check.c holds every field to recordings of that Lua (lua/record.lua), frame by frame.
 #ifndef CA_H
 #define CA_H
+#ifndef LIBC_H   // inside Gambit (chaos-bot/gambit) the engine builds on its own libc.h, with no system headers
 #include <stdint.h>
 #include <string.h>
+#endif
 
 #define W 6
 #define MAXROWS 48
 #define NUL (-2147483647 - 1)   // Lua nil
+#define UND (-2147483647)
 #define SETB(v) ((v) != NUL && (v) != 0)   // Lua truthiness of a nil-or-boolean
 #define SETN(v) ((v) != NUL)               // of a nil-or-number: 0 is true
 
@@ -23,7 +26,7 @@ typedef struct { int32_t f[NF]; } Panel;
 typedef struct { int32_t width, height, isChain, isMetal, frameEarned, finalized; } Incoming;
 typedef struct { int32_t leftId, rightId, row, col, clock; } Stall;
 // A piece this stack sent (pushGarbage): combo, shock and all-clear pieces; chains are counted by link (see Board).
-typedef struct { int8_t width, height, metal, allClear; int32_t clock; } Sent;
+typedef struct { signed char width, height, metal, allClear; int32_t clock; } CaSent;
 
 #define FEED 16
 #define MAXINC 512
@@ -32,6 +35,7 @@ typedef struct { int8_t width, height, metal, allClear; int32_t clock; } Sent;
 #define MAXMATCH 160
 #define MAXIDS 64
 #define MAXSENT 64
+#define MAXCOMBOS 16
 
 #define ERR_ROWS 1
 #define ERR_INC 2
@@ -89,9 +93,20 @@ typedef struct Board {
   // ---- what the stack sent (pushGarbage), since sentReset: pieces, chain links added, chains finished and their size.
   // The chain being built is outChain rows tall (0: none). Not part of the Lua's stack: the game's outgoing queue.
   int32_t nsent, outChain, outLinks, outChains, outChainRows;
-  Sent sent[MAXSENT];
+  CaSent sent[MAXSENT];
   // ---- FED ROWS: the rows and break colours the game dealt, played as dealt; empty, unseen colours are dealt.
   int32_t rowFeed[FEED][W], nRowFeed, rowFeedAt, brkFeed[FEED][W], nBrkFeed, brkFeedAt;
+  // ---- GAMBIT'S VIEW (the fields pa.c kept for the bot and its node store; not part of the Lua's stack, never compared):
+  // pressSwap -- the bot pressed swap for this frame (added to the frame's keys); swapDenied -- a swap pressed was not queued;
+  // wasToppedOut -- the top row held a panel at the start of the frame (Stack.panels_in_top_row as simulate first sets it);
+  // colors -- the colour count; quiet/noQuiet/cdLeft/hi/rowActive/popSeen -- pa.c's speed-ups, off here (quiet and cdLeft stay 0).
+  int32_t pressSwap, swapDenied, inputBits, wasToppedOut, colors, inCountdown, stopWatchIsRunning, cursorLock, gameOver;
+  int32_t quiet, noQuiet, cdLeft, hi, popSeen;
+  signed char rowActive[MAXROWS];
+  // WHAT A STEP DID (search.h MK_SETTLE), as pa.c counts it: each clear's size, the chain counter it reached, whether it is a link
+  // and whether it touched garbage; panels cleared, garbage cells converted, the most stop time one clear paid, garbage cells at rest
+  // that started to fall, the empty cells under garbage as it landed. Counted since the step began.
+  int32_t sCombo[MAXCOMBOS], sChainAt[MAXCOMBOS], sLink[MAXCOMBOS], sTouch[MAXCOMBOS], sNCombo, sCleared, sBroke, sEarned, sFell, sHollow;
   // ---- EVENTS: what the engine did, counted for the checks' coverage (never compared, never part of the Lua's stack)
   int32_t ev[16];
   int32_t ninc, nstall, nlanded;
@@ -107,6 +122,7 @@ enum { EV_CLEAR3, EV_COMBO, EV_LINK, EV_BIGCHAIN, EV_CHAINCAP, EV_SHOCKSENT, EV_
 #define EV_NAMES { "clear3", "combo", "chainLink", "chain6plus", "chainCap", "shockSent", "allClear", "allClearSent", "tallSent", \
                    "dropQueue1", "dropQueue2", "dropQueue3", "stopFaded", "healthLost", "swap", "garbageBroken" }
 #define BOARD_HEAD ((unsigned long)&((Board *)0)->inc)
+#define COPY_BOARD(dst, src) caCopy(dst, src)
 static inline void caCopy(Board *dst, const Board *src) {
   memcpy(dst, src, BOARD_HEAD);
   memcpy(dst->inc, src->inc, (unsigned long)src->ninc * sizeof(Incoming));
@@ -124,5 +140,7 @@ int caToppedOut(Board *b);
 int caCanSwap(Board *b, int row, int col);
 int caRiseFrames(int speed);             // frames per displacement step at `speed`
 void caSentReset(Board *b);
+int caSpawnColumn(const Board *b, int width);
+int caShake(Board *b, int width, int height);
 
 #endif

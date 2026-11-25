@@ -172,7 +172,7 @@ static int compare(Board *b, int sent0, int links0, int ends0) {
   // what was sent this frame
   if (b->nsent - sent0 != fr.no) report(fr.clock, "pieces sent", fr.no, b->nsent - sent0);
   else for (int i = 0; i < fr.no; i++) {
-    Sent *s = &b->sent[sent0 + i];
+    CaSent *s = &b->sent[sent0 + i];
     int32_t v[4] = { s->width, s->height, 0, s->metal };
     for (int j = 0; j < 4; j++) if (v[j] != fr.o[i][j]) { snprintf(what, sizeof what, "sent[%d].%d", i, j); report(fr.clock, what, fr.o[i][j], v[j]); }
   }

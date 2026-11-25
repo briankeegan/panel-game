@@ -94,17 +94,15 @@ static int stepFits(const List *L, const int32_t *sizes, int32_t nsizes, int32_t
   return 1;
 }
 
-// THE GARBAGE A CLEAR SENDS: the cells of its combo garbage (the server's combo garbage table, a row per piece), and a slab the width
-// of the board for every link past the first.
-static int32_t comboCells(int32_t size) {
-  static const int32_t CELLS[16] = { 0, 0, 0, 0, 3, 4, 5, 6, 7, 8, 10, 11, 12, 18, 24, 24 };
-  if (size < 16) return CELLS[size];
-  return size < 20 ? 24 : size < 27 ? 36 : 48;
-}
-// THE BLOCKS A LINE THROWS: its combo's pieces of combo garbage (the same table, a piece a row) and a slab for every link past the first
+// THE GARBAGE A CLEAR SENDS, by the chaos build's rule (checkMatches.lua pushGarbage; the old combo table is unused there): a combo of
+// n >= 4 sends ceil((n - 3) / 3) rows (pieces, or one tall block under chaos mode) each (n - 1) % 3 + 3 wide; a chain a 6-wide slab a
+// link past the first, at most 12 rows.
+static int32_t comboRows(int32_t size) { return size < 4 ? 0 : (size - 3 + 2) / 3; }
+static int32_t comboCells(int32_t size) { return size < 4 ? 0 : comboRows(size) * ((size - 1) % 3 + 3); }
+// THE BLOCKS A LINE THROWS: its combo's rows of combo garbage (a block a row) and a slab row for every link past the first (12 at most)
 static int32_t blocksOf(int32_t combo, int32_t chain) {
-  int32_t pieces = combo < 4 ? 0 : combo < 8 ? 1 : combo < 13 ? 2 : combo < 14 ? 3 : combo < 20 ? 4 : combo < 27 ? 6 : 8;
-  return pieces + (chain > 1 ? chain - 1 : 0);
+  int32_t links = chain > 1 ? chain - 1 : 0;
+  return comboRows(combo) + (links > 12 ? 12 : links);
 }
 
 // THE LIST FROM THE HOST: n entries, each ten words -- combo, chain and send (each op, n, near) and break -- in the io body (the loader

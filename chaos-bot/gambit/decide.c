@@ -87,7 +87,7 @@ static void fillList(List *L) {
   for (int i = 0; i < L->n && at < 0; i++) if (L->aim[i].chain.op == OP_FILL) at = i;
   if (at < 0) { fillN = NOT_ASKED; return; }
   int32_t top = theOpp.has && theOpp.topKnown ? theOpp.top : 0, free = FILL_ROWS - top, stop = theOpp.stopKnown ? imax(0, theOpp.stop) : 0;
-  int32_t perRow = decQ.b->speed >= 1 && decQ.b->speed <= 99 ? SPEED_TO_RISE_TIME[decQ.b->speed - 1] : 120, nmax = 0;
+  int32_t perRow = decQ.b->speed >= 1 && decQ.b->speed <= 99 ? 16 * SPEED_TO_RISE_TIME[decQ.b->speed - 1] : 120, nmax = 0;   // (chaos: a step's frames x 16)
   for (int n = MAXCHAIN; n >= 3 && !nmax; n--) { int32_t risen = imax(0, FILL_FLIGHT + FILL_LINK * (n - 1) - stop) / perRow; if (n - 1 <= free - risen - 1) nmax = n; }
   List out; memset(&out, 0, sizeof out);
   for (int n = imax(3, nmax); n >= 3 && out.n < MAXAIMS; n--) { Aim a; memset(&a, 0, sizeof a); a.chain.op = OP_EQ; a.chain.n = n; a.chain.near = 1; a.brk = -1; out.aim[out.n++] = a; }

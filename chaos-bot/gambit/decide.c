@@ -31,6 +31,7 @@ static int32_t raiseOpening, raiseTo, raiseRows;
 // faster level, or the speed's climb through a game, lowers it by itself. Never below CHAOS_RAISE_MIN rows (a board needs rows to
 // break with) nor above the height less CHAOS_BLOCK_ROWS.
 #define CHAOS_BLOCK_ROWS 3
+static int32_t chaosLetDrop;   // (decisions the board was left alone so waiting garbage could drop: the log's letDrop)
 #define CHAOS_RAISE_MIN 3
 static int32_t chaosRaiseTo(const Board *b) {
   int32_t h = b->height ? b->height : 12, perRow = 16 * caRiseFrames(b->speed ? b->speed : 1);
@@ -2134,6 +2135,18 @@ static Played playOf(const Read *R, int n) {
   if (P.line && !R->up && (farForNothing(P.line) || undoesLast(P.line) || overspends(P.line))) {
     const Judge *in = 0; for (int i = 0; i < n && !in; i++) if (!farForNothing(order[i]) && !undoesLast(order[i]) && !overspends(order[i])) in = order[i];
     P.line = !in || in->hold || (in->wait && in->k.play != PLAY_CARRYWAIT) ? 0 : in; P.top = in; P.wait = 0; P.deferred = 0; reachCut++;
+  }
+  // (CHAOS: DON'T STALL THE QUEUE. Chaos drops queued garbage only while the board is quiet (Stack:shouldDropGarbage: no matching or
+  // chaining panels for the modern queue, none active for classic and chaos), so a clear made while garbage waits holds it back -- and
+  // the judge, its horizon short, ranks that later loss higher, again and again, until the panels are spent and every block drops at
+  // once (run 7 combo_storm: 13-15 pieces held at the door, 47 panels burned to 9, broke=0). So while garbage waits in the queue, none
+  // is on the board, the chosen line breaks none, and what waits fits under the level's ceiling with the stack as it is, the board is
+  // left alone: the garbage drops while it is small, and is broken from the board.)
+  if (P.line && !R->under && !R->up && decQ.b->ninc > 0 && P.line->apBroke <= 0) {
+    int32_t waiting = 0;
+    for (int i = 0; i < decQ.b->ninc; i++) waiting += decQ.b->inc[i].height > 0 ? decQ.b->inc[i].height : 1;
+    int32_t h = decQ.b->height ? decQ.b->height : 12;
+    if (panelTop(decQ.b) + waiting <= h - CHAOS_BLOCK_ROWS) { P.line = 0; P.deferred = 0; chaosLetDrop++; }
   }
   P.name = P.line ? P.line->k.play : R->up ? -2 : PLAY_HOLD;   // -2: the raise
   for (int i = 0; i < n; i++) if (order[i]->o.lives) P.nlive++;

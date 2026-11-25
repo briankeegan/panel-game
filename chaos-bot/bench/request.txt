@@ -13,7 +13,12 @@
 #          (cancelled while it waited for Gambit's benchmark; asked again as run 6 with no wait, the same games)
 # run 6 -- survived 2/4 (worse): lost chain_garbage (17483) and insane_combo_storm (5573). The raise was asked ~20 times a game and
 #          never pressed -- under chaos garbage the stack is never still enough to take one; the material floor changed the play
-# run 7 -- run 4's rules (no floor) + a raise offered only when the game takes one that frame, up to the level's ceiling (owner)
+# run 7 -- run 4's rules (no floor) + a raise offered only when the game takes one that frame: survived 2/4. No raise was ever
+#          offered (never allowed under garbage). Lost combo_storm at 5692: no garbage ever landed -- 13-15 pieces held at the door
+#          while the bot cleared every ~14 frames (the modern queue drops only on a quiet board), 47 panels burned to 9, broke=0;
+#          insane_combo_storm lasted 13964 (was 5573)
+# run 8 -- one change: don't stall the queue (decide.c): with garbage waiting and none on the board, a line that breaks none gives
+#          way to leaving the board alone, while what waits fits under the level's ceiling
 combo_storm 1 9 9 2 21600
 chain_garbage 1 9 9 1 21600
 thicc_combo_storm 1 9 9 3 21600

@@ -1035,7 +1035,7 @@ static void answerTurn(int32_t qid, int32_t at, int32_t allowanceKnown, int32_t 
     for (int c = 1; c <= W; c++) for (int r = 1; r < sb->nrows; r++) if (sb->p[r][c].f[COLOR] > 0 || sb->p[r][c].f[ISGARBAGE]) hg[c] = r;
     for (int c = 1; c < W; c++) bump += iabs(hg[c] - hg[c + 1]);
     L_s(" stack="); L_i(bump); L_s("/"); L_i(evenOf(sb)); L_s("/"); L_i(spreadOf(sb)); }
-  L_s(" lifePeak="); L_i(lifePeakOf());
+  L_s(" lifePeak="); L_i(lifePeakOf()); L_s(" letDrop="); L_i(chaosLetDrop);
   if (R.full) L_s(" full=1");
   if (switchedNow) L_s(" switched=1");
   // (the enemy as the rules read it: its height, topped out, the frames of its stop -- what picked the rule)

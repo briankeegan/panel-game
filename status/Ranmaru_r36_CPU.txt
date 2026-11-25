@@ -1,6 +1,6 @@
 run 45548725017
 bot Ranmaru_r36_CPU
-bot wrote: 1795581822 setup
-step: Run actions/checkout@v4
-wait: not waiting
-sent: 2026-11-25T04:43:42Z
+bot wrote: 1795581884 standby
+step: Sit in the lobby (beta, gambit)
+wait: older live bots=1, handoff seen=0, checked 04:44:39
+sent: 2026-11-25T04:44:44Z

@@ -172,7 +172,12 @@ static Outcome outcomeOf(const int32_t *seq, int n, int settled, int waitAt, int
   int32_t alone = n > 0 && !waitTo && decF.under ? aloneBuildable() : 0;
   int coming = decF.land != NOT_ASKED;
   int timeLeft = decF.timeLeft >= 0 ? decF.timeLeft : leftMsOf() > 0;
-  JudgeOpts jo = { settled, decQ.tight, timeLeft ? (coming ? decF.land : 0) : NOT_ASKED, !coming, 1, HORIZON + REST, REST, !waitTo, waitAt, waitTo, 1 };
+  // (CHAOS: THE BOARD IS ALWAYS ABOUT TO DIE -- the owner: "it just has to not die, not die a little longer". At chaos speed no board
+  // stands left alone for a look-ahead, and every line was judged lost (runs 12-23: v=dies in every decision of every game), so the
+  // ranking ran on its tie-breaks. A line keeps the board alive when, after its last swap, the board does not die before the bot's next
+  // freeze can begin -- a break's time (levelBreak: the reaction and a clear, read off the level) -- a stop being frozen time the bot
+  // plays on in, not one the board must outlast (lifeStop 0); and it leaves the fuel for that freeze (below). docs/CHAOS_RULES.md)
+  JudgeOpts jo = { settled, decQ.tight, timeLeft ? (coming ? decF.land : 0) : NOT_ASKED, !coming, 1, levelBreak, levelBreak, !waitTo, waitAt, waitTo, 0 };
   if (outNBOn) { jo.notBefore = carryNB; jo.nNotBefore = imin(carryNBn, n); }
   jo.rooted = outRooted; jo.winWait = outWinWait;
   Outcome o;
@@ -193,7 +198,9 @@ static Outcome outcomeOf(const int32_t *seq, int n, int settled, int waitAt, int
     int32_t ready = o.j.ready;
     int breaks = o.j.made.broke > 0, stands = o.j.lostAt == FOREVER;
     o.dead = 0; o.ready = ready;
-    o.lives = breaks || !coming ? (stands || ready == 1) : (ready == 1 || (ready == NOT_ASKED && stands));
+    // (CHAOS: alive to the next freeze, and the fuel for it -- a three the board left has the panels for, or garbage it can break;
+    // a break ready for the next block is no longer asked: a landing shakes the board still and its garbage is fuel once broken)
+    o.lives = stands;
     o.fits = fitsList(&theList, o.j.made, &o.j, 1) && imax(o.j.made.chain, o.j.chainAll) <= MAXCHAIN;
     // (a break: whether the board it leaves still has a break to build -- the material the next one needs)
     o.nextBuild = -1;
@@ -209,6 +216,7 @@ static Outcome outcomeOf(const int32_t *seq, int n, int settled, int waitAt, int
       if (eb && decF.under) o.nearAfter = garbageOn(eb) ? nearOf(eb) : 0;
       if (eb && twinWanted && !clockOut()) o.twinAfter = twinCostOn((Board *)eb);
       if (breaks) o.nextBuild = eb ? (!garbageOn(eb) || breakBuildable(eb)) : -1;
+      if (o.lives && eb && !(o.groups > 0 || (garbageOn(eb) && breakBuildable(eb)))) o.lives = 0;   // (CHAOS: no fuel for the next freeze)
     }
     // (THE MATERIAL FLOOR: under garbage, a line that breaks nothing, does not stand and leaves no break to build where the board left
     // alone keeps one has spent what the next break needs -- it is lost the frame it is done)

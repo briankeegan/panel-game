@@ -10,6 +10,7 @@
 #          insane_combo_storm at 5573 (sooner): the board ran down to 10-19 panels -- nothing to break with -- and raise.to 0 shut off
 #          the floor's raise too (decide.c raises only when `to` > 0)
 # run 5 -- one change: the raise ceiling computed from the level (decide.c chaosRaiseTo) and the material floor back at 36 panels
+#          (cancelled while it waited for Gambit's benchmark; asked again as run 6 with no wait, the same games)
 combo_storm 1 9 9 2 21600
 chain_garbage 1 9 9 1 21600
 thicc_combo_storm 1 9 9 3 21600

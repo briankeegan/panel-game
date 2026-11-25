@@ -1,6 +1,7 @@
 # The chaos bot's games (chaos-bot/plans/chaos-goal.md §2): one job a game in the real chaos v3 client, headless, then a report.
 # Started only by a push to this project's branch that changes chaos-bot/bench/request.txt (the games to play, one a line), so a
 # run is always asked for on purpose. Shares nothing with Gambit's workflows: its own name, concurrency group, artifact names, cache key.
+# It does not wait for Gambit's benchmark (the owner, 2026-11-25: "you don't have to pay attention to Gambit's benchmark").
 name: chaos-bot games
 on:
   push:
@@ -15,22 +16,11 @@ permissions:
 jobs:
   plan:
     runs-on: ubuntu-24.04
-    timeout-minutes: 75
+    timeout-minutes: 5
     outputs:
       games: ${{ steps.games.outputs.games }}
     steps:
       - uses: actions/checkout@v4
-      # (the runners are shared with Gambit: no game starts while a gambit-24 run is in progress -- waits up to an hour)
-      - name: Wait while Gambit's benchmark runs
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          for i in $(seq 1 60); do
-            n=$(curl -fsS -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/briankeegan/GameCreator/actions/workflows/gambit-24.yml/runs?status=in_progress" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("total_count", 0))' || echo 0)
-            [ "$n" = 0 ] && { echo "no gambit-24 run in progress"; exit 0; }
-            echo "gambit-24 in progress ($n): waiting"; sleep 60
-          done
-          echo "::warning::gambit-24 still running after an hour; playing anyway"
       - id: games
         run: |
           python3 - <<'PY' >> "$GITHUB_OUTPUT"

@@ -19,8 +19,8 @@ starts with the last benchmark's number (survived x/N, frames lost at, health le
    `chaos-bot/` and nothing on any other branch; Gambit's files, branches and workflows are never touched. See section 6 for the
    one open question: where this project's workflow file lives.)*
 2. **Games run on GitHub Actions only**, never in the sandbox -- the sandbox times nothing like a runner.
-3. **One benchmark run at a time.** Before dispatching, check that none of yours is running and that no `gambit-24.yml` run is in
-   progress in GameCreator (the runners are shared). Start small: one pattern, a few games, before all of them.
+3. **One benchmark run at a time** (of ours). Gambit's benchmark is not waited for (the owner, 2026-11-25: our runs may play while
+   a `gambit-24.yml` run is in progress; "you don't have to pay attention to Gambit's benchmark"). Start small before big.
 4. **Read state, never recall it.** Before answering "what is running / what did it score", look at Actions and the run's own report.
 5. **Never parse a tool's prose -- make it emit data**, and have the consumer check the count it got back matches the count sent.
 6. **Never ask for or store tokens.** Scripts read `$GITHUB_TOKEN` from the environment.

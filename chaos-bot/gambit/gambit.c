@@ -1,6 +1,6 @@
 // GAMBIT, in C (PLAN.md). One translation unit: the server's engine and its node store (eval/native: pa.c, search.h), the clock and the nodes every search
 // plays its lines through (core/), then Gambit's own pieces on top of them.
-#include "../eval/native/pa.c"
+#include "native/pa.c"
 #include "core/nodes.h"
 #include "rules.c"
 #include "judge.c"

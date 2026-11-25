@@ -1,0 +1,298 @@
+local LegacyGameModes = require("common.compatibility.LegacyGameModes")
+local consts = require("common.engine.consts")
+local class = require("common.lib.class")
+require("common.lib.timezones")
+local ReplayPlayer = require("common.compatibility.ReplayV2Player")
+local LevelPresets = require("common.data.LevelPresets")
+local LevelData = require("common.data.LevelData")
+local StackBehaviours = require("common.data.StackBehaviours")
+local InputCompression = require("common.data.InputCompression")
+
+local REPLAY_VERSION = 2
+
+---@class ReplayV2
+---@field timestamp number The time the replay got created as a system dependent timestamp
+---@field engineVersion string The engine version the replay was generated with
+---@field replayVersion number Indicates the version of the replay's data format
+---@field seed number The seed to be used to for random functions
+---@field gameMode LegacyGameMode Contains flags and fields determining the overall Match settings
+---@field players ReplayV2Player[] The players that are/were part of the Match
+---@field ranked boolean? If the match counted towards the ladder
+---@field stageId string? The stage that was picked for the match on the machine saving the replay
+---@field duration number? How long the game took in frames
+---@field incomplete boolean? If the match was finished by an abort
+---@field completed boolean? If the match that is represented by the replay has already finished
+---@field winnerIndex number? index of players that won the match; nil if incomplete or the match concluded with a tie
+---@field winnerId number? publicId of the player that won the match; negative if unknown; nil if incomplete or the match concluded with a tie
+---@field gameId number? The identifier for the game on the server it was played on
+
+-- A replay is a data recording of a Match
+---@class ReplayV2
+---@overload fun(engineVersion: string, seed: number, gameMode: table, puzzle: table?): ReplayV2
+local ReplayV2 = class(
+function(self, engineVersion, seed, gameMode, puzzle)
+    self.timestamp = to_UTC(os.time())
+    self.engineVersion = engineVersion
+    self.replayVersion = REPLAY_VERSION
+    self.seed = seed
+    -- the gameMode argument in the constructor expects the format specified in GameModes.lua
+    self.gameMode = {
+      stackInteraction = gameMode.stackInteraction,
+      winConditions = gameMode.winConditions or {},
+      gameOverConditions = gameMode.gameOverConditions,
+      timeLimit = gameMode.timeLimit,
+      doCountdown = gameMode.doCountdown or true,
+      puzzle = puzzle,
+    }
+    self.players = {}
+  end
+)
+
+ReplayV2.TYPE = "Replay"
+
+function ReplayV2:setRanked(ranked)
+  self.ranked = ranked
+end
+
+function ReplayV2:setStage(stageId)
+  self.stageId = stageId
+end
+
+-- set the duration in frames
+function ReplayV2:setDuration(duration)
+  self.duration = duration
+end
+
+function ReplayV2:setOutcome(outcome)
+  if outcome == nil then
+    self.incomplete = true
+    self.winnerIndex = nil
+    self.winnerId = nil
+  else
+    self.incomplete = nil
+    if outcome == 0 then
+      -- it's a tie!
+      self.winnerIndex = nil
+      self.winnerId = nil
+    else
+      -- because attack engines are currently being saved with the player, the winning stack may not have a replayPlayer
+      -- this will be sensible to change in the future once e.g. "Arcade" mode is available but until then it wasn't deemed worthwhile to bump replay version
+      if self.players[outcome] then
+        self.winnerIndex = outcome
+        self.winnerId = self.players[outcome].publicId
+      end
+    end
+  end
+  self.completed = true
+end
+
+function ReplayV2:setTimestamp(timestamp)
+  self.timestamp = timestamp
+end
+
+-- adds or updates a replay player at the specified index
+-- replayPlayer is a table as defined by the ReplayPlayer class
+function ReplayV2:updatePlayer(i, replayPlayer)
+  self.players[i] = replayPlayer
+end
+
+-- creates a Replay from the table t which contains the deserialized data representation of a replay from network or file
+-- use the completed flag to indicate whether the replay is done (functionally equivalent to being loaded from file at this time)
+--   or whether it is in progress (functionally equivalent to getting the replay sent on joining a match as a spectator)
+function ReplayV2.createFromTable(t, completed)
+  local replay
+  if not t then
+    -- there was a problem reading the file
+    return replay
+  else
+    if not t.replayVersion then
+      replay = ReplayV2.createFromLegacyReplay(t)
+    elseif tonumber(t.replayVersion) == 2 then
+      replay = ReplayV2.createFromV2Data(t)
+    end
+    if completed ~= nil then
+      replay.completed = completed
+    end
+  end
+
+  return replay
+end
+
+function ReplayV2.createFromV2Data(replayData)
+  local replay = ReplayV2(replayData.engineVersion, replayData.seed, replayData.gameMode)
+  replay:setStage(replayData.stageId)
+  replay:setRanked(replayData.ranked)
+  replay:setDuration(replayData.duration)
+
+  for i, player in ipairs(replayData.players) do
+    local replayPlayer = ReplayPlayer(player.name, player.publicId, player.human)
+    replayPlayer:setWins(player.wins)
+    replayPlayer:setCharacterId(player.settings.characterId)
+    replayPlayer:setPanelId(player.settings.panelId)
+    if player.human then
+      if LevelData.validate(player.settings.levelData) then
+        setmetatable(player.settings.levelData, LevelData)
+        replayPlayer:setLevelData(player.settings.levelData)
+      end
+      replayPlayer:setInputMethod(player.settings.inputMethod)
+      replayPlayer:setInputs(InputCompression.decompressInputString2(player.settings.inputs))
+    else
+      replayPlayer:setHealthSettings(player.settings.healthSettings)
+    end
+    if replayData.engineVersion == "047" or replayData.engineVersion == "048" then
+      replayPlayer:setBehaviours(StackBehaviours.getV048Default())
+      replayPlayer:setAllowAdjacentColors(player.settings.allowAdjacentColors)
+    else
+      replayPlayer:setBehaviours(player.settings.stackBehaviours)
+    end
+    replayPlayer:setAttackEngineSettings(player.settings.attackEngineSettings)
+    replayPlayer:setLevel(player.settings.level)
+    replayPlayer:setColorCount(player.settings.color_count)
+    replayPlayer:setGameMode(player.settings.game_mode)
+    replayPlayer:setQueueType(player.settings.queue_type)
+    replayPlayer:setChaosMode(player.settings.chaos_mode)
+    replayPlayer:setMarginTime(player.settings.margin_time)
+    replayPlayer:setDifficulty(player.settings.difficulty)
+
+    replay:updatePlayer(i, replayPlayer)
+  end
+
+  -- setOutcome accesses ReplayPlayer tables for the publicId so can only happen after they have been set
+  if replayData.incomplete then
+    replay:setOutcome()
+  else
+    replay:setOutcome(replayData.winnerIndex or 0)
+  end
+
+  return replay
+end
+
+-- creates a replay from the table created by decoding the legacy json file
+-- timestamp and winnerIndex are optional properties that were not saved in the json for the longest time
+-- they were however encoded in the filename
+-- since this is in common they'd have to be determined elsewhere and passed in as arguments
+-- if they are present in the data, the data takes priority over the arguments
+function ReplayV2.createFromLegacyReplay(legacyReplay, timestamp, winnerIndex)
+  local mode
+  local gameMode
+  if legacyReplay.vs then
+    mode = "vs"
+    if legacyReplay.vs.P2_char then
+      gameMode = LegacyGameModes.getPreset("TWO_PLAYER_VS")
+    else
+      gameMode = LegacyGameModes.getPreset("ONE_PLAYER_VS_SELF")
+    end
+  elseif legacyReplay.time then
+    mode = "time"
+    gameMode = LegacyGameModes.getPreset("ONE_PLAYER_TIME_ATTACK")
+  elseif legacyReplay.endless then
+    mode = "endless"
+    gameMode = LegacyGameModes.getPreset("ONE_PLAYER_ENDLESS")
+  end
+  local v1r = legacyReplay[mode]
+  -- doCountdown used to be configurable client side for time attack / endless
+  gameMode.doCountdown = v1r.do_countdown
+
+  if mode == "time" then
+    gameMode.timeLimit = 120
+  end
+
+  -- really bold assumption; serverside replays haven't been tracking engineVersion until very late into v047
+  local engineVersion = legacyReplay.engineVersion or "046"
+
+  local replay = ReplayV2(engineVersion, v1r.seed, gameMode)
+  if legacyReplay.timestamp then
+    replay:setTimestamp(legacyReplay.timestamp)
+  elseif timestamp then
+    replay:setTimestamp(timestamp)
+  end
+  replay:setStage(v1r.stage or consts.RANDOM_STAGE_SPECIAL_VALUE)
+  replay:setRanked(v1r.match_type == "Ranked")
+
+  local p1 = ReplayPlayer(v1r.P1_name or "Player 1", -1, true)
+  p1:setWins(v1r.P1_win_count or 0)
+  p1:setCharacterId(v1r.P1_char)
+  -- not saved in v1
+  p1:setPanelId(config and config.panels or "pacci")
+
+  if gameMode.playerCount == 2 then
+    p1:setInputMethod(v1r.P1_inputMethod or "controller")
+  else
+    p1:setInputMethod(v1r.inputMethod or "controller")
+  end
+
+  p1:setInputs(InputCompression.decompressInputString2(v1r.in_buf))
+  p1:setBehaviours(StackBehaviours.getV048Default())
+
+  if v1r.P1_level then
+    p1:setLevel(v1r.P1_level)
+    p1:setColorCount(v1r.P1_color_count)
+    p1:setGameMode(v1r.P1_game_mode)
+    p1:setQueueType(v1r.P1_queue_type)
+    p1:setChaosMode(v1r.P1_chaos_mode)
+    p1:setMarginTime(v1r.P1_margin_time)
+    -- suffices because modern endless/timeattack never had replays
+    p1:setLevelData(LevelPresets.getModern(v1r.P1_level))
+    p1:setAllowAdjacentColors(v1r.P1_level < 8)
+  else
+    p1:setDifficulty(v1r.difficulty)
+    local levelData = LevelPresets.getClassic(v1r.difficulty)
+    levelData:setStartingSpeed(v1r.speed)
+    if v1r.difficulty == 1 and mode == "endless" then
+      -- endless has 5 colors, the preset has 6 like time attack so fix it
+      -- levelData:setColorCount(5)
+    end
+    p1:setLevelData(levelData)
+    p1:setAllowAdjacentColors(true)
+  end
+
+  replay:updatePlayer(1, p1)
+
+  if v1r.P2_char then
+    local p2 = ReplayPlayer(v1r.P2_name, -2, true)
+    p2:setWins(v1r.P2_win_count or 0)
+    p2:setCharacterId(v1r.P2_char)
+    -- not saved in v1
+    p2:setPanelId(config and config.panels or "pacci")
+    p2:setInputMethod(v1r.P2_inputMethod or "controller")
+    p2:setInputs(InputCompression.decompressInputString2(v1r.I))
+
+    -- presence of V2 means level and vs
+    p2:setBehaviours(StackBehaviours.getV048Default())
+    p2:setLevel(v1r.P2_level)
+    p2:setColorCount(v1r.P2_color_count)
+    p2:setGameMode(v1r.P2_game_mode)
+    p2:setQueueType(v1r.P2_queue_type)
+    p2:setChaosMode(v1r.P2_chaos_mode)
+    p2:setMarginTime(v1r.P2_margin_time)
+    p2:setLevelData(LevelPresets.getModern(v1r.P2_level))
+    p2:setAllowAdjacentColors(v1r.P2_level < 8)
+    if v1r.P2_level < 8 then
+      p2.settings.levelData.adjacentDenialFrequency = 0
+    else
+      p2.settings.levelData.adjacentDenialFrequency = 1
+    end
+
+    replay:updatePlayer(2, p2)
+  end
+
+  if v1r.duration then
+    replay:setDuration(v1r.duration)
+  else
+    if #replay.players == 1 then
+      replay:setDuration(string.len(replay.players[1].settings.inputs))
+    elseif #replay.players == 2 then
+      replay:setDuration(math.min(string.len(replay.players[1].settings.inputs), string.len(replay.players[2].settings.inputs)))
+    end
+  end
+
+  if v1r.winner then
+    replay:setOutcome(v1r.winner)
+  elseif winnerIndex then
+    replay:setOutcome(winnerIndex)
+  end
+
+  return replay
+end
+
+return ReplayV2

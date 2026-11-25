@@ -16,8 +16,8 @@ below was set for that game. Each is changed **one at a time**, judged on the be
 
 | Number | Where | Vanilla | Chaos | Status |
 |---|---|---|---|---|
-| `raise.to` | `profiles/*-rules.json` | 11 (raise to row 11) | 0 | done, run 4 |
-| `keep.material` | rules | >= 40 panels | none | done, run 4 |
+| `raise.to` | `profiles/*-rules.json` | 11 (raise to row 11) | run 4: 0 (shut every raise off: a board ran out of panels); run 5: -1 = computed, `decide.c chaosRaiseTo` (height - rows risen within HORIZON - 3) | done, run 5 |
+| `keep.material` | rules | >= 40 panels | run 4: none; run 5: >= 36 (half the board, level-free) | done, run 5 |
 | `opener` (8/6/4-chain by 600) | rules | on | off | done, run 4 |
 | `FINISH_ROWS` 8 | `decide.c` | finish them raises a low stack to 8 rows | to measure | open |
 | `LOW_ROWS` 6 | `decide.c` | a stack under 6 rows is raised | to measure | open |

@@ -24,7 +24,20 @@ static int32_t rescues; static int32_t rescueOn;   // (decisions whose lines wer
 // 1. READ: the facts of both boards, the mode and its list, the deadline, the floor every line keeps
 #define RAISE_MS 150
 static int32_t raiseRefill;   // (the raise asked is the floor's, not the opening's: answer.c lets nothing go before it)
-static int32_t raiseOpening, raiseTo, raiseRows;   // (the raise asked this decision: the opening's, and the rows it raises to -- the log's raiseFor)
+static int32_t raiseOpening, raiseTo, raiseRows;
+// CHAOS: THE RAISE'S CEILING, READ OFF THE LEVEL BEING PLAYED (docs/NUMBERS.md: every number dynamic). Health never refills in chaos, so
+// the stack is raised only to where it keeps the headroom the next look-ahead needs: the rows it rises on its own within HORIZON (a row
+// is sixteen steps of caRiseFrames(speed) frames -- ca.c advancePassiveRaise) and CHAOS_BLOCK_ROWS more for a block landing on it. A
+// faster level, or the speed's climb through a game, lowers it by itself. Never below CHAOS_RAISE_MIN rows (a board needs rows to
+// break with) nor above the height less CHAOS_BLOCK_ROWS.
+#define CHAOS_BLOCK_ROWS 3
+#define CHAOS_RAISE_MIN 3
+static int32_t chaosRaiseTo(const Board *b) {
+  int32_t h = b->height ? b->height : 12, perRow = 16 * caRiseFrames(b->speed ? b->speed : 1);
+  int32_t risen = (HORIZON + perRow - 1) / (perRow > 0 ? perRow : 1);
+  int32_t to = h - risen - CHAOS_BLOCK_ROWS;
+  return to < CHAOS_RAISE_MIN ? CHAOS_RAISE_MIN : to > h - CHAOS_BLOCK_ROWS ? h - CHAOS_BLOCK_ROWS : to;
+}   // (the raise asked this decision: the opening's, and the rows it raises to -- the log's raiseFor)
 static int32_t refillAsked, refillReady, refillAlive;   // (the floor's raise: the rows asked, ready, alive -- the log's)
 static int32_t raiseWait; static Board *raiseWaitBoard;   // (the floor's raise put off to the frame the stack takes one, and that board)
 static int32_t opLineOn;
@@ -280,6 +293,7 @@ static int readBoard_(Read *R) {
   // floor kept by raising, a reserve: below it, not topped, the panels under `to` -- garbage on them aside, a slab is no panel to break
   // with -- the rows the next break is made of brought in)
   int32_t to = rule->raiseTo ? rule->raiseTo : theTables.raiseTo;
+  if (to < 0) to = chaosRaiseTo(decQ.b);   // (chaos: the rules' "raise": {"to": -1} -- the ceiling read off the level being played)
   int opening = !gambitHit && !F->known[FACT_US_CONTACT] && !R->topped && decQ.b->clock < OPENING_RAISE;
   // (and A LOW STACK: under LOW_ROWS rows of panels, not topped, it is raised all the same -- the owner's rule: below six rows, raise high;
   // in a game garbage has reached or is on its way to -- the owner: the opener raise changed only where it kills, and with no garbage

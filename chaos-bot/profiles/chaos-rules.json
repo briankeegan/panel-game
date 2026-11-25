@@ -1,6 +1,6 @@
 {
  "raise": {
-  "to": 0
+  "to": -1
  },
  "underGarbage": "break",
  "attack": [
@@ -103,5 +103,8 @@
   }
  ],
  "opponents": {},
- "_chaos": "chaos-bot: gambit-rules.json (copied) with the vanilla stack-building taken out for chaos Level 9 -- no raise (was to row 11), no material floor (was >=40 panels), no opener (was an 8-chain by frame 600): health never refills in chaos, so the stack is kept low"
+ "_chaos": "chaos-bot: gambit-rules.json (copied), changed for chaos: raise to -1 = the ceiling computed from the level being played (decide.c chaosRaiseTo: the board height less the rows the stack rises within the look-ahead and 3 for a block; row 6 at Level 9's start, row 5 at Level 10's, row 3 once the speed climbs); material floor 36 panels (half the board; was 40 with a fixed raise to row 11); no opener",
+ "keep": {
+  "material": ">=36"
+ }
 }

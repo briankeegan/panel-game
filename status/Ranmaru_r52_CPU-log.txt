@@ -1,34 +1,142 @@
-run 45694482610, as of 2026-11-25T20:52:08Z
-opponent topped out: clock 12150 stopWatch 11962 stop 30 pre-stop 65 shake 3 health 51, top rows r12=gggggg r11=gggggg r10=gggggg
-garbage landed: our stopWatch 11964 clock 12152, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
-garbage landed: our stopWatch 11968 clock 12156, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
-opponent topped out: clock 12180 stopWatch 11992 stop 30 pre-stop 35 shake 0 health 51, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 12210 stopWatch 12022 stop 30 pre-stop 5 shake 0 health 51, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 12240 stopWatch 12052 stop 5 pre-stop 0 shake 0 health 51, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 12270 stopWatch 12082 stop 0 pre-stop 0 shake 0 health 45, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 12300 stopWatch 12112 stop 0 pre-stop 0 shake 0 health 30, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 12330 stopWatch 12142 stop 0 pre-stop 52 shake 0 health 30, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 12390 stopWatch 12202 stop 0 pre-stop 0 shake 38 health 51, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 12420 stopWatch 12232 stop 0 pre-stop 0 shake 8 health 51, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 12450 stopWatch 12262 stop 0 pre-stop 122 shake 0 health 37, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 12480 stopWatch 12292 stop 0 pre-stop 92 shake 0 health 37, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 12510 stopWatch 12322 stop 0 pre-stop 62 shake 0 health 37, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 12540 stopWatch 12352 stop 0 pre-stop 32 shake 0 health 37, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 12570 stopWatch 12382 stop 0 pre-stop 2 shake 0 health 37, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 12600 stopWatch 12412 stop 0 pre-stop 0 shake 63 health 37, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 12630 stopWatch 12442 stop 0 pre-stop 0 shake 33 health 37, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 12660 stopWatch 12472 stop 0 pre-stop 104 shake 3 health 37, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 12690 stopWatch 12502 stop 0 pre-stop 74 shake 0 health 37, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 12720 stopWatch 12532 stop 0 pre-stop 44 shake 0 health 37, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 12750 stopWatch 12562 stop 0 pre-stop 14 shake 0 health 37, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 12780 stopWatch 12592 stop 0 pre-stop 0 shake 0 health 37, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 12810 stopWatch 12622 stop 0 pre-stop 0 shake 0 health 17, top rows r12=gggggg r11=gggggg r10=gggggg
-REPLAY {"settings":{"metadata":{"completed":false,"stageId":"panel-attack-magellan-day","ranked":false,"stacks":[{"publicId":12078,"stackIndex":1,"wins":4,"panelId":"panelhd_basic_mizunoketsuban","level":10,"name":"Ranmaru_r52_CPU","characterId":"pa_characters_dragon"},{"publicId":12114,"stackIndex"
+run 45694482610, as of 2026-11-25T20:54:12Z
+opponent topped out: clock 6210 stopWatch 6022 stop 0 pre-stop 0 shake 0 health 51, top rows r12=gggggg r11=212000 r10=431524
+opponent topped out: clock 6270 stopWatch 6082 stop 92 pre-stop 51 shake 0 health 51, top rows r12=gggggg r11=212000 r10=431524
+opponent topped out: clock 6270 stopWatch 6082 stop 92 pre-stop 51 shake 0 health 51, top rows r12=gggggg r11=212000 r10=431524
+opponent topped out: clock 6300 stopWatch 6112 stop 92 pre-stop 21 shake 0 health 51, top rows r12=gggggg r11=212000 r10=431524
+opponent topped out: clock 6480 stopWatch 6292 stop 63 pre-stop 0 shake 0 health 51, top rows r12=0gggg0 r11=gggg00 r10=gggggg
+garbage landed: our stopWatch 6297 clock 6485, transits in flight before this frame {6297,6316}, opponent copy 1 frames behind, rollbacks so far 0
+opponent topped out: clock 6510 stopWatch 6322 stop 33 pre-stop 0 shake 0 health 51, top rows r12=0gggg0 r11=gggg00 r10=gggggg
+opponent topped out: clock 6540 stopWatch 6352 stop 3 pre-stop 0 shake 0 health 51, top rows r12=0gggg0 r11=gggg00 r10=gggggg
+opponent topped out: clock 6570 stopWatch 6382 stop 0 pre-stop 0 shake 1 health 51, top rows r12=0ggggg r11=0gggg0 r10=gggg00
+opponent topped out: clock 6570 stopWatch 6382 stop 0 pre-stop 0 shake 1 health 51, top rows r12=0ggggg r11=0gggg0 r10=gggg00
+garbage landed: our stopWatch 6403 clock 6591, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 6407 clock 6595, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+opponent topped out: clock 6600 stopWatch 6412 stop 0 pre-stop 67 shake 0 health 51, top rows r12=0ggggg r11=0gggg0 r10=gggg00
+opponent topped out: clock 6600 stopWatch 6412 stop 0 pre-stop 67 shake 0 health 51, top rows r12=0ggggg r11=0gggg0 r10=gggg00
+opponent topped out: clock 6630 stopWatch 6442 stop 0 pre-stop 119 shake 0 health 51, top rows r12=0ggggg r11=0gggg0 r10=gggg00
+opponent topped out: clock 6660 stopWatch 6472 stop 0 pre-stop 89 shake 0 health 51, top rows r12=0ggggg r11=0gggg0 r10=gggg00
+opponent topped out: clock 6660 stopWatch 6472 stop 0 pre-stop 89 shake 0 health 51, top rows r12=0ggggg r11=0gggg0 r10=gggg00
+opponent topped out: clock 6690 stopWatch 6502 stop 0 pre-stop 59 shake 0 health 51, top rows r12=0ggggg r11=0gggg0 r10=gggg00
+opponent topped out: clock 6720 stopWatch 6532 stop 0 pre-stop 29 shake 0 health 51, top rows r12=0ggggg r11=0gggg0 r10=gggg00
+opponent topped out: clock 6750 stopWatch 6562 stop 0 pre-stop 0 shake 0 health 51, top rows r12=0ggggg r11=0gggg0 r10=gggg00
+opponent topped out: clock 6810 stopWatch 6622 stop 92 pre-stop 39 shake 30 health 51, top rows r12=gggggg r11=0ggggg r10=0gggg0
+opponent topped out: clock 6810 stopWatch 6622 stop 92 pre-stop 39 shake 30 health 51, top rows r12=gggggg r11=0ggggg r10=0gggg0
+opponent topped out: clock 6870 stopWatch 6682 stop 92 pre-stop 42 shake 56 health 51, top rows r12=gggggg r11=gggggg r10=0ggggg
+opponent topped out: clock 6930 stopWatch 6742 stop 74 pre-stop 0 shake 0 health 51, top rows r12=gggggg r11=gggggg r10=0ggggg
+opponent topped out: clock 6930 stopWatch 6742 stop 74 pre-stop 0 shake 0 health 51, top rows r12=gggggg r11=gggggg r10=0ggggg
+opponent topped out: clock 6960 stopWatch 6772 stop 44 pre-stop 0 shake 0 health 51, top rows r12=gggggg r11=gggggg r10=0ggggg
+garbage landed: our stopWatch 6779 clock 6967, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+opponent topped out: clock 6990 stopWatch 6802 stop 14 pre-stop 0 shake 0 health 51, top rows r12=gggggg r11=gggggg r10=0ggggg
+opponent topped out: clock 6990 stopWatch 6802 stop 14 pre-stop 0 shake 0 health 51, top rows r12=gggggg r11=gggggg r10=0ggggg
+opponent topped out: clock 7020 stopWatch 6832 stop 0 pre-stop 0 shake 57 health 51, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 7020 stopWatch 6832 stop 0 pre-stop 0 shake 57 health 51, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 7050 stopWatch 6862 stop 0 pre-stop 0 shake 27 health 51, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 7050 stopWatch 6862 stop 0 pre-stop 0 shake 27 health 51, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 7110 stopWatch 6922 stop 92 pre-stop 63 shake 0 health 51, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 7140 stopWatch 6952 stop 92 pre-stop 33 shake 0 health 51, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 7170 stopWatch 6982 stop 92 pre-stop 3 shake 0 health 51, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 7170 stopWatch 6982 stop 92 pre-stop 3 shake 0 health 51, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 7230 stopWatch 7042 stop 54 pre-stop 378 shake 0 health 51, top rows r12=000ggg r11=gggggg r10=gggggg
+opponent topped out: clock 7260 stopWatch 7072 stop 54 pre-stop 348 shake 0 health 51, top rows r12=000ggg r11=gggggg r10=gggggg
+opponent topped out: clock 7290 stopWatch 7102 stop 54 pre-stop 318 shake 0 health 51, top rows r12=000ggg r11=gggggg r10=gggggg
+opponent topped out: clock 7320 stopWatch 7132 stop 54 pre-stop 288 shake 0 health 51, top rows r12=000ggg r11=gggggg r10=gggggg
+opponent topped out: clock 7320 stopWatch 7132 stop 54 pre-stop 288 shake 0 health 51, top rows r12=000ggg r11=gggggg r10=gggggg
+opponent topped out: clock 7350 stopWatch 7162 stop 54 pre-stop 258 shake 0 health 51, top rows r12=000ggg r11=gggggg r10=gggggg
+garbage landed: our stopWatch 7169 clock 7357, transits in flight before this frame {}, opponent copy 0 frames behind, rollbacks so far 0
+opponent topped out: clock 7380 stopWatch 7192 stop 54 pre-stop 228 shake 0 health 51, top rows r12=000ggg r11=gggggg r10=gggggg
+opponent topped out: clock 7380 stopWatch 7192 stop 54 pre-stop 228 shake 0 health 51, top rows r12=000ggg r11=gggggg r10=gggggg
+opponent topped out: clock 7470 stopWatch 7282 stop 54 pre-stop 138 shake 0 health 51, top rows r12=000ggg r11=gggggg r10=gggggg
+opponent topped out: clock 7530 stopWatch 7342 stop 54 pre-stop 78 shake 0 health 51, top rows r12=000ggg r11=gggggg r10=gggggg
+opponent topped out: clock 7530 stopWatch 7342 stop 54 pre-stop 78 shake 0 health 51, top rows r12=000ggg r11=gggggg r10=gggggg
+opponent topped out: clock 7560 stopWatch 7372 stop 54 pre-stop 48 shake 0 health 51, top rows r12=000ggg r11=gggggg r10=gggggg
+opponent topped out: clock 7620 stopWatch 7432 stop 42 pre-stop 0 shake 0 health 51, top rows r12=000543 r11=gggggg r10=gggggg
+opponent topped out: clock 7620 stopWatch 7432 stop 42 pre-stop 0 shake 0 health 51, top rows r12=000543 r11=gggggg r10=gggggg
+opponent topped out: clock 7770 stopWatch 7582 stop 43 pre-stop 0 shake 0 health 51, top rows r12=ggg000 r11=gggggg r10=000543
+garbage landed: our stopWatch 7594 clock 7782, transits in flight before this frame {7594}, opponent copy 0 frames behind, rollbacks so far 0
+opponent topped out: clock 7830 stopWatch 7642 stop 37 pre-stop 23 shake 0 health 51, top rows r12=ggg000 r11=gggggg r10=000543
+opponent topped out: clock 7830 stopWatch 7642 stop 37 pre-stop 23 shake 0 health 51, top rows r12=ggg000 r11=gggggg r10=000543
+opponent topped out: clock 7890 stopWatch 7702 stop 140 pre-stop 51 shake 0 health 51, top rows r12=ggg000 r11=gggggg r10=000543
+opponent topped out: clock 7890 stopWatch 7702 stop 140 pre-stop 51 shake 0 health 51, top rows r12=ggg000 r11=gggggg r10=000543
+opponent topped out: clock 7920 stopWatch 7732 stop 140 pre-stop 21 shake 0 health 51, top rows r12=ggg000 r11=gggggg r10=000543
+opponent topped out: clock 7920 stopWatch 7732 stop 140 pre-stop 21 shake 0 health 51, top rows r12=ggg000 r11=gggggg r10=000543
+opponent topped out: clock 7950 stopWatch 7762 stop 131 pre-stop 0 shake 0 health 51, top rows r12=ggg000 r11=gggggg r10=000543
+opponent topped out: clock 8010 stopWatch 7822 stop 152 pre-stop 20 shake 0 health 51, top rows r12=ggg000 r11=gggggg r10=000543
+opponent topped out: clock 8040 stopWatch 7852 stop 152 pre-stop 64 shake 0 health 51, top rows r12=ggg000 r11=gggggg r10=000543
+opponent topped out: clock 8070 stopWatch 7882 stop 152 pre-stop 34 shake 0 health 51, top rows r12=ggg000 r11=gggggg r10=000543
+opponent topped out: clock 8100 stopWatch 7912 stop 152 pre-stop 4 shake 0 health 51, top rows r12=gggggg r11=ggg000 r10=gggggg
+opponent topped out: clock 8100 stopWatch 7912 stop 152 pre-stop 4 shake 0 health 51, top rows r12=gggggg r11=ggg000 r10=gggggg
+garbage landed: our stopWatch 7915 clock 8103, transits in flight before this frame {7915}, opponent copy 0 frames behind, rollbacks so far 0
+opponent topped out: clock 8130 stopWatch 7942 stop 126 pre-stop 0 shake 37 health 51, top rows r12=gggggg r11=ggg000 r10=gggggg
+opponent topped out: clock 8190 stopWatch 8002 stop 66 pre-stop 0 shake 0 health 51, top rows r12=gggggg r11=ggg000 r10=gggggg
+opponent topped out: clock 8220 stopWatch 8032 stop 51 pre-stop 158 shake 51 health 51, top rows r12=gggggg r11=gggggg r10=ggg000
+opponent topped out: clock 8220 stopWatch 8032 stop 51 pre-stop 158 shake 51 health 51, top rows r12=gggggg r11=gggggg r10=ggg000
+opponent topped out: clock 8250 stopWatch 8062 stop 51 pre-stop 128 shake 21 health 51, top rows r12=gggggg r11=gggggg r10=ggg000
+opponent topped out: clock 8250 stopWatch 8062 stop 51 pre-stop 128 shake 21 health 51, top rows r12=gggggg r11=gggggg r10=ggg000
+opponent topped out: clock 8280 stopWatch 8092 stop 51 pre-stop 98 shake 0 health 51, top rows r12=gggggg r11=gggggg r10=ggg000
+opponent topped out: clock 8310 stopWatch 8122 stop 51 pre-stop 68 shake 0 health 51, top rows r12=gggggg r11=gggggg r10=ggg000
+opponent topped out: clock 8370 stopWatch 8182 stop 51 pre-stop 8 shake 0 health 51, top rows r12=gggggg r11=gggggg r10=ggg000
+opponent topped out: clock 8370 stopWatch 8182 stop 51 pre-stop 8 shake 0 health 51, top rows r12=gggggg r11=gggggg r10=ggg000
+opponent topped out: clock 8580 stopWatch 8392 stop 40 pre-stop 0 shake 0 health 51, top rows r12=000ggg r11=gggggg r10=gggggg
+opponent topped out: clock 8580 stopWatch 8392 stop 40 pre-stop 0 shake 0 health 51, top rows r12=000ggg r11=gggggg r10=gggggg
+opponent topped out: clock 8610 stopWatch 8422 stop 92 pre-stop 62 shake 0 health 51, top rows r12=000ggg r11=gggggg r10=gggggg
+opponent topped out: clock 8640 stopWatch 8452 stop 92 pre-stop 136 shake 0 health 51, top rows r12=000ggg r11=gggggg r10=gggggg
+opponent topped out: clock 8640 stopWatch 8452 stop 92 pre-stop 136 shake 0 health 51, top rows r12=000ggg r11=gggggg r10=gggggg
+opponent topped out: clock 8670 stopWatch 8482 stop 92 pre-stop 106 shake 0 health 51, top rows r12=000ggg r11=gggggg r10=gggggg
+opponent topped out: clock 8670 stopWatch 8482 stop 92 pre-stop 106 shake 0 health 51, top rows r12=000ggg r11=gggggg r10=gggggg
+opponent topped out: clock 8700 stopWatch 8512 stop 92 pre-stop 76 shake 0 health 51, top rows r12=000ggg r11=gggggg r10=gggggg
+opponent topped out: clock 8760 stopWatch 8572 stop 92 pre-stop 16 shake 0 health 51, top rows r12=000ggg r11=gggggg r10=gggggg
+garbage landed: our stopWatch 8657 clock 8845, transits in flight before this frame {}, opponent copy 0 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 8665 clock 8853, transits in flight before this frame {}, opponent copy 0 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 8672 clock 8860, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+opponent topped out: clock 9000 stopWatch 8812 stop 0 pre-stop 0 shake 0 health 48, top rows r12=gggggg r11=ggggg0 r10=00gggg
+opponent topped out: clock 9000 stopWatch 8812 stop 0 pre-stop 0 shake 0 health 48, top rows r12=gggggg r11=ggggg0 r10=00gggg
+garbage landed: our stopWatch 8849 clock 9037, transits in flight before this frame {}, opponent copy 0 frames behind, rollbacks so far 0
+opponent topped out: clock 9060 stopWatch 8872 stop 0 pre-stop 56 shake 0 health 24, top rows r12=gggggg r11=ggggg0 r10=00gggg
+opponent topped out: clock 9090 stopWatch 8902 stop 0 pre-stop 26 shake 0 health 24, top rows r12=gggggg r11=ggggg0 r10=00gggg
+opponent topped out: clock 9120 stopWatch 8932 stop 0 pre-stop 0 shake 0 health 21, top rows r12=gggggg r11=ggggg0 r10=00gggg
+opponent topped out: clock 9180 stopWatch 8992 stop 0 pre-stop 417 shake 35 health 17, top rows r12=gggggg r11=gggggg r10=ggggg0
+opponent topped out: clock 9180 stopWatch 8992 stop 0 pre-stop 417 shake 35 health 17, top rows r12=gggggg r11=gggggg r10=ggggg0
+opponent topped out: clock 9210 stopWatch 9022 stop 0 pre-stop 387 shake 5 health 17, top rows r12=gggggg r11=gggggg r10=ggggg0
+opponent topped out: clock 9240 stopWatch 9052 stop 0 pre-stop 357 shake 0 health 17, top rows r12=gggggg r11=gggggg r10=ggggg0
+opponent topped out: clock 9270 stopWatch 9082 stop 0 pre-stop 327 shake 0 health 17, top rows r12=gggggg r11=gggggg r10=ggggg0
+opponent topped out: clock 9300 stopWatch 9112 stop 0 pre-stop 297 shake 0 health 17, top rows r12=gggggg r11=gggggg r10=ggggg0
+opponent topped out: clock 9330 stopWatch 9142 stop 0 pre-stop 267 shake 0 health 17, top rows r12=gggggg r11=gggggg r10=ggggg0
+opponent topped out: clock 9360 stopWatch 9172 stop 0 pre-stop 237 shake 0 health 17, top rows r12=gggggg r11=gggggg r10=ggggg0
+opponent topped out: clock 9390 stopWatch 9202 stop 0 pre-stop 207 shake 0 health 17, top rows r12=gggggg r11=gggggg r10=ggggg0
+opponent topped out: clock 9420 stopWatch 9232 stop 0 pre-stop 177 shake 0 health 17, top rows r12=gggggg r11=gggggg r10=ggggg0
+opponent topped out: clock 9450 stopWatch 9262 stop 0 pre-stop 147 shake 0 health 17, top rows r12=gggggg r11=gggggg r10=ggggg0
+opponent topped out: clock 9450 stopWatch 9262 stop 0 pre-stop 147 shake 0 health 17, top rows r12=gggggg r11=gggggg r10=ggggg0
+opponent topped out: clock 9480 stopWatch 9292 stop 0 pre-stop 117 shake 0 health 17, top rows r12=gggggg r11=gggggg r10=ggggg0
+opponent topped out: clock 9510 stopWatch 9322 stop 0 pre-stop 87 shake 0 health 17, top rows r12=gggggg r11=gggggg r10=ggggg0
+opponent topped out: clock 9570 stopWatch 9382 stop 0 pre-stop 27 shake 0 health 17, top rows r12=gggggg r11=gggggg r10=ggggg0
+opponent topped out: clock 9600 stopWatch 9412 stop 0 pre-stop 0 shake 0 health 17, top rows r12=gggggg r11=241231 r10=152310
+opponent topped out: clock 9630 stopWatch 9442 stop 152 pre-stop 67 shake 0 health 17, top rows r12=gggggg r11=000230 r10=001311
+opponent topped out: clock 9690 stopWatch 9502 stop 152 pre-stop 74 shake 0 health 17, top rows r12=gggggg r11=000230 r10=003111
+opponent topped out: clock 9750 stopWatch 9562 stop 152 pre-stop 14 shake 0 health 17, top rows r12=gggggg r11=000230 r10=003111
+garbage landed: our stopWatch 9582 clock 9770, transits in flight before this frame {9582}, opponent copy 0 frames behind, rollbacks so far 0
+opponent topped out: clock 9780 stopWatch 9592 stop 136 pre-stop 0 shake 71 health 17, top rows r12=gggggg r11=gggggg r10=003230
+opponent topped out: clock 9810 stopWatch 9622 stop 106 pre-stop 0 shake 41 health 17, top rows r12=gggggg r11=gggggg r10=003230
+opponent topped out: clock 9840 stopWatch 9652 stop 93 pre-stop 60 shake 11 health 17, top rows r12=gggggg r11=gggggg r10=003230
+opponent topped out: clock 9900 stopWatch 9712 stop 93 pre-stop 0 shake 0 health 17, top rows r12=gggggg r11=gggggg r10=003230
+opponent topped out: clock 9930 stopWatch 9742 stop 92 pre-stop 60 shake 60 health 17, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 10020 stopWatch 9832 stop 62 pre-stop 0 shake 0 health 17, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 10050 stopWatch 9862 stop 32 pre-stop 0 shake 57 health 17, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 10080 stopWatch 9892 stop 17 pre-stop 110 shake 27 health 17, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 10080 stopWatch 9892 stop 17 pre-stop 110 shake 27 health 17, top rows r12=gggggg r11=gggggg r10=gggggg
+garbage landed: our stopWatch 9901 clock 10089, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+opponent topped out: clock 10110 stopWatch 9922 stop 17 pre-stop 80 shake 0 health 17, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 10140 stopWatch 9952 stop 17 pre-stop 50 shake 0 health 17, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 10200 stopWatch 10012 stop 7 pre-stop 0 shake 0 health 17, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 10230 stopWatch 10042 stop 0 pre-stop 61 shake 0 health 17, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 10260 stopWatch 10072 stop 0 pre-stop 31 shake 0 health 17, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 10290 stopWatch 10102 stop 0 pre-stop 1 shake 0 health 17, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 10320 stopWatch 10132 stop 0 pre-stop 0 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+REPLAY {"settings":{"metadata":{"completed":false,"stageId":"pa_stages_wind","ranked":false,"stacks":[{"publicId":12078,"stackIndex":1,"wins":5,"panelId":"panelhd_basic_mizunoketsuban","level":10,"name":"Ranmaru_r52_CPU","characterId":"pa_characters_dragon"},{"publicId":12114,"stackIndex":2,"wins":0
 engine rolled our stack back 0 times for late garbage this match
 match against: paneleitor
 match against id: 12114
-match over — bot won (pace: worst 0.31 frames off schedule); waiting for a rematch
-memory after match: rss 2768416 kB, threads 9, lua 58229 kB
+match over — bot won (pace: worst 0.30 frames off schedule); waiting for a rematch
+memory after match: rss 3051240 kB, threads 9, lua 54302 kB
 game about to start: both players are ready
 match start: building the match (seed nil, stage nil, opponent ?)
 match start: the match is built
@@ -38,114 +146,6 @@ match start: gambit: the link is created
 match start: gambit: the link is starting the match
 match start: gambit: the link has started the match
 both ready — match starting
-garbage landed: our stopWatch 620 clock 808, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
-garbage landed: our stopWatch 627 clock 815, transits in flight before this frame {}, opponent copy 2 frames behind, rollbacks so far 0
-garbage landed: our stopWatch 1403 clock 1591, transits in flight before this frame {1403}, opponent copy 1 frames behind, rollbacks so far 0
-opponent topped out: clock 1680 stopWatch 1492 stop 0 pre-stop 0 shake 41 health 51, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 1710 stopWatch 1522 stop 0 pre-stop 0 shake 11 health 51, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 1740 stopWatch 1552 stop 0 pre-stop 53 shake 0 health 51, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 1770 stopWatch 1582 stop 0 pre-stop 70 shake 0 health 51, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 1800 stopWatch 1612 stop 0 pre-stop 40 shake 0 health 51, top rows r12=gggggg r11=gggggg r10=gggggg
-garbage landed: our stopWatch 1632 clock 1820, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
-opponent topped out: clock 1830 stopWatch 1642 stop 0 pre-stop 10 shake 0 health 51, top rows r12=gggggg r11=gggggg r10=gggggg
-garbage landed: our stopWatch 1646 clock 1834, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
-opponent topped out: clock 1860 stopWatch 1672 stop 0 pre-stop 0 shake 0 health 42, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 1890 stopWatch 1702 stop 0 pre-stop 0 shake 0 health 27, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 1920 stopWatch 1732 stop 0 pre-stop 444 shake 51 health 27, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 1950 stopWatch 1762 stop 0 pre-stop 414 shake 21 health 27, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 1980 stopWatch 1792 stop 0 pre-stop 384 shake 0 health 27, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 2010 stopWatch 1822 stop 0 pre-stop 354 shake 0 health 27, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 2040 stopWatch 1852 stop 0 pre-stop 324 shake 0 health 27, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 2070 stopWatch 1882 stop 0 pre-stop 294 shake 0 health 27, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 2100 stopWatch 1912 stop 0 pre-stop 264 shake 0 health 27, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 2130 stopWatch 1942 stop 0 pre-stop 234 shake 0 health 27, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 2160 stopWatch 1972 stop 0 pre-stop 204 shake 0 health 27, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 2190 stopWatch 2002 stop 0 pre-stop 174 shake 0 health 27, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 2220 stopWatch 2032 stop 0 pre-stop 144 shake 0 health 27, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 2250 stopWatch 2062 stop 0 pre-stop 114 shake 0 health 27, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 2280 stopWatch 2092 stop 0 pre-stop 84 shake 0 health 27, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 2310 stopWatch 2122 stop 0 pre-stop 54 shake 0 health 27, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 2340 stopWatch 2152 stop 0 pre-stop 24 shake 0 health 27, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 2370 stopWatch 2182 stop 0 pre-stop 0 shake 0 health 27, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 2400 stopWatch 2212 stop 140 pre-stop 232 shake 53 health 27, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 2430 stopWatch 2242 stop 140 pre-stop 202 shake 23 health 27, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 2460 stopWatch 2272 stop 140 pre-stop 172 shake 0 health 27, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 2490 stopWatch 2302 stop 140 pre-stop 142 shake 0 health 27, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 2520 stopWatch 2332 stop 140 pre-stop 112 shake 0 health 27, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 2550 stopWatch 2362 stop 140 pre-stop 82 shake 0 health 27, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 2610 stopWatch 2422 stop 140 pre-stop 22 shake 0 health 27, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 2640 stopWatch 2452 stop 132 pre-stop 0 shake 0 health 27, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 2670 stopWatch 2482 stop 102 pre-stop 0 shake 8 health 51, top rows r12=ggg000 r11=gggggg r10=gggggg
-opponent topped out: clock 2700 stopWatch 2512 stop 72 pre-stop 0 shake 0 health 51, top rows r12=ggg000 r11=gggggg r10=gggggg
-opponent topped out: clock 2730 stopWatch 2542 stop 50 pre-stop 285 shake 0 health 51, top rows r12=ggg000 r11=gggggg r10=gggggg
-opponent topped out: clock 2760 stopWatch 2572 stop 50 pre-stop 255 shake 0 health 51, top rows r12=ggg000 r11=gggggg r10=gggggg
-opponent topped out: clock 2790 stopWatch 2602 stop 50 pre-stop 225 shake 0 health 51, top rows r12=ggg000 r11=gggggg r10=gggggg
-opponent topped out: clock 2820 stopWatch 2632 stop 50 pre-stop 195 shake 0 health 51, top rows r12=ggg000 r11=gggggg r10=gggggg
-opponent topped out: clock 2850 stopWatch 2662 stop 50 pre-stop 165 shake 0 health 51, top rows r12=ggg000 r11=gggggg r10=gggggg
-opponent topped out: clock 2850 stopWatch 2662 stop 50 pre-stop 165 shake 0 health 51, top rows r12=ggg000 r11=gggggg r10=gggggg
-garbage landed: our stopWatch 2667 clock 2855, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
-garbage landed: our stopWatch 2674 clock 2862, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
-opponent topped out: clock 2880 stopWatch 2692 stop 50 pre-stop 135 shake 0 health 51, top rows r12=ggg000 r11=gggggg r10=gggggg
-opponent topped out: clock 2910 stopWatch 2722 stop 50 pre-stop 105 shake 0 health 51, top rows r12=ggg000 r11=gggggg r10=gggggg
-opponent topped out: clock 2940 stopWatch 2752 stop 50 pre-stop 75 shake 0 health 51, top rows r12=ggg000 r11=gggggg r10=gggggg
-opponent topped out: clock 2970 stopWatch 2782 stop 50 pre-stop 45 shake 0 health 51, top rows r12=ggg000 r11=gggggg r10=gggggg
-opponent topped out: clock 3000 stopWatch 2812 stop 50 pre-stop 15 shake 0 health 51, top rows r12=ggg000 r11=gggggg r10=gggggg
-opponent topped out: clock 3030 stopWatch 2842 stop 35 pre-stop 0 shake 0 health 51, top rows r12=534000 r11=gggggg r10=145431
-opponent topped out: clock 3060 stopWatch 2872 stop 25 pre-stop 153 shake 0 health 51, top rows r12=534000 r11=gggggg r10=145431
-opponent topped out: clock 3090 stopWatch 2902 stop 25 pre-stop 123 shake 0 health 51, top rows r12=534000 r11=gggggg r10=145431
-opponent topped out: clock 3120 stopWatch 2932 stop 25 pre-stop 93 shake 0 health 51, top rows r12=534000 r11=gggggg r10=145431
-opponent topped out: clock 3150 stopWatch 2962 stop 25 pre-stop 63 shake 0 health 51, top rows r12=534000 r11=gggggg r10=145431
-opponent topped out: clock 3180 stopWatch 2992 stop 25 pre-stop 33 shake 0 health 51, top rows r12=534000 r11=gggggg r10=145431
-opponent topped out: clock 3210 stopWatch 3022 stop 25 pre-stop 3 shake 0 health 51, top rows r12=534000 r11=gggggg r10=145431
-opponent topped out: clock 3240 stopWatch 3052 stop 0 pre-stop 0 shake 64 health 51, top rows r12=gggggg r11=534000 r10=gggggg
-opponent topped out: clock 3270 stopWatch 3082 stop 0 pre-stop 115 shake 34 health 51, top rows r12=gggggg r11=534000 r10=gggggg
-opponent topped out: clock 3300 stopWatch 3112 stop 0 pre-stop 85 shake 4 health 51, top rows r12=gggggg r11=534000 r10=gggggg
-opponent topped out: clock 3330 stopWatch 3142 stop 0 pre-stop 55 shake 0 health 51, top rows r12=gggggg r11=534000 r10=gggggg
-opponent topped out: clock 3330 stopWatch 3142 stop 0 pre-stop 55 shake 0 health 51, top rows r12=gggggg r11=534000 r10=gggggg
-opponent topped out: clock 3360 stopWatch 3172 stop 0 pre-stop 25 shake 0 health 51, top rows r12=gggggg r11=534000 r10=gggggg
-opponent topped out: clock 3390 stopWatch 3202 stop 0 pre-stop 0 shake 0 health 51, top rows r12=gggggg r11=534000 r10=gggggg
-opponent topped out: clock 3420 stopWatch 3232 stop 152 pre-stop 67 shake 0 health 51, top rows r12=gggggg r11=534000 r10=gggggg
-opponent topped out: clock 3450 stopWatch 3262 stop 152 pre-stop 37 shake 0 health 51, top rows r12=gggggg r11=534000 r10=gggggg
-opponent topped out: clock 3480 stopWatch 3292 stop 152 pre-stop 7 shake 0 health 51, top rows r12=gggggg r11=534000 r10=gggggg
-opponent topped out: clock 3510 stopWatch 3322 stop 129 pre-stop 0 shake 54 health 51, top rows r12=gggggg r11=gggggg r10=534000
-garbage landed: our stopWatch 3372 clock 3560, transits in flight before this frame {3372}, opponent copy 1 frames behind, rollbacks so far 0
-opponent topped out: clock 3570 stopWatch 3382 stop 69 pre-stop 0 shake 0 health 51, top rows r12=gggggg r11=gggggg r10=534000
-opponent topped out: clock 3690 stopWatch 3502 stop 92 pre-stop 145 shake 31 health 51, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 3720 stopWatch 3532 stop 92 pre-stop 115 shake 1 health 51, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 3750 stopWatch 3562 stop 92 pre-stop 85 shake 0 health 51, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 3780 stopWatch 3592 stop 92 pre-stop 55 shake 0 health 51, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 3810 stopWatch 3622 stop 92 pre-stop 25 shake 0 health 51, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 3840 stopWatch 3652 stop 87 pre-stop 0 shake 0 health 51, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 3870 stopWatch 3682 stop 152 pre-stop 70 shake 0 health 51, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 3900 stopWatch 3712 stop 152 pre-stop 40 shake 0 health 51, top rows r12=gggggg r11=gggggg r10=gggggg
-garbage landed: our stopWatch 3768 clock 3956, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
-opponent topped out: clock 4050 stopWatch 3862 stop 119 pre-stop 0 shake 37 health 51, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 4080 stopWatch 3892 stop 90 pre-stop 124 shake 7 health 51, top rows r12=gggggg r11=gggggg r10=gggggg
-garbage landed: our stopWatch 3910 clock 4098, transits in flight before this frame {3910}, opponent copy 1 frames behind, rollbacks so far 0
-opponent topped out: clock 4110 stopWatch 3922 stop 90 pre-stop 94 shake 0 health 51, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 4140 stopWatch 3952 stop 90 pre-stop 64 shake 0 health 51, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 4170 stopWatch 3982 stop 90 pre-stop 34 shake 0 health 51, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 4200 stopWatch 4012 stop 90 pre-stop 4 shake 0 health 51, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 4230 stopWatch 4042 stop 64 pre-stop 0 shake 0 health 51, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 4260 stopWatch 4072 stop 34 pre-stop 77 shake 0 health 51, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 4290 stopWatch 4102 stop 34 pre-stop 47 shake 0 health 51, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 4290 stopWatch 4102 stop 34 pre-stop 47 shake 0 health 51, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 4320 stopWatch 4132 stop 34 pre-stop 17 shake 0 health 51, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 4350 stopWatch 4162 stop 21 pre-stop 0 shake 0 health 51, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 4380 stopWatch 4192 stop 0 pre-stop 0 shake 0 health 41, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 4410 stopWatch 4222 stop 0 pre-stop 54 shake 0 health 39, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 4440 stopWatch 4252 stop 0 pre-stop 24 shake 0 health 39, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 4470 stopWatch 4282 stop 0 pre-stop 0 shake 0 health 39, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 4500 stopWatch 4312 stop 92 pre-stop 52 shake 43 health 39, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 4530 stopWatch 4342 stop 92 pre-stop 22 shake 13 health 39, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 4590 stopWatch 4402 stop 152 pre-stop 52 shake 39 health 39, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 4620 stopWatch 4432 stop 152 pre-stop 22 shake 9 health 39, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 4680 stopWatch 4492 stop 114 pre-stop 0 shake 6 health 51, top rows r12=000ggg r11=gggggg r10=gggggg
-opponent topped out: clock 4710 stopWatch 4522 stop 108 pre-stop 461 shake 0 health 51, top rows r12=000ggg r11=gggggg r10=gggggg
-garbage landed: our stopWatch 4527 clock 4715, transits in flight before this frame {4527}, opponent copy 1 frames behind, rollbacks so far 0
-opponent topped out: clock 4740 stopWatch 4552 stop 108 pre-stop 431 shake 0 health 51, top rows r12=000ggg r11=gggggg r10=gggggg
-opponent topped out: clock 4770 stopWatch 4582 stop 108 pre-stop 401 shake 0 health 51, top rows r12=000ggg r11=gggggg r10=gggggg
-opponent topped out: clock 4770 stopWatch 4582 stop 108 pre-stop 401 shake 0 health 51, top rows r12=000ggg r11=gggggg r10=gggggg
-opponent topped out: clock 4800 stopWatch 4612 stop 108 pre-stop 371 shake 0 health 51, top rows r12=000ggg r11=gggggg r10=gggggg
-opponent topped out: clock 4860 stopWatch 4672 stop 108 pre-stop 311 shake 0 health 51, top rows r12=000ggg r11=gggggg r10=gggggg
-opponent topped out: clock 4890 stopWatch 4702 stop 108 pre-stop 281 shake 0 health 51, top rows r12=000ggg r11=gggggg r10=gggggg
+garbage landed: our stopWatch 341 clock 529, transits in flight before this frame {341}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 742 clock 930, transits in flight before this frame {742}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 1055 clock 1243, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0

@@ -1,7 +1,8 @@
 # The chaos bot's goal
 
 **The target: a bot that survives every game of the chaos benchmark to the end -- 6 minutes (21,600 frames) at chaos Level 10 --
-twice in a row, with 0 divergences, 0 late moves and 0 frames over the think budget. Then as much garbage sent as survival allows.**
+8/8, then 8/8 again on a new set of seeds (the owner, 2026-11-25 18:08 ET: not twice in a row on the same seeds), with 0 divergences,
+0 late moves and 0 frames over the think budget. Then as much garbage sent as survival allows.**
 
 *(The owner, 2026-11-25: "just focus on level 10 -- making sure everything is dynamic, so it will work on 9, 8, 7". The benchmark is
 Level 10 only. Every number the bot uses is read off the level being played (docs/NUMBERS.md), never tuned to one level, so the same
@@ -64,7 +65,8 @@ board's danger. *Done when:* 4 games played end to end on Actions with 0 diverge
 **Step 3 -- survival.** Every loss read decision by decision from its own log, the decision that lost it found, the cause fixed,
 the benchmark run again. Health is permanent in chaos, so the board's danger is judged on health too: garbage resting in the top
 row costs health that never comes back, and a line that saves frames by spending health is ranked as the loss it is. *Done when:*
-N/N survived, twice in a row, budgets at 0.
+8/8 survived with budgets at 0, then the next run on a new set of seeds (3 and 4, then 5 and 6, ...) 8/8 too -- a run that gets 8/8
+moves the benchmark to new seeds; it is never rerun on the same ones.
 
 **Step 4 -- attack.** Garbage sent a minute, raised without giving up a single game of Step 3. Every change is checked against
 survival first. *Done when:* the owner says the rate is enough, or names a number.

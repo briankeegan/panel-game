@@ -120,6 +120,13 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 18 (2026-11-25 17:48 ET), planned with the real health: survived 7/8 -- but spent it.** Survivors ended at 1, 1, 1, 7, 3,
+  1, 4 health (run 17: 13 in every one); lost thicc_combo_storm s2 at 4450, a game run 17 lived. Planned with 13, the search walks
+  into topped-out states it can stand for 12 frames, and health never refills. Reverted to 1. Run 19: 1, and the real pool only
+  while topped out with no stop or pre-stop -- the frames health is actually draining, where 1 made every line lost at once.
+- **Run 17 (2026-11-25 17:39 ET), dig the backlog: survived 7/8, surprises 0/752.** Lost insane_combo_storm s1 18864 only; every
+  survivor kept all 13 health; late 0, diverged 0, overruns 0; 17.70 rows a minute. The loss: from 16200 the queue grew 0 to 21 as
+  the speed rose, the last 300 frames no line in reach broke garbage, panels 20 to 11 spent on stop, then holds topped out to the loss.
 - **Run 16 (2026-11-25 17:28 ET), run 15's bot with the forecast checked: survived 4/8, surprises 0/632.** Every garbage arrival
   was foreseen 151 frames or more: the forecast is right. Lost thicc_combo_storm s1 19423, insane_combo_storm s1 7349, combo_storm
   s2 19613, insane_combo_storm s2 13010; late 0, diverged 0, overruns 0; 17.47 rows a minute. The losses are the dig: insane s1

@@ -163,7 +163,13 @@ static int frameOut(void) {
 static void ringKeep(int32_t at, int32_t allow);
 static void answerOne(FQuestion *q, Board *b, FAnswer *out) {
   double t0 = clock_ms();
-  if (gnPlanHealth) { b->health = imin(b->health, gnPlanHealth); b->maxHealth = imin(b->maxHealth, gnPlanHealth); }
+  // (CHAOS: health is a permanent pool, drained only on frames topped out with no stop and nothing moving. Planned at gnPlanHealth
+  // (1) the bot keeps clear of being topped out at all -- run 17 kept all 13 in every game it lived; planned with the real pool it spent
+  // it, run 18 ending games at 1. But once topped out with no stop left, health 1 makes every line lost at once and the hold, which
+  // spends health every frame, wins the tie (run 17 insane s1: holds to the loss). There, the real health is planned with, so the search
+  // finds the lines that keep the board moving and dig out)
+  int healthDraining = b->topRow && b->stopTime == 0 && b->preStopTime == 0;
+  if (gnPlanHealth && !healthDraining) { b->health = imin(b->health, gnPlanHealth); b->maxHealth = imin(b->maxHealth, gnPlanHealth); }
   dueFrame = q->at - 1; clockFrameOut = frameOut; rescueOn = 0;
   // (the searches' deadline is the frame loop's own: the start of the frame the decision is cut at -- the one before its move, sooner by
   // the burst -- less its closing work)

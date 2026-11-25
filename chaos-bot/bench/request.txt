@@ -43,7 +43,10 @@
 #          survived 4/8, surprises 0/632 (every arrival foreseen >= 151 frames). Lost thicc s1 19423, insane s1 7349, combo s2
 #          19613, insane s2 13010. insane s1: 15-24 queued for 1,700 frames, panels 40 to 7 on survive lines breaking nothing
 # run 17 -- one change: under a backlog, of two lines that both die, the one breaking more garbage rows first (rank.c)
+# run 17 -- (result) survived 7/8, surprises 0/752; lost insane s1 18864 (backlog 0 to 21 from 16200, no break in reach, panels spent on stop)
 # run 18 -- one change: plan with the board's real health (planHealth 0; chaos health is a permanent pool spent only on idle topped frames)
+#          survived 7/8 but spent health: survivors ended at 1,1,1,7,3,1,4 health (run 17: 13 each); lost thicc s2 at 4450. Reverted
+# run 19 -- one change: health planned at 1, but with the real pool while topped out with no stop (health draining) (native.c)
 combo_storm 1 9 9 2 21600 10
 chain_garbage 1 9 9 1 21600 10
 thicc_combo_storm 1 9 9 3 21600 10

@@ -49,6 +49,7 @@ local function rand(n)
 end
 if QUEUE == 0 then QUEUE = 1 + rand(3) end
 if CHAOS == nil then CHAOS = rand(2) end
+if arg[9] == "tall" then CHAOS = 1 end   -- tall combo garbage is what a chaos-mode stack sends
 if MARGIN == nil then MARGIN = 1 + rand(4) end
 
 local out = io.stdout
@@ -64,12 +65,149 @@ local rules = mode.matchRules
 rules.doCountdown = false
 local match = Match(GeneratorSource(SEED, true), rules)
 match:setCountdown(false)
-local stack = match:createStackWithSettings(LevelPresets.getModern(LEVEL), true, "controller", nil, 6, GAMEMODE, QUEUE, CHAOS == 1, MARGIN)
-stack.do_countdown = false
-stack.incomingGarbage.GarbageQueueType = QUEUE
-stack.incomingGarbage.illegalStuffIsAllowed = true
-stack.incomingGarbage.ChaosMode = rand(2) == 1
-stack:starting_state()
+local INCOMING_CHAOS = rand(2) == 1
+local function newStack(m)
+  local st = m:createStackWithSettings(LevelPresets.getModern(LEVEL), true, "controller", nil, 6, GAMEMODE, QUEUE, CHAOS == 1, MARGIN)
+  st.do_countdown = false
+  st.incomingGarbage.GarbageQueueType = QUEUE
+  st.incomingGarbage.illegalStuffIsAllowed = true
+  st.incomingGarbage.ChaosMode = INCOMING_CHAOS
+  st:starting_state()
+  return st
+end
+local stack = newStack(match)
+
+-- ---- HAND-BUILT BOARDS, for what random play never makes (SCENARIO: chain, allclear, shock, tall; anything else: none)
+local SCENARIO = arg[9] or "none"
+local function setCell(st, r, c, colour, changed)
+  local p = st.panels[r][c]
+  p.color = colour
+  p.state = "normal"
+  p.stateChanged = changed or false
+end
+local function clearRows(st)
+  for r = 1, st.height do for c = 1, st.width do setCell(st, r, c, 0) end end
+end
+-- a filler colour that makes no line of three with what is already placed left of and below (r, c)
+local function filler(st, r, c, avoid)
+  for _ = 1, 30 do
+    local k = 1 + rand(6)
+    local g = function(rr, cc) local p = st.panels[rr] and st.panels[rr][cc]; return p and p.color or 0 end
+    if k ~= avoid and not (c > 2 and g(r, c - 1) == k and g(r, c - 2) == k) and not (r > 2 and g(r - 1, c) == k and g(r - 2, c) == k)
+       and not (c > 1 and c < 6 and g(r, c - 1) == k and g(r, c + 1) == k) and not (r > 1 and g(r - 1, c) == k and g(r + 1, c) == k) then
+      return k
+    end
+  end
+  return 1 + rand(6)
+end
+-- A CHAIN STAIRCASE: link k is a line of three in row 1 over columns w..w+2; each link's window shares a column with the
+-- last, so it completes only when that column falls a row. The cells are placed where each column will have fallen to.
+local function buildChain(st)
+  clearRows(st)
+  local shift = { 0, 0, 0, 0, 0, 0 }
+  local colour = {}
+  local assigned = {}
+  for c = 1, 6 do assigned[c] = {} end
+  local links = 4 + rand(16)
+  local w = 1 + rand(4)
+  local made = 0
+  local prev1, prev2 = 0, 0
+  for k = 1, links do
+    if k > 1 then
+      -- the next window shares a column with this one; mostly the one whose columns have fallen least (taller staircases)
+      local options, best, bestH = {}, nil, 99
+      for nw = 1, 4 do
+        if nw ~= w and math.abs(nw - w) <= 2 then
+          options[#options + 1] = nw
+          local h = math.max(shift[nw], shift[nw + 1], shift[nw + 2])
+          if h < bestH then best, bestH = nw, h end
+        end
+      end
+      w = rand(4) == 0 and options[1 + rand(#options)] or best
+    end
+    local ok = true
+    for c = w, w + 2 do if shift[c] + 1 > 11 then ok = false end end
+    if not ok then break end
+    local col
+    repeat col = 1 + rand(5) until col ~= prev1 and col ~= prev2
+    prev2, prev1 = prev1, col
+    for c = w, w + 2 do
+      assigned[c][1 + shift[c]] = { colour = col, first = k == 1 }
+      shift[c] = shift[c] + 1
+    end
+    made = k
+  end
+  for c = 1, 6 do
+    local top = 0
+    for r in pairs(assigned[c]) do if r > top then top = r end end
+    for r = 1, top do
+      local a = assigned[c][r]
+      if a then setCell(st, r, c, a.colour, a.first) else setCell(st, r, c, filler(st, r, c)) end
+    end
+  end
+  return made
+end
+local function buildAllClear(st)
+  clearRows(st)
+  local a, b2 = 1 + rand(6), 0
+  repeat b2 = 1 + rand(6) until b2 ~= a
+  local w = 1 + rand(3)
+  for c = w, w + 2 do setCell(st, 1, c, a, true) end
+  if rand(2) == 0 and w <= 2 then
+    -- a second link: one panel above the window's last column falls into a pair beside it
+    setCell(st, 2, w + 2, b2)
+    setCell(st, 1, w + 3, b2); if w + 4 <= 6 then setCell(st, 1, w + 4, b2) end
+    if w + 4 > 6 then setCell(st, 1, w + 3, 0) end
+  end
+end
+local function buildShock(st)
+  local n = 3 + rand(4)
+  for c = 1, math.min(6, n) do setCell(st, 1, c, 8, true) end
+  if n > 6 then setCell(st, 2, 1, 8, true) end
+  for c = math.min(6, n) + 1, 6 do if st.panels[1][c].color == 8 then setCell(st, 1, c, 1 + rand(6)) end end
+end
+local function buildTall(st)
+  clearRows(st)
+  local a = 1 + rand(6)
+  local across, up = 3 + rand(4), 2 + rand(5)
+  for c = 1, across do setCell(st, 1, c, a, true) end
+  for r = 2, 1 + up do setCell(st, r, 1, a, true) end
+  for c = across + 1, 6 do setCell(st, 1, c, filler(st, 1, c, a)) end
+  for r = 2, 1 + up do for c = 2, 6 do if rand(2) == 0 then setCell(st, r, c, filler(st, r, c, a)) else break end end end
+  -- support: every column filled from row 1 up to its highest panel
+  for c = 2, 6 do
+    local top = 0
+    for r = 1, st.height do if st.panels[r][c].color ~= 0 then top = r end end
+    for r = 1, top do if st.panels[r][c].color == 0 then setCell(st, r, c, filler(st, r, c, a)) end end
+  end
+end
+local builders = { chain = buildChain, allclear = buildAllClear, shock = buildShock, tall = buildTall }
+if builders[SCENARIO] then
+  -- a game already some minutes in: the margin counter part way (stop time fading, the chaos queue's late rule)
+  if MARGIN >= 3 and rand(2) == 0 then stack.margin_time_counter = rand(21) end
+  if SCENARIO == "chain" then
+    -- try a few staircases on a scratch stack, keep the one that chains longest (the trial's randomness replayed exactly)
+    local bestState, bestChain = state, -1
+    for _ = 1, 12 do
+      local s0 = state
+      local m2 = Match(GeneratorSource(SEED, true), rules)
+      m2:setCountdown(false)
+      local st2 = newStack(m2)
+      buildChain(st2)
+      local most = 0
+      for _ = 1, 700 do
+        st2:receiveConfirmedInput(KeyDataEncoding.base64encode[1])
+        st2:run()
+        if st2.chain_counter > most then most = st2.chain_counter end
+        if st2:game_ended() then break end
+      end
+      if most > bestChain then bestChain, bestState = most, s0 end
+    end
+    state = bestState
+  end
+  builders[SCENARIO](stack)
+end
+local idleUntilSettled = builders[SCENARIO] ~= nil
 
 w("H", "seed", SEED, "level", LEVEL, "queue", QUEUE, "chaos", CHAOS, "margin", MARGIN, "gamemode", GAMEMODE,
   "incomingChaos", b01(stack.incomingGarbage.ChaosMode))
@@ -268,8 +406,14 @@ w("F", -1, 0)
 dump()
 for f = 1, FRAMES do
   if stack:game_ended() then break end
-  giveGarbage(stack.clock)
-  local bits = input()
+  local bits = 0
+  if idleUntilSettled and (f < 30 or stack.chain_counter > 0 or stack.n_active_panels > 0 or stack.n_prev_active_panels > 0) then
+    -- a hand-built board plays out untouched
+  else
+    idleUntilSettled = false
+    giveGarbage(stack.clock)
+    bits = input()
+  end
   w("F", stack.clock, bits)
   stack:receiveConfirmedInput(KeyDataEncoding.base64encode[bits + 1])
   stack:run()

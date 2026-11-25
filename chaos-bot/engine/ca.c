@@ -335,17 +335,16 @@ static double shakeMarginFactor(Board *b) {
   if (b->marginTime == MARGIN_CHAOS) return (double)(b->shakeMargin - b->ninc) / (double)b->shakeMargin;
   return 1.0;
 }
+static double luaMin(double a, double b);
+static double luaMax(double a, double b);
 static int32_t shakeFor(Board *b, int32_t width, int32_t height) {
-  double s = ceil((double)(18 + width * height * 2) * shakeMarginFactor(b));
-  if (s > 82) s = 82;   // math.min(82, x)
-  if (!(s > 18)) s = 18;   // math.max(18, x): NaN stays 18
-  return (int32_t)s;
+  // math.max(18, math.min(82, math.ceil(shake * margin))): the margin is never NaN (shake_margin >= 1)
+  return (int32_t)luaMax(18, luaMin(82, ceil((double)(18 + width * height * 2) * shakeMarginFactor(b))));
 }
 static int garbageMarginBase(Board *b) { return b->incChaos ? 30 : 50; }   // GarbageQueue:GarbageMarginBase
 static double marginTimeFactor(Board *b) {
   if (b->marginTime == MARGIN_MODOKI) {
-    double m = (double)(20 - b->marginCounter) / 20.0;
-    return m > 0 ? m : 0;   // math.max(0, m)
+    return luaMax(0, (double)(20 - b->marginCounter) / 20.0);
   }
   if (b->marginTime == MARGIN_CHAOS) {
     double gm = ceil(garbageMarginBase(b) * ((double)(20 - b->marginCounter) / 20.0));
@@ -353,9 +352,10 @@ static double marginTimeFactor(Board *b) {
   }
   return 1.0;
 }
-// LuaJIT's math.min / math.max, as the interpreter does them (the first argument kept unless the next is smaller / larger)
-static double luaMin(double a, double b) { return b < a ? b : a; }
-static double luaMax(double a, double b) { return b > a ? b : a; }
+// LuaJIT's math.min / math.max of two: the first only when it is strictly smaller / larger, so a NaN second wins
+// (luajit -e 'print(math.min(300, 0/0), math.min(0/0, 300))' prints nan 300)
+static double luaMin(double a, double b) { return a < b ? a : b; }
+static double luaMax(double a, double b) { return a > b ? a : b; }
 
 // =============================================================== the incoming queue (GarbageQueue.lua)
 // orderGarbage's comparators: true when a has lower priority than b (sorted to a lower index)
@@ -504,6 +504,7 @@ static void tryDropGarbage(Board *b) {
   for (int r = b->height + 1; r <= TOP(b); r++)
     for (int c = 1; c <= W; c++) if (P(b, r, c)->f[COLOR] != 0) return;
   Incoming g = b->inc[--b->ninc];
+  if (b->queueType >= 1 && b->queueType <= 3) b->ev[EV_DROPQ1 + b->queueType - 1]++;
   dropGarbage(b, g.width, g.height, g.isMetal);
 }
 
@@ -512,12 +513,15 @@ static void sendPiece(Board *b, int32_t w, int32_t h, int32_t metal, int32_t all
   if (b->nsent >= MAXSENT) { b->err |= ERR_SENT; return; }
   Sent s = { (int8_t)w, (int8_t)h, (int8_t)metal, (int8_t)allClear, b->clock };
   b->sent[b->nsent++] = s;
+  if (metal && !allClear) b->ev[EV_SHOCKSENT]++;
+  if (h > 1) b->ev[EV_TALLSENT]++;
 }
 void caSentReset(Board *b) { b->nsent = 0; b->outLinks = 0; b->outChains = 0; b->outChainRows = 0; }
 static void pushGarbage(Board *b, int isChain, int32_t comboSize, int32_t metalCount) {
   for (int i = 3; i <= metalCount; i++) sendPiece(b, 6, 1, 1, 0);
   if (b->hasAllClear && (comboSize || isChain)) {   // (comboSize is a number: always true)
     for (int i = 1; i <= 5; i++) sendPiece(b, imin(6, 2 + i), 1, i == 5, 1);
+    b->ev[EV_ALLCLEARSENT]++;
     b->hasAllClear = 0;
   }
   int pieces = comboSize >= 4 ? 1 : 0;   // ChaosPieces
@@ -654,6 +658,7 @@ static void convertGarbagePanels(Board *b, int isChain) {
 // Stack:matchGarbagePanels
 static void matchGarbagePanels(Board *b, Cells *g, int32_t matchTime, int isChain, int32_t onScreen) {
   sortByPopOrder(g, 1);
+  b->ev[EV_GARBAGEBROKEN]++;
   for (int i = 0; i < g->n; i++) {
     Panel *p = P(b, CR(g->at[i]), CC(g->at[i]));
     p->f[YOFF] -= 1; p->f[GHEIGHT] -= 1; p->f[STATE] = MATCHED;
@@ -663,7 +668,8 @@ static void matchGarbagePanels(Board *b, Cells *g, int32_t matchTime, int isChai
   convertGarbagePanels(b, isChain);
 }
 // Stack:calculateStopTime
-static int32_t calculateStopTime(Board *b, int32_t comboSize, int toppedOut, int isChain, int32_t chainCounter, int32_t metalCount) {
+// (a double: at the chaos margin's last step, garbage_margin is 0 and the stop time NaN or -inf, as in the Lua)
+static double calculateStopTime(Board *b, int32_t comboSize, int toppedOut, int isChain, int32_t chainCounter, int32_t metalCount) {
   double t = 0;
   int32_t chainSize = chainCounter - 2;   // chain_counter is never nil here
   int state = toppedOut && isChain ? 3 : toppedOut ? 2 : isChain ? 1 : 0;
@@ -672,13 +678,15 @@ static int32_t calculateStopTime(Board *b, int32_t comboSize, int toppedOut, int
     double v = ceil(b->stopBase * pow(1.05, comboSize - 4 > 0 ? comboSize - 4 : 0) * pow(1.1, chainSize) * pow(1.25, state) * marginTimeFactor(b)) + 20 * metalCount;
     t = luaMax(0, luaMin(300, v));
   }
-  return (int32_t)t;
+  return t;
 }
 // Stack:awardStopTime
 static void awardStopTime(Board *b, int isChain, int32_t comboSize, int32_t metalCount) {
-  int32_t t = calculateStopTime(b, comboSize, b->topRow, isChain, b->chainCounter, metalCount);
+  double t = calculateStopTime(b, comboSize, b->topRow, isChain, b->chainCounter, metalCount);
+  double m = marginTimeFactor(b);
+  if (t > 0 && m < 1) b->ev[EV_STOPFADED]++;
   if (b->gameMode >= 3) b->stopTime = 0;
-  else if (t > b->stopTime) b->stopTime = t;
+  else if (t > b->stopTime) b->stopTime = (int32_t)t;   // NaN is never greater: the stop time stays
 }
 // Stack:updateScoreWithBonus (combo, then chain)
 static double scoreModeModifier(Board *b) { return pow(2, 4 - imax(1, b->gameMode - 1)); }
@@ -715,6 +723,9 @@ static void checkMatches(Board *b) {
     }
     b->clearCounter = isChainLink ? b->clearCounter + 1 : 1;   // incrementClearCounter
     if (isChainLink) b->chainCounter = b->chainCounter != 0 ? b->chainCounter + 1 : 2;
+    if (isChainLink) { b->ev[EV_LINK]++; if (b->chainCounter >= 6) b->ev[EV_BIGCHAIN]++; if (b->chainCounter >= 13) b->ev[EV_CHAINCAP]++; }
+    else if (comboSize == 3) b->ev[EV_CLEAR3]++;
+    if (comboSize > 3) b->ev[EV_COMBO]++;
     b->manualRaise = 0;
     sortByPopOrder(&matching, 0);   // applyMatchToPanels
     for (i = 0; i < comboSize; i++) {
@@ -805,6 +816,7 @@ static int tryQueueSwap(Board *b, Panel *p1, Panel *p2) {
   return 0;
 }
 static void doSwap(Board *b, int row, int col) {
+  b->ev[EV_SWAP]++;
   startSwap(P(b, row, col), 1);
   startSwap(P(b, row, col + 1), 0);
   switchPanels(b, P(b, row, col), P(b, row, col + 1));
@@ -870,7 +882,7 @@ static void advancePassiveRaise(Board *b) {
     return;
   }
   if (b->stopTime == 0 && !b->riseLock) {
-    if (b->topRow) b->health--;
+    if (b->topRow) { b->health--; b->ev[EV_HEALTHLOST]++; }
     else {
       b->riseTimer--;
       if (b->riseTimer <= 0) {
@@ -944,6 +956,7 @@ void caRun(Board *b) {
   if (b->clearCounter != 0 && !hasMatchingPanels(b) && !hasChainingPanels(b)) {
     if (hasZeroPanels(b)) {
       b->hasAllClear = 1;
+      b->ev[EV_ALLCLEAR]++;
       b->score += 2500 * pow(2, b->colorCount - 4) * b->clearCounter;
     }
     b->clearCounter = 0;

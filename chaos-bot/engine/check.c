@@ -213,6 +213,10 @@ int main(int argc, char **argv) {
     }
     if (verbose && frames % 500 == 0) fprintf(stderr, "%d frames ok\n", frames);
   }
+  static const char *EVN[NEV] = EV_NAMES;
+  printf("events");
+  for (int i = 0; i < NEV; i++) printf(" %s %d", EVN[i], b.ev[i]);
+  printf("\n");
   printf("%d frames identical (seed %d level %d queue %d chaos %d margin %d gamemode %d)\n", frames, hdr[0], hdr[1], hdr[2], hdr[3], hdr[4], hdr[5]);
   return 0;
 }

@@ -92,6 +92,8 @@ typedef struct Board {
   Sent sent[MAXSENT];
   // ---- FED ROWS: the rows and break colours the game dealt, played as dealt; empty, unseen colours are dealt.
   int32_t rowFeed[FEED][W], nRowFeed, rowFeedAt, brkFeed[FEED][W], nBrkFeed, brkFeedAt;
+  // ---- EVENTS: what the engine did, counted for the checks' coverage (never compared, never part of the Lua's stack)
+  int32_t ev[16];
   int32_t ninc, nstall, nlanded;
   int32_t dropColumnIndex[7];            // [width], 1-based as the Lua keeps them
   Stall stall[MAXSTALL];
@@ -100,6 +102,10 @@ typedef struct Board {
   Incoming inc[MAXINC];
   Panel p[MAXROWS][W + 1];
 } Board;
+enum { EV_CLEAR3, EV_COMBO, EV_LINK, EV_BIGCHAIN, EV_CHAINCAP, EV_SHOCKSENT, EV_ALLCLEAR, EV_ALLCLEARSENT, EV_TALLSENT,
+       EV_DROPQ1, EV_DROPQ2, EV_DROPQ3, EV_STOPFADED, EV_HEALTHLOST, EV_SWAP, EV_GARBAGEBROKEN, NEV };
+#define EV_NAMES { "clear3", "combo", "chainLink", "chain6plus", "chainCap", "shockSent", "allClear", "allClearSent", "tallSent", \
+                   "dropQueue1", "dropQueue2", "dropQueue3", "stopFaded", "healthLost", "swap", "garbageBroken" }
 #define BOARD_HEAD ((unsigned long)&((Board *)0)->inc)
 static inline void caCopy(Board *dst, const Board *src) {
   memcpy(dst, src, BOARD_HEAD);

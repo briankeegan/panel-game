@@ -1,0 +1,31 @@
+# DRAFT -- to live at .github/workflows/chaos-bot-checks.yml once the owner allows a file outside chaos-bot/ (plans/chaos-goal.md §6).
+# Step 1's gate on every push: the C engine (chaos-bot/engine/ca.c) against recordings of the chaos v3 Lua, frame by frame,
+# with every event counted. Runs only on this project's branch and only when chaos-bot/ changes; shares nothing with Gambit's
+# workflows (own name, own concurrency group, own artifact names).
+name: chaos-bot checks
+on:
+  push:
+    branches: [ccr-9ee25bfb-744765]
+    paths: ['chaos-bot/**', '.github/workflows/chaos-bot-checks.yml']
+concurrency:
+  group: chaos-bot-checks-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  engine:
+    name: engine vs chaos Lua
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install luajit
+        run: sudo apt-get update && sudo apt-get install -y luajit
+      - name: Checks
+        run: |
+          set -o pipefail
+          chaos-bot/engine/checks.sh 300 | tee chaos-bot-checks.txt
+      - name: Upload the counts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chaos-bot-checks
+          path: chaos-bot-checks.txt

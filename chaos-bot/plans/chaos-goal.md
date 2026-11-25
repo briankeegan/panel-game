@@ -1,0 +1,113 @@
+# The chaos bot's goal
+
+**The target: a bot that survives every game of the chaos benchmark to the end -- 6 minutes (21,600 frames) at chaos Level 9 --
+twice in a row, with 0 divergences, 0 late moves and 0 frames over the think budget. Then as much garbage sent as survival allows.
+Then Level 10.**
+
+Nothing else counts as progress. A plan, a doc or an engine is a step toward this line, never a result. Every report to the owner
+starts with the last benchmark's number (survived x/N, frames lost at, health left), or says plainly that no bot plays yet.
+
+---
+
+## 1. Hard rules (never broken)
+
+1. **This project is separate from Gambit.** Never push to, edit, dispatch or cancel anything in `briankeegan/GameCreator` or
+   `briankeegan/panel-game`. Read them; copy what helps into `chaos-bot/`; never reference their files in place, never share a
+   library, profile, workflow, artifact name, concurrency group or seed record with them.
+   *(Owner's instruction, 2026-11-25: this project lives in `briankeegan/panel-game` itself, in its own folder `chaos-bot/`, on
+   branch `ccr-9ee25bfb-744765` -- "same repo is fine, just make sure it doesn't [disturb] the other bot". So: nothing outside
+   `chaos-bot/` and nothing on any other branch; Gambit's files, branches and workflows are never touched. See section 6 for the
+   one open question: where this project's workflow file lives.)*
+2. **Games run on GitHub Actions only**, never in the sandbox -- the sandbox times nothing like a runner.
+3. **One benchmark run at a time.** Before dispatching, check that none of yours is running and that no `gambit-24.yml` run is in
+   progress in GameCreator (the runners are shared). Start small: one pattern, a few games, before all of them.
+4. **Read state, never recall it.** Before answering "what is running / what did it score", look at Actions and the run's own report.
+5. **Never parse a tool's prose -- make it emit data**, and have the consumer check the count it got back matches the count sent.
+6. **Never ask for or store tokens.** Scripts read `$GITHUB_TOKEN` from the environment.
+7. **A question to the owner never stops the work.** Ask it, then go on with the next thing on this list.
+8. **An explicit instruction from the owner beats a measurement.** Say the number once, then do what was asked.
+
+## 2. The benchmark (the only measure)
+
+- A workflow in this repo plays **N games**: every chaos training pattern on fixed seeds, one job per game, plus a report job. The
+  same seeds every run until the bot survives them all; only then new seeds. Write the patterns, N and the seeds into this file
+  (section 6) before the first run.
+- Each game is chaos Level 9, ends at frame 21,600 or at the loss, and its job uploads the game's log.
+- **The report prints, every run, as data:** survived x/N; each loss's frame and pattern; health left at the end of each game and
+  the health lost to garbage on the top row; garbage sent a minute; the budgets (frames over the think budget, late moves,
+  divergences between the board the bot predicted and the one the game made); and the time the run finished, in ET on the 24-hour clock.
+- **One run per change, judged on whether its deaths go away.** The bot must survive whatever the seed or the runner's timing:
+  never run the same change twice to average out noise, never call a loss "noise".
+
+## 3. The order of work (each step has a gate; the next starts only when it passes)
+
+**Step 1 -- the engine is the truth.** `engine/ca.c` matches the real chaos game frame for frame on every path a game can take:
+plain clears, combos, chains up to the 12-row cap, big chains, combo garbage of every queue type, shock garbage, all-clears, stop
+time fading, health falling and never refilling, the faster swap. Gate: the checker runs on every push, prints how many times each
+of those events happened in the recorded frames (each at least 20), and fails on a single differing frame. Where random play never
+makes an event, a scripted test player or hand-built boards make it. *Done when:* 0 differences and every event counted.
+
+**Step 2 -- a bot plays, and its board is the game's.** Gambit's search copied into `chaos-bot/`, rebuilt on `ca.c`, hooked into
+the chaos client headless. Every frame the bot predicts the next board; a predicted board that differs from the game's is a
+divergence, and a run with any is red. Every decision logs one line: frame, what was played, why, the time it took, health, the
+board's danger. *Done when:* 4 games played end to end on Actions with 0 divergences, 0 late moves, and the report reading them.
+
+**Step 3 -- survival.** Every loss read decision by decision from its own log, the decision that lost it found, the cause fixed,
+the benchmark run again. Health is permanent in chaos, so the board's danger is judged on health too: garbage resting in the top
+row costs health that never comes back, and a line that saves frames by spending health is ranked as the loss it is. *Done when:*
+N/N survived, twice in a row, budgets at 0.
+
+**Step 4 -- attack.** Garbage sent a minute, raised without giving up a single game of Step 3. Every change is checked against
+survival first. *Done when:* the owner says the rate is enough, or names a number.
+
+**Step 5 -- Level 10.** The same benchmark at chaos Level 10, Steps 3 and 4 again.
+
+## 4. Chaos rules the bot must respect (from `docs/CHAOS_RULES.md`)
+
+- **Health never refills.** Survival is not only "not topped out": every frame garbage holds the top row costs health for good. The
+  report counts it; the ranking prices it.
+- **Stop time fades.** Clearing for stop time buys less than in vanilla; never plan on banked stop time.
+- **The 12-row chain cap**, the **new combo garbage** and the **queue types** are in the engine and in the attack planning.
+- **Faster swaps** change the swap timing the search and the frame loop assume: both read it from the engine, never a constant
+  copied from Gambit.
+- **The input allowance**: find out whether chaos limits actions per window as vanilla's server does (76 actions in 600 frames),
+  write the answer in section 6, and if it does, every line's walk is charged against it.
+
+## 5. Method (learned the hard way on Gambit)
+
+- **One engine, held to the game's own code.** The C engine is trusted only while recordings prove it frame for frame; a rule
+  change in the game means a new recording before anything else.
+- **Every answer on time.** A move answered after its frame is a late move. Anything that runs long without checking the clock --
+  freeing a big search tree, a batch of steps on worker threads -- makes moves late.
+- **Measure what moves, not only survival:** actions per break, frames from a block landing to its first break, health lost per
+  minute, time idle while under garbage.
+- **Leave the board easy to play:** flat, with breaks ready before the garbage lands. Clearing the middle while garbage rests on the
+  edge columns leaves it held up out of reach -- the commonest way Gambit loses.
+- **Speed is not the lever it looks like.** A faster search alone changed nothing on Gambit; better choices did.
+- **Every rule that matters has three parts:** a plain-English rule in this file, a script that decides it, and a check that runs it
+  on every push.
+- **Commit and push every change; never rerun code that has not changed.**
+
+## 6. Facts to fill in before the first benchmark run
+
+- **Repo, branch, and the workflow's file name:** `briankeegan/panel-game`, branch `ccr-9ee25bfb-744765`, folder `chaos-bot/`.
+  Workflow: `.github/workflows/chaos-bot.yml` (proposed). **Open question to the owner:** a workflow file has to live in
+  `.github/workflows/` (outside `chaos-bot/`) and is triggered by a push to this branch touching `chaos-bot/**` (no change to
+  `beta`). Gambit's own workflows are not on this branch and are not touched. Allowed?
+- **The chaos training patterns used, games per pattern, N:** TBD (Step 2). Candidates from the v3 TrainingMenu: training_random,
+  chain_garbage, combo_storm, thicc_combo_storm, insane_combo_storm, each generated once per seed and saved as a fixed
+  `training_chaos` file so every run sees the same garbage.
+- **The seeds:** TBD (Step 2).
+- **The input allowance in chaos:** **none.** The v3 build has no InputBudget (its `computerPlayers/` holds only DummyCpu) and the
+  chaos server source has no action limit. The 76-per-600 limit is the panel-game fork's, not chaos's. (Checked 2026-11-25.)
+- **The think budget a frame (ms) and the reaction delay the bot plays with:** TBD (Step 2). The v3 build has no ThinkBudget;
+  proposed: Gambit's (answers within the frame, decisions asked ahead).
+- **The client build the bot is hooked into, and how a headless game is started:** the v3 build fetched by `game/fetch.sh`
+  (upstream commit `4da6c5d`, zip sha256 `ec5baf00…`), run with LÖVE 11 under xvfb on Actions. How the bot attaches: TBD (Step 2).
+
+## 7. Progress log (the last benchmark first)
+
+- **No bot plays yet.** No benchmark has run.
+- 2026-11-25 -- Step 1 in progress: `engine/ca.c` identical to the chaos Lua over 150 recordings, 117,390 frames. Event coverage is
+  thin: in those frames, 24 pieces sent, 25 chains (none longer than 3), 0 shock sent, 0 tall chaos combos, 0 all-clears. A
+  scripted test player that makes them is next.

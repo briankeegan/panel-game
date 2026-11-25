@@ -8,6 +8,13 @@ echo "publishing the games so far ($(grep -c "match over —" "$log" 2>/dev/null
 [ -s "$log" ] || { echo "no log yet"; exit 0; }
 grep -q "match over —" "$log" || { echo "no finished game yet"; exit 0; }
 . dashboard/site_git.sh
+# ONE PUBLISH AT A TIME. Two calls share live-work/: on Nov 25 the after-game publish was still running when the bot left, the
+# workflow killed that script (but not its python, which went on deleting its files in live-work/) and the last publish wiped and
+# reused the same folder -- update_data.py died on a missing r####_in.json and the game that ended the run never reached the page.
+# The lock is held on fd 9, which update_data.py and git inherit, so it stays held until everything the earlier call started has
+# exited, even when the script itself was killed; the next call waits for it, then makes all the games again.
+exec 9>"$RUNNER_TEMP/live-publish.lock"
+flock -w 600 9 || echo "waited 10 min for the previous publish: going ahead anyway"
 d="$RUNNER_TEMP/live-stats"; w="$RUNNER_TEMP/live-work"
 rm -rf "$d" "$w"; mkdir -p "$d" "$w"
 cp "$log" "$d/"

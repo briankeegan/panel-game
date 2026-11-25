@@ -58,6 +58,8 @@
 #          break's time so the rule was not asked, panels 50 to 17 for nothing)
 # run 23 -- one change: the keep-the-panels rule whatever the stop left (rank.c)
 #          (the first push of run 23 left rank.c unchanged -- an edit that failed to apply; that run was cancelled, this is run 23)
+#          survived 7/8 (thicc s4 lived, health 13; lost insane s3 12434: 15 pieces burst in at 8008, 15-18 queued for 4,000 frames)
+# run 24 -- one change: under a backlog, the attack list orders no line at all (run 14 took only the hold out) (rank.c)
 combo_storm 3 9 9 2 21600 10
 chain_garbage 3 9 9 1 21600 10
 thicc_combo_storm 3 9 9 3 21600 10

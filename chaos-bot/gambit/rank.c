@@ -1592,7 +1592,9 @@ static int compareJudged(const Judge *x, const Judge *y) {
   // line that keeps a topped board held is ordered by the list like every other
   // (CHAOS: under garbage with more queued, a hold is never put first by the list -- holding builds nothing while the backlog waits;
   // run 12's two Level 10 losses held 10-12% of their frames so, the hold meeting an attack entry the dig did not. The keys after decide)
-  int chaosBacklog = decF.under && decQ.b->ninc > 0 && (x->hold || y->hold);
+  // (and run 24: no line at all is ordered by the list under a backlog -- run 23 insane s3, 15 pieces burst into the queue at 8008
+  // and stayed 15-18 for 4,000 frames: the list's combos of eight to ten spend the panels the dig needs. Attack is Step 4's)
+  int chaosBacklog = decF.under && decQ.b->ninc > 0;
   { int ax = x->met >= 0 ? x->met : MAXAIMS, ay = y->met >= 0 ? y->met : MAXAIMS; if (ax != ay && !chaosBacklog) return (cmpKey = __LINE__, (ax - ay));
     // 8a. MORE THROWN (several ideas at once): of two that live and meet the same entry, the one that throws more blocks, every attack
     // its own -- two ideas fired before one. (Not of two that die: there the panels a line spends are the next break's material.)

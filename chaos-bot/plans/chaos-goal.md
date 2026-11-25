@@ -122,6 +122,10 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 23 (2026-11-25 18:43 ET), keep the panels whatever the stop left: survived 7/8 (seeds 3, 4).** thicc_combo_storm s4 lived
+  with 13 health; lost insane_combo_storm s3 12434 (it lived in runs 21-22). late 0, diverged 0, overruns 0, surprises 0/780; 16.97
+  rows a minute. The loss: 15 pieces burst into the queue at 8008 and it stayed 15-18 for 4,000 frames, the bot never digging it
+  down, then out of panels. Run 24: under a backlog the attack list (finish them: combos of 8-10) orders no line, not only the hold.
 - **Run 22 (2026-11-25 18:31 ET), keep the panels with garbage queued too: survived 7/8 (seeds 3, 4).** Run 21's two losses lived;
   lost thicc_combo_storm s4 10361. late 0, diverged 0, overruns 0, surprises 0/769; 16.58 rows a minute. The loss: none on the board,
   8 to 13 queued, survive and hold both lost at 238 -- the survive line bought nothing -- yet it spent panels 50 to 17: the rule asked

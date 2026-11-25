@@ -107,6 +107,11 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 11 (2026-11-25 16:25 ET), a chain still building ends no sooner than a look-ahead: survived 6/8.** **Level 10 4/4** (health
+  13/13 each). Level 9 2/4: combo_storm and insane_combo_storm survived; lost chain_garbage at 14737 and thicc_combo_storm at 20277.
+  late 0, diverged 0, overruns 0; 16.72 rows a minute. The chain_garbage loss: a backlog of 5-15 queued pieces carried for minutes
+  while digging, then with the board clear and 54 panels the vanilla life table ("full" above 33 panels) spent them to 18 with
+  nothing broken, and the backlog dropped on an empty board. Run 12: that drive off.
 - **Run 10 (2026-11-25 16:13 ET), queue rule loosened: survived 4/8** (L9: chain_garbage, insane_combo_storm survived; lost
   combo_storm 5606, thicc_combo_storm 12393. L10: chain_garbage, thicc_combo_storm survived; lost combo_storm 5661,
   insane_combo_storm 20543). late 0, diverged 0, overruns 0. The new q= log: in the lost combo_storm the bot's own queue was empty

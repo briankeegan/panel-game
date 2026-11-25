@@ -25,7 +25,10 @@
 #          (L9: lost combo_storm 5606, thicc 12393; L10: lost combo_storm 5661, insane 20543). In the lost combo_storm the queue was
 #          EMPTY (q=0) while garbage was forecast 20-39 frames out for 600 frames: it was held at the SENDER behind a chain still
 #          building (chaos staging releases in order), and Gambit's forecast had that chain ending next frame
-# run 11 -- one change: a chain the sender is still building ends no sooner than a look-ahead (HORIZON, level-scaled) from now
+# run 11 -- one change: a chain still building ends no sooner than a look-ahead: survived 6/8 -- Level 10 4/4; Level 9 lost
+#          chain_garbage (14737) and thicc_combo_storm (20277). The chain_garbage loss: board clear, 54 panels, 10 pieces queued --
+#          Gambit's vanilla life table calls >33 panels "full" and spent them, 54 to 18, broke=0, then the backlog dropped
+# run 12 -- one change: the vanilla "full board" drive off (decide.c R->full)
 combo_storm 1 9 9 2 21600 9
 chain_garbage 1 9 9 1 21600 9
 thicc_combo_storm 1 9 9 3 21600 9

@@ -29,7 +29,7 @@ below was set for that game. Each is changed **one at a time**, judged on the be
 |---|---|---|---|---|
 | `HORIZON` 240, `REST` 120 (`AT_LEVEL`, scaled by `LEVEL11_BREAK` 97) | `outcome.c` | level-11 frames | Level 9's break time scales them; whether 240 is the right reach under chaos garbage rates is open | open |
 | `planHealth` 1 | profile `setup` | health planned as 1 frame (vanilla refills) | chaos health is permanent: plan with the real health and price what a line spends, or keep 1 | next after run 4 |
-| `core/material.h` | `core/` | the life a board has by its panels, measured on vanilla games | re-measure on chaos games (`build.sh material`) | open |
+| `core/material.h` | `core/` | the life a board has by its panels, measured on vanilla games; >33 panels "full" | its "full board" drive off (`decide.c R->full`): in chaos panels are what a backlog is dug out with | done, run 12 |
 
 ## 3. Attack sizes (what a clear sends)
 

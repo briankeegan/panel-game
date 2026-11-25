@@ -1,6 +1,4 @@
-run 45565486621, as of 2026-11-25T11:09:15Z
-opponent topped out: clock 10050 stopWatch 9862 stop 37 pre-stop 0 shake 0 health 1, top rows r12=gggggg r11=ggggg0 r10=gggggg
-garbage landed: our stopWatch 9874 clock 10062, transits in flight before this frame {9923}, opponent copy 1 frames behind, rollbacks so far 0
+run 45565486621, as of 2026-11-25T11:11:20Z
 opponent topped out: clock 10080 stopWatch 9892 stop 24 pre-stop 287 shake 40 health 1, top rows r12=gggggg r11=gggggg r10=ggggg0
 opponent topped out: clock 10110 stopWatch 9922 stop 24 pre-stop 257 shake 10 health 1, top rows r12=gggggg r11=gggggg r10=ggggg0
 opponent topped out: clock 10140 stopWatch 9952 stop 24 pre-stop 227 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=ggggg0
@@ -149,3 +147,5 @@ match over — bot won (pace: worst 0.22 frames off schedule); waiting for a rem
 memory after match: rss 2891112 kB, threads 9, lua 48062 kB
 game about to start: both players are ready
 set over: the room is closed, back in the lobby
+stop requested and no game is running: sitting out 8 s without readying, then leaving
+leaving

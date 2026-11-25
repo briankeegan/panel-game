@@ -122,6 +122,10 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 20 (2026-11-25 18:11 ET), stop time is a max -- stopped, keep the panels: survived 8/8.** Seeds 1 and 2, Level 10; late 0,
+  diverged 0, overruns 0, surprises 0/764; 17.06 rows a minute; health 13 in seven games, 3 in insane_combo_storm s2. The bot: runs
+  14 (no hold first by the attack list under a backlog), 15 (chain end forecast), 17 (dig the backlog), 19 (real health only while
+  topped out with no stop), 20 (keep the panels while stopped). Run 21: new seeds, 3 and 4, no change.
 - **Run 19 (2026-11-25 17:59 ET), real health only while topped out with no stop: survived 7/8, surprises 0/760.** Lost
   thicc_combo_storm s1 19895; survivors' health 13, 2, 13, 3, 13, 2, 13; late 0, diverged 0, overruns 0; 17.43 rows a minute. The
   loss: survive lines clearing panels at stop 70-127 -- stop is a max, a new award only replaces what is left -- panels 45 to 8, no

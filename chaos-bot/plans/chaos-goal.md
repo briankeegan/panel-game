@@ -107,6 +107,12 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 10 (2026-11-25 16:13 ET), queue rule loosened: survived 4/8** (L9: chain_garbage, insane_combo_storm survived; lost
+  combo_storm 5606, thicc_combo_storm 12393. L10: chain_garbage, thicc_combo_storm survived; lost combo_storm 5661,
+  insane_combo_storm 20543). late 0, diverged 0, overruns 0. The new q= log: in the lost combo_storm the bot's own queue was empty
+  for the 600 frames its panels drained (47 to 17) -- the garbage was held at the sender behind a chain still being built (chaos
+  staging releases in order) while Gambit's forecast had the chain ending next frame, so it braced every frame for a block that
+  had not left, then 12 pieces arrived at once. Run 11: a chain still building ends no sooner than a look-ahead from now.
 - **Run 9 (2026-11-25 16:01 ET), no change, the 4 games at Level 9 and Level 10: survived 4/8.** Level 9: 3/4 (insane_combo_storm
   lost at 3455 -- the queue rule never fired, letDrop=0: its ceiling test refused, the board burned to 12 panels and 11 rows
   dropped at once). Level 10: 1/4 (chain_garbage survived, health 13/13; lost combo_storm 10901, thicc_combo_storm 8894,

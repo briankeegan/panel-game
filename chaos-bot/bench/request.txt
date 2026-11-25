@@ -21,8 +21,11 @@
 # run 9 -- no change to the bot: survived 4/8 -- Level 9 3/4 (insane_combo_storm lost at 3455: the queue rule never fired,
 #          letDrop=0 -- its ceiling test refused every time; 11 rows dropped at once), Level 10 1/4 (combo_storm 10901,
 #          thicc_combo_storm 8894, insane_combo_storm 17916)
-# run 10 -- one change: the queue rule lets garbage drop whenever it lands without topping the board out (was: under the ceiling);
-#          the log shows the queue at each decision (q=)
+# run 10 -- one change: the queue rule lets garbage drop whenever it lands without topping out; log the queue (q=): survived 4/8
+#          (L9: lost combo_storm 5606, thicc 12393; L10: lost combo_storm 5661, insane 20543). In the lost combo_storm the queue was
+#          EMPTY (q=0) while garbage was forecast 20-39 frames out for 600 frames: it was held at the SENDER behind a chain still
+#          building (chaos staging releases in order), and Gambit's forecast had that chain ending next frame
+# run 11 -- one change: a chain the sender is still building ends no sooner than a look-ahead (HORIZON, level-scaled) from now
 combo_storm 1 9 9 2 21600 9
 chain_garbage 1 9 9 1 21600 9
 thicc_combo_storm 1 9 9 3 21600 9

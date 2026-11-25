@@ -179,7 +179,13 @@ static void arrivalsOf(const Board *b) {
     w += 6 * ns;
     for (int i = ns - 1; i >= 0; i--) {
       const int32_t *g = g0 + 6 * i;
-      int32_t chainGoing = g[2] && g[5] != 1 ? sw + 1 : 0;
+      // (CHAOS: a chain the sender is still building ends no sooner than a look-ahead from now (HORIZON, read off the level) -- the
+      // vanilla "at the soonest, next frame" had every piece queued behind it forecast to land ~150 frames out, frame after frame, while
+      // chaos training's chains ran on for seconds (a link up to 5 x 67 frames apart over its target rate) and the sender's staging
+      // (GarbageQueue:processStagedGarbageForClock) held all of it back behind the chain: the bot spent its panels bracing for a block
+      // that had not left (run 10 combo_storm: q=0 and land 20-39 for 600 frames, 47 panels to 17, then 12 pieces at once). Once the
+      // chain ends, staging and landing still give 151 frames: nothing arrives unforeseen.)
+      int32_t chainGoing = g[2] && g[5] != 1 ? sw + HORIZON : 0;
       ship = imax(ship, imax((g[4] == NUL ? sw : g[4]) + STAGING, chainGoing));
       // (pieces shipped together are one transit, landing together)
       int32_t raw = ship + LAND + offset, at = imax(raw, capped ? free : floor);

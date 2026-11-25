@@ -122,6 +122,11 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 21 (2026-11-25 18:22 ET), new seeds 3 and 4, no change: survived 6/8.** Lost thicc_combo_storm s3 7765 and combo_storm s4
+  7769; survivors' health 4, 1, 2, 12, 4, 9; late 0, diverged 0, overruns 0, surprises 0/699; 16.18 rows a minute. thicc s3: 8-9
+  pieces queued and none on the board, clears breaking nothing kept the stop up (and, the chaos queue dropping only with nothing
+  moving, the garbage held off), panels 27 to 12, then the queue dropped on a board with nothing left to dig with. Run 20's rule
+  asked for garbage on the board. Run 22: with garbage queued too. (Seeds 3 and 4 stay until 8/8.)
 - **Run 20 (2026-11-25 18:11 ET), stop time is a max -- stopped, keep the panels: survived 8/8.** Seeds 1 and 2, Level 10; late 0,
   diverged 0, overruns 0, surprises 0/764; 17.06 rows a minute; health 13 in seven games, 3 in insane_combo_storm s2. The bot: runs
   14 (no hold first by the attack list under a backlog), 15 (chain end forecast), 17 (dig the backlog), 19 (real health only while

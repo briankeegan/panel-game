@@ -51,6 +51,9 @@
 # run 20 -- one change: stop time is a max, not a sum -- stopped, of two dying lines breaking nothing, the one keeping more panels (rank.c)
 # run 20 -- (result) survived 8/8, budgets 0, surprises 0/764, health 13 in seven, 3 in insane s2. First 8/8 on seeds 1-2
 # run 21 -- the owner's rule: 8/8 moves the benchmark to new seeds -- seeds 3 and 4, no change to the bot
+#          survived 6/8 (lost thicc s3 7765, combo s4 7769). thicc s3: 8-9 queued, none on the board, clears breaking nothing
+#          kept stop up (and the chaos queue from dropping), panels 27 to 12, then the queue dropped on a board with none left
+# run 22 -- one change: run 20's keep-the-panels rule with garbage queued too, not only on the board (rank.c)
 combo_storm 3 9 9 2 21600 10
 chain_garbage 3 9 9 1 21600 10
 thicc_combo_storm 3 9 9 3 21600 10

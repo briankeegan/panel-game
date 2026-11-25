@@ -1564,7 +1564,10 @@ static int compareJudged(const Judge *x, const Judge *y) {
   }
   // 8. THE LIST: the earlier entry the judged line meets, its break as the entry asks it (rules.c metOf) -- before the kind of line, so a
   // line that keeps a topped board held is ordered by the list like every other
-  { int ax = x->met >= 0 ? x->met : MAXAIMS, ay = y->met >= 0 ? y->met : MAXAIMS; if (ax != ay) return (cmpKey = __LINE__, (ax - ay));
+  // (CHAOS: under garbage with more queued, a hold is never put first by the list -- holding builds nothing while the backlog waits;
+  // run 12's two Level 10 losses held 10-12% of their frames so, the hold meeting an attack entry the dig did not. The keys after decide)
+  int chaosBacklog = decF.under && decQ.b->ninc > 0 && (x->hold || y->hold);
+  { int ax = x->met >= 0 ? x->met : MAXAIMS, ay = y->met >= 0 ? y->met : MAXAIMS; if (ax != ay && !chaosBacklog) return (cmpKey = __LINE__, (ax - ay));
     // 8a. MORE THROWN (several ideas at once): of two that live and meet the same entry, the one that throws more blocks, every attack
     // its own -- two ideas fired before one. (Not of two that die: there the panels a line spends are the next break's material.)
     if (ax < MAXAIMS && lx) { int tx = thrownOf(x), ty = thrownOf(y); if (tx != ty) return (cmpKey = __LINE__, (ty - tx)); }

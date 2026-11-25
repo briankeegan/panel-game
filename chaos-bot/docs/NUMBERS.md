@@ -46,7 +46,7 @@ Chaos combo garbage is `ceil((n-3)/3)` rows, each `(n-1)%3+3` wide (rules.c alre
 
 | Number | Where | Vanilla | Chaos | Status |
 |---|---|---|---|---|
-| reaction 12, swapGap 12, cursorMoveFrames 4, ahead 90 | profile `setup` | Gambit's live pacing | chaos executes a swap the frame it is pressed (one sooner); measure late/idle first | open |
+| reaction 12, swapGap 12, cursorMoveFrames 4, ahead 90 | profile `setup` | Gambit's live pacing | kept: the owner chose vanilla hand speed (2026-11-25), though chaos's engine takes a tap every 2 frames and a swap any frame | kept (owner) |
 | `WALK_FRAMES` 8, `BREAK_WALK` 20, `PRESS_FRAMES` 3, `OUT_ACT` 8 | `rank.c`, `decide.c`, `search/outlive.c` | charges for actions under the 76/600 allowance | chaos has no allowance; an action costs only its frames | open |
 | `STAGING` 91, `LAND` 60, `EARLIEST_LANDING` 151 | `front.c`, `rank.c`, `GambitNative.lua` | garbage timing | identical in chaos (globals.lua 45/45/60) | checked |
 

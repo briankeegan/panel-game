@@ -39,6 +39,8 @@ starts with the last benchmark's number (survived x/N, frames lost at, health le
 - **The report prints, every run, as data:** survived x/N; each loss's frame and pattern; health left at the end of each game and
   the health lost to garbage on the top row; garbage sent a minute; the budgets (frames over the think budget, late moves,
   divergences between the board the bot predicted and the one the game made); and the time the run finished, in ET on the 24-hour clock.
+- **N = 8 (the owner, 2026-11-25 16:55 ET):** the 4 patterns (combo_storm, chain_garbage, thicc_combo_storm, insane_combo_storm)
+  x seeds 1 and 2, garbage level 9 speed 9, at chaos Level 10. Once a run is 8/8, the seeds change (3 and 4, and so on).
 - **One run per change, judged on whether its deaths go away.** The bot must survive whatever the seed or the runner's timing:
   never run the same change twice to average out noise, never call a loss "noise".
 
@@ -78,6 +80,10 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 5. Method (learned the hard way on Gambit)
 
+- **Don't stop to ask (the owner):** every decision is made from this file and written down here. Decisions the owner has made:
+  hands stay at Gambit's vanilla speed (setup 12 12 4: a swap every 12 frames, a cursor step every 4), though chaos has no input
+  limit -- survival comes from better choices, not faster hands (2026-11-25 16:52 ET); no DAS; moves within the reach.
+
 - **One engine, held to the game's own code.** The C engine is trusted only while recordings prove it frame for frame; a rule
   change in the game means a new recording before anything else.
 - **Every answer on time.** A move answered after its frame is a late move. Anything that runs long without checking the clock --
@@ -110,6 +116,13 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 13 (2026-11-25 16:48 ET), no change (run 11's bot), Level 10 only: survived 0/4.** Lost combo_storm 9684, chain_garbage
+  20964, thicc_combo_storm 18918, insane_combo_storm 13590; late 0, diverged 0, overruns 0; 16.58 rows a minute. Run 11's 4/4 did
+  not repeat: the search runs on a time budget, so the runner's speed changes the play. Level 10, runs 9-13: 9 of 20 survived.
+  Every loss (run 12's two read decision by decision): a backlog of 10-25 queued pieces carried for minutes with garbage always on
+  the board, the bot digging slower than it arrives, and holding 10-12% of its frames meanwhile -- the hold won on the attack list
+  (rank.c key 8, the finish-them combos) ahead of the survival keys. Run 14: under garbage with more queued, the list never puts a
+  hold first; and the benchmark is 8 games (seeds 1 and 2).
 - **Run 12 (2026-11-25 16:37 ET), the vanilla full-board drive off: survived 4/8 -- worse.** Level 10 2/4 (combo_storm and
   chain_garbage survived; lost thicc_combo_storm 11440, insane_combo_storm 20686). Level 9 2/4 (lost chain_garbage 11033,
   thicc_combo_storm 9116, both sooner than run 11). late 0, diverged 0, overruns 0; 16.03 rows a minute. Reverted. Run 13: Level 10

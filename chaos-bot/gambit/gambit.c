@@ -1,0 +1,27 @@
+// GAMBIT, in C (PLAN.md). One translation unit: the server's engine and its node store (eval/native: pa.c, search.h), the clock and the nodes every search
+// plays its lines through (core/), then Gambit's own pieces on top of them.
+#include "../eval/native/pa.c"
+#include "core/nodes.h"
+#include "rules.c"
+#include "judge.c"
+#include "outcome.c"
+#include "core/sort.h"
+#include "search/bits.c"
+#include "search/break.c"
+#include "facts.c"
+#include "search/plan.c"
+#include "search/extend.c"
+#include "search/chainup.c"
+#include "search/opening.c"
+#include "search/chainbuild.c"
+#include "search/ready.c"
+#include "search/level.c"
+#include "search/outlive.c"
+#include "search/fill.c"
+#include "search/ideas.c"
+#include "rank.c"
+#include "propose.c"
+#include "decide.c"
+#include "answer.c"
+
+EXPORT(gb_version) int gb_version(void) { return 1; }

@@ -248,8 +248,9 @@ function BotClient:dispatch(msg)
     self.oppInputs = {}
     if self.match and not self.matchEnded then
       -- said out loud (print reaches the run's log): who ended it and how far the game had got, so a cut-off game is explained
+      -- (the server sends gameAbort as a table with a reason, or as a bare true)
       print(string.format("the server aborted the game mid-game (%s) at our clock %s, the opponent's %s",
-        tostring(msg.gameAbort and msg.gameAbort.reason or msg.reason), tostring(self.myStack and self.myStack.clock), tostring(self.oppStack and self.oppStack.clock)))
+        tostring(type(msg.gameAbort) == "table" and msg.gameAbort.reason or msg.reason), tostring(self.myStack and self.myStack.clock), tostring(self.oppStack and self.oppStack.clock)))
       self.outcome = self.outcome or "unfinished"
     end
     self.matchEnded = true

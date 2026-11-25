@@ -108,6 +108,9 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 ## 7. Progress log (the last benchmark first)
 
 - **No bot plays yet.** No benchmark has run.
-- 2026-11-25 -- Step 1 in progress: `engine/ca.c` identical to the chaos Lua over 150 recordings, 117,390 frames. Event coverage is
-  thin: in those frames, 24 pieces sent, 25 chains (none longer than 3), 0 shock sent, 0 tall chaos combos, 0 all-clears. A
-  scripted test player that makes them is next.
+- 2026-11-25 -- **Step 1 gate passed locally** (`engine/checks.sh 300`): 300 recordings, 424,290 frames, 0 differences. Events in
+  those frames: clear3 942, combo 104, chainLink 1397, chain6plus 926, chainCap 235, shockSent 179, allClear 150, allClearSent 55,
+  tallSent 39, dropQueue1 387, dropQueue2 490, dropQueue3 575, stopFaded 241, healthLost 7608, swap 11344, garbageBroken 76.
+  Still open for the gate: running it on every push (the workflow, waiting on the owner's answer in section 6).
+- 2026-11-25 -- the one difference found on the way: at the chaos margin's last step with an empty queue the stop time is 0/0;
+  LuaJIT's math.min/max keep the NaN and no stop time is awarded. ca.c does the same.

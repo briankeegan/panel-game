@@ -1314,7 +1314,7 @@ static void frontNew(int reaction, int ahead, int gap, int jitter) {
   for (int i = 0; i < PLANN; i++) F.planAt[i] = NUL;
   F.nextId = nextId ? nextId : 1;
   F.reaction = reaction; F.ahead = ahead; F.gap = gap; F.jitter = jitter;
-  F.msPerFrame = 1000.0 / 60; F.limit = 76; F.window = 600;
+  F.msPerFrame = 1000.0 / 60; F.limit = 1 << 20; F.window = 600;   // chaos: no input allowance (plans/chaos-goal.md §6)
   F.rnd = (uint32_t)fNow();
   memset(wasGarbage, 0, sizeof wasGarbage);
   swapRingN = 0; for (int i = 0; i < SWAPRING; i++) swapRingAt[i] = NUL;

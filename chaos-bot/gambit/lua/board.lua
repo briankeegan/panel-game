@@ -1,4 +1,4 @@
--- THE STACK AS THE C ENGINE'S BOARD (eval/native/pa.h), as the player sees it: every field by pa.c's own name, every panel's fields
+-- THE CHAOS STACK AS THE C ENGINE'S BOARD (engine/ca.h, through gambit/native/pa.c's HEAD), as the player sees it: every field by pa.c's own name, every panel's fields
 -- in pa.h's order, the garbage queued, the stall log. Nothing the player cannot see goes in: the rows not dealt yet, and the colours
 -- garbage breaks into until the screen draws each one (shown), are left to the engine's unseen colours, which match nothing.
 local M = {}
@@ -12,33 +12,39 @@ local DIRS = { up = 0, down = 1, left = 2, right = 3 }
 -- The board's scalars, by pa.c's HEAD names, each handed to put(name, value) (nil: the Lua's nil, not handed). Nothing is made: a frame
 -- that builds no table leaves the collector nothing to do inside it.
 function M.head(a, put)
-  local ld, fc, st, bh = a.levelData, a.levelData.frameConstants, a.levelData.stop, a.behaviours
+  -- the chaos v3 stack's own fields (reference/chaos-v3/common/engine/Stack.lua), under the names gambit/native/pa.c's HEAD reads
+  local ld, fc, bh, q = a.levelData, a.levelData.frameConstants, a.behaviours, a.incomingGarbage
   put("riseTimer", a.rise_timer)
-  put("levelData.startingSpeed", ld.startingSpeed); put("levelData.colors", ld.colors); put("levelData.maxHealth", ld.maxHealth)
-  put("levelData.shockFrequency", ld.shockFrequency); put("levelData.shockCap", ld.shockCap)
-  put("levelData.speedIncreaseMode", ld.speedIncreaseMode)
+  put("levelData.maxHealth", ld.maxHealth); put("levelData.shockFrequency", ld.shockFrequency); put("levelData.shockCap", ld.shockCap)
   put("frames.HOVER", fc.HOVER); put("frames.GARBAGE_HOVER", fc.GARBAGE_HOVER); put("frames.FLASH", fc.FLASH)
-  put("frames.FACE", fc.FACE); put("frames.POP", fc.POP)
-  put("levelData.stop.formula", st.formula); put("levelData.stop.comboConstant", st.comboConstant)
-  put("levelData.stop.chainConstant", st.chainConstant); put("levelData.stop.dangerConstant", st.dangerConstant)
-  put("levelData.stop.coefficient", st.coefficient); put("levelData.stop.dangerCoefficient", st.dangerCoefficient)
+  put("frames.FACE", fc.FACE); put("frames.POP", fc.POP); put("frames.GARBAGE_POP", fc.GARBAGE_POP)
+  put("levelData.stop.BaseConstant", ld.stop.BaseConstant)
+  put("game_mode", a.game_mode); put("margin_time", a.margin_time); put("chaos_mode", a.chaos_mode)
+  put("incoming.GarbageQueueType", q.GarbageQueueType); put("incoming.ChaosMode", q.ChaosMode)
+  put("incoming.illegalStuffIsAllowed", q.illegalStuffIsAllowed)
   put("behaviours.passiveRaise", bh.passiveRaise); put("behaviours.allowManualRaise", bh.allowManualRaise)
   put("behaviours.swapStallingMode", bh.swapStallingMode); put("behaviours.swapStallingPunish", bh.swapStallingPunish)
-  put("height", a.height); put("panelIdCount", a.panelsCreatedCount); put("speed", a.speed); put("nextSpeedIncreaseClock", a.nextSpeedIncreaseClock)
-  put("clock", a.clock); put("stopWatch", a.stopWatch); put("stopWatchIsRunning", a.stopWatchIsRunning); put("inCountdown", a.in_countdown or false)
-  put("displacement", a.displacement); put("riseLock", a.rise_lock); put("hasRisen", a.has_risen); put("manualRaise", a.manual_raise)
-  put("manualRaiseYet", a.manual_raise_yet); put("preventManualRaise", a.prevent_manual_raise); put("swapThisFrame", a.swapThisFrame)
-  put("stopTime", a.stop_time); put("preStopTime", a.pre_stop_time); put("shakeTime", a.shake_time); put("prevShakeTime", a.prev_shake_time)
-  put("shakeTimeOnFrame", a.shake_time_on_frame); put("peakShakeTime", a.peak_shake_time); put("health", a.health)
-  put("wasToppedOut", a.wasToppedOut); put("chainCounter", a.chain_counter); put("nActive", a.n_active_panels)
-  put("nPrevActive", a.n_prev_active_panels); put("swappingCount", a.swappingPanelCount); put("panelsCleared", a.panels_cleared)
-  put("metalPanelsQueued", a.metalPanelsQueued); put("score", a.score); put("curRow", a.cur_row); put("curCol", a.cur_col)
-  put("topCurRow", a.top_cur_row); put("queuedSwapRow", a.queuedSwapRow); put("queuedSwapCol", a.queuedSwapColumn)
-  put("swapCount", a.swapCount); put("curTimer", a.cur_timer); put("curWaitTime", a.cur_wait_time or 20)
-  put("cursorDirection", a.cursorDirection == nil and -1 or DIRS[a.cursorDirection]); put("cursorLock", a.cursorLock)
+  put("behaviours.startTimersWithSwapCount", bh.startTimersWithSwapCount or 0)
+  put("height", a.height); put("panelsCreatedCount", a.panelsCreatedCount); put("speed", a.speed)
+  put("nextSpeedIncreaseClock", a.nextSpeedIncreaseClock); put("clock", a.clock); put("game_stopwatch", a.game_stopwatch)
+  put("displacement", a.displacement); put("rise_lock", a.rise_lock); put("has_risen", a.has_risen)
+  put("manual_raise", a.manual_raise); put("manual_raise_yet", a.manual_raise_yet); put("prevent_manual_raise", a.prevent_manual_raise)
+  put("swapThisFrame", a.swapThisFrame); put("stop_time", a.stop_time); put("pre_stop_time", a.pre_stop_time)
+  put("shake_time", a.shake_time); put("prev_shake_time", a.prev_shake_time); put("shake_time_on_frame", a.shake_time_on_frame)
+  put("peak_shake_time", a.peak_shake_time or 0); put("health", a.health); put("panels_in_top_row", a.panels_in_top_row)
+  put("chain_counter", a.chain_counter); put("clear_counter", a.clear_counter); put("has_all_clear", a.has_all_clear)
+  put("n_active_panels", a.n_active_panels); put("n_prev_active_panels", a.n_prev_active_panels)
+  put("n_active_garbage", a.n_active_garbage); put("n_prev_active_garbage", a.n_prev_active_garbage)
+  put("garbage_landed_this_frame", a.garbage_landed_this_frame); put("garbage_landed_last_frame", a.garbage_landed_last_frame)
+  put("garbage_matched_this_frame", a.garbage_matched_this_frame); put("swappingPanelCount", a.swappingPanelCount)
+  put("panels_cleared", a.panels_cleared); put("metalPanelsQueued", a.metalPanelsQueued)
+  put("garbage_panels_cleared", a.garbage_panels_cleared); put("cur_row", a.cur_row); put("cur_col", a.cur_col)
+  put("top_cur_row", a.top_cur_row); put("queuedSwapRow", a.queuedSwapRow); put("queuedSwapColumn", a.queuedSwapColumn)
+  put("swapCount", a.swapCount); put("cur_timer", a.cur_timer); put("cur_wait_time", a.cur_wait_time or 20)
+  put("cursorDirection", a.cursorDirection == nil and -1 or DIRS[a.cursorDirection])
   put("garbageCreatedCount", a.garbageCreatedCount); put("highestGarbageIdMatched", a.highestGarbageIdMatched)
-  local over = a.game_over_clock or -1
-  put("gameOverClock", over); put("gameOver", over > 0)
+  put("game_over_clock", a.game_over_clock or 0); put("margin_time_counter", a.margin_time_counter)
+  put("shake_margin", a.shake_margin); put("color_count", a.color_count)
 end
 
 local STATES = { normal = 0, dimmed = 1, swapping = 2, matched = 3, popping = 4, popped = 5, hovering = 6, falling = 7,

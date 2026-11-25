@@ -954,8 +954,10 @@ static int compareJudged(const Judge *x, const Judge *y) {
   // lines that both die and break no garbage, the one keeping more panels first, unless the other lives a break's time longer: the
   // panels are the next break's material -- run 19 thicc s1: survive lines at stop 70-127, panels 45 to 8, then nothing to break with.
   // And with garbage queued and none on the board too: run 21 thicc s3, 8-9 queued, the board kept busy -- the chaos queue drops only
-  // with nothing moving -- by clears breaking nothing at stop 53-94, panels 27 to 12, then the queue dropped on a board with none left)
-  if ((decF.under || decQ.b->ninc > 0) && decQ.b->stopTime + decQ.b->preStopTime > rankSave && !x->o.lives && !y->o.lives && x->apBroke <= 0 && y->apBroke <= 0) {
+  // with nothing moving -- by clears breaking nothing at stop 53-94, panels 27 to 12, then the queue dropped on a board with none left.
+  // Whatever the stop left: run 22 thicc s4, survive and hold both lost at 238 at stop 63-82 -- under a break's time, so this was not
+  // asked -- and the survive line spent panels 50 to 17 for nothing. Spending is worth it only if it lives a break's time longer)
+  if ((decF.under || decQ.b->ninc > 0) && !x->o.lives && !y->o.lives && x->apBroke <= 0 && y->apBroke <= 0) {
     int32_t px = panelsLeft(x), py = panelsLeft(y);
     if (px != py) {
       const Judge *keep = px > py ? x : y, *sp = keep == x ? y : x;

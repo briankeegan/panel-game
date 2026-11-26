@@ -22,7 +22,9 @@ starts with the last benchmark's number (survived x/N, frames lost at, health le
    branch `ccr-9ee25bfb-744765` -- "same repo is fine, just make sure it doesn't [disturb] the other bot". So: nothing outside
    `chaos-bot/` and nothing on any other branch; Gambit's files, branches and workflows are never touched. See section 6 for the
    one open question: where this project's workflow file lives.)*
-2. **Games run on GitHub Actions only**, never in the sandbox -- the sandbox times nothing like a runner.
+2. **Games run on GitHub Actions only**, never in the sandbox -- the sandbox times nothing like a runner. **So do the engine
+   checks** (owner, 2026-11-25 20:47 ET): the checks workflow runs them on every push; the sandbox runs nothing -- it edits, compiles
+   (to catch a typo before a push), commits and pushes.
 3. **One benchmark run at a time** (of ours). Gambit's benchmark is not waited for (the owner, 2026-11-25: our runs may play while
    a `gambit-24.yml` run is in progress; "you don't have to pay attention to Gambit's benchmark"). Start small before big.
 4. **Read state, never recall it.** Before answering "what is running / what did it score", look at Actions and the run's own report.

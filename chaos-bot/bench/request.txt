@@ -303,6 +303,10 @@
 #   topped at ~50 panels under four-row slabs; the queue never passed 20, so the rules never acted), 7 colours 3/4 (insane 13608).
 #   The same seed plays differently run to run (the think time), so one run of eight is a rough sample
 # run 101 -- 8 colours at LEVEL 10 vs 9/9 (the owner: 9 or 10 by the mode), seeds 1-2, every pattern, the bot of run 100
+# run 101 -- (result) 8 colours at L10 vs 9/9, seeds 1-2: survived 2/8 -- the weakest mode (combo s1 at 706: a dying eight of eight
+#   swaps carried 150 frames over living threes that broke the same garbage). The owner: focus on the weakest mode
+# run 102 -- under garbage, a fresh line that lives and breaks as much garbage puts a dying plan down at once (rank.c): 8 colours,
+#   L10 vs 9/9, seeds 1-2 again
 chain_garbage 1 9 9 1 21600 10 colors=8
 combo_storm 1 9 9 1 21600 10 colors=8
 thicc_combo_storm 1 9 9 1 21600 10 colors=8

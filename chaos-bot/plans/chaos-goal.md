@@ -150,6 +150,11 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 101 (2026-11-26 10:26 ET), 8 colours at L10 vs 9/9, seeds 1-2: survived 2/8 -- the weakest mode.** The owner (10:3x ET):
+  "Just focus on your weakest mode then." combo s1 lost at 706: at 561 three lines living on a three that broke 3 were put after an eight
+  breaking the same 3 (lost at 352) -- the fresh-line rule keeps the plan in progress until a living line has lived two decisions -- and
+  its eight swaps walked 150 frames on a rising board with no stop. Run 102: under garbage, a fresh line that lives and breaks as much
+  garbage puts a dying plan down at once.
 - **Run 100 (2026-11-26 10:14 ET), the queue near its limit (top row kept empty, quiet under garbage), L11 vs 11/11 seed 1: survived
   4/8.** 8 colours 1/4 (combo 4344, thicc 8349, insane 4054: topped at ~50 panels under four-row slabs -- the queue never passed 20, the
   new rules never acted), 7 colours 3/4. The same seed plays differently from run to run (the think time on the runner), so a run of

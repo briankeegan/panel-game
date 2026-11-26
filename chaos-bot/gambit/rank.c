@@ -1041,6 +1041,10 @@ static int compareJudged(const Judge *x, const Judge *y) {
     int bought = decF.under && l->o.lives && !l->hold && !(l->apBroke > 0) && l->spends && !o->hold && !o->o.dead && o->apBroke > 0 &&
                  diesAt(o) >= NEAR_LOSS * rankSave && diesAt(o) < 1e299;
     if (bought) return (cmpKey = __LINE__, (lx ? 1 : -1));
+    // (run 102, CHAOS: but never a dying plan kept over a line that lives and breaks as much garbage -- under garbage the break that
+    // lives is the plan. Run 101 8 colours combo s1, 561: three lines living on a three that broke 3 put after an eight breaking the
+    // same 3 lost at 352, eight swaps walked 150 frames on a rising board, lost at 706)
+    if (fresh && decF.under && l->apBroke > 0 && l->apBroke >= o->apBroke) fresh = 0;
     if (fresh) lx = ly = 0;
     else {
       if (!(!l->o.lives && goalLine(o) && !o->o.dead && o->o.lostAt != NOT_ASKED && diesAt(o) >= diesAt(l))) return (cmpKey = __LINE__, (lx ? -1 : 1));

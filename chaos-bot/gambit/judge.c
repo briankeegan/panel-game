@@ -76,6 +76,7 @@ typedef struct {
   int32_t even;                 // the board it ends on: its tallest column less its lowest, in rows (evenOf; -1 not known)
   int32_t spread;               // and how its colours are spread (spreadOf): the pairs a swap from a match less the pairs touching
   int32_t seams;                // and its crossed seams (seamsOf): the swaps on it that finish two colours at once
+  int32_t topRow;               // and whether anything rests in its top row or above (topRowOf: no queued garbage drops then)
   int32_t gap;                  // and the empty cells under its garbage, each column's lowest garbage down to what holds it (gapOf; -1 not known)
 } Judged;
 
@@ -324,6 +325,12 @@ static int32_t gapOf(const Board *b) {
     for (int r = g - 1; r >= 1 && b->p[r][c].f[COLOR] <= 0 && !b->p[r][c].f[ISGARBAGE]; r--) gap++;
   }
   return gap;
+}
+// (CHAOS, THE TOP ROW TAKEN: a panel or garbage in the top row or above -- Stack:shouldDropGarbage drops nothing waiting then)
+static int32_t topRowOf(const Board *b) {
+  int h = b->height ? b->height : 12;
+  for (int r = h; r < b->nrows; r++) for (int c = 1; c <= W; c++) if (b->p[r][c].f[COLOR] > 0 || b->p[r][c].f[ISGARBAGE]) return 1;
+  return 0;
 }
 static int32_t evenOf(const Board *b) {
   int hi = 0, lo = 1 << 20;
@@ -652,7 +659,7 @@ static void judgeOnce(const Question *q, const int32_t *seq, int nseq, const Jud
   for (int z = 4; z < MAXCOMBOS + 64; z++) if (single[z] && j->nsingles < MAXCOMBOS) j->singles[j->nsingles++] = z;
   Node *e = NODE(x, n);
   j->endNode = n;
-  { const Board *eb = ensureBoard(x, n); j->even = eb ? evenOf(eb) : -1; j->gap = eb ? gapOf(eb) : -1; j->spread = eb ? spreadOf(eb) : 0; j->seams = eb ? seamsOf(eb) : 0; }
+  { const Board *eb = ensureBoard(x, n); j->even = eb ? evenOf(eb) : -1; j->gap = eb ? gapOf(eb) : -1; j->topRow = eb ? topRowOf(eb) : 0; j->spread = eb ? spreadOf(eb) : 0; j->seams = eb ? seamsOf(eb) : 0; }
   j->dropAt = j->dead ? 0 : e->t + imax(e->stopTime + e->preStopTime, e->shakeTime);
   j->fire = j->nats ? j->ats[j->nats - 1] : -1;
   if (o->lifeTo >= 0) j->lostAt = j->dead ? j->deadAt : lostAlone(x, n, imax(o->lifeTo, imax(lastAt, o->lifeStop ? j->dropAt : 0) + o->lifeRest));

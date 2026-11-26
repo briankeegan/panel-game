@@ -2191,7 +2191,10 @@ static Played playOf(const Read *R, int n) {
   // once (run 7 combo_storm: 13-15 pieces held at the door, 47 panels burned to 9, broke=0). So while garbage waits in the queue, none
   // is on the board, the chosen line breaks none, and what waits fits under the level's ceiling with the stack as it is, the board is
   // left alone: the garbage drops while it is small, and is broken from the board.)
-  if (P.line && !R->under && !R->up && decQ.b->ninc > 0 && P.line->apBroke <= 0) {
+  // (run 100: and under garbage too while the queue is QUEUE_ROOM or fewer short of its limit (margin off) and the top row is empty --
+  // fifty waiting is the loss, and only a quiet board drops; run 99 L11 8 colours lost both games to the queue at full health)
+  int queueNear = decQ.b->marginTime == 1 && decQ.b->ninc >= CHAOS_QUEUE_LIMIT - QUEUE_ROOM;
+  if (P.line && (!R->under || queueNear) && !R->up && decQ.b->ninc > 0 && P.line->apBroke <= 0) {
     int32_t waiting = 0;
     for (int i = 0; i < decQ.b->ninc; i++) waiting += decQ.b->inc[i].height > 0 ? decQ.b->inc[i].height : 1;
     int32_t h = decQ.b->height ? decQ.b->height : 12;

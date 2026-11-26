@@ -295,11 +295,15 @@
 # run 98 -- (result) by the panels, 1'g, L10 seeds 15-16: survived 6/8 (combo s15 at 11731 with ~50 panels; thicc s15 at 1222, opening
 #   spent). Seeds 13-16: by the panels 13/16, small always 14/16, the gate's bot 14/16 -- none better. Both off: the gate's bot again
 # run 99 -- the gate's bot at LEVEL 11 vs garbage 11/11, the hard settings, seed 1: 7 colours, 8 colours, chaos margin, chaos mode
-combo_storm 1 11 11 1 21600 11 colors=7
-insane_combo_storm 1 11 11 1 21600 11 colors=7
+# run 99 -- (result) the gate's bot at L11 vs 11/11, seed 1: survived 4/8 -- 7 colours 1/2 (combo lost at 16429, no-line), 8 colours 0/2
+#   (both to the queue's fifty at full health: queue avg 38-46, stop 86-115), chaos margin 1/2, chaos mode 2/2
+# run 100 -- the queue near its limit (margin off, 15 or fewer short of fifty): the top row kept empty (rank.c) and the board left quiet
+#   under garbage too (decide.c): L11 vs 11/11, seed 1, every pattern at 8 and at 7 colours
+chain_garbage 1 11 11 1 21600 11 colors=8
 combo_storm 1 11 11 1 21600 11 colors=8
+thicc_combo_storm 1 11 11 1 21600 11 colors=8
 insane_combo_storm 1 11 11 1 21600 11 colors=8
-combo_storm 1 11 11 1 21600 11 margin=4
-insane_combo_storm 1 11 11 1 21600 11 margin=4
-combo_storm 1 11 11 1 21600 11 chaosmode=1
-insane_combo_storm 1 11 11 1 21600 11 chaosmode=1
+chain_garbage 1 11 11 1 21600 11 colors=7
+combo_storm 1 11 11 1 21600 11 colors=7
+thicc_combo_storm 1 11 11 1 21600 11 colors=7
+insane_combo_storm 1 11 11 1 21600 11 colors=7

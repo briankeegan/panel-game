@@ -148,6 +148,11 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 99 (2026-11-26 10:03 ET), the gate's bot at L11 vs 11/11 on the hard settings, seed 1: survived 4/8.** 7 colours 1/2 (combo
+  lost at 16429, no-line), 8 colours 0/2 -- both to the queue's fifty at full health (queue 38-46 on average over the last 1200
+  frames, stop 86-115: a board kept topped on stop drops nothing), chaos margin 1/2, chaos mode 2/2. The weakness is here. Run 100: with
+  the queue within 15 of fifty (margin off), lines leaving the top row empty first (rank.c), and the board left quiet under garbage too
+  (decide.c) -- 8 and 7 colours, every pattern.
 - **Run 98 (2026-11-26 09:52 ET), the combo size by the panels, 1'g, L10 seeds 15-16: survived 6/8.** Seeds 13-16: by the panels
   13/16, small always 14/16, the gate's bot 14/16 -- none better than eight games' noise; both turned off, the gate's bot is back (it
   holds the record: 40/40 on seeds 1-10, 22/24 on 11-16). Normal L10 is not where the bot is weak. Run 99: the gate's bot at L11 vs

@@ -566,6 +566,8 @@ static int cutsShort(const Judge *J) {
   return aloneChain > 1 && J->apWhole < aloneChain && ownChainAsked(aloneChain);
 }
 #define FLAT_ROWS 2
+#define CHAOS_QUEUE_LIMIT 50   // (the chaos queue limit, as decide.c names it)
+#define QUEUE_ROOM 15   // (run 100: pieces short of the queue's limit from which the top row is kept empty)
 #define GAP_CELLS 3   // (1'g: three empty cells under the garbage, a column half dug out, or three columns a row each)
 #define BREAK_WALK 20   // the actions a break's line is pressed in, as the allowance keeps them (an estimate: a few swaps and their walks)
 static int downtime(void) {
@@ -942,6 +944,14 @@ static int compareJudged(const Judge *x, const Judge *y) {
     int32_t bx = imax(0, x->apBroke), by = imax(0, y->apBroke);
     if (bx != by) return (cmpKey = __LINE__, (bx > by ? -1 : 1));
   }
+  // (run 100, CHAOS, THE QUEUE NEAR ITS LIMIT: with the queue's limit in force (margin off: fifty waiting is the loss whatever the
+  // health, Stack.lua) and QUEUE_ROOM or fewer pieces short of it, of two lines that do not die before a break's time, the one leaving
+  // the top row empty first -- nothing waiting drops while anything rests there (Stack:shouldDropGarbage), so a board kept topped on
+  // stop time only lets the queue grow. Run 99 L11 vs 11/11, 8 colours: both games lost to the queue at full health (queue 38-46 on
+  // average over the last 1200 frames, stop 86-115))
+  if (decQ.b->marginTime == 1 && decQ.b->ninc >= CHAOS_QUEUE_LIMIT - QUEUE_ROOM && x->o.j.topRow != y->o.j.topRow &&
+      !x->o.dead && !y->o.dead && (x->o.lives || diesAt(x) >= rankSave) && (y->o.lives || diesAt(y) >= rankSave))
+    return (cmpKey = __LINE__, (x->o.j.topRow ? 1 : -1));
   // (run 55, CHAOS, THE OPENING KEEPS ITS PANELS: before garbage first comes (the opening, decide.c), of two lines that both live and
   // break no garbage, the one clearing fewer panels first -- the stack rises on its own until then and the first garbage is broken with
   // what is kept; Training's garbage is scripted, so attack before it buys nothing. Run 52 insane s5: entries from frame 192 spent the

@@ -156,7 +156,10 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
-- **Run 114 (pushed 2026-11-26 13:2x ET): the opening keeps its panels only at six colours or fewer** -- run 113 insane s4 only set
+- **Run 114 (2026-11-26 13:32 ET): the opening keeps its panels only at six colours or fewer -- survived 2/8.** Openings lower
+  (30-38 panels at the first garbage), insane s4 1007 -> 10262, but thicc s4, chain s3 and combo s3 (run 113's survivors) lost. Back.
+  8 colours, seeds 3-4, the bot of run 113 (chains for stop, colours lined up, line-up swaps): 4/8; run 110 (without the swaps) 5/8.
+- (run 114 as pushed) the opening keeps its panels only at six colours or fewer -- run 113 insane s4 only set
   up in the opening (30 -> 48 panels by 458, no clear: run 55's rule), lost at 1007. 8 colours L10 s3-4.
 - **Run 113 (2026-11-26 13:20 ET): the line-up swaps -- survived 4/8.** chain s4 (its target) lived; insane s3 3031, insane s4 1007,
   thicc s3 8752, combo s4 13775 lost. Kept.

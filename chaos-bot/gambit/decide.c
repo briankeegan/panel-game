@@ -378,7 +378,8 @@ static int readBoard_(Read *R) {
   // insane s10: kept to frame 600 the opening grew 30 to 48 panels, eight rows, and every line was judged dying from 484 at that height)
   // (run 114: never above six colours -- the stack climbs past six rows in the opening whatever is kept there, and the chains set up
   // are never fired: run 113 8 colours insane s4, 30 -> 48 panels by frame 458 on set-ups alone, lost at 1007)
-  chaosOpenQuiet = opening && panelTop(decQ.b) < LOW_ROWS && decQ.b->colors <= 6;
+  // (run 114 tried it at six colours or fewer only: 8 colours s3-4 2/8 -- openings lower (30-38 panels), three run-113 survivors lost; back)
+  chaosOpenQuiet = opening && panelTop(decQ.b) < LOW_ROWS;
   R->low = to && (opening || refill || taRaise) && rowsUp > 0 && chaosRaisable; R->up = R->low && !cascadeLive(decQ.b) && canRaiseNow;
   refillAsked = refillReady = refillAlive = 0; raiseWait = 0; opRaiseLog[4] = 0;
   // (THE FLOOR'S RAISE, TIMED: a board busy now -- a cascade, panels moving, the shake -- is one the engine would not raise; it is run on,

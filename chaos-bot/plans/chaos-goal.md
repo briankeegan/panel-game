@@ -156,7 +156,11 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
-- **Run 112 (pushed 2026-11-26 13:0x ET): room for what is coming (1'i)** -- above six colours, when the garbage on its way and
+- **Run 113 (pushed 2026-11-26 13:1x ET): the line-up swaps** -- run 110's bot (1'g and 1'i off: runs 111-112 4/8 and 3/8, the losses
+  moved, none fixed) and, above six colours on a board at rest, the single swaps that leave the most breaks a swap away offered as
+  set-ups (judge.c lineUpSwaps, propose.c), so 1'h has them to choose: run 110 chain s4 held 284 frames of stop offered only walks.
+- **Run 112 (2026-11-26 13:09 ET): room for what is coming (1'i) -- survived 3/8.** Off.
+- (run 112 as pushed) room for what is coming (1'i) -- above six colours, when the garbage on its way and
   waiting, stacked on the board, reaches the top row, the line leaving the stack lower first. 8 colours L10 s3-4.
 - **Run 111 (2026-11-26 12:57 ET): 1'g on again above six colours -- survived 4/8.** combo s4 4447 -> 11152 (its target); insane s3
   lost at 580: a 7-row board told of a 5-row slab 50 frames out, spent them on a slow break, lost in the landing's shake. Kept.

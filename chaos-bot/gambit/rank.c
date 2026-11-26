@@ -1309,14 +1309,16 @@ static int compareJudged(const Judge *x, const Judge *y) {
   // cleared middle is out of reach of every break, and what lands next lands on it. Run 92 insane s16 17400-18158, lost at 18633
   // (run 111: on again above six colours -- run 110 8 colours combo s4, column 3 dug to a well seven rows deep under garbage resting on
   // the columns beside it, lost at 4447)
-  if (decQ.b->colors > 6 && decF.under && (lx || lostAlike(x, y)) && imax(0, x->apBroke) == imax(0, y->apBroke) && x->o.j.gap >= 0 && y->o.j.gap >= 0 &&
+  // (run 112: off again -- runs 111-112 4/8 and 3/8 against run 110's 5/8 on the same seeds; the losses moved, none fixed)
+  if (0 && decQ.b->colors > 6 && decF.under && (lx || lostAlike(x, y)) && imax(0, x->apBroke) == imax(0, y->apBroke) && x->o.j.gap >= 0 && y->o.j.gap >= 0 &&
       iabs(x->o.j.gap - y->o.j.gap) >= GAP_CELLS)
     return (cmpKey = __LINE__, (x->o.j.gap - y->o.j.gap));
   // 1'i. (run 112, CHAOS) ABOVE SIX COLOURS, ROOM FOR WHAT IS COMING: when the garbage on its way and waiting, stacked on the board as it
   // stands (fullTop), reaches the top row, of two that both live or are lost alike, the one leaving the stack lower first -- a slab that
   // lands on a topped board with no stop running ends the game inside the shake. Run 111 8 colours insane s3: a 7-row board told of a
   // 5-row slab 50 frames out, the frames spent on a slow break and walks, lost 70 frames after it landed
-  if (decQ.b->colors > 6 && (lx || lostAlike(x, y)) && x->o.topAfter >= 0 && y->o.topAfter >= 0 && x->o.topAfter != y->o.topAfter) {
+  // (run 112: off -- 3/8; chain s3 and s4 lost, lived in run 110)
+  if (0 && decQ.b->colors > 6 && (lx || lostAlike(x, y)) && x->o.topAfter >= 0 && y->o.topAfter >= 0 && x->o.topAfter != y->o.topAfter) {
     int32_t rows = 0, h = decQ.b->height ? decQ.b->height : 12;
     for (int i = 0; i < decQ.narr; i++) rows += decQ.arr[i].height > 0 ? decQ.arr[i].height : 1;
     for (int i = 0; i < decQ.b->ninc; i++) rows += decQ.b->inc[i].height > 0 ? decQ.b->inc[i].height : 1;

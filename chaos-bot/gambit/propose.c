@@ -1263,6 +1263,12 @@ static int proposeAll(const Read *R, const Found *S, Cand *out, int cap) {
     int32_t one = S->ap.setup; ADD(PLAY_SETUP, &one, 1, -1, 0);
   }
   if (S->haveAp && S->ap.lowest.set) { int m0 = n; ADD(PLAY_CLEAR, S->ap.lowest.seq, S->ap.lowest.nseq, -1, 0); if (n > m0) xFromPlan(&out[m0], &S->ap.lowest); }
+  // LINE UP (run 113, CHAOS, above six colours -- the owner: be more purposeful with colours): the single swaps that leave the most
+  // breaks a swap away (judge.c lineUpSwaps), on a board at rest, offered as set-ups and judged as any line (rank.c 1'h prefers them)
+  if (decQ.b->colors > 6 && !hasActivePanels(decQ.b)) {
+    int32_t lu[3]; int nlu = lineUpSwaps(decQ.b, lu, 3);
+    for (int i = 0; i < nlu; i++) { if (seenDigHas(decQ.b, lu[i])) continue; int32_t one = lu[i]; ADD(PLAY_SETUP, &one, 1, -1, 0); }
+  }
   #undef ADD
   // (and from the lines above: the converted row's chain, then every three grown -- the converted lines' own among them)
   // (the six first of these: proposed last it was judged last, and the clock left 25 of 43 unjudged -- set 86 combo_storm 1, run 4115)

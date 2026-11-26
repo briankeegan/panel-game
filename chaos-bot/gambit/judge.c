@@ -336,36 +336,72 @@ static int32_t topRowOf(const Board *b) {
 // (CHAOS, THE COLOURS LINED UP: the single swaps on a board -- two panels side by side, both at rest -- that make a match where they
 // land, and of those the ones whose match touches garbage: the breaks a swap away. At 8 colours a match seldom arrives by itself; the
 // board kept with matches a swap away is the one the next garbage is broken on (the owner: be more purposeful with colours))
-static void readyOf(const Board *b, int32_t *ready, int32_t *readyBreak) {
-  static LOCAL int g[64][W + 2];
+static int gridMatchAt(int g[][W + 2], int nr, int r, int cc, int *touch) {
+#define GG(r, c) ((r) >= 1 && (r) < nr && (c) >= 1 && (c) <= W ? g[r][c] : 0)
+  int v = g[r][cc]; if (v <= 0) return 0;
+  int lo = cc, hi = cc, dn = r, up = r;
+  while (GG(r, lo - 1) == v) lo--; while (GG(r, hi + 1) == v) hi++;
+  while (GG(dn - 1, cc) == v) dn--; while (GG(up + 1, cc) == v) up++;
+  int h = hi - lo + 1 >= 3, vv = up - dn + 1 >= 3;
+  if (!h && !vv) return 0;
+  if (h) for (int q = lo; q <= hi; q++) if (GG(r + 1, q) == -1 || GG(r - 1, q) == -1 || GG(r, q - 1) == -1 || GG(r, q + 1) == -1) *touch = 1;
+  if (vv) for (int q = dn; q <= up; q++) if (GG(q + 1, cc) == -1 || GG(q - 1, cc) == -1 || GG(q, cc - 1) == -1 || GG(q, cc + 1) == -1) *touch = 1;
+#undef GG
+  return 1;
+}
+// (the single swaps on a grid of colours -- -1 garbage, -2 a panel not at rest, 0 empty -- that make a match, and those touching garbage)
+static void gridReady(int g[][W + 2], int nr, int32_t *ready, int32_t *readyBreak) {
+  int32_t n = 0, nb = 0;
+  for (int r = 1; r < nr; r++) for (int c = 1; c < W; c++) {
+    int a = g[r][c], bb = g[r][c + 1];
+    if (a <= 0 || bb <= 0 || a == bb) continue;
+    g[r][c] = bb; g[r][c + 1] = a;
+    int touch = 0, made = gridMatchAt(g, nr, r, c, &touch) | gridMatchAt(g, nr, r, c + 1, &touch);
+    g[r][c] = a; g[r][c + 1] = bb;
+    n += made; nb += made && touch;
+  }
+  *ready = n; *readyBreak = nb;
+}
+static int gridOf(const Board *b, int g[][W + 2]) {
   int nr = b->nrows < 64 ? b->nrows : 64;
   for (int r = 0; r < nr; r++) for (int c = 0; c <= W + 1; c++) {
     if (r < 1 || c < 1 || c > W) { g[r][c] = 0; continue; }
     const int32_t *f = b->p[r][c].f;
     g[r][c] = f[ISGARBAGE] ? -1 : (f[COLOR] > 0 && f[STATE] == NORMAL) ? f[COLOR] : (f[COLOR] > 0 ? -2 : 0);
   }
-  int32_t n = 0, nb = 0;
-#define GG(r, c) ((r) >= 1 && (r) < nr && (c) >= 1 && (c) <= W ? g[r][c] : 0)
+  return nr;
+}
+static void readyOf(const Board *b, int32_t *ready, int32_t *readyBreak) {
+  static LOCAL int g[64][W + 2];
+  int nr = gridOf(b, g);
+  gridReady(g, nr, ready, readyBreak);
+}
+// (run 113, CHAOS, THE SWAPS THAT LINE COLOURS UP: of the single swaps on the board -- two resting panels side by side, making no match
+// themselves -- the best `max` by the breaks a swap away they leave (4 each), then the matches a swap away, and only those better than
+// the board as it stands; at 8 colours the board's waiting time is spent on these, not the hold (run 110 chain s4: 284 frames of stop
+// held, three lines offered, none a set-up). Moves as row * 8 + column. Returns how many)
+static int lineUpSwaps(const Board *b, int32_t *out, int max) {
+  static LOCAL int g[64][W + 2];
+  int nr = gridOf(b, g), n = 0;
+  int32_t r0, b0; gridReady(g, nr, &r0, &b0);
+  int32_t base = 4 * b0 + r0, best[8] = { 0 }; int32_t mv[8];
+  if (max > 8) max = 8;
   for (int r = 1; r < nr; r++) for (int c = 1; c < W; c++) {
     int a = g[r][c], bb = g[r][c + 1];
     if (a <= 0 || bb <= 0 || a == bb) continue;
     g[r][c] = bb; g[r][c + 1] = a;
-    int made = 0, touch = 0;
-    for (int k = 0; k < 2; k++) {
-      int cc = c + k, v = g[r][cc], lo = cc, hi = cc, dn = r, up = r;
-      while (GG(r, lo - 1) == v) lo--; while (GG(r, hi + 1) == v) hi++;
-      while (GG(dn - 1, cc) == v) dn--; while (GG(up + 1, cc) == v) up++;
-      int h = hi - lo + 1 >= 3, vv = up - dn + 1 >= 3;
-      if (!h && !vv) continue;
-      made = 1;
-      if (h) for (int q = lo; q <= hi; q++) if (GG(r + 1, q) == -1 || GG(r - 1, q) == -1 || GG(r, q - 1) == -1 || GG(r, q + 1) == -1) touch = 1;
-      if (vv) for (int q = dn; q <= up; q++) if (GG(q + 1, cc) == -1 || GG(q - 1, cc) == -1 || GG(q, cc - 1) == -1 || GG(q, cc + 1) == -1) touch = 1;
-    }
+    int t = 0, made = gridMatchAt(g, nr, r, c, &t) | gridMatchAt(g, nr, r, c + 1, &t);
+    int32_t rr = 0, rb = 0; if (!made) gridReady(g, nr, &rr, &rb);
     g[r][c] = a; g[r][c + 1] = bb;
-    n += made; nb += touch;
+    int32_t sc = 4 * rb + rr;
+    if (made || sc <= base) continue;
+    int k = n < max ? n++ : max - 1;
+    if (k == max - 1 && n == max && sc <= best[k]) continue;
+    best[k] = sc; mv[k] = r * 8 + c;
+    while (k > 0 && best[k] > best[k - 1]) { int32_t t1 = best[k]; best[k] = best[k - 1]; best[k - 1] = t1; t1 = mv[k]; mv[k] = mv[k - 1]; mv[k - 1] = t1; k--; }
   }
-#undef GG
-  *ready = n; *readyBreak = nb;
+  for (int i = 0; i < n; i++) out[i] = mv[i];
+  return n;
 }
 static int32_t evenOf(const Board *b) {
   int hi = 0, lo = 1 << 20;

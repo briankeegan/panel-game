@@ -341,6 +341,9 @@
 #   580: a 7-row board told of a 5-row slab 50 frames out, frames spent on a slow break, lost in the landing's shake. Kept
 # run 112 -- above six colours, when what is coming reaches the top row on the board as it stands, the lower stack first (rank.c 1'i):
 #   8 colours L10 s3-4
+# run 112 -- (result) 1'i (room for what is coming), 8 colours L10 s3-4: survived 3/8 (110: 5/8, 111: 4/8) -- 1'g and 1'i off: run 110's bot
+# run 113 -- run 110's bot and the line-up swaps above six colours (judge.c lineUpSwaps, propose.c): the single swaps leaving the most
+#   breaks a swap away offered as set-ups -- run 110 chain s4 held 284 frames of stop with nothing offered but walks. 8 colours L10 s3-4
 chain_garbage 3 9 9 1 21600 10 colors=8
 combo_storm 3 9 9 1 21600 10 colors=8
 thicc_combo_storm 3 9 9 1 21600 10 colors=8

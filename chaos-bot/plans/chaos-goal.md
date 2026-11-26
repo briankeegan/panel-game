@@ -139,6 +139,9 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 42 (2026-11-25 23:27 ET), seeds 1 and 2: survived 8/8, health 13 in every game, budgets 0.** The run-33 bot in Normal:
+  52/56 (seeds 1-2 8/8, 3-4 8/8, 5-6 7/8 and 8/8, 7-8 7/8 and 8/8, 9-10 6/8). Run 43: Challenge Mode -- the launcher starts a
+  challenge stage (challenge=D:S); Impossible, its 8 stages (level 11, chaos margin, 4-7 colours), won or alive at 6:00.
 - **Run 41 (2026-11-25 23:18 ET), dig down to the garbage: survived 5/8 -- worse.** chain_garbage s10 lived, but seed 9 lost
   chain 7162, thicc 20985 and insane 1926 (all lived in run 40): clearing panels whenever they are plenty spends the fuel the next
   minute needs. Reverted. Run 42: the run-40 bot on seeds 1 and 2.

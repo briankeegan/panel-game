@@ -35,7 +35,7 @@ jobs:
               # (1 off, 2 colors, 3 modoki, 4 chaos), chaosmode (0/1), colors
               kv = dict(x.split("=", 1) for x in f[6:] if "=" in x)
               games.append({"pattern": p, "seed": int(seed), "glevel": int(gl), "gspeed": int(gs), "queue": int(q), "frames": int(frames), "level": level,
-                            "mode": int(kv.get("mode", 1)), "margin": int(kv.get("margin", 1)), "chaosmode": int(kv.get("chaosmode", 0)), "colors": int(kv.get("colors", 6)),
+                            "mode": int(kv.get("mode", 1)), "margin": int(kv.get("margin", 1)), "chaosmode": int(kv.get("chaosmode", 0)), "colors": int(kv.get("colors", 6)), "challenge": kv.get("challenge", ""),
                             "n": len(games) + 1})
           assert games, "no games in request.txt"
           print("games=" + json.dumps(games))
@@ -49,7 +49,7 @@ jobs:
       max-parallel: 8
       matrix:
         game: ${{ fromJSON(needs.plan.outputs.games) }}
-    name: game ${{ matrix.game.n }} L${{ matrix.game.level }} ${{ matrix.game.pattern }} seed ${{ matrix.game.seed }} mode ${{ matrix.game.mode }} margin ${{ matrix.game.margin }} chaos ${{ matrix.game.chaosmode }} colors ${{ matrix.game.colors }}
+    name: game ${{ matrix.game.n }} L${{ matrix.game.level }} ${{ matrix.game.pattern }} seed ${{ matrix.game.seed }} mode ${{ matrix.game.mode }} margin ${{ matrix.game.margin }} chaos ${{ matrix.game.chaosmode }} colors ${{ matrix.game.colors }} challenge ${{ matrix.game.challenge }}
     steps:
       - uses: actions/checkout@v4
       - name: love, cached
@@ -74,6 +74,7 @@ jobs:
           CHAOSBOT_MARGIN: ${{ matrix.game.margin }}
           CHAOSBOT_CHAOSMODE: ${{ matrix.game.chaosmode }}
           CHAOSBOT_COLORS: ${{ matrix.game.colors }}
+          CHAOSBOT_CHALLENGE: ${{ matrix.game.challenge }}
         run: |
           g='${{ toJSON(matrix.game) }}'
           bash chaos-bot/bench/play.sh ${{ matrix.game.pattern }} ${{ matrix.game.seed }} ${{ matrix.game.glevel }} ${{ matrix.game.gspeed }} ${{ matrix.game.queue }} ${{ matrix.game.frames }} out

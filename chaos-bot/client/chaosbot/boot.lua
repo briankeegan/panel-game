@@ -20,6 +20,10 @@ local MARGIN = tonumber(env("CHAOSBOT_MARGIN", "1"))
 local COLORS = tonumber(env("CHAOSBOT_COLORS", "6"))
 local GAMEMODE = tonumber(env("CHAOSBOT_GAMEMODE", "1"))
 local CHAOSMODE = env("CHAOSBOT_CHAOSMODE", "0") == "1"
+-- CHAOSBOT_CHALLENGE "D:S": Challenge Mode difficulty D (1-17: 11 impossible, 12-15 line clears, 16 ridiculous, 17 panel hell),
+-- stage S -- the stage sets the player's level, colours, game mode and margin; the game is won when the challenger is beaten
+local CHALLENGE = env("CHAOSBOT_CHALLENGE", "")
+local CH_D, CH_S = CHALLENGE:match("^(%d+):(%d+)$")
 local FRAMES = tonumber(env("CHAOSBOT_FRAMES", "21600"))
 local OUT = env("CHAOSBOT_OUT", "chaosbot-result.txt")
 local DRAW_EVERY = tonumber(env("CHAOSBOT_DRAW_EVERY", "30"))
@@ -48,11 +52,12 @@ local function finish(reason)
   if bot then overruns, worst, dropped = bot:budget(); pcall(bot.endMatch, bot) end
   local e = engine or {}
   local played = e.game_stopwatch or 0
-  local r = { _order = { "seed", "pattern", "glevel", "gspeed", "queue", "level", "margin", "gamemode", "chaosmode", "colors", "survived", "frames", "lostAt", "health",
+  local r = { _order = { "seed", "pattern", "glevel", "gspeed", "queue", "level", "margin", "gamemode", "chaosmode", "colors", "challenge", "survived", "frames", "lostAt", "health",
                          "healthLostTop", "sentRows", "gpm", "overruns", "worstMs", "dropped", "reason" } }
   r.seed, r.pattern, r.glevel, r.gspeed, r.queue, r.level, r.margin = SEED, PATTERN, GLEVEL, GSPEED, QUEUE, LEVEL, MARGIN
   r.gamemode, r.chaosmode, r.colors = GAMEMODE, CHAOSMODE and 1 or 0, COLORS
-  r.survived = (reason == "frames") and 1 or 0
+  r.challenge = CH_D and (CH_D .. ":" .. CH_S) or "-"
+  r.survived = (reason == "frames" or reason == "won") and 1 or 0
   r.frames = played
   r.lostAt = (reason == "lost") and played or -1
   r.health = e.health or -1
@@ -86,6 +91,21 @@ local function startMatch()
   local GameBase = require("client.src.scenes.GameBase")
   local Training = require("chaosbot.training")
   local player = GAME.localPlayer
+  if CH_D then
+    -- (Challenge Mode: the battle room sets the stage's level, colours, game mode, margin and the challenger -- ChallengeMode:setStage)
+    local ChallengeMode = require("client.src.ChallengeMode")
+    math.randomseed(SEED)
+    GAME.battleRoom = ChallengeMode.create(tonumber(CH_D), tonumber(CH_S))
+    assert(GAME.battleRoom, "chaosbot: no challenge room")
+    player:setWantsReady(true)
+    if not player.inputConfiguration then
+      player:setInputMethod("controller")
+      player:restrictInputs(GAME.input.inputConfigurations[1])
+    end
+    LEVEL = player.settings.level
+    say(string.format("match asked: challenge %s:%s level %s colors %s", CH_D, CH_S, tostring(player.settings.level), tostring(player.settings.colorCount)))
+    return
+  end
   player:setStyle(GameModes.Styles.MODERN)
   player:setLevel(LEVEL)
   player:setLevelData(LevelPresets.getModern(LEVEL))
@@ -111,7 +131,9 @@ local function startMatch()
   say(string.format("match asked: seed %d pattern %s glevel %d gspeed %d queue %d level %d margin %d gamemode %d chaosmode %s colors %d", SEED, PATTERN, GLEVEL, GSPEED, QUEUE, LEVEL, MARGIN, GAMEMODE, tostring(CHAOSMODE), COLORS))
 end
 
+local attachedMatch
 local function attach(match)
+  attachedMatch = match
   for _, cs in ipairs(match.stacks) do
     if cs.player == GAME.localPlayer and cs.engine and cs.engine.panels then client, engine = cs, cs.engine end
   end
@@ -151,6 +173,7 @@ love.update = function(dt)
     if e.health and lastHealth and e.health < lastHealth and e.panels_in_top_row then healthLostTop = healthLostTop + (lastHealth - e.health) end
     lastHealth = e.health
     if e.game_over_clock and e.game_over_clock > 0 then finish("lost")
+    elseif CH_D and attachedMatch and attachedMatch.ended then finish("won")   -- (the challenger beaten: the match over, this stack alive)
     elseif (e.game_stopwatch or 0) >= FRAMES then finish("frames") end
   end
 end

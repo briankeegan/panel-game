@@ -112,11 +112,14 @@
 #          (rank.c, outcome.c topAfter). Seeds 9-10 again
 # run 41 -- (result) survived 5/8: chain s10 lived but seed 9 lost chain 7162, thicc 20985, insane 1926 -- dig-down reverted
 # run 42 -- the run-40 bot (dig-down off) on seeds 1 and 2, not yet played by it
-combo_storm 1 9 9 2 21600 10
-chain_garbage 1 9 9 1 21600 10
-thicc_combo_storm 1 9 9 3 21600 10
-insane_combo_storm 1 9 9 2 21600 10
-combo_storm 2 9 9 2 21600 10
-chain_garbage 2 9 9 1 21600 10
-thicc_combo_storm 2 9 9 3 21600 10
-insane_combo_storm 2 9 9 2 21600 10
+# run 42 -- (result) survived 8/8 on seeds 1-2, health 13 everywhere, budgets 0 (the run-33 bot: 52/56 in Normal)
+# run 43 -- CHALLENGE MODE, Impossible (difficulty 11), stages 1-8, one game each: the stage sets level 11, chaos margin, 4-7
+#          colours; passed = the challenger beaten, or alive at 6:00. No change to the bot
+challenge 1 9 9 1 21600 11 challenge=11:1
+challenge 1 9 9 1 21600 11 challenge=11:2
+challenge 1 9 9 1 21600 11 challenge=11:3
+challenge 1 9 9 1 21600 11 challenge=11:4
+challenge 1 9 9 1 21600 11 challenge=11:5
+challenge 1 9 9 1 21600 11 challenge=11:6
+challenge 1 9 9 1 21600 11 challenge=11:7
+challenge 1 9 9 1 21600 11 challenge=11:8

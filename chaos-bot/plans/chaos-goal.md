@@ -140,6 +140,7 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 83 (2026-11-26 06:02 ET), LEVEL 9 seeds 3-4: survived 7/8** (lost chain s4 at 4310). Level 9: 14/16. Run 84: seeds 5-6.
 - **Run 82 (2026-11-26 05:53 ET), LEVEL 8 against garbage 8/8: survived 8/8, full health.** Step 5, garbage of the level: L10
   8/8 on all five sets (the gate), L9 7/8, L8 8/8, L7 7/8 -- the level-derived numbers hold. Open at levels 7-8: garbage above the
   level (9/9) buries the board and the queue's fifty ends it. Run 83: level 9 on seeds 3-4.

@@ -251,11 +251,13 @@
 # run 82 -- (result) LEVEL 8 against garbage 8/8: survived 8/8, every game at full health (23).
 #          Step 5 with garbage of the level: L10 gate 8/8 x5 sets, L9 7/8, L8 8/8, L7 7/8 -- the level-derived numbers hold
 # run 83 -- LEVEL 9 (garbage 9/9) on seeds 3-4, the gate's bot
-chain_garbage 3 9 9 1 21600 9
-combo_storm 3 9 9 1 21600 9
-thicc_combo_storm 3 9 9 1 21600 9
-insane_combo_storm 3 9 9 1 21600 9
-chain_garbage 4 9 9 1 21600 9
-combo_storm 4 9 9 1 21600 9
-thicc_combo_storm 4 9 9 1 21600 9
-insane_combo_storm 4 9 9 1 21600 9
+# run 83 -- (result) LEVEL 9 seeds 3-4: survived 7/8, survivors at full health (17); lost chain s4 at 4310. Level 9: 14/16
+# run 84 -- LEVEL 9 on seeds 5-6, the gate's bot
+chain_garbage 5 9 9 1 21600 9
+combo_storm 5 9 9 1 21600 9
+thicc_combo_storm 5 9 9 1 21600 9
+insane_combo_storm 5 9 9 1 21600 9
+chain_garbage 6 9 9 1 21600 9
+combo_storm 6 9 9 1 21600 9
+thicc_combo_storm 6 9 9 1 21600 9
+insane_combo_storm 6 9 9 1 21600 9

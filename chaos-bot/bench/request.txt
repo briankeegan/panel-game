@@ -150,6 +150,12 @@
 #          Run 49's rule stays off. The run-46 bot: 9-10 8/8, 1-2 7/8, 3-4 7/8. insane s4 lost with both: 8-12 panel clears breaking
 #          nothing at stop 94-202 with 7 queued (stop is a max: they bought ~74 frames each), panels 51 to 8
 # run 52 -- the run-46 bot on seeds 5 and 6 (not yet played by it), no change
+# run 52 -- (result) survived 6/8 on seeds 5-6 (lost thicc s5 10956, insane s5 4463). insane s5: entries from 192 spent the 30
+#          opening panels to 17 by 588 before any garbage; the raise was refused each decision because the board was busy clearing
+#          (chaos raises only with nothing moving); one raise all game, panels 9-25 after
+# run 53 -- one change: in the opening (no garbage yet), the stack under its raise height and the raise refused only for the board
+#          being busy, of two lines judged alike the one spending no panels on clears breaking nothing first (rank.c, decide.c) --
+#          the board goes quiet and the raise is offered then (never waited for). Seeds 5-6
 chain_garbage 5 9 9 1 21600 10
 combo_storm 5 9 9 1 21600 10
 thicc_combo_storm 5 9 9 1 21600 10

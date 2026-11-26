@@ -131,6 +131,7 @@ static int carryOpener(void);   // (the line in progress was begun under the ope
 static int32_t twinWaste[5], twinWasteC, twinWasteX, twinWasteN;   // (the two-column eights taken out as wasting a three, by the test that called it so -- rank.c wasteWhy: the log's twinW=)
 static CbSeq opKeepSeq; static CbGrid opKeepPrev; static int opKeepOn; static int32_t opKeepHeld, opKeepAt;   // (the next chain's design carried on, and the decisions it was: the log's keep=)
 static int readBoard_(Read *R) {
+  chaosOpenQuiet = 0;   // (set again below once the raise is asked: never carried from the last decision)
   memset(R, 0, sizeof *R);
   FactSet *F = &R->F;
   factsOf(decQ.b, decQ.arr, decQ.narr, hostTopped, F);
@@ -338,6 +339,8 @@ static int readBoard_(Read *R) {
   // (ca.c controls and the manual raise: rise lock, panels_in_top_row, prevent_manual_raise); otherwise no raise is asked or waited for)
   int chaosRaisable = !swapQueued(decQ.b) && decQ.b->shakeTime == 0 && !hasActivePanels(decQ.b) && !hasPanelsInTopRow(decQ.b) &&
                       !decQ.b->preventManualRaise && !decQ.b->manualRaise;
+  chaosOpenQuiet = opening && to && rowsUp > 0 && !chaosRaisable && !hasPanelsInTopRow(decQ.b) && !decQ.b->preventManualRaise &&
+                   !decQ.b->manualRaise;   // (rank.c compareJudged: the opening's panels kept so the board goes quiet for the raise)
   R->low = to && (opening || refill || taRaise) && rowsUp > 0 && chaosRaisable; R->up = R->low && !cascadeLive(decQ.b) && canRaiseNow;
   refillAsked = refillReady = refillAlive = 0; raiseWait = 0; opRaiseLog[4] = 0;
   // (THE FLOOR'S RAISE, TIMED: a board busy now -- a cascade, panels moving, the shake -- is one the engine would not raise; it is run on,

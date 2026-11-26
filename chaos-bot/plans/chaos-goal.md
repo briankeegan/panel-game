@@ -140,6 +140,9 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 52 (2026-11-26 01:06 ET), the run-46 bot on seeds 5-6: survived 6/8** (lost thicc s5 10956, insane s5 4463). The run-46
+  bot in Normal: 28/32. insane s5 spent its 30 opening panels on entries before any garbage, and the raise was refused while the
+  board was busy. Run 53: in the opening, with a raise wanted, a line spending no panels on clears breaking nothing goes first.
 - **Run 51 (2026-11-26 00:57 ET), run 49's rule off (the run-46 bot) on seeds 3-4: survived 7/8** (lost insane s4 17308, which run
   50 lost too). Run 49's rule costs seeds 3-4 (two early losses) and stays off. The run-46 bot: 9-10 8/8, 1-2 7/8, 3-4 7/8.
   Open: clears breaking nothing while stopped (stop is a max), panels spent under a queue. Run 52: the run-46 bot on seeds 5-6.

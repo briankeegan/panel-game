@@ -919,8 +919,18 @@ static void creditPair(const Judge *x, const Judge *y, int *lxo, int *lyo) {
   }
   *lxo = lx; *lyo = ly;
 }
+static int32_t chaosOpenQuiet;   // (decide.c: the opening's raise is wanted and refused only for the board being busy)
 static int compareJudged(const Judge *x, const Judge *y) {
   int lx, ly; creditPair(x, y, &lx, &ly);
+  // (run 53, CHAOS, THE OPENING'S PANELS ARE THE OPENING'S RAISE: before garbage first comes, the stack under the level's raise height
+  // and the raise refused only because the board is busy -- the chaos engine takes a raise only with nothing moving -- of two lines
+  // judged alike, the one spending no panels on clears breaking nothing first: the board goes quiet, the raise is offered and taken
+  // (the owner's rule: a raise only when the game takes it -- never waited for). Run 52 insane s5: entries from frame 192 spent the
+  // 30 opening panels to 17 by 588, the raise refused each decision for the clearing, one raise all game, panels 9-25, lost at 4463)
+  if (chaosOpenQuiet && x->o.lives == y->o.lives) {
+    int sx = x->o.j.clearedPanels > 0 && x->apBroke <= 0, sy = y->o.j.clearedPanels > 0 && y->apBroke <= 0;
+    if (sx != sy) return (cmpKey = __LINE__, (sx ? 1 : -1));
+  }
   // THE LAST CHANCE: the hold lost inside a break's time, beside a line lost no sooner whose next moves promise a break's time more (the
   // readiness break, the survival search after it): the line first -- holding is the loss for certain. Only against the hold: the
   // promise is never weighed against another line's own life. 244 of 419 lost games held, dying, over such a line.

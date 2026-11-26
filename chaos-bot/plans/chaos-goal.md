@@ -122,7 +122,7 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
-- **Run 26 (pushed 2026-11-25 19:16 ET), the cycle verdict:** a line lives when, once done, the margin to the top left alone is at
+- **Run 26 (pushed 2026-11-25 20:12 ET), the cycle verdict:** a line lives when, once done, the margin to the top left alone is at
   least the next freeze's start (reaction + two swaps' walks, the hands' frames) and it leaves fuel (a three, or breakable garbage).
   The report now counts the decisions judged alive, so whether the verdict takes is measured, not guessed.
 - **Run 25 (2026-11-25 19:07 ET), the chaos verdict (alive to the next freeze, with fuel): survived 4/8 -- and no verdict changed.**

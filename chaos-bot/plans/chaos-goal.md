@@ -140,6 +140,9 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 58 (2026-11-26 02:04 ET), the run-55 bot on seeds 9-10: survived 6/8** (lost combo s10 18558, insane s10 3924). The run-55
+  bot: 28/32, the run-46 bot's rate. insane s10's opening kept its panels to 48 (eight rows) and was dying from 484 at that height.
+  Run 59: the opening keeps its panels only under six rows (LOW_ROWS).
 - **Run 57 (2026-11-26 01:54 ET), the run-55 bot on seeds 7-8: survived 7/8** (lost thicc s7 at 19850, late, the backlog pattern).
   The run-55 bot: 22/24 over seeds 3-8. Run 58: seeds 9-10.
 - **Run 56 (2026-11-26 01:45 ET), the run-55 bot on seeds 3-4: survived 8/8, health 13 in every game** (insane s4 lived, lost by

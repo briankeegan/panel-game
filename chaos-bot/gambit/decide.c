@@ -339,7 +339,9 @@ static int readBoard_(Read *R) {
   // (ca.c controls and the manual raise: rise lock, panels_in_top_row, prevent_manual_raise); otherwise no raise is asked or waited for)
   int chaosRaisable = !swapQueued(decQ.b) && decQ.b->shakeTime == 0 && !hasActivePanels(decQ.b) && !hasPanelsInTopRow(decQ.b) &&
                       !decQ.b->preventManualRaise && !decQ.b->manualRaise;
-  chaosOpenQuiet = opening;   // (rank.c compareJudged: the opening keeps its panels)
+  // (rank.c compareJudged: the opening keeps its panels -- while under LOW_ROWS rows (the owner: below six rows, raise high). Run 58
+  // insane s10: kept to frame 600 the opening grew 30 to 48 panels, eight rows, and every line was judged dying from 484 at that height)
+  chaosOpenQuiet = opening && panelTop(decQ.b) < LOW_ROWS;
   R->low = to && (opening || refill || taRaise) && rowsUp > 0 && chaosRaisable; R->up = R->low && !cascadeLive(decQ.b) && canRaiseNow;
   refillAsked = refillReady = refillAlive = 0; raiseWait = 0; opRaiseLog[4] = 0;
   // (THE FLOOR'S RAISE, TIMED: a board busy now -- a cascade, panels moving, the shake -- is one the engine would not raise; it is run on,

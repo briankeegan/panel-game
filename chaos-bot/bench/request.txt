@@ -170,6 +170,9 @@
 # run 57 -- the run-55 bot, unchanged, on seeds 7 and 8 (the gate for this bot: 3-4 passed; then 9-10, 1-2, 5-6)
 # run 57 -- (result) survived 7/8 on seeds 7-8 (lost thicc s7 at 19850, late); the run-55 bot: 22/24 over seeds 3-8
 # run 58 -- the run-55 bot, unchanged, on seeds 9 and 10
+# run 58 -- (result) survived 6/8 on seeds 9-10 (lost combo s10 18558, insane s10 3924). The run-55 bot: 28/32 (run-46 bot 45/52).
+#          insane s10: the opening kept its panels to frame 600, 30 to 48 -- eight rows -- and every line was dying from 484
+# run 59 -- one change: the opening keeps its panels only while the stack is under six rows (LOW_ROWS; decide.c). Seeds 9-10
 chain_garbage 9 9 9 1 21600 10
 combo_storm 9 9 9 1 21600 10
 thicc_combo_storm 9 9 9 1 21600 10

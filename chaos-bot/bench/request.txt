@@ -156,11 +156,14 @@
 # run 53 -- one change: in the opening (no garbage yet), the stack under its raise height and the raise refused only for the board
 #          being busy, of two lines judged alike the one spending no panels on clears breaking nothing first (rank.c, decide.c) --
 #          the board goes quiet and the raise is offered then (never waited for). Seeds 5-6
-chain_garbage 5 9 9 1 21600 10
-combo_storm 5 9 9 1 21600 10
-thicc_combo_storm 5 9 9 1 21600 10
-insane_combo_storm 5 9 9 1 21600 10
-chain_garbage 6 9 9 1 21600 10
-combo_storm 6 9 9 1 21600 10
-thicc_combo_storm 6 9 9 1 21600 10
-insane_combo_storm 6 9 9 1 21600 10
+# run 53 -- (result) survived 6/8 on seeds 5-6 (thicc s5 lived; lost insane s5 1667 and insane s6 10204). The rule never acted:
+#          no raise was asked at all -- the opening's raise height at level 10 (chaosRaiseTo) is ~5 rows, already there. Off again
+# run 54 -- the run-46 bot on seeds 7 and 8 (the one set it has not played), no change
+chain_garbage 7 9 9 1 21600 10
+combo_storm 7 9 9 1 21600 10
+thicc_combo_storm 7 9 9 1 21600 10
+insane_combo_storm 7 9 9 1 21600 10
+chain_garbage 8 9 9 1 21600 10
+combo_storm 8 9 9 1 21600 10
+thicc_combo_storm 8 9 9 1 21600 10
+insane_combo_storm 8 9 9 1 21600 10

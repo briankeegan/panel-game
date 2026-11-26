@@ -140,6 +140,9 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 53 (2026-11-26 01:17 ET), the opening keeping its panels for the raise: survived 6/8 -- inert.** No raise was asked in the
+  opening at all: at level 10 the raise height (chaosRaiseTo) is ~5 rows, which the 30 opening panels already are. Off. insane s5
+  is lost at 1667-4463 by every bot but run 37's: the seeds' spread is wide. Run 54: the run-46 bot on seeds 7-8.
 - **Run 52 (2026-11-26 01:06 ET), the run-46 bot on seeds 5-6: survived 6/8** (lost thicc s5 10956, insane s5 4463). The run-46
   bot in Normal: 28/32. insane s5 spent its 30 opening panels on entries before any garbage, and the raise was refused while the
   board was busy. Run 53: in the opening, with a raise wanted, a line spending no panels on clears breaking nothing goes first.

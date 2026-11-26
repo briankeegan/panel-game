@@ -927,7 +927,9 @@ static int compareJudged(const Judge *x, const Judge *y) {
   // judged alike, the one spending no panels on clears breaking nothing first: the board goes quiet, the raise is offered and taken
   // (the owner's rule: a raise only when the game takes it -- never waited for). Run 52 insane s5: entries from frame 192 spent the
   // 30 opening panels to 17 by 588, the raise refused each decision for the clearing, one raise all game, panels 9-25, lost at 4463)
-  if (chaosOpenQuiet && x->o.lives == y->o.lives) {
+  // (run 54: off -- inert: the opening never wants a raise at level 10 (chaosRaiseTo is ~5 rows, the opening's 30 panels already);
+  // run 53's insane s5 had no raise asked at all, and its 1667 loss was the game's spread, not this rule)
+  if (0 && chaosOpenQuiet && x->o.lives == y->o.lives) {
     int sx = x->o.j.clearedPanels > 0 && x->apBroke <= 0, sy = y->o.j.clearedPanels > 0 && y->apBroke <= 0;
     if (sx != sy) return (cmpKey = __LINE__, (sx ? 1 : -1));
   }

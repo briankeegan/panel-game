@@ -262,11 +262,14 @@
 #          36/40 (1-2 7/8, 3-4 7/8, 5-6 8/8, 7-8 6/8, 9-10 8/8), every survivor at 17; two of the four losses early chain_garbage
 # run 87 -- one change: under garbage with under five rows of panels beneath it, of two LIVING lines breaking no garbage, the one
 #          clearing fewer panels first (rank.c). Level 9 seeds 7-8 (6/8 with the gate's bot); then the L10 gate again if it holds
-chain_garbage 7 9 9 1 21600 9
-combo_storm 7 9 9 1 21600 9
-thicc_combo_storm 7 9 9 1 21600 9
-insane_combo_storm 7 9 9 1 21600 9
-chain_garbage 8 9 9 1 21600 9
-combo_storm 8 9 9 1 21600 9
-thicc_combo_storm 8 9 9 1 21600 9
-insane_combo_storm 8 9 9 1 21600 9
+# run 87 -- (result) LEVEL 9 seeds 7-8 with the scarce-fuel rule: survived 7/8 (6/8 without; chain s8 and insane s8 lived, thicc s7
+#          lost at 2441). Within the spread. It changes level-10 play too: the gate again before it is kept
+# run 88 -- the run-87 bot on the LEVEL 10 gate: seeds 1-2 first
+chain_garbage 1 9 9 1 21600 10
+combo_storm 1 9 9 1 21600 10
+thicc_combo_storm 1 9 9 1 21600 10
+insane_combo_storm 1 9 9 1 21600 10
+chain_garbage 2 9 9 1 21600 10
+combo_storm 2 9 9 1 21600 10
+thicc_combo_storm 2 9 9 1 21600 10
+insane_combo_storm 2 9 9 1 21600 10

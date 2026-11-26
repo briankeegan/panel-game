@@ -328,6 +328,9 @@
 # run 107 -- (result) the colours lined up, 8 colours L10 s1-2: survived 1/8, 14117 frames on average, no game lost before 6904
 #   (runs 101-106: 11 of 48 lost before 5000, some inside 1000). Kept (above six colours only)
 # run 108 -- the same bot, 8 colours L10, new seeds 3-4: more games before judging
+# run 108 -- (result) colours lined up, 8 colours L10 s3-4: survived 2/8, 14377 frames on average (107+108: ~14.2k; 101-106: ~12.0k).
+#   Four losses opened high (45+ panels at the first garbage): the opening puts threes off as wasted while matches are scarce
+# run 109 -- above six colours, with the stack six rows or more, a three is room bought, not wasted (rank.c wastesThree): 8 colours L10 s3-4
 chain_garbage 3 9 9 1 21600 10 colors=8
 combo_storm 3 9 9 1 21600 10 colors=8
 thicc_combo_storm 3 9 9 1 21600 10 colors=8

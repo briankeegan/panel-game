@@ -501,6 +501,7 @@ static int zipOver(const Judge *x, const Judge *y) {
 }
 static int breaksFirst(const Judge *J, int lx) { return J->apBroke > 0 && !(lx && !decF.topped && threeBreakOnly(J)); }
 static int32_t wasteWhy;   // (the test that called the last line a wasted three: 1 its threes, 2 a combo outside, 3 a chain cut short, 4 a lone clear)
+#define ROOM_ROWS 6     // (run 109: above six colours, a stack this tall makes a three room bought)
 static int wastesThree(const Judge *J) {
   if (J->hold) return 0;
   // (a line that makes a chain, longer than the board makes alone -- the hold's judging, aloneChain, judged before this is asked, 0
@@ -508,6 +509,10 @@ static int wastesThree(const Judge *J) {
   if (J->o.j.whole.chain >= 2 && J->o.j.whole.chain > aloneChain) return 0;
   // (any clear of three that breaks nothing and begins no chain, whatever the line breaks after it -- the owner: never a three unless
   // it follows through; a line dropped before its later break leaves the three made for nothing. A line lost too)
+  // (run 109, CHAOS: above six colours, with the stack six rows or more, a three is room bought, not wasted -- matches are scarce, the
+  // stack climbs while it waits for a combo, and the first garbage lands on a full board: run 108 8 colours combo s4, 30 panels to 48
+  // by frame 516 with the threes put off, lost at 981; four of the run's six losses opened high, 45+ panels at the first garbage)
+  if (decQ.b->colors > 6 && panelTop(decQ.b) >= ROOM_ROWS && !cutsShort(J)) return 0;
   if (J->o.j.threes > 0) { wasteWhy = 1; return 1; }
   if (comboOutside(J) && !(J->apBroke > 0)) { wasteWhy = 2; return 1; }   // (a combo the mode does not ask for that breaks nothing: the owner, only where the board dies without it)
   if (cutsShort(J) && !(J->apBroke > 0)) { wasteWhy = 3; return 1; }   // (the board's own chain cut short: the three that began it made for nothing -- unless the

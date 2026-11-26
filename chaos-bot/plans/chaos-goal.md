@@ -150,6 +150,10 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 108 (2026-11-26 12:18 ET), the colours lined up, 8 colours L10 s3-4: survived 2/8, 14377 frames on average** (107+108
+  ~14.2k, 101-106 ~12.0k). Four losses opened high (45+ panels at the first garbage): combo s4 went 30 -> 48 panels by frame 516 with
+  every three put off as wasted (Gambit's "never a three unless it follows through"), lost at 981. Run 109: above six colours, with the
+  stack six rows or more, a three is room bought (rank.c wastesThree).
 - **Run 107 (2026-11-26 12:09 ET): the colours lined up -- survived 1/8, 14117 frames on average, none lost before 6904** (runs
   101-106: 11 of 48 lost before 5000). Kept (above six colours only). Run 108: seeds 3-4. (the owner: "Might have to be more purposeful with colors?"). Above
   six colours, of two lines that live or are lost alike and break the same garbage, the one leaving more breaks a swap away (a single

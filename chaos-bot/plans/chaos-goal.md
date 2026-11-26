@@ -140,6 +140,9 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 79 (2026-11-26 05:23 ET), a stopped board left quiet: level 7 2/8 -- and the cause found.** combo s1 held 150 frames
+  at stop 258-114 with 25 waiting and none dropped: at levels 7-8 the board sits topped under its own garbage all game, alive on
+  stop (no health lost), and nothing drops with the top row full. Run 80: topped with pieces waiting, the line breaking more first.
 - **Run 78 (2026-11-26 05:12 ET), a living hold for the queue: level 7 2/8 -- it never asked** (at level 7 nearly every line is
   judged dying on the planned single point of health, while the real health, 30, is never touched). Run 79: while stopped by a
   break's time or more, the hold over lines breaking nothing.

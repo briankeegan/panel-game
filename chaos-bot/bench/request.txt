@@ -237,6 +237,11 @@
 #          health 1), so the rule never asked
 # run 79 -- one change (replacing run 78's): with 10+ waiting and the stop holding a break's time or more, a line breaking no garbage
 #          gives way to the hold when the queue's head fits -- the stack does not rise while stopped (decide.c). Level 7, seeds 1-2
+# run 79 -- (result) level 7: survived 2/8 again. combo s1 held 150 frames at stop 258-114 with 25 waiting and NONE dropped: the
+#          board was topped under its own garbage all game, living on stop (never a point of health lost), and nothing drops with the
+#          top row full (Stack:shouldDropGarbage). Runs 78-79 reverted
+# run 80 -- one change: topped with pieces waiting, of two lines judged alike, the one breaking more garbage first -- room under the top
+#          row lets the queue drop (rank.c). Level 7, seeds 1-2
 chain_garbage 1 9 9 1 21600 7
 combo_storm 1 9 9 1 21600 7
 thicc_combo_storm 1 9 9 1 21600 7

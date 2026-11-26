@@ -922,6 +922,15 @@ static void creditPair(const Judge *x, const Judge *y, int *lxo, int *lyo) {
 static int32_t chaosOpenQuiet;   // (decide.c: the opening -- before garbage first comes)
 static int compareJudged(const Judge *x, const Judge *y) {
   int lx, ly; creditPair(x, y, &lx, &ly);
+  // (run 80, CHAOS, TOPPED WITH GARBAGE WAITING, DIG: nothing waiting drops while anything is in the top row (Stack:shouldDropGarbage,
+  // panels_in_top_row first), and fifty waiting is the loss whatever the health. Topped with pieces waiting, of two lines judged alike,
+  // the one breaking more garbage first -- the room under the top row is what lets the queue drop. Run 79 level 7 combo s1: topped all
+  // game under its own garbage and living on stop (100-390 frames, never a point of health lost), 25 waiting through a 150-frame hold,
+  // none dropped; five of eight lost to the queue at full health (30))
+  if (decF.topped && decQ.b->ninc > 0 && x->o.lives == y->o.lives) {
+    int32_t bx = imax(0, x->apBroke), by = imax(0, y->apBroke);
+    if (bx != by) return (cmpKey = __LINE__, (bx > by ? -1 : 1));
+  }
   // (run 55, CHAOS, THE OPENING KEEPS ITS PANELS: before garbage first comes (the opening, decide.c), of two lines that both live and
   // break no garbage, the one clearing fewer panels first -- the stack rises on its own until then and the first garbage is broken with
   // what is kept; Training's garbage is scripted, so attack before it buys nothing. Run 52 insane s5: entries from frame 192 spent the

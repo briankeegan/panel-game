@@ -2181,16 +2181,9 @@ static Played playOf(const Read *R, int n) {
   // (runs 75-76 tried draining the queue under garbage -- the hold over lines breaking nothing from 25 waiting, then over any line from 40:
   // level 8 6/8 then 5/8, the queue still reaching fifty (CHAOS_QUEUE_LIMIT) with full health -- a hold does not quiet a board whose
   // garbage pops slowly, and the breaks put off grow the queue. Reverted: the queue's limit at levels 7-8 is open)
-  // (run 79, CHAOS, A STOPPED BOARD IS LEFT QUIET FOR THE QUEUE: garbage waiting drops only on a frame with nothing active -- no swap,
-  // clear or pop (Stack:shouldDropGarbage, classic) -- and fifty waiting is the loss whatever the health. While the stop has a break's
-  // time left (levelBreak) the stack does not rise, so holding costs nothing; a line breaking no garbage then gives way to the hold
-  // when the queue's head lands without topping the board out, and the queue gets its quiet frames. Run 77-78, level 7: 2/8, five
-  // losses to the queue at full health (30), stop at 100-390 frames for most of the game while the bot swapped on; run 78's version
-  // (only when the hold lives) never asked: at level 7 nearly every line is judged dying on the planned single point of health)
-  if (P.line && !P.line->hold && !R->up && decQ.b->ninc >= CHAOS_QUEUE_WAIT && P.line->apBroke <= 0 && decQ.b->stopTime >= levelBreak) {
-    int32_t head = decQ.b->inc[0].height > 0 ? decQ.b->inc[0].height : 1, hh = decQ.b->height ? decQ.b->height : 12;
-    if (fullTop(decQ.b) + head <= hh - 1) { P.line = 0; P.deferred = 0; chaosLetDrop++; }
-  }
+  // (runs 78-79 left the board quiet for the queue -- a living hold, then the hold while stopped: level 7 2/8 both times. A quiet board
+  // drops nothing with anything in the top row (Stack:shouldDropGarbage: panels_in_top_row first): run 79 combo s1 held 150 frames at
+  // stop 258-114 with 25 waiting and none dropped. Reverted; run 80 digs instead (rank.c))
   P.name = P.line ? P.line->k.play : R->up ? -2 : PLAY_HOLD;   // -2: the raise
   for (int i = 0; i < n; i++) if (order[i]->o.lives) P.nlive++;
   P.ncands = n; orderN = n;

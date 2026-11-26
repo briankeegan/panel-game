@@ -32,10 +32,10 @@ jobs:
               p, seed, gl, gs, q, frames = f[:6]
               level = int(f[6]) if len(f) > 6 and "=" not in f[6] else 9
               # the chaos settings after the level, as key=value: mode (1 normal, 2 one HP, 3 no stop time, 4 BALL), margin
-              # (1 off, 2 colors, 3 modoki, 4 chaos), chaosmode (0/1), colors
+              # (1 off, 2 colors, 3 modoki, 4 chaos), chaosmode (0/1), colors, profile (profiles/<name>.words; default chaos)
               kv = dict(x.split("=", 1) for x in f[6:] if "=" in x)
               games.append({"pattern": p, "seed": int(seed), "glevel": int(gl), "gspeed": int(gs), "queue": int(q), "frames": int(frames), "level": level,
-                            "mode": int(kv.get("mode", 1)), "margin": int(kv.get("margin", 1)), "chaosmode": int(kv.get("chaosmode", 0)), "colors": int(kv.get("colors", 6)), "challenge": kv.get("challenge", ""),
+                            "mode": int(kv.get("mode", 1)), "margin": int(kv.get("margin", 1)), "chaosmode": int(kv.get("chaosmode", 0)), "colors": int(kv.get("colors", 6)), "challenge": kv.get("challenge", ""), "profile": kv.get("profile", "chaos"),
                             "n": len(games) + 1})
           assert games, "no games in request.txt"
           print("games=" + json.dumps(games))
@@ -49,7 +49,7 @@ jobs:
       max-parallel: 8
       matrix:
         game: ${{ fromJSON(needs.plan.outputs.games) }}
-    name: game ${{ matrix.game.n }} L${{ matrix.game.level }} ${{ matrix.game.pattern }} seed ${{ matrix.game.seed }} mode ${{ matrix.game.mode }} margin ${{ matrix.game.margin }} chaos ${{ matrix.game.chaosmode }} colors ${{ matrix.game.colors }} challenge ${{ matrix.game.challenge }}
+    name: game ${{ matrix.game.n }} L${{ matrix.game.level }} ${{ matrix.game.pattern }} seed ${{ matrix.game.seed }} mode ${{ matrix.game.mode }} margin ${{ matrix.game.margin }} chaos ${{ matrix.game.chaosmode }} colors ${{ matrix.game.colors }} challenge ${{ matrix.game.challenge }} ${{ matrix.game.profile }}
     steps:
       - uses: actions/checkout@v4
       - name: love, cached
@@ -75,6 +75,7 @@ jobs:
           CHAOSBOT_CHAOSMODE: ${{ matrix.game.chaosmode }}
           CHAOSBOT_COLORS: ${{ matrix.game.colors }}
           CHAOSBOT_CHALLENGE: ${{ matrix.game.challenge }}
+          CHAOSBOT_PROFILE: ${{ matrix.game.profile }}
         run: |
           g='${{ toJSON(matrix.game) }}'
           bash chaos-bot/bench/play.sh ${{ matrix.game.pattern }} ${{ matrix.game.seed }} ${{ matrix.game.glevel }} ${{ matrix.game.gspeed }} ${{ matrix.game.queue }} ${{ matrix.game.frames }} out

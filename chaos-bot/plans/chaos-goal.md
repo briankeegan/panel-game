@@ -126,6 +126,8 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 - **Every rule that matters has three parts:** a plain-English rule in this file, a script that decides it, and a check that runs it
   on every push.
 - **Commit and push every change; never rerun code that has not changed.**
+- **request.txt is touched only by the push that starts the next run** -- a comment alone starts a run too (run 93's result note
+  queued a copy of run 94, cancelled 2026-11-26 09:05 ET). Results are written into it with the next run's games.
 
 ## 6. Facts to fill in before the first benchmark run
 

@@ -953,7 +953,8 @@ static int compareJudged(const Judge *x, const Judge *y) {
   // (run 105: and within QUEUE_LAST of fifty whatever either is judged lost at -- the health is planned as one, but a piece dropped on a
   // topped board costs health, never the game, where fifty waiting is the game: run 104 chain s2 and combo s2 lost to the queue at
   // 21591 and 21485 with health 13 and 6 left, boards of ~50 panels kept topped)
-  if (decQ.b->marginTime == 1 && decQ.b->ninc >= CHAOS_QUEUE_LIMIT - QUEUE_LAST && x->o.j.topRow != y->o.j.topRow && !x->o.dead && !y->o.dead)
+  // (run 106: off while the searches' shape is measured again -- run 105 with it 1/8)
+  if (0 && decQ.b->marginTime == 1 && decQ.b->ninc >= CHAOS_QUEUE_LIMIT - QUEUE_LAST && x->o.j.topRow != y->o.j.topRow && !x->o.dead && !y->o.dead)
     return (cmpKey = __LINE__, (x->o.j.topRow ? 1 : -1));
   if (decQ.b->marginTime == 1 && decQ.b->ninc >= CHAOS_QUEUE_LIMIT - QUEUE_ROOM && x->o.j.topRow != y->o.j.topRow &&
       !x->o.dead && !y->o.dead && (x->o.lives || diesAt(x) >= rankSave) && (y->o.lives || diesAt(y) >= rankSave))

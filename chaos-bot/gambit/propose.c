@@ -19,6 +19,14 @@ static Ctx2 C2;
 static double searchesEnd(void) { return C2.due ? C2.due - C2.margin - (C2.due - C2.t0) / 4 : 0; }
 static double leftMs(void) { return C2.due ? searchesEnd() - nowMs() : 1e9; }
 static double leftMsOf(void) { return leftMs(); }
+// (run 106, CHAOS, THE SEARCHES SHAPED BY THE COLOURS: above six colours a three is a longer walk -- panels move only sideways and
+// fewer of a colour sit near each other -- so the same time is spent narrower and deeper, in every search the profile shapes: per
+// colour over six, 6 lines fewer in the beam and 1.5 swaps deeper in the planner (8 colours: 40 x 7 -> 28 x 10; the extend search 28 wide, its depth kept). Run 104 (that shape
+// as a profile, every search) at 8 colours L10 s1-2: 16654 frames on average; runs 101-103 with 40 x 7: 9670, 12565, 11690; run 105
+// (the planner alone, and a queue rule): 10949)
+static int32_t colourExtra(void) { return decQ.b && decQ.b->colors > 6 ? decQ.b->colors - 6 : 0; }
+static int32_t gpWidth(int32_t w) { int32_t e = colourExtra(); return e && w > 6 * e + 8 ? w - 6 * e : w; }
+static int32_t gpDepth(int32_t d) { int32_t e = colourExtra(); return e ? (d + (3 * e + 1) / 2 < MAXLINE - 2 ? d + (3 * e + 1) / 2 : MAXLINE - 2) : d; }
 
 // ---- the board's state the proposers read
 static int cascadeLive(Board *b) {
@@ -70,7 +78,7 @@ static void startChains(const Read *R, Found *S, double ms) {
     if (!q.b) continue;
     double left = t0 + ms - nowMs();
     if (left < 2) break;
-    ExtOpts eo = { GP->width ? GP->width : 40, GP->extendDepth ? GP->extendDepth : 6, &R->guides, R->by ? R->by : NOT_ASKED, R->keepOn ? &R->keep : 0,
+    ExtOpts eo = { gpWidth(GP->width ? GP->width : 40), (GP->extendDepth ? GP->extendDepth : 6), &R->guides, R->by ? R->by : NOT_ASKED, R->keepOn ? &R->keep : 0,
                    left / (ns - j) };
     Ext E;
     extend(&q, &eo, &E);
@@ -93,15 +101,9 @@ static PlanOpts planOptsB; static Plan planB; static Paths planOutB;
 static double extMsBeside;
 static PlanOpts planOptsOf(const Read *R, const List *aims, double ms) {
   Profile *GP = &C2.GP;
-  PlanOpts po = { GP->width ? GP->width : 40, GP->depth ? GP->depth : 7, GP->pool ? GP->pool : 250, aims, R->by ? R->by : NOT_ASKED,
+  PlanOpts po = { gpWidth(GP->width ? GP->width : 40), gpDepth(GP->depth ? GP->depth : 7), GP->pool ? GP->pool : 250, aims, R->by ? R->by : NOT_ASKED,
                   R->keepOn ? &R->keep : 0, R->readyAt, R->under, R->F.v[FACT_US_DIES] > 0 ? R->F.v[FACT_US_DIES] : 0, R->under, ms,
                   planSeedsHave ? &planSeeds : 0 };
-  // (run 105, CHAOS, THE PLANNER BY THE COLOURS: above six colours a three is a longer walk -- panels move only sideways and fewer of a
-  // colour sit near each other -- so the same time is spent narrower and deeper: per colour over six, 6 lines fewer in the beam and
-  // 1.5 swaps deeper (8 colours: 40 x 7 -> 28 x 10). Run 104 (that shape as a profile) at 8 colours L10 s1-2: 16654 frames on average,
-  // two games lost in the last two seconds; runs 101-103 with 40 x 7: 9670, 12565, 11690)
-  { int32_t extra = decQ.b && decQ.b->colors > 6 ? decQ.b->colors - 6 : 0;
-    if (extra && po.width > 6 * extra + 8) { po.width -= 6 * extra; po.depth = imin(po.depth + (3 * extra + 1) / 2, MAXLINE - 2); } }
   return po;
 }
 static void searchPrep(const Read *R, Found *S) {
@@ -156,7 +158,7 @@ static void searchExt(const Read *R, Found *S, double ms) {
   if ((cascadeLive(board) || R->pop) && !GP->extendOff && (ms >= 20 || (opFall && ms >= 2))) {
     // (the opener's chain falling: the floor is not kept -- the panels are the chain's -- and its longest extension is offered, searched
     // as wide and deep as time attack's chain going: the chain puzzles' furthest)
-    int ew = GP->width ? GP->width : 40, ed = GP->extendDepth ? GP->extendDepth : 6;
+    int ew = gpWidth(GP->width ? GP->width : 40), ed = (GP->extendDepth ? GP->extendDepth : 6);
     if (opFall) { ew = imax(ew, OP_FALL_WIDTH); ed = imax(ed, OP_FALL_DEPTH); }
     ExtOpts eo = { ew, ed, &S->xAims, R->by ? R->by : NOT_ASKED, R->keepOn && !opFall ? &R->keep : 0, ms, opFall };
     extend(&decQ, &eo, &S->ex); S->haveEx = 1; extLog = S->ex; extLogged = 1;

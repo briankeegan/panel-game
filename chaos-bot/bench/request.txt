@@ -319,6 +319,9 @@
 #   11690); chain s2 and combo s2 lost to the queue's fifty at 21591 and 21485 with health left. Kept, by the colours (propose.c)
 # run 105 -- the planner shaped by the colours (8: 28 x 10, as run 104) and, within 6 of the queue's fifty, the top row emptied
 #   whatever the lines' losses (rank.c QUEUE_LAST): 8 colours L10 s1-2
+# run 105 -- (result) planner by the colours (planner only) + queue-last rule, 8 colours L10 s1-2: survived 1/8, 10949 frames on average
+#   -- below run 104 (16654), whose profile shaped the extend search's width too. Eight games swing thousands of frames
+# run 106 -- run 104 again, by the colours: every search's width 28 at 8 colours, the planner 10 deep; queue-last off. 8 colours L10 s1-2
 chain_garbage 1 9 9 1 21600 10 colors=8
 combo_storm 1 9 9 1 21600 10 colors=8
 thicc_combo_storm 1 9 9 1 21600 10 colors=8

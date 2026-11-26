@@ -150,6 +150,9 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 105 (2026-11-26 11:08 ET), the planner by the colours (planner only) and the queue-last rule, 8 colours L10 s1-2: survived
+  1/8, 10949 frames on average** -- below run 104 (16654), whose profile narrowed the extend search too. Eight games swing by thousands
+  of frames. Run 106: run 104's shape again, by the colours in every search the profile shapes; queue-last off.
 - **Run 104 (2026-11-26 10:57 ET), the planner narrower and deeper (28 x 10) at 8 colours L10 s1-2: survived 2/8, 16654 frames on
   average** (runs 101-103: 9670, 12565, 11690) -- chain s2 and combo s2 lost to the queue's fifty at 21591 and 21485 with health 13 and
   6 left, ~50 panels kept topped. Kept, shaped by the colours (propose.c: per colour over six, 6 narrower and 1.5 deeper). Run 105: that,

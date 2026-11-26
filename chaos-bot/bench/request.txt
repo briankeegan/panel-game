@@ -110,11 +110,13 @@
 #          16119). The fuel log: fuel low with room in 4/8/0 decisions, the game taking a raise in 0 -- the fuel raise is a dead end
 # run 41 -- one change: dig down to the garbage -- panels plenty under it, of two dying lines breaking nothing, the lower stack first
 #          (rank.c, outcome.c topAfter). Seeds 9-10 again
-combo_storm 9 9 9 2 21600 10
-chain_garbage 9 9 9 1 21600 10
-thicc_combo_storm 9 9 9 3 21600 10
-insane_combo_storm 9 9 9 2 21600 10
-combo_storm 10 9 9 2 21600 10
-chain_garbage 10 9 9 1 21600 10
-thicc_combo_storm 10 9 9 3 21600 10
-insane_combo_storm 10 9 9 2 21600 10
+# run 41 -- (result) survived 5/8: chain s10 lived but seed 9 lost chain 7162, thicc 20985, insane 1926 -- dig-down reverted
+# run 42 -- the run-40 bot (dig-down off) on seeds 1 and 2, not yet played by it
+combo_storm 1 9 9 2 21600 10
+chain_garbage 1 9 9 1 21600 10
+thicc_combo_storm 1 9 9 3 21600 10
+insane_combo_storm 1 9 9 2 21600 10
+combo_storm 2 9 9 2 21600 10
+chain_garbage 2 9 9 1 21600 10
+thicc_combo_storm 2 9 9 3 21600 10
+insane_combo_storm 2 9 9 2 21600 10

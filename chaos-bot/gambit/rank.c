@@ -970,7 +970,9 @@ static int compareJudged(const Judge *x, const Judge *y) {
   // other side -- of two lines that both die and break no garbage, the one leaving the stack lower first, unless the other lives a
   // break's time longer: clearing panels brings the garbage down within reach -- run 40 chain_garbage s10, 34-56 panels under the slab,
   // nothing in reach, holds while the stack rose to the loss)
-  if (decF.under && materialOn(decQ.b) >= 2 * W && !x->o.lives && !y->o.lives && x->apBroke <= 0 && y->apBroke <= 0 &&
+  // (run 41: off -- survived 5/8, three new losses on seed 9 (insane at 1926): clearing panels whenever they are plenty spends the
+  // fuel the next minute needs)
+  if (0 && decF.under && materialOn(decQ.b) >= 2 * W && !x->o.lives && !y->o.lives && x->apBroke <= 0 && y->apBroke <= 0 &&
       x->o.topAfter >= 0 && y->o.topAfter >= 0 && x->o.topAfter != y->o.topAfter) {
     const Judge *low = x->o.topAfter < y->o.topAfter ? x : y, *hi = low == x ? y : x;
     if (lostOf(hi) - lostOf(low) < rankSave) return (cmpKey = __LINE__, (low == x ? -1 : 1));

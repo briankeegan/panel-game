@@ -139,6 +139,9 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 41 (2026-11-25 23:18 ET), dig down to the garbage: survived 5/8 -- worse.** chain_garbage s10 lived, but seed 9 lost
+  chain 7162, thicc 20985 and insane 1926 (all lived in run 40): clearing panels whenever they are plenty spends the fuel the next
+  minute needs. Reverted. Run 42: the run-40 bot on seeds 1 and 2.
 - **Run 40 (2026-11-25 23:08 ET), seeds 9 and 10: survived 6/8.** Lost chain_garbage s10 5491 (34-56 panels under the slab, none
   in reach, holds while the stack rose) and thicc_combo_storm s10 16119. Budgets 0. The run-33 bot: 44/48 in Normal. The fuel log:
   fuel low with room in 4, 8 and 0 decisions, the game taking a raise in none -- under garbage the board is almost never still, so a

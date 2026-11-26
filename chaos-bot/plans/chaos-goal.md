@@ -150,6 +150,10 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 102 (2026-11-26 10:37 ET), a living break puts a dying plan down, 8 colours L10 s1-2: survived 2/8, 12565 frames on
+  average (run 101: 9670).** Kept. Losses: full boards (~50 panels) topped out, no-line. Under garbage the break search found nothing on
+  57% of decisions, a third of them cut short by its time (6 colours alike). Run 103: the break search's share of the same budget under
+  garbage 0.75 -> 0.9 (the budget itself never raised -- the owner).
 - **Run 101 (2026-11-26 10:26 ET), 8 colours at L10 vs 9/9, seeds 1-2: survived 2/8 -- the weakest mode.** The owner (10:3x ET):
   "Just focus on your weakest mode then." combo s1 lost at 706: at 561 three lines living on a three that broke 3 were put after an eight
   breaking the same 3 (lost at 352) -- the fresh-line rule keeps the plan in progress until a living line has lived two decisions -- and

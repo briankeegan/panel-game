@@ -307,6 +307,10 @@
 #   swaps carried 150 frames over living threes that broke the same garbage). The owner: focus on the weakest mode
 # run 102 -- under garbage, a fresh line that lives and breaks as much garbage puts a dying plan down at once (rank.c): 8 colours,
 #   L10 vs 9/9, seeds 1-2 again
+# run 102 -- (result) a living break puts a dying plan down, 8 colours L10 s1-2: survived 2/8, but lasting 12565 frames on average
+#   (run 101: 9670). Kept. Losses: full boards (~50 panels) topped, no-line; under garbage the break search found nothing on
+#   57% of decisions, a third of them cut short by its time
+# run 103 -- the break search's share of the same budget under garbage 0.75 -> 0.9 (answer.c UNDER_SHARE): 8 colours L10 s1-2
 chain_garbage 1 9 9 1 21600 10 colors=8
 combo_storm 1 9 9 1 21600 10 colors=8
 thicc_combo_storm 1 9 9 1 21600 10 colors=8

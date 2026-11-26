@@ -231,7 +231,12 @@ static Outcome outcomeOf(const int32_t *seq, int n, int settled, int waitAt, int
         // put off and the next one: two breaks' time. Run 45 Line Clear 15:6, no garbage at all: six such lines in a row (level, carry,
         // setup, clearing nothing) each lived on one break's margin, 187 down to 115, then no line lived and 17 health went topped out)
         int clears = o.j.clearedPanels > 0 || o.j.made.broke > 0;
-        int cycle = fuel && margin >= (clears ? levelBreak : 2 * levelBreak);
+        // (run 67: A BREAK TAKES LONGER TO FIND WITH MORE COLOURS -- three of a colour are rarer among more colours, so the break's
+        // time is scaled by the colours over the six the levels are tuned at: the same at six (the gate's games), longer at seven and
+        // eight, shorter at four and five. Run 66, 8 colours: 2/8, nearly every decision dying, the board left near the top by lines
+        // that lived on a six-colour margin)
+        int32_t colours = eb->colors > 0 ? eb->colors : 6, need = levelBreak * colours / 6;
+        int cycle = fuel && margin >= (clears ? need : 2 * need);
         if (cycle) o.lives = breaks || !coming ? 1 : (ready == 1 || ready == NOT_ASKED);
       }
     }

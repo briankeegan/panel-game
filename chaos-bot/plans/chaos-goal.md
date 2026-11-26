@@ -140,6 +140,8 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 66 (2026-11-26 03:18 ET), 8 colours, the full set: survived 2/8.** The weak mode. Run 67: the cycle's break time scaled by
+  colours/6 (unchanged at six colours, so the gate's bot plays the same there).
 - **Run 65 (2026-11-26 03:08 ET), every mode with the gate's bot: 7/8.** No Stop Time 6:00, BALL 6:00 (1 health, none lost), 5
   colours 6:00, 8 colours insane 6:00, Panel Hell 4, Ridiculous 4 and Impossible 8 won; lost 8 colours combo s1 at 1033 (every
   line dying from 413 at 42 panels). Run 66: 8 colours, the full 8-game set.

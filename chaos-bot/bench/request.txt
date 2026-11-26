@@ -192,6 +192,10 @@
 #          36), 8 colours insane 6:00 (lost in run 36), Panel Hell 4 won, Ridiculous 4 won, Impossible 8 won; lost 8 colours combo s1
 #          at 1033 (every line dying from 413 at 42 panels -- matches are rare at 8 colours; the opening rule kept only 6 panels)
 # run 66 -- 8 colours, the full set (4 patterns x seeds 1-2), the gate's bot unchanged: how weak is it there?
+# run 66 -- (result) 8 colours, the full set: survived 2/8 (combo s1, insane s1). chain s2 lost at 19122 with health 13: 50
+#          queued. The rest by health: nearly every decision dying, the stack near the top
+# run 67 -- one change: the cycle's break time scaled by the colours over six (outcome.c) -- the same at six colours (the gate's
+#          games unchanged), longer at 7-8, shorter at 4-5. 8 colours, the same set
 chain_garbage 1 9 9 1 21600 10 colors=8
 combo_storm 1 9 9 1 21600 10 colors=8
 thicc_combo_storm 1 9 9 1 21600 10 colors=8

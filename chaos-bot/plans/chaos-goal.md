@@ -122,6 +122,11 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **The overarching problem, found 2026-11-25 20:35 ET (run 27's cycle log):** every line in every decision came back dead in
+  the judge's own steps, done 0. The chaos engine (engine/ca.c) never set b->quiet -- pa.c's "the board has settled", which the
+  search's MK_SETTLE waits for -- so no settle ever ended: each line the judge played ran on to the board's loss. Every decision of
+  runs 1-27 was judged lost, and every ranking change since was a tie-break among losses. Fixed (ca.c caQuiet: a signal only, the
+  engine skips nothing on it). Run 28: the fix, with run 26's cycle verdict now able to fire.
 - **Run 26 (2026-11-25 20:20 ET), the cycle verdict: survived 7/8, lives 0 of ~9,800 decisions.** The verdict never fired: run
   23's bot again (lost thicc_combo_storm s4 16701). Run 27 logs the numbers of the verdict for the first line of each decision
   (its loss left alone, the frame it is done, the threes left, dead flags) to find which condition fails.

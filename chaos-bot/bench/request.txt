@@ -70,6 +70,9 @@
 #          survived 7/8 (lost thicc s4 16701) -- but lives 0/9800: the verdict never fired, so this was run 23's bot again
 # run 27 -- no change to play: each decision logs the cycle numbers of its first line (cyc=lostAt/done/groups/jdead/dead), to see
 #          which of margin and fuel fails
+#          found: every line jdead=1 done=0 -- the engine's b->quiet was never set, so no settle step ever ended; every line ran
+#          on to the board's loss and every decision of runs 1-27 was judged lost (the overarching problem)
+# run 28 -- the engine sets b->quiet (ca.c): settles end, lines are judged; with run 26's cycle verdict in place
 combo_storm 3 9 9 2 21600 10
 chain_garbage 3 9 9 1 21600 10
 thicc_combo_storm 3 9 9 3 21600 10

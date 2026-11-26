@@ -210,11 +210,16 @@
 # run 71 -- (result) no opener above six colours: 7 colours 5/8 (thicc s2 lived; combo s1 6696, thicc s1 7332, insane s2 3245 lost)
 #          -- worse than 6/8 with it. Reverted
 # run 72 -- chaos margin (margin=4, most challenge stages' margin), the full set (4 patterns x seeds 1-2), the run-69 bot
-chain_garbage 1 9 9 1 21600 10 margin=4
-combo_storm 1 9 9 1 21600 10 margin=4
-thicc_combo_storm 1 9 9 1 21600 10 margin=4
-insane_combo_storm 1 9 9 1 21600 10 margin=4
-chain_garbage 2 9 9 1 21600 10 margin=4
-combo_storm 2 9 9 1 21600 10 margin=4
-thicc_combo_storm 2 9 9 1 21600 10 margin=4
-insane_combo_storm 2 9 9 1 21600 10 margin=4
+# run 72 -- (result) chaos margin, full set: survived 7/8 -- every survivor at health 1 (chaos margin shrinks health and adds a
+#          colour every 10 margin steps, to 8); lost insane s1 at 1790 (opening entries spent 30 to 22 panels, fuel 10-25 after)
+#          8 colours' limit found: the break search reaches 3 swaps in its time (brDeep=3, ~10k boards) and finds none -- depth is
+#          the engine's throughput, not the time share (75% under garbage already)
+# run 73 -- Step 5: the current bot at LEVEL 9 (every number read off the level), Normal, seeds 1-2
+chain_garbage 1 9 9 1 21600 9
+combo_storm 1 9 9 1 21600 9
+thicc_combo_storm 1 9 9 1 21600 9
+insane_combo_storm 1 9 9 1 21600 9
+chain_garbage 2 9 9 1 21600 9
+combo_storm 2 9 9 1 21600 9
+thicc_combo_storm 2 9 9 1 21600 9
+insane_combo_storm 2 9 9 1 21600 9

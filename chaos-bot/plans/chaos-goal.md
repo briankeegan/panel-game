@@ -140,6 +140,9 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 72 (2026-11-26 04:14 ET), chaos margin, full set: survived 7/8** (survivors at health 1: the mode shrinks health and adds
+  colours to 8; lost insane s1 at 1790, opening panels spent). 8 colours' limit: the break search reaches only 3 swaps in its
+  time (~10k boards) -- engine throughput or a narrower move set (same-colour swaps) is the fix, not more time. Run 73: Level 9.
 - **Run 71 (2026-11-26 04:05 ET), no opener above six colours: 7 colours 5/8 -- worse, reverted.** Open at 7-8 colours: the search
   offering no line but the hold when the colours are scattered (8 colours thicc s3). Run 72: chaos margin, the full set.
 - **Run 70 (2026-11-26 03:55 ET), 7 colours, the full set: survived 6/8** (lost thicc s1 15090, thicc s2 968: the opening plan

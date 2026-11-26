@@ -140,6 +140,9 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 48 (2026-11-26 00:28 ET), the run-46 bot on seeds 1-2: survived 7/8** (lost thicc s1 at 20886, 12 s short). With run 46's
+  insane s10 (21070): the queue grows all game to 22-33 pieces and dying lines spend 6-18 panels on clears breaking no garbage.
+  Run 49: of two dying lines that both clear and break no garbage, the cheaper first (unless the other lives a break longer).
 - **Run 47 (2026-11-26 00:19 ET), the run-46 bot on seeds 9-10: survived 8/8, health 13 in every game** -- the first 8/8 on
   9-10 (insane s10 lost in run 46 and lived here: the search's time budget makes games vary, so a set is passed only by one
   unchanged bot on every set). Run 48: seeds 1-2, then 3-4, 5-6, 7-8.

@@ -966,6 +966,16 @@ static int compareJudged(const Judge *x, const Judge *y) {
       if (lostOf(sp) - lostOf(keep) < rankSave) return (cmpKey = __LINE__, (keep == x ? -1 : 1));
     }
   }
+  // (run 48, CHAOS, A CLEAR THAT BREAKS NO GARBAGE IS PAID IN FUEL: with garbage on the board or queued, of two lines that both die,
+  // both clear panels and neither breaks garbage, the one spending fewer first, unless the other lives a break's time (rankSave)
+  // longer. Holds clear nothing, so this never puts a hold first (run 31's trouble with the rule above). Run 46 insane s10 and run
+  // 48 thicc s1, both lost in the last 15 s: 22-33 pieces queued, entries and combos clearing 6-18 panels breaking nothing --
+  // Training's garbage is scripted, so attack buys no life -- panels down to 13-21, then nothing to break the slab with)
+  if ((decF.under || decQ.b->ninc > 0) && !x->o.lives && !y->o.lives && x->apBroke <= 0 && y->apBroke <= 0 &&
+      x->o.j.clearedPanels > 0 && y->o.j.clearedPanels > 0 && x->o.j.clearedPanels != y->o.j.clearedPanels) {
+    const Judge *keep = x->o.j.clearedPanels < y->o.j.clearedPanels ? x : y, *sp = keep == x ? y : x;
+    if (lostOf(sp) - lostOf(keep) < rankSave) return (cmpKey = __LINE__, (keep == x ? -1 : 1));
+  }
   // (CHAOS, DIG DOWN TO THE GARBAGE: under garbage with panels plenty -- two rows' worth or more under it (2 x W), the fuel raise's
   // other side -- of two lines that both die and break no garbage, the one leaving the stack lower first, unless the other lives a
   // break's time longer: clearing panels brings the garbage down within reach -- run 40 chain_garbage s10, 34-56 panels under the slab,

@@ -242,11 +242,14 @@
 #          top row full (Stack:shouldDropGarbage). Runs 78-79 reverted
 # run 80 -- one change: topped with pieces waiting, of two lines judged alike, the one breaking more garbage first -- room under the top
 #          row lets the queue drop (rank.c). Level 7, seeds 1-2
-chain_garbage 1 9 9 1 21600 7
-combo_storm 1 9 9 1 21600 7
-thicc_combo_storm 1 9 9 1 21600 7
-insane_combo_storm 1 9 9 1 21600 7
-chain_garbage 2 9 9 1 21600 7
-combo_storm 2 9 9 1 21600 7
-thicc_combo_storm 2 9 9 1 21600 7
-insane_combo_storm 2 9 9 1 21600 7
+# run 80 -- (result) level 7: survived 2/8 again (five queue losses). Off. At level 7 garbage pops slowly and the patterns' garbage
+#          (level 9, speed 9 -- set for level 10) buries the board to the top; the bot lives on stop and the queue overflows
+# run 81 -- the question: is it the benchmark's garbage? Level 7 against garbage level 7, speed 7 (the gate's bot), seeds 1-2
+chain_garbage 1 7 7 1 21600 7
+combo_storm 1 7 7 1 21600 7
+thicc_combo_storm 1 7 7 1 21600 7
+insane_combo_storm 1 7 7 1 21600 7
+chain_garbage 2 7 7 1 21600 7
+combo_storm 2 7 7 1 21600 7
+thicc_combo_storm 2 7 7 1 21600 7
+insane_combo_storm 2 7 7 1 21600 7

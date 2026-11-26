@@ -140,6 +140,9 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 80 (2026-11-26 05:34 ET), topped with garbage waiting, dig first: level 7 2/8 -- off.** The level 9/9 garbage set for
+  level 10 buries a level-7 board (slow pops) to the top; the bot lives on stop and the queue overflows. Run 81: level 7 against
+  garbage 7/7 -- is it the benchmark's garbage or the bot?
 - **Run 79 (2026-11-26 05:23 ET), a stopped board left quiet: level 7 2/8 -- and the cause found.** combo s1 held 150 frames
   at stop 258-114 with 25 waiting and none dropped: at levels 7-8 the board sits topped under its own garbage all game, alive on
   stop (no health lost), and nothing drops with the top row full. Run 80: topped with pieces waiting, the line breaking more first.

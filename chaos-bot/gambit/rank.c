@@ -927,7 +927,8 @@ static int compareJudged(const Judge *x, const Judge *y) {
   // the one breaking more garbage first -- the room under the top row is what lets the queue drop. Run 79 level 7 combo s1: topped all
   // game under its own garbage and living on stop (100-390 frames, never a point of health lost), 25 waiting through a 150-frame hold,
   // none dropped; five of eight lost to the queue at full health (30))
-  if (decF.topped && decQ.b->ninc > 0 && x->o.lives == y->o.lives) {
+  // (run 81: off -- level 7 2/8 with it too, five losses to the queue; digging first does not make the room either at level 7)
+  if (0 && decF.topped && decQ.b->ninc > 0 && x->o.lives == y->o.lives) {
     int32_t bx = imax(0, x->apBroke), by = imax(0, y->apBroke);
     if (bx != by) return (cmpKey = __LINE__, (bx > by ? -1 : 1));
   }

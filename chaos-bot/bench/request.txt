@@ -93,11 +93,14 @@
 # run 34 -- (result) survived 7/8 on seeds 5-6, survivors' health 13; lost insane s5 at 2124 (panels 7-22 from the start, no raise)
 # run 35 -- THE MODE SURVEY (owner: try every chaos mode, 6 minutes each): combo_storm seed 1 at Level 10, one setting a game --
 #          training_random, margin Colors / Modoki / Chaos, Chaos Mode on, 1 HP, No Stop Time, BALL. No change to the bot
-training_random 1 9 9 2 21600 10
-combo_storm 1 9 9 2 21600 10 margin=2
-combo_storm 1 9 9 2 21600 10 margin=3
-combo_storm 1 9 9 2 21600 10 margin=4
-combo_storm 1 9 9 2 21600 10 chaosmode=1
-combo_storm 1 9 9 2 21600 10 mode=2
-combo_storm 1 9 9 2 21600 10 mode=3
-combo_storm 1 9 9 2 21600 10 mode=4
+# run 35 -- (result) survey 6/8: training_random, margin Colors/Modoki/Chaos, Chaos Mode on, 1 HP all 6:00; lost No Stop Time 6250
+#          and BALL 7437 (the 17-piece burst at ~6000: no stop time to carry it). Budgets 0
+# run 36 -- the survey's colour counts: 4, 5, 7, 8 on combo_storm s1 and insane_combo_storm s1. No change to the bot
+combo_storm 1 9 9 2 21600 10 colors=4
+insane_combo_storm 1 9 9 2 21600 10 colors=4
+combo_storm 1 9 9 2 21600 10 colors=5
+insane_combo_storm 1 9 9 2 21600 10 colors=5
+combo_storm 1 9 9 2 21600 10 colors=7
+insane_combo_storm 1 9 9 2 21600 10 colors=7
+combo_storm 1 9 9 2 21600 10 colors=8
+insane_combo_storm 1 9 9 2 21600 10 colors=8

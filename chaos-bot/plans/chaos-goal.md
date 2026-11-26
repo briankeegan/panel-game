@@ -139,6 +139,10 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 35 (2026-11-25 22:18 ET), the mode survey (combo_storm s1, one setting a game): 6/8.** Survived 6:00: training_random,
+  margin Colors, Modoki and Chaos (health decaying to 1 as designed), Chaos Mode on, 1 HP (never an idle topped frame). Lost: No Stop
+  Time at 6250 and BALL at 7437, both at the 17-piece burst near 6000 -- with no stop time, only motion, garbage pops and shakes hold
+  the stack. Budgets 0. Run 36: colour counts 4, 5, 7, 8.
 - **Run 34 (2026-11-25 21:55 ET), seeds 5 and 6, no change: survived 7/8.** Survivors' health 13 each; budgets 0. Lost
   insane_combo_storm s5 at 2124: panels 7-22 from the start, lines dying in their own steps, no raise all game -- fuel. The seed
   sets go on from 5-6 after a change. Run 35: the mode survey -- one game a setting, combo_storm s1 (lived in Normal).

@@ -258,11 +258,5 @@
 # run 85 -- (result) LEVEL 9 seeds 7-8: survived 6/8 (lost chain s8 at 1282 -- opening entry 36 to 28 panels, then an extend
 #          clearing 12 breaking none at 606, panels 11-17 under the slabs -- and insane s8 at 18970). Level 9: 28/32
 # run 86 -- LEVEL 9 on seeds 9-10, the gate's bot
-chain_garbage 9 9 9 1 21600 9
-combo_storm 9 9 9 1 21600 9
-thicc_combo_storm 9 9 9 1 21600 9
-insane_combo_storm 9 9 9 1 21600 9
-chain_garbage 10 9 9 1 21600 9
-combo_storm 10 9 9 1 21600 9
-thicc_combo_storm 10 9 9 1 21600 9
-insane_combo_storm 10 9 9 1 21600 9
+# run 86 -- (result) LEVEL 9 seeds 9-10: survived 8/8, full health. LEVEL 9 over every seed set with the gate's bot unchanged:
+#          36/40 (1-2 7/8, 3-4 7/8, 5-6 8/8, 7-8 6/8, 9-10 8/8), every survivor at 17; two of the four losses early chain_garbage

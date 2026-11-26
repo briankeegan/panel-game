@@ -140,6 +140,9 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 86 (2026-11-26 06:30 ET), LEVEL 9 seeds 9-10: survived 8/8.** Level 9 with the gate's bot unchanged, every seed set:
+  36/40 (90%), every survivor at full health -- 1-2 7/8, 3-4 7/8, 5-6 8/8, 7-8 6/8, 9-10 8/8. Losses: combo s1 11544, chain s4
+  4310, chain s8 1282 (panels spent on attack under garbage, then starved), insane s8 18970.
 - **Run 85 (2026-11-26 06:21 ET), LEVEL 9 seeds 7-8: survived 6/8** (chain s8 at 1282: panels spent on an entry and a 12-panel
   extend breaking nothing, then starved under the slabs; insane s8 at 18970). Level 9: 28/32. Run 86: seeds 9-10.
 - **Run 84 (2026-11-26 06:12 ET), LEVEL 9 seeds 5-6: survived 8/8, full health.** Level 9: 22/24. Run 85: seeds 7-8.

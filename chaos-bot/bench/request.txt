@@ -73,6 +73,10 @@
 #          found: every line jdead=1 done=0 -- the engine's b->quiet was never set, so no settle step ever ended; every line ran
 #          on to the board's loss and every decision of runs 1-27 was judged lost (the overarching problem)
 # run 28 -- the engine sets b->quiet (ca.c): settles end, lines are judged; with run 26's cycle verdict in place
+#          survived 3/8 (run 27, same bot unfixed: 7/8); lives now 60-85% of decisions. combo s3: a hold judged alive decision
+#          after decision while its margin ran 274 to 72 and the stop out -- holding costs nothing, so it won -- then dead
+# run 29 -- one change: the cycle test stands in only for 'stands left alone' -- with garbage coming and nothing broken, a break
+#          must still be ready for the landing (the readiness, as the verdict had it) (outcome.c)
 combo_storm 3 9 9 2 21600 10
 chain_garbage 3 9 9 1 21600 10
 thicc_combo_storm 3 9 9 3 21600 10

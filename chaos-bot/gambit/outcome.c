@@ -214,10 +214,14 @@ static Outcome outcomeOf(const int32_t *seq, int n, int settled, int waitAt, int
       // margin for the bot's next freeze to begin -- frames to the top left alone (its loss less the line's end) at least the reaction
       // and two swaps' walks (CHAOS_FREEZE_START, the hands' own frames) -- and the fuel for that freeze: a three it has the panels
       // for, or garbage it can break. docs/CHAOS_RULES.md "How chaos is survived")
+      // (run 28: alone, this let a hold live decision after decision while its margin ran down 274 to 72 and the stop out, then
+      // nothing could rebuild it. So it stands in only for "stands left alone" in the verdict above: with garbage coming and the line
+      // breaking none, a break must still be ready for the landing (the readiness) -- the next freeze, and the garbage its fuel)
       if (!o.lives && eb && !waitTo && o.j.lostAt != NOT_ASKED) {
         int32_t margin = o.j.lostAt == FOREVER ? FOREVER : o.j.lostAt - o.j.done;
         int fuel = o.groups > 0 || (garbageOn(eb) && breakBuildable(eb));
-        if (fuel && margin >= cfgReaction + 1 + 2 * (cfgSwapGap + 2 * cfgCursor)) o.lives = 1;
+        int cycle = fuel && margin >= cfgReaction + 1 + 2 * (cfgSwapGap + 2 * cfgCursor);
+        if (cycle) o.lives = breaks || !coming ? 1 : (ready == 1 || ready == NOT_ASKED);
       }
     }
     // (THE MATERIAL FLOOR: under garbage, a line that breaks nothing, does not stand and leaves no break to build where the board left

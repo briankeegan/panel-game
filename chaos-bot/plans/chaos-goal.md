@@ -124,6 +124,12 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 28 (2026-11-25 20:50 ET), settles end: survived 3/8 (run 27, same bot without the fix: 7/8).** Lines are judged at last
+  -- 60-85% of decisions have a line that lives -- but the bot plays worse: 12.5 rows a minute (17.1 before). combo_storm s3 5780:
+  a hold judged alive decision after decision while its margin ran 274 to 72 and the stop out (holding spends nothing, so it
+  ranks first among living lines), then nothing could rebuild it. Runs 12-24's changes were tuned on a bot that judged every line
+  lost. Run 29: the cycle test stands in only for "stands left alone"; with garbage coming, a break ready for the landing is asked
+  again (the readiness).
 - **The overarching problem, found 2026-11-25 20:35 ET (run 27's cycle log):** every line in every decision came back dead in
   the judge's own steps, done 0. The chaos engine (engine/ca.c) never set b->quiet -- pa.c's "the board has settled", which the
   search's MK_SETTLE waits for -- so no settle ever ended: each line the judge played ran on to the board's loss. Every decision of

@@ -1,6 +1,4 @@
-run 45840041718, as of 2026-11-26T15:30:22Z
-match start: gambit: the link has started the match
-both ready — match starting
+run 45840041718, as of 2026-11-26T15:32:28Z
 opponent topped out: clock 630 stopWatch 442 stop 94 pre-stop 53 shake 59 health 31, top rows r12=gggggg r11=500003 r10=310042
 opponent topped out: clock 660 stopWatch 472 stop 94 pre-stop 23 shake 29 health 31, top rows r12=gggggg r11=500003 r10=310042
 opponent topped out: clock 690 stopWatch 502 stop 152 pre-stop 71 shake 0 health 31, top rows r12=gggggg r11=500003 r10=300042
@@ -149,3 +147,5 @@ match over — bot won (pace: worst 0.18 frames off schedule); waiting for a rem
 memory after match: rss 3912104 kB, threads 9, lua 51940 kB
 game about to start: both players are ready
 set over: the room is closed, back in the lobby
+stop requested and no game is running: sitting out 8 s without readying, then leaving
+leaving

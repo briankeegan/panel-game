@@ -51,7 +51,8 @@ starts with the last benchmark's number (survived x/N, frames lost at, health le
 - **One run per change, judged on whether its deaths go away.** The bot must survive whatever the seed or the runner's timing:
   never run the same change twice to average out noise, never call a loss "noise".
 
-## 2b. Every chaos mode, 6 minutes each (owner, 2026-11-25 21:58 ET: "try them all, and you should be able to do them all for
+## 2b. Every chaos mode, 6 minutes each -- the owner, 2026-11-25 23:40 ET: "fix it all", "should be able to survive anything":
+no mode is written off; a mode that loses is a bot problem to fix (owner, 2026-11-25 21:58 ET: "try them all, and you should be able to do them all for
 6 minutes" -- "nothing should be impossible")
 
 Each is its own benchmark set of 8 games at chaos Level 10, 21,600 frames, judged as the main one (8/8, budgets 0), played one run

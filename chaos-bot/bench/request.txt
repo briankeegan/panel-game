@@ -199,11 +199,13 @@
 # run 67 -- (result) 8 colours: survived 3/8 (combo s1, chain s2, insane s2), losses later -- 16.4k frames on average (12.1k)
 # run 68 -- one change: the scale by (colours/6)^2 and never below six's (outcome.c) -- 8 colours x1.78; 4-6 colours as the gate's
 #          bot. 8 colours, the same set
-chain_garbage 1 9 9 1 21600 10 colors=8
-combo_storm 1 9 9 1 21600 10 colors=8
-thicc_combo_storm 1 9 9 1 21600 10 colors=8
-insane_combo_storm 1 9 9 1 21600 10 colors=8
-chain_garbage 2 9 9 1 21600 10 colors=8
-combo_storm 2 9 9 1 21600 10 colors=8
-thicc_combo_storm 2 9 9 1 21600 10 colors=8
-insane_combo_storm 2 9 9 1 21600 10 colors=8
+# run 68 -- (result) 8 colours by the square: survived 1/8, two losses inside 45 s -- worse. Back to linear
+# run 69 -- the linear scale, never below six's (outcome.c); 8 colours on seeds 3-4 (new seeds, more of the mode)
+chain_garbage 3 9 9 1 21600 10 colors=8
+combo_storm 3 9 9 1 21600 10 colors=8
+thicc_combo_storm 3 9 9 1 21600 10 colors=8
+insane_combo_storm 3 9 9 1 21600 10 colors=8
+chain_garbage 4 9 9 1 21600 10 colors=8
+combo_storm 4 9 9 1 21600 10 colors=8
+thicc_combo_storm 4 9 9 1 21600 10 colors=8
+insane_combo_storm 4 9 9 1 21600 10 colors=8

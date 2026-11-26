@@ -140,6 +140,8 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 68 (2026-11-26 03:36 ET), by (colours/6)^2: 8 colours 1/8 -- worse** (two losses inside 45 s). Back to linear, never
+  below six's. Run 69: 8 colours seeds 3-4.
 - **Run 67 (2026-11-26 03:27 ET), the break time scaled by colours/6: 8 colours 3/8**, losses later (16.4k frames on average vs
   12.1k). Run 68: by (colours/6)^2, never below six's.
 - **Run 66 (2026-11-26 03:18 ET), 8 colours, the full set: survived 2/8.** The weak mode. Run 67: the cycle's break time scaled by

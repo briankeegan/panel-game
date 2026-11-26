@@ -235,9 +235,10 @@ static Outcome outcomeOf(const int32_t *seq, int n, int settled, int waitAt, int
         // time is scaled by the colours over the six the levels are tuned at: the same at six (the gate's games), longer at seven and
         // eight, shorter at four and five. Run 66, 8 colours: 2/8, nearly every decision dying, the board left near the top by lines
         // that lived on a six-colour margin)
-        // (run 68: by the square -- three of a colour are rarer by about (colours/6)^2 -- and never shorter than at six: four and five
-        // colours already lived 6:00, so their margin stays. Run 67, linear: 8 colours 3/8, losses later (16.4k frames on average, 12.1k))
-        int32_t colours = eb->colors > 6 ? eb->colors : 6, need = levelBreak * colours * colours / 36;
+        // (never shorter than at six: four and five colours already lived 6:00, so their margin stays. Run 67, linear: 8 colours 3/8,
+        // losses later (16.4k frames on average, 12.1k); run 68, by the square: 1/8, two losses inside 45 s -- too long a margin holds
+        // the bot from every line. Linear it is)
+        int32_t colours = eb->colors > 6 ? eb->colors : 6, need = levelBreak * colours / 6;
         int cycle = fuel && margin >= (clears ? need : 2 * need);
         if (cycle) o.lives = breaks || !coming ? 1 : (ready == 1 || ready == NOT_ASKED);
       }

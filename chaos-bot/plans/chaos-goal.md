@@ -124,6 +124,10 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 29 (2026-11-25 21:01 ET), the cycle test with the readiness: survived 5/8.** Lost combo_storm s3 14645, s4 7629,
+  insane_combo_storm s4 5195; 14.23 rows a minute; budgets 0. insane s4: holds living with a break ready and never played, the margin
+  137 down to 60 as the stop ran out -- the margin asked (53, the next freeze's start) left no time to finish a break. Run 30: the
+  margin is a whole break's time (levelBreak, 94 at Level 10).
 - **Run 28 (2026-11-25 20:50 ET), settles end: survived 3/8 (run 27, same bot without the fix: 7/8).** Lines are judged at last
   -- 60-85% of decisions have a line that lives -- but the bot plays worse: 12.5 rows a minute (17.1 before). combo_storm s3 5780:
   a hold judged alive decision after decision while its margin ran 274 to 72 and the stop out (holding spends nothing, so it

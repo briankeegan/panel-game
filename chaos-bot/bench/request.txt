@@ -77,6 +77,9 @@
 #          after decision while its margin ran 274 to 72 and the stop out -- holding costs nothing, so it won -- then dead
 # run 29 -- one change: the cycle test stands in only for 'stands left alone' -- with garbage coming and nothing broken, a break
 #          must still be ready for the landing (the readiness, as the verdict had it) (outcome.c)
+#          survived 5/8 (lost combo s3 14645, combo s4 7629, insane s4 5195): holds living with a break ready, never played, margin
+#          137 down to 60 as the stop ran out
+# run 30 -- one change: the cycle's margin is a whole break's time (levelBreak), not only the next freeze's start (outcome.c)
 combo_storm 3 9 9 2 21600 10
 chain_garbage 3 9 9 1 21600 10
 thicc_combo_storm 3 9 9 3 21600 10

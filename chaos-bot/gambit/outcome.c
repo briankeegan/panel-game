@@ -220,7 +220,10 @@ static Outcome outcomeOf(const int32_t *seq, int n, int settled, int waitAt, int
       if (!o.lives && eb && !waitTo && o.j.lostAt != NOT_ASKED) {
         int32_t margin = o.j.lostAt == FOREVER ? FOREVER : o.j.lostAt - o.j.done;
         int fuel = o.groups > 0 || (garbageOn(eb) && breakBuildable(eb));
-        int cycle = fuel && margin >= cfgReaction + 1 + 2 * (cfgSwapGap + 2 * cfgCursor);
+        // (the margin: a whole break's time -- levelBreak, the reaction then a three flashing and popping, read off the level -- not
+        // only the next freeze's start: run 29 insane s4, holds living at margins 137 down to 60 with a break ready and never played,
+        // the stop running out under them, then no break could be finished in what was left)
+        int cycle = fuel && margin >= levelBreak;
         if (cycle) o.lives = breaks || !coming ? 1 : (ready == 1 || ready == NOT_ASKED);
       }
     }

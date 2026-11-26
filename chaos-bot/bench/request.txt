@@ -289,11 +289,14 @@
 #   44-61 panels -- a full board, and a carried 5 into a 2x waited on 110 frames that never fired). Seeds 13-16: 14/16, as the gate's bot
 # run 97 -- the combo size by the panels (decide.c): smallest first at or under 33 panels (the life peak), eights first above; 1'g:
 #   L10 seeds 13-14
-chain_garbage 13 9 9 1 21600 10
-combo_storm 13 9 9 1 21600 10
-thicc_combo_storm 13 9 9 1 21600 10
-insane_combo_storm 13 9 9 1 21600 10
-chain_garbage 14 9 9 1 21600 10
-combo_storm 14 9 9 1 21600 10
-thicc_combo_storm 14 9 9 1 21600 10
-insane_combo_storm 14 9 9 1 21600 10
+# run 97 -- (result) combo size by the panels, 1'g, L10 seeds 13-14: survived 7/8, survivors at full health (chain s13 lived -- lost in
+#   runs 91 and 96; combo s14 lived; insane s13 lost at 6357, starved). Seeds 13-14: gate's bot 7/8, small always 6/8, by the panels 7/8
+# run 98 -- the same bot (by the panels, 1'g) on L10 seeds 15-16: seeds 13-16 against the gate's bot's 14/16
+chain_garbage 15 9 9 1 21600 10
+combo_storm 15 9 9 1 21600 10
+thicc_combo_storm 15 9 9 1 21600 10
+insane_combo_storm 15 9 9 1 21600 10
+chain_garbage 16 9 9 1 21600 10
+combo_storm 16 9 9 1 21600 10
+thicc_combo_storm 16 9 9 1 21600 10
+insane_combo_storm 16 9 9 1 21600 10

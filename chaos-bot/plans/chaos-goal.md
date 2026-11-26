@@ -113,6 +113,8 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 - **Don't stop to ask (the owner):** every decision is made from this file and written down here. Decisions the owner has made:
   hands stay at Gambit's vanilla speed (setup 12 12 4: a swap every 12 frames, a cursor step every 4), though chaos has no input
   limit -- survival comes from better choices, not faster hands (2026-11-25 16:52 ET); no DAS; moves within the reach.
+  The decision budget is not raised either (the owner, 2026-11-26 10:28 ET: "Don't double the decision budget. That's cheating" --
+  "just figure out how to make it work with" it): the searches' time stays what the hands' cadence gives (propose.c searchesEnd).
 
 - **One engine, held to the game's own code.** The C engine is trusted only while recordings prove it frame for frame; a rule
   change in the game means a new recording before anything else.

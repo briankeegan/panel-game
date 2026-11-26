@@ -299,11 +299,15 @@
 #   (both to the queue's fifty at full health: queue avg 38-46, stop 86-115), chaos margin 1/2, chaos mode 2/2
 # run 100 -- the queue near its limit (margin off, 15 or fewer short of fifty): the top row kept empty (rank.c) and the board left quiet
 #   under garbage too (decide.c): L11 vs 11/11, seed 1, every pattern at 8 and at 7 colours
-chain_garbage 1 11 11 1 21600 11 colors=8
-combo_storm 1 11 11 1 21600 11 colors=8
-thicc_combo_storm 1 11 11 1 21600 11 colors=8
-insane_combo_storm 1 11 11 1 21600 11 colors=8
-chain_garbage 1 11 11 1 21600 11 colors=7
-combo_storm 1 11 11 1 21600 11 colors=7
-thicc_combo_storm 1 11 11 1 21600 11 colors=7
-insane_combo_storm 1 11 11 1 21600 11 colors=7
+# run 100 -- (result) queue rules on, L11 vs 11/11 seed 1: survived 4/8 -- 8 colours 1/4 (combo 4344, thicc 8349, insane 4054: boards
+#   topped at ~50 panels under four-row slabs; the queue never passed 20, so the rules never acted), 7 colours 3/4 (insane 13608).
+#   The same seed plays differently run to run (the think time), so one run of eight is a rough sample
+# run 101 -- 8 colours at LEVEL 10 vs 9/9 (the owner: 9 or 10 by the mode), seeds 1-2, every pattern, the bot of run 100
+chain_garbage 1 9 9 1 21600 10 colors=8
+combo_storm 1 9 9 1 21600 10 colors=8
+thicc_combo_storm 1 9 9 1 21600 10 colors=8
+insane_combo_storm 1 9 9 1 21600 10 colors=8
+chain_garbage 2 9 9 1 21600 10 colors=8
+combo_storm 2 9 9 1 21600 10 colors=8
+thicc_combo_storm 2 9 9 1 21600 10 colors=8
+insane_combo_storm 2 9 9 1 21600 10 colors=8

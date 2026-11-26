@@ -148,6 +148,11 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 100 (2026-11-26 10:14 ET), the queue near its limit (top row kept empty, quiet under garbage), L11 vs 11/11 seed 1: survived
+  4/8.** 8 colours 1/4 (combo 4344, thicc 8349, insane 4054: topped at ~50 panels under four-row slabs -- the queue never passed 20, the
+  new rules never acted), 7 colours 3/4. The same seed plays differently from run to run (the think time on the runner), so a run of
+  eight is a rough sample. The bottom five rows never move at 8 colours: every break is made just under the slab, and the search finds
+  few (brDeep 3). Run 101: 8 colours at L10 vs 9/9, seeds 1-2.
 - **Run 99 (2026-11-26 10:03 ET), the gate's bot at L11 vs 11/11 on the hard settings, seed 1: survived 4/8.** 7 colours 1/2 (combo
   lost at 16429, no-line), 8 colours 0/2 -- both to the queue's fifty at full health (queue 38-46 on average over the last 1200
   frames, stop 86-115: a board kept topped on stop drops nothing), chaos margin 1/2, chaos mode 2/2. The weakness is here. Run 100: with

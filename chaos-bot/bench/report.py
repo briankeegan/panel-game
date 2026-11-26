@@ -34,13 +34,17 @@ def parse_stats(path):
 def verdicts(path):
     """the decisions' verdicts in gambit.log (GAMBITD ... v=lives|dies): how often a line was judged to keep the board alive"""
     lives = dies = raises = 0
+    fuel = [0, 0, 0]   # decisions with fuel low / low with room / low with room and the raise offered (fuel=)
     if os.path.exists(path):
         for line in open(path, errors="replace"):
             if line.startswith("GAMBITD "):
                 if " v=lives" in line: lives += 1
                 elif " v=dies" in line: dies += 1
                 if " got=raise" in line: raises += 1
-    return lives, dies, raises
+                if " fuel=" in line: fuel[0] += 1
+                if " fuel=2:" in line: fuel[1] += 1
+                if " fuel=2:1" in line: fuel[2] += 1
+    return lives, dies, raises, fuel
 
 def main():
     games_dir, asked = sys.argv[1], json.loads(sys.argv[2])
@@ -50,7 +54,7 @@ def main():
         d = os.path.join(games_dir, "chaosbot-game-%d" % g["n"])
         r = parse_result(os.path.join(d, "result.txt")) or {"reason": "noresult"}
         s = parse_stats(os.path.join(d, "gambit.log")) or {}
-        vl, vd, vr = verdicts(os.path.join(d, "gambit.log"))
+        vl, vd, vr, vf = verdicts(os.path.join(d, "gambit.log"))
         ok = r.get("survived") == "1"
         survived += ok
         arrivals += int(s.get("arrivals", 0)); surprises += int(s.get("surprises", 0))
@@ -58,9 +62,9 @@ def main():
         fr = int(r.get("frames", -1))
         if fr > 0:
             played += fr; sent += float(r.get("sentRows", 0))
-        rows.append("game %d level %s mode %s margin %s chaosmode %s colors %s pattern %s seed %d frames %s survived %d lostAt %s health %s healthLostTop %s gpm %s late %s diverged %s overruns %s worstMs %s surprises %s/%s noticeMin %s lives %d/%d raises %d reason %s" % (
+        rows.append("game %d level %s mode %s margin %s chaosmode %s colors %s pattern %s seed %d frames %s survived %d lostAt %s health %s healthLostTop %s gpm %s late %s diverged %s overruns %s worstMs %s surprises %s/%s noticeMin %s lives %d/%d raises %d fuel %d/%d/%d reason %s" % (
             g["n"], g.get("level", 9), g.get("mode", 1), g.get("margin", 1), g.get("chaosmode", 0), g.get("colors", 6), g["pattern"], g["seed"], r.get("frames", -1), ok, r.get("lostAt", -1), r.get("health", -1), r.get("healthLostTop", -1),
-            r.get("gpm", -1), s.get("late", "?"), s.get("diverged", "?"), r.get("overruns", "?"), r.get("worstMs", "?"), s.get("surprises", "?"), s.get("arrivals", "?"), s.get("noticeMin", "?"), vl, vl + vd, vr, r.get("reason", "?")))
+            r.get("gpm", -1), s.get("late", "?"), s.get("diverged", "?"), r.get("overruns", "?"), r.get("worstMs", "?"), s.get("surprises", "?"), s.get("arrivals", "?"), s.get("noticeMin", "?"), vl, vl + vd, vr, vf[0], vf[1], vf[2], r.get("reason", "?")))
     for row in rows:
         print(row)
     from zoneinfo import ZoneInfo

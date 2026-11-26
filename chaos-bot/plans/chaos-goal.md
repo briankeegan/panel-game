@@ -139,6 +139,10 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 39 (2026-11-25 22:59 ET), seeds 7 and 8: survived 8/8, health 13 in every game, budgets 0** -- but raises 0 in every
+  game: the reworked fuel raise did not fire either, so this is the run-33 bot again. Its record in Normal: 38/40 (runs 33, 34, 37,
+  38, 39), every survivor at 13 health. Run 40: seeds 9 and 10, with the fuel raise's two tests (fuel low; the game taking a raise)
+  logged apart and counted in the report.
 - **Run 38 (2026-11-25 22:49 ET), seeds 7 and 8: survived 7/8.** Survivors' health 13 each; budgets 0; 15.93 rows a minute. Lost
   thicc_combo_storm s8 at 13888 (backlog 19-24 pieces from 8400). **Correction:** the fuel raise never fired -- 0 raises and 0 raise
   offers in run 38 and in run 37's insane s5 too: its test (fewer than two threes and no garbage break) never passes on the boards

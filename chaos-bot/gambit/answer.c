@@ -1023,6 +1023,7 @@ static void answerTurn(int32_t qid, int32_t at, int32_t allowanceKnown, int32_t 
   // engine could raise now (1) or a cascade held it (0) -- on every decision a raise was asked)
   if (amidDropped) { L_s(" amid="); L_i(amidDropped); L_s("/"); L_i((int32_t)amidBest); }
   if (opRaiseLog[4]) { L_s(" opRaise="); L_i(opRaiseLog[0]); L_s("/"); L_i(opRaiseLog[1]); L_s("/"); L_i(opRaiseLog[2]); L_s("/"); L_i(opRaiseLog[3]); }
+  if (decFuelLow) { L_s(" fuel="); L_i(decFuelLow); L_s(":"); L_i(R.low ? 1 : 0); }
   if (R.low) { L_s(" raiseFor="); L_s(raiseOpening ? "o" : raiseRefill ? "r" : "-"); L_s(":"); L_i(raiseTo); L_s(":"); L_i(raiseRows); L_s(":"); L_i(R.up ? 1 : 0); }
   if (P.deferred) L_s(" deferred=1");
   // (WHY A HOLD HOLDS, named: raise -- waiting for the raise to open; timing -- its next swap does as well pressed later; nothing -- no

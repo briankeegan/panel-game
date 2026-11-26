@@ -31,6 +31,7 @@ static int32_t raiseOpening, raiseTo, raiseRows;
 // faster level, or the speed's climb through a game, lowers it by itself. Never below CHAOS_RAISE_MIN rows (a board needs rows to
 // break with) nor above the height less CHAOS_BLOCK_ROWS.
 #define CHAOS_BLOCK_ROWS 3
+static int32_t decFuelLow;   // (the fuel raise's test this decision, logged as fuel=: 0 not low, 1 low, 2 low with room)
 static int32_t chaosLetDrop;   // (decisions the board was left alone so waiting garbage could drop: the log's letDrop)
 static int32_t chaosWaiting = -1;   // (the rows waiting at the last such test, -1 none: the log's q)
 #define CHAOS_RAISE_MIN 3
@@ -307,13 +308,14 @@ static int readBoard_(Read *R) {
   // 2755, panels 5-8 with nothing to break with. Garbage in play, no break on it to build and fewer than two threes of panels: raise
   // a row -- fresh panels from below -- when the whole stack, garbage and all, still leaves a break's time (levelBreak) of rise after
   // it, at this speed (caRiseFrames, read off the level); asked only when the game takes a raise (chaosRaisable, below))
-  int chaosFuelRaise = 0;
+  int chaosFuelRaise = 0; decFuelLow = 0;
   if (!opening && garbageGame && !R->topped) {
     // (run 38: "no garbage break and fewer than two threes" never passed on the boards that lose -- 3-5 threes scattered over
     // 7-16 panels; never raised in runs 37-38. Fuel under garbage is the panels under it, the next break's material: under two rows'
     // worth (2 x W) is low. With no garbage, fewer than two threes)
     int fuelLow = garbageOn(decQ.b) ? materialOn(decQ.b) < 2 * W : groupsOn(decQ.b) < 2;
     int32_t rowFrames = 16 * caRiseFrames(decQ.b->speed), roomRows = decQ.b->height - fullTop(decQ.b) - 1;
+    decFuelLow = fuelLow ? (rowFrames > 0 && roomRows * rowFrames >= levelBreak ? 2 : 1) : 0;   // (logged: fuel=1 low, 2 low with room)
     if (fuelLow && rowFrames > 0 && roomRows * rowFrames >= levelBreak) { refill = 1; chaosFuelRaise = 1; }
   }
   // (and FINISH THEM'S RAISE: the eights it fires need rows to sort -- three to five tall in two columns side by side -- so a stack

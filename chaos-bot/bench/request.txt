@@ -103,11 +103,14 @@
 # run 38 -- the fuel-raise bot, unchanged, on seeds 7 and 8 (then 9-10, 1-2, and 3-4 again)
 # run 38 -- (result) survived 7/8 on seeds 7-8 (lost thicc s8 13888, backlog 19-24); the fuel raise never fired (nor in run 37)
 # run 39 -- one change: fuel under garbage = panels under it < 2 rows (2 x W) (decide.c); the report counts raises. Seeds 7-8 again
-combo_storm 7 9 9 2 21600 10
-chain_garbage 7 9 9 1 21600 10
-thicc_combo_storm 7 9 9 3 21600 10
-insane_combo_storm 7 9 9 2 21600 10
-combo_storm 8 9 9 2 21600 10
-chain_garbage 8 9 9 1 21600 10
-thicc_combo_storm 8 9 9 3 21600 10
-insane_combo_storm 8 9 9 2 21600 10
+# run 39 -- (result) survived 8/8 on seeds 7-8, health 13 everywhere, budgets 0 -- but raises 0 in every game: the run-33 bot again
+#          (38/40 in Normal over runs 33-39)
+# run 40 -- seeds 9 and 10; the fuel raise's tests logged (fuel=low[:offered]), the report counts them. No change to play
+combo_storm 9 9 9 2 21600 10
+chain_garbage 9 9 9 1 21600 10
+thicc_combo_storm 9 9 9 3 21600 10
+insane_combo_storm 9 9 9 2 21600 10
+combo_storm 10 9 9 2 21600 10
+chain_garbage 10 9 9 1 21600 10
+thicc_combo_storm 10 9 9 3 21600 10
+insane_combo_storm 10 9 9 2 21600 10

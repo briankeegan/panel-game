@@ -124,6 +124,10 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 33 (2026-11-25 21:45 ET), run 19's real-health-while-topped off: survived 8/8 on seeds 3 and 4 -- health 13 in every
+  game.** Budgets 0, surprises 0/851, 15.43 rows a minute. The bot now: the engine's settles end (the verdict works), the cycle
+  verdict (margin a break's time, fuel -- a break on the garbage under garbage -- and the readiness), runs 14/15/17 kept, runs 19 and
+  20-23 off. Run 34: new seeds, 5 and 6, no change.
 - **Run 32 (2026-11-25 21:34 ET), fuel under garbage is a break on the garbage: survived 6/8.** insane_combo_storm s3 lived; lost
   chain_garbage s3 at 21558 (42 frames short) and thicc_combo_storm s4 7168 (backlog 9 to 15, digging 3-6 a break: every line dying
   on the readiness). Kept. Survivors' health 1, 2, 1, 8, 4, 13 -- run 19's real-health-while-topped, made for the broken verdict, is

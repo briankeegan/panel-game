@@ -159,11 +159,15 @@
 # run 53 -- (result) survived 6/8 on seeds 5-6 (thicc s5 lived; lost insane s5 1667 and insane s6 10204). The rule never acted:
 #          no raise was asked at all -- the opening's raise height at level 10 (chaosRaiseTo) is ~5 rows, already there. Off again
 # run 54 -- the run-46 bot on seeds 7 and 8 (the one set it has not played), no change
-chain_garbage 7 9 9 1 21600 10
-combo_storm 7 9 9 1 21600 10
-thicc_combo_storm 7 9 9 1 21600 10
-insane_combo_storm 7 9 9 1 21600 10
-chain_garbage 8 9 9 1 21600 10
-combo_storm 8 9 9 1 21600 10
-thicc_combo_storm 8 9 9 1 21600 10
-insane_combo_storm 8 9 9 1 21600 10
+# run 54 -- (result) survived 8/8 on seeds 7-8, health 13 in every game. The run-46 bot in Normal: 45/52 (9-10 8/8, 7-8 8/8,
+#          1-2 7/8, 3-4 7/8, 5-6 6/8 twice, s10 3/4); seed 5's insane is lost early by almost every bot
+# run 55 -- one change: in the opening (before garbage first comes), of two lines that both live and break no garbage, the one
+#          clearing fewer panels first (rank.c) -- the opening keeps its panels and the stack rises on its own. Seeds 5-6
+chain_garbage 5 9 9 1 21600 10
+combo_storm 5 9 9 1 21600 10
+thicc_combo_storm 5 9 9 1 21600 10
+insane_combo_storm 5 9 9 1 21600 10
+chain_garbage 6 9 9 1 21600 10
+combo_storm 6 9 9 1 21600 10
+thicc_combo_storm 6 9 9 1 21600 10
+insane_combo_storm 6 9 9 1 21600 10

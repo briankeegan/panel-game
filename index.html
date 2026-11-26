@@ -5,13 +5,13 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
 .dash-skeleton{background:#e4e7ee}@media (prefers-color-scheme:dark){.dash-skeleton{background:#262b3a}}</style><script src='https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js'></script><script>// Stand-in for the artifact "dash" object: loads data files and runs the page's onData callbacks when they arrive.
 // THE DATA IS NOT PART OF THE PAGE: it lives at its own address (the data project, <project>-data.pages.dev), named in data-base.txt beside
 // the page (a URL, else ignored: Pages answers a missing file with the page), so new games reach the page without the page being published again. No data-base.txt (a local copy): ./data.
-// THE SET (#set=<name> in the link): which bot's games. Ranmaru's are the data's top level, as they always were; another bot's sit
-// in their own folder beside them (data/chaos/ for the chaos bot), so the two never mix. A set is chosen by a fresh load.
+// THE SET is the page's address: /chaos/ is the chaos bot's page, the site's root is Ranmaru's. Ranmaru's games are the data's top level,
+// as they always were; another bot's sit in their own folder beside them (data/chaos/), so the two never mix. Both pages are one page.
 (function () {
   const P = { ver: '', opp: '', minn: 10 }, fns = [], cache = {};
-  const SET = ((/(?:^#|&)set=([a-z0-9-]+)/.exec(location.hash) || [])[1] || 'ranmaru');
+  const SET = ((/^\/([a-z0-9-]+)\/(?:index\.html)?$/.exec(location.pathname) || [])[1] || 'ranmaru');
   document.documentElement.classList.add('set-' + SET);   // (each set's colours: page.html, html.set-<name>; set before anything draws)
-  const base = fetch('data-base.txt', { cache: 'no-store' }).then((r) => (r.ok ? r.text() : '')).then((t) => (/^https:\/\/[^\s<]+$/.test(t.trim()) ? t.trim().replace(/\/?$/, '/') : 'data/')).catch(() => 'data/')
+  const base = fetch(SET === 'ranmaru' ? 'data-base.txt' : '../data-base.txt', { cache: 'no-store' }).then((r) => (r.ok ? r.text() : '')).then((t) => (/^https:\/\/[^\s<]+$/.test(t.trim()) ? t.trim().replace(/\/?$/, '/') : (SET === 'ranmaru' ? 'data/' : '../data/'))).catch(() => (SET === 'ranmaru' ? 'data/' : '../data/'))
     .then((b) => (SET === 'ranmaru' ? b : b + SET + '/'));
   const name = (id) => (id === 'games' || id === 'versions') ? id + '.json' : id + '.json.gz';
   async function load(id) {
@@ -408,7 +408,7 @@ html.set-chaos { --color-fg: #241a35; --color-fg-muted: #6c5d83; --color-bg: #f6
   html.set-chaos { --color-fg: #ede6f7; --color-fg-muted: #a898c2; --color-bg: #16111f; --color-panel: #1f182b; --color-border-line: #362a4a;
     --cds-chart-grid: #362a4a; --cds-chart-muted: #4a3b63; --cds-surface-popover: #1f182b; --cds-border: #362a4a; --cds-text-secondary: #a898c2; --set-accent: #b98cff; }
 }
-html.set-chaos .gs-seg button[aria-pressed=true] { background: var(--set-accent); color: var(--color-panel); }
+html.set-chaos .gs-seg button[aria-pressed=true], html.set-chaos .lb-tabs button[aria-selected="true"] { background: var(--set-accent); color: var(--color-panel); }
 html.set-chaos .gs h1 { color: var(--set-accent); }
 .gs-eyebrow { display: inline-flex; align-items: center; gap: 8px; font-size: 11.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--color-fg-muted); margin-bottom: 8px; }
 .gs-pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--color-ok); box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-ok) 50%, transparent); }
@@ -639,9 +639,9 @@ html.set-chaos .gs h1 { color: var(--set-accent); }
 </style>
 
 <div class="gs" id="gs">
-  <nav class="gs-setbar" aria-label="Which bot"><span class="gs-setname" id="gs-setname" hidden></span><div class="gs-seg sm gs-sets" role="group" aria-label="Which bot" id="gs-sets"><button type="button" data-set="ranmaru">Ranmaru</button><button type="button" data-set="chaos">Chaos</button></div></nav>
-  <section class="gs-card pod-card" id="sec-podium"><div class="lb-head"><h2>Leaderboard</h2><div class="lb-tabs" id="lb-tabs" role="tablist"><button type="button" data-p="week" role="tab">This week</button><button type="button" data-p="last" role="tab">Last week</button><button type="button" data-p="all" role="tab">All time</button></div><button type="button" class="lb-more" id="lb-more" aria-expanded="false">Show top 3 &amp; details ▾</button></div><p class="gs-note" id="lb-note"></p><div class="lb-grid" id="lb"></div></section>
-  <section class="gs-card pod-card" id="sec-last"><h2>Last kill</h2><p class="gs-note">Level 10 v 10</p><button type="button" class="pod-kill" id="pod-last"></button></section>
+  <nav class="gs-setbar" id="gs-setbar" aria-label="Which bot" hidden><span class="gs-setname" id="gs-setname" hidden></span></nav>
+  <section class="gs-card pod-card" id="sec-podium"><div class="lb-head"><h2>Leaderboard</h2><div class="lb-tabs" id="lb-tabs" role="tablist"><button type="button" data-p="week" role="tab">This week</button><button type="button" data-p="last" role="tab">Last week</button><button type="button" data-p="all" role="tab">All time</button></div><div class="lb-tabs" id="lb-lv" role="tablist" aria-label="Level" hidden></div><button type="button" class="lb-more" id="lb-more" aria-expanded="false">Show top 3 &amp; details ▾</button></div><p class="gs-note" id="lb-note"></p><div class="lb-grid" id="lb"></div></section>
+  <section class="gs-card pod-card" id="sec-last"><h2>Last kill</h2><p class="gs-note" id="last-lv">Level 10 v 10</p><button type="button" class="pod-kill" id="pod-last"></button></section>
   <header class="gs-hero">
     <div class="gs-eyebrow"><span class="gs-pulse" aria-hidden="true"></span>Live stats · updates itself after every set</div>
     <h1 id="gs-title">Ranmaru on panelattack.com</h1>
@@ -912,10 +912,19 @@ html.set-chaos .gs h1 { color: var(--set-accent); }
   // Latest results' sort: a column heading's key and direction; newest first until a heading is clicked
   let latestSort = { key: 'when', dir: 'desc' };
   // LEADERBOARD PERIOD: this week (from Monday 00:00 US Eastern, daylight saving included), last week, or all time
+  // lbLevel: the level the leaderboard and Last kill count (both players at it). Ranmaru's is 10, fixed. The chaos bot plays whatever level
+  // the other player picks (6 at the least), so its page offers 7 and up to pick from, 8 first.
+  const LB_LEVELS = dash.set === 'chaos' ? [7, 8, 9, 10, 11] : [10], LB_LEVEL0 = dash.set === 'chaos' ? 8 : 10;
+  let lbLevel = LB_LEVEL0;
   let lbPeriod = 'week', lbAll = false;   // lbAll: the WHOLE leaderboard expanded (every card's top 3 and details), not one card at a time
   const lbSync = () => { document.querySelectorAll('#sec-podium .lb-card').forEach((c) => { c.open = lbAll; }); $('lb').classList.toggle('compact', !lbAll); const b = $('lb-more'); b.textContent = lbAll ? 'Show winners only ▴' : 'Show top 3 & details ▾'; b.setAttribute('aria-expanded', lbAll ? 'true' : 'false'); };
   $('lb-more').addEventListener('click', () => { lbAll = !lbAll; lbSync(); });
   $('lb-tabs').addEventListener('click', (e) => { const b = e.target.closest('button[data-p]'); if (b) { lbPeriod = b.dataset.p; render(); } });
+  if (LB_LEVELS.length > 1) {
+    $('lb-lv').hidden = false;
+    LB_LEVELS.forEach((n) => { const b = document.createElement('button'); b.type = 'button'; b.dataset.lv = n; b.setAttribute('role', 'tab'); b.textContent = 'L' + n; b.title = 'Level ' + n + ' v ' + n; $('lb-lv').appendChild(b); });
+    $('lb-lv').addEventListener('click', (e) => { const b = e.target.closest('button[data-lv]'); if (b) { lbLevel = Number(b.dataset.lv); render(); } });
+  }
   try { if (localStorage.getItem('gs-sets') === '0') groupSets = false; } catch (e) {}
   $('form-sets').checked = groupSets;
   $('form-sets').addEventListener('change', (e) => { groupSets = e.target.checked; try { localStorage.setItem('gs-sets', groupSets ? '1' : '0'); } catch (x) {} render(); });
@@ -1261,7 +1270,9 @@ html.set-chaos .gs h1 { color: var(--set-accent); }
       // the name shown is the one this account used most.
       // a name that has an id in any game takes that id, so its older games (no id) join the same player
       // only games where both players were level 10 (lv = [bot level, opponent level], from the replay)
-      const lvGames = games.filter((g) => Array.isArray(g.lv) && g.lv[0] === 10 && g.lv[1] === 10 && g.mode !== 'Time attack');
+      const lvGames = games.filter((g) => Array.isArray(g.lv) && g.lv[0] === lbLevel && g.lv[1] === lbLevel && g.mode !== 'Time attack');
+      Array.from($('lb-lv').children).forEach((b) => b.setAttribute('aria-selected', Number(b.dataset.lv) === lbLevel ? 'true' : 'false'));
+      $('last-lv').textContent = 'Level ' + lbLevel + ' v ' + lbLevel;
       const idOfName = new Map(); d3.rollup(lvGames.filter((g) => g.pid), (v) => d3.rollup(v, (x) => x.length, (x) => x.pid), (g) => g.opp)
         .forEach((ids, name) => { const best = Array.from(ids).sort((a, b) => b[1] - a[1])[0]; idOfName.set(name, best[0]); });
       const byOpp = d3.group(lvGames, (g) => g.pid || idOfName.get(g.opp) || g.opp);
@@ -1276,7 +1287,7 @@ html.set-chaos .gs h1 { color: var(--set-accent); }
       const nowWk = weekStart(Date.now()), lastWk = weekStart(nowWk - 864e5), tOf = (g) => g.at ? new Date(g.at).getTime() : new Date(g.date + 'T12:00:00Z').getTime();
       const inPeriod = (g) => lbPeriod === 'all' ? true : lbPeriod === 'week' ? tOf(g) >= nowWk : tOf(g) >= lastWk && tOf(g) < nowWk;
       const fmtDay = (t) => new Date(t).toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric' });
-      $('lb-note').textContent = 'Level 10 v 10 only · ' + (lbPeriod === 'week' ? 'this week, from Monday ' + fmtDay(nowWk) + ' (midnight Eastern)' : lbPeriod === 'last' ? 'last week, ' + fmtDay(lastWk) + ' to ' + fmtDay(nowWk - 864e5) + ' (Eastern)' : 'all time, with the versions of Ranmaru released since each player last played');
+      $('lb-note').textContent = 'Level ' + lbLevel + ' v ' + lbLevel + ' only · ' + (lbPeriod === 'week' ? 'this week, from Monday ' + fmtDay(nowWk) + ' (midnight Eastern)' : lbPeriod === 'last' ? 'last week, ' + fmtDay(lastWk) + ' to ' + fmtDay(nowWk - 864e5) + ' (Eastern)' : 'all time, with the versions of Ranmaru released since each player last played');
       Array.from($('lb-tabs').children).forEach((b) => b.setAttribute('aria-selected', b.dataset.p === lbPeriod ? 'true' : 'false'));
       const newestOrder = vers.length ? d3.max(vers, (v) => v.order) : 0;
       const gamesTxt = (k) => k + (k === 1 ? ' game played' : ' games played');
@@ -2659,7 +2670,6 @@ function projectPlan(G, seq, cursor) {
     const sortStr = (x) => x.key + ':' + x.dir;
     function state(share) {
       const o = {}, P = dash.params(), add = (k, v, def) => { if (v !== undefined && v !== null && String(v) !== String(def === undefined ? '' : def)) o[k] = String(v); };
-      add('set', dash.set, 'ranmaru');
       add('ver', P.ver); add('opp', P.opp); add('min', P.minn ?? 10, 10);
       add('oq', $('s-opp').value.trim()); add('om', oppMin, 0); add('os', sortStr(sortState.opp), 'n:-1'); if (expanded.opp) o.oall = '1';
       add('vq', $('s-ver').value.trim()); add('vs', sortStr(sortState.ver), 'order:-1'); if (expanded.ver) o.vall = '1';
@@ -2669,7 +2679,7 @@ function projectPlan(G, seq, cursor) {
       if (!PLAN.on) o.plan = '0';
       add('lm', LIST.mode, 'chg'); add('speed', R.speed, 1);
       add('gset', groupSets ? 1 : 0, 1); add('gply', groupPlayers ? 1 : 0, 0); add('lsort', latestSort.key + ':' + latestSort.dir, 'when:desc'); if (recentMore) o.more = '1';
-      add('lb', lbPeriod, 'week'); if (lbAll) o.lball = '1';
+      add('lb', lbPeriod, 'week'); if (lbAll) o.lball = '1'; add('lblv', lbLevel, LB_LEVEL0);
       return o;
     }
     const hashOf = (o) => { const k = Object.keys(o); return k.length ? '#' + k.map((x) => x + '=' + enc(o[x])).join('&') : ''; };
@@ -2700,6 +2710,7 @@ function projectPlan(G, seq, cursor) {
       { const m = /^(when|res|opp|lv|mode|len|garb|ver):(asc|desc)$/.exec(p.lsort || ''); latestSort = m ? { key: m[1], dir: m[2] } : { key: 'when', dir: 'desc' }; }
       recentMore = p.more === '1';
       lbPeriod = one(p.lb, ['week', 'last', 'all'], 'week'); lbAll = p.lball === '1';
+      lbLevel = LB_LEVELS.includes(Number(p.lblv)) ? Number(p.lblv) : LB_LEVEL0;
       const sp = num(p.speed, 1); if ([1, 0.5, 0.25, 0.125].includes(sp)) setSpeed(sp);
       if (p.plan === '0') (init ? setTimeout : (f) => f())(() => setPlan(false), 0);
       U.pending = /^r\d+$/.test(p.game || '') ? { rid: p.game, frame: p.frame !== undefined && /^\d+$/.test(p.frame) ? Number(p.frame) : null, part: p.part === 'open' ? 'open' : 'end' } : null; U.reset = false;
@@ -2708,28 +2719,20 @@ function projectPlan(G, seq, cursor) {
     };
     setInterval(() => { if (!R.playing) U.flush(); }, 700);
     document.addEventListener('visibilitychange', () => { if (document.hidden) U.flush(); });
-    window.addEventListener('hashchange', () => {
-      const s = (/(?:^#|&)set=([a-z0-9-]+)/.exec(location.hash) || [])[1] || 'ranmaru';
-      if (s !== dash.set) { location.reload(); return; }
-      U.apply(location.hash, false);
-    });
+    window.addEventListener('hashchange', () => U.apply(location.hash, false));
     $('copy-link').addEventListener('click', async () => { const ok = await copyText(U.link()), b = $('copy-link'), t0 = 'Copy link to this view'; b.textContent = ok ? 'Link copied' : 'Could not copy'; setTimeout(() => { b.textContent = t0; }, 2200); });
     return U;
   })();
-  // THE SETS: each bot's own name and where it plays. Every string on the page says "Ranmaru" (it was the only bot); on another set
-  // the page's words are rewritten to that bot's name as they appear, the set switch itself aside.
+  // THE SETS: each bot's own name and where it plays (each its own address: / is Ranmaru's page, /chaos/ the chaos bot's). Every string
+  // on the page says "Ranmaru" (it was the only bot); on another set the page's words are rewritten to that bot's name as they appear.
   const SETS = { ranmaru: { bot: 'Ranmaru', where: 'panelattack.com' }, chaos: { bot: 'Chaos', where: 'the chaos server' } };
   (() => {
     const S = SETS[dash.set] || { bot: dash.set, where: '' };
-    document.querySelectorAll('#gs-sets button').forEach((b) => {
-      b.setAttribute('aria-pressed', String(b.dataset.set === dash.set));
-      b.addEventListener('click', () => { if (b.dataset.set !== dash.set) location.hash = b.dataset.set === 'ranmaru' ? '#set=ranmaru' : '#set=' + b.dataset.set; });
-    });
     if (dash.set === 'ranmaru') return;
-    $('gs-setname').textContent = S.bot; $('gs-setname').hidden = false;
+    $('gs-setname').textContent = S.bot; $('gs-setname').hidden = false; $('gs-setbar').hidden = false;
     $('gs-title').textContent = S.bot + (S.where ? ' on ' + S.where : '');
     document.title = S.bot + ' stats';
-    const sw = $('gs-sets'), ATTR = ['title', 'aria-label', 'placeholder'];
+    const sw = $('gs-setbar'), ATTR = ['title', 'aria-label', 'placeholder'];
     const fix = (root) => {
       if (root.nodeType === 3) { if (root.nodeValue.includes('Ranmaru') && !sw.contains(root)) root.nodeValue = root.nodeValue.replace(/Ranmaru/g, S.bot); return; }
       if (root.nodeType !== 1 || sw.contains(root)) return;

@@ -337,6 +337,10 @@
 # run 110 -- (result) chains for stop above six colours, 8 colours L10 s3-4: survived 5/8 (runs 108-109: 2/8). Kept. Losses: insane s3
 #   10618 (no-line), chain s4 5354, combo s4 4447 (column 3 a well seven rows deep under garbage resting beside it)
 # run 111 -- 1'g (no canyon under garbage) on again above six colours: 8 colours L10 s3-4
+# run 111 -- (result) 1'g above six colours, 8 colours L10 s3-4: survived 4/8 -- combo s4 (its target) 4447 -> 11152; insane s3 lost at
+#   580: a 7-row board told of a 5-row slab 50 frames out, frames spent on a slow break, lost in the landing's shake. Kept
+# run 112 -- above six colours, when what is coming reaches the top row on the board as it stands, the lower stack first (rank.c 1'i):
+#   8 colours L10 s3-4
 chain_garbage 3 9 9 1 21600 10 colors=8
 combo_storm 3 9 9 1 21600 10 colors=8
 thicc_combo_storm 3 9 9 1 21600 10 colors=8

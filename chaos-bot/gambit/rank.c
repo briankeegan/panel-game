@@ -1312,6 +1312,16 @@ static int compareJudged(const Judge *x, const Judge *y) {
   if (decQ.b->colors > 6 && decF.under && (lx || lostAlike(x, y)) && imax(0, x->apBroke) == imax(0, y->apBroke) && x->o.j.gap >= 0 && y->o.j.gap >= 0 &&
       iabs(x->o.j.gap - y->o.j.gap) >= GAP_CELLS)
     return (cmpKey = __LINE__, (x->o.j.gap - y->o.j.gap));
+  // 1'i. (run 112, CHAOS) ABOVE SIX COLOURS, ROOM FOR WHAT IS COMING: when the garbage on its way and waiting, stacked on the board as it
+  // stands (fullTop), reaches the top row, of two that both live or are lost alike, the one leaving the stack lower first -- a slab that
+  // lands on a topped board with no stop running ends the game inside the shake. Run 111 8 colours insane s3: a 7-row board told of a
+  // 5-row slab 50 frames out, the frames spent on a slow break and walks, lost 70 frames after it landed
+  if (decQ.b->colors > 6 && (lx || lostAlike(x, y)) && x->o.topAfter >= 0 && y->o.topAfter >= 0 && x->o.topAfter != y->o.topAfter) {
+    int32_t rows = 0, h = decQ.b->height ? decQ.b->height : 12;
+    for (int i = 0; i < decQ.narr; i++) rows += decQ.arr[i].height > 0 ? decQ.arr[i].height : 1;
+    for (int i = 0; i < decQ.b->ninc; i++) rows += decQ.b->inc[i].height > 0 ? decQ.b->inc[i].height : 1;
+    if (rows > 0 && fullTop(decQ.b) + rows >= h - 1) return (cmpKey = __LINE__, (x->o.topAfter - y->o.topAfter));
+  }
   // 1'h. (run 107, CHAOS) ABOVE SIX COLOURS, THE COLOURS LINED UP (the owner: be more purposeful with colours): of two that both live
   // or are lost alike and break the same garbage, the one leaving more breaks a swap away (judge.c readyOf: a single swap that makes a
   // match touching garbage), then more matches a swap away -- at 8 colours a match seldom arrives by itself, and runs 101-106 found no

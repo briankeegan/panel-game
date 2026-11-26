@@ -156,7 +156,11 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
-- **Run 111 (pushed 2026-11-26 12:5x ET): 1'g (no canyon under garbage) on again above six colours** -- run 110 combo s4 lost with
+- **Run 112 (pushed 2026-11-26 13:0x ET): room for what is coming (1'i)** -- above six colours, when the garbage on its way and
+  waiting, stacked on the board, reaches the top row, the line leaving the stack lower first. 8 colours L10 s3-4.
+- **Run 111 (2026-11-26 12:57 ET): 1'g on again above six colours -- survived 4/8.** combo s4 4447 -> 11152 (its target); insane s3
+  lost at 580: a 7-row board told of a 5-row slab 50 frames out, spent them on a slow break, lost in the landing's shake. Kept.
+- (run 111 as pushed) 1'g (no canyon under garbage) on again above six colours -- run 110 combo s4 lost with
   column 3 dug to a well seven rows deep under garbage resting on the columns beside it. 8 colours L10 s3-4.
 - **Run 110 (2026-11-26 12:47 ET): above six colours, chains for stop -- survived 5/8** (runs 108-109 on the same seeds: 2/8). Kept. The owner: "you have your work cut out for you".
   The list asks a 2x, then a 3x, then a combo of 4+ (decide.c): only stop time halts a stack rising a row a second, and a 2x buys it

@@ -309,7 +309,10 @@ static int readBoard_(Read *R) {
   // it, at this speed (caRiseFrames, read off the level); asked only when the game takes a raise (chaosRaisable, below))
   int chaosFuelRaise = 0;
   if (!opening && garbageGame && !R->topped) {
-    int fuelLow = !breakBuildable(decQ.b) && groupsOn(decQ.b) < 2;
+    // (run 38: "no garbage break and fewer than two threes" never passed on the boards that lose -- 3-5 threes scattered over
+    // 7-16 panels; never raised in runs 37-38. Fuel under garbage is the panels under it, the next break's material: under two rows'
+    // worth (2 x W) is low. With no garbage, fewer than two threes)
+    int fuelLow = garbageOn(decQ.b) ? materialOn(decQ.b) < 2 * W : groupsOn(decQ.b) < 2;
     int32_t rowFrames = 16 * caRiseFrames(decQ.b->speed), roomRows = decQ.b->height - fullTop(decQ.b) - 1;
     if (fuelLow && rowFrames > 0 && roomRows * rowFrames >= levelBreak) { refill = 1; chaosFuelRaise = 1; }
   }

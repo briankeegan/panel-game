@@ -101,6 +101,8 @@
 # run 37 -- one change: the fuel raise (decide.c) -- fuel low and room for a row: raise one. Back on Normal seeds 5 and 6
 # run 37 -- (result) survived 8/8 on seeds 5-6, health 13 in every game, budgets 0, surprises 0/787, 16.26 rows a minute
 # run 38 -- the fuel-raise bot, unchanged, on seeds 7 and 8 (then 9-10, 1-2, and 3-4 again)
+# run 38 -- (result) survived 7/8 on seeds 7-8 (lost thicc s8 13888, backlog 19-24); the fuel raise never fired (nor in run 37)
+# run 39 -- one change: fuel under garbage = panels under it < 2 rows (2 x W) (decide.c); the report counts raises. Seeds 7-8 again
 combo_storm 7 9 9 2 21600 10
 chain_garbage 7 9 9 1 21600 10
 thicc_combo_storm 7 9 9 3 21600 10

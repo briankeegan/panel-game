@@ -35,6 +35,7 @@ typedef struct {
   int32_t twinAfter;   // the swaps to a two-column eight on the board the line leaves (propose.c twinCostOn; 99 none), -1 not asked
   int32_t nearAfter;   // under garbage: how near the next break is on the board the line leaves (search/break.c nearOf: its swaps, NEAR_MISS and over none to walk to), -1 not asked
   int32_t putOff;      // the frames the line puts the queue's drop off, beyond the board left alone (holdQueueAt): taken out of lostAt
+  int32_t topAfter;    // (CHAOS) the stack's top, garbage and all, on the board the line leaves (fullTop); -1 not asked
   Judged j;
 } Outcome;
 
@@ -114,6 +115,7 @@ static int32_t lifePeakOf(void) { static int32_t peak = -1; if (peak < 0) { peak
 static Outcome outcomeOf(const int32_t *seq, int n, int settled, int waitAt, int32_t waitTo);
 static int breakBuildable(const Board *b);   // (search/break.c: a break the panels touching garbage can be walked into)
 static int garbageOn(const Board *b);        // (search/break.c: garbage on the board)
+static int32_t fullTop(const Board *b);      // (facts.c: the stack's top, garbage and all)
 static int32_t panelsOn(const Board *b);     // (search/break.c: the panels on the board)
 static int nearOf(const Board *b);           // (search/break.c: the swaps to the nearest break; NEAR_MISS and over, how short of one)
 static int32_t perchOf(const Board *b, int *can);   // (search/break.c: how far the garbage is from coming down a row, and whether it can)
@@ -197,10 +199,10 @@ static Outcome outcomeOf(const int32_t *seq, int n, int settled, int waitAt, int
     o.fits = fitsList(&theList, o.j.made, &o.j, 1) && imax(o.j.made.chain, o.j.chainAll) <= MAXCHAIN;
     // (a break: whether the board it leaves still has a break to build -- the material the next one needs)
     o.nextBuild = -1;
-    o.panelsLeft = -1; o.nearAfter = -1; o.twinAfter = -1; o.lifeLeft = -1; o.floorKept = -1; o.matLeft = -1; o.matSettled = -1; o.groups = -1;
+    o.panelsLeft = -1; o.nearAfter = -1; o.twinAfter = -1; o.lifeLeft = -1; o.floorKept = -1; o.matLeft = -1; o.matSettled = -1; o.groups = -1; o.topAfter = -1;
     if (!waitTo) {
       const Board *eb = ensureBoard(judgeCtx, o.j.endNode);
-      if (eb) { o.panelsLeft = panelsOn(eb); o.lifeLeft = lifeOf(o.panelsLeft); o.floorKept = floorOf ? floorOf(eb) : -1; o.matLeft = materialOn(eb); o.groups = groupsOn(eb); }
+      if (eb) { o.panelsLeft = panelsOn(eb); o.lifeLeft = lifeOf(o.panelsLeft); o.floorKept = floorOf ? floorOf(eb) : -1; o.matLeft = materialOn(eb); o.groups = groupsOn(eb); o.topAfter = fullTop(eb); }
       // (and once the board has settled: a chain still falling at the line's end spends panels after it -- the opener's chains, r1412)
       if (eb && eb->chainCounter > 0) { int sn = settleOf(judgeCtx, o.j.endNode); const Board *sb = liveNode(judgeCtx, sn) ? ensureBoard(judgeCtx, sn) : 0; o.matSettled = sb ? materialOn(sb) : o.matLeft; }
       else o.matSettled = o.matLeft;

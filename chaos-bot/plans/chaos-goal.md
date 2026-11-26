@@ -139,6 +139,11 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 40 (2026-11-25 23:08 ET), seeds 9 and 10: survived 6/8.** Lost chain_garbage s10 5491 (34-56 panels under the slab, none
+  in reach, holds while the stack rose) and thicc_combo_storm s10 16119. Budgets 0. The run-33 bot: 44/48 in Normal. The fuel log:
+  fuel low with room in 4, 8 and 0 decisions, the game taking a raise in none -- under garbage the board is almost never still, so a
+  manual raise is almost never possible: the fuel raise is a dead end. Run 41: dig down to the garbage (panels plenty under it: of
+  two dying lines breaking nothing, the one leaving the stack lower first).
 - **Run 39 (2026-11-25 22:59 ET), seeds 7 and 8: survived 8/8, health 13 in every game, budgets 0** -- but raises 0 in every
   game: the reworked fuel raise did not fire either, so this is the run-33 bot again. Its record in Normal: 38/40 (runs 33, 34, 37,
   38, 39), every survivor at 13 health. Run 40: seeds 9 and 10, with the fuel raise's two tests (fuel low; the game taking a raise)

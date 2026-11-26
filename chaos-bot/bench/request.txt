@@ -106,6 +106,10 @@
 # run 39 -- (result) survived 8/8 on seeds 7-8, health 13 everywhere, budgets 0 -- but raises 0 in every game: the run-33 bot again
 #          (38/40 in Normal over runs 33-39)
 # run 40 -- seeds 9 and 10; the fuel raise's tests logged (fuel=low[:offered]), the report counts them. No change to play
+# run 40 -- (result) survived 6/8 on seeds 9-10 (lost chain s10 5491: panels 34-56 under the slab, none in reach, holds; thicc s10
+#          16119). The fuel log: fuel low with room in 4/8/0 decisions, the game taking a raise in 0 -- the fuel raise is a dead end
+# run 41 -- one change: dig down to the garbage -- panels plenty under it, of two dying lines breaking nothing, the lower stack first
+#          (rank.c, outcome.c topAfter). Seeds 9-10 again
 combo_storm 9 9 9 2 21600 10
 chain_garbage 9 9 9 1 21600 10
 thicc_combo_storm 9 9 9 3 21600 10

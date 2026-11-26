@@ -966,6 +966,15 @@ static int compareJudged(const Judge *x, const Judge *y) {
       if (lostOf(sp) - lostOf(keep) < rankSave) return (cmpKey = __LINE__, (keep == x ? -1 : 1));
     }
   }
+  // (CHAOS, DIG DOWN TO THE GARBAGE: under garbage with panels plenty -- two rows' worth or more under it (2 x W), the fuel raise's
+  // other side -- of two lines that both die and break no garbage, the one leaving the stack lower first, unless the other lives a
+  // break's time longer: clearing panels brings the garbage down within reach -- run 40 chain_garbage s10, 34-56 panels under the slab,
+  // nothing in reach, holds while the stack rose to the loss)
+  if (decF.under && materialOn(decQ.b) >= 2 * W && !x->o.lives && !y->o.lives && x->apBroke <= 0 && y->apBroke <= 0 &&
+      x->o.topAfter >= 0 && y->o.topAfter >= 0 && x->o.topAfter != y->o.topAfter) {
+    const Judge *low = x->o.topAfter < y->o.topAfter ? x : y, *hi = low == x ? y : x;
+    if (lostOf(hi) - lostOf(low) < rankSave) return (cmpKey = __LINE__, (low == x ? -1 : 1));
+  }
   // 1. lives before does not -- the line in progress that lives by the horizon alone beside a line of the mode's first entry lost no sooner
   // than it, the two alike: the mode gives way to survival only (the owner), never to a plan that lives by the horizon alone
   if (lx != ly) {

@@ -89,6 +89,10 @@ Any loss: a change, and the sets start over from the one lost.
 **Step 4 -- attack.** Garbage sent a minute, raised without giving up a single game of Step 3. Every change is checked against
 survival first. *Done when:* the owner says the rate is enough, or names a number.
 
+**Focus (the owner, 2026-11-26): the harder levels.** "It just needs to be dynamic... harder levels are where you should focus."
+Level 10 and Level 11 (the top preset: health 10, start speed 81), against garbage up to 11/11, every number read from the
+level. Lower levels are not tested until the harder ones hold; being dynamic is what carries the bot down to them.
+
 **Step 5 -- the lower levels.** The same benchmark at Levels 9, 8 and 7, with no change to the bot: every number is the level's.
 
 ## 4. Chaos rules the bot must respect (from `docs/CHAOS_RULES.md`)

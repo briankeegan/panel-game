@@ -168,7 +168,8 @@ static void answerOne(FQuestion *q, Board *b, FAnswer *out) {
   // it, run 18 ending games at 1. But once topped out with no stop left, health 1 makes every line lost at once and the hold, which
   // spends health every frame, wins the tie (run 17 insane s1: holds to the loss). There, the real health is planned with, so the search
   // finds the lines that keep the board moving and dig out)
-  int healthDraining = b->topRow && b->stopTime == 0 && b->preStopTime == 0;
+  // (run 33: off -- made when every topped line was judged lost (settles never ended); re-tested against the working verdict)
+  int healthDraining = 0 && b->topRow && b->stopTime == 0 && b->preStopTime == 0;
   if (gnPlanHealth && !healthDraining) { b->health = imin(b->health, gnPlanHealth); b->maxHealth = imin(b->maxHealth, gnPlanHealth); }
   dueFrame = q->at - 1; clockFrameOut = frameOut; rescueOn = 0;
   // (the searches' deadline is the frame loop's own: the start of the frame the decision is cut at -- the one before its move, sooner by

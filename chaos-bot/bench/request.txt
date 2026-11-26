@@ -86,6 +86,8 @@
 #          survived 7/8 (lost insane s3 4028: lines living on the margin with a three or two left, panels 31 to 10, broke 0)
 # run 32 -- one change: the cycle's fuel under garbage is a break on the garbage, not any three (outcome.c)
 #          (the first push missed outcome.c -- an edit that did not apply; that run was cancelled, this is run 32)
+#          survived 6/8 (insane s3 lived; lost chain_garbage s3 21558 -- 42 frames short -- and thicc s4 7168: backlog 9 to 15)
+# run 33 -- re-test: run 19's real health while topped out off (planned at 1 everywhere) (native.c)
 combo_storm 3 9 9 2 21600 10
 chain_garbage 3 9 9 1 21600 10
 thicc_combo_storm 3 9 9 3 21600 10

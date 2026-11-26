@@ -124,6 +124,11 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 30 (2026-11-25 21:12 ET), the cycle's margin a whole break's time: survived 6/8.** Lost thicc_combo_storm s3 10320,
+  combo_storm s4 8323; 16.49 rows a minute; budgets 0; ~20% of decisions with a living line. Since the settle fix: 3, 5, 6. combo s4:
+  backlog 8-14 from 5200, panels 12-20, then holds at margin 95 to 58 to the loss -- runs 20-23's keep-the-panels rule, made when
+  every line was judged lost, puts the hold first among dying lines. Runs 12-24's changes are re-tested one by one against the
+  working verdict; run 31: that rule off.
 - **Run 29 (2026-11-25 21:01 ET), the cycle test with the readiness: survived 5/8.** Lost combo_storm s3 14645, s4 7629,
   insane_combo_storm s4 5195; 14.23 rows a minute; budgets 0. insane s4: holds living with a break ready and never played, the margin
   137 down to 60 as the stop ran out -- the margin asked (53, the next freeze's start) left no time to finish a break. Run 30: the

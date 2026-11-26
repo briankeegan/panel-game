@@ -80,6 +80,9 @@
 #          survived 5/8 (lost combo s3 14645, combo s4 7629, insane s4 5195): holds living with a break ready, never played, margin
 #          137 down to 60 as the stop ran out
 # run 30 -- one change: the cycle's margin is a whole break's time (levelBreak), not only the next freeze's start (outcome.c)
+#          survived 6/8 (lost thicc s3 10320, combo s4 8323), 16.49 rows a minute. combo s4: backlog 8-14 from 5200, panels 12-20,
+#          and at the end holds at margin 95 to 58 -- runs 20-23's keep-the-panels rule putting the hold first among dying lines
+# run 31 -- one change: runs 20-23's keep-the-panels rule off (made when every line was judged lost) (rank.c)
 combo_storm 3 9 9 2 21600 10
 chain_garbage 3 9 9 1 21600 10
 thicc_combo_storm 3 9 9 3 21600 10

@@ -957,7 +957,9 @@ static int compareJudged(const Judge *x, const Judge *y) {
   // with nothing moving -- by clears breaking nothing at stop 53-94, panels 27 to 12, then the queue dropped on a board with none left.
   // Whatever the stop left: run 22 thicc s4, survive and hold both lost at 238 at stop 63-82 -- under a break's time, so this was not
   // asked -- and the survive line spent panels 50 to 17 for nothing. Spending is worth it only if it lives a break's time longer)
-  if ((decF.under || decQ.b->ninc > 0) && !x->o.lives && !y->o.lives && x->apBroke <= 0 && y->apBroke <= 0) {
+  // (run 31: off -- made when every line was judged lost (the engine's settles never ended, runs 1-27); with lines judged, it puts
+  // the hold first among dying lines and the bot holds its margin away -- run 30 combo s4, holds at margin 95 to 58 to the loss)
+  if (0 && (decF.under || decQ.b->ninc > 0) && !x->o.lives && !y->o.lives && x->apBroke <= 0 && y->apBroke <= 0) {
     int32_t px = panelsLeft(x), py = panelsLeft(y);
     if (px != py) {
       const Judge *keep = px > py ? x : y, *sp = keep == x ? y : x;

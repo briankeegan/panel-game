@@ -238,6 +238,17 @@ static int readBoard_(Read *R) {
     }
     chaosSmallFirst = smallFirst;
   }
+  // (run 110, CHAOS, ABOVE SIX COLOURS, CHAINS FOR STOP (the owner: be more purposeful with colours): the stack rises a row a second at
+  // level 10 and only stop time halts it; at 8 colours a combo of 8-10 is seldom there, while a 2x -- colours stacked so one clear drops
+  // a panel into the next -- buys stop (40 x 1.1^(c-2)) with six panels. The list asks a 2x, then a 3x, then a combo of four or more;
+  // the profile's list as it is at six colours and fewer. Runs 101-109 at 8 colours: about 2/8, 12-14k frames on average)
+  if (decQ.b->colors > 6 && R->list.n > 0) {
+    List L; memset(&L, 0, sizeof L);
+    L.aim[0].chain.op = OP_EQ; L.aim[0].chain.n = 2; L.aim[0].chain.near = 1; L.aim[0].brk = -1;
+    L.aim[1].chain.op = OP_EQ; L.aim[1].chain.n = 3; L.aim[1].chain.near = 1; L.aim[1].brk = -1;
+    L.aim[2].combo.op = OP_GE; L.aim[2].combo.n = 4; L.aim[2].combo.near = 1; L.aim[2].brk = -1;
+    L.n = 3; R->list = L;
+  }
   // (EIGHT AND UP -- the owner: 8x plus, 9s and 10s alike: in a list that asks combos and no chain, an entry of exactly eight asks eight
   // or more -- a two-column eight of 11 or 12 panels is the attack asked, never a combo outside the list taken out as a wasted three;
   // set 86 combo_storm 1, 261 of 277 eights taken out so)

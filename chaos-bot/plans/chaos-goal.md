@@ -150,6 +150,9 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 110 (pushed 2026-11-26 12:3x ET): above six colours, chains for stop.** The owner: "you have your work cut out for you".
+  The list asks a 2x, then a 3x, then a combo of 4+ (decide.c): only stop time halts a stack rising a row a second, and a 2x buys it
+  with six panels where an eight is seldom there at 8 colours. 8 colours L10 s3-4 (runs 108/109: 14377/12353).
 - **Run 109 (2026-11-26 12:30 ET), a three on a tall stack is room (above six colours), 8 colours L10 s3-4: survived 2/8, 12353
   frames on average** (run 108: 14377). Off: the opening still held ~48 panels at the first garbage -- at level 10 the stack rises a row
   a second, more than threes at 8 colours take off. 8 colours stands at about 2/8, ~13-14k frames on average with runs 102 and 107 kept.

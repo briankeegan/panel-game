@@ -16,7 +16,11 @@ operator if the owner does not run that server.
 - Hands run at vanilla speed (a swap every 12 frames, a cursor step every 4), with no DAS. Chaos itself has no input limit.
 - **Status:** survival at Level 10 passes the gate (one bot, 8/8 on seeds 1-10) and gets 22/24 on new seeds 11-16; Level 9 is 36/40.
   Attack (garbage sent) is not done yet, and neither are 7/8 colours or Line Clear. The live log is `chaos-bot/plans/chaos-goal.md`.
-  The bot changes often, so deploy a named commit, not the branch tip.
+  **Which commit to deploy (the owner, 2026-11-26):** deploy from `main`, like everything else, or from `bramp/multi-player` if
+  there is no `main`. `briankeegan/panel-game` has no `main`; its default branch is `beta`. As of 2026-11-26 the bot is on neither
+  `bramp/multi-player` nor `beta`. It lives only on `ccr-9ee25bfb-744765`, which branched from `beta` at `1b6fac2` and is 128
+  commits ahead. It has to be merged into `bramp/multi-player` first (a pull request, the owner's call). The bot-building agent may
+  not push to that branch.
 
 ## 2. Where the files are
 
@@ -40,6 +44,7 @@ operator if the owner does not run that server.
 
 From the extracted v3 Lua (`client/src/scenes/MainMenu.lua`, `common/engine/consts.lua`):
 
+- (Answers to the deploy agent's questions are in section 6.)
 - **`alt-server.chaos952.org`**: the server the chaos build's "VS online" menu opens (`Lobby({serverIp = "alt-server.chaos952.org"})`).
   It gives no port, so the client's default is used (49569 is the default elsewhere in the client). This is the chaos server. It
   appears to belong to the chaos build's author (chaos9520), not to the owner. Confirm who runs it before connecting a bot.
@@ -68,3 +73,31 @@ within each frame (the logs record late moves; it has 0 now).
 - Nothing outside `chaos-bot/` except the two workflow files. No shared names, concurrency groups or artifacts with Gambit's
   workflows. The games workflow uses the concurrency group `chaos-bot-games`. Leave it to the bot-building agent.
 - Don't edit `chaos-bot/` on `ccr-9ee25bfb-744765` while the bot-building agent is working there. Take a commit and copy from it.
+
+## 6. Answers to the deploy agent's questions (2026-11-26)
+
+1. **Is the field renaming all the adapting GambitNative needs?** For the stack, yes: before every frame `boot.lua` sets
+   `stopWatch = game_stopwatch or clock`, `stopWatchIsRunning = game_stopwatch_running and not do_countdown`,
+   `isToppedOut = hasPanelsInTopRow`, and copies `stopWatch` onto each garbage source. Per match it also does the following
+   (`boot.lua` `attach`):
+   - finds the local player's stack (`cs.player == GAME.localPlayer`);
+   - collects the garbage sources aimed at it (`match.engine.garbageSources[engine]`);
+   - calls `Gambit.new({})` and `bot:startMatch(engine, match.engine)`;
+   - replaces `client.send_controls` with: refresh the names, `key = bot:input(engine, sources, nil)`,
+     `engine:receiveConfirmedInput(key)`. Online, the input has to go through the client's normal networked input path instead.
+   - `countSends` only counts garbage sent for the report.
+   - Everything before `attach` (Training/Challenge settings, seeds, claiming a controller) is the offline launcher's alone.
+   - `bot:input`'s third argument (`view`, the opponent's board) is nil offline. GambitNative also supports a wired opponent copy,
+     inherited from the fork's bot, but that path is untested on chaos.
+   - GambitNative `require`s `ThinkBudget` and `InputBudget` (from `common.engine.computerPlayers.*`, else `bot.*`). `play.sh`
+     copies the chaos versions to `game/bot/`. Use the chaos `InputBudget.lua` (no action limit), not the fork's.
+2. **Which commit:** see section 1. Deploy from `main`, or from `bramp/multi-player` if there is no `main`. The bot must be merged
+   there first.
+3. **Does it need chaos.words or the CHAOSBOT_* variables?**
+   - `CHAOSBOT_*`: no. They are read only by `boot.lua` to set up the offline match.
+   - `profiles/chaos.words`: yes, it is required. GambitNative reads it at load (`GC_GAMBIT_WORDS`, else
+     `GC_GAMBIT_DIR/gambit.words`), and fails without it. Its `setup 12 12 4 ...` line holds the vanilla hand speed.
+   - Also set `GC_GAMBIT_DIR` (the directory holding `libgambit.so` and `lua/board.lua`). Optionally set `GC_GAMBIT_LOG` (the log;
+     empty means none).
+   - Optional tuning: `GC_GAMBIT_WORKERS`, `GC_GAMBIT_CPUS`, `GC_GAMBIT_WORKER_CPUS`, `GC_GAMBIT_HEAP_MB` (`host.c`).
+   - The bot reads its level, colours and other chaos settings from the stack itself, so the match's own settings apply.

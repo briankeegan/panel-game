@@ -143,6 +143,9 @@ env:
   CHAOS_BOT_REF: ac4ad5ce0bd213197b51ac051487d95ec37eff1d
   # (the chaos bot plays the other player's level from 6 up: below 6 it plays 6)
   CHAOS_LEVEL_FROM: '6'
+  # the chaos server's public replay folder (a repository VARIABLE, like panelattack.com/replays/): the evidence that lets a chaos opponent's
+  # name be shown (dashboard/privacy.py). Unset: every chaos opponent is "Name not shared". server-probe looks for it.
+  CHAOS_REPLAYS: ${{ vars.CHAOS_REPLAYS }}
 
 jobs:
   bot-vs-bot:
@@ -1231,6 +1234,21 @@ jobs:
           # the games were played on the Panel Attack engine of the bot branch (it follows the live server): replay them on that one, not this branch's older engine
           engine=""
           if git fetch -q --depth=1 origin "$UPSTREAM_BOT_REF" && git worktree add -q --detach "$PWD/engine" FETCH_HEAD; then engine="$PWD/engine"; else echo "::warning::could not check out $UPSTREAM_BOT_REF: replays will use this branch's engine"; fi
+          # the chaos bot's games were played on the chaos build: their replays are played back on it (the pinned v3 build, the bot's
+          # bot/ laid on as in its run), made the first time a chaos run needs it
+          chaos_engine=""
+          chaos_engine_dir() {
+            [ -z "$chaos_engine" ] || { echo "$chaos_engine"; return; }
+            local w="$PWD/chaos-engine"; rm -rf "$w" "$PWD/chaos-src" "$PWD/chaos-zip"
+            git init -q "$PWD/chaos-src" && git -C "$PWD/chaos-src" fetch -q --depth 1 "$CHAOS_REPO" "$CHAOS_BUILD_COMMIT" \
+              && git -C "$PWD/chaos-src" checkout -q FETCH_HEAD -- "$CHAOS_ZIP" \
+              && echo "$CHAOS_ZIP_SHA256  $PWD/chaos-src/$CHAOS_ZIP" | sha256sum -c - >/dev/null \
+              && mkdir -p "$PWD/chaos-zip" "$w" && unzip -q "$PWD/chaos-src/$CHAOS_ZIP" -d "$PWD/chaos-zip" \
+              && { unzip -q "$PWD/chaos-zip/${CHAOS_ZIP%.zip}/panel.exe" -d "$w" || [ -f "$w/main.lua" ]; } \
+              && [ -f "$w/main.lua" ] && [ -n "$engine" ] && cp -r "$engine/bot" "$w/bot" \
+              && chaos_engine="$w" || echo "::warning::could not set up the chaos build: chaos replays are left out this time" >&2
+            echo "$chaos_engine"
+          }
           done_setup=0
           for attempt in 1 2 3; do
             site_open "$PWD/site" || { echo "no gh-pages branch yet: nothing to update"; exit 0; }
@@ -1279,7 +1297,9 @@ jobs:
                 if [ -n "$url" ]; then curl -sSL "$url" -o "$d/job.log" || true; else gh api "repos/$repo/actions/jobs/$job/logs" > "$d/job.log" || true; fi
                 echo "run $id: job $job, job log $(wc -c < "$d/job.log" 2>/dev/null || echo 0) bytes, Gambit commit line: $(grep -m1 -o 'Gambit built from GameCreator [0-9a-f]*' "$d/job.log" 2>/dev/null || echo NONE)"
               fi
-              python3 dashboard/update_data.py --run-id "$id" --dir "$d" --data "$dd" --title "$title" --started "$started" --ended "$ended" --job-log "$d/job.log" --sizes site-sizes.txt --prune-out site-prune.txt --max-mb 900 ${engine:+--engine "$engine"} $redo || echo "run $id: update failed"
+              eng="$engine"
+              if [ "$dd" = site/data/chaos ]; then [ -n "$chaos_engine" ] || chaos_engine=$(chaos_engine_dir); eng="$chaos_engine"; [ -n "$eng" ] || { echo "run $id: no chaos build to play its replays on; left for the next update"; continue; }; fi
+              python3 dashboard/update_data.py --run-id "$id" --dir "$d" --data "$dd" --title "$title" --started "$started" --ended "$ended" --job-log "$d/job.log" --sizes site-sizes.txt --prune-out site-prune.txt --max-mb 900 ${eng:+--engine "$eng"} $redo || echo "run $id: update failed"
               if [ -n "$redo" ] && grep -q "\"$id\"" "$dd/runs.json" 2>/dev/null; then DD="$dd" python3 -c 'import json,os,sys; p=os.environ["DD"]+"/redone.json"; l=json.load(open(p)) if os.path.exists(p) else []; l.append(sys.argv[1]) if sys.argv[1] not in l else None; json.dump(l, open(p, "w"))' "$id"; fi
               # (names relative to data/, as site-sizes.txt has them: chaos/replay_r9.json.gz and replay_r9.json.gz are two files)
               if [ -s site-prune.txt ]; then sed 's#^data/##' site-prune.txt | sort -u > .gone; awk 'NR==FNR {g[$0]=1; next} !($2 in g)' .gone site-sizes.txt > .sizes && mv .sizes site-sizes.txt; fi

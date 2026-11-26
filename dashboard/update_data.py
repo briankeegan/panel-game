@@ -139,7 +139,9 @@ if not sha and a.job_log and os.path.exists(a.job_log):      # the commit is onl
 if not sha: sha = a.sha[:8]
 m = re.search(r"[_-]p(\d+)[_-]", a.title) or re.search(r"\bp(\d+)\b", a.title)
 nm = re.search(r"Ranmaru_([A-Za-z0-9]+)_CPU", a.title)
-bot = "p" + m.group(1) if m else (nm.group(1) if nm else "p?")
+# (another bot's name -- the chaos bot's, Chaos_CPU -- is its own label: the part after the title's last " · ")
+other = a.title.rsplit(" · ", 1)[-1].split(",")[0].strip() if " · " in a.title else ""
+bot = "p" + m.group(1) if m else (nm.group(1) if nm else (other or "p?"))
 date = a.started[:10]
 
 # --- Gambit's decision log, split into games, for the decisions and plans of each loss

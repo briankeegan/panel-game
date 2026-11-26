@@ -46,8 +46,9 @@ def names_in(folder):
     return folder.split("-vs-")
 
 
-def public_names_by_day(days):
+def public_names_by_day(days, base=BASE):
     """{day: {lowercased opponent name}} from the public archive, for each day wanted (every engine version folder)."""
+    BASE = base
     versions = [v for v in listing(BASE) if re.match(r"^v\d+$", v)]
     if not versions: raise RuntimeError("the replay archive lists no engine versions")
     out = {}
@@ -67,10 +68,11 @@ def near(d):
     return [(t + datetime.timedelta(days=k)).isoformat() for k in (-1, 0, 1)]
 
 
-# THE SETS: Ranmaru's games are data/ and are checked against panelattack.com's archive. Another bot's are data/<set>/ on its own server; a
-# server whose public archive this does not know (the chaos server, for now) gives no evidence, so every opponent there stays "Name not
-# shared" -- never shown on a guess. Give a set's archive here once it is known (the same folder layout as panelattack.com's).
-ARCHIVES = {"": BASE}
+# THE SETS, ONE RULE: Ranmaru's games are data/, checked against panelattack.com's public replay folder; the chaos bot's are data/chaos/,
+# checked the same way against the chaos server's own folder -- CHAOS_REPLAYS (a repository variable: its address, the same layout as
+# panelattack.com's). While that is not set, the chaos server gives no evidence, so every opponent there stays "Name not shared":
+# never shown on a guess.
+ARCHIVES = {"": BASE, "chaos": (os.environ.get("CHAOS_REPLAYS") or "").strip().rstrip("/") + "/" if (os.environ.get("CHAOS_REPLAYS") or "").strip() else None}
 
 
 def main(site):
@@ -89,7 +91,7 @@ def main_set(site, rel, archive):
     todo = [g for g in games if "pv" not in g and not str(g.get("opp", "")).startswith(ANON)]
     if not todo: print("privacy%s: every game is already checked" % (" (" + rel.rstrip("/") + ")" if rel else "")); return 0
     days = {nd for g in todo for nd in near(g["date"])}
-    evid = public_names_by_day(days) if archive else {}
+    evid = public_names_by_day(days, archive) if archive else {}
     hidden = {}; shown = 0; dropped = []
     # the numbers already given stay; a new player gets the next one. (Real names are never kept, so the same player in a LATER publish gets a new number.)
     nums = [int(m.group(1)) for g in games for m in [re.match(re.escape(ANON) + r" (\d+)$", str(g.get("opp", "")))] if m]

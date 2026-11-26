@@ -1,7 +1,8 @@
 -- replayFrames.lua REPLAY.json OUT.json [FROM_FRAME]
 -- Plays a saved game (the bot's REPLAY line) back through the engine and writes both boards, frame by frame.
 require("bot.headlessBoot")
-do local l = require("common.lib.logger"); l.setLogLevel(l.levels.ERROR) end
+do local l = require("common.lib.logger")   -- (the chaos build's older logger has no levels: its chatter below ERROR is silenced by hand)
+  if l.setLogLevel and l.levels then l.setLogLevel(l.levels.ERROR) else for _, k in ipairs({ "trace", "debug", "info", "warn" }) do l[k] = function() end end end end
 local json = require("common.lib.dkjson")
 local Match = require("common.engine.Match")
 local rp = json.decode(io.open(arg[1]):read("*a"))
@@ -54,7 +55,8 @@ local function incoming(st)
       for k = q.first, q.last do
         local at = q[k]
         -- transit times are on the stopWatch (the clock minus the countdown); the viewer counts on the frame clock
-        for _, g in ipairs(oq.garbageInTransit[at] or {}) do t[#t + 1] = "t" .. (at + (st.clock - st.stopWatch)) .. ":" .. piece(g) end
+        -- (the chaos build's stack has no stopWatch: its game_stopwatch is the same count)
+        for _, g in ipairs(oq.garbageInTransit[at] or {}) do t[#t + 1] = "t" .. (at + (st.clock - (st.stopWatch or st.game_stopwatch or st.clock))) .. ":" .. piece(g) end
       end
     end
   end

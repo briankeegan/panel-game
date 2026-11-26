@@ -219,7 +219,9 @@ static Outcome outcomeOf(const int32_t *seq, int n, int settled, int waitAt, int
       // breaking none, a break must still be ready for the landing (the readiness) -- the next freeze, and the garbage its fuel)
       if (!o.lives && eb && !waitTo && o.j.lostAt != NOT_ASKED) {
         int32_t margin = o.j.lostAt == FOREVER ? FOREVER : o.j.lostAt - o.j.done;
-        int fuel = o.groups > 0 || (garbageOn(eb) && breakBuildable(eb));
+        // (fuel under garbage is a break on the garbage -- it freezes longest and pays panels back; a three of panels only burns
+        // them: run 31 insane s3, lines living on the margin with a three or two left, panels 31 to 10 and broke 0, then none)
+        int fuel = garbageOn(eb) ? breakBuildable(eb) : o.groups > 0;
         // (the margin: a whole break's time -- levelBreak, the reaction then a three flashing and popping, read off the level -- not
         // only the next freeze's start: run 29 insane s4, holds living at margins 137 down to 60 with a break ready and never played,
         // the stop running out under them, then no break could be finished in what was left)

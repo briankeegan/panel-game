@@ -85,6 +85,7 @@
 # run 31 -- one change: runs 20-23's keep-the-panels rule off (made when every line was judged lost) (rank.c)
 #          survived 7/8 (lost insane s3 4028: lines living on the margin with a three or two left, panels 31 to 10, broke 0)
 # run 32 -- one change: the cycle's fuel under garbage is a break on the garbage, not any three (outcome.c)
+#          (the first push missed outcome.c -- an edit that did not apply; that run was cancelled, this is run 32)
 combo_storm 3 9 9 2 21600 10
 chain_garbage 3 9 9 1 21600 10
 thicc_combo_storm 3 9 9 3 21600 10

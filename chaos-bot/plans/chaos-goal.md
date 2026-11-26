@@ -140,6 +140,8 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 91 (2026-11-26 07:16 ET), the gate's bot on NEW seeds 13-14: survived 7/8** (lost chain s13 at 4646). On seeds it never
+  saw: 15/16. Run 92: new seeds 15-16.
 - **Run 90 (2026-11-26 07:07 ET), the gate's bot on NEW seeds 11-12: survived 8/8** (seven at full health, insane s12 at 3).
   It holds beyond its seeds. Run 91: new seeds 13-14.
 - **Run 89 (2026-11-26 06:58 ET), the run-87 bot on L10 seeds 3-4: survived 7/8** (the gate's bot: 8/8). The scarce-fuel rule

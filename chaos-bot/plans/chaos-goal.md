@@ -140,6 +140,10 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 64 (2026-11-26 02:59 ET), the run-59 bot on seeds 9-10: survived 8/8. THE NORMAL SURVIVAL GATE IS PASSED** (section 2):
+  one unchanged bot (the run-59 bot: run 46's two-break margin for lines clearing nothing, run 55/59's opening keeping its panels
+  under six rows) 8/8 on seeds 1-2 (run 61), 3-4 (62), 5-6 (60), 7-8 (63) and 9-10 (64): every game 6:00 at health 13, 0 late,
+  0 diverged, 0 surprises; 47/48 with run 59's 7/8. Next: every mode again with this bot (run 65), then fix what fails.
 - **Run 63 (2026-11-26 02:50 ET), the run-59 bot on seeds 7-8: survived 8/8, health 13 in every game.** The run-59 bot: 39/40;
   1-2, 3-4, 5-6, 7-8 all 8/8. Run 64: seeds 9-10 again (7/8 in run 59) -- 8/8 completes the survival gate.
 - **Run 62 (2026-11-26 02:41 ET), the run-59 bot on seeds 3-4: survived 8/8, health 13 in every game.** The run-59 bot: 31/32

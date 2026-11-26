@@ -140,6 +140,9 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 74 (2026-11-26 04:33 ET), LEVEL 8, seeds 1-2: survived 6/8**, survivors at full health (23); both losses at full health --
+  the queue reached 50 (the loss) under a board always busy breaking. Run 75: from 25 waiting, under garbage too, the hold lets the
+  queue's head drop when it fits (one piece a quiet frame).
 - **Run 73 (2026-11-26 04:24 ET), Step 5 -- LEVEL 9, seeds 1-2: survived 7/8**, survivors at full health (17), 0 late (lost combo
   s1 at 11544). Run 74: Level 8.
 - **Run 72 (2026-11-26 04:14 ET), chaos margin, full set: survived 7/8** (survivors at health 1: the mode shrinks health and adds

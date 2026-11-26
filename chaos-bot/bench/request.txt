@@ -217,6 +217,11 @@
 # run 73 -- Step 5: the current bot at LEVEL 9 (every number read off the level), Normal, seeds 1-2
 # run 73 -- (result) LEVEL 9, seeds 1-2: survived 7/8, every survivor at its full 17 health, 0 late (lost combo s1 at 11544)
 # run 74 -- Step 5: the current bot at LEVEL 8, Normal, seeds 1-2
+# run 74 -- (result) LEVEL 8, seeds 1-2: survived 6/8, survivors at full health (23). Lost chain s2 17614 and insane s2 18138
+#          WITH FULL HEALTH: the queue grew ~10 a minute to 50 (the loss) under a board always busy breaking garbage; the queue
+#          rule asks only with no garbage on the board
+# run 75 -- one change: from half the queue limit (25), under garbage too, a line breaking no garbage gives way to the hold when the
+#          queue's head lands without topping out (one piece drops per quiet frame) (decide.c). Level 8, seeds 1-2 again
 chain_garbage 1 9 9 1 21600 8
 combo_storm 1 9 9 1 21600 8
 thicc_combo_storm 1 9 9 1 21600 8

@@ -32,6 +32,7 @@ static int32_t raiseOpening, raiseTo, raiseRows;
 // break with) nor above the height less CHAOS_BLOCK_ROWS.
 #define CHAOS_BLOCK_ROWS 3
 static int32_t decFuelLow;   // (the fuel raise's test this decision, logged as fuel=: 0 not low, 1 low, 2 low with room)
+#define CHAOS_QUEUE_LIMIT 50   // (pieces waiting: the loss at this many, chaos Stack queue limit)
 static int32_t chaosLetDrop;   // (decisions the board was left alone so waiting garbage could drop: the log's letDrop)
 static int32_t chaosWaiting = -1;   // (the rows waiting at the last such test, -1 none: the log's q)
 #define CHAOS_RAISE_MIN 3
@@ -2175,6 +2176,16 @@ static Played playOf(const Read *R, int n) {
     // combo storm never let it drop under the stricter ceiling test, letDrop=0, and lost at 3455 with 11 rows dropped at once)
     chaosWaiting = waiting;
     if (panelTop(decQ.b) + waiting <= h - 1) { P.line = 0; P.deferred = 0; chaosLetDrop++; }
+  }
+  // (run 75, CHAOS, THE QUEUE HAS A LIMIT: fifty pieces waiting is the loss (Match/Stack: queue size), health or none. A quiet frame drops
+  // ONE piece -- the queue's head (Stack:tryDropGarbage pops one) -- and its fall makes the board busy again. So under garbage too, once
+  // half the limit waits, a chosen line breaking no garbage gives way to the hold when the head lands without topping the board out:
+  // the queue drains a piece at a time. Run 74, level 8: chain s2 and insane s2 lost at 17614 and 18138 with full health (23) -- the
+  // queue grew ~10 a minute to 50 under a board always busy breaking, and the rule above never asked (garbage on the board))
+  else if (P.line && R->under && !R->up && decQ.b->ninc >= CHAOS_QUEUE_LIMIT / 2 && P.line->apBroke <= 0) {
+    int32_t head = decQ.b->inc[0].height > 0 ? decQ.b->inc[0].height : 1, h = decQ.b->height ? decQ.b->height : 12;
+    chaosWaiting = head;
+    if (fullTop(decQ.b) + head <= h - 1) { P.line = 0; P.deferred = 0; chaosLetDrop++; }
   }
   P.name = P.line ? P.line->k.play : R->up ? -2 : PLAY_HOLD;   // -2: the raise
   for (int i = 0; i < n; i++) if (order[i]->o.lives) P.nlive++;

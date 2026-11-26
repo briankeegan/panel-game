@@ -672,6 +672,9 @@ static void answerTurn(int32_t qid, int32_t at, int32_t allowanceKnown, int32_t 
   L_s(" want="); if (R.up) L_s("raise"); else if (P.wait) L_s("hold"); else if (!n) L_s("-"); else if (order[0]->hold || order[0]->wait) L_s("hold"); else L_mv(order[0]->k.seq[0]);
   L_s(" got="); if (d.kind == 1) L_mv(d.move); else L_s(d.kind == 2 ? "raise" : "hold");
   L_s(" src=gambit v="); L_s(A->verdict == 1 ? "lives" : A->verdict == 2 ? "dies" : A->verdict == 3 ? "raise" : "none");
+  // (CHAOS, THE CYCLE VERDICT'S NUMBERS for the first line in the order: its loss left alone (-1 stands), the frame it is done, the
+  // threes its board leaves, whether the judge found it dead in its own steps, whether the outcome did -- cyc=lostAt/done/groups/jdead/dead)
+  if (n) { const Outcome *oc = &order[0]->o; L_s(" cyc="); L_i(oc->j.lostAt == FOREVER ? -1 : oc->j.lostAt); L_s("/"); L_i(oc->j.done); L_s("/"); L_i(oc->groups); L_s("/"); L_i(oc->j.dead); L_s("/"); L_i(oc->dead); }
   L_s(" under="); L_i(R.under); L_s(" mat="); L_d(R.F.v[FACT_US_MATERIAL]); L_s(" pan="); L_i(panelsOn(decQ.b)); L_s(" chain="); L_i(A->chain); L_s(" combo="); L_i(A->combo); L_s(" broke="); L_i(A->broke); L_s(" clr="); L_i(A->cleared);
   // (the chain the board makes left alone, and the one it makes with the line played: own=4/2 is a chain cut short -- a line the judge
   // could not play out, or the hold, shows the board's own)

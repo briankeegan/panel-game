@@ -122,6 +122,9 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 26 (2026-11-25 20:20 ET), the cycle verdict: survived 7/8, lives 0 of ~9,800 decisions.** The verdict never fired: run
+  23's bot again (lost thicc_combo_storm s4 16701). Run 27 logs the numbers of the verdict for the first line of each decision
+  (its loss left alone, the frame it is done, the threes left, dead flags) to find which condition fails.
 - **Run 26 (pushed 2026-11-25 20:12 ET), the cycle verdict:** a line lives when, once done, the margin to the top left alone is at
   least the next freeze's start (reaction + two swaps' walks, the hands' frames) and it leaves fuel (a three, or breakable garbage).
   The report now counts the decisions judged alive, so whether the verdict takes is measured, not guessed.

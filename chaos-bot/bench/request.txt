@@ -67,6 +67,9 @@
 # run 26 -- one change: the cycle verdict -- a line lives when, once done, the board's margin to the top (left alone) is at least the
 #          next freeze's start (the reaction and two swaps' walks) and it leaves fuel (a three or breakable garbage) (outcome.c).
 #          The report counts decisions judged alive (lives n/N)
+#          survived 7/8 (lost thicc s4 16701) -- but lives 0/9800: the verdict never fired, so this was run 23's bot again
+# run 27 -- no change to play: each decision logs the cycle numbers of its first line (cyc=lostAt/done/groups/jdead/dead), to see
+#          which of margin and fuel fails
 combo_storm 3 9 9 2 21600 10
 chain_garbage 3 9 9 1 21600 10
 thicc_combo_storm 3 9 9 3 21600 10

@@ -131,10 +131,14 @@
 #          6697 with NO garbage: six lines clearing nothing in a row each lived on one break's margin (187 down to 115), then none lived
 # run 46 -- one change: a line that clears nothing needs two breaks' margin to live -- the break it puts off and the next (outcome.c).
 #          The losses it may touch (15:6, Ridiculous 4, Panel Hell 4), No Stop Time combo s1, and Normal seed 10 x 4 as the check
-challenge 1 9 9 1 21600 9 challenge=15:6
-challenge 1 9 9 1 21600 7 challenge=16:4
-challenge 1 9 9 1 21600 8 challenge=17:4
-combo_storm 1 9 9 1 21600 10 mode=3
+# run 46 -- (result) 6/8, and every loss it was aimed at turned: Ridiculous 4 won, Panel Hell 4 won, No Stop Time combo s1 6:00 at
+#          health 13 (lost 6250 in run 35), 15:6 alive to the two-minute wall (health 8; the wall is attack work); Normal s10 chain,
+#          combo, thicc 6:00 at 13 (chain and thicc lost in run 40); lost insane s10 at 21070
+# run 47 -- the run-46 bot, unchanged, on Normal seeds 9 and 10 (the gate: 8/8 on every seed set with one bot)
+chain_garbage 9 9 9 1 21600 10
+combo_storm 9 9 9 1 21600 10
+thicc_combo_storm 9 9 9 1 21600 10
+insane_combo_storm 9 9 9 1 21600 10
 chain_garbage 10 9 9 1 21600 10
 combo_storm 10 9 9 1 21600 10
 thicc_combo_storm 10 9 9 1 21600 10

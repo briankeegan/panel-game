@@ -140,6 +140,9 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 46 (2026-11-26 00:10 ET), a line that clears nothing needs two breaks' margin: 6/8, every targeted loss turned.**
+  Ridiculous 4 won, Panel Hell 4 won (8 colours, no stop time), No Stop Time combo s1 6:00 at health 13, Line Clear 15:6 alive to
+  the two-minute wall; Normal s10 chain/combo/thicc 6:00 at 13; lost insane s10 at 21070. Run 47: this bot on Normal seeds 9-10.
 - **Run 45 (2026-11-25 23:56 ET), the rest of Challenge Mode: 3/8.** Ridiculous 5 and Line Clear 15:1-2 won. A Line Clear stage
   waits 7230 frames (2:00.5) and then sends a row a frame with no queue limit, so 50 queued ends it: a two-minute attack test (send
   the stage's rows: 15:3 needs 39.5, the bot sent 30.3) -- Step 4 work; 15:3-5 and 14:6 ended that way, health full. 15:6 lost by

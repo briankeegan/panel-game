@@ -3,9 +3,8 @@
 // on, the line toward a break begun, the line in progress, the pair the last swap swapped.
 
 #define BREAK_SHARE 0.4    // of the searches' time (propose.c leftMs), for the break search
-#define UNDER_SHARE 0.9    // with garbage on the board: there the break is what saves the board (run 103, chaos: 0.75 -> 0.9 -- the
-                           // break search ran out of time with nothing found on a third of decisions under garbage; the same budget,
-                           // more of it to the break)
+#define UNDER_SHARE 0.75   // with garbage on the board: there the break is what saves the board (run 103 tried 0.9 at 8 colours:
+                           // 2/8, 11690 frames on average against 12565 -- no better; back)
 // (the profile's own, in percent, where it gives one: gb_share)
 static double breakShare = BREAK_SHARE, underShare = UNDER_SHARE;
 #define FILL_UNDER_SHARE 0.9   // in fill, with garbage on the board: fill buries the board in slabs, and only breaks keep it (seed 86: 27 and 27 of 28

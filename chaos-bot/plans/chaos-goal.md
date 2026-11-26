@@ -150,6 +150,9 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 103 (2026-11-26 10:47 ET), the break search's share under garbage 0.9, 8 colours L10 s1-2: survived 2/8, 11690 frames on
+  average** (run 102: 12565) -- no better; back to 0.75. Run 104: the planner narrower and deeper in the same time (chaos-deep: width 28,
+  depth 10).
 - **Run 102 (2026-11-26 10:37 ET), a living break puts a dying plan down, 8 colours L10 s1-2: survived 2/8, 12565 frames on
   average (run 101: 9670).** Kept. Losses: full boards (~50 panels) topped out, no-line. Under garbage the break search found nothing on
   57% of decisions, a third of them cut short by its time (6 colours alike). Run 103: the break search's share of the same budget under

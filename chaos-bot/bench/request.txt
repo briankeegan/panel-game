@@ -311,11 +311,15 @@
 #   (run 101: 9670). Kept. Losses: full boards (~50 panels) topped, no-line; under garbage the break search found nothing on
 #   57% of decisions, a third of them cut short by its time
 # run 103 -- the break search's share of the same budget under garbage 0.75 -> 0.9 (answer.c UNDER_SHARE): 8 colours L10 s1-2
-chain_garbage 1 9 9 1 21600 10 colors=8
-combo_storm 1 9 9 1 21600 10 colors=8
-thicc_combo_storm 1 9 9 1 21600 10 colors=8
-insane_combo_storm 1 9 9 1 21600 10 colors=8
-chain_garbage 2 9 9 1 21600 10 colors=8
-combo_storm 2 9 9 1 21600 10 colors=8
-thicc_combo_storm 2 9 9 1 21600 10 colors=8
-insane_combo_storm 2 9 9 1 21600 10 colors=8
+# run 103 -- (result) break search share 0.9 under garbage, 8 colours L10 s1-2: survived 2/8, 11690 frames on average (run 102: 12565)
+#   -- no better; back to 0.75
+# run 104 -- the planner narrower and deeper in the same time (profile chaos-deep: width 40 -> 28, depth 7 -> 10): at 8 colours a
+#   three is a longer walk (panels only move sideways). 8 colours L10 s1-2
+chain_garbage 1 9 9 1 21600 10 colors=8 profile=chaos-deep
+combo_storm 1 9 9 1 21600 10 colors=8 profile=chaos-deep
+thicc_combo_storm 1 9 9 1 21600 10 colors=8 profile=chaos-deep
+insane_combo_storm 1 9 9 1 21600 10 colors=8 profile=chaos-deep
+chain_garbage 2 9 9 1 21600 10 colors=8 profile=chaos-deep
+combo_storm 2 9 9 1 21600 10 colors=8 profile=chaos-deep
+thicc_combo_storm 2 9 9 1 21600 10 colors=8 profile=chaos-deep
+insane_combo_storm 2 9 9 1 21600 10 colors=8 profile=chaos-deep

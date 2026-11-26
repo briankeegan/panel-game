@@ -140,6 +140,9 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 47 (2026-11-26 00:19 ET), the run-46 bot on seeds 9-10: survived 8/8, health 13 in every game** -- the first 8/8 on
+  9-10 (insane s10 lost in run 46 and lived here: the search's time budget makes games vary, so a set is passed only by one
+  unchanged bot on every set). Run 48: seeds 1-2, then 3-4, 5-6, 7-8.
 - **Run 46 (2026-11-26 00:10 ET), a line that clears nothing needs two breaks' margin: 6/8, every targeted loss turned.**
   Ridiculous 4 won, Panel Hell 4 won (8 colours, no stop time), No Stop Time combo s1 6:00 at health 13, Line Clear 15:6 alive to
   the two-minute wall; Normal s10 chain/combo/thicc 6:00 at 13; lost insane s10 at 21070. Run 47: this bot on Normal seeds 9-10.

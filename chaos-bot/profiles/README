@@ -6,3 +6,5 @@ bench/play.sh plays profiles/${CHAOSBOT_PROFILE:-chaos}.words.
 
 chaos.words (run 95, 2026-11-26): finish them asks combos 4, 5, 6 before 8, 9, 10 -- a four buys about 23 frames of freeze and stop
 a panel, an eight about 15. The profile before it is chaos-big.words.
+Run 96 (combos 4-6 first always): seeds 13-14 6/8. chaos.words is the eights-first profile again; the order is chosen each decision
+by the panels on the board instead (decide.c, run 97): smallest first at or under the life peak (33 panels), as listed above it.

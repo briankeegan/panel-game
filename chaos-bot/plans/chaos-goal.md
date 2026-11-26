@@ -148,6 +148,10 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 96 (2026-11-26 09:31 ET), combos 4-6 first always, 1'g, L10 seeds 13-14: survived 6/8.** chain s13 lost at 4630 (run 91:
+  4646); combo s14 at 2901 with 44-61 panels on the board -- a full board needs the big clears -- after a carried 5 into a 2x waited on
+  for 110 frames that never fired. Seeds 13-16: 14/16, the same as the gate's bot. Run 97: the combo size chosen by the panels each
+  decision (decide.c): smallest first at or under 33 panels (the life peak), eights first above it; chaos.words back to eights first.
 - **Run 95 (2026-11-26 09:22 ET), combos 4-6 first (chaos-small) with 1'g, L10 seeds 15-16: survived 8/8, every game at full health
   (13)** -- no health lost in any game; run 92 (the gate's bot) 7/8, run 94 (1'g alone) 7/8. Kept: `profiles/chaos.words` is now the
   small-combo profile (the old one `chaos-big.words`). The new bot has to pass every seed set (1-16) again at L10, then L11.

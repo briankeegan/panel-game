@@ -285,6 +285,10 @@
 # run 95 -- (result) chaos-small + 1'g on L10 seeds 15-16: survived 8/8, every game at full health (13), 0 late. Kept: chaos.words is
 #   now the small-combo profile (the old one is chaos-big.words). The new bot goes round every seed set; seeds 15-16 done
 # run 96 -- the new bot (combos 4-6 first, 1'g) on L10 seeds 13-14 (run 91 lost chain s13)
+# run 96 -- (result) combos 4-6 first always, 1'g, L10 seeds 13-14: survived 6/8 (chain s13 at 4630 as run 91; combo s14 at 2901 with
+#   44-61 panels -- a full board, and a carried 5 into a 2x waited on 110 frames that never fired). Seeds 13-16: 14/16, as the gate's bot
+# run 97 -- the combo size by the panels (decide.c): smallest first at or under 33 panels (the life peak), eights first above; 1'g:
+#   L10 seeds 13-14
 chain_garbage 13 9 9 1 21600 10
 combo_storm 13 9 9 1 21600 10
 thicc_combo_storm 13 9 9 1 21600 10

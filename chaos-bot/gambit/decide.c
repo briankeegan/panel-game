@@ -4,7 +4,7 @@
 typedef struct { int32_t has, out, topKnown, top, stopKnown, stop; } Opp;
 static Opp theOpp;
 static int32_t garbageSeen;   // (garbage has been on the board or on its way this game)
-static int32_t canRaiseNow, gambitHit, modeRule = -1, hostTopped, surviveAsked;
+static int32_t canRaiseNow, gambitHit, modeRule = -1, hostTopped, surviveAsked, chaosSmallFirst;
 #define OP_FALL_LOST AT_LEVEL(200)   // (frames to the board's loss inside which an extension short of the eight gives way: set 86 combo_storm 7, its extensions lost at 130-193 and a break at 442-465; combo_storm 3's at 205, kept, made its 8; the large slabs', lost at 299-471 a second chain is still made)
 #define OP_KEEP_PANELS 36   // (the panels the opener's chain leaves once landed, at least: six rows -- the owner: keep enough to break)
 #define OP_FALL_KEEP AT_LEVEL(250)   // (and how much longer the line it gives way to keeps the board: set 86 combo_storm 7, a break 294-312 frames longer; combo_storm 3, 135-232, the chain the eight needed given up and the board lost all the same)
@@ -216,6 +216,27 @@ static int readBoard_(Read *R) {
   R->keep = rule->keep.on ? rule->keep : theTables.keep; R->keepOn = R->keep.on && garbageGame;
   floorKeep = R->keep; floorKeepOn = R->keepOn; floorOf = decisionFloor;
   R->list = rule->list; R->end = rule->end;
+  // (run 97, CHAOS, THE COMBO SIZE BY THE PANELS: a four buys about 23 frames of freeze and stop a panel, an eight about 15 (40 x
+  // 1.05^(c-4) stop, FLASH+FACE+POP x n) -- with the board at or under the panels it lives longest with (outcome.c lifePeakOf, 33),
+  // the list's combos asked smallest first; above it, as the profile lists them (eights first: a full board needs panels off it).
+  // Within W panels of the peak the last order holds. Run 95 (combos 4-6 first always): L10 seeds 15-16 8/8 at full health; run 96:
+  // seeds 13-14 6/8, combo s14 lost at 2901 with 44-61 panels on the board)
+  {
+    static int32_t smallFirst = 0, lastClk = -1;
+    if (decQ.b->clock < lastClk) smallFirst = 0;
+    lastClk = decQ.b->clock;
+    int32_t pn = panelsOn(decQ.b), peak = lifePeakOf();
+    if (pn <= peak - W / 2) smallFirst = 1; else if (pn > peak + W / 2) smallFirst = 0;
+    if (smallFirst) {
+      for (int i = 1; i < R->list.n; i++) for (int j = i; j > 0; j--) {
+        const Test *a = &R->list.aim[j - 1].combo, *b = &R->list.aim[j].combo;
+        if (a->op == OP_EQ && b->op == OP_EQ && !R->list.aim[j - 1].chain.op && !R->list.aim[j].chain.op && b->n < a->n) {
+          Aim t = R->list.aim[j - 1]; R->list.aim[j - 1] = R->list.aim[j]; R->list.aim[j] = t;
+        } else break;
+      }
+    }
+    chaosSmallFirst = smallFirst;
+  }
   // (EIGHT AND UP -- the owner: 8x plus, 9s and 10s alike: in a list that asks combos and no chain, an entry of exactly eight asks eight
   // or more -- a two-column eight of 11 or 12 panels is the attack asked, never a combo outside the list taken out as a wasted three;
   // set 86 combo_storm 1, 261 of 277 eights taken out so)

@@ -293,6 +293,12 @@ static int canMatch(const Panel *p) {
 #define DT_SPEED_INCREASE (15 * 60)
 static int hasActivePanels(Board *b) { return b->nActive > 0 || b->nPrevActive > 0; }
 static int swapQueued(Board *b) { return b->queuedSwapCol != 0 && b->queuedSwapRow != 0; }
+static int caQuiet(Board *b) {
+  if (hasActivePanels(b) || swapQueued(b) || b->chainCounter) return 0;
+  for (int r = 1; r <= TOP(b); r++)
+    for (int c = 1; c <= W; c++) { const int32_t *f = P(b, r, c)->f; if (f[COLOR] != 0 && f[STATE] != NORMAL) return 0; }
+  return 1;
+}
 // Stack.has_falling_garbage (rows 1..height)
 static int hasFallingGarbage(Board *b) {
   for (int r = 1; r <= b->height && r < b->nrows; r++)
@@ -1007,6 +1013,10 @@ void caRun(Board *b) {
   b->clock++;
   b->stopWatch = (b->stopWatch == NUL ? -1 : b->stopWatch) + 1;
   b->input = 0;
+  // THE BOARD HAS SETTLED (b->quiet: the search's MK_SETTLE waits for it, search.h) -- nothing moved this frame or the last, no swap
+  // queued, no chain running, every panel at rest (pa.c isQuiet). Only a signal: nothing here is skipped on it. Left 0 until 2026-11-26,
+  // so no settle ever ended: every line the judge played ran on to the board's loss, and every decision was judged lost (runs 1-27)
+  b->quiet = !b->noQuiet && caQuiet(b);
 }
 
 // =============================================================== setup and questions

@@ -115,11 +115,15 @@
 # run 42 -- (result) survived 8/8 on seeds 1-2, health 13 everywhere, budgets 0 (the run-33 bot: 52/56 in Normal)
 # run 43 -- CHALLENGE MODE, Impossible (difficulty 11), stages 1-8, one game each: the stage sets level 11, chaos margin, 4-7
 #          colours; passed = the challenger beaten, or alive at 6:00. No change to the bot
-challenge 1 9 9 1 21600 11 challenge=11:1
-challenge 1 9 9 1 21600 11 challenge=11:2
-challenge 1 9 9 1 21600 11 challenge=11:3
-challenge 1 9 9 1 21600 11 challenge=11:4
-challenge 1 9 9 1 21600 11 challenge=11:5
-challenge 1 9 9 1 21600 11 challenge=11:6
-challenge 1 9 9 1 21600 11 challenge=11:7
-challenge 1 9 9 1 21600 11 challenge=11:8
+# run 43 -- (result) Impossible 8/8 won (stage 1 1:08 ... stage 8 3:05), surprises 0/140, 0 late; health left 6,5,6,5,5,3,3,1
+# run 44 -- CHALLENGE MODE, Panel Hell (17: level 8, game mode 3 = no stop time, 5-8 colours, 30 rows a minute of healing)
+#          stages 1-4 and Ridiculous (16: level 7, 6 colours, chaos margin) stages 1-4. The launcher now records the stage's own
+#          level/colours/game mode/margin/queue. No change to the bot
+challenge 1 9 9 1 21600 8 challenge=17:1
+challenge 1 9 9 1 21600 8 challenge=17:2
+challenge 1 9 9 1 21600 8 challenge=17:3
+challenge 1 9 9 1 21600 8 challenge=17:4
+challenge 1 9 9 1 21600 7 challenge=16:1
+challenge 1 9 9 1 21600 7 challenge=16:2
+challenge 1 9 9 1 21600 7 challenge=16:3
+challenge 1 9 9 1 21600 7 challenge=16:4

@@ -102,8 +102,12 @@ local function startMatch()
       player:setInputMethod("controller")
       player:restrictInputs(GAME.input.inputConfigurations[1])
     end
-    LEVEL = player.settings.level
-    say(string.format("match asked: challenge %s:%s level %s colors %s", CH_D, CH_S, tostring(player.settings.level), tostring(player.settings.colorCount)))
+    -- the result records the stage's own settings (ChallengeMode:setStage), not the env defaults
+    local st = player.settings
+    LEVEL, COLORS, GAMEMODE, QUEUE = st.level, st.color_count or COLORS, st.game_mode or GAMEMODE, st.queue_type or QUEUE
+    MARGIN, CHAOSMODE = st.margin_time or MARGIN, st.chaos_mode and true or false
+    say(string.format("match asked: challenge %s:%s level %s colors %s gamemode %s margin %s queue %s", CH_D, CH_S,
+      tostring(LEVEL), tostring(COLORS), tostring(GAMEMODE), tostring(MARGIN), tostring(QUEUE)))
     return
   end
   player:setStyle(GameModes.Styles.MODERN)

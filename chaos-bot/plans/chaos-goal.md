@@ -140,6 +140,9 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 43 (2026-11-25 23:36 ET), Challenge Mode Impossible (difficulty 11), stages 1-8: won 8/8**, 1:08 to 3:05, surprises
+  0/140, 0 late; health left 6,5,6,5,5,3,3,1 (stage 8 won on its last point: the margin to fix). Run 44: Panel Hell (17, no stop
+  time, 5-8 colours) stages 1-4 and Ridiculous (16) stages 1-4; the launcher records each stage's own settings.
 - **Run 42 (2026-11-25 23:27 ET), seeds 1 and 2: survived 8/8, health 13 in every game, budgets 0.** The run-33 bot in Normal:
   52/56 (seeds 1-2 8/8, 3-4 8/8, 5-6 7/8 and 8/8, 7-8 7/8 and 8/8, 9-10 6/8). Run 43: Challenge Mode -- the launcher starts a
   challenge stage (challenge=D:S); Impossible, its 8 stages (level 11, chaos margin, 4-7 colours), won or alive at 6:00.

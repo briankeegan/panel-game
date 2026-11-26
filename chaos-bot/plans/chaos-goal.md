@@ -68,7 +68,10 @@ board's danger. *Done when:* 4 games played end to end on Actions with 0 diverge
 the benchmark run again. Health is permanent in chaos, so the board's danger is judged on health too: garbage resting in the top
 row costs health that never comes back, and a line that saves frames by spending health is ranked as the loss it is. *Done when:*
 8/8 survived with budgets at 0, then the next run on a new set of seeds (3 and 4, then 5 and 6, ...) 8/8 too -- a run that gets 8/8
-moves the benchmark to new seeds; it is never rerun on the same ones.
+moves the benchmark to new seeds; it is never rerun on the same ones. **Survival is called complete only when one bot, unchanged,
+has 8/8 on several sets** (owner, 2026-11-25 21:50 ET: "try a few more seeds before saying it's complete"): after run 33's 8/8 on
+seeds 3-4, the same bot on seeds 5-6, 7-8 and 9-10, and on seeds 1-2 again (run 20 passed them with the bot before the settle fix).
+Any loss: a change, and the sets start over from the one lost.
 
 **Step 4 -- attack.** Garbage sent a minute, raised without giving up a single game of Step 3. Every change is checked against
 survival first. *Done when:* the owner says the rate is enough, or names a number.

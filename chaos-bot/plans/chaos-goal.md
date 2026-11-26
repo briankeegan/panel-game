@@ -94,6 +94,9 @@ Level 10 and Level 11 (the top preset: health 10, start speed 81), against garba
 level. Never test below Level 9 (the owner, 2026-11-26: "you can test on 9 or 10 as well.. depending on the training mode.. just
 don't test below 9"): Levels 9, 10 and 11, whichever suits the training mode. Being dynamic is what carries the bot to the rest.
 
+**One mode at a time (the owner, 2026-11-26 12:4x ET: "focus on [one] at a time"):** the weakest mode is worked on alone until it
+holds -- now 8 colours at Level 10 -- and nothing else is changed or surveyed meanwhile.
+
 **Step 5 -- every level from 9 up.** The same benchmark at Levels 9, 10 and 11, with no change to the bot: every number is the
 level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 

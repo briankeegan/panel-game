@@ -139,6 +139,9 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 37 (2026-11-25 22:39 ET), the fuel raise: survived 8/8 on seeds 5 and 6 -- health 13 in every game.** Budgets 0,
+  surprises 0/787, 16.26 rows a minute; insane s5 (lost at 2124 in run 34) lived. A changed bot re-earns every set: 7-8, 9-10, 1-2,
+  and 3-4 again. Run 38: seeds 7 and 8.
 - **Run 36 (2026-11-25 22:28 ET), colour counts: 5/8.** 4 colours: both 6:00, 26.8 and 25.6 rows a minute. 5: insane 6:00, combo
   lost 2755 (panels 5-8, nothing to break with). 7: both 6:00. 8: combo lost 17845, insane 11518 (fewer matches, slower digging).
   Budgets 0. Fuel is the common thread (insane s5, NST, 5 colours) and the bot has never raised: the refill raise only fired on a stack

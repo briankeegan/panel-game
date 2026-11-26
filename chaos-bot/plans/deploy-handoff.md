@@ -16,11 +16,9 @@ operator if the owner does not run that server.
 - Hands run at vanilla speed (a swap every 12 frames, a cursor step every 4), with no DAS. Chaos itself has no input limit.
 - **Status:** survival at Level 10 passes the gate (one bot, 8/8 on seeds 1-10) and gets 22/24 on new seeds 11-16; Level 9 is 36/40.
   Attack (garbage sent) is not done yet, and neither are 7/8 colours or Line Clear. The live log is `chaos-bot/plans/chaos-goal.md`.
-  **Which commit to deploy (the owner, 2026-11-26):** deploy from `main`, like everything else, or from `bramp/multi-player` if
-  there is no `main`. `briankeegan/panel-game` has no `main`; its default branch is `beta`. As of 2026-11-26 the bot is on neither
-  `bramp/multi-player` nor `beta`. It lives only on `ccr-9ee25bfb-744765`, which branched from `beta` at `1b6fac2` and is 128
-  commits ahead. It has to be merged into `bramp/multi-player` first (a pull request, the owner's call). The bot-building agent may
-  not push to that branch.
+  **Branch to deploy from: `bramp/multi-player`.** `briankeegan/panel-game` has no `main`. The bot is not on `bramp/multi-player`
+  yet. It lives only on `ccr-9ee25bfb-744765`, so it has to be merged into `bramp/multi-player` with a pull request first. The
+  bot-building agent may not push to that branch.
 
 ## 2. Where the files are
 
@@ -91,8 +89,7 @@ within each frame (the logs record late moves; it has 0 now).
      inherited from the fork's bot, but that path is untested on chaos.
    - GambitNative `require`s `ThinkBudget` and `InputBudget` (from `common.engine.computerPlayers.*`, else `bot.*`). `play.sh`
      copies the chaos versions to `game/bot/`. Use the chaos `InputBudget.lua` (no action limit), not the fork's.
-2. **Which commit:** see section 1. Deploy from `main`, or from `bramp/multi-player` if there is no `main`. The bot must be merged
-   there first.
+2. **Which branch:** `bramp/multi-player`, after the bot is merged into it (see section 1).
 3. **Does it need chaos.words or the CHAOSBOT_* variables?**
    - `CHAOSBOT_*`: no. They are read only by `boot.lua` to set up the offline match.
    - `profiles/chaos.words`: yes, it is required. GambitNative reads it at load (`GC_GAMBIT_WORDS`, else

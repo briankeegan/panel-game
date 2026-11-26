@@ -76,6 +76,7 @@ typedef struct {
   int32_t even;                 // the board it ends on: its tallest column less its lowest, in rows (evenOf; -1 not known)
   int32_t spread;               // and how its colours are spread (spreadOf): the pairs a swap from a match less the pairs touching
   int32_t seams;                // and its crossed seams (seamsOf): the swaps on it that finish two colours at once
+  int32_t gap;                  // and the empty cells under its garbage, each column's lowest garbage down to what holds it (gapOf; -1 not known)
 } Judged;
 
 static LOCAL Ctx *judgeCtx;   // the judge's own nodes: a search can ask it while its own nodes stand
@@ -311,6 +312,19 @@ static void ownChainOf(const Question *q) {
 }
 // THE JUDGE: the line seq (n swaps, r * 8 + c) from the question, as the options say.
 // HOW FLAT A BOARD IS: its tallest column less its lowest, in rows -- panels and garbage alike, the stack as it stands
+// (CHAOS, THE GARBAGE HELD UP: the empty cells between each column's lowest garbage cell and the first thing under it -- the canyon a
+// piece is perched over, out of reach of any break until the panels under it are built back up. Run 92 insane s16 17400-18158: the middle
+// cleared under garbage resting on the edge towers, more landing on top, lost at 18633)
+static int32_t gapOf(const Board *b) {
+  int32_t gap = 0;
+  for (int c = 1; c <= W; c++) {
+    int g = 0;
+    for (int r = 1; r < b->nrows; r++) if (b->p[r][c].f[ISGARBAGE]) { g = r; break; }
+    if (!g) continue;
+    for (int r = g - 1; r >= 1 && b->p[r][c].f[COLOR] <= 0 && !b->p[r][c].f[ISGARBAGE]; r--) gap++;
+  }
+  return gap;
+}
 static int32_t evenOf(const Board *b) {
   int hi = 0, lo = 1 << 20;
   for (int c = 1; c <= W; c++) {
@@ -638,7 +652,7 @@ static void judgeOnce(const Question *q, const int32_t *seq, int nseq, const Jud
   for (int z = 4; z < MAXCOMBOS + 64; z++) if (single[z] && j->nsingles < MAXCOMBOS) j->singles[j->nsingles++] = z;
   Node *e = NODE(x, n);
   j->endNode = n;
-  { const Board *eb = ensureBoard(x, n); j->even = eb ? evenOf(eb) : -1; j->spread = eb ? spreadOf(eb) : 0; j->seams = eb ? seamsOf(eb) : 0; }
+  { const Board *eb = ensureBoard(x, n); j->even = eb ? evenOf(eb) : -1; j->gap = eb ? gapOf(eb) : -1; j->spread = eb ? spreadOf(eb) : 0; j->seams = eb ? seamsOf(eb) : 0; }
   j->dropAt = j->dead ? 0 : e->t + imax(e->stopTime + e->preStopTime, e->shakeTime);
   j->fire = j->nats ? j->ats[j->nats - 1] : -1;
   if (o->lifeTo >= 0) j->lostAt = j->dead ? j->deadAt : lostAlone(x, n, imax(o->lifeTo, imax(lastAt, o->lifeStop ? j->dropAt : 0) + o->lifeRest));

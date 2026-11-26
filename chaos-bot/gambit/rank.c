@@ -566,6 +566,7 @@ static int cutsShort(const Judge *J) {
   return aloneChain > 1 && J->apWhole < aloneChain && ownChainAsked(aloneChain);
 }
 #define FLAT_ROWS 2
+#define GAP_CELLS 3   // (1'g: three empty cells under the garbage, a column half dug out, or three columns a row each)
 #define BREAK_WALK 20   // the actions a break's line is pressed in, as the allowance keeps them (an estimate: a few swaps and their walks)
 static int downtime(void) {
   return !decF.under && (decF.next == NOT_ASKED || decF.next > 2 * rankSave) && decQ.b->chainCounter < 2 &&
@@ -1274,6 +1275,12 @@ static int compareJudged(const Judge *x, const Judge *y) {
   if ((lx || lostAlike(x, y)) && !decF.under && decQ.narr == 0 && decF.next == NOT_ASKED && decQ.b->chainCounter < 2 &&
       x->o.j.even >= 0 && y->o.j.even >= 0 && iabs(x->o.j.even - y->o.j.even) >= FLAT_ROWS)
     return (cmpKey = __LINE__, (x->o.j.even - y->o.j.even));
+  // 1'g. (run 94, CHAOS) UNDER GARBAGE, NO CANYON UNDER IT: garbage on the board, of two that both live or are lost alike and break
+  // the same garbage, the one leaving GAP_CELLS fewer empty cells under the garbage (judge.c gapOf) first -- a piece perched over a
+  // cleared middle is out of reach of every break, and what lands next lands on it. Run 92 insane s16 17400-18158, lost at 18633
+  if (decF.under && (lx || lostAlike(x, y)) && imax(0, x->apBroke) == imax(0, y->apBroke) && x->o.j.gap >= 0 && y->o.j.gap >= 0 &&
+      iabs(x->o.j.gap - y->o.j.gap) >= GAP_CELLS)
+    return (cmpKey = __LINE__, (x->o.j.gap - y->o.j.gap));
   // 1'f. NO SLAB AT THE FINISH: where the list is the finish (finishAsked), of two that survive alike, the line that sends no slab of two
   // rows or more (a chain of three or longer, the board's own going on included) before one that does, whatever either breaks -- the
   // owner: no big chains at the finish; a chain is played there only where nothing else lives as long

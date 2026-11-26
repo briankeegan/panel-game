@@ -91,9 +91,11 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 **Focus (the owner, 2026-11-26): the harder levels.** "It just needs to be dynamic... harder levels are where you should focus."
 Level 10 and Level 11 (the top preset: health 10, start speed 81), against garbage up to 11/11, every number read from the
-level. Lower levels are not tested until the harder ones hold; being dynamic is what carries the bot down to them.
+level. Never test below Level 9 (the owner, 2026-11-26: "you can test on 9 or 10 as well.. depending on the training mode.. just
+don't test below 9"): Levels 9, 10 and 11, whichever suits the training mode. Being dynamic is what carries the bot to the rest.
 
-**Step 5 -- the lower levels.** The same benchmark at Levels 9, 8 and 7, with no change to the bot: every number is the level's.
+**Step 5 -- every level from 9 up.** The same benchmark at Levels 9, 10 and 11, with no change to the bot: every number is the
+level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 4. Chaos rules the bot must respect (from `docs/CHAOS_RULES.md`)
 

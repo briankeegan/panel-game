@@ -37,6 +37,12 @@ ENV = dict(os.environ,
 def load(name, default):
     p = os.path.join(a.data, name)
     return json.load(open(p)) if os.path.exists(p) else default
+# THE SET: --data is data/ (Ranmaru's games) or data/<set>/ (another bot's, e.g. data/chaos/). Names written for the page's commit (the prune
+# list) carry the set's folder, and of the sizes file only this set's lines count: each set numbers its own games, so r9 is in both.
+_dp = os.path.normpath(a.data).split(os.sep)
+SETDIR = (_dp[-1] + "/") if len(_dp) >= 2 and _dp[-2] == "data" else ""
+PRE = "data/" + SETDIR
+
 def save(name, obj):
     json.dump(obj, open(os.path.join(a.data, name), "w"), separators=(",", ":"))
 
@@ -52,7 +58,7 @@ if a.redo and a.run_id in runs:
     for n in gone0:
         f = os.path.join(a.data, n)
         if os.path.exists(f): os.remove(f)
-    if a.prune_out and gone0: open(a.prune_out, "a").write("".join("data/" + n + "\n" for n in gone0))
+    if a.prune_out and gone0: open(a.prune_out, "a").write("".join(PRE + n + "\n" for n in gone0))
     for v in vers0:
         if mine and v["sha"] == mine[0].get("sha") and v.get("runs", 1) > 1: v["runs"] -= 1
     save("games.json", [r for r in rows0 if r.get("run") != a.run_id]); save("versions.json", vers0)
@@ -68,7 +74,7 @@ if prior and not resume:
     for n_ in prior.get("replays", []):              # replays a partial publish made: taken back with its rows (the final update makes them again)
         fp_ = os.path.join(a.data, n_)
         if os.path.exists(fp_): os.remove(fp_)
-        if a.prune_out: open(a.prune_out, "a").write("data/" + n_ + "\n")
+        if a.prune_out: open(a.prune_out, "a").write(PRE + n_ + "\n")
     rows0 = load("games.json", []); vers0 = load("versions.json", [])
     rows0 = [r for r in rows0 if r.get("run") != a.run_id]
     for v in vers0:
@@ -280,7 +286,12 @@ if not a.partial:
     if a.sizes and os.path.exists(a.sizes):
         for line in open(a.sizes):
             parts = line.split(None, 1)
-            if len(parts) == 2 and parts[1].strip().startswith("replay_r"): known.setdefault(parts[1].strip(), int(parts[0]))
+            if len(parts) != 2: continue
+            nm = parts[1].strip()
+            if SETDIR and not nm.startswith(SETDIR): continue      # another set's replay
+            if not SETDIR and "/" in nm: continue
+            nm = nm[len(SETDIR):]
+            if nm.startswith("replay_r"): known.setdefault(nm, int(parts[0]))
     total = sum(known.values()); limit = a.max_mb * 1e6; gone = []
     when = {("replay_" + r["replay"] + ".json.gz"): (r.get("at") or (r.get("date", "") + "T00:00:00Z")) for r in rows if r.get("replay")}
     for name in sorted(known, key=lambda n: (when.get(n, ""), rnum(n))):
@@ -292,7 +303,7 @@ if not a.partial:
         ids = {n.replace("replay_", "").replace(".json.gz", "") for n in gone}
         for r in rows:
             if r.get("replay") in ids: del r["replay"]
-        if a.prune_out: open(a.prune_out, "a").write("".join("data/" + n + "\n" for n in gone))
+        if a.prune_out: open(a.prune_out, "a").write("".join(PRE + n + "\n" for n in gone))
         print("pruned %d old replays, %.0f MB kept" % (len(gone), total / 1e6))
 rows.sort(key=lambda r: r.get("at") or (r.get("date", "") + "T00:00:00Z"))
 vers.sort(key=lambda q: q.get("start") or "")

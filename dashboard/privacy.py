@@ -67,14 +67,29 @@ def near(d):
     return [(t + datetime.timedelta(days=k)).isoformat() for k in (-1, 0, 1)]
 
 
+# THE SETS: Ranmaru's games are data/ and are checked against panelattack.com's archive. Another bot's are data/<set>/ on its own server; a
+# server whose public archive this does not know (the chaos server, for now) gives no evidence, so every opponent there stays "Name not
+# shared" -- never shown on a guess. Give a set's archive here once it is known (the same folder layout as panelattack.com's).
+ARCHIVES = {"": BASE}
+
+
 def main(site):
-    path = os.path.join(site, "data", "games.json")
-    if not os.path.exists(path): print("privacy: no games.json yet"); return 0
+    rc = 0
+    sets = [""] + sorted(n + "/" for n in os.listdir(os.path.join(site, "data")) if os.path.isfile(os.path.join(site, "data", n, "games.json"))) \
+        if os.path.isdir(os.path.join(site, "data")) else [""]
+    for rel in sets:
+        rc = main_set(site, rel, ARCHIVES.get(rel.rstrip("/"))) or rc
+    return rc
+
+
+def main_set(site, rel, archive):
+    path = os.path.join(site, "data", rel, "games.json")
+    if not os.path.exists(path): print("privacy%s: no games.json yet" % (" (" + rel.rstrip("/") + ")" if rel else "")); return 0
     games = json.load(open(path))
     todo = [g for g in games if "pv" not in g and not str(g.get("opp", "")).startswith(ANON)]
-    if not todo: print("privacy: every game is already checked"); return 0
+    if not todo: print("privacy%s: every game is already checked" % (" (" + rel.rstrip("/") + ")" if rel else "")); return 0
     days = {nd for g in todo for nd in near(g["date"])}
-    evid = public_names_by_day(days)
+    evid = public_names_by_day(days) if archive else {}
     hidden = {}; shown = 0; dropped = []
     # the numbers already given stay; a new player gets the next one. (Real names are never kept, so the same player in a LATER publish gets a new number.)
     nums = [int(m.group(1)) for g in games for m in [re.match(re.escape(ANON) + r" (\d+)$", str(g.get("opp", "")))] if m]
@@ -90,15 +105,15 @@ def main(site):
             r = g.pop("replay", None)
             if r: dropped.append("replay_%s.json.gz" % r)
     for n in dropped:
-        f = os.path.join(site, "data", n)
+        f = os.path.join(site, "data", rel, n)
         if os.path.exists(f): os.remove(f)
     if dropped:
         with open(os.path.join(site, "..", "site-prune.txt"), "a") as p:
-            p.write("".join("data/%s\n" % n for n in dropped))
+            p.write("".join("data/%s%s\n" % (rel, n) for n in dropped))
     json.dump(games, open(path, "w"), separators=(",", ":"))
     # (only counts are printed: the log of a public repository must not name the players kept off the page)
-    print("privacy: %d games checked, %d shown with the opponent's name, %d made anonymous (%d players), %d replays dropped"
-          % (len(todo), shown, len(todo) - shown, len(hidden), len(dropped)))
+    print("privacy%s: %d games checked, %d shown with the opponent's name, %d made anonymous (%d players), %d replays dropped"
+          % ((" (" + rel.rstrip("/") + ")" if rel else ""), len(todo), shown, len(todo) - shown, len(hidden), len(dropped)))
     return 0
 
 

@@ -4,7 +4,9 @@
 #     (<project>-data.pages.dev), which the page reads when it is opened;
 #   - the page (index.html, from dashboard/page.html + loader.js) lives on `gh-pages` and goes up only when it changes (page_publish).
 # site_open DIR  : DIR is a checkout of the data branch's small files (data/*.json); the replays are never downloaded.
-#                  It writes DIR/../site-sizes.txt, 'bytes name' for every replay on the page.
+#                  It writes DIR/../site-sizes.txt, 'bytes name' for every replay on the page, the name relative to data/ (replay_r9.json.gz
+#                  for Ranmaru's, chaos/replay_r9.json.gz for another set's -- each set numbers its own games, so a bare name is not enough).
+#                  A set is a folder in data/ with its own games.json (data/chaos/: the chaos bot); Ranmaru's are data/ itself.
 # site_push DIR MESSAGE : publishes DIR's tree as a single commit, only if nobody pushed in the meantime (else returns 1: start over).
 SITE_BRANCH=${SITE_BRANCH:-stats-data}
 site_open() {
@@ -14,9 +16,9 @@ site_open() {
   SITE_OLD=$(git rev-parse FETCH_HEAD)
   git worktree add -q --detach --no-checkout "$dir" "$SITE_OLD" || return 1
   git -C "$dir" sparse-checkout init --no-cone >/dev/null 2>&1
-  git -C "$dir" sparse-checkout set '/data/*.json' >/dev/null 2>&1
+  git -C "$dir" sparse-checkout set '/data/*.json' '/data/*/*.json' >/dev/null 2>&1
   git -C "$dir" checkout -q --detach "$SITE_OLD"
-  git -C "$dir" ls-tree -r -l "$SITE_OLD" -- data/ | awk '{n=split($5,a,"/"); print $4, a[n]}' > "$dir/../site-sizes.txt"
+  git -C "$dir" ls-tree -r -l "$SITE_OLD" -- data/ | awk '{p=$5; sub(/^data\//, "", p); print $4, p}' > "$dir/../site-sizes.txt"
   mkdir -p "$dir/data"
 }
 site_push() {

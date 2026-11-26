@@ -32,7 +32,13 @@ def rewrite_replay(path):
 
 
 def main(site):
-    data = os.path.join(site, "data")
+    root = os.path.join(site, "data")
+    # every set: data/ (Ranmaru) and each data/<set>/ beside it (the chaos bot's)
+    for data in [root] + sorted(os.path.join(root, n) for n in os.listdir(root) if os.path.isdir(os.path.join(root, n))) if os.path.isdir(root) else []:
+        main_dir(data)
+
+
+def main_dir(data):
     # games
     gp = os.path.join(data, "games.json")
     if os.path.exists(gp):

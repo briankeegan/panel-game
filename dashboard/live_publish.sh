@@ -25,9 +25,12 @@ info=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" --jq '[.dis
 title=${info%%$'\t'*}; started=${info#*$'\t'}
 [ -n "$title" ] && [ -n "$started" ] || { echo "could not read the run's title"; exit 0; }
 now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+# the set: the chaos bot's games go to data/chaos/ (the page's #set=chaos), every other bot's to data/ (Ranmaru's)
+sub=""; [ "${BOT_HOST:-}:${BOT_PORT:-}" != "${CHAOS_SERVER:-none}" ] || sub=/chaos
 for attempt in 1 2 3; do
   site_open "$w/site" || { echo "no gh-pages branch"; exit 0; }
-  python3 dashboard/update_data.py --run-id "$GITHUB_RUN_ID" --dir "$d" --data "$w/site/data" --title "$title" --started "$started" --partial --sha "$sha" --now "$now" ${eng:+--engine "$eng"} || { echo "update_data.py failed"; exit 0; }
+  mkdir -p "$w/site/data$sub"
+  python3 dashboard/update_data.py --run-id "$GITHUB_RUN_ID" --dir "$d" --data "$w/site/data$sub" --title "$title" --started "$started" --partial --sha "$sha" --now "$now" ${eng:+--engine "$eng"} || { echo "update_data.py failed"; exit 0; }
   # (the page itself is NOT rebuilt here: this checkout is the one the bot started on, and may be older than the page on the site; the update step rebuilds it)
   site_push "$w/site" "Gambit stats: games so far from the run in progress" && { echo "published (attempt $attempt)"; exit 0; }
   echo "push failed (attempt $attempt)"

@@ -42,6 +42,7 @@ on:
           - auto
           - panelattack.com:49569
           - 104.156.250.136:49569
+          - alt-server.chaos952.org:49569
       bot:
         description: '3. Gambit (the bot in the lobby): the latest main, or a kept build named for its actions window (w150 = 150 actions in 10 seconds)'
         required: true
@@ -53,6 +54,7 @@ on:
           - gambit-w100
           - gambit-w90
           - gambit-w80
+          - chaos
       name:
         description: '4. That bot''s name in the lobby (letters, digits, _; 16 max). A # is the next number: ranmaru-deploy swaps between the two saved accounts and renames one, so Ranmaru_p#_CPU gives p7, then p8, ... On the Bramp server the names in a fight take over existing accounts, so any name works'
         required: false
@@ -127,6 +129,18 @@ env:
   # the deployed commit, runs use exactly that build (see the fetch step).
   UPSTREAM_DEPLOYED_TAG: betaserver-live
   UPSTREAM_BOT_REF: claude/game-bot-creation-action-0e7emk
+  # THE CHAOS BUILD (chaos9520's fork of Panel Attack, its own server): a third server, upstream-protocol like the beta one (network
+  # 005), with its own bot -- Gambit rebuilt on the chaos engine (chaos-bot/ on CHAOS_BOT_REF of this repo). The game is the v3 test
+  # build, pinned by commit AND checksum (chaos-bot/game/fetch.sh), and the bot is a named commit, never a branch tip: bot=chaos with
+  # server=alt-server.chaos952.org:49569, nothing else. Its games go to the stats page's chaos set (data/chaos/, #set=chaos).
+  CHAOS_SERVER: alt-server.chaos952.org:49569
+  CHAOS_REPO: https://github.com/chaos9520/panel-game.git
+  CHAOS_BUILD_COMMIT: 4da6c5dd9249c58c53362c9e2204c5c0138ec203
+  CHAOS_ZIP: test-build_v3.zip
+  CHAOS_ZIP_SHA256: ec5baf0025bd16c62a12dfde51770071e58008650311bab928c62463daa91336
+  CHAOS_BOT_REF: ac4ad5ce0bd213197b51ac051487d95ec37eff1d
+  # (the chaos bot plays the other player's level from 6 up: below 6 it plays 6)
+  CHAOS_LEVEL_FROM: '6'
 
 jobs:
   bot-vs-bot:
@@ -167,8 +181,16 @@ jobs:
           # gambit-w100 etc.: Gambit of that kept build (a name in GameCreator's gambit-versions.txt)
           kind=$BOT
           case "$BOT" in gambit-*) kind=gambit; [ -n "$gambit_from" ] || gambit_from=$BOT;; esac
+          # the chaos bot: Gambit on the chaos build, which plays only the chaos server (and nothing else plays there)
+          chaos=""
+          if [ "$BOT" = chaos ] || [ '${{ env.SERVER_EFF }}' = "$CHAOS_SERVER" ]; then
+            [ "$BOT" = chaos ] && [ '${{ env.SERVER_EFF }}' = "$CHAOS_SERVER" ] || { echo "::error::bot=chaos goes with server=$CHAOS_SERVER, and only it plays there"; exit 1; }
+            [ '${{ env.MODE }}' = live ] || { echo "::error::the chaos bot runs as mode: live for now (deploy / stop / fight come once it has played the real server)"; exit 1; }
+            case '${{ env.BOT_NAME }}' in *'#'*|Ranmaru*) echo "::error::name the chaos bot (not the Ranmaru default), e.g. Chaos_CPU"; exit 1;; esac
+            kind=gambit; chaos=1
+          fi
           [ -n "$profile" ] || profile=survivor-profiles/gambit.json
-          { echo "RUN_START=$(date +%s)"; echo "PROFILE=$profile"; echo "GAMBIT_FROM=$gambit_from"; echo "UPSTREAM_REF=$upstream_ref"; echo "BOT_KIND=$kind"; echo "STANDBY=$standby"; echo "AFTER=$after"; [ -z "$level" ] || echo "PA_LEVEL=$level"; } >> "$GITHUB_ENV"
+          { echo "RUN_START=$(date +%s)"; echo "PROFILE=$profile"; echo "GAMBIT_FROM=$gambit_from"; echo "UPSTREAM_REF=$upstream_ref"; echo "BOT_KIND=$kind"; echo "STANDBY=$standby"; echo "AFTER=$after"; echo "CHAOS=$chaos"; [ -z "$level" ] || echo "PA_LEVEL=$level"; } >> "$GITHUB_ENV"
 
       # Status from the very start (for the agent): every minute the bot's status file says which step the run is on, so a stall in
       # setup is visible while it happens (the bot's own status only starts once the bot is running). Never fails the run.
@@ -223,7 +245,7 @@ jobs:
         run: |
           set -eu
           server='${{ env.SERVER_EFF }}'
-          if [ "$server" = "$BETA_SERVER" ] || [ "$server" = "$PROD_SERVER" ]; then
+          if [ "$server" = "$BETA_SERVER" ] || [ "$server" = "$PROD_SERVER" ] || [ "$server" = "$CHAOS_SERVER" ]; then
             [ '${{ env.MODE }}' = live ] || { echo "$server is only for mode: live"; exit 1; }   # fight: the fork's client only
             dir="$GITHUB_WORKSPACE/upstream"
           else
@@ -245,7 +267,7 @@ jobs:
       #   3. the latest UPSTREAM_REF -- right whenever the server was deployed
       #      from beta's head, which is the normal case.
       - name: Check out the upstream bot
-        if: (env.SERVER_EFF == env.BETA_SERVER || env.SERVER_EFF == env.PROD_SERVER)
+        if: (env.SERVER_EFF == env.BETA_SERVER || env.SERVER_EFF == env.PROD_SERVER || env.SERVER_EFF == env.CHAOS_SERVER)
         uses: actions/checkout@v4
         with:
           ref: ${{ env.UPSTREAM_BOT_REF }}
@@ -253,7 +275,7 @@ jobs:
           sparse-checkout: bot
 
       - name: Fetch upstream Panel Attack and add the bot
-        if: (env.SERVER_EFF == env.BETA_SERVER || env.SERVER_EFF == env.PROD_SERVER)
+        if: (env.SERVER_EFF == env.BETA_SERVER || env.SERVER_EFF == env.PROD_SERVER || env.SERVER_EFF == env.CHAOS_SERVER)
         env:
           PIN: ${{ env.UPSTREAM_REF }}
         run: |
@@ -267,10 +289,23 @@ jobs:
           else
             ref="$UPSTREAM_REF"; why="latest $UPSTREAM_REF (no $UPSTREAM_DEPLOYED_TAG tag; assuming the server runs it)"
           fi
+          if [ "${CHAOS:-}" = 1 ]; then
+            # THE CHAOS BUILD: the game players run (the v3 zip: panel.exe is love.exe with the game appended), pinned by commit and checksum
+            git init -q chaossrc
+            git -C chaossrc fetch -q --depth 1 "$CHAOS_REPO" "$CHAOS_BUILD_COMMIT"
+            git -C chaossrc checkout -q FETCH_HEAD -- "$CHAOS_ZIP"
+            echo "$CHAOS_ZIP_SHA256  chaossrc/$CHAOS_ZIP" | sha256sum -c - || { echo "::error::the chaos build is not the pinned one"; exit 1; }
+            mkdir -p chaoszip upstream
+            unzip -q "chaossrc/$CHAOS_ZIP" -d chaoszip
+            unzip -q "chaoszip/${CHAOS_ZIP%.zip}/panel.exe" -d upstream || [ -f upstream/main.lua ]
+            [ -f upstream/main.lua ] || { echo "::error::no game in the chaos build"; exit 1; }
+            echo "::notice::bot runs on the chaos build ($CHAOS_ZIP of chaos9520/panel-game ${CHAOS_BUILD_COMMIT:0:8})"
+          else
           git init -q upstream
           git -C upstream fetch -q --depth 1 "$UPSTREAM_REPO" "$ref"
           git -C upstream checkout -q FETCH_HEAD
           echo "::notice::bot runs on upstream $(git -C upstream log -1 --format='%h %s') -- $why"
+          fi
           [ ! -e upstream/bot ] || { echo "upstream now has its own bot/ -- refusing to overwrite it"; exit 1; }
           cp -r botsrc/bot upstream/bot
           # THE LINK TO GAMECREATOR'S BOTS IS ALWAYS THIS RUN'S: the upstream-protocol bot/ is its own client, but the
@@ -279,7 +314,7 @@ jobs:
           for f in bot/SurvivalLink.lua bot/tests/survivalLinkTelegraphVerify.lua; do
             mkdir -p "upstream/$(dirname "$f")"; cp "$f" "upstream/$f"
           done
-          (cd upstream && LUA_PATH="./?.lua;./common/lib/?.lua;$(luarocks path --local --lua-version 5.1 --lr-path);;" \
+          [ "${CHAOS:-}" = 1 ] || (cd upstream && LUA_PATH="./?.lua;./common/lib/?.lua;$(luarocks path --local --lua-version 5.1 --lr-path);;" \
              LUA_CPATH="./common/lib/?.so;./common/lib/?/?.so;$(luarocks path --local --lua-version 5.1 --lr-cpath);;" \
              luajit bot/tests/survivalLinkTelegraphVerify.lua)
 
@@ -292,7 +327,7 @@ jobs:
       # re-run it, or run bot/beverly.sh on the server box under systemd for
       # something permanent.
       - name: Check the name and the weight set before connecting
-        if: (env.MODE == 'live' || env.MODE == 'survival') && !(env.MODE == 'live' && (env.SERVER_EFF == env.BETA_SERVER || env.SERVER_EFF == env.PROD_SERVER) && (env.BOT_KIND == 'wasm' || env.BOT_KIND == 'bitbot' || env.BOT_KIND == 'gambit'))
+        if: (env.MODE == 'live' || env.MODE == 'survival') && !(env.MODE == 'live' && (env.SERVER_EFF == env.BETA_SERVER || env.SERVER_EFF == env.PROD_SERVER || env.SERVER_EFF == env.CHAOS_SERVER) && (env.BOT_KIND == 'wasm' || env.BOT_KIND == 'bitbot' || env.BOT_KIND == 'gambit'))
         run: |
           set -eu
           cd "$BOT_DIR"
@@ -324,7 +359,7 @@ jobs:
       # one), so a beta bot keeps its name by saving the id it was given
       # instead -- see "Save the account id".
       - name: Derive this name's account id
-        if: env.MODE == 'live' && !(env.SERVER_EFF == env.BETA_SERVER || env.SERVER_EFF == env.PROD_SERVER)
+        if: env.MODE == 'live' && !(env.SERVER_EFF == env.BETA_SERVER || env.SERVER_EFF == env.PROD_SERVER || env.SERVER_EFF == env.CHAOS_SERVER)
         env:
           BASE_NAME: ${{ env.BOT_NAME }}
           BOT_IP: ${{ env.BOT_HOST }}
@@ -347,15 +382,24 @@ jobs:
       # is built here from GameCreator's own native/build.sh line; WasmSurvivor
       # is a Node process beside the client (bot/SurvivalLink.lua talks to it).
       - name: Check out GameCreator (beta bot)
-        if: env.MODE == 'live' && (env.SERVER_EFF == env.BETA_SERVER || env.SERVER_EFF == env.PROD_SERVER) && (env.BOT_KIND == 'wasm' || env.BOT_KIND == 'bitbot' || env.BOT_KIND == 'gambit')
+        if: env.MODE == 'live' && env.CHAOS != '1' && (env.SERVER_EFF == env.BETA_SERVER || env.SERVER_EFF == env.PROD_SERVER) && (env.BOT_KIND == 'wasm' || env.BOT_KIND == 'bitbot' || env.BOT_KIND == 'gambit')
         uses: actions/checkout@v4
         with:
           repository: briankeegan/GameCreator
           path: GameCreator
           sparse-checkout: games/the-game
 
+      # the chaos bot: Gambit on the chaos engine, chaos-bot/ of this repo at CHAOS_BOT_REF (a named commit: the bot changes often)
+      - name: Check out the chaos bot
+        if: env.MODE == 'live' && env.CHAOS == '1'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.CHAOS_BOT_REF }}
+          path: chaosbot
+          sparse-checkout: chaos-bot
+
       - name: The Gambit of another GameCreator commit (beta/real server)
-        if: env.MODE == 'live' && (env.SERVER_EFF == env.BETA_SERVER || env.SERVER_EFF == env.PROD_SERVER) && env.BOT_KIND == 'gambit' && env.GAMBIT_FROM != ''
+        if: env.MODE == 'live' && env.CHAOS != '1' && (env.SERVER_EFF == env.BETA_SERVER || env.SERVER_EFF == env.PROD_SERVER) && env.BOT_KIND == 'gambit' && env.GAMBIT_FROM != ''
         env:
           GAMBIT_FROM: ${{ env.GAMBIT_FROM }}
         run: |
@@ -368,17 +412,19 @@ jobs:
           echo "::notice::Gambit of GameCreator $GAMBIT_FROM ($from)"
 
       - uses: actions/setup-node@v4
-        if: env.MODE == 'live' && (env.SERVER_EFF == env.BETA_SERVER || env.SERVER_EFF == env.PROD_SERVER) && (env.BOT_KIND == 'wasm' || env.BOT_KIND == 'bitbot' || env.BOT_KIND == 'gambit')
+        if: env.MODE == 'live' && (env.SERVER_EFF == env.BETA_SERVER || env.SERVER_EFF == env.PROD_SERVER || env.SERVER_EFF == env.CHAOS_SERVER) && (env.BOT_KIND == 'wasm' || env.BOT_KIND == 'bitbot' || env.BOT_KIND == 'gambit')
         with:
           node-version: '22'
 
       - name: Sit in the lobby (beta, ${{ inputs.bot }})
-        if: env.MODE == 'live' && (env.SERVER_EFF == env.BETA_SERVER || env.SERVER_EFF == env.PROD_SERVER) && (env.BOT_KIND == 'wasm' || env.BOT_KIND == 'bitbot' || env.BOT_KIND == 'gambit')
+        if: env.MODE == 'live' && (env.SERVER_EFF == env.BETA_SERVER || env.SERVER_EFF == env.PROD_SERVER || env.SERVER_EFF == env.CHAOS_SERVER) && (env.BOT_KIND == 'wasm' || env.BOT_KIND == 'bitbot' || env.BOT_KIND == 'gambit')
         id: betalink
         run: |
           set -eu
           eval "$(luarocks path --local --lua-version 5.1)"
           export GC_EVAL_DIR="$GITHUB_WORKSPACE/GameCreator/games/the-game/ai/eval"
+          # the chaos bot: chaos-bot/gambit beside chaos-bot/profiles (GambitNative is found at GC_EVAL_DIR/../gambit), its words file as is
+          [ "${CHAOS:-}" != 1 ] || export GC_EVAL_DIR="$GITHUB_WORKSPACE/chaosbot/chaos-bot/profiles" PA_LEVEL_MIRROR="$CHAOS_LEVEL_FROM"
           # name is "BOT" or "BOT,OPPONENT": the second half is a lobby name this bot challenges
           name='${{ env.BOT_NAME }}'
           # "BOT,OPPONENT" or "BOT,OPPONENT,GAMES": after GAMES finished games against OPPONENT the bot stops challenging
@@ -389,7 +435,7 @@ jobs:
           # GAMES may be "first10": a series, first to 10 wins, then back to accepting anyone
           first=""; case "$games" in first*) first=${games#first}; games="";; esac
           [ -n "$name" ] && [ ${#name} -le 16 ] || { echo "name '$name' must be 1-16 characters"; exit 1; }
-          echo "::notice::GameCreator at $(git -C "$GC_EVAL_DIR" log -1 --format='%h %s' | cut -c1-120)"
+          echo "::notice::$([ "${CHAOS:-}" = 1 ] && echo "the chaos bot" || echo GameCreator) at $(git -C "$GC_EVAL_DIR" log -1 --format='%h %s' | cut -c1-120)"
           kind='${{ env.BOT_KIND }}'
           pin=""
           if [ "$kind" = bitbot ]; then
@@ -400,11 +446,20 @@ jobs:
             # GameCreator's Gambit (C, libgambit.so), built here and played in the client's own process
             # (gambit/lua/GambitNative.lua). Its profile is a path under the eval dir, as numbers (words.js).
             G="$GC_EVAL_DIR/../gambit"
+            if [ "${CHAOS:-}" = 1 ]; then
+              # the chaos bot's settings are its words file (profiles/chaos.words: the vanilla hand speed with it); it will not load without it
+              gp=chaos.words
+              [ -f "$GC_EVAL_DIR/$gp" ] || { echo "no chaos bot words $GC_EVAL_DIR/$gp"; exit 1; }
+              sh "$G/build.sh" native > gambit-build.log 2>&1 || { cat gambit-build.log; echo "libgambit.so did not build"; exit 1; }
+              cp "$GC_EVAL_DIR/$gp" "$PWD/gambit.words"
+              export GC_GAMBIT_DIR="$G"
+            else
             gp=survivor-profiles/gambit.json
             case '${{ env.PROFILE }}' in survivor-profiles/*) gp='${{ env.PROFILE }}';; esac
             [ -f "$GC_EVAL_DIR/$gp" ] || { echo "no Gambit profile $GC_EVAL_DIR/$gp"; exit 1; }
             sh "$G/build.sh" native > gambit-build.log 2>&1 || { cat gambit-build.log; echo "libgambit.so did not build"; exit 1; }
             GC_SURVIVOR_PROFILE="$GC_EVAL_DIR/$gp" node "$G/words.js" > "$PWD/gambit.words" 2>> gambit-build.log || { cat gambit-build.log; echo "Gambit's profile did not encode"; exit 1; }
+            fi
             echo "setup: Gambit profile encoded"
             gc=$(git -C "$GC_EVAL_DIR" log -1 --format=%h)
             [ -z "${GAMBIT_COMMIT:-}" ] || gc="${GAMBIT_COMMIT:0:8} (gambit_from '${{ env.GAMBIT_FROM }}'; main is $gc)"
@@ -515,7 +570,7 @@ jobs:
               # MEMORY: Gambit's heap only grows (its pools reach new peaks and nothing goes back to the system), so a bot whose memory after
               # a match passes 70% of the machine's RAM hands over the same way, early -- long before the kernel would kill it mid-game.
               why=""
-              if [ "$kind" = gambit ] && [ ! -e "$RUNNER_TEMP/restart-deploy" ]; then
+              if [ "$kind" = gambit ] && [ "${CHAOS:-}" != 1 ] && [ ! -e "$RUNNER_TEMP/restart-deploy" ]; then   # (the chaos bot: not yet, see CHAOS_SERVER)
                 if [ $(( $(date -u +%s) - started )) -ge 14400 ]; then why="4 hours"; fi
                 rss=$(grep 'memory after match: rss' "$GITHUB_WORKSPACE/bot-prod-smoke.log" 2>/dev/null | tail -n 1 | sed -n 's/.*rss \([0-9][0-9]*\) kB.*/\1/p' || true)
                 tot=$(awk '/^MemTotal:/ {print $2}' /proc/meminfo 2>/dev/null || true)
@@ -624,7 +679,7 @@ jobs:
           case "$rc" in 0|124|75) : ;; *) exit "$rc";; esac
 
       - name: Sit in the lobby
-        if: env.MODE == 'live' && !(env.MODE == 'live' && (env.SERVER_EFF == env.BETA_SERVER || env.SERVER_EFF == env.PROD_SERVER) && (env.BOT_KIND == 'wasm' || env.BOT_KIND == 'bitbot' || env.BOT_KIND == 'gambit'))
+        if: env.MODE == 'live' && !(env.MODE == 'live' && (env.SERVER_EFF == env.BETA_SERVER || env.SERVER_EFF == env.PROD_SERVER || env.SERVER_EFF == env.CHAOS_SERVER) && (env.BOT_KIND == 'wasm' || env.BOT_KIND == 'bitbot' || env.BOT_KIND == 'gambit'))
         id: live
         env:
           PA_SEARCH_PROFILE: ${{ env.PROFILE }}
@@ -684,7 +739,7 @@ jobs:
       # commits it to UPSTREAM_BOT_REF so the next run logs back in instead of
       # being denied as "already taken". Not secret, on purpose: bot accounts.
       - name: Save the account id
-        if: always() && (env.SERVER_EFF == env.BETA_SERVER || env.SERVER_EFF == env.PROD_SERVER)
+        if: always() && (env.SERVER_EFF == env.BETA_SERVER || env.SERVER_EFF == env.PROD_SERVER || env.SERVER_EFF == env.CHAOS_SERVER)
         run: |
           set -eu
           n='${{ env.BOT_NAME }}'; n=${n%%,*}   # (a "BOT,OPPONENT" name: the account is the bot's)
@@ -744,7 +799,7 @@ jobs:
           WASM_PROFILE: ${{ env.PROFILE }}
         run: |
           eval "$(luarocks path --local --lua-version 5.1)"
-          [ "${BOT_HOST}:${BOT_PORT}" != "$BETA_SERVER" ] && [ "${BOT_HOST}:${BOT_PORT}" != "$PROD_SERVER" ] || { echo "fight plays the fork's server only"; exit 1; }
+          [ "${BOT_HOST}:${BOT_PORT}" != "$BETA_SERVER" ] && [ "${BOT_HOST}:${BOT_PORT}" != "$PROD_SERVER" ] && [ "${BOT_HOST}:${BOT_PORT}" != "$CHAOS_SERVER" ] || { echo "fight plays the fork's server only"; exit 1; }
           if [ -d GameCreator ]; then echo "::notice::GameCreator $(git -C GameCreator log -1 --format='%h %s')"; fi
           echo "::notice::${{ env.BOT_NAME }} (${{ env.BOT_KIND }}) vs ${{ inputs.player || 'you' }} on $BOT_HOST:$BOT_PORT for ${{ inputs.hours }}h"
           set -o pipefail
@@ -851,7 +906,7 @@ jobs:
       # It starts the same name with versus-player (no deploy, no rename).
       - name: Bring the bot back if it ended on its own
         # never on a cancel: a cancelled run starts nothing (a cancel is someone stopping it on purpose)
-        if: ${{ always() && !cancelled() && env.MODE == 'live' && env.BOT_KIND == 'gambit' && !contains(inputs.advanced, 'no-restart') && !contains(inputs.advanced, 'bot_run') }}
+        if: ${{ always() && !cancelled() && env.MODE == 'live' && env.BOT_KIND == 'gambit' && env.CHAOS != '1' && !contains(inputs.advanced, 'no-restart') && !contains(inputs.advanced, 'bot_run') }}
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
@@ -1180,15 +1235,20 @@ jobs:
             : > site-prune.txt
             # runs to process again (dashboard/redo.txt, one run id a line): taken back and ingested afresh, once (data/redone.json remembers them)
             redo_ids=""
+            # THE SET of a run, from its title's server: the chaos bot's games are data/chaos/ (the page's #set=chaos), all others data/
+            ddir() { case "$1" in *" · $CHAOS_SERVER · "*) echo site/data/chaos;; *) echo site/data;; esac; }
+            mkdir -p site/data/chaos
             for rid in $(grep -E '^[0-9]+$' dashboard/redo.txt 2>/dev/null); do
-              if grep -q "\"$rid\"" site/data/runs.json 2>/dev/null && ! grep -q "\"$rid\"" site/data/redone.json 2>/dev/null; then redo_ids="$redo_ids $rid"; fi
+              for dd in site/data site/data/chaos; do
+                if grep -q "\"$rid\"" $dd/runs.json 2>/dev/null && ! grep -q "\"$rid\"" $dd/redone.json 2>/dev/null; then redo_ids="$redo_ids $rid"; fi
+              done
             done
             # this workflow's own finished runs (not every workflow's: pushes and page builds would push the bot runs out of the first 100)
-            runs=$(for pg in 1 2 3 4 5; do gh api "repos/$repo/actions/workflows/bot-prod-smoke-test.yml/runs?per_page=100&page=$pg&status=completed" --jq '.workflow_runs[] | select(.display_title | test("^live · .* · [A-Za-z0-9_]*_[a-z][0-9]+_")) | [.id, .display_title, .run_started_at, .updated_at, .created_at] | @tsv'; done | sort -t$'\t' -k5 | cut -f1-4)
+            runs=$(for pg in 1 2 3 4 5; do gh api "repos/$repo/actions/workflows/bot-prod-smoke-test.yml/runs?per_page=100&page=$pg&status=completed" --jq '.workflow_runs[] | select(.display_title | test("^live · .* · [A-Za-z0-9_]*_[a-z][0-9]+_") or startswith("live · '"$CHAOS_SERVER"' · ")) | [.id, .display_title, .run_started_at, .updated_at, .created_at] | @tsv'; done | sort -t$'\t' -k5 | cut -f1-4)
             todo=0
             while IFS=$'\t' read -r id title started ended; do
               [ -n "$id" ] || continue
-              if grep -q "\"$id\"" site/data/runs.json 2>/dev/null; then case " $redo_ids " in *" $id "*) ;; *) continue;; esac; fi
+              if grep -q "\"$id\"" "$(ddir "$title")/runs.json" 2>/dev/null; then case " $redo_ids " in *" $id "*) ;; *) continue;; esac; fi
               todo=$((todo + 1))
             done <<< "$runs"
             echo "$todo finished bot runs are not on the stats page yet"
@@ -1206,7 +1266,8 @@ jobs:
             eval "$(luarocks path --local --lua-version 5.1)"
             while IFS=$'\t' read -r id title started ended; do
               [ -n "$id" ] || continue
-              redo=""; if grep -q "\"$id\"" site/data/runs.json 2>/dev/null; then case " $redo_ids " in *" $id "*) redo="--redo";; *) continue;; esac; fi
+              dd=$(ddir "$title")
+              redo=""; if grep -q "\"$id\"" "$dd/runs.json" 2>/dev/null; then case " $redo_ids " in *" $id "*) redo="--redo";; *) continue;; esac; fi
               d="stats-pulled/$id"; mkdir -p "$d"
               [ -s "$d/bot-prod-smoke.log" ] || gh run download "$id" -n bot-prod-smoke-log -D "$d" 2>/dev/null || { echo "run $id: no log artifact, skipped"; continue; }
               if [ ! -s "$d/job.log" ]; then
@@ -1216,9 +1277,10 @@ jobs:
                 if [ -n "$url" ]; then curl -sSL "$url" -o "$d/job.log" || true; else gh api "repos/$repo/actions/jobs/$job/logs" > "$d/job.log" || true; fi
                 echo "run $id: job $job, job log $(wc -c < "$d/job.log" 2>/dev/null || echo 0) bytes, Gambit commit line: $(grep -m1 -o 'Gambit built from GameCreator [0-9a-f]*' "$d/job.log" 2>/dev/null || echo NONE)"
               fi
-              python3 dashboard/update_data.py --run-id "$id" --dir "$d" --data site/data --title "$title" --started "$started" --ended "$ended" --job-log "$d/job.log" --sizes site-sizes.txt --prune-out site-prune.txt --max-mb 900 ${engine:+--engine "$engine"} $redo || echo "run $id: update failed"
-              if [ -n "$redo" ] && grep -q "\"$id\"" site/data/runs.json 2>/dev/null; then python3 -c 'import json,os,sys; p="site/data/redone.json"; l=json.load(open(p)) if os.path.exists(p) else []; l.append(sys.argv[1]) if sys.argv[1] not in l else None; json.dump(l, open(p, "w"))' "$id"; fi
-              if [ -s site-prune.txt ]; then sed 's#.*/##' site-prune.txt | sort -u > .gone; grep -vFf .gone site-sizes.txt > .sizes && mv .sizes site-sizes.txt; fi
+              python3 dashboard/update_data.py --run-id "$id" --dir "$d" --data "$dd" --title "$title" --started "$started" --ended "$ended" --job-log "$d/job.log" --sizes site-sizes.txt --prune-out site-prune.txt --max-mb 900 ${engine:+--engine "$engine"} $redo || echo "run $id: update failed"
+              if [ -n "$redo" ] && grep -q "\"$id\"" "$dd/runs.json" 2>/dev/null; then DD="$dd" python3 -c 'import json,os,sys; p=os.environ["DD"]+"/redone.json"; l=json.load(open(p)) if os.path.exists(p) else []; l.append(sys.argv[1]) if sys.argv[1] not in l else None; json.dump(l, open(p, "w"))' "$id"; fi
+              # (names relative to data/, as site-sizes.txt has them: chaos/replay_r9.json.gz and replay_r9.json.gz are two files)
+              if [ -s site-prune.txt ]; then sed 's#^data/##' site-prune.txt | sort -u > .gone; awk 'NR==FNR {g[$0]=1; next} !($2 in g)' .gone site-sizes.txt > .sizes && mv .sizes site-sizes.txt; fi
             done <<< "$runs"
             # the games go to the data branch (and the data's Cloudflare copy); the page only if dashboard/page.html changed
             site_push "$PWD/site" "Gambit stats: add finished bot runs" && { page_publish || true; break; }
@@ -1265,7 +1327,7 @@ jobs:
       contents: read
     concurrency:
       # (the data copy and the page copy each have their own: a data copy never cancels a page copy)
-      group: ranmaru-site-sync-${{ inputs.advanced == 'data' && 'data' || inputs.advanced == 'page' && 'page' || 'all' }}
+      group: ranmaru-site-sync-${{ inputs.advanced == 'data' && 'data' || inputs.advanced == 'page' && 'page' || inputs.advanced == 'preview' && 'preview' || 'all' }}
       cancel-in-progress: true
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -1282,8 +1344,10 @@ jobs:
           fi
           # TWO PROJECTS: the games in <project>-data (from the stats-data branch, a copy after every publish) and the page in <project> (from
           # gh-pages, only when the page changed). The page reads the games from the data project's address (data-base.txt beside it), so new
-          # games never republish the page. advanced = data | page; anything else (a run by hand) does both.
-          what='${{ inputs.advanced }}'; case "$what" in data|page) ;; *) what=all;; esac
+          # games never republish the page. advanced = data | page | preview; anything else (a run by hand) does both.
+          # preview: the page as it is on the ref this run was started on (dashboard/ of that checkout, not gh-pages), at its own address
+          # (preview.<project>.pages.dev), reading the same live games -- the live page is not touched. To look at a page change first.
+          what='${{ inputs.advanced }}'; case "$what" in data|page|preview) ;; *) what=all;; esac
           url="https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
           DATA_PROJECT="$PROJECT-data"; deployed=""
           sub_of() { curl -fsS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/$1" 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin)["result"]["subdomain"])' 2>/dev/null; }
@@ -1309,8 +1373,16 @@ jobs:
             npx --yes wrangler@3 pages deploy psite --project-name "$PROJECT" --branch main --commit-dirty=true || return 1
             deployed="$deployed $PROJECT"; echo "Page published to https://$PROJECT.pages.dev (its games from https://$sub/data/)" >> "$GITHUB_STEP_SUMMARY"
           }
+          deploy_preview() {
+            sub=$(sub_of "$DATA_PROJECT"); [ -n "$sub" ] || { echo "::error::the data project has no address"; return 1; }
+            rm -rf vsite; python3 dashboard/make_site.py vsite >/dev/null || return 1
+            printf 'https://%s/data/\n' "$sub" > vsite/data-base.txt
+            npx --yes wrangler@3 pages deploy vsite --project-name "$PROJECT" --branch preview --commit-dirty=true || return 1
+            deployed="$deployed $PROJECT"
+            echo "Preview of the page on ${{ github.ref_name }}: https://preview.$PROJECT.pages.dev (the live page is unchanged)" >> "$GITHUB_STEP_SUMMARY"
+          }
           rc=0
-          case "$what" in data) deploy_data || rc=1;; page) deploy_page || rc=1;; all) deploy_data || rc=1; deploy_page || rc=1;; esac
+          case "$what" in data) deploy_data || rc=1;; page) deploy_page || rc=1;; preview) deploy_preview || rc=1;; all) deploy_data || rc=1; deploy_page || rc=1;; esac
           export DEPLOYED="$deployed"
           # only the newest deployment stays: Cloudflare keeps every older one at its own address, and an older one may hold data that has since been taken off the page
           python3 - <<'PY' || echo "could not clean up old deployments"
@@ -1325,7 +1397,12 @@ jobs:
               for _ in range(6):
                   d = call('GET', '/accounts/%s/pages/projects/%s/deployments?per_page=25' % (acct, proj))['result']
                   d.sort(key=lambda x: x['created_on'], reverse=True)
-                  old = d[1:]
+                  # the newest of each environment stays: the live one (production) and the preview (a preview never removes the live page)
+                  seen, old = set(), []
+                  for x in d:
+                      env = x.get('environment') or 'production'
+                      if env in seen: old.append(x)
+                      else: seen.add(env)
                   if not old: break
                   for x in old:
                       try: call('DELETE', '/accounts/%s/pages/projects/%s/deployments/%s?force=true' % (acct, proj, x['id'])); gone += 1

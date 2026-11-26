@@ -140,6 +140,8 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 59 (2026-11-26 02:14 ET), the opening keeps its panels only under six rows: survived 7/8 on seeds 9-10** (insane s10 and
+  combo s10 lived; lost combo s9 at 20319, late). Run 60: the run-59 bot on seeds 5-6.
 - **Run 58 (2026-11-26 02:04 ET), the run-55 bot on seeds 9-10: survived 6/8** (lost combo s10 18558, insane s10 3924). The run-55
   bot: 28/32, the run-46 bot's rate. insane s10's opening kept its panels to 48 (eight rows) and was dying from 484 at that height.
   Run 59: the opening keeps its panels only under six rows (LOW_ROWS).

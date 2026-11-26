@@ -233,6 +233,10 @@
 #          (insane s1 1528). The queue's limit is Step 5's problem: the bot swaps every few frames on a board never in danger
 # run 78 -- one change: with 10 or more waiting, when the hold itself lives (the cycle verdict), the hold is played -- quiet frames
 #          for the queue while they cost nothing (decide.c). Level 7, seeds 1-2 again
+# run 78 -- (result) level 7: survived 2/8 again, five queue losses at full health -- the hold almost never lives at level 7 (planned
+#          health 1), so the rule never asked
+# run 79 -- one change (replacing run 78's): with 10+ waiting and the stop holding a break's time or more, a line breaking no garbage
+#          gives way to the hold when the queue's head fits -- the stack does not rise while stopped (decide.c). Level 7, seeds 1-2
 chain_garbage 1 9 9 1 21600 7
 combo_storm 1 9 9 1 21600 7
 thicc_combo_storm 1 9 9 1 21600 7

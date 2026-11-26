@@ -32,7 +32,7 @@ static int32_t raiseOpening, raiseTo, raiseRows;
 // break with) nor above the height less CHAOS_BLOCK_ROWS.
 #define CHAOS_BLOCK_ROWS 3
 static int32_t decFuelLow;   // (the fuel raise's test this decision, logged as fuel=: 0 not low, 1 low, 2 low with room)
-#define CHAOS_QUEUE_WAIT 10    // (pieces waiting from which a living hold is played for the queue: run 78)
+#define CHAOS_QUEUE_WAIT 10    // (pieces waiting from which a stopped board is left quiet for the queue: run 79)
 #define CHAOS_QUEUE_LIMIT 50   // (pieces waiting: the loss at this many, chaos Stack queue limit)
 static int32_t chaosLetDrop;   // (decisions the board was left alone so waiting garbage could drop: the log's letDrop)
 static int32_t chaosWaiting = -1;   // (the rows waiting at the last such test, -1 none: the log's q)
@@ -2181,14 +2181,15 @@ static Played playOf(const Read *R, int n) {
   // (runs 75-76 tried draining the queue under garbage -- the hold over lines breaking nothing from 25 waiting, then over any line from 40:
   // level 8 6/8 then 5/8, the queue still reaching fifty (CHAOS_QUEUE_LIMIT) with full health -- a hold does not quiet a board whose
   // garbage pops slowly, and the breaks put off grow the queue. Reverted: the queue's limit at levels 7-8 is open)
-  // (run 78, CHAOS, A SAFE BOARD IS LEFT QUIET FOR THE QUEUE: garbage waiting drops only on a frame with nothing active -- no swap, no
-  // clear, no pop (Stack:shouldDropGarbage, classic) -- and fifty waiting is the loss whatever the health. When pieces wait and the hold
-  // itself lives (the cycle verdict: the board left alone keeps a break's time and its fuel), the hold is played: the queue gets its
-  // quiet frames while they cost nothing. Run 77, level 7: 2/8, five losses to the queue at full health (30) -- the stack slow, the
-  // bot never in danger, but swapping every few frames, so nothing ever dropped)
-  if (P.line && !P.line->hold && !R->up && decQ.b->ninc >= CHAOS_QUEUE_WAIT) {
-    const Judge *h = 0; for (int i = 0; i < n && !h; i++) if (order[i]->hold) h = order[i];
-    if (h && h->o.lives) { P.line = 0; P.deferred = 0; chaosLetDrop++; }
+  // (run 79, CHAOS, A STOPPED BOARD IS LEFT QUIET FOR THE QUEUE: garbage waiting drops only on a frame with nothing active -- no swap,
+  // clear or pop (Stack:shouldDropGarbage, classic) -- and fifty waiting is the loss whatever the health. While the stop has a break's
+  // time left (levelBreak) the stack does not rise, so holding costs nothing; a line breaking no garbage then gives way to the hold
+  // when the queue's head lands without topping the board out, and the queue gets its quiet frames. Run 77-78, level 7: 2/8, five
+  // losses to the queue at full health (30), stop at 100-390 frames for most of the game while the bot swapped on; run 78's version
+  // (only when the hold lives) never asked: at level 7 nearly every line is judged dying on the planned single point of health)
+  if (P.line && !P.line->hold && !R->up && decQ.b->ninc >= CHAOS_QUEUE_WAIT && P.line->apBroke <= 0 && decQ.b->stopTime >= levelBreak) {
+    int32_t head = decQ.b->inc[0].height > 0 ? decQ.b->inc[0].height : 1, hh = decQ.b->height ? decQ.b->height : 12;
+    if (fullTop(decQ.b) + head <= hh - 1) { P.line = 0; P.deferred = 0; chaosLetDrop++; }
   }
   P.name = P.line ? P.line->k.play : R->up ? -2 : PLAY_HOLD;   // -2: the raise
   for (int i = 0; i < n; i++) if (order[i]->o.lives) P.nlive++;

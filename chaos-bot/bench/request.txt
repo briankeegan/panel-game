@@ -175,11 +175,13 @@
 # run 59 -- one change: the opening keeps its panels only while the stack is under six rows (LOW_ROWS; decide.c). Seeds 9-10
 # run 59 -- (result) survived 7/8 on seeds 9-10 (insane s10 and combo s10 lived; lost combo s9 at 20319, late)
 # run 60 -- the run-59 bot on seeds 5 and 6 (does the six-row cap keep insane s5's gain?), no change
-chain_garbage 5 9 9 1 21600 10
-combo_storm 5 9 9 1 21600 10
-thicc_combo_storm 5 9 9 1 21600 10
-insane_combo_storm 5 9 9 1 21600 10
-chain_garbage 6 9 9 1 21600 10
-combo_storm 6 9 9 1 21600 10
-thicc_combo_storm 6 9 9 1 21600 10
-insane_combo_storm 6 9 9 1 21600 10
+# run 60 -- (result) survived 8/8 on seeds 5-6, health 13 in every game (insane s5 lived again)
+# run 61 -- the run-59 bot, unchanged, on seeds 1 and 2 (the gate for this bot: 5-6 passed, 9-10 7/8; then 3-4, 7-8)
+chain_garbage 1 9 9 1 21600 10
+combo_storm 1 9 9 1 21600 10
+thicc_combo_storm 1 9 9 1 21600 10
+insane_combo_storm 1 9 9 1 21600 10
+chain_garbage 2 9 9 1 21600 10
+combo_storm 2 9 9 1 21600 10
+thicc_combo_storm 2 9 9 1 21600 10
+insane_combo_storm 2 9 9 1 21600 10

@@ -2182,7 +2182,10 @@ static Played playOf(const Read *R, int n) {
   // half the limit waits, a chosen line breaking no garbage gives way to the hold when the head lands without topping the board out:
   // the queue drains a piece at a time. Run 74, level 8: chain s2 and insane s2 lost at 17614 and 18138 with full health (23) -- the
   // queue grew ~10 a minute to 50 under a board always busy breaking, and the rule above never asked (garbage on the board))
-  else if (P.line && R->under && !R->up && decQ.b->ninc >= CHAOS_QUEUE_LIMIT / 2 && P.line->apBroke <= 0) {
+  // (run 76: and near the limit -- ten short of it -- even over a line that breaks: at level 8 garbage pops slowly and nearly every line
+  // breaks some, so the board was never quiet and the hold above gave way only five times in a game; fifty waiting is the loss for
+  // certain, a break put off is not. Run 75 level 8: chain s2 and insane s1 still lost to the queue, chain s2 nine frames short)
+  else if (P.line && R->under && !R->up && (decQ.b->ninc >= CHAOS_QUEUE_LIMIT - 10 || (decQ.b->ninc >= CHAOS_QUEUE_LIMIT / 2 && P.line->apBroke <= 0))) {
     int32_t head = decQ.b->inc[0].height > 0 ? decQ.b->inc[0].height : 1, h = decQ.b->height ? decQ.b->height : 12;
     chaosWaiting = head;
     if (fullTop(decQ.b) + head <= h - 1) { P.line = 0; P.deferred = 0; chaosLetDrop++; }

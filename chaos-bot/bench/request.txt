@@ -222,6 +222,10 @@
 #          rule asks only with no garbage on the board
 # run 75 -- one change: from half the queue limit (25), under garbage too, a line breaking no garbage gives way to the hold when the
 #          queue's head lands without topping out (one piece drops per quiet frame) (decide.c). Level 8, seeds 1-2 again
+# run 75 -- (result) level 8: survived 6/8, both losses still the queue (insane s1 17561, chain s2 21591 -- nine frames short);
+#          the hold gave way only 5 times a game: nearly every line breaks some garbage at level 8, the board never quiet
+# run 76 -- one change: from 40 waiting (ten short of the limit) the hold wins over a breaking line too, when the head fits (decide.c).
+#          Level 8, seeds 1-2
 chain_garbage 1 9 9 1 21600 8
 combo_storm 1 9 9 1 21600 8
 thicc_combo_storm 1 9 9 1 21600 8

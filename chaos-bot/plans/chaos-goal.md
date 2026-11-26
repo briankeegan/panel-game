@@ -140,6 +140,8 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 63 (2026-11-26 02:50 ET), the run-59 bot on seeds 7-8: survived 8/8, health 13 in every game.** The run-59 bot: 39/40;
+  1-2, 3-4, 5-6, 7-8 all 8/8. Run 64: seeds 9-10 again (7/8 in run 59) -- 8/8 completes the survival gate.
 - **Run 62 (2026-11-26 02:41 ET), the run-59 bot on seeds 3-4: survived 8/8, health 13 in every game.** The run-59 bot: 31/32
   (1-2, 3-4, 5-6 8/8; 9-10 7/8, combo s9 late). Run 63: seeds 7-8, then 9-10 again.
 - **Run 61 (2026-11-26 02:32 ET), the run-59 bot on seeds 1-2: survived 8/8, health 13 in every game.** Gate: 1-2 and 5-6 passed,

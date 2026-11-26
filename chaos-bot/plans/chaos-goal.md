@@ -140,6 +140,9 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 76 (2026-11-26 04:53 ET), the queue drained from 40 over breaking lines: level 8 5/8 -- worse.** Runs 75-76 reverted.
+  At level 8 the bot never loses health; the queue's fifty is the loss, and a hold does not quiet a board of slowly popping
+  garbage. Open. Run 77: level 7.
 - **Run 75 (2026-11-26 04:44 ET), the queue drains from 25: level 8 6/8**, both losses still the queue (chain s2 nine frames
   short); the hold gave way only 5 times (nearly every line breaks some). Run 76: from 40, over breaking lines too.
 - **Run 74 (2026-11-26 04:33 ET), LEVEL 8, seeds 1-2: survived 6/8**, survivors at full health (23); both losses at full health --

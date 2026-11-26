@@ -2177,19 +2177,9 @@ static Played playOf(const Read *R, int n) {
     chaosWaiting = waiting;
     if (panelTop(decQ.b) + waiting <= h - 1) { P.line = 0; P.deferred = 0; chaosLetDrop++; }
   }
-  // (run 75, CHAOS, THE QUEUE HAS A LIMIT: fifty pieces waiting is the loss (Match/Stack: queue size), health or none. A quiet frame drops
-  // ONE piece -- the queue's head (Stack:tryDropGarbage pops one) -- and its fall makes the board busy again. So under garbage too, once
-  // half the limit waits, a chosen line breaking no garbage gives way to the hold when the head lands without topping the board out:
-  // the queue drains a piece at a time. Run 74, level 8: chain s2 and insane s2 lost at 17614 and 18138 with full health (23) -- the
-  // queue grew ~10 a minute to 50 under a board always busy breaking, and the rule above never asked (garbage on the board))
-  // (run 76: and near the limit -- ten short of it -- even over a line that breaks: at level 8 garbage pops slowly and nearly every line
-  // breaks some, so the board was never quiet and the hold above gave way only five times in a game; fifty waiting is the loss for
-  // certain, a break put off is not. Run 75 level 8: chain s2 and insane s1 still lost to the queue, chain s2 nine frames short)
-  else if (P.line && R->under && !R->up && (decQ.b->ninc >= CHAOS_QUEUE_LIMIT - 10 || (decQ.b->ninc >= CHAOS_QUEUE_LIMIT / 2 && P.line->apBroke <= 0))) {
-    int32_t head = decQ.b->inc[0].height > 0 ? decQ.b->inc[0].height : 1, h = decQ.b->height ? decQ.b->height : 12;
-    chaosWaiting = head;
-    if (fullTop(decQ.b) + head <= h - 1) { P.line = 0; P.deferred = 0; chaosLetDrop++; }
-  }
+  // (runs 75-76 tried draining the queue under garbage -- the hold over lines breaking nothing from 25 waiting, then over any line from 40:
+  // level 8 6/8 then 5/8, the queue still reaching fifty (CHAOS_QUEUE_LIMIT) with full health -- a hold does not quiet a board whose
+  // garbage pops slowly, and the breaks put off grow the queue. Reverted: the queue's limit at levels 7-8 is open)
   P.name = P.line ? P.line->k.play : R->up ? -2 : PLAY_HOLD;   // -2: the raise
   for (int i = 0; i < n; i++) if (order[i]->o.lives) P.nlive++;
   P.ncands = n; orderN = n;

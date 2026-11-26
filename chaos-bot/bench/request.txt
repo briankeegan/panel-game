@@ -226,11 +226,14 @@
 #          the hold gave way only 5 times a game: nearly every line breaks some garbage at level 8, the board never quiet
 # run 76 -- one change: from 40 waiting (ten short of the limit) the hold wins over a breaking line too, when the head fits (decide.c).
 #          Level 8, seeds 1-2
-chain_garbage 1 9 9 1 21600 8
-combo_storm 1 9 9 1 21600 8
-thicc_combo_storm 1 9 9 1 21600 8
-insane_combo_storm 1 9 9 1 21600 8
-chain_garbage 2 9 9 1 21600 8
-combo_storm 2 9 9 1 21600 8
-thicc_combo_storm 2 9 9 1 21600 8
-insane_combo_storm 2 9 9 1 21600 8
+# run 76 -- (result) level 8: survived 5/8 -- worse; three losses to the queue at full health. Runs 75-76 reverted: a hold does
+#          not quiet a board whose garbage pops slowly; the queue's limit at levels 7-8 is open
+# run 77 -- Step 5: the gate's bot (+ the colour scale) at LEVEL 7, Normal, seeds 1-2
+chain_garbage 1 9 9 1 21600 7
+combo_storm 1 9 9 1 21600 7
+thicc_combo_storm 1 9 9 1 21600 7
+insane_combo_storm 1 9 9 1 21600 7
+chain_garbage 2 9 9 1 21600 7
+combo_storm 2 9 9 1 21600 7
+thicc_combo_storm 2 9 9 1 21600 7
+insane_combo_storm 2 9 9 1 21600 7

@@ -325,11 +325,14 @@
 # run 106 -- (result) run 104's shape again, 8 colours L10 s1-2: survived 2/8, 11122 frames on average (104's 16654 was noise)
 # run 107 -- above six colours, the colours lined up (the owner: be more purposeful with colours): of lines alike, more breaks a swap
 #   away (a single swap making a match touching garbage), then more matches a swap away (judge.c readyOf, rank.c 1'h). 8 colours L10 s1-2
-chain_garbage 1 9 9 1 21600 10 colors=8
-combo_storm 1 9 9 1 21600 10 colors=8
-thicc_combo_storm 1 9 9 1 21600 10 colors=8
-insane_combo_storm 1 9 9 1 21600 10 colors=8
-chain_garbage 2 9 9 1 21600 10 colors=8
-combo_storm 2 9 9 1 21600 10 colors=8
-thicc_combo_storm 2 9 9 1 21600 10 colors=8
-insane_combo_storm 2 9 9 1 21600 10 colors=8
+# run 107 -- (result) the colours lined up, 8 colours L10 s1-2: survived 1/8, 14117 frames on average, no game lost before 6904
+#   (runs 101-106: 11 of 48 lost before 5000, some inside 1000). Kept (above six colours only)
+# run 108 -- the same bot, 8 colours L10, new seeds 3-4: more games before judging
+chain_garbage 3 9 9 1 21600 10 colors=8
+combo_storm 3 9 9 1 21600 10 colors=8
+thicc_combo_storm 3 9 9 1 21600 10 colors=8
+insane_combo_storm 3 9 9 1 21600 10 colors=8
+chain_garbage 4 9 9 1 21600 10 colors=8
+combo_storm 4 9 9 1 21600 10 colors=8
+thicc_combo_storm 4 9 9 1 21600 10 colors=8
+insane_combo_storm 4 9 9 1 21600 10 colors=8

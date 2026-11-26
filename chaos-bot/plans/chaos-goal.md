@@ -150,7 +150,8 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
-- **Run 107 (pushed 2026-11-26 11:2x ET): the colours lined up** (the owner: "Might have to be more purposeful with colors?"). Above
+- **Run 107 (2026-11-26 12:09 ET): the colours lined up -- survived 1/8, 14117 frames on average, none lost before 6904** (runs
+  101-106: 11 of 48 lost before 5000). Kept (above six colours only). Run 108: seeds 3-4. (the owner: "Might have to be more purposeful with colors?"). Above
   six colours, of two lines that live or are lost alike and break the same garbage, the one leaving more breaks a swap away (a single
   swap of two resting panels making a match that touches garbage), then more matches a swap away (judge.c readyOf, rank.c 1'h): the
   waiting time spent lining colours up rather than holding. 8 colours L10 s1-2.

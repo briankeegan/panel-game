@@ -5,14 +5,22 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
 .dash-skeleton{background:#e4e7ee}@media (prefers-color-scheme:dark){.dash-skeleton{background:#262b3a}}</style><script src='https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js'></script><script>// Stand-in for the artifact "dash" object: loads data files and runs the page's onData callbacks when they arrive.
 // THE DATA IS NOT PART OF THE PAGE: it lives at its own address (the data project, <project>-data.pages.dev), named in data-base.txt beside
 // the page (a URL, else ignored: Pages answers a missing file with the page), so new games reach the page without the page being published again. No data-base.txt (a local copy): ./data.
+// THE SET (#set=<name> in the link): which bot's games. Ranmaru's are the data's top level, as they always were; another bot's sit
+// in their own folder beside them (data/chaos/ for the chaos bot), so the two never mix. A set is chosen by a fresh load.
 (function () {
   const P = { ver: '', opp: '', minn: 10 }, fns = [], cache = {};
-  const base = fetch('data-base.txt', { cache: 'no-store' }).then((r) => (r.ok ? r.text() : '')).then((t) => (/^https:\/\/[^\s<]+$/.test(t.trim()) ? t.trim().replace(/\/?$/, '/') : 'data/')).catch(() => 'data/');
+  const SET = ((/(?:^#|&)set=([a-z0-9-]+)/.exec(location.hash) || [])[1] || 'ranmaru');
+  document.documentElement.classList.add('set-' + SET);   // (each set's colours: page.html, html.set-<name>; set before anything draws)
+  const base = fetch('data-base.txt', { cache: 'no-store' }).then((r) => (r.ok ? r.text() : '')).then((t) => (/^https:\/\/[^\s<]+$/.test(t.trim()) ? t.trim().replace(/\/?$/, '/') : 'data/')).catch(() => 'data/')
+    .then((b) => (SET === 'ranmaru' ? b : b + SET + '/'));
   const name = (id) => (id === 'games' || id === 'versions') ? id + '.json' : id + '.json.gz';
   async function load(id) {
     try {
       // (no-store: a game finished a minute ago is on the page at the next load, not after a cache expires)
-      const url = (await base) + name(id), r = await fetch(url, { cache: 'no-store' }); if (!r.ok) throw new Error(url + ' ' + r.status);
+      const url = (await base) + name(id), r = await fetch(url, { cache: 'no-store' });
+      // a set with no games yet has no folder at all: its lists are empty, not an error (Ranmaru's data/ always exists)
+      if (r.status === 404 && SET !== 'ranmaru' && (id === 'games' || id === 'versions')) { cache[id] = { status: 'ok', data: [] }; fns.forEach((f) => f()); return; }
+      if (!r.ok) throw new Error(url + ' ' + r.status);
       let text;
       if (url.endsWith('.gz') && r.headers.get('content-encoding') !== 'gzip' && window.DecompressionStream) text = await new Response(r.body.pipeThrough(new DecompressionStream('gzip'))).text();
       else text = await r.text();
@@ -28,6 +36,7 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
     data: (id) => { if (!cache[id]) { cache[id] = { status: 'loading', data: [] }; load(id); } return cache[id]; },
     onData: (f) => { fns.push(f); f(); }, setLink() {}, refresh() {},
     dataBase: () => base,
+    set: SET,
   };
   base.then((b) => { window.__dataBase = b; });   // (for the page's own links to a replay file)
 })();
@@ -390,6 +399,17 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
 .gs { --gs-shadow: 0 1px 2px rgba(20,24,40,.05), 0 6px 18px -10px rgba(20,24,40,.18); gap: 22px; }
 @media (prefers-color-scheme: dark) { .gs { --color-ok: #3fbf7a; --color-warn: #e3a936; --color-bad: #ef6a66; --gs-shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 22px -12px rgba(0,0,0,.6); } }
 .gs-hero { padding-top: 22px; }
+.gs-setbar { padding-top: 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.gs-setname { font-family: var(--font-serif); font-size: 2rem; line-height: 1; letter-spacing: .02em; color: var(--set-accent, var(--color-fg)); }
+/* THE CHAOS SET'S COLOURS: the same page in a violet cast, so the two bots' pages are told apart at a glance (light and dark) */
+html.set-chaos { --color-fg: #241a35; --color-fg-muted: #6c5d83; --color-bg: #f6f2fb; --color-panel: #fefcff; --color-border-line: #ddd2ec;
+  --cds-chart-grid: #e8e0f2; --cds-chart-muted: #cfc2e2; --cds-border: #ddd2ec; --cds-text-secondary: #6c5d83; --set-accent: #7a3fd0; }
+@media (prefers-color-scheme: dark) {
+  html.set-chaos { --color-fg: #ede6f7; --color-fg-muted: #a898c2; --color-bg: #16111f; --color-panel: #1f182b; --color-border-line: #362a4a;
+    --cds-chart-grid: #362a4a; --cds-chart-muted: #4a3b63; --cds-surface-popover: #1f182b; --cds-border: #362a4a; --cds-text-secondary: #a898c2; --set-accent: #b98cff; }
+}
+html.set-chaos .gs-seg button[aria-pressed=true] { background: var(--set-accent); color: var(--color-panel); }
+html.set-chaos .gs h1 { color: var(--set-accent); }
 .gs-eyebrow { display: inline-flex; align-items: center; gap: 8px; font-size: 11.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--color-fg-muted); margin-bottom: 8px; }
 .gs-pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--color-ok); box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-ok) 50%, transparent); }
 @media (prefers-reduced-motion: no-preference) { .gs-pulse { animation: gs-pulse 2.4s ease-out infinite; } }
@@ -619,6 +639,7 @@ select.dash-select{font:inherit;padding:6px 8px;border-radius:8px;border:1px sol
 </style>
 
 <div class="gs" id="gs">
+  <nav class="gs-setbar" aria-label="Which bot"><span class="gs-setname" id="gs-setname" hidden></span><div class="gs-seg sm gs-sets" role="group" aria-label="Which bot" id="gs-sets"><button type="button" data-set="ranmaru">Ranmaru</button><button type="button" data-set="chaos">Chaos</button></div></nav>
   <section class="gs-card pod-card" id="sec-podium"><div class="lb-head"><h2>Leaderboard</h2><div class="lb-tabs" id="lb-tabs" role="tablist"><button type="button" data-p="week" role="tab">This week</button><button type="button" data-p="last" role="tab">Last week</button><button type="button" data-p="all" role="tab">All time</button></div><button type="button" class="lb-more" id="lb-more" aria-expanded="false">Show top 3 &amp; details ▾</button></div><p class="gs-note" id="lb-note"></p><div class="lb-grid" id="lb"></div></section>
   <section class="gs-card pod-card" id="sec-last"><h2>Last kill</h2><p class="gs-note">Level 10 v 10</p><button type="button" class="pod-kill" id="pod-last"></button></section>
   <header class="gs-hero">
@@ -1984,7 +2005,7 @@ function projectPlan(G, seq, cursor) {
     const L = 8, R2 = 8, px = (i) => L + (i / Math.max(1, n - 1)) * (w - L - R2), mid = h / 2 - 2, maxP = Math.max(8, ...S.me.concat(S.opp).map((e) => e.w * e.h));
     x.strokeStyle = line; x.lineWidth = 1; x.beginPath(); x.moveTo(L, Math.round(mid) + 0.5); x.lineTo(w - R2, Math.round(mid) + 0.5); x.stroke();
     [[S.me, -1], [S.opp, 1]].forEach(([evs, dir]) => evs.forEach((e) => { const bh = 3 + (e.w * e.h / maxP) * (mid - 6); x.fillStyle = gcol(e).fill; x.globalAlpha = e.i <= now ? 1 : 0.45; x.fillRect(px(e.i) - 1.5, dir < 0 ? mid - bh - 1 : mid + 2, 3, bh); x.globalAlpha = 1; }));
-    x.font = '11px system-ui, sans-serif'; x.fillStyle = ink; x.textAlign = 'left'; x.fillText('Ranmaru', L, 10); x.fillText(oppName.length > 14 ? oppName.slice(0, 13) + '…' : oppName, L, h - 3);
+    x.font = '11px system-ui, sans-serif'; x.fillStyle = ink; x.textAlign = 'left'; x.fillText(dash.set === 'ranmaru' ? 'Ranmaru' : (SETS[dash.set] || { bot: dash.set }).bot, L, 10); x.fillText(oppName.length > 14 ? oppName.slice(0, 13) + '…' : oppName, L, h - 3);
     x.textAlign = 'right'; x.fillText(fmtClock(D.frames[n - 1][0]), w - R2, h - 3);
     const X = Math.round(px(now)) + 0.5; x.strokeStyle = fg; x.lineWidth = 1.5; x.beginPath(); x.moveTo(X, 0); x.lineTo(X, h); x.stroke();
     // the list: the garbage sent just before and just after the moment you are watching, at one scale, landing columns kept
@@ -2638,6 +2659,7 @@ function projectPlan(G, seq, cursor) {
     const sortStr = (x) => x.key + ':' + x.dir;
     function state(share) {
       const o = {}, P = dash.params(), add = (k, v, def) => { if (v !== undefined && v !== null && String(v) !== String(def === undefined ? '' : def)) o[k] = String(v); };
+      add('set', dash.set, 'ranmaru');
       add('ver', P.ver); add('opp', P.opp); add('min', P.minn ?? 10, 10);
       add('oq', $('s-opp').value.trim()); add('om', oppMin, 0); add('os', sortStr(sortState.opp), 'n:-1'); if (expanded.opp) o.oall = '1';
       add('vq', $('s-ver').value.trim()); add('vs', sortStr(sortState.ver), 'order:-1'); if (expanded.ver) o.vall = '1';
@@ -2686,9 +2708,42 @@ function projectPlan(G, seq, cursor) {
     };
     setInterval(() => { if (!R.playing) U.flush(); }, 700);
     document.addEventListener('visibilitychange', () => { if (document.hidden) U.flush(); });
-    window.addEventListener('hashchange', () => U.apply(location.hash, false));
+    window.addEventListener('hashchange', () => {
+      const s = (/(?:^#|&)set=([a-z0-9-]+)/.exec(location.hash) || [])[1] || 'ranmaru';
+      if (s !== dash.set) { location.reload(); return; }
+      U.apply(location.hash, false);
+    });
     $('copy-link').addEventListener('click', async () => { const ok = await copyText(U.link()), b = $('copy-link'), t0 = 'Copy link to this view'; b.textContent = ok ? 'Link copied' : 'Could not copy'; setTimeout(() => { b.textContent = t0; }, 2200); });
     return U;
+  })();
+  // THE SETS: each bot's own name and where it plays. Every string on the page says "Ranmaru" (it was the only bot); on another set
+  // the page's words are rewritten to that bot's name as they appear, the set switch itself aside.
+  const SETS = { ranmaru: { bot: 'Ranmaru', where: 'panelattack.com' }, chaos: { bot: 'Chaos', where: 'the chaos server' } };
+  (() => {
+    const S = SETS[dash.set] || { bot: dash.set, where: '' };
+    document.querySelectorAll('#gs-sets button').forEach((b) => {
+      b.setAttribute('aria-pressed', String(b.dataset.set === dash.set));
+      b.addEventListener('click', () => { if (b.dataset.set !== dash.set) location.hash = b.dataset.set === 'ranmaru' ? '#set=ranmaru' : '#set=' + b.dataset.set; });
+    });
+    if (dash.set === 'ranmaru') return;
+    $('gs-setname').textContent = S.bot; $('gs-setname').hidden = false;
+    $('gs-title').textContent = S.bot + (S.where ? ' on ' + S.where : '');
+    document.title = S.bot + ' stats';
+    const sw = $('gs-sets'), ATTR = ['title', 'aria-label', 'placeholder'];
+    const fix = (root) => {
+      if (root.nodeType === 3) { if (root.nodeValue.includes('Ranmaru') && !sw.contains(root)) root.nodeValue = root.nodeValue.replace(/Ranmaru/g, S.bot); return; }
+      if (root.nodeType !== 1 || sw.contains(root)) return;
+      const els = [root, ...root.querySelectorAll('*')];
+      els.forEach((el) => { if (sw.contains(el)) return; ATTR.forEach((a) => { const v = el.getAttribute(a); if (v && v.includes('Ranmaru')) el.setAttribute(a, v.replace(/Ranmaru/g, S.bot)); }); });
+      const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT); let n;
+      while ((n = w.nextNode())) if (n.nodeValue.includes('Ranmaru') && !sw.contains(n)) n.nodeValue = n.nodeValue.replace(/Ranmaru/g, S.bot);
+    };
+    const gs = $('gs'); fix(gs);
+    new MutationObserver((ms) => ms.forEach((m) => {
+      if (m.type === 'characterData') fix(m.target);
+      else if (m.type === 'attributes') fix(m.target);
+      else m.addedNodes.forEach(fix);
+    })).observe(gs, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ATTR });
   })();
   URLSTATE.apply(location.hash, true);
   {

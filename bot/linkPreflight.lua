@@ -24,7 +24,7 @@
 io.stdout:setvbuf("no")
 package.path = "./?.lua;" .. package.path
 require("bot.headlessBoot")
-local logger = require("common.lib.logger"); logger.setLogLevel(logger.levels.ERROR)
+local logger = require("common.lib.logger"); require("bot.quietLogger")(logger, "ERROR")
 local Match = require("common.engine.Match")
 local GeneratorSource = require("common.engine.GeneratorSource")
 local GameModes = require("common.data.GameModes")

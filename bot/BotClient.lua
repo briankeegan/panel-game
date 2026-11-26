@@ -70,6 +70,10 @@ local BotClient = class(function(self, opts)
   -- rest of that set (even if they go back down); it returns to baseLevel when the set is closed.
   self.baseLevel = self.level
   self.followUp = opts.followUp == true
+  -- mirrorFrom (PA_LEVEL_MIRROR=<lowest>, the chaos bot): the bot plays whatever level the other player picks, up or down, every time
+  -- they change it -- never below mirrorFrom (a pick below it plays mirrorFrom) and never above the build's highest level.
+  -- Replaces followUp; the change is sent to the server at once, so the room shows the level the bot will play.
+  self.mirrorFrom = tonumber(opts.mirrorFrom)
   -- Ranked is a login setting like level and character, and the bot sets it
   -- EXPLICITLY every time: at login and again on every ready. Off unless a
   -- caller opts in -- a bot's games must never move anyone's rating.
@@ -91,6 +95,9 @@ local BotClient = class(function(self, opts)
       panelId = "panelhd_basic_mizunoketsuban",
       wantsReady = false, wantsRanked = self.ranked,
       inputMethod = "controller",
+      -- the chaos build's own settings, at its client's defaults (client/src/config.lua): 5 colours, game mode 1, queue 1,
+      -- chaos mode off, margin 1 -- the rules Gambit was tuned on. Upstream's menu state does not read them.
+      color_count = 5, game_mode = 1, queue_type = 1, chaos_mode = false, margin_time = 1,
     },
   }
 end)
@@ -204,6 +211,15 @@ end
 local FOLLOW_LEVEL = 11
 -- The other player chose a level: if it is 11, this set is played on 11, whatever they pick next.
 function BotClient:noteOpponentLevel(level)
+  if self.mirrorFrom and tonumber(level) then
+    local top = LevelPresets.modernPresetCount or 11
+    local want = math.max(self.mirrorFrom, math.min(top, math.floor(tonumber(level))))
+    if want ~= self.level then
+      self:setLevel(want, "the other player chose level " .. tostring(level))
+      if self.inRoom then self:sendReady(self.playerStub.settings.wantsReady) end   -- the room sees it now, not at the next ready
+    end
+    return
+  end
   if self.followUp and tonumber(level) == FOLLOW_LEVEL and self.level ~= FOLLOW_LEVEL then
     self:setLevel(FOLLOW_LEVEL, "the other player chose it: the rest of this set")
   end
@@ -255,6 +271,27 @@ function BotClient:dispatch(msg)
     end
     self.matchEnded = true
     self.outcome = self.outcome or "aborted"
+  elseif msg.unpaired then
+    -- NETWORK 005 (the chaos build): the lobby comes as names (unpaired = in the lobby; spectatable rooms hold the rest),
+    -- with public ids only for players on the leaderboard. Kept in the 006 shape the rest of the bot reads.
+    local ids, list = msg.players or {}, {}
+    for _, n in ipairs(msg.unpaired) do list[#list + 1] = { name = n, state = "lobby", publicId = ids[n] and ids[n].publicId } end
+    for _, r in ipairs(msg.spectatable or {}) do
+      for _, n in ipairs({ r.a, r.b }) do list[#list + 1] = { name = n, state = "playing", publicId = ids[n] and ids[n].publicId } end
+    end
+    self.lobbyPlayers = list
+  elseif msg.game_request then
+    -- NETWORK 005: a challenge names its sender and receiver; answering is challenging the sender back (no game modes: always VS)
+    local gr = msg.game_request
+    if gr.receiver == self.name and not self.inRoom then
+      local only = self.acceptOnly
+      if only and only ~= "" and not BotClient.nameMatches(only, gr.sender) then
+        logger.info(string.format("bot[%s]: ignoring a challenge from %s", self.name, tostring(gr.sender)))
+      else
+        logger.info(string.format("bot[%s]: accepting challenge from %s", self.name, tostring(gr.sender)))
+        self.gameplay:sendRequest(ClientProtocol.challengePlayer(self.name, gr.sender))
+      end
+    end
   elseif msg.challengeUpdate then
     -- someone challenged us in the lobby: always accept (reciprocate), which
     -- makes the server create the room and we fall into the normal match flow.
@@ -327,8 +364,13 @@ function BotClient.nameMatches(target, name)
   return part ~= "" and name:find(part, 1, true) ~= nil
 end
 
-function BotClient:challenge(receiverId, gameModeId)
-  self.gameplay:sendRequest(ClientProtocol.updateChallengeStatus(self.publicId, receiverId, gameModeId, true))
+-- receiverName: network 005 (the chaos build) challenges by name, and has no game modes
+function BotClient:challenge(receiverId, gameModeId, receiverName)
+  if ClientProtocol.updateChallengeStatus then
+    self.gameplay:sendRequest(ClientProtocol.updateChallengeStatus(self.publicId, receiverId, gameModeId, true))
+  else
+    self.gameplay:sendRequest(ClientProtocol.challengePlayer(self.name, receiverName))
+  end
 end
 
 -- Declare loaded + ready in one settings update. A bot has no assets, so it
@@ -392,6 +434,21 @@ function BotClient:startMatch()
     else
       self.link = require("bot.SurvivalLink").new({})
     end
+    -- THE CHAOS BUILD'S STACK under the fork's names Gambit's Lua side reads (as the chaos launcher, chaos-bot/client/chaosbot/
+    -- boot.lua, gives them): upstream's stack has a stopWatch from the start, the chaos build's (an older engine) never does
+    if self.myStack.stopWatch == nil then
+      local stack, sources = self.myStack, (self.match.garbageSources and self.match.garbageSources[self.myStack]) or {}
+      self.chaosRefresh = function()
+        stack.stopWatch = stack.game_stopwatch or stack.clock
+        stack.stopWatchIsRunning = stack.game_stopwatch_running and not stack.do_countdown
+        stack.isToppedOut = stack.hasPanelsInTopRow
+        for _, src in ipairs(sources) do src.stopWatch = stack.stopWatch end
+      end
+      self.chaosRefresh()
+      print("match start: chaos build: the stack is given the names Gambit reads")
+    else
+      self.chaosRefresh = nil
+    end
     print("match start: gambit: the link is starting the match")
     self.link:startMatch(self.myStack, self.match)
     print("match start: gambit: the link has started the match")
@@ -426,6 +483,7 @@ function BotClient:_sendInput()
 
   if self.link then
     -- WasmSurvivor / BitBot: the key for this frame, from the bot itself; nothing is decided here
+    if self.chaosRefresh then self.chaosRefresh() end
     local char = self.link:input(stack, self.match.garbageSources and self.match.garbageSources[stack]) or IDLE
     self.gameplay:send(NetworkProtocol.markedMessageForTypeAndBody(I_PREFIX, char))
     stack:receiveConfirmedInput(char)

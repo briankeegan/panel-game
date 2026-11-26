@@ -39,3 +39,5 @@ require("client.src.globals")            -- engine constants (GARBAGE_TRANSIT_TI
 
 -- Response writes GAME.crashTrace on a coroutine error; give it a home.
 GAME = GAME or {}
+-- The chaos build's engine reads the client's global config for its debug switches (Match:shouldRun): none of them on.
+config = config or {}

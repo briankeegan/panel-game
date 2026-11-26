@@ -9,7 +9,7 @@ io.stdout:setvbuf("no")
 require("bot.headlessBoot")
 
 local logger = require("common.lib.logger")
-logger.setLogLevel(logger.levels.WARN) -- quiet; we print our own status
+require("bot.quietLogger")(logger, "WARN") -- quiet; we print our own status
 
 local socket = require("socket")
 local BotClient = require("bot.BotClient")
@@ -26,7 +26,9 @@ local bot = BotClient({
   ip = ip, port = port, name = name, cursorSpeed = cursorSpeed,
   brain = arg[6] or "weighted", searchProfile = os.getenv("PA_SEARCH_PROFILE"),   -- arg 6: weighted | survival | bitbot | gambit
   level = tonumber(os.getenv("PA_LEVEL")),   -- (the modern level it plays; 10 when unset)
-  followUp = os.getenv("PA_LEVEL") == nil,   -- (a lobby bot with no level set plays a whole set on 11 once the other player takes level 11)
+  -- (a lobby bot with no level set plays a whole set on 11 once the other player takes level 11)
+  followUp = os.getenv("PA_LEVEL") == nil and os.getenv("PA_LEVEL_MIRROR") == nil,
+  mirrorFrom = os.getenv("PA_LEVEL_MIRROR"),   -- (the chaos bot: the other player's level, from this one up)
 })
 
 local ok, err = bot:login()
@@ -79,7 +81,8 @@ local function challengeIfFree()
   challengeTurn = challengeTurn + 1
   local p = free[(challengeTurn - 1) % #free + 1]
   lastChallengeAt = now
-  bot:challenge(p.publicId, require("common.data.GameModes").IDs.TWO_PLAYER_VS)
+  local ids = require("common.data.GameModes").IDs   -- (none on network 005, the chaos build: challenges there are by name)
+  bot:challenge(p.publicId, ids and ids.TWO_PLAYER_VS, p.name)
 end
 if challengeName then print("    and challenging '" .. challengeName .. "' whenever both are in the lobby.\n") end
 

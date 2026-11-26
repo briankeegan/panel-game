@@ -63,6 +63,10 @@
 #          survived 5/8 -- worse (lost thicc s3 6129, combo s4 5317, insane s4 2431). Reverted
 # run 25 -- one change: the chaos verdict -- a line lives if the board does not die before the bot's next freeze (a break's time
 #          after it, a stop counting as frozen time) and it leaves fuel for that freeze (outcome.c; docs/CHAOS_RULES.md)
+#          survived 4/8, and every decision still v=dies (a board left alone after a ~300-frame line is within a break of the top). Reverted
+# run 26 -- one change: the cycle verdict -- a line lives when, once done, the board's margin to the top (left alone) is at least the
+#          next freeze's start (the reaction and two swaps' walks) and it leaves fuel (a three or breakable garbage) (outcome.c).
+#          The report counts decisions judged alive (lives n/N)
 combo_storm 3 9 9 2 21600 10
 chain_garbage 3 9 9 1 21600 10
 thicc_combo_storm 3 9 9 3 21600 10

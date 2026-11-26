@@ -209,6 +209,16 @@ static Outcome outcomeOf(const int32_t *seq, int n, int settled, int waitAt, int
       if (eb && decF.under) o.nearAfter = garbageOn(eb) ? nearOf(eb) : 0;
       if (eb && twinWanted && !clockOut()) o.twinAfter = twinCostOn((Board *)eb);
       if (breaks) o.nextBuild = eb ? (!garbageOn(eb) || breakBuildable(eb)) : -1;
+      // (CHAOS, THE CYCLE GOES ON: the board is always about to die -- no board left alone stands at chaos speed, and every line was
+      // judged lost (runs 12-25, v=dies in every decision). A line keeps the board alive when, once it is done, the board still has the
+      // margin for the bot's next freeze to begin -- frames to the top left alone (its loss less the line's end) at least the reaction
+      // and two swaps' walks (CHAOS_FREEZE_START, the hands' own frames) -- and the fuel for that freeze: a three it has the panels
+      // for, or garbage it can break. docs/CHAOS_RULES.md "How chaos is survived")
+      if (!o.lives && eb && !waitTo && o.j.lostAt != NOT_ASKED) {
+        int32_t margin = o.j.lostAt == FOREVER ? FOREVER : o.j.lostAt - o.j.done;
+        int fuel = o.groups > 0 || (garbageOn(eb) && breakBuildable(eb));
+        if (fuel && margin >= cfgReaction + 1 + 2 * (cfgSwapGap + 2 * cfgCursor)) o.lives = 1;
+      }
     }
     // (THE MATERIAL FLOOR: under garbage, a line that breaks nothing, does not stand and leaves no break to build where the board left
     // alone keeps one has spent what the next break needs -- it is lost the frame it is done)

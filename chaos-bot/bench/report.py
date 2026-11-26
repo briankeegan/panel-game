@@ -31,6 +31,16 @@ def parse_stats(path):
                 pass
     return stats
 
+def verdicts(path):
+    """the decisions' verdicts in gambit.log (GAMBITD ... v=lives|dies): how often a line was judged to keep the board alive"""
+    lives = dies = 0
+    if os.path.exists(path):
+        for line in open(path, errors="replace"):
+            if line.startswith("GAMBITD "):
+                if " v=lives" in line: lives += 1
+                elif " v=dies" in line: dies += 1
+    return lives, dies
+
 def main():
     games_dir, asked = sys.argv[1], json.loads(sys.argv[2])
     rows, survived, late, diverged, overruns, arrivals, surprises = [], 0, 0, 0, 0, 0, 0
@@ -39,6 +49,7 @@ def main():
         d = os.path.join(games_dir, "chaosbot-game-%d" % g["n"])
         r = parse_result(os.path.join(d, "result.txt")) or {"reason": "noresult"}
         s = parse_stats(os.path.join(d, "gambit.log")) or {}
+        vl, vd = verdicts(os.path.join(d, "gambit.log"))
         ok = r.get("survived") == "1"
         survived += ok
         arrivals += int(s.get("arrivals", 0)); surprises += int(s.get("surprises", 0))
@@ -46,9 +57,9 @@ def main():
         fr = int(r.get("frames", -1))
         if fr > 0:
             played += fr; sent += float(r.get("sentRows", 0))
-        rows.append("game %d level %s pattern %s seed %d frames %s survived %d lostAt %s health %s healthLostTop %s gpm %s late %s diverged %s overruns %s worstMs %s surprises %s/%s noticeMin %s reason %s" % (
+        rows.append("game %d level %s pattern %s seed %d frames %s survived %d lostAt %s health %s healthLostTop %s gpm %s late %s diverged %s overruns %s worstMs %s surprises %s/%s noticeMin %s lives %d/%d reason %s" % (
             g["n"], g.get("level", 9), g["pattern"], g["seed"], r.get("frames", -1), ok, r.get("lostAt", -1), r.get("health", -1), r.get("healthLostTop", -1),
-            r.get("gpm", -1), s.get("late", "?"), s.get("diverged", "?"), r.get("overruns", "?"), r.get("worstMs", "?"), s.get("surprises", "?"), s.get("arrivals", "?"), s.get("noticeMin", "?"), r.get("reason", "?")))
+            r.get("gpm", -1), s.get("late", "?"), s.get("diverged", "?"), r.get("overruns", "?"), r.get("worstMs", "?"), s.get("surprises", "?"), s.get("arrivals", "?"), s.get("noticeMin", "?"), vl, vl + vd, r.get("reason", "?")))
     for row in rows:
         print(row)
     from zoneinfo import ZoneInfo

@@ -46,6 +46,77 @@ def verdicts(path):
                 if " fuel=2:1" in line: fuel[2] += 1
     return lives, dies, raises, fuel
 
+def _kv(line):
+    d = {}
+    for tok in line.split()[2:]:
+        k, eq, v = tok.partition("=")
+        if eq and k not in d:
+            d[k] = v
+    return d
+
+def death(path, frames, health, reason):
+    """WHY A GAME WAS LOST, read off gambit.log's decisions (GAMBITD lines; the decisions' own clock): the cause's tags and the numbers
+    behind them, so a loss explains itself without the log being read by hand.
+      queue50       lost with health left: fifty pieces waiting (chaos's queue limit)
+      early         lost inside 6000 frames
+      opening-high  the stack at 45+ panels when garbage first reached it; opening-spent: at 22 or fewer
+      starved       12 or fewer panels at some decision of the last 1200 frames (nothing to break with)
+      backlog       20+ pieces waiting on average over the last 1200 frames
+      no-line       5+ decisions of the last 1200 frames offered nothing but the hold (the search found no line)
+      (and always: the lines newly chosen over the last 3600 frames that clear panels breaking no garbage, and their panels)
+      dying P%      the share of the game's decisions every line was judged lost"""
+    if reason != "lost":
+        return None
+    tags = []
+    if health > 0:
+        tags.append("queue50")
+    if 0 < frames < 6000:
+        tags.append("early")
+    dec, seen = [], set()
+    if os.path.exists(path):
+        for line in open(path, errors="replace"):
+            if not line.startswith("GAMBITD "):
+                continue
+            f = line.split()
+            try:
+                t = int(f[1])
+            except (IndexError, ValueError):
+                continue
+            if t in seen:
+                continue
+            seen.add(t)
+            dec.append((t, f[4] if len(f) > 4 else "", _kv(line)))
+    if not dec:
+        return "tags=%s (no decisions logged)" % (",".join(tags) or "-")
+    dec.sort(key=lambda d: d[0])
+    end = dec[-1][0]
+    def num(d, k, i=0):
+        try:
+            return int(d.get(k, "").split("/")[i])
+        except (ValueError, IndexError):
+            return None
+    last = [d for d in dec if d[0] >= end - 1200]
+    pans = [num(d[2], "pan") for d in last if num(d[2], "pan") is not None]
+    qs = [num(d[2], "q") for d in last if num(d[2], "q") is not None]
+    stops = [num(d[2], "stop") for d in last if num(d[2], "stop") is not None]
+    holdonly = sum(1 for d in last if d[2].get("opts", "").startswith("hold") and "," not in d[2].get("opts", ""))
+    # (lines newly chosen -- not a carry of one already begun, which logs the same planned clears again each decision)
+    fresh = [d for d in dec if d[0] >= end - 3600 and (num(d[2], "broke") or 0) <= 0 and (num(d[2], "clr") or 0) > 0 and
+             not d[1].startswith("play=carry") and d[1] != "play=hold"]
+    spent, spentN = sum(num(d[2], "clr") or 0 for d in fresh), len(fresh)
+    first = next((d for d in dec if d[2].get("under") == "1"), None)
+    fpan = num(first[2], "pan") if first else None
+    dying = 100.0 * sum(1 for d in dec if d[2].get("v") == "dies") / len(dec)
+    if fpan is not None and fpan >= 45: tags.append("opening-high")
+    if fpan is not None and fpan <= 22: tags.append("opening-spent")
+    if pans and min(pans) <= 12: tags.append("starved")
+    if qs and sum(qs) / len(qs) >= 20: tags.append("backlog")
+    if holdonly >= 5: tags.append("no-line")
+    return "tags=%s | last 1200f: panels min %s avg %s, queue avg %s max %s, stop avg %s, hold-only %d | last 3600f: %d lines chose clears breaking none, %d panels | first garbage at %s with %s panels | dying %.0f%%" % (
+        ",".join(tags) or "other", min(pans) if pans else "?", round(sum(pans) / len(pans)) if pans else "?",
+        round(sum(qs) / len(qs)) if qs else "?", max(qs) if qs else "?", round(sum(stops) / len(stops)) if stops else "?", holdonly,
+        spentN, spent, first[0] if first else "-", fpan if fpan is not None else "-", dying)
+
 def main():
     games_dir, asked = sys.argv[1], json.loads(sys.argv[2])
     rows, survived, late, diverged, overruns, arrivals, surprises = [], 0, 0, 0, 0, 0, 0
@@ -67,6 +138,23 @@ def main():
             r.get("gpm", -1), s.get("late", "?"), s.get("diverged", "?"), r.get("overruns", "?"), r.get("worstMs", "?"), s.get("surprises", "?"), s.get("arrivals", "?"), s.get("noticeMin", "?"), vl, vl + vd, vr, vf[0], vf[1], vf[2], r.get("reason", "?")))
     for row in rows:
         print(row)
+    causes = {}
+    for g in asked:
+        d = os.path.join(games_dir, "chaosbot-game-%d" % g["n"])
+        r = parse_result(os.path.join(d, "result.txt")) or {"reason": "noresult"}
+        if r.get("survived") == "1":
+            continue
+        try:
+            fr, hp = int(r.get("frames", -1)), int(r.get("health", 0))
+        except ValueError:
+            fr, hp = -1, 0
+        why = death(os.path.join(d, "gambit.log"), fr, hp, r.get("reason", "?"))
+        if why:
+            print("death game %d %s seed %d at %s: %s" % (g["n"], g["pattern"], g["seed"], r.get("frames", "?"), why))
+            for t in why.split("|")[0].replace("tags=", "").strip().split(","):
+                causes[t] = causes.get(t, 0) + 1
+    if causes:
+        print("deaths by cause: " + ", ".join("%s %d" % (k, v) for k, v in sorted(causes.items(), key=lambda kv: -kv[1])))
     from zoneinfo import ZoneInfo
     et = datetime.datetime.now(ZoneInfo("America/New_York"))
     print("run games %d survived %d/%d late %d diverged %d overruns %d surprises %d/%d gpm %.2f finished %s ET" % (

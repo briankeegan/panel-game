@@ -140,6 +140,13 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 92 (2026-11-26 07:25 ET), the gate's bot on NEW seeds 15-16: survived 7/8** (lost insane s16 at 18633). On seeds it never
+  saw: 22/24. THE REPORT NOW EXPLAINS EVERY LOSS (owner, 07:30 ET: "what are the patterns of deaths? fix the info problem"): a
+  "death" line per lost game read off gambit.log -- tags queue50 / early / opening-high / opening-spent / starved / backlog /
+  no-line, with the last 1200 frames' panels, queue, stop and hold-only decisions, the last minute's lines clearing panels that
+  break no garbage, the panels at first garbage, the share of decisions judged dying -- and a count of deaths by cause per run.
+  Read back over ten losses of the night: dying 77-95% of decisions in 9 of 10; the search offering only the hold (no-line) in 6;
+  the first garbage met with 22 or fewer panels in 5; 5-27 lines a minute clearing panels that break no garbage in all.
 - **Run 91 (2026-11-26 07:16 ET), the gate's bot on NEW seeds 13-14: survived 7/8** (lost chain s13 at 4646). On seeds it never
   saw: 15/16. Run 92: new seeds 15-16.
 - **Run 90 (2026-11-26 07:07 ET), the gate's bot on NEW seeds 11-12: survived 8/8** (seven at full health, insane s12 at 3).

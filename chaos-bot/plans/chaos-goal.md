@@ -148,6 +148,10 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 98 (2026-11-26 09:52 ET), the combo size by the panels, 1'g, L10 seeds 15-16: survived 6/8.** Seeds 13-16: by the panels
+  13/16, small always 14/16, the gate's bot 14/16 -- none better than eight games' noise; both turned off, the gate's bot is back (it
+  holds the record: 40/40 on seeds 1-10, 22/24 on 11-16). Normal L10 is not where the bot is weak. Run 99: the gate's bot at L11 vs
+  11/11 on the hard settings -- 7 and 8 colours, chaos margin, chaos mode -- where it is.
 - **Run 97 (2026-11-26 09:42 ET), the combo size by the panels, 1'g, L10 seeds 13-14: survived 7/8**, survivors at full health.
   chain s13 lived (lost in runs 91 and 96 at ~4630: a 5x judged living spent 37 panels to 12 under an 8-row chain slab 354 frames
   out); combo s14 lived; insane s13 lost at 6357 (starved). Seeds 13-14: the gate's bot 7/8, small always 6/8, by the panels 7/8 --

@@ -1275,10 +1275,11 @@ static int compareJudged(const Judge *x, const Judge *y) {
   if ((lx || lostAlike(x, y)) && !decF.under && decQ.narr == 0 && decF.next == NOT_ASKED && decQ.b->chainCounter < 2 &&
       x->o.j.even >= 0 && y->o.j.even >= 0 && iabs(x->o.j.even - y->o.j.even) >= FLAT_ROWS)
     return (cmpKey = __LINE__, (x->o.j.even - y->o.j.even));
+  // (run 98: off -- 1'g alone L10 seeds 15-16 7/8, the gate's bot 7/8; with the other changes seeds 13-16 13-14/16, the gate's 14/16)
   // 1'g. (run 94, CHAOS) UNDER GARBAGE, NO CANYON UNDER IT: garbage on the board, of two that both live or are lost alike and break
   // the same garbage, the one leaving GAP_CELLS fewer empty cells under the garbage (judge.c gapOf) first -- a piece perched over a
   // cleared middle is out of reach of every break, and what lands next lands on it. Run 92 insane s16 17400-18158, lost at 18633
-  if (decF.under && (lx || lostAlike(x, y)) && imax(0, x->apBroke) == imax(0, y->apBroke) && x->o.j.gap >= 0 && y->o.j.gap >= 0 &&
+  if (0 && decF.under && (lx || lostAlike(x, y)) && imax(0, x->apBroke) == imax(0, y->apBroke) && x->o.j.gap >= 0 && y->o.j.gap >= 0 &&
       iabs(x->o.j.gap - y->o.j.gap) >= GAP_CELLS)
     return (cmpKey = __LINE__, (x->o.j.gap - y->o.j.gap));
   // 1'f. NO SLAB AT THE FINISH: where the list is the finish (finishAsked), of two that survive alike, the line that sends no slab of two

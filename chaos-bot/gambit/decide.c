@@ -226,7 +226,8 @@ static int readBoard_(Read *R) {
     if (decQ.b->clock < lastClk) smallFirst = 0;
     lastClk = decQ.b->clock;
     int32_t pn = panelsOn(decQ.b), peak = lifePeakOf();
-    if (pn <= peak - W / 2) smallFirst = 1; else if (pn > peak + W / 2) smallFirst = 0;
+    // (run 98: off -- by the panels L10 seeds 13-16 13/16, the gate's bot 14/16, small always 14/16: no better than the noise)
+    if (0 && pn <= peak - W / 2) smallFirst = 1; else smallFirst = 0;
     if (smallFirst) {
       for (int i = 1; i < R->list.n; i++) for (int j = i; j > 0; j--) {
         const Test *a = &R->list.aim[j - 1].combo, *b = &R->list.aim[j].combo;

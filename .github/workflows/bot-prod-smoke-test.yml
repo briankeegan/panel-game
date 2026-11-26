@@ -33,6 +33,7 @@ on:
           - ranmaru-watch
           - ranmaru-site
           - stats-rebuild
+          - server-probe
       server:
         description: '2. Server. auto = panelattack.com, or the Bramp server (104.156.250.136) for a fight. Stop / deploy / fight clear it of bots first'
         required: true
@@ -42,7 +43,7 @@ on:
           - auto
           - panelattack.com:49569
           - 104.156.250.136:49569
-          - alt-server.chaos952.org:49569
+          - alt-server.chaos952.org:49570
       bot:
         description: '3. Gambit (the bot in the lobby): the latest main, or a kept build named for its actions window (w150 = 150 actions in 10 seconds)'
         required: true
@@ -132,8 +133,9 @@ env:
   # THE CHAOS BUILD (chaos9520's fork of Panel Attack, its own server): a third server, upstream-protocol like the beta one (network
   # 005), with its own bot -- Gambit rebuilt on the chaos engine (chaos-bot/ on CHAOS_BOT_REF of this repo). The game is the v3 test
   # build, pinned by commit AND checksum (chaos-bot/game/fetch.sh), and the bot is a named commit, never a branch tip: bot=chaos with
-  # server=alt-server.chaos952.org:49569, nothing else. Its games go to the stats page's chaos set (data/chaos/, #set=chaos).
-  CHAOS_SERVER: alt-server.chaos952.org:49569
+  # server=alt-server.chaos952.org:49570, nothing else. Its games go to the stats page's chaos set (data/chaos/, #set=chaos).
+  # (the port is the chaos client's own default: TcpClient connectToServer, port or 49570 -- its menu gives no port)
+  CHAOS_SERVER: alt-server.chaos952.org:49570
   CHAOS_REPO: https://github.com/chaos9520/panel-game.git
   CHAOS_BUILD_COMMIT: 4da6c5dd9249c58c53362c9e2204c5c0138ec203
   CHAOS_ZIP: test-build_v3.zip
@@ -185,7 +187,7 @@ jobs:
           chaos=""
           if [ "$BOT" = chaos ] || [ '${{ env.SERVER_EFF }}' = "$CHAOS_SERVER" ]; then
             [ "$BOT" = chaos ] && [ '${{ env.SERVER_EFF }}' = "$CHAOS_SERVER" ] || { echo "::error::bot=chaos goes with server=$CHAOS_SERVER, and only it plays there"; exit 1; }
-            [ '${{ env.MODE }}' = live ] || { echo "::error::the chaos bot runs as mode: live for now (deploy / stop / fight come once it has played the real server)"; exit 1; }
+            [ '${{ env.MODE }}' = live ] || { echo "::error::the chaos bot runs as mode: versus-player for now (deploy / stop / fight come once it has played the real server)"; exit 1; }
             case '${{ env.BOT_NAME }}' in *'#'*|Ranmaru*) echo "::error::name the chaos bot (not the Ranmaru default), e.g. Chaos_CPU"; exit 1;; esac
             kind=gambit; chaos=1
           fi
@@ -1294,6 +1296,49 @@ jobs:
   # two are found.
   # stats-rebuild: rebuild the stats page from dashboard/page.html and publish it to gh-pages, using the same site_open/site_push as a bot run.
   # No bot and no server is touched. Dispatch with ref bramp/multi-player.
+  # server-probe: is a server up, and what does it speak? From a runner (the agent's sandbox cannot reach game ports). It NEVER logs in:
+  # per port it opens a connection and sends the version check every client sends first (H<network version>, no name, no account; nothing
+  # shows in the lobby), prints the answer (H = this version is accepted, N = it is not), and closes. Then the server's web side (/, /replays/).
+  server-probe:
+    name: Probe the server (no login)
+    if: ${{ inputs.mode == 'server-probe' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Probe
+        env:
+          TARGET: ${{ env.SERVER_EFF }}
+        run: |
+          python3 - <<'PY'
+          import os, socket, ssl, urllib.request
+          host, port = os.environ['TARGET'].rsplit(':', 1)
+          out = []
+          def say(x): print(x); out.append(x)
+          try: say('%s resolves to %s' % (host, sorted({a[4][0] for a in socket.getaddrinfo(host, None)})))
+          except Exception as e: say('%s does not resolve: %s' % (host, e))
+          END = '\u2190J\u2190'.encode('utf-8')   # the protocol's message end marker
+          for p in sorted({int(port), 49569, 49570}):
+              for v in ('005', '006', '004'):
+                  try:
+                      c = socket.create_connection((host, p), timeout=10); c.settimeout(8)
+                      c.sendall(b'H' + v.encode() + END)
+                      try: r = c.recv(64)
+                      except socket.timeout: r = b'(no answer in 8 s)'
+                      c.close()
+                      say('port %d, version check %s: connected; answer %r' % (p, v, r[:40]))
+                  except Exception as e:
+                      say('port %d: %s' % (p, e)); break
+          for u in ('http://%s/' % host, 'http://%s/replays/' % host, 'https://%s/' % host, 'https://%s/replays/' % host):
+              try:
+                  r = urllib.request.urlopen(urllib.request.Request(u, headers={'User-Agent': 'server-probe'}), timeout=15)
+                  say('%s -> %s, %d bytes: %r' % (u, r.status, len(r.read(4000)), ''))
+              except Exception as e:
+                  say('%s -> %s' % (u, e))
+          open(os.environ['GITHUB_STEP_SUMMARY'], 'a').write('\n'.join(['```'] + out + ['```']) + '\n')
+          PY
+
   stats-rebuild:
     name: Rebuild the stats page
     if: ${{ inputs.mode == 'stats-rebuild' }}

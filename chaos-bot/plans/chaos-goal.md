@@ -140,6 +140,9 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 51 (2026-11-26 00:57 ET), run 49's rule off (the run-46 bot) on seeds 3-4: survived 7/8** (lost insane s4 17308, which run
+  50 lost too). Run 49's rule costs seeds 3-4 (two early losses) and stays off. The run-46 bot: 9-10 8/8, 1-2 7/8, 3-4 7/8.
+  Open: clears breaking nothing while stopped (stop is a max), panels spent under a queue. Run 52: the run-46 bot on seeds 5-6.
 - **Run 50 (2026-11-26 00:47 ET), the run-49 bot on seeds 3-4: survived 5/8** (lost insane s3 5221, chain s4 3860, insane s4
   19914; the run-33 bot had 8/8 here). Run 51: run 49's rule off (the run-46 bot) on seeds 3-4, to tell which change costs them.
 - **Run 49 (2026-11-26 00:38 ET), the cheaper of two dying clears breaking no garbage: survived 8/8 on seeds 1-2, health 13 in

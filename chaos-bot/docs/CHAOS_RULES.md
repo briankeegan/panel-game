@@ -19,6 +19,31 @@ Baseline for diffs: panel-game `bramp/multi-player` (c924107), which is what Gam
 
 Health is a one-time budget; after ~4 min with margin on, any topped-out frame without stop/shake = death.
 
+### How chaos is survived (owner: "it's always about to die -- it just has to not die, not die a little longer")
+
+The board is always about to die. Level 10 starts at speed 73: 4 frames a sixteenth of a row, 64 frames a row, and the speed goes up
+every 900 frames (SPEED_TO_RISE_TIME falls to 1 frame a sixteenth, 16 frames a row). Left alone, any board reaches the top in seconds.
+What stops it is only this, frame by frame:
+- **The stack rises only on a frame with no stop time and no rise lock** (Stack:advancePassiveRaise). Rise lock = anything moving:
+  a swap, a clear flashing or popping, panels falling, garbage shaking (Stack:updateRiseLock).
+- **Topped out, those same frames cost 1 health**, 13 at Level 10, never refilled -- and garbage cannot drop while topped out.
+- **Freezes**: a clear freezes the stack while it pops -- FLASH+FACE+POP x n (+GARBAGE_POP per garbage panel touched +GARBAGE_HOVER):
+  45 frames for a three of panels, 108 for a three on a 6x2 block; a combo of 4+ or a chain adds stop (40 x 1.05^(c-4) x 1.1^(chain-2),
+  x1.25 topped out), the largest kept, never summed; a landing shakes 18-82.
+- **Fuel**: every freeze costs panels (3 or more a clear). Breaking garbage gives panels back (a row per piece per match) and freezes
+  longest. Survival is a fuel budget: freeze frames bought per panel, panels in from garbage and the rise, panels out in clears.
+
+So "alive" is never "stands if left alone": nothing does. **A line keeps the board alive when, after it, the board does not die before
+the bot's next freeze can begin (a break's time: the reaction and a clear), and it leaves the fuel for that freeze** (panels to clear,
+or garbage to break). The bot then makes the next freeze, and the next: it never dies, rather than dying later.
+
+**Run 25 tried exactly that as the verdict and it changed nothing (every decision still "dies"):** a line lasts ~300 frames to its
+settle, and at 64 frames a row the board left alone after it is within a break of the top -- on a fresh board at frame 192 too (lost at
+390). Any verdict of the form "alive at X if the bot then stops" fails: there is always an X. The bot lives only by never stopping. So
+the verdict has to be about the cycle continuing -- after the line, the margin (frames to the top if nothing moves) at least the next
+freeze's start, the fuel for it (a three, or breakable garbage), and the cost (freeze frames bought per panel; breaking garbage the
+cheapest, it freezes longest and pays panels back) -- never "how long until it dies" ("die a little longer" is the wrong aim).
+
 ### What a topped-out frame costs (read again 2026-11-25, owner: "read the engine rules")
 
 - **rise_lock** (Stack.lua:1893) is on while a swap is queued, a garbage shake runs, or any panel is active this frame or last

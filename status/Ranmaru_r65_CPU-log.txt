@@ -1,16 +1,4 @@
-run 45840041718, as of 2026-11-26T15:24:09Z
-
-=== Bot 'Ranmaru_r65_CPU' (gambit, L10, cursor 4/12, unranked) is idle in the lobby on panelattack.com:49569 ===
-    Open your client, CHALLENGE 'Ranmaru_r65_CPU' in the lobby, and play — it auto-accepts.
-    Ctrl+C to stop.
-
-game about to start: both players are ready
-match start: building the match (seed nil, stage nil, opponent ?)
-match start: the match is built
-match start: the match is started
-match start: gambit: creating the link
-match start: gambit: the link is created
-match start: gambit: the link is starting the match
+run 45840041718, as of 2026-11-26T15:26:13Z
 match start: gambit: the link has started the match
 both ready — match starting
 opponent topped out: clock 630 stopWatch 442 stop 94 pre-stop 53 shake 59 health 31, top rows r12=gggggg r11=500003 r10=310042
@@ -147,3 +135,17 @@ opponent topped out: clock 3120 stopWatch 2932 stop 0 pre-stop 0 shake 53 health
 opponent topped out: clock 3150 stopWatch 2962 stop 0 pre-stop 0 shake 23 health 14, top rows r12=gggggg r11=gggggg r10=gggggg
 opponent topped out: clock 3180 stopWatch 2992 stop 0 pre-stop 42 shake 0 health 14, top rows r12=gggggg r11=gggggg r10=gggggg
 opponent topped out: clock 3210 stopWatch 3022 stop 0 pre-stop 12 shake 0 health 14, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 3240 stopWatch 3052 stop 78 pre-stop 73 shake 0 health 14, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 3270 stopWatch 3082 stop 78 pre-stop 43 shake 0 health 14, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 3300 stopWatch 3112 stop 78 pre-stop 13 shake 0 health 14, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 3330 stopWatch 3142 stop 61 pre-stop 0 shake 0 health 14, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 3360 stopWatch 3172 stop 31 pre-stop 0 shake 0 health 14, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 3390 stopWatch 3202 stop 1 pre-stop 0 shake 0 health 14, top rows r12=gggggg r11=gggggg r10=gggggg
+REPLAY {"settings":{"panelSource":{"seed":8526734,"sourceType":3,"shockEnabled":true},"metadata":{"timestamp":1795706595,"gameModeName":"VS","stageId":"ppl_pu2","completed":false,"ranked":false,"stacks":[{"panelId":"panelhd_basic_mizunoketsuban","stackIndex":1,"characterId":"pa_characters_dragon","l
+engine rolled our stack back 0 times for late garbage this match
+match against: Jdawson
+match against id: 10592
+match over — bot won (pace: worst 0.18 frames off schedule); waiting for a rematch
+memory after match: rss 3912104 kB, threads 9, lua 51940 kB
+game about to start: both players are ready
+set over: the room is closed, back in the lobby

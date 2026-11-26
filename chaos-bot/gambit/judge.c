@@ -76,6 +76,7 @@ typedef struct {
   int32_t even;                 // the board it ends on: its tallest column less its lowest, in rows (evenOf; -1 not known)
   int32_t spread;               // and how its colours are spread (spreadOf): the pairs a swap from a match less the pairs touching
   int32_t seams;                // and its crossed seams (seamsOf): the swaps on it that finish two colours at once
+  int32_t swapReady, readyBreak; // and the single swaps on it that make a match, and of those the matches touching garbage (readyOf)
   int32_t topRow;               // and whether anything rests in its top row or above (topRowOf: no queued garbage drops then)
   int32_t gap;                  // and the empty cells under its garbage, each column's lowest garbage down to what holds it (gapOf; -1 not known)
 } Judged;
@@ -331,6 +332,40 @@ static int32_t topRowOf(const Board *b) {
   int h = b->height ? b->height : 12;
   for (int r = h; r < b->nrows; r++) for (int c = 1; c <= W; c++) if (b->p[r][c].f[COLOR] > 0 || b->p[r][c].f[ISGARBAGE]) return 1;
   return 0;
+}
+// (CHAOS, THE COLOURS LINED UP: the single swaps on a board -- two panels side by side, both at rest -- that make a match where they
+// land, and of those the ones whose match touches garbage: the breaks a swap away. At 8 colours a match seldom arrives by itself; the
+// board kept with matches a swap away is the one the next garbage is broken on (the owner: be more purposeful with colours))
+static void readyOf(const Board *b, int32_t *ready, int32_t *readyBreak) {
+  static LOCAL int g[64][W + 2];
+  int nr = b->nrows < 64 ? b->nrows : 64;
+  for (int r = 0; r < nr; r++) for (int c = 0; c <= W + 1; c++) {
+    if (r < 1 || c < 1 || c > W) { g[r][c] = 0; continue; }
+    const int32_t *f = b->p[r][c].f;
+    g[r][c] = f[ISGARBAGE] ? -1 : (f[COLOR] > 0 && f[STATE] == NORMAL) ? f[COLOR] : (f[COLOR] > 0 ? -2 : 0);
+  }
+  int32_t n = 0, nb = 0;
+#define GG(r, c) ((r) >= 1 && (r) < nr && (c) >= 1 && (c) <= W ? g[r][c] : 0)
+  for (int r = 1; r < nr; r++) for (int c = 1; c < W; c++) {
+    int a = g[r][c], bb = g[r][c + 1];
+    if (a <= 0 || bb <= 0 || a == bb) continue;
+    g[r][c] = bb; g[r][c + 1] = a;
+    int made = 0, touch = 0;
+    for (int k = 0; k < 2; k++) {
+      int cc = c + k, v = g[r][cc], lo = cc, hi = cc, dn = r, up = r;
+      while (GG(r, lo - 1) == v) lo--; while (GG(r, hi + 1) == v) hi++;
+      while (GG(dn - 1, cc) == v) dn--; while (GG(up + 1, cc) == v) up++;
+      int h = hi - lo + 1 >= 3, vv = up - dn + 1 >= 3;
+      if (!h && !vv) continue;
+      made = 1;
+      if (h) for (int q = lo; q <= hi; q++) if (GG(r + 1, q) == -1 || GG(r - 1, q) == -1 || GG(r, q - 1) == -1 || GG(r, q + 1) == -1) touch = 1;
+      if (vv) for (int q = dn; q <= up; q++) if (GG(q + 1, cc) == -1 || GG(q - 1, cc) == -1 || GG(q, cc - 1) == -1 || GG(q, cc + 1) == -1) touch = 1;
+    }
+    g[r][c] = a; g[r][c + 1] = bb;
+    n += made; nb += touch;
+  }
+#undef GG
+  *ready = n; *readyBreak = nb;
 }
 static int32_t evenOf(const Board *b) {
   int hi = 0, lo = 1 << 20;
@@ -659,7 +694,7 @@ static void judgeOnce(const Question *q, const int32_t *seq, int nseq, const Jud
   for (int z = 4; z < MAXCOMBOS + 64; z++) if (single[z] && j->nsingles < MAXCOMBOS) j->singles[j->nsingles++] = z;
   Node *e = NODE(x, n);
   j->endNode = n;
-  { const Board *eb = ensureBoard(x, n); j->even = eb ? evenOf(eb) : -1; j->gap = eb ? gapOf(eb) : -1; j->topRow = eb ? topRowOf(eb) : 0; j->spread = eb ? spreadOf(eb) : 0; j->seams = eb ? seamsOf(eb) : 0; }
+  { const Board *eb = ensureBoard(x, n); j->even = eb ? evenOf(eb) : -1; j->gap = eb ? gapOf(eb) : -1; j->topRow = eb ? topRowOf(eb) : 0; j->swapReady = j->readyBreak = 0; if (eb) readyOf(eb, &j->swapReady, &j->readyBreak); j->spread = eb ? spreadOf(eb) : 0; j->seams = eb ? seamsOf(eb) : 0; }
   j->dropAt = j->dead ? 0 : e->t + imax(e->stopTime + e->preStopTime, e->shakeTime);
   j->fire = j->nats ? j->ats[j->nats - 1] : -1;
   if (o->lifeTo >= 0) j->lostAt = j->dead ? j->deadAt : lostAlone(x, n, imax(o->lifeTo, imax(lastAt, o->lifeStop ? j->dropAt : 0) + o->lifeRest));

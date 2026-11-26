@@ -1303,6 +1303,14 @@ static int compareJudged(const Judge *x, const Judge *y) {
   if (0 && decF.under && (lx || lostAlike(x, y)) && imax(0, x->apBroke) == imax(0, y->apBroke) && x->o.j.gap >= 0 && y->o.j.gap >= 0 &&
       iabs(x->o.j.gap - y->o.j.gap) >= GAP_CELLS)
     return (cmpKey = __LINE__, (x->o.j.gap - y->o.j.gap));
+  // 1'h. (run 107, CHAOS) ABOVE SIX COLOURS, THE COLOURS LINED UP (the owner: be more purposeful with colours): of two that both live
+  // or are lost alike and break the same garbage, the one leaving more breaks a swap away (judge.c readyOf: a single swap that makes a
+  // match touching garbage), then more matches a swap away -- at 8 colours a match seldom arrives by itself, and runs 101-106 found no
+  // break on 57% of decisions under garbage
+  if (decQ.b->colors > 6 && (lx || lostAlike(x, y)) && imax(0, x->apBroke) == imax(0, y->apBroke)) {
+    if (x->o.j.readyBreak != y->o.j.readyBreak) return (cmpKey = __LINE__, (x->o.j.readyBreak > y->o.j.readyBreak ? -1 : 1));
+    if (x->o.j.swapReady != y->o.j.swapReady) return (cmpKey = __LINE__, (x->o.j.swapReady > y->o.j.swapReady ? -1 : 1));
+  }
   // 1'f. NO SLAB AT THE FINISH: where the list is the finish (finishAsked), of two that survive alike, the line that sends no slab of two
   // rows or more (a chain of three or longer, the board's own going on included) before one that does, whatever either breaks -- the
   // owner: no big chains at the finish; a chain is played there only where nothing else lives as long

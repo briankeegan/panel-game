@@ -150,6 +150,10 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 107 (pushed 2026-11-26 11:2x ET): the colours lined up** (the owner: "Might have to be more purposeful with colors?"). Above
+  six colours, of two lines that live or are lost alike and break the same garbage, the one leaving more breaks a swap away (a single
+  swap of two resting panels making a match that touches garbage), then more matches a swap away (judge.c readyOf, rank.c 1'h): the
+  waiting time spent lining colours up rather than holding. 8 colours L10 s1-2.
 - **Run 106 (2026-11-26 11:19 ET), run 104's search shape again (by the colours, every search), 8 colours L10 s1-2: survived 2/8,
   11122 frames on average** -- run 104's 16654 was the noise. 8 colours, runs 101-106: 2, 2, 2, 2, 1, 2 of 8; 9.7k-16.7k frames on
   average, no change clearly better. Kept: run 102's rule (a living break puts a dying plan down -- sound on its own) and the shape by the

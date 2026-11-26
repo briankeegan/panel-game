@@ -179,11 +179,13 @@
 # run 61 -- the run-59 bot, unchanged, on seeds 1 and 2 (the gate for this bot: 5-6 passed, 9-10 7/8; then 3-4, 7-8)
 # run 61 -- (result) survived 8/8 on seeds 1-2, health 13 in every game
 # run 62 -- the run-59 bot, unchanged, on seeds 3 and 4 (gate: 1-2 and 5-6 passed, 9-10 7/8; then 7-8)
-chain_garbage 3 9 9 1 21600 10
-combo_storm 3 9 9 1 21600 10
-thicc_combo_storm 3 9 9 1 21600 10
-insane_combo_storm 3 9 9 1 21600 10
-chain_garbage 4 9 9 1 21600 10
-combo_storm 4 9 9 1 21600 10
-thicc_combo_storm 4 9 9 1 21600 10
-insane_combo_storm 4 9 9 1 21600 10
+# run 62 -- (result) survived 8/8 on seeds 3-4, health 13 in every game. The run-59 bot: 31/32 (1-2, 3-4, 5-6 8/8; 9-10 7/8)
+# run 63 -- the run-59 bot, unchanged, on seeds 7 and 8 (then 9-10 again)
+chain_garbage 7 9 9 1 21600 10
+combo_storm 7 9 9 1 21600 10
+thicc_combo_storm 7 9 9 1 21600 10
+insane_combo_storm 7 9 9 1 21600 10
+chain_garbage 8 9 9 1 21600 10
+combo_storm 8 9 9 1 21600 10
+thicc_combo_storm 8 9 9 1 21600 10
+insane_combo_storm 8 9 9 1 21600 10

@@ -303,6 +303,16 @@ static int readBoard_(Read *R) {
   // in a game garbage has reached or is on its way to -- the owner: the opener raise changed only where it kills, and with no garbage
   // ever it does: endless at level 11, 15 of 28 raising, 25 of 28 not)
   int refill = !opening && garbageGame && (R->belowFloor || panelTop(decQ.b) < LOW_ROWS) && !R->topped;
+  // (CHAOS, THE FUEL RAISE: the bot never raised in any game, and its losses ran out of panels -- insane s5 at 2124, 5 colours at
+  // 2755, panels 5-8 with nothing to break with. Garbage in play, no break on it to build and fewer than two threes of panels: raise
+  // a row -- fresh panels from below -- when the whole stack, garbage and all, still leaves a break's time (levelBreak) of rise after
+  // it, at this speed (caRiseFrames, read off the level); asked only when the game takes a raise (chaosRaisable, below))
+  int chaosFuelRaise = 0;
+  if (!opening && garbageGame && !R->topped) {
+    int fuelLow = !breakBuildable(decQ.b) && groupsOn(decQ.b) < 2;
+    int32_t rowFrames = 16 * caRiseFrames(decQ.b->speed), roomRows = decQ.b->height - fullTop(decQ.b) - 1;
+    if (fuelLow && rowFrames > 0 && roomRows * rowFrames >= levelBreak) { refill = 1; chaosFuelRaise = 1; }
+  }
   // (and FINISH THEM'S RAISE: the eights it fires need rows to sort -- three to five tall in two columns side by side -- so a stack
   // under LOW_ROWS is raised to FINISH_ROWS in a game garbage has not reached too; set 86 endless, a stack of four rows cleared by 4s
   // and 6s, no eight in reach in four decisions of five)
@@ -316,6 +326,7 @@ static int readBoard_(Read *R) {
   if (taRaise) to = taTo;
   raiseRefill = refill; raiseOpening = opening; raiseTo = to;
   int32_t rowsUp = to - (opening ? fullTop(decQ.b) : panelTop(decQ.b));
+  if (chaosFuelRaise) { to = panelTop(decQ.b) + 1; rowsUp = 1; }   // (one row at a time: the next decision asks again)
   raiseRows = rowsUp;
   // (CHAOS: A RAISE IS AN OPTION ONLY WHEN THE GAME TAKES ONE -- the owner: the decision is offered only when it is allowed. The chaos
   // engine raises on the press only with no swap queued, no shake, nothing moving, nothing in the top row and no raise running

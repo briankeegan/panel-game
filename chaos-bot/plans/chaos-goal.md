@@ -139,6 +139,10 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 36 (2026-11-25 22:28 ET), colour counts: 5/8.** 4 colours: both 6:00, 26.8 and 25.6 rows a minute. 5: insane 6:00, combo
+  lost 2755 (panels 5-8, nothing to break with). 7: both 6:00. 8: combo lost 17845, insane 11518 (fewer matches, slower digging).
+  Budgets 0. Fuel is the common thread (insane s5, NST, 5 colours) and the bot has never raised: the refill raise only fired on a stack
+  under six rows or under the rules' floor, which chaos has none of. Run 37: the fuel raise (decide.c), on Normal seeds 5-6.
 - **Run 35 (2026-11-25 22:18 ET), the mode survey (combo_storm s1, one setting a game): 6/8.** Survived 6:00: training_random,
   margin Colors, Modoki and Chaos (health decaying to 1 as designed), Chaos Mode on, 1 HP (never an idle topped frame). Lost: No Stop
   Time at 6250 and BALL at 7437, both at the 17-piece burst near 6000 -- with no stop time, only motion, garbage pops and shakes hold

@@ -96,11 +96,14 @@
 # run 35 -- (result) survey 6/8: training_random, margin Colors/Modoki/Chaos, Chaos Mode on, 1 HP all 6:00; lost No Stop Time 6250
 #          and BALL 7437 (the 17-piece burst at ~6000: no stop time to carry it). Budgets 0
 # run 36 -- the survey's colour counts: 4, 5, 7, 8 on combo_storm s1 and insane_combo_storm s1. No change to the bot
-combo_storm 1 9 9 2 21600 10 colors=4
-insane_combo_storm 1 9 9 2 21600 10 colors=4
-combo_storm 1 9 9 2 21600 10 colors=5
-insane_combo_storm 1 9 9 2 21600 10 colors=5
-combo_storm 1 9 9 2 21600 10 colors=7
-insane_combo_storm 1 9 9 2 21600 10 colors=7
-combo_storm 1 9 9 2 21600 10 colors=8
-insane_combo_storm 1 9 9 2 21600 10 colors=8
+# run 36 -- (result) colours 5/8: 4 colours both 6:00 (26.8 and 25.6 rows a minute), 5 insane and 7 both 6:00; lost 5 combo 2755
+#          (panels 5-8, nothing to break with), 8 combo 17845, 8 insane 11518. Budgets 0. The bot has never raised in any game
+# run 37 -- one change: the fuel raise (decide.c) -- fuel low and room for a row: raise one. Back on Normal seeds 5 and 6
+combo_storm 5 9 9 2 21600 10
+chain_garbage 5 9 9 1 21600 10
+thicc_combo_storm 5 9 9 3 21600 10
+insane_combo_storm 5 9 9 2 21600 10
+combo_storm 6 9 9 2 21600 10
+chain_garbage 6 9 9 1 21600 10
+thicc_combo_storm 6 9 9 3 21600 10
+insane_combo_storm 6 9 9 2 21600 10

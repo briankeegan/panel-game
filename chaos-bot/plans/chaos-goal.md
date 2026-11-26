@@ -140,6 +140,9 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 65 (2026-11-26 03:08 ET), every mode with the gate's bot: 7/8.** No Stop Time 6:00, BALL 6:00 (1 health, none lost), 5
+  colours 6:00, 8 colours insane 6:00, Panel Hell 4, Ridiculous 4 and Impossible 8 won; lost 8 colours combo s1 at 1033 (every
+  line dying from 413 at 42 panels). Run 66: 8 colours, the full 8-game set.
 - **Run 64 (2026-11-26 02:59 ET), the run-59 bot on seeds 9-10: survived 8/8. THE NORMAL SURVIVAL GATE IS PASSED** (section 2):
   one unchanged bot (the run-59 bot: run 46's two-break margin for lines clearing nothing, run 55/59's opening keeping its panels
   under six rows) 8/8 on seeds 1-2 (run 61), 3-4 (62), 5-6 (60), 7-8 (63) and 9-10 (64): every game 6:00 at health 13, 0 late,

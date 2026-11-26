@@ -140,6 +140,10 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 44 (2026-11-25 23:47 ET), Panel Hell 1-4 and Ridiculous 1-4: 6/8.** Lost Panel Hell 4 (8 colours, no stop time, chaos
+  margin: near the top from 0:08, every line judged dying) and Ridiculous 4 (garbage up to the top row with 6-10 panels under it:
+  out of fuel, and no raise with the top row full). Run 45: the stages not yet played (Ridiculous 5, Line Clear 15 1-6, 14:6), to
+  have the whole failure list before fixing; then fuel first (the most common loss: 5 colours, insane s5, Ridiculous 4).
 - **Run 43 (2026-11-25 23:36 ET), Challenge Mode Impossible (difficulty 11), stages 1-8: won 8/8**, 1:08 to 3:05, surprises
   0/140, 0 late; health left 6,5,6,5,5,3,3,1 (stage 8 won on its last point: the margin to fix). Run 44: Panel Hell (17, no stop
   time, 5-8 colours) stages 1-4 and Ridiculous (16) stages 1-4; the launcher records each stage's own settings.

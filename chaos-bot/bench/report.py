@@ -63,7 +63,7 @@ def main():
         if fr > 0:
             played += fr; sent += float(r.get("sentRows", 0))
         rows.append("game %d level %s challenge %s mode %s margin %s chaosmode %s colors %s pattern %s seed %d frames %s survived %d lostAt %s health %s healthLostTop %s gpm %s late %s diverged %s overruns %s worstMs %s surprises %s/%s noticeMin %s lives %d/%d raises %d fuel %d/%d/%d reason %s" % (
-            g["n"], r.get("level", g.get("level", 9)), g.get("challenge", "") or "-", g.get("mode", 1), g.get("margin", 1), g.get("chaosmode", 0), g.get("colors", 6), g["pattern"], g["seed"], r.get("frames", -1), ok, r.get("lostAt", -1), r.get("health", -1), r.get("healthLostTop", -1),
+            g["n"], r.get("level", g.get("level", 9)), g.get("challenge", "") or "-", r.get("gamemode", g.get("mode", 1)), r.get("margin", g.get("margin", 1)), r.get("chaosmode", g.get("chaosmode", 0)), r.get("colors", g.get("colors", 6)), g["pattern"], g["seed"], r.get("frames", -1), ok, r.get("lostAt", -1), r.get("health", -1), r.get("healthLostTop", -1),
             r.get("gpm", -1), s.get("late", "?"), s.get("diverged", "?"), r.get("overruns", "?"), r.get("worstMs", "?"), s.get("surprises", "?"), s.get("arrivals", "?"), s.get("noticeMin", "?"), vl, vl + vd, vr, vf[0], vf[1], vf[2], r.get("reason", "?")))
     for row in rows:
         print(row)

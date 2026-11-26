@@ -119,11 +119,17 @@
 # run 44 -- CHALLENGE MODE, Panel Hell (17: level 8, game mode 3 = no stop time, 5-8 colours, 30 rows a minute of healing)
 #          stages 1-4 and Ridiculous (16: level 7, 6 colours, chaos margin) stages 1-4. The launcher now records the stage's own
 #          level/colours/game mode/margin/queue. No change to the bot
-challenge 1 9 9 1 21600 8 challenge=17:1
-challenge 1 9 9 1 21600 8 challenge=17:2
-challenge 1 9 9 1 21600 8 challenge=17:3
-challenge 1 9 9 1 21600 8 challenge=17:4
-challenge 1 9 9 1 21600 7 challenge=16:1
-challenge 1 9 9 1 21600 7 challenge=16:2
-challenge 1 9 9 1 21600 7 challenge=16:3
-challenge 1 9 9 1 21600 7 challenge=16:4
+# run 44 -- (result) 6/8: Panel Hell 1-3 won (health left 9,8,1), Ridiculous 1-3 won (9,12,12); lost Panel Hell 4 at 2916 (8 colours,
+#          no stop time: v=dies from 0:08, 47-56 panels held at the top) and Ridiculous 4 at 2518 (garbage to the top row, 6-10 panels
+#          under it -- no raise possible with the top row full; out of fuel). Surprises 0/213, 0 late
+# run 45 -- the stages not yet played: Ridiculous 5, Line Clear Very Hard (15: level 9, 5-7 colours) 1-6, Line Clear Hard (14) 6.
+#          Line Clear stages are won by sending the stage's rows (5-80); passed here = won or alive at 6:00. The report prints the
+#          game's own settings. No change to the bot
+challenge 1 9 9 1 21600 7 challenge=16:5
+challenge 1 9 9 1 21600 9 challenge=15:1
+challenge 1 9 9 1 21600 9 challenge=15:2
+challenge 1 9 9 1 21600 9 challenge=15:3
+challenge 1 9 9 1 21600 9 challenge=15:4
+challenge 1 9 9 1 21600 9 challenge=15:5
+challenge 1 9 9 1 21600 9 challenge=15:6
+challenge 1 9 9 1 21600 7 challenge=14:6

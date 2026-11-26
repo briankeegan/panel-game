@@ -140,6 +140,9 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 81 (2026-11-26 05:43 ET), LEVEL 7 against garbage 7/7: survived 7/8, survivors at full health, no queue losses.**
+  The level-7 failures against 9/9 were the benchmark's level-10 garbage; with garbage of its level the level-derived bot holds.
+  Against garbage above its level, levels 7-8 fill to the top and the queue's fifty ends it -- open. Run 82: level 8 vs 8/8.
 - **Run 80 (2026-11-26 05:34 ET), topped with garbage waiting, dig first: level 7 2/8 -- off.** The level 9/9 garbage set for
   level 10 buries a level-7 board (slow pops) to the top; the bot lives on stop and the queue overflows. Run 81: level 7 against
   garbage 7/7 -- is it the benchmark's garbage or the bot?

@@ -512,7 +512,9 @@ static int wastesThree(const Judge *J) {
   // (run 109, CHAOS: above six colours, with the stack six rows or more, a three is room bought, not wasted -- matches are scarce, the
   // stack climbs while it waits for a combo, and the first garbage lands on a full board: run 108 8 colours combo s4, 30 panels to 48
   // by frame 516 with the threes put off, lost at 981; four of the run's six losses opened high, 45+ panels at the first garbage)
-  if (decQ.b->colors > 6 && panelTop(decQ.b) >= ROOM_ROWS && !cutsShort(J)) return 0;
+  // (run 109: off -- 8 colours s3-4 2/8, 12353 frames on average against 14377; the opening still held ~48 panels at the first
+  // garbage: at level 10 the stack rises a row a second, more than threes at 8 colours take off)
+  if (0 && decQ.b->colors > 6 && panelTop(decQ.b) >= ROOM_ROWS && !cutsShort(J)) return 0;
   if (J->o.j.threes > 0) { wasteWhy = 1; return 1; }
   if (comboOutside(J) && !(J->apBroke > 0)) { wasteWhy = 2; return 1; }   // (a combo the mode does not ask for that breaks nothing: the owner, only where the board dies without it)
   if (cutsShort(J) && !(J->apBroke > 0)) { wasteWhy = 3; return 1; }   // (the board's own chain cut short: the three that began it made for nothing -- unless the

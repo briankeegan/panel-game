@@ -150,6 +150,9 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 109 (2026-11-26 12:30 ET), a three on a tall stack is room (above six colours), 8 colours L10 s3-4: survived 2/8, 12353
+  frames on average** (run 108: 14377). Off: the opening still held ~48 panels at the first garbage -- at level 10 the stack rises a row
+  a second, more than threes at 8 colours take off. 8 colours stands at about 2/8, ~13-14k frames on average with runs 102 and 107 kept.
 - **Run 108 (2026-11-26 12:18 ET), the colours lined up, 8 colours L10 s3-4: survived 2/8, 14377 frames on average** (107+108
   ~14.2k, 101-106 ~12.0k). Four losses opened high (45+ panels at the first garbage): combo s4 went 30 -> 48 panels by frame 516 with
   every three put off as wasted (Gambit's "never a three unless it follows through"), lost at 981. Run 109: above six colours, with the

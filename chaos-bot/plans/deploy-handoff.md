@@ -58,7 +58,7 @@ within each frame (the logs record late moves; it has 0 now).
 
 ## 4. GitHub, for an agent looking things up
 
-- Our repo: `briankeegan/panel-game`. Work on the bot branch is pushed only to `ccr-9ee25bfb-744765`. Never push to `bramp/multi-player`,
+- Our repo: `briankeegan/panel-game`. The bot-building agent pushes only to `ccr-9ee25bfb-744765` and never to `bramp/multi-player`,
   `beta`, `claude/newsey-game-ask-qa8u5e`, or GameCreator's `main`.
 - Upstream chaos build (read-only): `chaos9520/panel-game`, branch `chaos_build`. The raw zip URL is in `chaos-bot/game/fetch.sh`.
 - LÖVE 12 for Linux is downloaded from `panel-attack/panel-game` release `love2d-12.0` (see `chaos-bot-games.yml`).

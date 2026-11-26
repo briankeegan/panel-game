@@ -90,11 +90,14 @@
 # run 33 -- re-test: run 19's real health while topped out off (planned at 1 everywhere) (native.c)
 # run 33 -- (result) survived 8/8 on seeds 3-4, health 13 in every game, budgets 0, surprises 0/851, 15.43 rows a minute
 # run 34 -- 8/8 moves the benchmark to new seeds: 5 and 6, no change to the bot
-combo_storm 5 9 9 2 21600 10
-chain_garbage 5 9 9 1 21600 10
-thicc_combo_storm 5 9 9 3 21600 10
-insane_combo_storm 5 9 9 2 21600 10
-combo_storm 6 9 9 2 21600 10
-chain_garbage 6 9 9 1 21600 10
-thicc_combo_storm 6 9 9 3 21600 10
-insane_combo_storm 6 9 9 2 21600 10
+# run 34 -- (result) survived 7/8 on seeds 5-6, survivors' health 13; lost insane s5 at 2124 (panels 7-22 from the start, no raise)
+# run 35 -- THE MODE SURVEY (owner: try every chaos mode, 6 minutes each): combo_storm seed 1 at Level 10, one setting a game --
+#          training_random, margin Colors / Modoki / Chaos, Chaos Mode on, 1 HP, No Stop Time, BALL. No change to the bot
+training_random 1 9 9 2 21600 10
+combo_storm 1 9 9 2 21600 10 margin=2
+combo_storm 1 9 9 2 21600 10 margin=3
+combo_storm 1 9 9 2 21600 10 margin=4
+combo_storm 1 9 9 2 21600 10 chaosmode=1
+combo_storm 1 9 9 2 21600 10 mode=2
+combo_storm 1 9 9 2 21600 10 mode=3
+combo_storm 1 9 9 2 21600 10 mode=4

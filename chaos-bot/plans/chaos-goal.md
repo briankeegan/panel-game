@@ -139,6 +139,9 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 34 (2026-11-25 21:55 ET), seeds 5 and 6, no change: survived 7/8.** Survivors' health 13 each; budgets 0. Lost
+  insane_combo_storm s5 at 2124: panels 7-22 from the start, lines dying in their own steps, no raise all game -- fuel. The seed
+  sets go on from 5-6 after a change. Run 35: the mode survey -- one game a setting, combo_storm s1 (lived in Normal).
 - **Run 33 (2026-11-25 21:45 ET), run 19's real-health-while-topped off: survived 8/8 on seeds 3 and 4 -- health 13 in every
   game.** Budgets 0, surprises 0/851, 15.43 rows a minute. The bot now: the engine's settles end (the verdict works), the cycle
   verdict (margin a break's time, fuel -- a break on the garbage under garbage -- and the readiness), runs 14/15/17 kept, runs 19 and

@@ -201,11 +201,14 @@
 #          bot. 8 colours, the same set
 # run 68 -- (result) 8 colours by the square: survived 1/8, two losses inside 45 s -- worse. Back to linear
 # run 69 -- the linear scale, never below six's (outcome.c); 8 colours on seeds 3-4 (new seeds, more of the mode)
-chain_garbage 3 9 9 1 21600 10 colors=8
-combo_storm 3 9 9 1 21600 10 colors=8
-thicc_combo_storm 3 9 9 1 21600 10 colors=8
-insane_combo_storm 3 9 9 1 21600 10 colors=8
-chain_garbage 4 9 9 1 21600 10 colors=8
-combo_storm 4 9 9 1 21600 10 colors=8
-thicc_combo_storm 4 9 9 1 21600 10 colors=8
-insane_combo_storm 4 9 9 1 21600 10 colors=8
+# run 69 -- (result) 8 colours seeds 3-4, the linear scale: survived 3/8. thicc s3 (lost 2404): from 788 to 918 the search offered
+#          no line but the hold (24 panels, 8 colours: no three in reach) while the stop ran out -- the search's reach, a deeper fix
+# run 70 -- 7 colours, the full set (4 patterns x seeds 1-2) with the run-69 bot (the colour scale; six colours and under unchanged)
+chain_garbage 1 9 9 1 21600 10 colors=7
+combo_storm 1 9 9 1 21600 10 colors=7
+thicc_combo_storm 1 9 9 1 21600 10 colors=7
+insane_combo_storm 1 9 9 1 21600 10 colors=7
+chain_garbage 2 9 9 1 21600 10 colors=7
+combo_storm 2 9 9 1 21600 10 colors=7
+thicc_combo_storm 2 9 9 1 21600 10 colors=7
+insane_combo_storm 2 9 9 1 21600 10 colors=7

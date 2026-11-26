@@ -140,6 +140,9 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 69 (2026-11-26 03:46 ET), the linear colour scale (floored at six) on 8 colours seeds 3-4: survived 3/8.** Kept (exactly
+  the gate's play at six colours and under). 8 colours stays ~3/8: thicc s3 sat 130 frames with no line offered but the hold (24
+  panels, no three in reach at 8 colours) -- the search's reach at many colours is the deeper fix. Run 70: 7 colours, full set.
 - **Run 68 (2026-11-26 03:36 ET), by (colours/6)^2: 8 colours 1/8 -- worse** (two losses inside 45 s). Back to linear, never
   below six's. Run 69: 8 colours seeds 3-4.
 - **Run 67 (2026-11-26 03:27 ET), the break time scaled by colours/6: 8 colours 3/8**, losses later (16.4k frames on average vs

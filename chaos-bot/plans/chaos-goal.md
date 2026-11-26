@@ -140,6 +140,8 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 57 (2026-11-26 01:54 ET), the run-55 bot on seeds 7-8: survived 7/8** (lost thicc s7 at 19850, late, the backlog pattern).
+  The run-55 bot: 22/24 over seeds 3-8. Run 58: seeds 9-10.
 - **Run 56 (2026-11-26 01:45 ET), the run-55 bot on seeds 3-4: survived 8/8, health 13 in every game** (insane s4 lived, lost by
   the run-46 and run-49 bots). The gate for the run-55 bot: 3-4 passed, 5-6 7/8; run 57 seeds 7-8, then 9-10, 1-2, 5-6.
 - **Run 55 (2026-11-26 01:36 ET), the opening keeps its panels: survived 7/8 on seeds 5-6** (insane s5 lived, the first time since

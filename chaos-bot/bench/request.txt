@@ -168,11 +168,13 @@
 # run 56 -- the run-55 bot on seeds 3 and 4 (where run 49's rule showed its harm), no change
 # run 56 -- (result) survived 8/8 on seeds 3-4, health 13 in every game (insane s4 lived: lost by the run-46 and run-49 bots)
 # run 57 -- the run-55 bot, unchanged, on seeds 7 and 8 (the gate for this bot: 3-4 passed; then 9-10, 1-2, 5-6)
-chain_garbage 7 9 9 1 21600 10
-combo_storm 7 9 9 1 21600 10
-thicc_combo_storm 7 9 9 1 21600 10
-insane_combo_storm 7 9 9 1 21600 10
-chain_garbage 8 9 9 1 21600 10
-combo_storm 8 9 9 1 21600 10
-thicc_combo_storm 8 9 9 1 21600 10
-insane_combo_storm 8 9 9 1 21600 10
+# run 57 -- (result) survived 7/8 on seeds 7-8 (lost thicc s7 at 19850, late); the run-55 bot: 22/24 over seeds 3-8
+# run 58 -- the run-55 bot, unchanged, on seeds 9 and 10
+chain_garbage 9 9 9 1 21600 10
+combo_storm 9 9 9 1 21600 10
+thicc_combo_storm 9 9 9 1 21600 10
+insane_combo_storm 9 9 9 1 21600 10
+chain_garbage 10 9 9 1 21600 10
+combo_storm 10 9 9 1 21600 10
+thicc_combo_storm 10 9 9 1 21600 10
+insane_combo_storm 10 9 9 1 21600 10

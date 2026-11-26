@@ -140,6 +140,9 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 77 (2026-11-26 05:03 ET), LEVEL 7, seeds 1-2: survived 2/8** -- five losses to the queue at full health (30). Step 5's
+  problem: garbage drops only on quiet frames and the bot swaps constantly on a board never in danger. Run 78: with 10+ waiting,
+  a living hold is played.
 - **Run 76 (2026-11-26 04:53 ET), the queue drained from 40 over breaking lines: level 8 5/8 -- worse.** Runs 75-76 reverted.
   At level 8 the bot never loses health; the queue's fifty is the loss, and a hold does not quiet a board of slowly popping
   garbage. Open. Run 77: level 7.

@@ -229,6 +229,10 @@
 # run 76 -- (result) level 8: survived 5/8 -- worse; three losses to the queue at full health. Runs 75-76 reverted: a hold does
 #          not quiet a board whose garbage pops slowly; the queue's limit at levels 7-8 is open
 # run 77 -- Step 5: the gate's bot (+ the colour scale) at LEVEL 7, Normal, seeds 1-2
+# run 77 -- (result) LEVEL 7, seeds 1-2: survived 2/8 -- five losses to the queue (50) at full health (30), one early by health
+#          (insane s1 1528). The queue's limit is Step 5's problem: the bot swaps every few frames on a board never in danger
+# run 78 -- one change: with 10 or more waiting, when the hold itself lives (the cycle verdict), the hold is played -- quiet frames
+#          for the queue while they cost nothing (decide.c). Level 7, seeds 1-2 again
 chain_garbage 1 9 9 1 21600 7
 combo_storm 1 9 9 1 21600 7
 thicc_combo_storm 1 9 9 1 21600 7

@@ -140,6 +140,9 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 82 (2026-11-26 05:53 ET), LEVEL 8 against garbage 8/8: survived 8/8, full health.** Step 5, garbage of the level: L10
+  8/8 on all five sets (the gate), L9 7/8, L8 8/8, L7 7/8 -- the level-derived numbers hold. Open at levels 7-8: garbage above the
+  level (9/9) buries the board and the queue's fifty ends it. Run 83: level 9 on seeds 3-4.
 - **Run 81 (2026-11-26 05:43 ET), LEVEL 7 against garbage 7/7: survived 7/8, survivors at full health, no queue losses.**
   The level-7 failures against 9/9 were the benchmark's level-10 garbage; with garbage of its level the level-derived bot holds.
   Against garbage above its level, levels 7-8 fill to the top and the queue's fifty ends it -- open. Run 82: level 8 vs 8/8.

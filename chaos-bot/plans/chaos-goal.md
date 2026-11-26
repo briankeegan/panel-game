@@ -140,6 +140,8 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 67 (2026-11-26 03:27 ET), the break time scaled by colours/6: 8 colours 3/8**, losses later (16.4k frames on average vs
+  12.1k). Run 68: by (colours/6)^2, never below six's.
 - **Run 66 (2026-11-26 03:18 ET), 8 colours, the full set: survived 2/8.** The weak mode. Run 67: the cycle's break time scaled by
   colours/6 (unchanged at six colours, so the gate's bot plays the same there).
 - **Run 65 (2026-11-26 03:08 ET), every mode with the gate's bot: 7/8.** No Stop Time 6:00, BALL 6:00 (1 health, none lost), 5

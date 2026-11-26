@@ -140,6 +140,11 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 45 (2026-11-25 23:56 ET), the rest of Challenge Mode: 3/8.** Ridiculous 5 and Line Clear 15:1-2 won. A Line Clear stage
+  waits 7230 frames (2:00.5) and then sends a row a frame with no queue limit, so 50 queued ends it: a two-minute attack test (send
+  the stage's rows: 15:3 needs 39.5, the bot sent 30.3) -- Step 4 work; 15:3-5 and 14:6 ended that way, health full. 15:6 lost by
+  health with no garbage at all: lines clearing nothing lived on one break's margin decision after decision until none lived.
+  Run 46: a line that clears nothing needs two breaks' margin (the break put off and the next).
 - **Run 44 (2026-11-25 23:47 ET), Panel Hell 1-4 and Ridiculous 1-4: 6/8.** Lost Panel Hell 4 (8 colours, no stop time, chaos
   margin: near the top from 0:08, every line judged dying) and Ridiculous 4 (garbage up to the top row with 6-10 panels under it:
   out of fuel, and no raise with the top row full). Run 45: the stages not yet played (Ridiculous 5, Line Clear 15 1-6, 14:6), to

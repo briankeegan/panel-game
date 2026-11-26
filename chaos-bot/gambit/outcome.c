@@ -227,7 +227,11 @@ static Outcome outcomeOf(const int32_t *seq, int n, int settled, int waitAt, int
         // (the margin: a whole break's time -- levelBreak, the reaction then a three flashing and popping, read off the level -- not
         // only the next freeze's start: run 29 insane s4, holds living at margins 137 down to 60 with a break ready and never played,
         // the stop running out under them, then no break could be finished in what was left)
-        int cycle = fuel && margin >= levelBreak;
+        // (run 46: A LINE THAT CLEARS NOTHING PUTS THE BREAK OFF, it does not do without it -- so it needs the margin for the break it
+        // put off and the next one: two breaks' time. Run 45 Line Clear 15:6, no garbage at all: six such lines in a row (level, carry,
+        // setup, clearing nothing) each lived on one break's margin, 187 down to 115, then no line lived and 17 health went topped out)
+        int clears = o.j.clearedPanels > 0 || o.j.made.broke > 0;
+        int cycle = fuel && margin >= (clears ? levelBreak : 2 * levelBreak);
         if (cycle) o.lives = breaks || !coming ? 1 : (ready == 1 || ready == NOT_ASKED);
       }
     }

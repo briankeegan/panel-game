@@ -125,11 +125,17 @@
 # run 45 -- the stages not yet played: Ridiculous 5, Line Clear Very Hard (15: level 9, 5-7 colours) 1-6, Line Clear Hard (14) 6.
 #          Line Clear stages are won by sending the stage's rows (5-80); passed here = won or alive at 6:00. The report prints the
 #          game's own settings. No change to the bot
-challenge 1 9 9 1 21600 7 challenge=16:5
-challenge 1 9 9 1 21600 9 challenge=15:1
-challenge 1 9 9 1 21600 9 challenge=15:2
-challenge 1 9 9 1 21600 9 challenge=15:3
-challenge 1 9 9 1 21600 9 challenge=15:4
-challenge 1 9 9 1 21600 9 challenge=15:5
+# run 45 -- (result) 3/8: Ridiculous 5 won, Line Clear 15:1-2 won; 15:3/4/5 and 14:6 lost at ~7247 with full health -- every Line
+#          Clear stage waits 7230 frames then sends a row a frame with no queue limit: 50 queued is the loss. A Line Clear stage is a
+#          two-minute attack test (send its rows in time: 15:3 needs 39.5, sent 30.3) -- attack work (Step 4). 15:6 lost by health at
+#          6697 with NO garbage: six lines clearing nothing in a row each lived on one break's margin (187 down to 115), then none lived
+# run 46 -- one change: a line that clears nothing needs two breaks' margin to live -- the break it puts off and the next (outcome.c).
+#          The losses it may touch (15:6, Ridiculous 4, Panel Hell 4), No Stop Time combo s1, and Normal seed 10 x 4 as the check
 challenge 1 9 9 1 21600 9 challenge=15:6
-challenge 1 9 9 1 21600 7 challenge=14:6
+challenge 1 9 9 1 21600 7 challenge=16:4
+challenge 1 9 9 1 21600 8 challenge=17:4
+combo_storm 1 9 9 1 21600 10 mode=3
+chain_garbage 10 9 9 1 21600 10
+combo_storm 10 9 9 1 21600 10
+thicc_combo_storm 10 9 9 1 21600 10
+insane_combo_storm 10 9 9 1 21600 10

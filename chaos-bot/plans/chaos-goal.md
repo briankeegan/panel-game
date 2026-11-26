@@ -150,6 +150,12 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 106 (2026-11-26 11:19 ET), run 104's search shape again (by the colours, every search), 8 colours L10 s1-2: survived 2/8,
+  11122 frames on average** -- run 104's 16654 was the noise. 8 colours, runs 101-106: 2, 2, 2, 2, 1, 2 of 8; 9.7k-16.7k frames on
+  average, no change clearly better. Kept: run 102's rule (a living break puts a dying plan down -- sound on its own) and the shape by the
+  colours (only above six colours; 104+106 average 13.9k against 11.3k for 101-103, weak). The 8-colour losses: no-line (the search
+  finds no clear: 57% of decisions under garbage find no break), full boards topped, the queue's fifty. Open: a new idea is needed, not
+  a tuned number -- the next step is reading what a break needs at 8 colours on the boards themselves.
 - **Run 105 (2026-11-26 11:08 ET), the planner by the colours (planner only) and the queue-last rule, 8 colours L10 s1-2: survived
   1/8, 10949 frames on average** -- below run 104 (16654), whose profile narrowed the extend search too. Eight games swing by thousands
   of frames. Run 106: run 104's shape again, by the colours in every search the profile shapes; queue-last off.

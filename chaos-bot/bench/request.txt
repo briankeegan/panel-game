@@ -277,11 +277,12 @@
 # run 92 -- (result) the gate's bot on NEW seeds 15-16: survived 7/8 (lost insane s16 at 18633). New seeds 11-16: 22/24
 # run 93 -- the owner (2026-11-26): focus on the harder levels, numbers dynamic. Baseline: LEVEL 11 (health 10, start speed 81),
 #   the hardest garbage 11/11, seeds 1-2, the gate's bot unchanged
-chain_garbage 1 11 11 1 21600 11
-combo_storm 1 11 11 1 21600 11
-thicc_combo_storm 1 11 11 1 21600 11
-insane_combo_storm 1 11 11 1 21600 11
-chain_garbage 2 11 11 1 21600 11
-combo_storm 2 11 11 1 21600 11
-thicc_combo_storm 2 11 11 1 21600 11
-insane_combo_storm 2 11 11 1 21600 11
+# run 94 -- 1'g, no canyon under garbage (judge.c gapOf, rank.c): L10 seeds 15-16, where run 92 (the gate's bot) lost insane s16
+chain_garbage 15 9 9 1 21600 10
+combo_storm 15 9 9 1 21600 10
+thicc_combo_storm 15 9 9 1 21600 10
+insane_combo_storm 15 9 9 1 21600 10
+chain_garbage 16 9 9 1 21600 10
+combo_storm 16 9 9 1 21600 10
+thicc_combo_storm 16 9 9 1 21600 10
+insane_combo_storm 16 9 9 1 21600 10

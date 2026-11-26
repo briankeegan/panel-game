@@ -267,11 +267,13 @@
 # run 88 -- the run-87 bot on the LEVEL 10 gate: seeds 1-2 first
 # run 88 -- (result) the run-87 bot, LEVEL 10 seeds 1-2: survived 8/8, full health
 # run 89 -- the run-87 bot, LEVEL 10 seeds 3-4 (where run 49's rule cost two games)
-chain_garbage 3 9 9 1 21600 10
-combo_storm 3 9 9 1 21600 10
-thicc_combo_storm 3 9 9 1 21600 10
-insane_combo_storm 3 9 9 1 21600 10
-chain_garbage 4 9 9 1 21600 10
-combo_storm 4 9 9 1 21600 10
-thicc_combo_storm 4 9 9 1 21600 10
-insane_combo_storm 4 9 9 1 21600 10
+# run 89 -- (result) the run-87 bot, LEVEL 10 seeds 3-4: survived 7/8 (lost thicc s4 at 10939; the gate's bot had 8/8). Not kept
+# run 90 -- the gate's bot on NEW seeds 11 and 12, never played: does it hold beyond the seeds it was made on?
+chain_garbage 11 9 9 1 21600 10
+combo_storm 11 9 9 1 21600 10
+thicc_combo_storm 11 9 9 1 21600 10
+insane_combo_storm 11 9 9 1 21600 10
+chain_garbage 12 9 9 1 21600 10
+combo_storm 12 9 9 1 21600 10
+thicc_combo_storm 12 9 9 1 21600 10
+insane_combo_storm 12 9 9 1 21600 10

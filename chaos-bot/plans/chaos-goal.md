@@ -140,6 +140,8 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 89 (2026-11-26 06:58 ET), the run-87 bot on L10 seeds 3-4: survived 7/8** (the gate's bot: 8/8). The scarce-fuel rule
+  is not kept; the gate's bot stays. Run 90: the gate's bot on new seeds 11-12, never played.
 - **Run 88 (2026-11-26 06:49 ET), the run-87 bot on L10 seeds 1-2: survived 8/8, full health.** Run 89: L10 seeds 3-4.
 - **Run 87 (2026-11-26 06:40 ET), scarce fuel under garbage not spent on attack (living lines only): L9 seeds 7-8 7/8** (6/8
   without). Within the spread; it changes L10 play, so the L10 gate is run again before it is kept (run 88: seeds 1-2).

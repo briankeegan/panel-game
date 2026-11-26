@@ -156,7 +156,11 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
-- **Run 113 (pushed 2026-11-26 13:1x ET): the line-up swaps** -- run 110's bot (1'g and 1'i off: runs 111-112 4/8 and 3/8, the losses
+- **Run 114 (pushed 2026-11-26 13:2x ET): the opening keeps its panels only at six colours or fewer** -- run 113 insane s4 only set
+  up in the opening (30 -> 48 panels by 458, no clear: run 55's rule), lost at 1007. 8 colours L10 s3-4.
+- **Run 113 (2026-11-26 13:20 ET): the line-up swaps -- survived 4/8.** chain s4 (its target) lived; insane s3 3031, insane s4 1007,
+  thicc s3 8752, combo s4 13775 lost. Kept.
+- (run 113 as pushed) the line-up swaps -- run 110's bot (1'g and 1'i off: runs 111-112 4/8 and 3/8, the losses
   moved, none fixed) and, above six colours on a board at rest, the single swaps that leave the most breaks a swap away offered as
   set-ups (judge.c lineUpSwaps, propose.c), so 1'h has them to choose: run 110 chain s4 held 284 frames of stop offered only walks.
 - **Run 112 (2026-11-26 13:09 ET): room for what is coming (1'i) -- survived 3/8.** Off.

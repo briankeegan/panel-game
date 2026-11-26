@@ -1,5 +1,44 @@
-run 45883935714, as of 2026-11-26T21:01:27Z
+run 45883935714, as of 2026-11-26T21:03:31Z
 
 === Bot 'Ranmaru_r69_CPU' (gambit, L10, cursor 4/12, unranked) is idle in the lobby on panelattack.com:49569 ===
     Open your client, CHALLENGE 'Ranmaru_r69_CPU' in the lobby, and play — it auto-accepts.
     Ctrl+C to stop.
+
+game about to start: both players are ready
+match start: building the match (seed nil, stage nil, opponent ?)
+match start: the match is built
+match start: the match is started
+match start: gambit: creating the link
+match start: gambit: the link is created
+match start: gambit: the link is starting the match
+match start: gambit: the link has started the match
+both ready — match starting
+opponent topped out: clock 1020 stopWatch 832 stop 26 pre-stop 0 shake 22 health 1, top rows r12=ggggg0 r11=gggggg r10=gggggg
+garbage landed: our stopWatch 879 clock 1067, transits in flight before this frame {879}, opponent copy 1 frames behind, rollbacks so far 0
+opponent topped out: clock 1380 stopWatch 1192 stop 0 pre-stop 34 shake 52 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+REPLAY {"settings":{"replayVersion":3,"panelSource":{"sourceType":3,"shockEnabled":true,"seed":5692879},"metadata":{"stacks":[{"level":10,"wins":0,"stackIndex":1,"panelId":"panelhd_basic_mizunoketsuban","name":"Ranmaru_r69_CPU","publicId":12076,"characterId":"pa_characters_dragon"},{"level":10,"wins
+engine rolled our stack back 0 times for late garbage this match
+match against: javi
+match against id: 10757
+match over — bot won (pace: worst 0.15 frames off schedule); waiting for a rematch
+memory after match: rss 1795272 kB, threads 9, lua 44447 kB
+game about to start: both players are ready
+match start: building the match (seed nil, stage nil, opponent ?)
+match start: the match is built
+match start: the match is started
+match start: gambit: creating the link
+match start: gambit: the link is created
+match start: gambit: the link is starting the match
+match start: gambit: the link has started the match
+both ready — match starting
+garbage landed: our stopWatch 440 clock 628, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+opponent topped out: clock 720 stopWatch 532 stop 66 pre-stop 35 shake 60 health 1, top rows r12=gggggg r11=000003 r10=000004
+opponent topped out: clock 750 stopWatch 562 stop 66 pre-stop 5 shake 30 health 1, top rows r12=gggggg r11=000003 r10=000004
+opponent topped out: clock 780 stopWatch 592 stop 62 pre-stop 38 shake 49 health 1, top rows r12=gggggg r11=gggggg r10=000003
+opponent topped out: clock 810 stopWatch 622 stop 62 pre-stop 8 shake 19 health 1, top rows r12=gggggg r11=gggggg r10=000003
+garbage landed: our stopWatch 651 clock 839, transits in flight before this frame {651}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 719 clock 907, transits in flight before this frame {}, opponent copy 2 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 776 clock 964, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 1333 clock 1521, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 1337 clock 1525, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 1506 clock 1694, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0

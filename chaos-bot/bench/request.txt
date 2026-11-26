@@ -144,6 +144,8 @@
 #          spending fewer first unless the other lives a break's time longer (rank.c; holds clear nothing, so never put first). Seeds 1-2
 # run 49 -- (result) survived 8/8 on seeds 1-2, health 13 in every game, budgets 0, surprises 0/604 (thicc s1 lived)
 # run 50 -- the run-49 bot, unchanged, on seeds 3 and 4 (the gate for this bot: 1-2 done; then 5-6, 7-8, 9-10)
+# run 50 -- (result) survived 5/8 on seeds 3-4 (lost insane s3 5221, chain s4 3860, insane s4 19914); the run-33 bot had 8/8 here
+# run 51 -- one change: run 49's rule off again (the run-46 bot) on seeds 3-4, to tell which change costs these seeds
 chain_garbage 3 9 9 1 21600 10
 combo_storm 3 9 9 1 21600 10
 thicc_combo_storm 3 9 9 1 21600 10

@@ -140,6 +140,8 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 50 (2026-11-26 00:47 ET), the run-49 bot on seeds 3-4: survived 5/8** (lost insane s3 5221, chain s4 3860, insane s4
+  19914; the run-33 bot had 8/8 here). Run 51: run 49's rule off (the run-46 bot) on seeds 3-4, to tell which change costs them.
 - **Run 49 (2026-11-26 00:38 ET), the cheaper of two dying clears breaking no garbage: survived 8/8 on seeds 1-2, health 13 in
   every game.** The gate for the run-49 bot: 1-2 passed; run 50 seeds 3-4, then 5-6, 7-8, 9-10, unchanged.
 - **Run 48 (2026-11-26 00:28 ET), the run-46 bot on seeds 1-2: survived 7/8** (lost thicc s1 at 20886, 12 s short). With run 46's

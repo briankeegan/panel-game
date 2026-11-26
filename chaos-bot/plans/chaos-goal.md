@@ -140,6 +140,8 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 73 (2026-11-26 04:24 ET), Step 5 -- LEVEL 9, seeds 1-2: survived 7/8**, survivors at full health (17), 0 late (lost combo
+  s1 at 11544). Run 74: Level 8.
 - **Run 72 (2026-11-26 04:14 ET), chaos margin, full set: survived 7/8** (survivors at health 1: the mode shrinks health and adds
   colours to 8; lost insane s1 at 1790, opening panels spent). 8 colours' limit: the break search reaches only 3 swaps in its
   time (~10k boards) -- engine throughput or a narrower move set (same-colour swaps) is the fix, not more time. Run 73: Level 9.

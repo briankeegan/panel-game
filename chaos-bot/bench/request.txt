@@ -215,11 +215,13 @@
 #          8 colours' limit found: the break search reaches 3 swaps in its time (brDeep=3, ~10k boards) and finds none -- depth is
 #          the engine's throughput, not the time share (75% under garbage already)
 # run 73 -- Step 5: the current bot at LEVEL 9 (every number read off the level), Normal, seeds 1-2
-chain_garbage 1 9 9 1 21600 9
-combo_storm 1 9 9 1 21600 9
-thicc_combo_storm 1 9 9 1 21600 9
-insane_combo_storm 1 9 9 1 21600 9
-chain_garbage 2 9 9 1 21600 9
-combo_storm 2 9 9 1 21600 9
-thicc_combo_storm 2 9 9 1 21600 9
-insane_combo_storm 2 9 9 1 21600 9
+# run 73 -- (result) LEVEL 9, seeds 1-2: survived 7/8, every survivor at its full 17 health, 0 late (lost combo s1 at 11544)
+# run 74 -- Step 5: the current bot at LEVEL 8, Normal, seeds 1-2
+chain_garbage 1 9 9 1 21600 8
+combo_storm 1 9 9 1 21600 8
+thicc_combo_storm 1 9 9 1 21600 8
+insane_combo_storm 1 9 9 1 21600 8
+chain_garbage 2 9 9 1 21600 8
+combo_storm 2 9 9 1 21600 8
+thicc_combo_storm 2 9 9 1 21600 8
+insane_combo_storm 2 9 9 1 21600 8

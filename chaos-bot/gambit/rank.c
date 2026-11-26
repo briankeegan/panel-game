@@ -922,6 +922,14 @@ static void creditPair(const Judge *x, const Judge *y, int *lxo, int *lyo) {
 static int32_t chaosOpenQuiet;   // (decide.c: the opening -- before garbage first comes)
 static int compareJudged(const Judge *x, const Judge *y) {
   int lx, ly; creditPair(x, y, &lx, &ly);
+  // (run 87, CHAOS, SCARCE FUEL UNDER GARBAGE IS NOT SPENT ON ATTACK: under garbage with fewer than five rows of panels under it
+  // (materialOn < 5 x W), of two lines that both live and break no garbage, the one clearing fewer panels first -- what is under the
+  // garbage is the next break's material, and Training's garbage is scripted, so attack buys nothing. Only among living lines (run 49's
+  // rule, among dying ones, cost seeds 3-4 two early losses). Run 85 level 9 chain s8: an extend clearing 12 panels breaking none at 28
+  // panels, 11-17 after, lost at 1282)
+  if (decF.under && x->o.lives && y->o.lives && x->apBroke <= 0 && y->apBroke <= 0 &&
+      materialOn(decQ.b) < 5 * W && x->o.j.clearedPanels != y->o.j.clearedPanels)
+    return (cmpKey = __LINE__, (x->o.j.clearedPanels < y->o.j.clearedPanels ? -1 : 1));
   // (run 80, CHAOS, TOPPED WITH GARBAGE WAITING, DIG: nothing waiting drops while anything is in the top row (Stack:shouldDropGarbage,
   // panels_in_top_row first), and fifty waiting is the loss whatever the health. Topped with pieces waiting, of two lines judged alike,
   // the one breaking more garbage first -- the room under the top row is what lets the queue drop. Run 79 level 7 combo s1: topped all

@@ -148,6 +148,9 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 95 (2026-11-26 09:22 ET), combos 4-6 first (chaos-small) with 1'g, L10 seeds 15-16: survived 8/8, every game at full health
+  (13)** -- no health lost in any game; run 92 (the gate's bot) 7/8, run 94 (1'g alone) 7/8. Kept: `profiles/chaos.words` is now the
+  small-combo profile (the old one `chaos-big.words`). The new bot has to pass every seed set (1-16) again at L10, then L11.
 - **Run 94 (2026-11-26 09:12 ET), 1'g no canyon under garbage, L10 seeds 15-16: survived 7/8.** insane s16 (run 92's loss) lived at
   full health; chain s16 lost at 8847 (opening-spent, no-line; it lived in run 92). Run 95: combos 4-6 first (chaos-small), 1'g on.
 - **Run 93 (2026-11-26 09:01 ET), LEVEL 11 against garbage 11/11, seeds 1-2: survived 8/8, every game at full health (10)**, 0

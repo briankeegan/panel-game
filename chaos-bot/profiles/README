@@ -3,3 +3,6 @@ GameCreator's words.js on a scratch copy (GC_SURVIVOR_PROFILE=gambit-finish.json
 chaos.json / chaos-rules.json / chaos.words: gambit-finish with Gambit's vanilla stack-building taken out for chaos (run 4): no raise
 (gambit-rules.json raises to row 11), no material floor (>=40 panels), no opener (an 8-chain by frame 600). Written the same way.
 bench/play.sh plays profiles/${CHAOSBOT_PROFILE:-chaos}.words.
+
+chaos.words (run 95, 2026-11-26): finish them asks combos 4, 5, 6 before 8, 9, 10 -- a four buys about 23 frames of freeze and stop
+a panel, an eight about 15. The profile before it is chaos-big.words.

@@ -16,4 +16,7 @@ html = ("<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='
         "<script src='https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js'></script><script>" + loader + "</script></head>"
         "<body><div id='dash-root'>" + page + "</div></body></html>")
 open(os.path.join(out, "index.html"), "w").write(html)
-print("wrote", os.path.join(out, "index.html"), len(html))
+# THE CHAOS BOT'S PAGE: the same page at /chaos/ (loader.js reads the set from the address; its data is data/chaos/)
+os.makedirs(os.path.join(out, "chaos"), exist_ok=True)
+open(os.path.join(out, "chaos", "index.html"), "w").write(html.replace("<title>Ranmaru stats</title>", "<title>Chaos stats</title>"))
+print("wrote", os.path.join(out, "index.html"), "and chaos/index.html", len(html))

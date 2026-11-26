@@ -1412,7 +1412,7 @@ jobs:
             if [ -z "$sub" ]; then deploy_data || return 1; sub=$(sub_of "$DATA_PROJECT"); fi
             [ -n "$sub" ] || { echo "::error::the data project has no address: the page would show no games"; return 1; }
             rm -rf psite; git clone -q --depth 1 --branch gh-pages --sparse --filter=blob:none "$url" psite || return 1
-            git -C psite sparse-checkout set --no-cone /index.html /.nojekyll; rm -rf psite/.git psite/data
+            git -C psite sparse-checkout set --no-cone /index.html /chaos/index.html /.nojekyll; rm -rf psite/.git psite/data
             printf 'https://%s/data/\n' "$sub" > psite/data-base.txt
             npx --yes wrangler@3 pages project create "$PROJECT" --production-branch main >/dev/null 2>&1 || true
             npx --yes wrangler@3 pages deploy psite --project-name "$PROJECT" --branch main --commit-dirty=true || return 1

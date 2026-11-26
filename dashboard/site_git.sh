@@ -46,7 +46,7 @@ page_publish() {
   else echo "page: could not read the newest dashboard/ from ${PAGE_BRANCH:-bramp/multi-player}; not republishing"; return 1; fi
   git fetch -q --depth=1 --filter=blob:none origin gh-pages 2>/dev/null || git fetch -q --depth=1 origin gh-pages || { echo "page: no gh-pages branch"; return 1; }
   git worktree add -q --detach --no-checkout "$w/page" FETCH_HEAD || return 1
-  git -C "$w/page" sparse-checkout init --no-cone >/dev/null 2>&1; git -C "$w/page" sparse-checkout set '/index.html' '/.nojekyll' >/dev/null 2>&1
+  git -C "$w/page" sparse-checkout init --no-cone >/dev/null 2>&1; git -C "$w/page" sparse-checkout set '/index.html' '/chaos/index.html' '/.nojekyll' >/dev/null 2>&1
   git -C "$w/page" checkout -q --detach FETCH_HEAD 2>/dev/null || git -C "$w/page" checkout -q --detach "$(git rev-parse FETCH_HEAD)" || return 1
   python3 "$here/make_site.py" "$w/page" >/dev/null || return 1
   # the page branch holds the page alone: data that used to live beside it goes (it is on stats-data now)

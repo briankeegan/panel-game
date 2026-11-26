@@ -1,13 +1,13 @@
 // Stand-in for the artifact "dash" object: loads data files and runs the page's onData callbacks when they arrive.
 // THE DATA IS NOT PART OF THE PAGE: it lives at its own address (the data project, <project>-data.pages.dev), named in data-base.txt beside
 // the page (a URL, else ignored: Pages answers a missing file with the page), so new games reach the page without the page being published again. No data-base.txt (a local copy): ./data.
-// THE SET (#set=<name> in the link): which bot's games. Ranmaru's are the data's top level, as they always were; another bot's sit
-// in their own folder beside them (data/chaos/ for the chaos bot), so the two never mix. A set is chosen by a fresh load.
+// THE SET is the page's address: /chaos/ is the chaos bot's page, the site's root is Ranmaru's. Ranmaru's games are the data's top level,
+// as they always were; another bot's sit in their own folder beside them (data/chaos/), so the two never mix. Both pages are one page.
 (function () {
   const P = { ver: '', opp: '', minn: 10 }, fns = [], cache = {};
-  const SET = ((/(?:^#|&)set=([a-z0-9-]+)/.exec(location.hash) || [])[1] || 'ranmaru');
+  const SET = ((/^\/([a-z0-9-]+)\/(?:index\.html)?$/.exec(location.pathname) || [])[1] || 'ranmaru');
   document.documentElement.classList.add('set-' + SET);   // (each set's colours: page.html, html.set-<name>; set before anything draws)
-  const base = fetch('data-base.txt', { cache: 'no-store' }).then((r) => (r.ok ? r.text() : '')).then((t) => (/^https:\/\/[^\s<]+$/.test(t.trim()) ? t.trim().replace(/\/?$/, '/') : 'data/')).catch(() => 'data/')
+  const base = fetch(SET === 'ranmaru' ? 'data-base.txt' : '../data-base.txt', { cache: 'no-store' }).then((r) => (r.ok ? r.text() : '')).then((t) => (/^https:\/\/[^\s<]+$/.test(t.trim()) ? t.trim().replace(/\/?$/, '/') : (SET === 'ranmaru' ? 'data/' : '../data/'))).catch(() => (SET === 'ranmaru' ? 'data/' : '../data/'))
     .then((b) => (SET === 'ranmaru' ? b : b + SET + '/'));
   const name = (id) => (id === 'games' || id === 'versions') ? id + '.json' : id + '.json.gz';
   async function load(id) {

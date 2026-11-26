@@ -150,6 +150,10 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 104 (2026-11-26 10:57 ET), the planner narrower and deeper (28 x 10) at 8 colours L10 s1-2: survived 2/8, 16654 frames on
+  average** (runs 101-103: 9670, 12565, 11690) -- chain s2 and combo s2 lost to the queue's fifty at 21591 and 21485 with health 13 and
+  6 left, ~50 panels kept topped. Kept, shaped by the colours (propose.c: per colour over six, 6 narrower and 1.5 deeper). Run 105: that,
+  and within 6 of the queue's fifty the top row emptied whatever the lines' losses.
 - **Run 103 (2026-11-26 10:47 ET), the break search's share under garbage 0.9, 8 colours L10 s1-2: survived 2/8, 11690 frames on
   average** (run 102: 12565) -- no better; back to 0.75. Run 104: the planner narrower and deeper in the same time (chaos-deep: width 28,
   depth 10).

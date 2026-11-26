@@ -315,11 +315,15 @@
 #   -- no better; back to 0.75
 # run 104 -- the planner narrower and deeper in the same time (profile chaos-deep: width 40 -> 28, depth 7 -> 10): at 8 colours a
 #   three is a longer walk (panels only move sideways). 8 colours L10 s1-2
-chain_garbage 1 9 9 1 21600 10 colors=8 profile=chaos-deep
-combo_storm 1 9 9 1 21600 10 colors=8 profile=chaos-deep
-thicc_combo_storm 1 9 9 1 21600 10 colors=8 profile=chaos-deep
-insane_combo_storm 1 9 9 1 21600 10 colors=8 profile=chaos-deep
-chain_garbage 2 9 9 1 21600 10 colors=8 profile=chaos-deep
-combo_storm 2 9 9 1 21600 10 colors=8 profile=chaos-deep
-thicc_combo_storm 2 9 9 1 21600 10 colors=8 profile=chaos-deep
-insane_combo_storm 2 9 9 1 21600 10 colors=8 profile=chaos-deep
+# run 104 -- (result) planner 28 x 10 at 8 colours L10 s1-2: survived 2/8, 16654 frames on average (runs 101-103: 9670, 12565,
+#   11690); chain s2 and combo s2 lost to the queue's fifty at 21591 and 21485 with health left. Kept, by the colours (propose.c)
+# run 105 -- the planner shaped by the colours (8: 28 x 10, as run 104) and, within 6 of the queue's fifty, the top row emptied
+#   whatever the lines' losses (rank.c QUEUE_LAST): 8 colours L10 s1-2
+chain_garbage 1 9 9 1 21600 10 colors=8
+combo_storm 1 9 9 1 21600 10 colors=8
+thicc_combo_storm 1 9 9 1 21600 10 colors=8
+insane_combo_storm 1 9 9 1 21600 10 colors=8
+chain_garbage 2 9 9 1 21600 10 colors=8
+combo_storm 2 9 9 1 21600 10 colors=8
+thicc_combo_storm 2 9 9 1 21600 10 colors=8
+insane_combo_storm 2 9 9 1 21600 10 colors=8

@@ -96,6 +96,12 @@ static PlanOpts planOptsOf(const Read *R, const List *aims, double ms) {
   PlanOpts po = { GP->width ? GP->width : 40, GP->depth ? GP->depth : 7, GP->pool ? GP->pool : 250, aims, R->by ? R->by : NOT_ASKED,
                   R->keepOn ? &R->keep : 0, R->readyAt, R->under, R->F.v[FACT_US_DIES] > 0 ? R->F.v[FACT_US_DIES] : 0, R->under, ms,
                   planSeedsHave ? &planSeeds : 0 };
+  // (run 105, CHAOS, THE PLANNER BY THE COLOURS: above six colours a three is a longer walk -- panels move only sideways and fewer of a
+  // colour sit near each other -- so the same time is spent narrower and deeper: per colour over six, 6 lines fewer in the beam and
+  // 1.5 swaps deeper (8 colours: 40 x 7 -> 28 x 10). Run 104 (that shape as a profile) at 8 colours L10 s1-2: 16654 frames on average,
+  // two games lost in the last two seconds; runs 101-103 with 40 x 7: 9670, 12565, 11690)
+  { int32_t extra = decQ.b && decQ.b->colors > 6 ? decQ.b->colors - 6 : 0;
+    if (extra && po.width > 6 * extra + 8) { po.width -= 6 * extra; po.depth = imin(po.depth + (3 * extra + 1) / 2, MAXLINE - 2); } }
   return po;
 }
 static void searchPrep(const Read *R, Found *S) {

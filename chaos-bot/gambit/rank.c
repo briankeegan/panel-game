@@ -567,6 +567,7 @@ static int cutsShort(const Judge *J) {
 }
 #define FLAT_ROWS 2
 #define CHAOS_QUEUE_LIMIT 50   // (the chaos queue limit, as decide.c names it)
+#define QUEUE_LAST 6    // (run 105: pieces short of the queue's limit from which the top row is emptied whatever the lines' losses)
 #define QUEUE_ROOM 15   // (run 100: pieces short of the queue's limit from which the top row is kept empty)
 #define GAP_CELLS 3   // (1'g: three empty cells under the garbage, a column half dug out, or three columns a row each)
 #define BREAK_WALK 20   // the actions a break's line is pressed in, as the allowance keeps them (an estimate: a few swaps and their walks)
@@ -949,6 +950,11 @@ static int compareJudged(const Judge *x, const Judge *y) {
   // the top row empty first -- nothing waiting drops while anything rests there (Stack:shouldDropGarbage), so a board kept topped on
   // stop time only lets the queue grow. Run 99 L11 vs 11/11, 8 colours: both games lost to the queue at full health (queue 38-46 on
   // average over the last 1200 frames, stop 86-115))
+  // (run 105: and within QUEUE_LAST of fifty whatever either is judged lost at -- the health is planned as one, but a piece dropped on a
+  // topped board costs health, never the game, where fifty waiting is the game: run 104 chain s2 and combo s2 lost to the queue at
+  // 21591 and 21485 with health 13 and 6 left, boards of ~50 panels kept topped)
+  if (decQ.b->marginTime == 1 && decQ.b->ninc >= CHAOS_QUEUE_LIMIT - QUEUE_LAST && x->o.j.topRow != y->o.j.topRow && !x->o.dead && !y->o.dead)
+    return (cmpKey = __LINE__, (x->o.j.topRow ? 1 : -1));
   if (decQ.b->marginTime == 1 && decQ.b->ninc >= CHAOS_QUEUE_LIMIT - QUEUE_ROOM && x->o.j.topRow != y->o.j.topRow &&
       !x->o.dead && !y->o.dead && (x->o.lives || diesAt(x) >= rankSave) && (y->o.lives || diesAt(y) >= rankSave))
     return (cmpKey = __LINE__, (x->o.j.topRow ? 1 : -1));

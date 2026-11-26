@@ -13,7 +13,10 @@
   async function load(id) {
     try {
       // (no-store: a game finished a minute ago is on the page at the next load, not after a cache expires)
-      const url = (await base) + name(id), r = await fetch(url, { cache: 'no-store' }); if (!r.ok) throw new Error(url + ' ' + r.status);
+      const url = (await base) + name(id), r = await fetch(url, { cache: 'no-store' });
+      // a set with no games yet has no folder at all: its lists are empty, not an error (Ranmaru's data/ always exists)
+      if (r.status === 404 && SET !== 'ranmaru' && (id === 'games' || id === 'versions')) { cache[id] = { status: 'ok', data: [] }; fns.forEach((f) => f()); return; }
+      if (!r.ok) throw new Error(url + ' ' + r.status);
       let text;
       if (url.endsWith('.gz') && r.headers.get('content-encoding') !== 'gzip' && window.DecompressionStream) text = await new Response(r.body.pipeThrough(new DecompressionStream('gzip'))).text();
       else text = await r.text();

@@ -234,7 +234,7 @@ static int drawBoard(const char *log, int frame) {
   if (!f) return 2;
   static char line[1 << 17];
   while (fgets(line, sizeof line, f)) {
-    const char *b = strstr(line, "GAMBITL "); if (!b) b = strstr(line, "GAMBITQ "); if (!b) continue;
+    const char *b = strstr(line, "GAMBITL "); if (!b) b = strstr(line, "GAMBITQ "); if (!b) b = strstr(line, "GAMBITB "); if (!b) continue;
     if (atoi(b + 8) != frame) continue;
     int narr, n = loadLine(b, &narr);
     if (n < 0 || gb_question_bytes(n, narr) != 0) continue;

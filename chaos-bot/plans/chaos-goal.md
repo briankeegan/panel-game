@@ -124,6 +124,9 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 31 (2026-11-25 21:23 ET), keep-the-panels rule off: survived 7/8.** Lost insane_combo_storm s3 4028; 16.67 rows a minute;
+  budgets 0. The loss: lines living on the margin with a three or two of panels left, panels 31 to 10 with nothing broken, then none.
+  Run 32: under garbage the cycle's fuel is a break on the garbage (it freezes longest and pays panels back), not any three.
 - **Run 30 (2026-11-25 21:12 ET), the cycle's margin a whole break's time: survived 6/8.** Lost thicc_combo_storm s3 10320,
   combo_storm s4 8323; 16.49 rows a minute; budgets 0; ~20% of decisions with a living line. Since the settle fix: 3, 5, 6. combo s4:
   backlog 8-14 from 5200, panels 12-20, then holds at margin 95 to 58 to the loss -- runs 20-23's keep-the-panels rule, made when

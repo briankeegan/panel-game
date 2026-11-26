@@ -51,6 +51,18 @@ starts with the last benchmark's number (survived x/N, frames lost at, health le
 - **One run per change, judged on whether its deaths go away.** The bot must survive whatever the seed or the runner's timing:
   never run the same change twice to average out noise, never call a loss "noise".
 
+## 2b. Every chaos mode, 6 minutes each (owner, 2026-11-25 21:58 ET: "try them all, and you should be able to do them all for
+6 minutes" -- "nothing should be impossible")
+
+Each is its own benchmark set of 8 games at chaos Level 10, 21,600 frames, judged as the main one (8/8, budgets 0), played one run
+at a time, never more than 8 games at once (the owner's limit). request.txt carries the setting after the level as key=value:
+- training_random (the fifth generator), seeds 1-8
+- Margin Time: Colors (margin=2), Modoki (margin=3), Chaos (margin=4) -- health decays x0.9 every 900 frames with any of them
+- Chaos Mode on (chaosmode=1)
+- Game modes: 1 HP (mode=2), No Stop Time (mode=3), BALL (mode=4: 1 HP and no stop time)
+- Colour counts 4, 5, 7, 8 (colors=)
+- Challenge Mode, every difficulty to Impossible (the launcher starts a challenge stage: to build), and Line Clears (Step 4)
+
 ## 3. The order of work (each step has a gate; the next starts only when it passes)
 
 **Step 1 -- the engine is the truth.** `engine/ca.c` matches the real chaos game frame for frame on every path a game can take:

@@ -30,8 +30,13 @@ jobs:
               f = line.split()
               if not f or f[0].startswith("#"): continue
               p, seed, gl, gs, q, frames = f[:6]
-              level = int(f[6]) if len(f) > 6 else 9
-              games.append({"pattern": p, "seed": int(seed), "glevel": int(gl), "gspeed": int(gs), "queue": int(q), "frames": int(frames), "level": level, "n": len(games) + 1})
+              level = int(f[6]) if len(f) > 6 and "=" not in f[6] else 9
+              # the chaos settings after the level, as key=value: mode (1 normal, 2 one HP, 3 no stop time, 4 BALL), margin
+              # (1 off, 2 colors, 3 modoki, 4 chaos), chaosmode (0/1), colors
+              kv = dict(x.split("=", 1) for x in f[6:] if "=" in x)
+              games.append({"pattern": p, "seed": int(seed), "glevel": int(gl), "gspeed": int(gs), "queue": int(q), "frames": int(frames), "level": level,
+                            "mode": int(kv.get("mode", 1)), "margin": int(kv.get("margin", 1)), "chaosmode": int(kv.get("chaosmode", 0)), "colors": int(kv.get("colors", 6)),
+                            "n": len(games) + 1})
           assert games, "no games in request.txt"
           print("games=" + json.dumps(games))
           PY
@@ -44,7 +49,7 @@ jobs:
       max-parallel: 8
       matrix:
         game: ${{ fromJSON(needs.plan.outputs.games) }}
-    name: game ${{ matrix.game.n }} L${{ matrix.game.level }} ${{ matrix.game.pattern }} seed ${{ matrix.game.seed }}
+    name: game ${{ matrix.game.n }} L${{ matrix.game.level }} ${{ matrix.game.pattern }} seed ${{ matrix.game.seed }} mode ${{ matrix.game.mode }} margin ${{ matrix.game.margin }} chaos ${{ matrix.game.chaosmode }} colors ${{ matrix.game.colors }}
     steps:
       - uses: actions/checkout@v4
       - name: love, cached
@@ -65,6 +70,10 @@ jobs:
         env:
           LOVE: /home/runner/love2d/love.AppImage
           CHAOSBOT_LEVEL: ${{ matrix.game.level }}
+          CHAOSBOT_GAMEMODE: ${{ matrix.game.mode }}
+          CHAOSBOT_MARGIN: ${{ matrix.game.margin }}
+          CHAOSBOT_CHAOSMODE: ${{ matrix.game.chaosmode }}
+          CHAOSBOT_COLORS: ${{ matrix.game.colors }}
         run: |
           g='${{ toJSON(matrix.game) }}'
           bash chaos-bot/bench/play.sh ${{ matrix.game.pattern }} ${{ matrix.game.seed }} ${{ matrix.game.glevel }} ${{ matrix.game.gspeed }} ${{ matrix.game.queue }} ${{ matrix.game.frames }} out

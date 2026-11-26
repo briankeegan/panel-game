@@ -4,7 +4,9 @@ name: chaos-bot checks
 on:
   push:
     branches: [ccr-9ee25bfb-744765]
-    paths: ['chaos-bot/**', '.github/workflows/chaos-bot-checks.yml']
+    # (only the engine and the recorder it is held to: an ordinary push -- a bot change, the request -- starts no job beside the games,
+    # which are kept to 8 at a time, the owner's limit)
+    paths: ['chaos-bot/engine/**', 'chaos-bot/lua/**', '.github/workflows/chaos-bot-checks.yml']
 concurrency:
   group: chaos-bot-checks-${{ github.ref }}
   cancel-in-progress: true

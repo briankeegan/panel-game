@@ -6,6 +6,7 @@
 -- Env: CHAOSBOT_SEED, CHAOSBOT_PATTERN (training_random | chain_garbage | combo_storm | thicc_combo_storm | insane_combo_storm),
 --      CHAOSBOT_GLEVEL (garbage level 1-11), CHAOSBOT_GSPEED (garbage speed 1-11), CHAOSBOT_QUEUE (1 classic, 2 modern, 3 chaos),
 --      CHAOSBOT_LEVEL (default 9), CHAOSBOT_MARGIN (1 off, 2 colors, 3 modoki, 4 chaos; default 1), CHAOSBOT_COLORS (default 6),
+--      CHAOSBOT_GAMEMODE (1 normal, 2 one HP, 3 no stop time, 4 BALL; default 1), CHAOSBOT_CHAOSMODE (1: the player's Chaos Mode on),
 --      CHAOSBOT_FRAMES (default 21600), CHAOSBOT_OUT (the result file), CHAOSBOT_DRAW_EVERY (draw every nth frame; default 30),
 --      GC_GAMBIT_DIR (libgambit.so and lua/board.lua), GC_GAMBIT_WORDS (the profile), GC_GAMBIT_LOG (Gambit's own log).
 local env = function(k, d) local v = os.getenv(k); if v == nil or v == "" then return d end; return v end
@@ -17,6 +18,8 @@ local QUEUE = tonumber(env("CHAOSBOT_QUEUE", "2"))
 local LEVEL = tonumber(env("CHAOSBOT_LEVEL", "9"))
 local MARGIN = tonumber(env("CHAOSBOT_MARGIN", "1"))
 local COLORS = tonumber(env("CHAOSBOT_COLORS", "6"))
+local GAMEMODE = tonumber(env("CHAOSBOT_GAMEMODE", "1"))
+local CHAOSMODE = env("CHAOSBOT_CHAOSMODE", "0") == "1"
 local FRAMES = tonumber(env("CHAOSBOT_FRAMES", "21600"))
 local OUT = env("CHAOSBOT_OUT", "chaosbot-result.txt")
 local DRAW_EVERY = tonumber(env("CHAOSBOT_DRAW_EVERY", "30"))
@@ -45,9 +48,10 @@ local function finish(reason)
   if bot then overruns, worst, dropped = bot:budget(); pcall(bot.endMatch, bot) end
   local e = engine or {}
   local played = e.game_stopwatch or 0
-  local r = { _order = { "seed", "pattern", "glevel", "gspeed", "queue", "level", "margin", "survived", "frames", "lostAt", "health",
+  local r = { _order = { "seed", "pattern", "glevel", "gspeed", "queue", "level", "margin", "gamemode", "chaosmode", "colors", "survived", "frames", "lostAt", "health",
                          "healthLostTop", "sentRows", "gpm", "overruns", "worstMs", "dropped", "reason" } }
   r.seed, r.pattern, r.glevel, r.gspeed, r.queue, r.level, r.margin = SEED, PATTERN, GLEVEL, GSPEED, QUEUE, LEVEL, MARGIN
+  r.gamemode, r.chaosmode, r.colors = GAMEMODE, CHAOSMODE and 1 or 0, COLORS
   r.survived = (reason == "frames") and 1 or 0
   r.frames = played
   r.lostAt = (reason == "lost") and played or -1
@@ -86,9 +90,9 @@ local function startMatch()
   player:setLevel(LEVEL)
   player:setLevelData(LevelPresets.getModern(LEVEL))
   player:setColorCount(COLORS)
-  player:setGameMode(1)
+  player:setGameMode(GAMEMODE)
   player:setMarginTime(MARGIN)
-  player:setChaosMode(false)
+  player:setChaosMode(CHAOSMODE)
   player:setQueueType(QUEUE)
   math.randomseed(SEED)
   local shape = SHAPES[PATTERN] or SHAPES.combo_storm
@@ -104,7 +108,7 @@ local function startMatch()
     player:restrictInputs(GAME.input.inputConfigurations[1])
   end
   math.randomseed(SEED + 7919)   -- the panels the match deals (BattleRoom:createPanelSource draws its seed from math.random)
-  say(string.format("match asked: seed %d pattern %s glevel %d gspeed %d queue %d level %d margin %d", SEED, PATTERN, GLEVEL, GSPEED, QUEUE, LEVEL, MARGIN))
+  say(string.format("match asked: seed %d pattern %s glevel %d gspeed %d queue %d level %d margin %d gamemode %d chaosmode %s colors %d", SEED, PATTERN, GLEVEL, GSPEED, QUEUE, LEVEL, MARGIN, GAMEMODE, tostring(CHAOSMODE), COLORS))
 end
 
 local function attach(match)

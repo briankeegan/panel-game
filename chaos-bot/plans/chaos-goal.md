@@ -96,6 +96,9 @@ don't test below 9"): Levels 9, 10 and 11, whichever suits the training mode. Be
 
 **One mode at a time (the owner, 2026-11-26 12:4x ET: "focus on [one] at a time"):** the weakest mode is worked on alone until it
 holds -- now 8 colours at Level 10 -- and nothing else is changed or surveyed meanwhile.
+**No luck, no reruns (the owner, 2026-11-26 12:5x ET: "Luck is not really a factor. ignore that noise. no reruns. should work
+regardless of run."):** a run is never repeated to see whether it holds, and a loss is never put down to the noise -- the bot has to
+survive whatever a run deals it; every loss is a fault to find and fix.
 
 **Step 5 -- every level from 9 up.** The same benchmark at Levels 9, 10 and 11, with no change to the bot: every number is the
 level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
@@ -153,7 +156,9 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
-- **Run 110 (pushed 2026-11-26 12:3x ET): above six colours, chains for stop.** The owner: "you have your work cut out for you".
+- **Run 111 (pushed 2026-11-26 12:5x ET): 1'g (no canyon under garbage) on again above six colours** -- run 110 combo s4 lost with
+  column 3 dug to a well seven rows deep under garbage resting on the columns beside it. 8 colours L10 s3-4.
+- **Run 110 (2026-11-26 12:47 ET): above six colours, chains for stop -- survived 5/8** (runs 108-109 on the same seeds: 2/8). Kept. The owner: "you have your work cut out for you".
   The list asks a 2x, then a 3x, then a combo of 4+ (decide.c): only stop time halts a stack rising a row a second, and a 2x buys it
   with six panels where an eight is seldom there at 8 colours. 8 colours L10 s3-4 (runs 108/109: 14377/12353).
 - **Run 109 (2026-11-26 12:30 ET), a three on a tall stack is room (above six colours), 8 colours L10 s3-4: survived 2/8, 12353

@@ -1307,7 +1307,9 @@ static int compareJudged(const Judge *x, const Judge *y) {
   // 1'g. (run 94, CHAOS) UNDER GARBAGE, NO CANYON UNDER IT: garbage on the board, of two that both live or are lost alike and break
   // the same garbage, the one leaving GAP_CELLS fewer empty cells under the garbage (judge.c gapOf) first -- a piece perched over a
   // cleared middle is out of reach of every break, and what lands next lands on it. Run 92 insane s16 17400-18158, lost at 18633
-  if (0 && decF.under && (lx || lostAlike(x, y)) && imax(0, x->apBroke) == imax(0, y->apBroke) && x->o.j.gap >= 0 && y->o.j.gap >= 0 &&
+  // (run 111: on again above six colours -- run 110 8 colours combo s4, column 3 dug to a well seven rows deep under garbage resting on
+  // the columns beside it, lost at 4447)
+  if (decQ.b->colors > 6 && decF.under && (lx || lostAlike(x, y)) && imax(0, x->apBroke) == imax(0, y->apBroke) && x->o.j.gap >= 0 && y->o.j.gap >= 0 &&
       iabs(x->o.j.gap - y->o.j.gap) >= GAP_CELLS)
     return (cmpKey = __LINE__, (x->o.j.gap - y->o.j.gap));
   // 1'h. (run 107, CHAOS) ABOVE SIX COLOURS, THE COLOURS LINED UP (the owner: be more purposeful with colours): of two that both live

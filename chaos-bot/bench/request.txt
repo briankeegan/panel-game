@@ -334,6 +334,9 @@
 # run 109 -- (result) a three on a tall stack is room, 8 colours L10 s3-4: survived 2/8, 12353 frames on average (run 108: 14377). Off
 # run 110 -- above six colours the list asks a 2x, then a 3x, then a combo of 4+ (decide.c): chains buy stop, the one thing that halts
 #   the rise, with six panels. 8 colours L10 s3-4
+# run 110 -- (result) chains for stop above six colours, 8 colours L10 s3-4: survived 5/8 (runs 108-109: 2/8). Kept. Losses: insane s3
+#   10618 (no-line), chain s4 5354, combo s4 4447 (column 3 a well seven rows deep under garbage resting beside it)
+# run 111 -- 1'g (no canyon under garbage) on again above six colours: 8 colours L10 s3-4
 chain_garbage 3 9 9 1 21600 10 colors=8
 combo_storm 3 9 9 1 21600 10 colors=8
 thicc_combo_storm 3 9 9 1 21600 10 colors=8

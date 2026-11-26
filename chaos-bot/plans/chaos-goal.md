@@ -148,6 +148,8 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 94 (2026-11-26 09:12 ET), 1'g no canyon under garbage, L10 seeds 15-16: survived 7/8.** insane s16 (run 92's loss) lived at
+  full health; chain s16 lost at 8847 (opening-spent, no-line; it lived in run 92). Run 95: combos 4-6 first (chaos-small), 1'g on.
 - **Run 93 (2026-11-26 09:01 ET), LEVEL 11 against garbage 11/11, seeds 1-2: survived 8/8, every game at full health (10)**, 0
   late, 16.06 garbage rows a minute. The gate's bot unchanged. Level 11 next on new seeds. Found while it ran (boards drawn, runs 91-92's
   losses): the profile plays "finish them" the whole game -- combos of 8-10 asked first -- and an 8 buys about 15 frames a panel where a

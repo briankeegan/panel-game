@@ -279,11 +279,14 @@
 #   the hardest garbage 11/11, seeds 1-2, the gate's bot unchanged
 # run 93 -- (result) LEVEL 11 vs garbage 11/11, seeds 1-2: survived 8/8, every game at full health (10), 0 late, gpm 16.06
 # run 94 -- 1'g, no canyon under garbage (judge.c gapOf, rank.c): L10 seeds 15-16, where run 92 (the gate's bot) lost insane s16
-chain_garbage 15 9 9 1 21600 10
-combo_storm 15 9 9 1 21600 10
-thicc_combo_storm 15 9 9 1 21600 10
-insane_combo_storm 15 9 9 1 21600 10
-chain_garbage 16 9 9 1 21600 10
-combo_storm 16 9 9 1 21600 10
-thicc_combo_storm 16 9 9 1 21600 10
-insane_combo_storm 16 9 9 1 21600 10
+# run 94 -- (result) 1'g on L10 seeds 15-16: survived 7/8 -- insane s16 lived (full health), chain s16 lost at 8847 (lived in run 92)
+# run 95 -- profile chaos-small (finish them asks combos 4, 5, 6 before 8, 9, 10: a four buys ~23 frames a panel, an eight ~15),
+#   1'g on: L10 seeds 15-16 again
+chain_garbage 15 9 9 1 21600 10 profile=chaos-small
+combo_storm 15 9 9 1 21600 10 profile=chaos-small
+thicc_combo_storm 15 9 9 1 21600 10 profile=chaos-small
+insane_combo_storm 15 9 9 1 21600 10 profile=chaos-small
+chain_garbage 16 9 9 1 21600 10 profile=chaos-small
+combo_storm 16 9 9 1 21600 10 profile=chaos-small
+thicc_combo_storm 16 9 9 1 21600 10 profile=chaos-small
+insane_combo_storm 16 9 9 1 21600 10 profile=chaos-small

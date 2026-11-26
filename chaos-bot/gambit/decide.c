@@ -1611,7 +1611,10 @@ static Played playOf(const Read *R, int n) {
   // (and the next chain, the first thrown, is planned under garbage too: its panels are the ones under it)
   int opNext = openerSum > 0 && opNeed > 0;
   int opWants = (!R->under || opNext) && R->rule >= 0 && theTables.r[R->rule].table == 2 && theList.n > 0 && (theList.aim[0].chain.op || opNext) && clockFrameOut && !clockFrameOut() &&
-                (opNext || !cascadeLive(decQ.b)) && decQ.b->chainCounter == 0;
+                (opNext || !cascadeLive(decQ.b)) && decQ.b->chainCounter == 0 &&
+                decQ.b->colors <= 6;   // (run 71: CHAOS, NO OPENER PLAN ABOVE SIX COLOURS -- the chain it builds before the first garbage
+                // takes longer to find at seven and eight, and the stack climbs under it: run 70 thicc s2 at 7 colours, the opening plan's
+                // setups 279-424 raised 30 panels to 48, every line dying from 592, lost at 968; six colours and under unchanged)
   // (THE OPENER AS ONE PLAN -- the owner: the opener includes everything it is going to do, the flattening too, and raises the moment
   // it is flat: while the opening raise is due and done before the next block lands, the plan is made on the board it will build on -- the stack
   // flattened (opFlatten), then raised the rows the raise asks on the engine -- and grown there in the decision's time. The flattening

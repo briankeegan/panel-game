@@ -140,6 +140,8 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 70 (2026-11-26 03:55 ET), 7 colours, the full set: survived 6/8** (lost thicc s1 15090, thicc s2 968: the opening plan
+  built its chain while the stack rose 30 to 48 panels). Run 71: no opening plan above six colours.
 - **Run 69 (2026-11-26 03:46 ET), the linear colour scale (floored at six) on 8 colours seeds 3-4: survived 3/8.** Kept (exactly
   the gate's play at six colours and under). 8 colours stays ~3/8: thicc s3 sat 130 frames with no line offered but the hold (24
   panels, no three in reach at 8 colours) -- the search's reach at many colours is the deeper fix. Run 70: 7 colours, full set.

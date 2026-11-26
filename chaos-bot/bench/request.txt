@@ -204,6 +204,9 @@
 # run 69 -- (result) 8 colours seeds 3-4, the linear scale: survived 3/8. thicc s3 (lost 2404): from 788 to 918 the search offered
 #          no line but the hold (24 panels, 8 colours: no three in reach) while the stop ran out -- the search's reach, a deeper fix
 # run 70 -- 7 colours, the full set (4 patterns x seeds 1-2) with the run-69 bot (the colour scale; six colours and under unchanged)
+# run 70 -- (result) 7 colours: survived 6/8 (lost thicc s1 15090, thicc s2 968). thicc s2: the opening plan (plan=, why=setup)
+#          built its chain 279-424 while the stack rose 30 to 48 panels, every line dying from 592
+# run 71 -- one change: no opening plan above six colours (decide.c; six and under unchanged). 7 colours seeds 1-2 again
 chain_garbage 1 9 9 1 21600 10 colors=7
 combo_storm 1 9 9 1 21600 10 colors=7
 thicc_combo_storm 1 9 9 1 21600 10 colors=7

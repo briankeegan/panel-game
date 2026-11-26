@@ -265,11 +265,13 @@
 # run 87 -- (result) LEVEL 9 seeds 7-8 with the scarce-fuel rule: survived 7/8 (6/8 without; chain s8 and insane s8 lived, thicc s7
 #          lost at 2441). Within the spread. It changes level-10 play too: the gate again before it is kept
 # run 88 -- the run-87 bot on the LEVEL 10 gate: seeds 1-2 first
-chain_garbage 1 9 9 1 21600 10
-combo_storm 1 9 9 1 21600 10
-thicc_combo_storm 1 9 9 1 21600 10
-insane_combo_storm 1 9 9 1 21600 10
-chain_garbage 2 9 9 1 21600 10
-combo_storm 2 9 9 1 21600 10
-thicc_combo_storm 2 9 9 1 21600 10
-insane_combo_storm 2 9 9 1 21600 10
+# run 88 -- (result) the run-87 bot, LEVEL 10 seeds 1-2: survived 8/8, full health
+# run 89 -- the run-87 bot, LEVEL 10 seeds 3-4 (where run 49's rule cost two games)
+chain_garbage 3 9 9 1 21600 10
+combo_storm 3 9 9 1 21600 10
+thicc_combo_storm 3 9 9 1 21600 10
+insane_combo_storm 3 9 9 1 21600 10
+chain_garbage 4 9 9 1 21600 10
+combo_storm 4 9 9 1 21600 10
+thicc_combo_storm 4 9 9 1 21600 10
+insane_combo_storm 4 9 9 1 21600 10

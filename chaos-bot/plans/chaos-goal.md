@@ -140,6 +140,8 @@ survival first. *Done when:* the owner says the rate is enough, or names a numbe
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 55 (2026-11-26 01:36 ET), the opening keeps its panels: survived 7/8 on seeds 5-6** (insane s5 lived, the first time since
+  run 37; lost thicc s6 at 4365, three minutes after an opening that grew 30 to 48 panels as meant). Kept. Run 56: seeds 3-4.
 - **Run 54 (2026-11-26 01:27 ET), the run-46 bot on seeds 7-8: survived 8/8, health 13 in every game.** The run-46 bot in Normal:
   45/52. Run 55: in the opening, of two living lines breaking no garbage, the one clearing fewer panels first. Seeds 5-6.
 - **Run 53 (2026-11-26 01:17 ET), the opening keeping its panels for the raise: survived 6/8 -- inert.** No raise was asked in the

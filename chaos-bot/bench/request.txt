@@ -163,11 +163,14 @@
 #          1-2 7/8, 3-4 7/8, 5-6 6/8 twice, s10 3/4); seed 5's insane is lost early by almost every bot
 # run 55 -- one change: in the opening (before garbage first comes), of two lines that both live and break no garbage, the one
 #          clearing fewer panels first (rank.c) -- the opening keeps its panels and the stack rises on its own. Seeds 5-6
-chain_garbage 5 9 9 1 21600 10
-combo_storm 5 9 9 1 21600 10
-thicc_combo_storm 5 9 9 1 21600 10
-insane_combo_storm 5 9 9 1 21600 10
-chain_garbage 6 9 9 1 21600 10
-combo_storm 6 9 9 1 21600 10
-thicc_combo_storm 6 9 9 1 21600 10
-insane_combo_storm 6 9 9 1 21600 10
+# run 55 -- (result) survived 7/8 on seeds 5-6 (insane s5 lived -- first time since run 37 -- and thicc s5, insane s6; lost thicc s6
+#          4365, its opening grew 30 to 48 panels as meant, the loss three minutes on in ordinary digging). Kept
+# run 56 -- the run-55 bot on seeds 3 and 4 (where run 49's rule showed its harm), no change
+chain_garbage 3 9 9 1 21600 10
+combo_storm 3 9 9 1 21600 10
+thicc_combo_storm 3 9 9 1 21600 10
+insane_combo_storm 3 9 9 1 21600 10
+chain_garbage 4 9 9 1 21600 10
+combo_storm 4 9 9 1 21600 10
+thicc_combo_storm 4 9 9 1 21600 10
+insane_combo_storm 4 9 9 1 21600 10

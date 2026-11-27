@@ -1,4 +1,4 @@
-run 46065716319, as of 2026-11-27T22:50:43Z
+run 46065716319, as of 2026-11-27T22:52:47Z
 garbage landed: our stopWatch 17270 clock 17458, transits in flight before this frame {}, opponent copy 2 frames behind, rollbacks so far 0
 garbage landed: our stopWatch 17554 clock 17742, transits in flight before this frame {17565}, opponent copy 2 frames behind, rollbacks so far 0
 garbage landed: our stopWatch 17558 clock 17746, transits in flight before this frame {17565}, opponent copy 2 frames behind, rollbacks so far 0
@@ -150,12 +150,6 @@ memory after match: rss 4662480 kB, threads 9, lua 60752 kB
 game about to start: both players are ready
 set over: the room is closed, back in the lobby
 --- publish (the last 30 lines) ---
-[publish] 28 games finished so far; between two games of a set; the last publish 255 s ago
-[publish] publishing the games so far (28 finished)
-[publish] run 46065716319: 1 games added (r77, 7b03b6b0, 1 new replays)
-[publish] privacy: 1 games checked, 1 shown with the opponent's name, 0 made anonymous (0 players), 0 replays dropped
-[publish] asked for the Cloudflare Pages copy
-[publish] published (attempt 1)
 [publish] 29 games finished so far; between two games of a set; the last publish 61 s ago
 [publish] publishing the games so far (29 finished)
 [publish] run 46065716319: 1 games added (r77, 7b03b6b0, 1 new replays)
@@ -178,5 +172,11 @@ set over: the room is closed, back in the lobby
 [publish] publishing the games so far (32 finished)
 [publish] run 46065716319: 1 games added (r77, 7b03b6b0, 1 new replays)
 [publish] privacy: 1 games checked, 1 shown with the opponent's name, 0 made anonymous (0 players), 0 replays dropped
+[publish] asked for the Cloudflare Pages copy
+[publish] published (attempt 1)
+[publish] 34 games finished so far; the set is over; the last publish 60 s ago
+[publish] publishing the games so far (34 finished)
+[publish] run 46065716319: 2 games added (r77, 7b03b6b0, 2 new replays)
+[publish] privacy: 2 games checked, 2 shown with the opponent's name, 0 made anonymous (0 players), 0 replays dropped
 [publish] asked for the Cloudflare Pages copy
 [publish] published (attempt 1)

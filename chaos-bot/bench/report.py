@@ -128,6 +128,57 @@ def history(path):
                 h.setdefault(tuple(f[1:8]), []).append((f[0], f[8], f[9]))
     return h
 
+_SRC = {}
+def _src(name):
+    """the bot's source lines (rank.c, decide.c) as this checkout has them -- the run's own build"""
+    if name not in _SRC:
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "gambit", name)
+        try: _SRC[name] = open(path, errors="replace").read().split("\n")
+        except OSError: _SRC[name] = []
+    return _SRC[name]
+
+def won_name(won):
+    """EVERY DECISION LABELLED: the log's won= read as the rule that decided it -- k<line> the order's key in rank.c, d<line> the place
+    in decide.c's playOf that put another line in the order's first place; named by the nearest comment above that line that opens a
+    rule ("// 1'L. UNDER GARBAGE, BREAK", "// (run 160 ...") -- only, tie, raise, none as they are"""
+    if not won: return "-"
+    tag = won.split(":")[0]
+    if tag[:1] not in "kd" or not tag[1:].isdigit(): return won
+    lines = _src("rank.c" if tag[0] == "k" else "decide.c")
+    n = int(tag[1:]) - 1
+    import re
+    # the function the line is in (a line at column 0 opening it), then the depth of every line from there: the rule is the top-level
+    # statement of that function holding the line, named by the comment block just above it
+    f0 = n
+    while f0 > 0 and not (lines[f0][:1].isalpha() and "(" in lines[f0] and lines[f0].rstrip().endswith("{")): f0 -= 1
+    def code(t):
+        t = re.sub(r'"(\\.|[^"\\])*"', '""', t); t = re.sub(r"'(\\.|[^'\\])'", "''", t)
+        return t.split("//")[0]
+    depth, top, at = 0, f0, {}
+    for k in range(f0, n + 1):
+        c = code(lines[k])
+        at[k] = depth
+        if depth == 1 and c.strip() and not c.strip().startswith("}"): top = k
+        depth += c.count("{") - c.count("}")
+    # (back to the statement's first line: a condition run over several lines)
+    while top - 1 > f0 and at.get(top - 1) == 1 and code(lines[top - 1]).strip() and not code(lines[top - 1]).rstrip().endswith((";", "{", "}")):
+        top -= 1
+    name, note = "", ""
+    j2 = top
+    while j2 > 0 and lines[j2 - 1].strip().startswith("//"): j2 -= 1
+    block = [lines[k].strip()[3:] for k in range(j2, top)]
+    # the block's own header: its first line that opens a rule (numbered, or a capitalised name), else its first line
+    for b in block:
+        if re.match(r"^\d{1,2}['a-zA-Z]{0,4}\.\s", b) or re.match(r"^\((run \d+, CHAOS\) )?[A-Z][A-Z0-9 ,'/-]{6,}[:(-]", b):
+            name = b; break
+    if not name and block: name = block[0]
+    for b in reversed(block):
+        if b.startswith("(run "): note = b.split(":")[0].split(",")[0].strip("( "); break
+    if not name: name = "code: " + " ".join(lines[top].split())   # (no comment over it: the statement itself)
+    if note and note not in name: name = name + " {" + note + "}"
+    name = " ".join(name.split())[:80]
+    return "%s[%s:%s]" % (won, "rank.c" if tag[0] == "k" else "decide.c", name or "?")
+
 def story(d, gtest, last=900, boards=10):
     """A LOSS TOLD ON THE BOARD: the decisions of the last `last` frames (frame, play, verdict, panels, garbage broken, panels cleared,
     swaps, stop, lines living/offered, the three best lines offered) and the last `boards` board snapshots drawn (G garbage, digits the
@@ -155,7 +206,7 @@ def story(d, gtest, last=900, boards=10):
         seen.add(fr)
         kv = _kv(line)
         opts = ",".join(kv.get("opts", "").split(",")[:3])
-        out.append("  %6d " % fr + " ".join("%s=%s" % (k, kv.get(k, "-")) for k in keys) + " opts=" + opts)
+        out.append("  %6d " % fr + " ".join("%s=%s" % (k, kv.get(k, "-")) for k in keys) + " won=" + won_name(kv.get("won")) + " opts=" + opts)
     # the whole game, not only its end: one line every ~300 frames before the last `last` (how the board got there)
     out.insert(0, "  -- the whole game, a decision every ~300 frames --")
     early, nxt = [], 0
@@ -164,7 +215,7 @@ def story(d, gtest, last=900, boards=10):
         if fr < nxt: continue
         nxt = fr + 300
         kv = _kv(line)
-        early.append("  %6d " % fr + " ".join("%s=%s" % (k, kv.get(k, "-")) for k in ("play", "v", "under", "pan", "broke", "clr", "stop", "q")))
+        early.append("  %6d " % fr + " ".join("%s=%s" % (k, kv.get(k, "-")) for k in ("play", "v", "under", "pan", "broke", "clr", "stop", "q")) + " won=" + won_name(kv.get("won")))
     out[1:1] = early + ["  -- the last %d frames, every decision --" % last]
     if gtest and os.path.exists(gtest):
         import subprocess

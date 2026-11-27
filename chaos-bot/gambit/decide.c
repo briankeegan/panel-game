@@ -4,6 +4,9 @@
 typedef struct { int32_t has, out, topKnown, top, stopKnown, stop; } Opp;
 static Opp theOpp;
 static int32_t garbageSeen;   // (garbage has been on the board or on its way this game)
+// (WHY THE LINE PLAYED, WHEN NOT THE ORDER'S FIRST: the line of playOf that put a line other than the order's first in its place, 0 where
+// the order's first is played -- answer.c logs it as won=d<line>; the order's own key is won=k<line> (rank.c cmpKey))
+static int32_t decWhy;
 static int32_t canRaiseNow, gambitHit, modeRule = -1, hostTopped, surviveAsked, chaosSmallFirst;
 #define OP_FALL_LOST AT_LEVEL(200)   // (frames to the board's loss inside which an extension short of the eight gives way: set 86 combo_storm 7, its extensions lost at 130-193 and a break at 442-465; combo_storm 3's at 205, kept, made its 8; the large slabs', lost at 299-471 a second chain is still made)
 #define OP_KEEP_PANELS 36   // (the panels the opener's chain leaves once landed, at least: six rows -- the owner: keep enough to break)
@@ -1565,7 +1568,7 @@ static Played playOf(const Read *R, int n) {
   for (int i = 0; i < n; i++) if (order[i]->hold && order[i]->o.lives) holdLivesNow = 1;
   // (and never while a chain falls: the raise cannot come then, and the chain is extended)
   P.wait = R->low && !R->up && !(n && order[0]->k.extend) && holdLivesNow && !cascadeLive(decQ.b) && decQ.b->chainCounter == 0 && !cdAsk;
-  P.top = R->up || P.wait ? 0 : (n ? order[0] : 0);
+  decWhy = 0; P.top = R->up || P.wait ? 0 : (n ? order[0] : 0);
   // (the line in progress that waits for the board is played as it was judged: its next swap from the frame the judge pressed it from)
   P.line = P.top && !P.top->hold && (!P.top->wait || P.top->k.play == PLAY_CARRYWAIT) ? P.top : 0;
   // (A SWAP AND ITS SWAP BACK ARE A WAIT -- the owner: no flip and back: two swaps of the line played that swap a pair and straight back
@@ -1618,7 +1621,7 @@ static Played playOf(const Read *R, int n) {
     Outcome d = outcomeOf(L->k.seq, L->k.nseq, L->settled, 0, L->apAts[1] - rankReact);
     // (the line pressed later must be known to last as long: a loss it was not judged for never licenses waiting)
     double dl = d.lostAt == NOT_ASKED ? -1 : lostAtOf(d.lostAt, 0), ol = lostAtOf(L->o.lostAt, 0);
-    if (!d.late && !d.dead && d.lives >= L->o.lives && d.j.made.broke >= L->apBroke && dl >= ol) { P.line = 0; P.deferred = 1; }
+    if (!d.late && !d.dead && d.lives >= L->o.lives && d.j.made.broke >= L->apBroke && dl >= ol) { decWhy = __LINE__, P.line = 0; P.deferred = 1; }
   }
   // (THE COMBO TIMED FOR ITS STOP -- the owner: wait to do a combo to give more time, not as soon as it can be: in finish them, where
   // nothing lives, each of the best COMBO_TIMED combo lines (four or more, a 2x at most) is judged pressed later, COMBO_WAIT frames on and
@@ -1643,7 +1646,7 @@ static Played playOf(const Read *R, int n) {
         clockShareEnd(sh);
         if (d.late || d.dead) continue;
         double dl = d.lives ? 1e9 : d.lostAt == NOT_ASKED ? -1 : lostAtOf(d.lostAt, 0);
-        if (d.j.made.combo >= J->apCombo && d.j.chainAll <= 2 && dl >= topLost && dl > diesAt(J)) { P.line = 0; P.deferred = 1; comboTimed = w; break; }
+        if (d.j.made.combo >= J->apCombo && d.j.chainAll <= 2 && dl >= topLost && dl > diesAt(J)) { decWhy = __LINE__, P.line = 0; P.deferred = 1; comboTimed = w; break; }
       }
     }
     clockDue = due; clockShare = share;
@@ -1667,7 +1670,7 @@ static Played playOf(const Read *R, int n) {
         else if (wastesThree(&FS)) freeSetup = -4;
         else if (spendsReserve(&FS)) freeSetup = -5;
         else if (twinSecond && !loadedAfter(one, 1)) freeSetup = -8;   // (the second eight's swap: never one that unloads the first)
-        else { P.line = &FS; freeSetup = 1; }
+        else { decWhy = __LINE__, P.line = &FS; freeSetup = 1; }
       }
     }
   }
@@ -1686,7 +1689,7 @@ static Played playOf(const Read *R, int n) {
         if (judgeCand(R, &k, &FW) && !FW.o.dead &&
             (C->o.lives ? FW.o.lives : (FW.o.lives || (FW.o.lostAt != NOT_ASKED && diesAt(&FW) >= diesAt(C)))) &&
             imax(0, FW.apBroke) >= imax(0, C->apBroke) && (FW.met < 0 ? MAXAIMS : FW.met) <= (C->met < 0 ? MAXAIMS : C->met) &&
-            !cutsShort(&FW) && !wastesThree(&FW)) { P.line = P.top = &FW; P.wait = 0; freeSetup = 2; }
+            !cutsShort(&FW) && !wastesThree(&FW)) { decWhy = __LINE__, P.line = P.top = &FW; P.wait = 0; freeSetup = 2; }
       }
     }
   }
@@ -1705,7 +1708,7 @@ static Played playOf(const Read *R, int n) {
       freeSetup = -7;
       if (candOf(&k, PLAY_ENTRY, seq, ns, -1, 0)) {
         k.settled = C->settled; k.twin = 1; k.x.combo = E->k.x.combo;
-        if (judgeCand(R, &k, &EW) && EW.apCombo >= 8 && (finishEightBy(&EW, C) || (!EW.o.dead && diesAt(&EW) >= diesAt(C)))) { P.line = P.top = &EW; P.wait = 0; freeSetup = 3; }
+        if (judgeCand(R, &k, &EW) && EW.apCombo >= 8 && (finishEightBy(&EW, C) || (!EW.o.dead && diesAt(&EW) >= diesAt(C)))) { decWhy = __LINE__, P.line = P.top = &EW; P.wait = 0; freeSetup = 3; }
       }
     }
   }
@@ -1738,7 +1741,7 @@ static Played playOf(const Read *R, int n) {
       opGrew = 2;
       if (opFlatN > 0) {
         static Judge FL; Cand k;
-        if (!decF.under && candOf(&k, PLAY_LEVEL, opFlat, opFlatN, -1, 0)) { k.settled = 1; if (judgeCand(R, &k, &FL) && !FL.o.dead && (FL.o.lives || !P.top || diesAt(&FL) >= diesAt(P.top))) { P.line = P.top = &FL; P.wait = 0; opFlatPlayed = 1; } }
+        if (!decF.under && candOf(&k, PLAY_LEVEL, opFlat, opFlatN, -1, 0)) { k.settled = 1; if (judgeCand(R, &k, &FL) && !FL.o.dead && (FL.o.lives || !P.top || diesAt(&FL) >= diesAt(P.top))) { decWhy = __LINE__, P.line = P.top = &FL; P.wait = 0; opFlatPlayed = 1; } }
       }
     }
     clockDue = keepDue; clockShare = keepShare;
@@ -1753,7 +1756,7 @@ static Played playOf(const Read *R, int n) {
   // lands -- one that cannot fire in time is survival's to decide)
   // (but not with garbage on the board: there the opener's line competes as every line does -- the owner: efficiency is key -- and the
   // window it would spend is the next break's)
-  if (opLineOn && opCarried && !decF.under && !(P.line && P.line->carried)) { P.line = P.top = opCarried; P.wait = 0; P.deferred = 0; }
+  if (opLineOn && opCarried && !decF.under && !(P.line && P.line->carried)) { decWhy = __LINE__, P.line = P.top = opCarried; P.wait = 0; P.deferred = 0; }
   // (THE OPENER'S CHAIN FALLING -- the owner: as long as you extend, you can't die: the stack is still while it falls and the garbage
   // waits for it, so nothing is pressed under it but its extension -- a swap of anything else is a link taken from it)
   // (the opener's chain: one falling while the opener is the mode, held to until it lands whatever mode comes after it)
@@ -1938,14 +1941,14 @@ static Played playOf(const Read *R, int n) {
         if (J != base && !J->hold && !J->o.dead && J->apBroke > 0 && (J->o.lives || (J->o.lostAt != NOT_ASKED && J->o.lostAt >= base->o.lostAt))) { keep = J; keepEight = 1; } }
     if (!keep) { if (SPENDS_BOARD(lnk)) { opSpent |= 2; opSpentMat = lnk->o.matSettled; lnk = 0; } if (SPENDS_BOARD(two)) { opSpent |= 4; opSpentMat = two->o.matSettled; two = 0; twoReaches = 0; } }
     opFallWay = ext && ext->apChainAll >= need && !keepEight ? 1 : keep ? 7 : twoReaches ? 2 : lnk ? 6 : ext ? 3 : brk ? 5 : two ? 4 : 0;
-    if (opFallWay == 7) { P.top = keep; P.line = keep->hold ? 0 : keep; }
-    else if (opFallWay == 1 || opFallWay == 3) P.line = P.top = ext;
-    else if (opFallWay == 6) P.line = P.top = lnk;
-    else if (opFallWay == 5) P.line = P.top = brk;
+    if (opFallWay == 7) { decWhy = __LINE__, P.top = keep; decWhy = __LINE__, P.line = keep->hold ? 0 : keep; }
+    else if (opFallWay == 1 || opFallWay == 3) decWhy = __LINE__, P.line = P.top = ext;
+    else if (opFallWay == 6) decWhy = __LINE__, P.line = P.top = lnk;
+    else if (opFallWay == 5) decWhy = __LINE__, P.line = P.top = brk;
     // (never the second chain over the line ranked first where that line outlives it by a break's time: the opener gives way to survival
     // -- r1351, 807: a set-up lost at 103 played over an extend lost at 428, the board lost at 1119)
     else if (two && P.line && !P.line->hold && outlives(P.line, two)) { }
-    else if (two) P.line = P.top = two;
+    else if (two) decWhy = __LINE__, P.line = P.top = two;
     else {
       // (WHILE IT LANDS, THE CURSOR WORKS -- the owner: can it not do something while it waits? organize, zip, set up: the best set-up,
       // lineup, zip, level or line toward a break in the order that keeps the chain falling as far as the hold does, wastes no three,
@@ -1973,14 +1976,14 @@ static Played playOf(const Read *R, int n) {
       #undef SPENDS_BOARD
       #undef FARTHER_OFF
       #undef UNREADY
-      if (sk) { P.line = P.top = sk; opFallWay = kp ? 8 : 9; }
-      else { P.line = 0; P.top = h ? h : P.top; } } }
+      if (sk) { decWhy = __LINE__, P.line = P.top = sk; opFallWay = kp ? 8 : 9; }
+      else { decWhy = __LINE__, P.line = 0; decWhy = __LINE__, P.top = h ? h : P.top; } } }
   // (THE OPENER'S PLAN IS NOT PUT DOWN FOR A LATER LOSS -- the owner: nothing stops the opener's chain but survival: the plan in progress,
   // as judged still a chain of OPENER_LEAST or more and its board not lost while it is pressed, is played over any line ranked above it
   // for a loss after it -- what comes after the chain is the next decision's, and its stop time is the board's)
   opKept = 0;
   if (opLineOn && carriedJ && carriedJ->carried && P.line != carriedJ && !carriedJ->o.dead && carriedJ->apChainAll >= OPENER_LEAST && !R->up && !opFalling) {
-    P.line = P.top = carriedJ; P.wait = 0; P.deferred = 0; opKept = 1;
+    decWhy = __LINE__, P.line = P.top = carriedJ; P.wait = 0; P.deferred = 0; opKept = 1;
   }
   if (opLineOn && !(carryHeld() && P.line && P.line->carried)) opLineOn = 0;
   // (THE NEXT CHAIN DESIGNED -- the owner: chains of three or more adding up to the eight: the first thrown and the eight not yet made,
@@ -2016,7 +2019,7 @@ static Played playOf(const Read *R, int n) {
         if (!ok) { opNextCut = lastCut; opNextCutCell = lastCutCell; opNextSeqN = imin(ns, 16); for (int i = 0; i < opNextSeqN; i++) opNextSeq[i] = seq[i]; boardRows(decQ.b, opNextRows, sizeof opNextRows); }
         if (ok && !ND.o.dead && ND.apChainAll >= OPENER_LEAST) {
           for (int s2 = 0; s2 < ND.o.j.nats && s2 < ND.k.nseq && s2 < MAXLINE; s2++) ND.k.seq[s2] = (CR(ND.k.seq[s2]) + ND.o.j.risen[s2]) * 8 + CC(ND.k.seq[s2]);
-          P.line = P.top = &ND; P.wait = 0; P.deferred = 0; opLineOn = 1;
+          decWhy = __LINE__, P.line = P.top = &ND; P.wait = 0; P.deferred = 0; opLineOn = 1;
         }
       }
     }
@@ -2037,13 +2040,13 @@ static Played playOf(const Read *R, int n) {
       // design lost at 51 over a break of 28 cells lost at 646; g4230 factory 6, 1131)
       // (and under garbage, never a swap whose walk spends the next break's reserve (rank.c spendsReserve): the design's chain is built
       // out of the same window the break is pressed from)
-      if (t2 && opSecondCh >= OPENER_LEAST && !(decF.under && spendsReserve(t2)) && !(P.line && P.line->o.lives && !t2->o.lives && !fires) && !(P.line && !P.line->hold && !fires && outlives(P.line, t2)) && !(P.line && !P.line->hold && P.line->apBroke > 0 && (outlives(P.line, t2) || (decF.under && !P.line->o.dead && (P.line->o.lives || diesAt(P.line) >= diesAt(t2)))))) { P.line = P.top = t2; P.wait = 0; P.deferred = 0; opNextDesign = 100 + opSecondCh; }
+      if (t2 && opSecondCh >= OPENER_LEAST && !(decF.under && spendsReserve(t2)) && !(P.line && P.line->o.lives && !t2->o.lives && !fires) && !(P.line && !P.line->hold && !fires && outlives(P.line, t2)) && !(P.line && !P.line->hold && P.line->apBroke > 0 && (outlives(P.line, t2) || (decF.under && !P.line->o.dead && (P.line->o.lives || diesAt(P.line) >= diesAt(t2)))))) { decWhy = __LINE__, P.line = P.top = t2; P.wait = 0; P.deferred = 0; opNextDesign = 100 + opSecondCh; }
       // (and while it waits for its panels to come to rest, the board is held: a clear short of what is needed spends the panels it is
       // made of -- set 86 factory 5, a 3's design half pressed, two 2s played in its waits and no 3)
       else if (!t2 && fires && opKeepOn && (opSecondWhy == 5 || opSecondWhy == 9) && P.line && !P.line->hold &&
                (P.line->apCombo > 0 || P.line->apChain > 0) && P.line->apChainAll < imax(OPENER_LEAST, opNeed)) {
         const Judge *h = 0; for (int i = 0; i < n; i++) if (order[i]->hold) h = order[i];
-        if (h) { P.top = h; P.line = 0; P.wait = 0; P.deferred = 0; opNextDesign = 200; }
+        if (h) { decWhy = __LINE__, P.top = h; decWhy = __LINE__, P.line = 0; P.wait = 0; P.deferred = 0; opNextDesign = 200; }
       }
     }
   }
@@ -2158,13 +2161,13 @@ static Played playOf(const Read *R, int n) {
           t[4] = jok ? (CU.apFire >= 0 ? CU.apFire : CU.apNats > 0 ? CU.apAts[CU.apNats - 1] : -1) : -1; t[5] = why; t[7] = pl->design; t[6] = jok ? CU.o.j.clearStep : lastCut >= 0 ? -1000 - lastCut * 100 - lastCutWhy * 10 - lastCutRisen : -2;
           if (opTryN <= 3) { opTrySeqN[opTryN - 1] = ns; for (int s = 0; s < ns; s++) opTrySeq[opTryN - 1][s] = seq[s]; } }
         if (!why) { if (pl->design) for (int s = 0; s < CU.o.j.nats && s < CU.k.nseq && s < MAXLINE; s++) CU.k.seq[s] = (CR(CU.k.seq[s]) + CU.o.j.risen[s]) * 8 + CC(CU.k.seq[s]);
-          P.line = &CU; chainUp = 3; openingReset(); opLineOn = 1; }
+          decWhy = __LINE__, P.line = &CU; chainUp = 3; openingReset(); opLineOn = 1; }
         else if (!chainUp) chainUp = why;
       }
     }
     if (chainUp <= 0 && trig && opAsked(trigCh)) {
       static Judge CT; Cand k; int32_t one[1] = { trig };
-      if (candOf(&k, PLAY_ENTRY, one, 1, -1, 0)) { k.settled = 0; lastDrop = -1; if (judgeCand(R, &k, &CT) && !CT.o.dead && CT.o.lives) { P.line = &CT; chainUp = 2; openingReset(); opLineOn = 0; } }
+      if (candOf(&k, PLAY_ENTRY, one, 1, -1, 0)) { k.settled = 0; lastDrop = -1; if (judgeCand(R, &k, &CT) && !CT.o.dead && CT.o.lives) { decWhy = __LINE__, P.line = &CT; chainUp = 2; openingReset(); opLineOn = 0; } }
     }
     clockDue = keepDue; clockShare = keepShare;
   }
@@ -2189,7 +2192,7 @@ static Played playOf(const Read *R, int n) {
         k.settled = 0; lastDrop = -1;
         // (never a sooner death: the extension in the rank's place only where it lives or its board is lost no sooner than the rank's line's
         // -- a chain taken on over a tower ends with the tower at the top)
-        if (judgeCand(R, &k, &CU) && !CU.o.dead && (CU.o.lives || !P.line || diesAt(&CU) >= diesAt(P.line))) { P.line = &CU; taLog = 3; }
+        if (judgeCand(R, &k, &CU) && !CU.o.dead && (CU.o.lives || !P.line || diesAt(&CU) >= diesAt(P.line))) { decWhy = __LINE__, P.line = &CU; taLog = 3; }
         else taLog = -20 - lastDrop;
       }
     }
@@ -2217,13 +2220,13 @@ static Played playOf(const Read *R, int n) {
       if (taHave && (taLinks >= TA_LINKS || taMs >= TA_DESIGN_MS || panelTop(decQ.b) >= TA_TOP)) taOn = 1;
       // (and while it is searched, the board is left as it is -- a swap played meanwhile changes the rows the design is of -- unless it
       // is dying or raised: a raise only lifts the rows)
-      else if (taHave && !R->taDying && !R->up && taHoldNoSooner(P.line, n)) P.line = 0;
+      else if (taHave && !R->taDying && !R->up && taHoldNoSooner(P.line, n)) decWhy = __LINE__, P.line = 0;
     }
     // (both held to the engine's clock: the hold is put in the line's place only where it tops the board out no sooner -- an uneven stack
     // whose tall column a clear brings down is never held up while the rise takes it to the top)
     // (and till a design is on, nothing cleared on a board that lives -- the owner: flatten, raise, then the chain that uses every block; a
     // clear made on the way spends the panels the design is made of, and starts a chain too short to take to 13)
-    if (!taOn && !R->taDying && P.line && taClears(P.line) && taHoldNoSooner(P.line, n)) P.line = 0;
+    if (!taOn && !R->taDying && P.line && taClears(P.line) && taHoldNoSooner(P.line, n)) decWhy = __LINE__, P.line = 0;
     if (taOn) {
       int32_t seq[CB_MAXSWAPS + 1]; int n = cbOrder(&G, &taD, taTr, seq, CB_MAXSWAPS + 1);
       // (never a build the board does not live through -- the owner: you can't choose to die: the swaps left and the trigger, walked and
@@ -2238,7 +2241,7 @@ static Played playOf(const Read *R, int n) {
         if (candOf(&k, PLAY_ENTRY, seq, hand, -1, 0)) {
           k.settled = 1; lastDrop = -1;
           int jok = judgeCand(R, &k, &CU);
-          if (jok && !CU.o.dead) { P.line = &CU; taStep = hand; taLog = n == 1 ? 2 : 1; if (n == 1) taReset(); }
+          if (jok && !CU.o.dead) { decWhy = __LINE__, P.line = &CU; taStep = hand; taLog = n == 1 ? 2 : 1; if (n == 1) taReset(); }
           else { taLog = -10 - lastDrop; if (n == 1) taReset(); }
         }
       }
@@ -2259,13 +2262,13 @@ static Played playOf(const Read *R, int n) {
           if (!(K->o.lives || lostOf(K) > lostOf(J))) continue;
           sooner = K->o.lives ? !J->o.lives : (!J->o.lives && !lostAlike(J, K) && !(walkTurns(J, K) && diesAt(J) > diesAt(K))); }
         if (sooner) continue; }
-      P.line = P.top = J; P.deferred = 0; enPlayed++; break; }
+      decWhy = __LINE__, P.line = P.top = J; P.deferred = 0; enPlayed++; break; }
   }
   // (THE REACH HELD TO THE END: a line put in the order's place after the cut -- a set-up, a plan, a trigger -- keeps to the reach and
   // takes no flip back as the order does: the best line the order kept is played instead, the hold among them)
   if (P.line && !R->up && (farForNothing(P.line) || undoesLast(P.line) || overspends(P.line))) {
     const Judge *in = 0; for (int i = 0; i < n && !in; i++) if (!farForNothing(order[i]) && !undoesLast(order[i]) && !overspends(order[i])) in = order[i];
-    P.line = !in || in->hold || (in->wait && in->k.play != PLAY_CARRYWAIT) ? 0 : in; P.top = in; P.wait = 0; P.deferred = 0; reachCut++;
+    decWhy = __LINE__, P.line = !in || in->hold || (in->wait && in->k.play != PLAY_CARRYWAIT) ? 0 : in; decWhy = __LINE__, P.top = in; P.wait = 0; P.deferred = 0; reachCut++;
   }
   // (CHAOS: DON'T STALL THE QUEUE. Chaos drops queued garbage only while the board is quiet (Stack:shouldDropGarbage: no matching or
   // chaining panels for the modern queue, none active for classic and chaos), so a clear made while garbage waits holds it back -- and
@@ -2291,7 +2294,7 @@ static Played playOf(const Read *R, int n) {
     // (run 167 at 6647, the top at row 10), a 6-wide slab landed on row 12 perched on one panel, and the waves after buried it at 7886)
     // (runs 170-171 tried it, 3/8 and 0/8 (from the start, then once garbage first landed): back to the ceiling)
     int32_t room = 1;
-    if (panelTop(decQ.b) + waiting <= h - room) { P.line = 0; P.deferred = 0; chaosLetDrop++; }
+    if (panelTop(decQ.b) + waiting <= h - room) { decWhy = __LINE__, P.line = 0; P.deferred = 0; chaosLetDrop++; }
   }
   // (runs 75-76 tried draining the queue under garbage -- the hold over lines breaking nothing from 25 waiting, then over any line from 40:
   // level 8 6/8 then 5/8, the queue still reaching fifty (CHAOS_QUEUE_LIMIT) with full health -- a hold does not quiet a board whose

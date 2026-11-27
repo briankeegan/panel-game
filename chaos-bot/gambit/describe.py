@@ -94,6 +94,22 @@ ACT = {
     'ready': 'readying a break for the garbage coming', 'toward': 'walking toward an attack', 'raise': 'raising', 'setup': 'setting up',
 }
 
+DECIDED = {'only': 'the only line offered', 'tie': 'the order\'s keys left it alike with the next (kept first)',
+           'raise': 'the raise', 'none': 'nothing offered'}
+_DEC = None
+def decide_place(n):
+    """the comment block over decide.c's line n -- the place in playOf that put the line played in the order's place"""
+    global _DEC
+    if _DEC is None:
+        try: _DEC = open(os.path.join(HERE, 'decide.c'), errors='replace').read().splitlines()
+        except OSError: _DEC = []
+    i = min(n - 1, len(_DEC) - 1)
+    while i > 0 and i > n - 80 and not _DEC[i].strip().startswith('//'): i -= 1
+    j = i
+    while j > 0 and _DEC[j - 1].strip().startswith('//'): j -= 1
+    t = ' '.join(_DEC[j].strip()[2:].split()) if 0 <= j < len(_DEC) else ''
+    return '(' + t[:90].lstrip('(') + ')' if t else ''
+
 def describe(l, rules):
     f = fields(l)
     p = l.split()
@@ -103,6 +119,11 @@ def describe(l, rules):
     key = f.get('won', '')
     km = re.match(r'k(\d+):(\S+)', key)
     rule = ('rule: %s (over %s)' % (rules.get(int(km.group(1)), 'rank.c %s' % km.group(1)), km.group(2))) if km else ''
+    # (every decision labelled: won=d<line> -- decide.c's playOf put another line in the order's first place; only, tie, raise, none)
+    dm = re.match(r'd(\d+):(\S+)', key)
+    if dm: rule = 'rule: decide.c %s %s (over the order\'s first, %s)' % (dm.group(1), decide_place(int(dm.group(1))), dm.group(2))
+    elif key in DECIDED: rule = 'rule: ' + DECIDED[key]
+    elif not key: rule = 'rule: (unlabelled)'
     if play == 'hold' and f.get('held'):
         h = f['held']
         what = {'raise': 'holding: waiting for the raise to open',
@@ -138,7 +159,7 @@ def describe(l, rules):
         if a and play in ('zip', 'level', 'toward', 'ready'): what += ', leaving ' + a
     under = 'under garbage' if f.get('under') == '1' else ''
     tail = ', '.join(x for x in (under, 'tops out in %s frames' % f['dies'] if 'dies' in f else '', life) if x)
-    return '%s %-11s %s%s%s' % (frame, mode, what, ' [%s]' % tail if tail else '', ('  ' + rule) if rule and play != 'hold' else '')
+    return '%s %-11s %s%s%s' % (frame, mode, what, ' [%s]' % tail if tail else '', ('  ' + rule) if rule and (play != 'hold' or rule not in what) else '')
 
 def main():
     sha = None

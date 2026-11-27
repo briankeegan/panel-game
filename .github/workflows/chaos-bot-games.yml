@@ -109,6 +109,11 @@ jobs:
         run: |
           python3 chaos-bot/bench/report.py games '${{ needs.plan.outputs.games }}' | tee report.txt
           { echo '```'; cat report.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          # (EVERY DECISION LABELLED -- the owner: every decision of every game in plain words with the rule that decided it, as the
+          # replays had them: describe.py reads each GAMBITD line and quotes rank.c (won=k<line>) or decide.c (won=d<line>) as this
+          # commit has them)
+          mkdir -p decisions
+          for d in games/chaosbot-game-*; do n=${d##*-}; [ -f "$d/gambit.log" ] && python3 chaos-bot/gambit/describe.py "$d/gambit.log" > "decisions/game-$n.txt" 2>&1 || true; done
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -116,3 +121,4 @@ jobs:
           path: |
             report.txt
             losses.txt
+            decisions/

@@ -934,13 +934,22 @@ static void answerTurn(int32_t qid, int32_t at, int32_t allowanceKnown, int32_t 
   }
   // (WHY THIS LINE: the order's key that put the line played before the best line it passed over, and what that line was -- rank.c's
   // line number, named by eval/rank_keys.js; none where nothing else was offered)
-  if (top && P.ncands > 1) { const Judge *ru = order[0] == top ? order[1] : order[0]; int32_t keepKey = cmpKey;
+  // (EVERY DECISION LABELLED -- the owner: every decision is labelled: won=d<line> where playOf put a line other than the order's first
+  // in its place (decide.c decWhy), won=raise for the raise, won=only where one line was offered, won=tie where the order's keys left the
+  // two first alike, won=none where nothing was offered; else the order's key, won=k<line>)
+  if (decWhy) { L_s(" won=d"); L_i(decWhy); L_s(":"); L_play(P.ncands > 0 ? (order[0]->hold ? PLAY_HOLD : order[0]->k.play) : PLAY_HOLD); }
+  else if (R.up) L_s(" won=raise");
+  else if (!top || P.ncands < 1) L_s(" won=none");
+  else if (P.ncands == 1) L_s(" won=only");
+  if (!decWhy && !R.up && top && P.ncands > 1) { const Judge *ru = order[0] == top ? order[1] : order[0]; int32_t keepKey = cmpKey;
+    if (!ru || ru == top || compareJudged(top, ru) >= 0) L_s(" won=tie");
     if (ru && ru != top && compareJudged(top, ru) < 0) { L_s(" won=k"); L_i(cmpKey); L_s(":"); L_play(ru->hold ? PLAY_HOLD : ru->k.play);
       // (both sides as the order read them: the frame each board is lost on, then that less the walk charged -- inf a board that lives)
       const Judge *s2[2] = { top, ru };
       L_s(" wonBy=");
       for (int q = 0; q < 2; q++) { if (q) L_s(":"); if (s2[q]->o.lives) L_s("inf"); else { L_i((int64_t)diesAt(s2[q])); L_s("/"); L_i((int64_t)lostOf(s2[q])); } L_s("/w"); L_i(s2[q]->hold ? 0 : lineWalk(s2[q])); } }
     cmpKey = keepKey; }
+  decWhy = 0;   // (a decision that does not pass through playOf is not labelled with the last one's)
   L_s(" opts=");
   for (int i = 0; i < P.ncands && i < 8; i++) {
     const Judge *j = order[i];

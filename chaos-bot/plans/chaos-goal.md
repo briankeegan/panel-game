@@ -10,6 +10,22 @@ limit, training_random, Challenge Mode to Impossible.) (The owner, 2026-11-27 14
 counts; "If you have that. GO into next mode" -- run 190: 7 colours at Level 10 with run 180's bot. "And once all modes are that good
 go back and get them all to 100%" -- every mode to 7/8 first, then each to 8/8.)
 
+**Mode table (the owner: "Love this table" -- kept here, updated every run; seeds 7-8, 4 patterns each):**
+
+| Mode | Level | Run | Result |
+|---|---|---|---|
+| 8 colours | 10 | 180 | 7/8 |
+| 7 colours | 10 | 190 | 7/8 |
+| Chaos margin 4 | 10 | 191 | 7/8 |
+| Chaos mode | 10 | 192 | 8/8 |
+| 1 HP | 10 | 193 | 8/8 |
+| No stop time | 10 | 194 | 6/8, being fixed (run 195) |
+| BALL | 10 | - | next |
+| Line Clear | - | - | to do |
+| Queue limit | 10 | - | to do |
+| training_random | 10 | - | to do |
+| Challenge Mode | stage's | - | to do |
+
 **Standing orders -- every step, no exceptions:**
 1. **A run is always going.** The moment a run finishes, the next one is pushed -- before writing to the owner, before reading at
    length. Never end a turn, never write a summary, with no run in flight. Never stop to ask; decide from this file.

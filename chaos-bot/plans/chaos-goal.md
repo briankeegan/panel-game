@@ -177,6 +177,10 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 163 (2026-11-27 06:54 ET), no chain aims with no garbage on the board below six rows' worth of panels: survived 4/8, 138496
+  frames -- kept**, its target fixed: combo s8 lived (lost at ~4500-5000 in runs 160-162). Three losses that repeated run after run are
+  now gone (insane/combo s8's high opening, chain s7's spent opening, combo s8's spent lull). insane s8 lost at 6859 (6406 in run 161): a
+  full board, 54-57 panels in eight rows, under garbage with 13-14 waiting. Run 164: run 126's full board asks the combo first, on again.
 - **Run 162 (2026-11-27 06:41 ET), keep the panels between waves: survived 2/8, 92014 frames** -- off. combo s8 still lost at 4525. Its
   run-161 log: 2x/4x/6x chains with no garbage on the board took 63 panels to 25 (3556-4117) -- run 161's guard (tallest column under six
   rows) missed them, a tower holding the top at six or more -- then 20 pieces arrived at 4616. Run 163: the guard by the panels too (under

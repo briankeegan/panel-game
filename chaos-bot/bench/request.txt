@@ -515,6 +515,10 @@
 #   board took 63 panels to 25 (3556-4117) -- run 161's guard missed them, the tallest column at six rows or more -- then 20 pieces came.
 # run 163 -- run 161's guard also by the panels: no garbage on the board and under six rows' worth of panels, the chain aims asked only as
 #   breaks (decide.c). 8 colours s7-8
+# run 163 -- (result) survived 4/8, 138496 frames -- kept: its target fixed, combo s8 lived (lost ~4500-5000 in runs 160-162). Three repeating
+#   losses fixed in four runs (insane/combo s8 opening, chain s7 opening, combo s8 between waves). insane s8 6859 (as 161, 6406): a full
+#   board, 54-57 panels and eight rows, under garbage with 13-14 waiting. combo s7 15386, insane s7 10123, thicc s8 19728.
+# run 164 -- run 126's full board asks the combo first (decide.c: 48 panels or more, the combo of four ahead of 2x/3x) on again. s7-8
 chain_garbage 7 9 9 1 21600 10 colors=8
 combo_storm 7 9 9 1 21600 10 colors=8
 thicc_combo_storm 7 9 9 1 21600 10 colors=8

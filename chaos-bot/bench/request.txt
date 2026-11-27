@@ -687,6 +687,10 @@
 #   garbage, no break offered, the panels kept: k1265) held over a 2-chain lineup lost 63 frames later, five decisions running
 #   (1176-1231: 194 vs 257), 14 panels under seven rows of garbage.
 # run 198 -- that rule never puts first the line lost sooner (rank.c). 8 colours s21-22 again
+# run 198 -- (result) survived 3/8, 133942 frames (197: 85914) -- no worse, kept: every loss now late (10267-16582), queue 16-25.
+#   Most frequent rule putting a line lost 55-92 frames sooner first: THE PLAN KEPT (k1156) -- combo s21 11929/11947 117 over 193, 99
+#   over 191; insane s22 9876/9903 222 over 299, 195 over 272; combo s22 16117-16448 202 over 257, 171 over 223.
+# run 199 -- above six colours under garbage, THE PLAN KEPT does not keep a line lost half a break's time sooner (rank.c). 8 colours s21-22
 chain_garbage 21 9 9 1 21600 10 colors=8
 combo_storm 21 9 9 1 21600 10 colors=8
 thicc_combo_storm 21 9 9 1 21600 10 colors=8

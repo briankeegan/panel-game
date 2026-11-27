@@ -1152,7 +1152,11 @@ static int compareJudged(const Judge *x, const Judge *y) {
   if (lx == ly && x->carried != y->carried && !x->hold && !y->hold) {
     const Judge *c = x->carried ? x : y, *o = x->carried ? y : x;
     if (carriedSame(c) && (c->o.lives || diesAt(c) >= rankSave) && !o->o.dead && imax(0, brokeSeen(o)) <= imax(0, brokeSeen(c)) && imax(0, o->apBroke) <= imax(0, c->apBroke) &&
-        !outlives(o, c) && !finishEightBy(o, c))
+        !outlives(o, c) && !finishEightBy(o, c) &&
+        // (run 199: above six colours under garbage, nor over a line lost half a break's time later -- run 198 8 colours, every loss
+        // late with a backlog: combo s21 11929-11947 kept lost at 117 and 99 over 193 and 191; insane s22 9876-9903 222 over 299, 195
+        // over 272; combo s22 16117-16448 202 over 257, 171 over 223)
+        !(decQ.b->colors > 6 && decF.under && !c->o.lives && !o->o.lives && diesAt(o) - diesAt(c) >= rankSave / 2))
       return (cmpKey = __LINE__, (x->carried ? -1 : 1));
   }
   // 1. READY WHEN IT LANDS (the owner: just be ready -- the stack raised, the garbage on its way): with garbage on its way and none on the

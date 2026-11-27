@@ -17,7 +17,7 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 
 | Mode | Level | Seeds | Run | Result |
 |---|---|---|---|---|
-| 8 colours | 10 | 21-22 | 197 | 3/8, being fixed (run 198) |
+| 8 colours | 10 | 21-22 | 198 | 3/8 (197: 3/8, losses now late), being fixed (run 199) |
 | 7 colours | 10 | 23-24 | - | to redo (old: 7/8 on seeds 7-8, run 190 -- does not count) |
 | Chaos margin 4 | 10 | 25-26 | - | to redo (old: 7/8 on 7-8, run 191) |
 | Chaos mode | 10 | 27-28 | - | to redo (old: 8/8 on 7-8, run 192) |
@@ -203,6 +203,9 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 198 (2026-11-27 16:42 ET), 8 colours seeds 21-22, + k1265 never the line lost sooner: 3/8, 133942 frames (was 85914)** -- kept;
+  losses all late with a backlog. THE PLAN KEPT (k1156) kept lines lost 55-92 frames sooner (combo s21, insane s22, combo s22). Run 199:
+  above six colours under garbage it does not keep a line lost half a break's time sooner.
 - **Run 197 (2026-11-27 16:27 ET), 8 COLOURS at L10 on its OWN seeds 21-22, run 196's bot: survived 3/8, 85914 frames** -- seeds 7-8
   gave 7/8: fitted. chain s21 lost at 1601: rank.c k1265 (run 167: above six colours under garbage, no break, the panels kept) put a hold
   lost at 194 over a 2-chain lineup lost at 257, five decisions running. Run 198: that rule never puts the line lost sooner first.

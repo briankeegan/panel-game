@@ -177,6 +177,9 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 183 (2026-11-27 12:19 ET), high-opening rule capped on run 180: survived 1/8, 78840 frames** -- reverted. The order measured
+  in playOf: 1.5% inverted, 2.8% drift (the old label's state), 4.8% ties; 45 of 69 inversions are decide.c rank() putting the hold on top
+  after the sort (needless one-swap line). Run 184: that override off above six colours under garbage; post-sort moves labelled.
 - **Run 182 (2026-11-27 12:02 ET), the top beats the most others head to head: survived 4/8, 148207 frames** -- reverted; 0 late. The
   inversions hardly moved (404/7227): most come from state moving between the order and the label (livedPrev, set after playOf) and lines
   moved after the sort, not the sort. Run 183: run 180 plus the high-opening rule capped at two rows; the agreement measured in playOf.

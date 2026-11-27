@@ -947,6 +947,7 @@ static void answerTurn(int32_t qid, int32_t at, int32_t allowanceKnown, int32_t 
     // (read in playOf, where the order was made: the state compareJudged reads -- livedPrev, set below playOf -- has moved since)
     if (decInv == 2) L_s(" won=tie");
     else if (decInv == 1) { L_s(" won=inv:k"); L_i(decInvKey); L_s(":"); L_play(decInvRu); }
+    else if (decInv == 3) { L_s(decInvKey < 0 ? " won=moved:k" : " won=moved:d"); L_i(decInvKey < 0 ? -decInvKey : decInvKey); L_s(":"); L_play(decInvRu); }
     else if (!ru || ru == top) L_s(" won=tie");
     // (the key that put it first, read now: where the state has moved so that it no longer does, won=drift)
     if (!decInv && ru && ru != top && compareJudged(top, ru) >= 0) L_s(" won=drift");

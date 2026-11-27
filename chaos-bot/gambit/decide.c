@@ -1201,19 +1201,22 @@ static int ranked(const Read *R, const Found *S) {
   // longer is a walk for nothing -- only a board left ready where the hold leaves none is kept)
   // (nor the swap that lets the garbage down onto more of the stack where no break is offered: rank.c letsDown)
   // (but never a flatten the window has room for: rank.c flattenFree -- the board it leaves is the one the next break is walked on)
-  if (n && order[0] && !order[0]->hold && order[0]->k.nseq == 1 && !order[0]->o.lives && !letsDown(order[0]) && !flattenFree(order[0])) {
+  // (run 184: not above six colours under garbage -- there a move goes before the hold where the keys leave them alike (rank.c, run 180:
+  // 7/8); run 183's labels, read in playOf, show this the hold played first over the order's own top on most of the true inversions)
+  if (n && order[0] && !order[0]->hold && order[0]->k.nseq == 1 && !order[0]->o.lives && !letsDown(order[0]) && !flattenFree(order[0]) &&
+      !(decQ.b->colors > 6 && decF.under)) {
     Judge *J = order[0]; const Judge *h = 0; int hi = -1;
     for (int i = 1; i < n; i++) if (order[i]->hold) { h = order[i]; hi = i; break; }
     if (h && !h->o.dead && !(J->apBroke > 0) && (J->apChainAll <= h->apChainAll || J->apChainAll < 2) && J->apCombo < 3 && !(J->o.j.ready == 1 && h->o.j.ready != 1) &&
         !(J->o.nearAfter >= 0 && h->o.nearAfter >= 0 && J->o.nearAfter < h->o.nearAfter && diesAt(J) >= diesAt(h)) &&
         diesAt(J) - diesAt(h) <= (double)WALK_FRAMES * lineWalk(J) && diesAt(J) - diesAt(h) < rankSave && lostAlike(J, h) && lineWalk(J) > 0) {
-      Judge *hh = order[hi]; for (int k = hi; k > 0; k--) order[k] = order[k - 1]; order[0] = hh; needlessTrimmed++; outlivingFirst(order, n); }
+      Judge *hh = order[hi]; for (int k = hi; k > 0; k--) order[k] = order[k - 1]; order[0] = hh; needlessTrimmed++; outlivingFirst(order, n); if (!rankMoved) rankMoved = __LINE__; }
   }
   // (and a line of nothing but swaps of two panels alike is the hold: the board it leaves is the board as it is)
   if (n && order[0] && !order[0]->hold && order[0]->o.j.sames && order[0]->k.nseq >= 1) {
     Judge *J = order[0]; int all = 1;
     for (int i = 0; i < J->k.nseq && all; i++) if (!(i < 64 && (J->o.j.sames >> i & 1))) all = 0;
-    if (all) for (int i = 1; i < n; i++) if (order[i]->hold) { Judge *h = order[i]; for (int k = i; k > 0; k--) order[k] = order[k - 1]; order[0] = h; samesTrimmed = 2; outlivingFirst(order, n); break; }
+    if (all) for (int i = 1; i < n; i++) if (order[i]->hold) { Judge *h = order[i]; for (int k = i; k > 0; k--) order[k] = order[k - 1]; order[0] = h; samesTrimmed = 2; outlivingFirst(order, n); if (!rankMoved) rankMoved = __LINE__; break; }
   }
   phaseMs[0] = (int32_t)(t1 - t0); phaseMs[1] = (int32_t)(t2 - t1); phaseMs[2] = (int32_t)(nowMs() - t2);
   return n;
@@ -2311,7 +2314,7 @@ static Played playOf(const Read *R, int n) {
   if (P.line && P.line->k.nseq == 1 && R->rule >= 0 && theTables.r[R->rule].table == 2 && ((opLineOn && P.line->carried) || chainUp >= 2)) opFiredAt = decQ.b->clock;
   decInv = 0;
   if (!decWhy && P.top && n > 1) { const Judge *ru = order[0] == P.top ? order[1] : order[0]; int32_t keep = cmpKey;
-    if (ru && ru != P.top) { int c = compareJudged(P.top, ru); if (c > 0) { decInv = 1; decInvKey = cmpKey; decInvRu = ru->hold ? PLAY_HOLD : ru->k.play; } else if (c == 0) decInv = 2; }
+    if (ru && ru != P.top) { int c = compareJudged(P.top, ru); if (c > 0) { decInv = rankMoved ? 3 : 1; decInvKey = rankMoved ? rankMoved : cmpKey; decInvRu = ru->hold ? PLAY_HOLD : ru->k.play; } else if (c == 0) decInv = 2; }
     cmpKey = keep; }
   return P;
 }

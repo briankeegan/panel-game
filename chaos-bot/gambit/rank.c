@@ -1032,12 +1032,10 @@ static int compareJudged(const Judge *x, const Judge *y) {
   // living lines the one clearing more panels first -- at 8 colours the stack passes six rows by ~440 on set-ups alone, and the first slab
   // (two or three rows, ~700) on an eight-row stack is every line lost the moment it is told. Runs 151 combo s8 and 159 insane s8 (the same
   // board, the same opening): 30 -> 48 panels by 441 on set-ups and zips, every line dying from 545, topped at 768, lost at ~605)
-  // (run 183: counted up to two rows' worth (2 x W) -- room made, not the stack spent. Run 180 combo s8 (its one loss, at 1111): this
-  // rule kept a 4-chain at 455-473 in the seed-8 opening, the board spent before the first slab. Run 178 had it on run 167's bot: 3/8, the
-  // seed-8 opening passed in two of three)
+  // (run 183 counted cleared panels up to two rows' worth on run 180's bot: 1/8. Back)
   if (chaosOpenHigh && x->o.lives && y->o.lives && x->apBroke <= 0 && y->apBroke <= 0 &&
-      imin(x->o.j.clearedPanels, 2 * W) != imin(y->o.j.clearedPanels, 2 * W))
-    return (cmpKey = __LINE__, (imin(x->o.j.clearedPanels, 2 * W) > imin(y->o.j.clearedPanels, 2 * W) ? -1 : 1));
+      x->o.j.clearedPanels != y->o.j.clearedPanels)
+    return (cmpKey = __LINE__, (x->o.j.clearedPanels > y->o.j.clearedPanels ? -1 : 1));
   // THE LAST CHANCE: the hold lost inside a break's time, beside a line lost no sooner whose next moves promise a break's time more (the
   // readiness break, the survival search after it): the line first -- holding is the loss for certain. Only against the hold: the
   // promise is never weighed against another line's own life. 244 of 419 lost games held, dying, over such a line.
@@ -1927,6 +1925,10 @@ static int walkTried(const Read *R, const Cand *k, Judge *J, int ok, int most) {
 }
 static int judgeWalkedIn(const Read *R, const Cand *k, Judge *J, int most) { int ok = judgeCand(R, k, J); return walkTried(R, k, J, ok, most) || ok; }
 static int judgeWalked(const Read *R, const Cand *k, Judge *J) { return judgeWalkedIn(R, k, J, 1); }
+// (A LINE MOVED AFTER THE SORT: the line of the move that put a line on top past the order's own keys -- outlivingFirst and the eight
+// here (negative: rank.c), the hold put in a line's place in decide.c rank() (positive: decide.c); 0 where none did. The label reads it:
+// won=moved:k<line> / moved:d<line> -- the owner: every decision labelled, the order and the line played not disagreeing unsaid)
+static int32_t rankMoved;
 // sorted stably by the one order
 static void outlivingFirst(Judge **a, int n) {
   // (THE LINE THAT OUTLIVES THE TOP AND BEATS IT IS THE TOP: the keys are not transitive, and a line that loses to another head to head
@@ -1936,12 +1938,13 @@ static void outlivingFirst(Judge **a, int n) {
   { int32_t keep = cmpKey;
     for (int pass = 0; pass < 4 && n > 1; pass++) { int moved = 0;
       for (int i = 1; i < n; i++) if (!a[i]->o.dead && outlives(a[i], a[0]) && compareJudged(a[i], a[0]) < 0) {
-        Judge *e = a[i]; for (int q = i; q > 0; q--) a[q] = a[q - 1]; a[0] = e; moved = 1; break; }
+        Judge *e = a[i]; for (int q = i; q > 0; q--) a[q] = a[q - 1]; a[0] = e; moved = 1; rankMoved = -__LINE__; break; }
       if (!moved) break; }
     cmpKey = keep; }
 }
 static void sortJudged(Judge **a, int n) {
   static Judge *tmp[512];
+  rankMoved = 0;
   markIdle(a, n);
   for (int w = 1; w < n; w *= 2)
     for (int lo = 0; lo < n; lo += 2 * w) {
@@ -1960,7 +1963,7 @@ static void sortJudged(Judge **a, int n) {
   if (finishAsked() && n > 1 && !(a[0]->apCombo >= 8 && a[0]->apChain < 2)) {
     int32_t keep = cmpKey;
     for (int i = 1; i < n; i++) if (a[i]->k.twin == 1 && !a[i]->o.dead && a[i]->apCombo >= 8 && compareJudged(a[i], a[0]) < 0) {
-      Judge *e = a[i]; for (int q = i; q > 0; q--) a[q] = a[q - 1]; a[0] = e; break;
+      Judge *e = a[i]; for (int q = i; q > 0; q--) a[q] = a[q - 1]; a[0] = e; rankMoved = -__LINE__; break;
     }
     cmpKey = keep;
   }
@@ -1974,6 +1977,6 @@ static void sortJudged(Judge **a, int n) {
       if (!(e->o.lives || diesAt(e) >= FINISH_8_LIFE * rankSave)) continue;
       if (pressAllowance >= 0 && pressAllowance - lineWalk(e) < BREAK_WALK) continue;   // (and a break's walk of the window kept: the next break is pressed from it)
       if (best < 0 || (e->o.lives && !a[best]->o.lives) || (!a[best]->o.lives && diesAt(e) > diesAt(a[best]))) best = i; }
-    if (best > 0) { Judge *e = a[best]; for (int q = best; q > 0; q--) a[q] = a[q - 1]; a[0] = e; }
+    if (best > 0) { Judge *e = a[best]; for (int q = best; q > 0; q--) a[q] = a[q - 1]; a[0] = e; rankMoved = -__LINE__; }
   }
 }

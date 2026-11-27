@@ -1,13 +1,4 @@
-run 46038954801, as of 2026-11-27T19:36:35Z
-match start: the match is started
-match start: gambit: creating the link
-match start: gambit: the link is created
-match start: gambit: the link is starting the match
-match start: gambit: the link has started the match
-both ready — match starting
-garbage landed: our stopWatch 534 clock 722, transits in flight before this frame {534}, opponent copy 1 frames behind, rollbacks so far 0
-garbage landed: our stopWatch 544 clock 732, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
-garbage landed: our stopWatch 548 clock 736, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+run 46038954801, as of 2026-11-27T19:38:39Z
 opponent topped out: clock 1230 stopWatch 1042 stop 60 pre-stop 272 shake 47 health 1, top rows r12=gggggg r11=ggggg0 r10=ggg000
 garbage landed: our stopWatch 1056 clock 1244, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
 opponent topped out: clock 1260 stopWatch 1072 stop 60 pre-stop 242 shake 17 health 1, top rows r12=gggggg r11=ggggg0 r10=ggg000
@@ -149,3 +140,12 @@ match over — bot won (pace: worst 2.99 frames off schedule); waiting for a rem
 memory after match: rss 3556756 kB, threads 9, lua 46215 kB
 game about to start: both players are ready
 set over: the room is closed, back in the lobby
+game about to start: both players are ready
+match start: building the match (seed nil, stage nil, opponent ?)
+match start: the match is built
+match start: the match is started
+match start: gambit: creating the link
+match start: gambit: the link is created
+match start: gambit: the link is starting the match
+match start: gambit: the link has started the match
+both ready — match starting

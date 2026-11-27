@@ -577,6 +577,11 @@
 #   ran: it was gated on decide.c's gambitHit, which answer.c sets on a topped board too, and the board topped before the slab rested.
 # run 176 -- run 175's rule with its own record of garbage resting on the stack (rank.c underBreak: restSeen), so a topped board does not
 #   turn it off; describe.py's rule names read one- or two-digit headings only ('5287.' was a frame in a comment). 8 colours s7-8
+# run 176 -- (result) survived 2/8, 110303 frames -- reverted. No seed-8 opening loss (all three seed-8 games past 7000), worse overall.
+# run 177 -- run 167's bot with run 167's own rule (no break offered: of two lost alike breaking nothing, fewer panels cleared first)
+#   only under seven rows' worth of panels (materialOn < 42). Run 175 (run 167's bot in effect: its rule never ran) thicc s7, labelled:
+#   5836-5849 rank.c's run-167 rule (k1257) held over walking toward a break on 52 panels with 253 frames of stop; the stop ran out,
+#   the next slabs filled the board to 63 panels, lost at 6196. 8 colours s7-8
 chain_garbage 7 9 9 1 21600 10 colors=8
 combo_storm 7 9 9 1 21600 10 colors=8
 thicc_combo_storm 7 9 9 1 21600 10 colors=8

@@ -629,30 +629,9 @@ static int ruleNoEnemy;   // (the rule in force asks enemy.none: decide.c)
 // that is not there, and the board that holds them builds none -- decide.c sets it before the order is made)
 static int breakOffered = 1;
 // (run 172 widened the break-first rule to two breaks' time above six colours: 3/8, removed)
-// (run 175, CHAOS: GARBAGE ON THE BOARD FOR THE BREAK RULES, THE FIRST SLAB -- decF.under is garbage resting on the stack (facts.c
-// FACT_US_CONTACT); a slab on the board not yet resting on it is breakable all the same. Above six colours, until garbage first rests on
-// the stack (decide.c gambitHit), the break rules read garbage anywhere on the board. The seed-8 opening was lost at ~950 in runs 169,
-// 171, 172, 174 alike: under=0 with a break of 15 offered (run 171 insane s8, 664), creditPair's no-break credit rule and the
-// break-first rules skipped, and the credit step (won=k1119) put a carry lost at 370 breaking nothing over the break lost at 249, 45
-// panels spent to 23. Run 173 had it all game: no opening loss, 0/8 with every loss after the first contact)
-// (run 176: its own record of garbage resting on the stack -- run 175 read decide.c's gambitHit, which a topped board sets too
-// (answer.c), so in the seed-8 opening (topped before the slab rested) the rule was off and the credit step decided as before:
-// thicc s8 lost at 943, rank.c '1. lives before does not' at 661 over the break of 15)
-static int32_t restSeen, restClock = -1;
-static int garbOnBoard(void) {
-  static const Board *atB; static int32_t atClock = -1, on;
-  if (decQ.b != atB || decQ.b->clock != atClock) {
-    atB = decQ.b; atClock = decQ.b->clock; on = 0;
-    for (int r = 1; r < decQ.b->nrows && !on; r++) for (int c = 1; c <= W; c++) if (decQ.b->p[r][c].f[ISGARBAGE]) { on = 1; break; }
-  }
-  return on;
-}
-static int underBreak(void) {
-  if (decQ.b->clock < restClock) restSeen = 0;   // (a new game)
-  restClock = decQ.b->clock;
-  if (decF.under) restSeen = 1;
-  return decF.under || (decQ.b->colors > 6 && !restSeen && garbOnBoard());
-}
+// (runs 173, 175, 176 had the break rules read garbage on the board not yet resting on the stack (decF.under is FACT_US_CONTACT): all
+// game 0/8; only until garbage first rests 3/8 (gated on gambitHit, which topping sets: it never ran) and 2/8 (its own record: no seed-8
+// opening loss, every seed-8 game past 7000). Removed)
 static int32_t waitOf(void);
 static int cascadeLive(Board *b);   // (propose.c: the board still moving of its own)
 // (the window as the next block finds it: at its landing with one on its way, else EARLIEST_LANDING)
@@ -925,8 +904,8 @@ static void creditPair(const Judge *x, const Judge *y, int *lxo, int *lyo) {
   // (nor, under garbage, the credit of a line that breaks nothing beside a break lost within a break's time of it: the break is the way
   // out the board has, the horizon is a promise -- r1363, 14839: a 4x stall in progress lost at 296 kept over a break lost at 282, and no
   // break offered again; r1362, 16120)
-  if (lx && !x->o.lives && underBreak() && brokeSeen(x) <= 0 && !y->hold && !y->o.dead && y->apBroke > 0 && diesAt(x) - diesAt(y) < rankSave) lx = 0;
-  if (ly && !y->o.lives && underBreak() && brokeSeen(y) <= 0 && !x->hold && !x->o.dead && x->apBroke > 0 && diesAt(y) - diesAt(x) < rankSave) ly = 0;
+  if (lx && !x->o.lives && decF.under && brokeSeen(x) <= 0 && !y->hold && !y->o.dead && y->apBroke > 0 && diesAt(x) - diesAt(y) < rankSave) lx = 0;
+  if (ly && !y->o.lives && decF.under && brokeSeen(y) <= 0 && !x->hold && !x->o.dead && x->apBroke > 0 && diesAt(y) - diesAt(x) < rankSave) ly = 0;
   // (IN FINISH THEM, A BOARD THAT STANDS TWICE THE HORIZON IS SAFE -- the owner: survival is not pushed where the board is not dying: a
   // line whose board is lost FINISH_SAFE or more from now, its next moves played (diesAt: its own loss or the life after it), survives as
   // one that lives does, and the combos decide between them)
@@ -1260,7 +1239,9 @@ static int compareJudged(const Judge *x, const Judge *y) {
   // 1. (run 167, CHAOS) ABOVE SIX COLOURS UNDER GARBAGE, NO BREAK OFFERED, THE PANELS KEPT: of two lost alike that break nothing, the
   // one clearing fewer panels first -- the panels a clear spends under garbage are the next break's. Run 166 thicc s8: four rows of
   // full-width garbage on 41 panels, no break offered, levels spent them to 31 (5296-5566) and the next slab buried it, lost at 5395
-  if (!lx && decQ.b->colors > 6 && decF.under && !breakOffered && lostAlike(x, y) && !(x->apBroke > 0) && !(y->apBroke > 0) &&
+  // (run 177: only short of panels, under seven rows' worth -- run 175 thicc s7, 5836-5849: 52 panels and 253 frames of stop, this rule
+  // held over walking toward a break, the stop ran out, the next slabs filled the board to 63 panels, lost at 6196)
+  if (!lx && decQ.b->colors > 6 && decF.under && !breakOffered && materialOn(decQ.b) < 7 * W && lostAlike(x, y) && !(x->apBroke > 0) && !(y->apBroke > 0) &&
       x->o.j.clearedPanels != y->o.j.clearedPanels)
     return (cmpKey = __LINE__, (x->o.j.clearedPanels < y->o.j.clearedPanels ? -1 : 1));
   // (survival as the board is lost: a line that meets the mode's first entry and is lost no sooner is never passed over for the walk the
@@ -1272,7 +1253,7 @@ static int compareJudged(const Judge *x, const Judge *y) {
   // the break first -- the moves after are planned again each decision, on the window the line spent, and the break is on the board now.
   // r1350, 5110: a ready lost at 98, then344, over a break in progress lost at 273; the 344 was never kept and the board was lost at
   // 5287. The finish's eight keeps its own rule: finishEightBy)
-  if (!lx && underBreak()) {
+  if (!lx && decF.under) {
     int bx = !x->hold && !x->o.dead && x->apBroke > 0, by = !y->hold && !y->o.dead && y->apBroke > 0;
     if (bx != by) {
       const Judge *b = bx ? x : y, *p = bx ? y : x;
@@ -1315,7 +1296,7 @@ static int compareJudged(const Judge *x, const Judge *y) {
   // that breaks garbage before one that breaks none -- the hold too -- unless that one's own board, not what its next moves promise,
   // outlives the break's by a break's time: 4538 combo_storm 3, 4887, a chain breaking nothing lost at 409, promising 697, played over a
   // break of 16 lost at 429; the panels drained and the breaks after it came too late)
-  if (!lx && underBreak()) {
+  if (!lx && decF.under) {
     int bx = !x->hold && !x->o.dead && x->apBroke > 0, by = !y->hold && !y->o.dead && y->apBroke > 0;
     if (bx != by) {
       const Judge *b = bx ? x : y, *o = bx ? y : x;

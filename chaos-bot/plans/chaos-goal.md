@@ -177,6 +177,9 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 176 (2026-11-27 10:20 ET), the first slab read before it rests (own record): survived 2/8, 110303 frames** -- reverted; no
+  seed-8 opening loss, worse overall. Run 177: run 167's no-break panels-kept rule only short of panels (< 42) -- run 175's thicc s7
+  labels show it (k1257) holding over a walk to a break on 52 panels with 253 frames of stop, then the board filled to 63.
 - **Run 175 (2026-11-27 10:03 ET), the first slab read before it rests: survived 3/8, 102378 frames** -- every decision labelled. thicc
   s8 lost the seed-8 opening at 943; the labels show the credit step (rank.c '1. lives before does not') at 661 again: the new rule was
   gated on gambitHit, which a topped board sets too, so it never ran. Run 176: the rule keeps its own record of garbage resting.

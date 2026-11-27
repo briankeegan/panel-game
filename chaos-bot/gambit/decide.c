@@ -273,10 +273,7 @@ static int readBoard_(Read *R) {
     // (runs 168-169 tried seven rows' worth -- run 167 thicc s7: the opening rose to exactly 36 panels and a 12-panel chain spent the
     // board to 18 before the first slab: all game 1/8, in the opening only 0/8 (the opening grew to 48 and the chain spent that). Six)
     if (!F->known[FACT_US_CONTACT] && (panelTop(decQ.b) < LOW_ROWS || pn < 6 * W)) brk = 1;
-    // (run 174: and garbage resting on the stack, whatever the panels -- run 173 chain s8, 2670-2823: under garbage on 41-50 panels the
-    // aims met by 2x chains clearing 9 breaking nothing (brk -1 from five rows' worth up), columns 2-3 dug to a canyon under the
-    // garbage, lost at 3083)
-    if (F->known[FACT_US_CONTACT]) brk = 1;
+    // (run 174 tried brk 1 whenever garbage rests on the stack: 2/8, the seed-8 opening lost three times at ~950)
     L.aim[0].chain.op = OP_EQ; L.aim[0].chain.n = 2; L.aim[0].chain.near = 1; L.aim[0].brk = brk;
     // (run 125 dropped the 3x: 8 colours s5-6 about 2/8 -- back)
     L.aim[1].chain.op = OP_EQ; L.aim[1].chain.n = 3; L.aim[1].chain.near = 1; L.aim[1].brk = brk;

@@ -567,6 +567,11 @@
 #   and breaking nothing (decide.c aims: brk -1 at five rows' worth of panels and up), columns 2-3 dug to a canyon under the garbage.
 # run 174 -- run 167's bot plus: above six colours, garbage resting on the stack -> the aims are met only by lines that break it
 #   (decide.c brk 1 whatever the panels). 8 colours s7-8
+# run 174 -- (result) survived 2/8, 88004 frames -- reverted. combo s8 932, thicc s8 959, insane s8 999: the seed-8 opening again (as in
+#   runs 169, 171, 172) -- the one run without it was 173, whose break rules read garbage not yet resting on the stack.
+# run 175 -- run 167's bot plus run 173's rule only until garbage first rests on the stack (rank.c underBreak: decF.under, or above six
+#   colours garbage anywhere on the board while decide.c's gambitHit is 0). First run with every decision labelled (won= on every
+#   GAMBITD line, decisions/game-N.txt). 8 colours s7-8
 chain_garbage 7 9 9 1 21600 10 colors=8
 combo_storm 7 9 9 1 21600 10 colors=8
 thicc_combo_storm 7 9 9 1 21600 10 colors=8

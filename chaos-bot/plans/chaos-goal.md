@@ -177,6 +177,10 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 174 (2026-11-27 09:46 ET), under garbage aims met only by breaks: survived 2/8, 88004 frames** -- reverted. The seed-8 opening
+  lost three times at ~950 (as runs 169, 171, 172; not in run 173). Run 175: run 173's rule (break rules read garbage not yet resting on
+  the stack) only until garbage first rests on the stack. Every decision now labelled (won=k<line> rank.c, d<line> decide.c, only/tie/
+  raise/none; losses.txt names the rule; decisions/game-N.txt every decision in words) -- the owner: every decision labelled.
 - **Run 173 (2026-11-27 09:27 ET), break rules read garbage anywhere on the board: survived 0/8, 76099 frames** -- reverted. The
   seed-8 opening losses at ~1000 did not happen; every game lost later. chain s8 3083: under garbage on 41-50 panels the aims (decide.c
   brk -1 from five rows' worth up) were met by 2x chains clearing 9 and breaking nothing, a canyon dug under the garbage. Run 174: garbage

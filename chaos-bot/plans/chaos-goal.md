@@ -17,7 +17,7 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 
 | Mode | Level | Seeds | Run | Result |
 |---|---|---|---|---|
-| 8 colours | 10 | 21-22 | 201 | 5/8 (202: 2/8, 203: 4/8, both off), being fixed (run 204) |
+| 8 colours | 10 | 21-22 | 204 | 5/8 (best; 202 and 203 off), being fixed (run 205) |
 | 7 colours | 10 | 23-24 | - | to redo (old: 7/8 on seeds 7-8, run 190 -- does not count) |
 | Chaos margin 4 | 10 | 25-26 | - | to redo (old: 7/8 on 7-8, run 191) |
 | Chaos mode | 10 | 27-28 | - | to redo (old: 8/8 on 7-8, run 192) |
@@ -203,6 +203,9 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 204 (2026-11-27 17:46 ET), run 201 with the run-160 high-opening rule off: 5/8, 137380 frames** -- kept; openings now meet the
+  garbage with 34-38 panels. chain s22 lost at 2121: DIG THE BACKLOG put a one-row break lost at 197 over a line lost at 299. Run 205:
+  above six colours it gives way at a quarter break.
 - **Run 203 (2026-11-27 17:36 ET), run 201 + a 30-panel floor on the high-opening rule: 4/8 -- off.** Openings still met the garbage with
   20 panels. Run 204: run 201's bot with the run-160 high-opening rule off (it was built on seed 8's opening).
 - **Run 202 (2026-11-27 17:26 ET), the plan kept a quarter break everywhere: 2/8 -- off.** Openings spent: the first garbage met with

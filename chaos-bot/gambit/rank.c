@@ -635,8 +635,8 @@ static int breakOffered = 1;
 // (run 181 had run 176's first-slab break rule on run 180's bot: 3/8, five lost by 2608 -- the break-first rules put breaks of 6 on the
 // unrested slab before building, 541-953 chain s7. Removed)
 // (run 187 had the creditPair rule alone read the unrested first slab: 4/8, thicc s8 lost the seed-8 opening at 933 all the same.
-// Run 188: the rule 'A BREAK IN HAND BEFORE A PROMISE' alone reads it -- run 187 thicc s8, 615: an entry breaking nothing, credited to
-// 419 by the moves after it, over a break of 9 in progress lost at 268 on its own board; that rule is for this, and decF.under was 0)
+// Run 188 had 'A BREAK IN HAND BEFORE A PROMISE' alone read it: 2/8, thicc s8 lost at 609. underCredit kept for decide.c's needless-swap
+// hold (run 189))
 static int32_t restSeen, restClock = -1;
 static int garbOnBoard(void) {
   static const Board *atB; static int32_t atClock = -1, on;
@@ -1272,7 +1272,7 @@ static int compareJudged(const Judge *x, const Judge *y) {
   // the break first -- the moves after are planned again each decision, on the window the line spent, and the break is on the board now.
   // r1350, 5110: a ready lost at 98, then344, over a break in progress lost at 273; the 344 was never kept and the board was lost at
   // 5287. The finish's eight keeps its own rule: finishEightBy)
-  if (!lx && underCredit()) {
+  if (!lx && decF.under) {
     int bx = !x->hold && !x->o.dead && x->apBroke > 0, by = !y->hold && !y->o.dead && y->apBroke > 0;
     if (bx != by) {
       const Judge *b = bx ? x : y, *p = bx ? y : x;

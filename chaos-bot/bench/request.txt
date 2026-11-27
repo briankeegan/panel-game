@@ -649,6 +649,10 @@
 #   decF.under -- 0 there (the first slab not yet resting).
 # run 188 -- run 180's bot plus: that one rule reads the unrested first slab too (rank.c underCredit, own record of garbage resting);
 #   creditPair and the other break-first rule as before. 8 colours s7-8
+# run 188 -- (result) survived 2/8, 115508 frames -- reverted. thicc s8 lost at 609: 604-618 the hold put on top by decide.c's
+#   needless-swap override (labelled moved:d1211) over a ready line, the first slab on the board unrested.
+# run 189 -- run 180's bot plus: that needless-swap hold override off above six colours with garbage on the board, resting or not
+#   (decide.c, rank.c underCredit). 8 colours s7-8
 chain_garbage 7 9 9 1 21600 10 colors=8
 combo_storm 7 9 9 1 21600 10 colors=8
 thicc_combo_storm 7 9 9 1 21600 10 colors=8

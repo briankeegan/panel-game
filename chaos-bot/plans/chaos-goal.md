@@ -4,7 +4,9 @@
 
 **Goal now: 8 colours at chaos Level 10 survives 8/8 games to 6:00 on a seed set, then 8/8 on a new seed set, the bot unchanged.**
 Then the next weakest mode, one at a time (7 colours, chaos margin, Line Clear, the queue limit), each to 8/8 twice, never below Level 9,
-the Level 10 six-colour gate kept. Done only when every mode holds.
+the Level 10 six-colour gate kept. Done only when every mode holds. (The owner, 2026-11-27: "Not just the colors... other modes as
+well" -- once colours are done, every other mode: 7 colours, chaos margins 2/3/4, chaos mode, 1HP, NST, BALL, Line Clear, the queue
+limit, training_random, Challenge Mode to Impossible.)
 
 **Standing orders -- every step, no exceptions:**
 1. **A run is always going.** The moment a run finishes, the next one is pushed -- before writing to the owner, before reading at
@@ -177,6 +179,9 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 188 (2026-11-27 14:20 ET), 'a break in hand before a promise' reads the unrested first slab: survived 2/8, 115508 frames** --
+  reverted. thicc s8 lost at 609: 604-618 the hold put on top by decide.c's needless-swap override over a ready line, the first slab
+  unrested. Run 189: that override off above six colours with garbage on the board, resting or not.
 - **Run 187 (2026-11-27 14:01 ET, third ask -- two asks lost to the client download answering 504; the zip now cached): survived 4/8,
   112481 frames** -- reverted. thicc s8 lost the seed-8 opening (615: an entry breaking nothing credited by moves after it over a break
   of 9 lost no sooner on its own board). Run 188: 'A BREAK IN HAND BEFORE A PROMISE' reads the unrested first slab.

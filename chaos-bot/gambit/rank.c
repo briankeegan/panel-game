@@ -923,8 +923,11 @@ static void creditPair(const Judge *x, const Judge *y, int *lxo, int *lyo) {
   int lx = livesOn(x), ly = livesOn(y);
   // (the horizon's credit is no life beside a board that outlives it: the line in progress lost past the horizon, beside a line that
   // lives or is lost a break's time later, is a line that is lost -- death is never an option)
-  if (lx && !x->o.lives && outlives(y, x) && !calmKept(x, y)) lx = 0;
-  if (ly && !y->o.lives && outlives(x, y) && !calmKept(y, x)) ly = 0;
+  // (run 210: above six colours, nor beside a board lost a quarter of a break's time later -- as lostAlike there. Run 208 8 colours chain
+  // s21 2664: a carry_wait lost at 232 kept by the horizon credit over a convert lost at 319 (1. lives before does not), lost at 3201)
+  #define OUT_Q(A, B) (decQ.b->colors > 6 && !(A)->o.dead && ((A)->o.lives || diesAt(A) - diesAt(B) >= rankSave / 4))
+  if (lx && !x->o.lives && (outlives(y, x) || OUT_Q(y, x)) && !calmKept(x, y)) lx = 0;
+  if (ly && !y->o.lives && (outlives(x, y) || OUT_Q(x, y)) && !calmKept(y, x)) ly = 0;
   // (nor, under garbage, the credit of a line that breaks nothing beside a break lost within a break's time of it: the break is the way
   // out the board has, the horizon is a promise -- r1363, 14839: a 4x stall in progress lost at 296 kept over a break lost at 282, and no
   // break offered again; r1362, 16120)
@@ -1086,10 +1089,7 @@ static int compareJudged(const Judge *x, const Judge *y) {
     int32_t bx = imax(0, x->apBroke) / W, by = imax(0, y->apBroke) / W;
     if (bx != by) {
       const Judge *dig = bx > by ? x : y, *other = dig == x ? y : x;
-      // (run 209: above six colours, unless the other lives a quarter of a break's time longer -- as lostAlike there. 8 colours: run 204
-      // chain s22 1730 a one-row break lost at 197 over a 3-chain lost at 299, lost at 2121; run 208 thicc s22 1318 lost at 90 over 200,
-      // lost at 1286)
-      if (lostOf(other) - lostOf(dig) < (decQ.b->colors > 6 ? rankSave / 4 : rankSave)) return (cmpKey = __LINE__, (dig == x ? -1 : 1));
+      if (lostOf(other) - lostOf(dig) < rankSave) return (cmpKey = __LINE__, (dig == x ? -1 : 1));
     }
   }
   // (CHAOS, STOP TIME IS A MAX, NOT A SUM: a new award only replaces what is left (checkMatches.lua awardStopTime), so panels cleared

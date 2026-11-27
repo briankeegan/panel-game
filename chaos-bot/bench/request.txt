@@ -735,6 +735,11 @@
 #   in worse scenarios." Earliest loss thicc s22 1286: 1318 DIG THE BACKLOG put a one-row break lost at 90 over a line lost at 200 -- the
 #   same rule as run 204's chain s22 loss (1730, 197 over 299).
 # run 209 -- run 204's exact bot (02c3173) plus: above six colours, DIG THE BACKLOG gives way to a line lost a quarter break later. 8 colours s21-22
+# run 209 -- cancelled by me: the same code as run 205 (only comments differed) -- the owner: "you should not be rerunning the same thing
+#   twice". Every new run is checked against all earlier runs' rank.c.
+# run 210 -- run 204's exact bot plus: above six colours, the horizon credit (a line in progress counted as living) is taken back beside a
+#   board lost a quarter break later (rank.c creditPair). Run 208 chain s21 2664: a carry_wait lost at 232 kept over a convert at 319 by
+#   "1. lives before does not", lost at 3201. 8 colours s21-22
 chain_garbage 21 9 9 1 21600 10 colors=8
 combo_storm 21 9 9 1 21600 10 colors=8
 thicc_combo_storm 21 9 9 1 21600 10 colors=8

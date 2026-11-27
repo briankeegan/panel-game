@@ -17,7 +17,7 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 
 | Mode | Level | Seeds | Run | Result |
 |---|---|---|---|---|
-| 8 colours | 10 | 21-22 | 208 | 2/8 (run 204's bot, which had 5/8), being fixed (run 209) |
+| 8 colours | 10 | 21-22 | 208 | 2/8 (run 204's bot, which had 5/8), being fixed (run 210) |
 | 7 colours | 10 | 23-24 | - | to redo (old: 7/8 on seeds 7-8, run 190 -- does not count) |
 | Chaos margin 4 | 10 | 25-26 | - | to redo (old: 7/8 on 7-8, run 191) |
 | Chaos mode | 10 | 27-28 | - | to redo (old: 8/8 on 7-8, run 192) |
@@ -203,6 +203,9 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 209 cancelled: it was run 205's code again** (the owner: "you should not be rerunning the same thing twice"). Each run's rank.c is
+  now checked against every earlier run's. Run 210: run 204 + the horizon credit taken back beside a board lost a quarter break later
+  (chain s21 2664, 232 kept over 319).
 - **Run 208 (2026-11-27 18:24 ET), run 204's exact bot: 2/8.** The owner: "Just focus on the losses. You need to succeed in worse
   scenarios" -- the bot must win on the slow machines too. thicc s22 1286: DIG THE BACKLOG, lost at 90 over 200 (as run 204 chain s22).
   Run 209: that rule gives way at a quarter break above six colours.

@@ -785,6 +785,10 @@ static int lostAlike(const Judge *x, const Judge *y) {
     if (!x->o.lives && !y->o.lives && dlo >= 0 && dhi < 1e299 && dlo < NEAR_LOSS * rankSave && dhi - dlo >= rankSave) return 0; }
   double lo = lostOf(x) < lostOf(y) ? lostOf(x) : lostOf(y), hi = lostOf(x) < lostOf(y) ? lostOf(y) : lostOf(x);
   int tlo = (int)(lo / rankSave), thi = (int)(hi / rankSave);
+  // (run 200: above six colours under garbage, alike only within a quarter of a break's time -- run 199 8 colours, the line put first
+  // over one lost later, both breaking the same: combo s22 12984 a break lost at 241 over a convert at 297 (20 broken each), thicc s21
+  // 7959 225 over an entry at 308 (12 each); the rules after alike kept the sooner loss, lost at 13227 and 8428)
+  if (decQ.b && decQ.b->colors > 6 && decF.under) return lo >= rankSave && (tlo >= 3 || hi - lo < rankSave / 4);
   return lo >= rankSave && (tlo == thi || tlo >= 3 || hi - lo < rankSave);   // (or lost less than a break's time apart: the later buys no break more)
 }
 // (LOST ALIKE AT THE FINISH: within one break's time of each other -- the finish's own keys trade the board's life for a combo or a

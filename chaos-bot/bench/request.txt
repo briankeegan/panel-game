@@ -691,6 +691,10 @@
 #   Most frequent rule putting a line lost 55-92 frames sooner first: THE PLAN KEPT (k1156) -- combo s21 11929/11947 117 over 193, 99
 #   over 191; insane s22 9876/9903 222 over 299, 195 over 272; combo s22 16117-16448 202 over 257, 171 over 223.
 # run 199 -- above six colours under garbage, THE PLAN KEPT does not keep a line lost half a break's time sooner (rank.c). 8 colours s21-22
+# run 199 -- (result) survived 4/8, 118876 frames -- better (3/8), kept. Lost thicc s21 8428, chain s22 9506, combo s22 13227, insane s22
+#   1315. combo s22 12984 a break lost at 241 put over a convert lost at 297 (20 broken each); thicc s21 7959 225 over an entry at 308 (12
+#   each): rank.c lostAlike calls lines under a break's time apart alike, and the rules after it kept the sooner loss.
+# run 200 -- above six colours under garbage, lostAlike only within a quarter of a break's time (rank.c). 8 colours s21-22
 chain_garbage 21 9 9 1 21600 10 colors=8
 combo_storm 21 9 9 1 21600 10 colors=8
 thicc_combo_storm 21 9 9 1 21600 10 colors=8

@@ -17,7 +17,7 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 
 | Mode | Level | Seeds | Run | Result |
 |---|---|---|---|---|
-| 8 colours | 10 | 21-22 | 198 | 3/8 (197: 3/8, losses now late), being fixed (run 199) |
+| 8 colours | 10 | 21-22 | 199 | 4/8 (197: 3/8, 198: 3/8), being fixed (run 200) |
 | 7 colours | 10 | 23-24 | - | to redo (old: 7/8 on seeds 7-8, run 190 -- does not count) |
 | Chaos margin 4 | 10 | 25-26 | - | to redo (old: 7/8 on 7-8, run 191) |
 | Chaos mode | 10 | 27-28 | - | to redo (old: 8/8 on 7-8, run 192) |
@@ -203,6 +203,9 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 199 (2026-11-27 16:55 ET), 8 colours seeds 21-22, + the plan kept gives way: 4/8** -- kept. Lines lost 56-83 frames later
+  were called alike (rank.c lostAlike: under a break's time apart) and lost to the sooner (combo s22 12984 241 vs 297; thicc s21 7959
+  225 vs 308). Run 200: above six colours under garbage, alike only within a quarter of a break's time.
 - **Run 198 (2026-11-27 16:42 ET), 8 colours seeds 21-22, + k1265 never the line lost sooner: 3/8, 133942 frames (was 85914)** -- kept;
   losses all late with a backlog. THE PLAN KEPT (k1156) kept lines lost 55-92 frames sooner (combo s21, insane s22, combo s22). Run 199:
   above six colours under garbage it does not keep a line lost half a break's time sooner.

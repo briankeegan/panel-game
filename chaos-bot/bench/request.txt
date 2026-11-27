@@ -536,6 +536,10 @@
 #   first slab -- as run 156 at 2283), insane s7 7886, thicc s8 19086.
 # run 168 -- run 167's bot with no chain aims, no garbage on the board, below seven rows' worth of panels (42), not six (decide.c).
 #   8 colours s7-8
+# run 168 -- (result) survived 1/8, 96679 frames -- reverted. thicc s7 lived (the target), but chain s7 4530, chain s8 4769, combo s8 5925,
+#   thicc s8 5546 lost early: the higher floor held chains back all game.
+# run 169 -- run 167's bot with the seven-row floor in the opening only (before garbage first lands, clock < 600), six rows after
+#   (decide.c). 8 colours s7-8
 chain_garbage 7 9 9 1 21600 10 colors=8
 combo_storm 7 9 9 1 21600 10 colors=8
 thicc_combo_storm 7 9 9 1 21600 10 colors=8

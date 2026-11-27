@@ -177,6 +177,9 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 168 (2026-11-27 08:06 ET), no chain aims below 42 panels without garbage: survived 1/8, 96679 frames** -- reverted. thicc s7
+  lived, but chain s7/s8, combo s8 and thicc s8 lost by 6000: the floor held chains back all game. Run 169: the 42-panel floor in the
+  opening only (before garbage first lands), 36 after.
 - **Run 167 (2026-11-27 07:49 ET), no break offered, keep the panels: survived 5/8, 137319 frames** -- kept. thicc s8 lasted 19086 (was
   5395), insane s8 lived. Lost thicc s7 at 2347: the opening rose to exactly 36 panels, a 12-panel chain aim opened (the no-chain floor is
   below 36) and the carry spent the board to 18 before the first slab (run 156 the same, 2283); insane s7 7886, thicc s8 19086. Run 168: the

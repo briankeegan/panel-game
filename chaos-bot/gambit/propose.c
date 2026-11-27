@@ -36,8 +36,8 @@ static int32_t colourExtra(void) { return decQ.b && decQ.b->colors > 6 ? decQ.b-
 // (run 152 tried 18 a colour over six (76 x 6): 2/8, 111422 frames -- back to 12 (64 x 6))
 static int32_t gpWidth(int32_t w) { int32_t e = colourExtra(); return w + 12 * e; }
 // (run 149 tried a swap shallower a colour over six (64 x 5): 2/8, 90487 frames -- back to half a swap (64 x 6))
-// (run 157: the full depth kept with the wide beam (8 colours 64 x 7) -- 40 x 7 4/8, 64 x 6 5/8 three times; late moves 0 throughout)
-static int32_t gpDepth(int32_t d) { return d; }
+// (run 157 kept the full depth at the wide beam (64 x 7): 2/8, 125777 frames -- back to half a swap shallower (64 x 6))
+static int32_t gpDepth(int32_t d) { int32_t e = colourExtra(); return d - e / 2 >= 4 ? d - e / 2 : d; }
 // (run 150: the extend search -- the chains and breaks grown from the board -- a swap deeper above six colours: at 8 colours a break is a
 // longer walk, and the planner's shape (wider, shallower) has been the lever that moved these seeds)
 // (run 150 made it a swap deeper above six colours: 1/8, 105996 frames -- back)
@@ -1285,7 +1285,8 @@ static int proposeAll(const Read *R, const Found *S, Cand *out, int cap) {
   // breaks a swap away (judge.c lineUpSwaps), on a board at rest, offered as set-ups and judged as any line (rank.c 1'h prefers them)
   // (run 131: whenever the two panels swapped are at rest -- lineUpSwaps swaps only resting panels -- not only on a board with nothing
   // moving: under garbage something is nearly always popping or falling, and run 130's losses held 15-22 times a minute at the end)
-  if (decQ.b->colors > 6 && !swapQueued(decQ.b)) {
+  // (run 158: the line-up swaps off, measured on the wide search -- run 131's 3/8 -> 6/8 was on the 28 x 10 search)
+  if (0 && decQ.b->colors > 6 && !swapQueued(decQ.b)) {
     // (run 139 offered five, not three: 3/8 against 6/8 -- back to three)
     int32_t lu[3]; int nlu = lineUpSwaps(decQ.b, lu, 3);
     for (int i = 0; i < nlu; i++) { if (seenDigHas(decQ.b, lu[i])) continue; int32_t one = lu[i]; ADD(PLAY_SETUP, &one, 1, -1, 0); }

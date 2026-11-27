@@ -177,6 +177,9 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 142 (2026-11-27 02:19 ET), the top row kept empty from twenty waiting: survived 2/8, 91868 frames** -- back to thirty-five.
+  Ten tie-break changes since run 132 (runs 133-142) scored 1-5 of 8; none clearly beats the noise. Run 143 tries the bigger lever, the
+  search's reach: above six colours, per colour 8 narrower and 2.5 deeper (8 colours 24 x 12, was 28 x 10).
 - **Run 141 (2026-11-27 02:07 ET), starving, any break asked first: survived 3/8, 124684 frames** (run 140: 4/8, 130640) -- off. Both
   thicc games lived; chain s7 11883, combo s7 5696, chain s8 14908, combo s8 10723 and insane s8 16674 lost, the last two to backlog
   (24-31 waiting). Backlog runs through the late losses of runs 135-141. Run 142: the queue-room rule (the top row left empty) from twenty

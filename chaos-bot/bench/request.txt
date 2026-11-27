@@ -446,6 +446,10 @@
 #   chain s8 14908, combo s8 10723 (queue 24-30), insane s8 16674 (queue 27-31) lost.
 # run 142 -- run 140's bot with the queue-room rule (rank.c, run 100: of two lines, the one leaving the top row empty) from twenty
 #   waiting above six colours, not thirty-five -- the backlog losses died with 24-36 waiting. 8 colours s7-8
+# run 142 -- (result) survived 2/8, 91868 frames -- back to thirty-five. Lost chain s7 14193, combo s7 4642, thicc s7 5092, insane s7
+#   14513 (queue 25-30), chain s8 3343, thicc s8 6885.
+# run 143 -- run 140's bot with the searches shaped further by the colours (propose.c): per colour over six, 8 narrower and 2.5 deeper
+#   (8 colours 24 x 12, was 28 x 10). Tie-break rules move nothing past the noise (runs 133-142); the search's reach is the bigger lever.
 chain_garbage 7 9 9 1 21600 10 colors=8
 combo_storm 7 9 9 1 21600 10 colors=8
 thicc_combo_storm 7 9 9 1 21600 10 colors=8

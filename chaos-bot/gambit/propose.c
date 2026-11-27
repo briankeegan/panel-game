@@ -25,8 +25,11 @@ static double leftMsOf(void) { return leftMs(); }
 // as a profile, every search) at 8 colours L10 s1-2: 16654 frames on average; runs 101-103 with 40 x 7: 9670, 12565, 11690; run 105
 // (the planner alone, and a queue rule): 10949)
 static int32_t colourExtra(void) { return decQ.b && decQ.b->colors > 6 ? decQ.b->colors - 6 : 0; }
-static int32_t gpWidth(int32_t w) { int32_t e = colourExtra(); return e && w > 6 * e + 8 ? w - 6 * e : w; }
-static int32_t gpDepth(int32_t d) { int32_t e = colourExtra(); return e ? (d + (3 * e + 1) / 2 < MAXLINE - 2 ? d + (3 * e + 1) / 2 : MAXLINE - 2) : d; }
+// (run 143: further the same way -- per colour over six, 8 narrower and 2.5 deeper (8 colours: 40 x 7 -> 24 x 12). The shape was kept
+// on weak evidence (runs 104-106), and the 8-colour losses are still the search finding no break or no living line (no-line in 3-5 of
+// every run's losses, runs 132-142); a break at 8 colours is a longer walk than ten swaps reach)
+static int32_t gpWidth(int32_t w) { int32_t e = colourExtra(); return e && w > 8 * e + 8 ? w - 8 * e : w; }
+static int32_t gpDepth(int32_t d) { int32_t e = colourExtra(); return e ? (d + (5 * e + 1) / 2 < MAXLINE - 2 ? d + (5 * e + 1) / 2 : MAXLINE - 2) : d; }
 
 // ---- the board's state the proposers read
 static int cascadeLive(Board *b) {

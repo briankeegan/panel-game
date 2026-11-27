@@ -1285,8 +1285,8 @@ static int proposeAll(const Read *R, const Found *S, Cand *out, int cap) {
   // breaks a swap away (judge.c lineUpSwaps), on a board at rest, offered as set-ups and judged as any line (rank.c 1'h prefers them)
   // (run 131: whenever the two panels swapped are at rest -- lineUpSwaps swaps only resting panels -- not only on a board with nothing
   // moving: under garbage something is nearly always popping or falling, and run 130's losses held 15-22 times a minute at the end)
-  // (run 158: the line-up swaps off, measured on the wide search -- run 131's 3/8 -> 6/8 was on the 28 x 10 search)
-  if (0 && decQ.b->colors > 6 && !swapQueued(decQ.b)) {
+  // (run 158 measured the line-up swaps off on the wide search: 4/8 against 5/8 -- back on)
+  if (decQ.b->colors > 6 && !swapQueued(decQ.b)) {
     // (run 139 offered five, not three: 3/8 against 6/8 -- back to three)
     int32_t lu[3]; int nlu = lineUpSwaps(decQ.b, lu, 3);
     for (int i = 0; i < nlu; i++) { if (seenDigHas(decQ.b, lu[i])) continue; int32_t one = lu[i]; ADD(PLAY_SETUP, &one, 1, -1, 0); }

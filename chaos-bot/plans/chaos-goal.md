@@ -177,6 +177,9 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 158 (2026-11-27 05:47 ET), the line-up swaps off: survived 4/8, 104839 frames** -- back on. Six features measured off on the
+  wide search (runs 151, 153-155, 158): only 1'h was dispensable. Since run 145 the bot has scored 5/8 four times and nothing tried has
+  moved it past; 8/8 twice needs a different kind of step than another tie-break. Run 159: starving from four rows' worth again.
 - **Run 157 (2026-11-27 05:33 ET), the planner 64 x 7: survived 2/8, 125777 frames** -- back to 64 x 6 (four lost late, 16405-19906).
   Run 158 measures the line-up swaps off on the wide search.
 - **Run 156 (2026-11-27 05:20 ET), starving, any break asked last: survived 3/8, 99096 frames** -- off. Run 157: the planner 64 x 7 (the

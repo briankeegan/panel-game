@@ -494,6 +494,8 @@
 # run 157 -- run 151's bot with the planner's full depth kept at the wide beam (8 colours 64 x 7; propose.c gpDepth). 8 colours s7-8
 # run 157 -- (result) survived 2/8, 125777 frames -- back to 64 x 6. Four lost late (16405-19906): combo s7, chain s8, combo s8, thicc s8.
 # run 158 -- run 151's bot with the line-up swaps (propose.c, runs 113/131) off, measured on the wide search. 8 colours s7-8
+# run 158 -- (result) survived 4/8, 104839 frames -- back on. Of six features measured off on the wide search only 1'h was dispensable.
+# run 159 -- run 151's bot with starving from four rows' worth of panels again (decide.c brk, 5W -> 4W), on the wide search. 8 colours s7-8
 chain_garbage 7 9 9 1 21600 10 colors=8
 combo_storm 7 9 9 1 21600 10 colors=8
 thicc_combo_storm 7 9 9 1 21600 10 colors=8

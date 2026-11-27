@@ -1086,7 +1086,10 @@ static int compareJudged(const Judge *x, const Judge *y) {
     int32_t bx = imax(0, x->apBroke) / W, by = imax(0, y->apBroke) / W;
     if (bx != by) {
       const Judge *dig = bx > by ? x : y, *other = dig == x ? y : x;
-      if (lostOf(other) - lostOf(dig) < rankSave) return (cmpKey = __LINE__, (dig == x ? -1 : 1));
+      // (run 209: above six colours, unless the other lives a quarter of a break's time longer -- as lostAlike there. 8 colours: run 204
+      // chain s22 1730 a one-row break lost at 197 over a 3-chain lost at 299, lost at 2121; run 208 thicc s22 1318 lost at 90 over 200,
+      // lost at 1286)
+      if (lostOf(other) - lostOf(dig) < (decQ.b->colors > 6 ? rankSave / 4 : rankSave)) return (cmpKey = __LINE__, (dig == x ? -1 : 1));
     }
   }
   // (CHAOS, STOP TIME IS A MAX, NOT A SUM: a new award only replaces what is left (checkMatches.lua awardStopTime), so panels cleared

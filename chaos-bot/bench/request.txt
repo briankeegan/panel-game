@@ -731,6 +731,10 @@
 #   garbage resting or not) + the run-160 rule off; run 207 played that + run 205's change (dig the backlog a quarter break) + its own;
 #   run 208 had run 206's change in. Fixed: the kept bot is taken from its run's commit by hash (run 204 = 02c3173).
 # run 208 -- THE BASELINE again: rank.c exactly run 204's (02c3173), each game's CPU logged. 8 colours s21-22
+# run 208 -- (result) survived 2/8, 97747 frames: run 204's exact bot (5/8 there). The owner: "Just focus on the losses. You need to succeed
+#   in worse scenarios." Earliest loss thicc s22 1286: 1318 DIG THE BACKLOG put a one-row break lost at 90 over a line lost at 200 -- the
+#   same rule as run 204's chain s22 loss (1730, 197 over 299).
+# run 209 -- run 204's exact bot (02c3173) plus: above six colours, DIG THE BACKLOG gives way to a line lost a quarter break later. 8 colours s21-22
 chain_garbage 21 9 9 1 21600 10 colors=8
 combo_storm 21 9 9 1 21600 10 colors=8
 thicc_combo_storm 21 9 9 1 21600 10 colors=8

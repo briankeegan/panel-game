@@ -17,7 +17,7 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 
 | Mode | Level | Seeds | Run | Result |
 |---|---|---|---|---|
-| 8 colours | 10 | 21-22 | 204 | 5/8 (best; 202, 203, 205, 206, 207 off), baseline rerun (run 208) |
+| 8 colours | 10 | 21-22 | 208 | 2/8 (run 204's bot, which had 5/8), being fixed (run 209) |
 | 7 colours | 10 | 23-24 | - | to redo (old: 7/8 on seeds 7-8, run 190 -- does not count) |
 | Chaos margin 4 | 10 | 25-26 | - | to redo (old: 7/8 on 7-8, run 191) |
 | Chaos mode | 10 | 27-28 | - | to redo (old: 8/8 on 7-8, run 192) |
@@ -203,6 +203,9 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 208 (2026-11-27 18:24 ET), run 204's exact bot: 2/8.** The owner: "Just focus on the losses. You need to succeed in worse
+  scenarios" -- the bot must win on the slow machines too. thicc s22 1286: DIG THE BACKLOG, lost at 90 over 200 (as run 204 chain s22).
+  Run 209: that rule gives way at a quarter break above six colours.
 - **Revert fault found (18:20 ET):** "back to the kept bot" took rank.c from the commit before, sometimes the turned-off run's own. Run 204
   (5/8) really played run 201 + run 202's change (THE PLAN KEPT a quarter break, garbage resting or not) + run-160 off; run 207 also had
   run 205's change. From now on the kept bot is restored from its run's commit by hash. Run 208 re-pushed with run 204's exact file.

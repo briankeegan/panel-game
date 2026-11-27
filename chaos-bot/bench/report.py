@@ -156,9 +156,23 @@ def story(d, gtest, last=900, boards=10):
         kv = _kv(line)
         opts = ",".join(kv.get("opts", "").split(",")[:3])
         out.append("  %6d " % fr + " ".join("%s=%s" % (k, kv.get(k, "-")) for k in keys) + " opts=" + opts)
+    # the whole game, not only its end: one line every ~300 frames before the last `last` (how the board got there)
+    out.insert(0, "  -- the whole game, a decision every ~300 frames --")
+    early, nxt = [], 0
+    for fr, line in dec:
+        if fr >= end - last: break
+        if fr < nxt: continue
+        nxt = fr + 300
+        kv = _kv(line)
+        early.append("  %6d " % fr + " ".join("%s=%s" % (k, kv.get(k, "-")) for k in ("play", "v", "under", "pan", "broke", "clr", "stop", "q")))
+    out[1:1] = early + ["  -- the last %d frames, every decision --" % last]
     if gtest and os.path.exists(gtest):
         import subprocess
-        for fr in sorted(set(snaps))[-boards:]:
+        allb = sorted(set(snaps))
+        late = allb[-boards:]
+        before = [b for b in allb if b < (late[0] if late else end)]
+        spread = [before[int(i * (len(before) - 1) / 7)] for i in range(8)] if len(before) >= 8 else before
+        for fr in sorted(set(spread)) + late:
             try:
                 b = subprocess.run([gtest, "test", "board", log, str(fr)], capture_output=True, text=True, timeout=20).stdout
                 rows = [l.rstrip() for l in b.splitlines()[:15] if l.strip()]

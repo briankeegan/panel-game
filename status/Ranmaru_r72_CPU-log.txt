@@ -1,13 +1,4 @@
-run 45942834396, as of 2026-11-27T07:08:01Z
-opponent topped out: clock 38040 stopWatch 37852 stop 48 pre-stop 12 shake 33 health 1, top rows r12=gggggg r11=0ggggg r10=ggg000
-opponent topped out: clock 38070 stopWatch 37882 stop 90 pre-stop 110 shake 54 health 1, top rows r12=gggggg r11=gggggg r10=052000
-opponent topped out: clock 38100 stopWatch 37912 stop 90 pre-stop 80 shake 24 health 1, top rows r12=gggggg r11=gggggg r10=052000
-opponent topped out: clock 38130 stopWatch 37942 stop 90 pre-stop 50 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=052000
-opponent topped out: clock 38160 stopWatch 37972 stop 90 pre-stop 20 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=052000
-opponent topped out: clock 38160 stopWatch 37972 stop 90 pre-stop 20 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=052000
-garbage landed: our stopWatch 38469 clock 38657, transits in flight before this frame {38497}, opponent copy 1 frames behind, rollbacks so far 0
-garbage landed: our stopWatch 38473 clock 38661, transits in flight before this frame {38497}, opponent copy 1 frames behind, rollbacks so far 0
-garbage landed: our stopWatch 38847 clock 39035, transits in flight before this frame {38902}, opponent copy 1 frames behind, rollbacks so far 0
+run 45942834396, as of 2026-11-27T07:10:05Z
 garbage landed: our stopWatch 38851 clock 39039, transits in flight before this frame {38902}, opponent copy 1 frames behind, rollbacks so far 0
 garbage landed: our stopWatch 39411 clock 39599, transits in flight before this frame {39432}, opponent copy 1 frames behind, rollbacks so far 0
 garbage landed: our stopWatch 39487 clock 39675, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
@@ -149,3 +140,12 @@ match over — bot won (pace: worst 0.36 frames off schedule); waiting for a rem
 memory after match: rss 2260508 kB, threads 9, lua 50853 kB
 game about to start: both players are ready
 set over: the room is closed, back in the lobby
+game about to start: both players are ready
+match start: building the match (seed nil, stage nil, opponent ?)
+match start: the match is built
+match start: the match is started
+match start: gambit: creating the link
+match start: gambit: the link is created
+match start: gambit: the link is starting the match
+match start: gambit: the link has started the match
+both ready — match starting

@@ -531,6 +531,11 @@
 #   spent them to 31, the next slab buried it), insane s8 15289.
 # run 167 -- run 166's bot plus: above six colours under garbage with no break offered, of two lost alike that break nothing, the one
 #   clearing fewer panels first (rank.c). 8 colours s7-8
+# run 167 -- (result) survived 5/8, 137319 frames -- kept (better than run 166's 4/8). thicc s8 lasted 19086 (was 5395), insane s8 lived.
+#   Lost thicc s7 2347 (the opening rose to exactly 36 panels, a 12-panel chain aim opened and the carry spent the board to 18 before the
+#   first slab -- as run 156 at 2283), insane s7 7886, thicc s8 19086.
+# run 168 -- run 167's bot with no chain aims, no garbage on the board, below seven rows' worth of panels (42), not six (decide.c).
+#   8 colours s7-8
 chain_garbage 7 9 9 1 21600 10 colors=8
 combo_storm 7 9 9 1 21600 10 colors=8
 thicc_combo_storm 7 9 9 1 21600 10 colors=8

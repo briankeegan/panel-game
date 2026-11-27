@@ -267,7 +267,9 @@ static int readBoard_(Read *R) {
     // three rows at ~1028, lost at 2000)
     // (run 163: or under six rows' worth of panels whatever the tallest column -- run 161 combo s8 (as 160, 162): between waves, none on
     // the board, 2x/4x/6x chains took 63 panels to 25 (3556-4117) while a tower kept the top at six rows or more, then 20 pieces came)
-    if (!F->known[FACT_US_CONTACT] && (panelTop(decQ.b) < LOW_ROWS || pn < 6 * W)) brk = 1;
+    // (run 168: seven rows' worth -- run 167 thicc s7: the opening rose to exactly 36 panels, a 12-panel chain aim opened and the carry
+    // spent the board to 18 before the first slab, lost at 2347; run 156 the same at 2283)
+    if (!F->known[FACT_US_CONTACT] && (panelTop(decQ.b) < LOW_ROWS || pn < 7 * W)) brk = 1;
     L.aim[0].chain.op = OP_EQ; L.aim[0].chain.n = 2; L.aim[0].chain.near = 1; L.aim[0].brk = brk;
     // (run 125 dropped the 3x: 8 colours s5-6 about 2/8 -- back)
     L.aim[1].chain.op = OP_EQ; L.aim[1].chain.n = 3; L.aim[1].chain.near = 1; L.aim[1].brk = brk;

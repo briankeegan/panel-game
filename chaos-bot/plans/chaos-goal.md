@@ -177,6 +177,10 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 167 (2026-11-27 07:49 ET), no break offered, keep the panels: survived 5/8, 137319 frames** -- kept. thicc s8 lasted 19086 (was
+  5395), insane s8 lived. Lost thicc s7 at 2347: the opening rose to exactly 36 panels, a 12-panel chain aim opened (the no-chain floor is
+  below 36) and the carry spent the board to 18 before the first slab (run 156 the same, 2283); insane s7 7886, thicc s8 19086. Run 168: the
+  no-chain floor at 42 panels.
 - **Run 166 (2026-11-27 07:34 ET), the queue let drop from 25 waiting above six colours: survived 4/8, 133500 frames** -- kept (equal to
   run 163; combo s8 lived again). Lost chain s7 13565 and insane s7 12851 (backlogs of 15-29), insane s8 15289, thicc s8 5395: four rows
   of full-width garbage on 41 panels, no break offered, levels spent the panels to 31 and the next slab buried it. Run 167: under garbage

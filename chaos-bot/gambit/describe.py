@@ -6,7 +6,7 @@
 import os, re, subprocess, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-HEADING = re.compile(r"^  // (\d+[a-z]?'{0,2}[a-zA-Z0-9]?\.) (.*)")
+HEADING = re.compile(r"^  // (\d{1,2}[a-z]?'{0,2}[a-zA-Z0-9]?\.) (.*)")   # (one or two digits: '5287.' in a comment is a frame)
 
 def rank_rules(sha=None):
     """line number of each `return (cmpKey = __LINE__` -> the comment just above it, first sentence"""

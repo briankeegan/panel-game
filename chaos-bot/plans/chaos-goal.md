@@ -177,6 +177,9 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 175 (2026-11-27 10:03 ET), the first slab read before it rests: survived 3/8, 102378 frames** -- every decision labelled. thicc
+  s8 lost the seed-8 opening at 943; the labels show the credit step (rank.c '1. lives before does not') at 661 again: the new rule was
+  gated on gambitHit, which a topped board sets too, so it never ran. Run 176: the rule keeps its own record of garbage resting.
 - **Run 174 (2026-11-27 09:46 ET), under garbage aims met only by breaks: survived 2/8, 88004 frames** -- reverted. The seed-8 opening
   lost three times at ~950 (as runs 169, 171, 172; not in run 173). Run 175: run 173's rule (break rules read garbage not yet resting on
   the stack) only until garbage first rests on the stack. Every decision now labelled (won=k<line> rank.c, d<line> decide.c, only/tie/

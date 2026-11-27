@@ -635,7 +635,10 @@ static int breakOffered = 1;
 // 171, 172, 174 alike: under=0 with a break of 15 offered (run 171 insane s8, 664), creditPair's no-break credit rule and the
 // break-first rules skipped, and the credit step (won=k1119) put a carry lost at 370 breaking nothing over the break lost at 249, 45
 // panels spent to 23. Run 173 had it all game: no opening loss, 0/8 with every loss after the first contact)
-static int32_t gambitHit;   // (decide.c's: garbage has rested on the stack this game)
+// (run 176: its own record of garbage resting on the stack -- run 175 read decide.c's gambitHit, which a topped board sets too
+// (answer.c), so in the seed-8 opening (topped before the slab rested) the rule was off and the credit step decided as before:
+// thicc s8 lost at 943, rank.c '1. lives before does not' at 661 over the break of 15)
+static int32_t restSeen, restClock = -1;
 static int garbOnBoard(void) {
   static const Board *atB; static int32_t atClock = -1, on;
   if (decQ.b != atB || decQ.b->clock != atClock) {
@@ -644,7 +647,12 @@ static int garbOnBoard(void) {
   }
   return on;
 }
-static int underBreak(void) { return decF.under || (decQ.b->colors > 6 && !gambitHit && garbOnBoard()); }
+static int underBreak(void) {
+  if (decQ.b->clock < restClock) restSeen = 0;   // (a new game)
+  restClock = decQ.b->clock;
+  if (decF.under) restSeen = 1;
+  return decF.under || (decQ.b->colors > 6 && !restSeen && garbOnBoard());
+}
 static int32_t waitOf(void);
 static int cascadeLive(Board *b);   // (propose.c: the board still moving of its own)
 // (the window as the next block finds it: at its landing with one on its way, else EARLIEST_LANDING)

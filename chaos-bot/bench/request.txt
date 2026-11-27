@@ -572,6 +572,11 @@
 # run 175 -- run 167's bot plus run 173's rule only until garbage first rests on the stack (rank.c underBreak: decF.under, or above six
 #   colours garbage anywhere on the board while decide.c's gambitHit is 0). First run with every decision labelled (won= on every
 #   GAMBITD line, decisions/game-N.txt). 8 colours s7-8
+# run 175 -- (result) survived 3/8, 102378 frames; every decision labelled (0 unlabelled in 8 games). thicc s8 lost the seed-8 opening at
+#   943: the labels show rank.c '1. lives before does not' (the credit step) at 661 over the break of 15, as before -- the rule never
+#   ran: it was gated on decide.c's gambitHit, which answer.c sets on a topped board too, and the board topped before the slab rested.
+# run 176 -- run 175's rule with its own record of garbage resting on the stack (rank.c underBreak: restSeen), so a topped board does not
+#   turn it off; describe.py's rule names read one- or two-digit headings only ('5287.' was a frame in a comment). 8 colours s7-8
 chain_garbage 7 9 9 1 21600 10 colors=8
 combo_storm 7 9 9 1 21600 10 colors=8
 thicc_combo_storm 7 9 9 1 21600 10 colors=8

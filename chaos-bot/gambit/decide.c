@@ -401,7 +401,8 @@ static int readBoard_(Read *R) {
   // (run 137: above six colours a row higher -- the stack passes six rows by ~450 at 8 colours and the opening then fires its chains
   // before the first garbage: run 136 thicc s7, a carry clearing 12 at 498 with no garbage near, 45 -> 24 panels by the first slab, lost
   // at 2106; runs 58 and 114: eight rows kept is every line judged dying)
-  chaosOpenQuiet = opening && panelTop(decQ.b) < LOW_ROWS + (decQ.b->colors > 6);
+  // (run 137 kept it to seven rows above six colours: 4/8 against 6/8 -- back to six)
+  chaosOpenQuiet = opening && panelTop(decQ.b) < LOW_ROWS;
   R->low = to && (opening || refill || taRaise) && rowsUp > 0 && chaosRaisable; R->up = R->low && !cascadeLive(decQ.b) && canRaiseNow;
   refillAsked = refillReady = refillAlive = 0; raiseWait = 0; opRaiseLog[4] = 0;
   // (THE FLOOR'S RAISE, TIMED: a board busy now -- a cascade, panels moving, the shake -- is one the engine would not raise; it is run on,

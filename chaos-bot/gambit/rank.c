@@ -939,7 +939,9 @@ static int compareJudged(const Judge *x, const Judge *y) {
   // rule, among dying ones, cost seeds 3-4 two early losses). Run 85 level 9 chain s8: an extend clearing 12 panels breaking none at 28
   // panels, 11-17 after, lost at 1282)
   // (run 90: off -- L9 seeds 7-8 7/8 with it (6/8 without), but on the L10 gate seeds 3-4 7/8 where the gate's bot had 8/8: not kept)
-  if (0 && decF.under && x->o.lives && y->o.lives && x->apBroke <= 0 && y->apBroke <= 0 &&
+  // (run 138: on again above six colours only -- the gate it cost a game on is six colours; at 8 colours the losses starve under garbage
+  // (runs 130-137: 9-36 panels, 15-25 clears a minute breaking nothing), and the stop such a clear buys halts the rise that brings panels)
+  if (decQ.b->colors > 6 && decF.under && x->o.lives && y->o.lives && x->apBroke <= 0 && y->apBroke <= 0 &&
       materialOn(decQ.b) < 5 * W && x->o.j.clearedPanels != y->o.j.clearedPanels)
     return (cmpKey = __LINE__, (x->o.j.clearedPanels < y->o.j.clearedPanels ? -1 : 1));
   // (run 80, CHAOS, TOPPED WITH GARBAGE WAITING, DIG: nothing waiting drops while anything is in the top row (Stack:shouldDropGarbage,

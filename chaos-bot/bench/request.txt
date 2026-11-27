@@ -423,6 +423,12 @@
 #   insane s8 18479: a line-up put over a longer life loses the life. Every rule that outranks the life count has cost games (129, 134, 136).
 # run 137 -- run 132's bot exactly (judge.c restored), plus the opening keeps its panels a row higher above six colours (7 rows, not 6:
 #   decide.c chaosOpenQuiet). Run 136 thicc s7: a carry clearing 12 at 498 with no garbage near, 45 -> 24 panels by the first slab. s7-8
+# run 137 -- (result) survived 4/8 -- back to six rows. thicc s7 met the first slab with 36 panels (was 24) and still starved (2498);
+#   insane s7 8382, combo s8 6949, thicc s8 4574 lost.
+#   FOUND: the search is cut by wall-clock time on one thread (native.c: the frame's start), so the same bot plays a different game on a
+#   faster or slower runner -- every s7-8 seed has lived and died across runs 130-137. 8 games carry ~1.4 games of noise.
+# run 138 -- run 132's bot plus run 87's rule on again above six colours only (rank.c): under garbage below five rows of panels, of two
+#   living lines breaking nothing, the one clearing fewer panels first -- the losses starve, and a clear's stop halts the rise. s7-8
 chain_garbage 7 9 9 1 21600 10 colors=8
 combo_storm 7 9 9 1 21600 10 colors=8
 thicc_combo_storm 7 9 9 1 21600 10 colors=8

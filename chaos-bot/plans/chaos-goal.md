@@ -177,6 +177,13 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 137 (2026-11-27 01:15 ET), run 132's bot with the opening keeping its panels to seven rows: survived 4/8** -- back to six.
+  thicc s7 met the first slab with 36 panels (24 in run 136) and still starved, lost at 2498; insane s7 8382, combo s8 6949, thicc s8
+  4574 lost. **Found: the search is cut by wall-clock time on a single thread** (native.c: the deadline is the frame's start), so the
+  same bot plays a different game on a faster or slower runner -- every seed of s7-8 has lived and died across runs 130-137. An 8-game
+  run carries about 1.4 games of noise; a change is real only when it moves more than that, or holds across runs. Run 138: run 87's rule
+  (scarce fuel under garbage is not spent: of two living lines breaking nothing below five rows of panels, the one clearing fewer) on
+  again above six colours only.
 - **Run 136 (2026-11-27 01:02 ET), 1'h' -- a break made ready over a dying wait, though lost up to two breaks' time sooner: survived
   2/8** -- removed. Lost chain s7 6370, thicc s7 2106, insane s7 10233, combo s8 5255, thicc s8 8249, insane s8 18479. Every rule that
   ranks something above the life count has cost games (runs 129, 134, 136). thicc s7, lost early in runs 135 and 136 (both carried

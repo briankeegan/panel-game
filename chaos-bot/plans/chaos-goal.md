@@ -17,7 +17,7 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 
 | Mode | Level | Seeds | Run | Result |
 |---|---|---|---|---|
-| 8 colours | 10 | 21-22 | 210 | 3/8 (211: 2/8, off), being fixed (run 212) |
+| 8 colours | 10 | 21-22 | 212 | 3/8 (more frames), being fixed (run 213) |
 | 7 colours | 10 | 23-24 | - | to redo (old: 7/8 on seeds 7-8, run 190 -- does not count) |
 | Chaos margin 4 | 10 | 25-26 | - | to redo (old: 7/8 on 7-8, run 191) |
 | Chaos mode | 10 | 27-28 | - | to redo (old: 8/8 on 7-8, run 192) |
@@ -203,6 +203,8 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 212 (2026-11-27 18:58 ET), outliving first at a quarter break: 3/8, 127328 frames** -- kept. The horizon credit still kept carries
+  lost 72-103 frames sooner (credited by their promise). Run 213: the quarter-break test reads the carry's own loss.
 - **Run 211 (2026-11-27 18:49 ET), no dig lost inside a break put first: 2/8 -- off** (run 210 restored by hash). The hold on top over
   lines lost 41-84 frames later, through a third line. Run 212: outlivingFirst at a quarter break above six colours.
 - **Run 210 (2026-11-27 18:40 ET), run 204 + horizon credit taken back a quarter break: 3/8, 120364 frames** -- kept (base last 2/8).

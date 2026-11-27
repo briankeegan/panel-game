@@ -925,7 +925,9 @@ static void creditPair(const Judge *x, const Judge *y, int *lxo, int *lyo) {
   // lives or is lost a break's time later, is a line that is lost -- death is never an option)
   // (run 210: above six colours, nor beside a board lost a quarter of a break's time later -- as lostAlike there. Run 208 8 colours chain
   // s21 2664: a carry_wait lost at 232 kept by the horizon credit over a convert lost at 319 (1. lives before does not), lost at 3201)
-  #define OUT_Q(A, B) (decQ.b->colors > 6 && !(A)->o.dead && ((A)->o.lives || diesAt(A) - diesAt(B) >= rankSave / 4))
+  // (run 213: the line in progress on its own board, not what its next moves promise -- run 212 insane s21 19265/19279, 27 queued: a carry
+  // lost at 283 and 269 credited 409 and 395 kept over lines lost at 355 and 372 by the horizon credit, lost at 19485)
+  #define OUT_Q(A, B) (decQ.b->colors > 6 && !(A)->o.dead && ((A)->o.lives || diesAt(A) - lostAtOf((B)->o.lostAt, (B)->hold) >= rankSave / 4))
   if (lx && !x->o.lives && (outlives(y, x) || OUT_Q(y, x)) && !calmKept(x, y)) lx = 0;
   if (ly && !y->o.lives && (outlives(x, y) || OUT_Q(x, y)) && !calmKept(y, x)) ly = 0;
   // (nor, under garbage, the credit of a line that breaks nothing beside a break lost within a break's time of it: the break is the way

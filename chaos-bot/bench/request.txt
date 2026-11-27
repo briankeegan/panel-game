@@ -749,6 +749,11 @@
 #   12423 118 over an entry at 159; thicc s22 16414 216 over a carry at 300; insane s22 3371 331 over 376.
 # run 212 -- run 210's bot plus: above six colours, outlivingFirst (the line that outlives the top and beats it alone moves up) counts a
 #   quarter of a break's time as outliving (rank.c). 8 colours s21-22
+# run 212 -- (result) survived 3/8, 127328 frames (210: 3/8, 120364) -- no worse, kept. insane s22 lost at 21449. insane s21 19265/19279
+#   (27 queued): "1. lives before does not" kept a carry lost at 283/269 over lines lost at 355/372 -- the carry's credited 409/395 beat
+#   run 210's quarter-break take-back, which compared credited losses.
+# run 213 -- the quarter-break test (OUT_Q: creditPair's take-back and outlivingFirst) reads the line in progress's own loss, not its
+#   promise (rank.c). 8 colours s21-22
 chain_garbage 21 9 9 1 21600 10 colors=8
 combo_storm 21 9 9 1 21600 10 colors=8
 thicc_combo_storm 21 9 9 1 21600 10 colors=8

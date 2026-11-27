@@ -32,7 +32,8 @@ static int32_t colourExtra(void) { return decQ.b && decQ.b->colors > 6 ? decQ.b-
 // same lever; the shape itself was kept on weak evidence)
 // (run 144, 40 x 7: 4/8, 143378 frames, the most yet -- kept. The frames have followed the shape: 24 x 12 98k, 28 x 10 131k, 40 x 7 143k.
 // Run 145 follows it: per colour over six, 6 wider and half a swap shallower (8 colours 52 x 6))
-static int32_t gpWidth(int32_t w) { int32_t e = colourExtra(); return w + 6 * e; }
+// (run 145, 52 x 6: 5/8, 120708 frames -- kept. Run 147: wider again, 12 a colour over six (8 colours 64 x 6))
+static int32_t gpWidth(int32_t w) { int32_t e = colourExtra(); return w + 12 * e; }
 static int32_t gpDepth(int32_t d) { int32_t e = colourExtra(); return d - e / 2 >= 4 ? d - e / 2 : d; }
 
 // ---- the board's state the proposers read

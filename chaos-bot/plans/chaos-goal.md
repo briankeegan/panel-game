@@ -177,6 +177,8 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 146 (2026-11-27 03:13 ET), perched drops for full-width blocks: survived 2/8, 80654 frames** -- removed. Four early losses
+  (chain s7 3020, insane s7 3775, chain s8 3516, thicc s8 4132). Run 147: run 145's bot with the searches wider again (64 x 6 at 8 colours).
 - **Run 145 (2026-11-27 02:59 ET), the searches 52 x 6 at 8 colours: survived 5/8, 120708 frames, 0 late -- kept.** All four seed-7
   games lived. combo s8 lost at 866: the opening left a one-panel tower in column 0, a 6-wide slab landed on it at 712 with columns 1-5
   two to four rows lower, and no perched drop was offered -- perchedDrops walks a support past the block's edge, and a full-width block

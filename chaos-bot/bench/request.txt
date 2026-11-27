@@ -462,6 +462,9 @@
 #   full-width block has no edge to walk its support past), insane s8 8360.
 # run 146 -- perched drops for a block with no edge (search/break.c perchedOf): the support walked along its row under the block to the
 #   nearest column it falls down in. 8 colours s7-8
+# run 146 -- (result) survived 2/8, 80654 frames -- removed. Four early losses: chain s7 3020, insane s7 3775, chain s8 3516, thicc s8
+#   4132; combo s7 9332, combo s8 13679.
+# run 147 -- run 145's bot with the searches wider again: 12 a colour over six (8 colours 64 x 6; propose.c). 8 colours s7-8
 chain_garbage 7 9 9 1 21600 10 colors=8
 combo_storm 7 9 9 1 21600 10 colors=8
 thicc_combo_storm 7 9 9 1 21600 10 colors=8

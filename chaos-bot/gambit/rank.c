@@ -945,6 +945,14 @@ static int compareJudged(const Judge *x, const Judge *y) {
   if (0 && decQ.b->colors > 6 && decF.under && x->o.lives && y->o.lives && x->apBroke <= 0 && y->apBroke <= 0 &&
       materialOn(decQ.b) < 5 * W && x->o.j.clearedPanels != y->o.j.clearedPanels)
     return (cmpKey = __LINE__, (x->o.j.clearedPanels < y->o.j.clearedPanels ? -1 : 1));
+  // (run 140, CHAOS, ABOVE SIX COLOURS, A STARVED BOARD'S BREAK PAYS FOR ITSELF: under garbage below five rows of panels, of two living
+  // lines that both break garbage, the one whose cells broken less panels cleared is a row (W) or more better first -- a broken cell
+  // comes back as one panel, a cleared panel is gone. Run 139 8 colours thicc s7, 645-765: lines judged living cleared 12-15 panels to
+  // break 6 cells, 27 -> 14 panels, then 8-11 under the next slab, lost at 911)
+  if (decQ.b->colors > 6 && decF.under && x->o.lives && y->o.lives && x->apBroke > 0 && y->apBroke > 0 && materialOn(decQ.b) < 5 * W) {
+    int32_t nx = x->apBroke - x->o.j.clearedPanels, ny = y->apBroke - y->o.j.clearedPanels;
+    if (iabs(nx - ny) >= W) return (cmpKey = __LINE__, (nx > ny ? -1 : 1));
+  }
   // (run 80, CHAOS, TOPPED WITH GARBAGE WAITING, DIG: nothing waiting drops while anything is in the top row (Stack:shouldDropGarbage,
   // panels_in_top_row first), and fifty waiting is the loss whatever the health. Topped with pieces waiting, of two lines judged alike,
   // the one breaking more garbage first -- the room under the top row is what lets the queue drop. Run 79 level 7 combo s1: topped all

@@ -177,6 +177,12 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 139 (2026-11-27 01:40 ET), five line-up swaps offered: survived 3/8** -- back to three. Since run 132's 6/8: 5, 1, 5, 2, 4, 3,
+  3 -- run 132's own 6/8 was likely high. thicc s7 lost at 911: from 346 to 765 every line was judged living, and the opening's chains
+  and then 12-15-panel clears breaking 6 garbage cells took the board from 42 panels to 14, then 8-11 under the next slab. The search
+  runs on its own thread while the game plays in real time (native.c frameOut reads the game's live frame), so the noise is in real-time
+  play itself; a lockstep benchmark mode would make games repeatable but is a large change to the launcher and the native side -- asked
+  of the owner, not built. Run 140: a starved board's break pays for itself (cells broken less panels cleared, a row better first).
 - **Run 138 (2026-11-27 01:28 ET), run 87's scarce-fuel rule above six colours: survived 3/8** -- off. Lost chain s7 2101, thicc s7
   2267, insane s8 2065 (not starved: a 6-row slab converted to ~30 panels at 1264 and the next slabs landed on a 10-row board), chain s8
   9687, combo s8 15234 (queue 31-36). Since run 132 (6/8): 5, 1, 5, 2, 4, 3. Run 139: five line-up swaps offered, not three -- run 131's

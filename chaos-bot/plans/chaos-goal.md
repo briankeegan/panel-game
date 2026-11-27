@@ -177,6 +177,13 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 135 (2026-11-27 00:48 ET), the open side a line itself digs beside a resting slab (sideDig): survived 5/8** -- off. thicc s8
+  (its target, lost in 132-133) lived; thicc s7 lost at 2411 (buried under 6-wide slabs from 696, 18-36 panels), chain s7 at 16647 (a
+  1-wide tower of converted panels on column 0 up to row 11, 3-wide slabs landing on it) and insane s8 at 14025 (backlog 25-29: at
+  13813 a combo bought 229 frames of stop under a slab, and the bot held and leveled through it -- hold:229 beat toward:187, two lines
+  not judged alike, so 1'h never chose the line-up -- no break readied). Every seed of s7-8 has now lived in one run and died in another
+  (runs 130-135): the fixes move the losses. Run 136: 1'h' -- of two dying lines breaking nothing, a break made ready over waiting,
+  though lost up to two breaks' time sooner.
 - **Run 134 (2026-11-27 00:34 ET), the canyon counts the whole open side beside a slab: survived 1/8** -- off. Measured on the line's
   board, the side gap moved with every falling slab and grew with every clear breaking nothing, so rule 117 put down nearly every clear
   that buys stop: boards starved and topped (lost at 4865-17657; only chain s7 lived) -- the run-129 failure again. Run 135: run 132's bot

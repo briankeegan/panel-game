@@ -414,6 +414,11 @@
 #   nothing a canyon (falling garbage moved it too): no stop bought, boards starved and topped (lost 4865-17657; only chain s7 lived).
 # run 135 -- run 132's bot plus the open side dug by the line itself (judge.c sideDig): against the board as it stands, beside a slab in
 #   the visible rows, the rows a line takes off an open column's top that is already below the slab -- added to rule 117's dig. 8 colours s7-8
+# run 135 -- (result) survived 5/8 (run 132: 6/8) -- sideDig off. thicc s8 (its target) lived; thicc s7 2411 (buried by 6-wide slabs,
+#   18-36 panels), chain s7 16647 (a 1-wide converted tower on column 0 to row 11, slabs landing on it), insane s8 14025 lost.
+# run 136 -- run 132's bot plus 1'h' (rank.c): above six colours under garbage, of two dying lines breaking nothing, the one leaving a
+#   break a swap away goes first though lost up to two breaks' time sooner. Run 135 insane s8 13813-13934: 229 frames of stop under a
+#   slab with 25 queued, held and leveled (hold:229 over toward:187, not alike), no break readied. 8 colours s7-8
 chain_garbage 7 9 9 1 21600 10 colors=8
 combo_storm 7 9 9 1 21600 10 colors=8
 thicc_combo_storm 7 9 9 1 21600 10 colors=8

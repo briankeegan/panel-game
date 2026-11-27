@@ -2005,6 +2005,11 @@ static void sortJudged(Judge **a, int n) {
     for (int i = 1; i < n; i++) { const Judge *e = a[i];
       if (e->hold || e->o.dead || e->apCombo < 8 || e->apChain >= 2) continue;
       if (!(e->o.lives || diesAt(e) >= FINISH_8_LIFE * rankSave)) continue;
+      // (run 196: nor, under garbage where no clear buys stop time (game mode 3 and up: ca.c awardStopTime), over a top line that dies
+      // later than the eight -- run 195 moved the 1b goal key off there, and this move put it back: no stop time combo s8 3092 an eight
+      // dying at 172 over a chain at 256, 3118 146 over 247, lost at 3116; thicc s7 16907 an eight breaking none dying at 205 over a
+      // break of 6 at 213, lost at 17012)
+      if (decQ.b->gameMode >= 3 && decF.under && !a[0]->o.lives && diesAt(e) < diesAt(a[0])) continue;
       if (pressAllowance >= 0 && pressAllowance - lineWalk(e) < BREAK_WALK) continue;   // (and a break's walk of the window kept: the next break is pressed from it)
       if (best < 0 || (e->o.lives && !a[best]->o.lives) || (!a[best]->o.lives && diesAt(e) > diesAt(a[best]))) best = i; }
     if (best > 0) { Judge *e = a[best]; for (int q = best; q > 0; q--) a[q] = a[q - 1]; a[0] = e; rankMoved = -__LINE__; }

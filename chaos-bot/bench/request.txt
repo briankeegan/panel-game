@@ -670,6 +670,13 @@
 #   run-167 rule; it now names them as the report does, and rank.c names those keys.
 # run 195 -- run 180's bot plus: under garbage where no clear buys stop time (game mode 3 and up), rule 1b (the mode's goals) does not
 #   decide between two that do not live (rank.c). No stop time s7-8 again
+# run 195 -- (result) no stop time: survived 6/8, 149728 frames -- no worse than 194 (kept). combo s7 now lives (was 3652), thicc s7
+#   17012 (was 11312); lost combo s8 at 3116. Game 6 parts from run 194 at frame 257/260 before any garbage, where 195's change reads
+#   nothing: the searches stop on the wall clock (core/clock.h clockOut), so a game can part with no code path of the change in it.
+#   Both losses: rank.c's FINISH_8_LIFE move (k2010) put an eight over a top line dying later under garbage -- combo s8 3092 172 over
+#   256, 3118 146 over 247; thicc s7 16907 an eight breaking none at 205 over a break of 6 at 213.
+# run 196 -- run 195's bot plus: in game mode 3 and up under garbage, FINISH_8_LIFE does not move an eight over a top line that dies
+#   later than it (rank.c). No stop time s7-8 again
 chain_garbage 7 9 9 1 21600 10 mode=3
 combo_storm 7 9 9 1 21600 10 mode=3
 thicc_combo_storm 7 9 9 1 21600 10 mode=3

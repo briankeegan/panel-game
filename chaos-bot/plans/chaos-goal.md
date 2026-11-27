@@ -19,7 +19,7 @@ go back and get them all to 100%" -- every mode to 7/8 first, then each to 8/8.)
 | Chaos margin 4 | 10 | 191 | 7/8 |
 | Chaos mode | 10 | 192 | 8/8 |
 | 1 HP | 10 | 193 | 8/8 |
-| No stop time | 10 | 194 | 6/8, being fixed (run 195) |
+| No stop time | 10 | 195 | 6/8 (194: 6/8), being fixed (run 196) |
 | BALL | 10 | - | next |
 | Line Clear | - | - | to do |
 | Queue limit | 10 | - | to do |
@@ -197,6 +197,11 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 195 (2026-11-27 15:55 ET), NO STOP TIME at L10, run 180's bot + 1b off for dying lines under garbage in modes 3+: survived 6/8,
+  149728 frames** -- no worse, kept. combo s7 lives now, thicc s7 17012 (was 11312), lost combo s8 3116. In both losses rank.c's
+  FINISH_8_LIFE move (k2010) put an eight over a line dying later under garbage (combo s8 3092: 172 over 256; thicc s7 16907: an eight
+  breaking none at 205 over a break of 6 at 213). Run 196: that move skips such an eight in modes 3+ under garbage. Game 6 parted from
+  run 194 at frame 257/260, before any garbage: the searches stop on the wall clock (core/clock.h clockOut).
 - **Run 194 (2026-11-27 15:35 ET), NO STOP TIME at L10, run 180's bot: survived 6/8, 145364 frames** -- below 7/8. combo s7 3652: the
   mode's goals (1b) and the plan kept carried a combo breaking nothing under garbage where combos buy no stop. Run 195: 1b does not decide
   between two dying lines under garbage in game modes 3+. describe.py's names fixed (bare keys were named after the run-167 rule).

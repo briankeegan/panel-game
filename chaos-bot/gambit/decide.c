@@ -265,7 +265,9 @@ static int readBoard_(Read *R) {
     // nothing is asked: a chain there buys a stop that halts the rise and spends the panels the first slab is broken with. Run 160 chain
     // s7 (and runs 156-159, 1647-4637): 2x and 4x chains from 298 to 838 with no garbage near, 36 -> 21 -> 15 panels, a 6-row slab on
     // three rows at ~1028, lost at 2000)
-    if (!F->known[FACT_US_CONTACT] && panelTop(decQ.b) < LOW_ROWS) brk = 1;
+    // (run 163: or under six rows' worth of panels whatever the tallest column -- run 161 combo s8 (as 160, 162): between waves, none on
+    // the board, 2x/4x/6x chains took 63 panels to 25 (3556-4117) while a tower kept the top at six rows or more, then 20 pieces came)
+    if (!F->known[FACT_US_CONTACT] && (panelTop(decQ.b) < LOW_ROWS || pn < 6 * W)) brk = 1;
     L.aim[0].chain.op = OP_EQ; L.aim[0].chain.n = 2; L.aim[0].chain.near = 1; L.aim[0].brk = brk;
     // (run 125 dropped the 3x: 8 colours s5-6 about 2/8 -- back)
     L.aim[1].chain.op = OP_EQ; L.aim[1].chain.n = 3; L.aim[1].chain.near = 1; L.aim[1].brk = brk;
@@ -433,7 +435,8 @@ static int readBoard_(Read *R) {
   // (run 162: above six colours between waves too -- no garbage on the board, the stack under six rows: what is kept is what the next
   // wave is broken with. Run 161 combo s8 (and run 160, 5028): 63 -> 25 panels between waves (3574-4180, none on the board), then about
   // eight rows of slabs on three or four rows at ~4690, buried by 4975, lost at 4842)
-  if (!chaosOpenQuiet && decQ.b->colors > 6 && !F->known[FACT_US_CONTACT] && !R->under && panelTop(decQ.b) < LOW_ROWS) chaosOpenQuiet = 1;
+  // (run 162: 2/8 -- off)
+  if (0 && !chaosOpenQuiet && decQ.b->colors > 6 && !F->known[FACT_US_CONTACT] && !R->under && panelTop(decQ.b) < LOW_ROWS) chaosOpenQuiet = 1;
   // (run 160: and the other side -- above six colours, the opening's stack at seven rows or more makes room: rank.c)
   chaosOpenHigh = opening && decQ.b->colors > 6 && panelTop(decQ.b) >= LOW_ROWS + 1;
   R->low = to && (opening || refill || taRaise) && rowsUp > 0 && chaosRaisable; R->up = R->low && !cascadeLive(decQ.b) && canRaiseNow;

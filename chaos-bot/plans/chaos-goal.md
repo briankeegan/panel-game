@@ -177,6 +177,10 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 162 (2026-11-27 06:41 ET), keep the panels between waves: survived 2/8, 92014 frames** -- off. combo s8 still lost at 4525. Its
+  run-161 log: 2x/4x/6x chains with no garbage on the board took 63 panels to 25 (3556-4117) -- run 161's guard (tallest column under six
+  rows) missed them, a tower holding the top at six or more -- then 20 pieces arrived at 4616. Run 163: the guard by the panels too (under
+  six rows' worth).
 - **Run 161 (2026-11-27 06:28 ET), no chain aims before garbage on a low stack: survived 4/8, 117188 frames -- kept**, its target fixed:
   chain s7 lived (lost early in runs 156-160). Two repeating opening losses fixed in two runs. combo s8 now loses at ~5000 each run (5028,
   4842): between waves, none on the board, the bot cleared 63 -> 25 panels, then ~8 rows of slabs landed on 3-4 rows at ~4690. Run 162:

@@ -511,6 +511,10 @@
 #   waves with none on the board, then ~8 rows of slabs on 3-4 rows at ~4690), insane s8 6406.
 # run 162 -- run 55's keep-the-panels rule (rank.c chaosOpenQuiet) above six colours between waves too: no garbage on the board, the
 #   stack under six rows (decide.c). 8 colours s7-8
+# run 162 -- (result) survived 2/8, 92014 frames -- off. combo s8 still lost (4525): in run 161's log, 2x/4x/6x chains with no garbage on the
+#   board took 63 panels to 25 (3556-4117) -- run 161's guard missed them, the tallest column at six rows or more -- then 20 pieces came.
+# run 163 -- run 161's guard also by the panels: no garbage on the board and under six rows' worth of panels, the chain aims asked only as
+#   breaks (decide.c). 8 colours s7-8
 chain_garbage 7 9 9 1 21600 10 colors=8
 combo_storm 7 9 9 1 21600 10 colors=8
 thicc_combo_storm 7 9 9 1 21600 10 colors=8

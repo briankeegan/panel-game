@@ -1,61 +1,4 @@
-run 46038954801, as of 2026-11-27T19:09:43Z
-opponent topped out: clock 9480 stopWatch 9292 stop 0 pre-stop 0 shake 56 health 1, top rows r12=000ggg r11=gggggg r10=gggggg
-opponent topped out: clock 9510 stopWatch 9322 stop 60 pre-stop 323 shake 26 health 1, top rows r12=000ggg r11=gggggg r10=gggggg
-opponent topped out: clock 9540 stopWatch 9352 stop 60 pre-stop 293 shake 0 health 1, top rows r12=000ggg r11=gggggg r10=gggggg
-opponent topped out: clock 9570 stopWatch 9382 stop 60 pre-stop 263 shake 0 health 1, top rows r12=000ggg r11=gggggg r10=gggggg
-opponent topped out: clock 9600 stopWatch 9412 stop 60 pre-stop 233 shake 0 health 1, top rows r12=000ggg r11=gggggg r10=gggggg
-opponent topped out: clock 9630 stopWatch 9442 stop 60 pre-stop 203 shake 0 health 1, top rows r12=000ggg r11=gggggg r10=gggggg
-opponent topped out: clock 9660 stopWatch 9472 stop 60 pre-stop 173 shake 0 health 1, top rows r12=000ggg r11=gggggg r10=gggggg
-garbage landed: our stopWatch 9499 clock 9687, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
-opponent topped out: clock 9690 stopWatch 9502 stop 60 pre-stop 143 shake 0 health 1, top rows r12=000ggg r11=gggggg r10=gggggg
-opponent topped out: clock 9720 stopWatch 9532 stop 60 pre-stop 113 shake 0 health 1, top rows r12=000ggg r11=gggggg r10=gggggg
-opponent topped out: clock 9750 stopWatch 9562 stop 60 pre-stop 83 shake 0 health 1, top rows r12=000ggg r11=gggggg r10=gggggg
-opponent topped out: clock 9780 stopWatch 9592 stop 60 pre-stop 53 shake 0 health 1, top rows r12=000ggg r11=gggggg r10=gggggg
-opponent topped out: clock 9810 stopWatch 9622 stop 60 pre-stop 23 shake 0 health 1, top rows r12=000ggg r11=gggggg r10=gggggg
-opponent topped out: clock 9840 stopWatch 9652 stop 94 pre-stop 225 shake 0 health 1, top rows r12=000534 r11=161321 r10=gggggg
-opponent topped out: clock 9870 stopWatch 9682 stop 94 pre-stop 195 shake 0 health 1, top rows r12=000534 r11=161321 r10=gggggg
-opponent topped out: clock 9900 stopWatch 9712 stop 94 pre-stop 165 shake 0 health 1, top rows r12=000534 r11=161321 r10=gggggg
-opponent topped out: clock 9930 stopWatch 9742 stop 94 pre-stop 135 shake 0 health 1, top rows r12=000534 r11=161321 r10=gggggg
-opponent topped out: clock 9960 stopWatch 9772 stop 94 pre-stop 105 shake 0 health 1, top rows r12=000534 r11=161321 r10=gggggg
-garbage landed: our stopWatch 9781 clock 9969, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
-garbage landed: our stopWatch 9787 clock 9975, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
-garbage landed: our stopWatch 9792 clock 9980, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
-garbage landed: our stopWatch 9796 clock 9984, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
-opponent topped out: clock 9990 stopWatch 9802 stop 94 pre-stop 75 shake 0 health 1, top rows r12=000534 r11=161321 r10=gggggg
-opponent topped out: clock 10020 stopWatch 9832 stop 94 pre-stop 45 shake 0 health 1, top rows r12=000534 r11=161321 r10=gggggg
-opponent topped out: clock 10050 stopWatch 9862 stop 94 pre-stop 15 shake 0 health 1, top rows r12=000534 r11=161321 r10=gggggg
-garbage landed: our stopWatch 10035 clock 10223, transits in flight before this frame {10037}, opponent copy 1 frames behind, rollbacks so far 0
-garbage landed: our stopWatch 10184 clock 10372, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
-opponent topped out: clock 10650 stopWatch 10462 stop 30 pre-stop 0 shake 38 health 1, top rows r12=ggg000 r11=gggggg r10=gggggg
-garbage landed: our stopWatch 10872 clock 11060, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
-garbage landed: our stopWatch 10876 clock 11064, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
-opponent topped out: clock 11130 stopWatch 10942 stop 17 pre-stop 0 shake 17 health 1, top rows r12=0gggg0 r11=gggggg r10=gggggg
-REPLAY {"mine":1,"settings":{"engineVersion":"049","rules":{"stackOverConditions":{"HEALTH":0},"doCountdown":true,"stackSetupModifications":[],"stackWinConditions":[],"matchWinRuleset":[{"GAME_OVER_CLOCK":"HIGHEST"}],"matchEndConditions":{"STACKS_ACTIVE":1}},"replayVersion":3,"garbageFlows":[{"sourc
-engine rolled our stack back 0 times for late garbage this match
-match against: Spritz
-match against id: 3184
-match over — bot won (pace: worst 0.30 frames off schedule); waiting for a rematch
-memory after match: rss 3531628 kB, threads 9, lua 44050 kB
-game about to start: both players are ready
-match start: building the match (seed nil, stage nil, opponent ?)
-match start: the match is built
-match start: the match is started
-match start: gambit: creating the link
-match start: gambit: the link is created
-match start: gambit: the link is starting the match
-match start: gambit: the link has started the match
-both ready — match starting
-garbage landed: our stopWatch 562 clock 750, transits in flight before this frame {562}, opponent copy 1 frames behind, rollbacks so far 0
-garbage landed: our stopWatch 925 clock 1113, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
-garbage landed: our stopWatch 1423 clock 1611, transits in flight before this frame {}, opponent copy 2 frames behind, rollbacks so far 0
-opponent topped out: clock 1830 stopWatch 1642 stop 38 pre-stop 171 shake 64 health 1, top rows r12=gggggg r11=gggggg r10=ggggg0
-opponent topped out: clock 1860 stopWatch 1672 stop 60 pre-stop 141 shake 34 health 1, top rows r12=gggggg r11=gggggg r10=ggggg0
-opponent topped out: clock 1890 stopWatch 1702 stop 60 pre-stop 111 shake 4 health 1, top rows r12=gggggg r11=gggggg r10=ggggg0
-opponent topped out: clock 1920 stopWatch 1732 stop 60 pre-stop 81 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=ggggg0
-opponent topped out: clock 1950 stopWatch 1762 stop 90 pre-stop 51 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=ggggg0
-opponent topped out: clock 1980 stopWatch 1792 stop 90 pre-stop 21 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=ggggg0
-opponent topped out: clock 2010 stopWatch 1822 stop 90 pre-stop 42 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=364120
-opponent topped out: clock 2040 stopWatch 1852 stop 90 pre-stop 12 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=364120
+run 46038954801, as of 2026-11-27T19:11:47Z
 garbage landed: our stopWatch 1897 clock 2085, transits in flight before this frame {1897}, opponent copy 1 frames behind, rollbacks so far 0
 garbage landed: our stopWatch 2167 clock 2355, transits in flight before this frame {2214}, opponent copy 1 frames behind, rollbacks so far 0
 garbage landed: our stopWatch 2171 clock 2359, transits in flight before this frame {2214}, opponent copy 1 frames behind, rollbacks so far 0
@@ -149,3 +92,60 @@ garbage landed: our stopWatch 3501 clock 3689, transits in flight before this fr
 garbage landed: our stopWatch 3953 clock 4141, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
 garbage landed: our stopWatch 4021 clock 4209, transits in flight before this frame {4029}, opponent copy 1 frames behind, rollbacks so far 0
 garbage landed: our stopWatch 4025 clock 4213, transits in flight before this frame {4029}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 4507 clock 4695, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+opponent topped out: clock 4800 stopWatch 4612 stop 62 pre-stop 22 shake 48 health 1, top rows r12=gggggg r11=gggggg r10=000610
+opponent topped out: clock 4860 stopWatch 4672 stop 24 pre-stop 0 shake 42 health 1, top rows r12=0ggggg r11=gggggg r10=gggggg
+opponent topped out: clock 4890 stopWatch 4702 stop 8 pre-stop 164 shake 12 health 1, top rows r12=0ggggg r11=gggggg r10=gggggg
+garbage landed: our stopWatch 4720 clock 4908, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+opponent topped out: clock 4920 stopWatch 4732 stop 8 pre-stop 134 shake 0 health 1, top rows r12=0ggggg r11=gggggg r10=gggggg
+opponent topped out: clock 4950 stopWatch 4762 stop 8 pre-stop 104 shake 0 health 1, top rows r12=0ggggg r11=gggggg r10=gggggg
+opponent topped out: clock 4980 stopWatch 4792 stop 8 pre-stop 74 shake 0 health 1, top rows r12=0ggggg r11=gggggg r10=gggggg
+opponent topped out: clock 5010 stopWatch 4822 stop 8 pre-stop 44 shake 0 health 1, top rows r12=0ggggg r11=gggggg r10=gggggg
+opponent topped out: clock 5040 stopWatch 4852 stop 8 pre-stop 14 shake 0 health 1, top rows r12=0ggggg r11=gggggg r10=gggggg
+garbage landed: our stopWatch 4869 clock 5057, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 4905 clock 5093, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+opponent topped out: clock 5310 stopWatch 5122 stop 37 pre-stop 0 shake 37 health 1, top rows r12=ggggg0 r11=gggggg r10=030001
+opponent topped out: clock 5340 stopWatch 5152 stop 7 pre-stop 0 shake 7 health 1, top rows r12=ggggg0 r11=gggggg r10=030000
+REPLAY {"mine":1,"settings":{"engineVersion":"049","rules":{"stackOverConditions":{"HEALTH":0},"doCountdown":true,"stackSetupModifications":[],"stackWinConditions":[],"matchWinRuleset":[{"GAME_OVER_CLOCK":"HIGHEST"}],"matchEndConditions":{"STACKS_ACTIVE":1}},"replayVersion":3,"garbageFlows":[{"sourc
+engine rolled our stack back 0 times for late garbage this match
+match against: Spritz
+match against id: 3184
+match over — bot won (pace: worst 1.47 frames off schedule); waiting for a rematch
+memory after match: rss 3490128 kB, threads 9, lua 43286 kB
+game about to start: both players are ready
+match start: building the match (seed nil, stage nil, opponent ?)
+match start: the match is built
+match start: the match is started
+match start: gambit: creating the link
+match start: gambit: the link is created
+match start: gambit: the link is starting the match
+match start: gambit: the link has started the match
+both ready — match starting
+garbage landed: our stopWatch 610 clock 798, transits in flight before this frame {610,661}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 1145 clock 1333, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 1414 clock 1602, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 2120 clock 2308, transits in flight before this frame {2151}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 2373 clock 2561, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 2709 clock 2897, transits in flight before this frame {2731}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 2731 clock 2919, transits in flight before this frame {2731}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 3573 clock 3761, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 3920 clock 4108, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 3930 clock 4118, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 3934 clock 4122, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 3939 clock 4127, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 4035 clock 4223, transits in flight before this frame {4059}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 4121 clock 4309, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 4300 clock 4488, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 4769 clock 4957, transits in flight before this frame {4769}, opponent copy 1 frames behind, rollbacks so far 0
+opponent topped out: clock 5070 stopWatch 4882 stop 0 pre-stop 0 shake 70 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 5100 stopWatch 4912 stop 0 pre-stop 273 shake 40 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 5130 stopWatch 4942 stop 0 pre-stop 243 shake 10 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 5160 stopWatch 4972 stop 0 pre-stop 213 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 5190 stopWatch 5002 stop 60 pre-stop 183 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 5220 stopWatch 5032 stop 60 pre-stop 153 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 5250 stopWatch 5062 stop 60 pre-stop 123 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 5280 stopWatch 5092 stop 60 pre-stop 93 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 5310 stopWatch 5122 stop 60 pre-stop 63 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 5340 stopWatch 5152 stop 60 pre-stop 33 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 5370 stopWatch 5182 stop 60 pre-stop 3 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
+opponent topped out: clock 5460 stopWatch 5272 stop 37 pre-stop 0 shake 8 health 1, top rows r12=000ggg r11=gggggg r10=gggggg

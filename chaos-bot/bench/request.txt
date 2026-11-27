@@ -419,6 +419,10 @@
 # run 136 -- run 132's bot plus 1'h' (rank.c): above six colours under garbage, of two dying lines breaking nothing, the one leaving a
 #   break a swap away goes first though lost up to two breaks' time sooner. Run 135 insane s8 13813-13934: 229 frames of stop under a
 #   slab with 25 queued, held and leveled (hold:229 over toward:187, not alike), no break readied. 8 colours s7-8
+# run 136 -- (result) survived 2/8 -- 1'h' removed. Lost chain s7 6370, thicc s7 2106, insane s7 10233, combo s8 5255, thicc s8 8249,
+#   insane s8 18479: a line-up put over a longer life loses the life. Every rule that outranks the life count has cost games (129, 134, 136).
+# run 137 -- run 132's bot exactly (judge.c restored), plus the opening keeps its panels a row higher above six colours (7 rows, not 6:
+#   decide.c chaosOpenQuiet). Run 136 thicc s7: a carry clearing 12 at 498 with no garbage near, 45 -> 24 panels by the first slab. s7-8
 chain_garbage 7 9 9 1 21600 10 colors=8
 combo_storm 7 9 9 1 21600 10 colors=8
 thicc_combo_storm 7 9 9 1 21600 10 colors=8

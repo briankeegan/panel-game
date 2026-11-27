@@ -972,8 +972,8 @@ static int compareJudged(const Judge *x, const Judge *y) {
   // nothing emptied columns 1-3 from row 4 to 9 under garbage resting on the edge towers, lost at 4491)
   if (decQ.b->colors > 6 && decF.under && !x->o.dead && !y->o.dead && imax(0, x->apBroke) == 0 && imax(0, y->apBroke) == 0 &&
       x->o.j.gap >= 0 && y->o.j.gap >= 0) {
-    // (run 135 added the open side a line digs beside a slab, judge.c sideDig: 5/8 against 6/8 -- off)
-    int32_t g0 = gapOf(decQ.b), dx = x->o.j.gap - g0 + 0 * sideDig(decQ.b, x->o.j.ptop), dy = y->o.j.gap - g0 + 0 * sideDig(decQ.b, y->o.j.ptop);
+    // (run 135 added the open side a line digs beside a slab (sideDig): 5/8 against 6/8 -- removed)
+    int32_t g0 = gapOf(decQ.b), dx = x->o.j.gap - g0, dy = y->o.j.gap - g0;
     int xd = dx >= W && dy < W / 2, yd = dy >= W && dx < W / 2;
     if (xd || yd) { const Judge *dig = xd ? x : y, *o = xd ? y : x;
       if (o->o.lives || diesAt(o) + rankSave > diesAt(dig)) return (cmpKey = __LINE__, (xd ? 1 : -1)); }
@@ -1372,16 +1372,8 @@ static int compareJudged(const Judge *x, const Judge *y) {
     if (x->o.j.readyBreak != y->o.j.readyBreak) return (cmpKey = __LINE__, (x->o.j.readyBreak > y->o.j.readyBreak ? -1 : 1));
     if (x->o.j.swapReady != y->o.j.swapReady) return (cmpKey = __LINE__, (x->o.j.swapReady > y->o.j.swapReady ? -1 : 1));
   }
-  // 1'h'. (run 136, CHAOS) ABOVE SIX COLOURS, UNDER GARBAGE, A BREAK MADE READY OVER WAITING: of two that are both lost and break no
-  // garbage, the one leaving a break a swap away (readyOf) over one leaving none, though lost up to two breaks' time sooner -- a dying
-  // hold lives only as long as the stop it waits out, and at 8 colours a break is found only where one was set up. Run 135 insane s8,
-  // 13813-13934: 229 frames of stop under a slab with 24-31 panels and 25 pieces queued, held and leveled (hold:229 over toward:187,
-  // not alike), no break readied; lost at 14025
-  if (decQ.b->colors > 6 && decF.under && !x->o.lives && !y->o.lives && !x->o.dead && !y->o.dead &&
-      x->apBroke <= 0 && y->apBroke <= 0 && (x->o.j.readyBreak > 0) != (y->o.j.readyBreak > 0)) {
-    const Judge *r = x->o.j.readyBreak > 0 ? x : y, *o = r == x ? y : x;
-    if (diesAt(r) + 2 * rankSave > diesAt(o)) return (cmpKey = __LINE__, (r == x ? -1 : 1));
-  }
+  // (1'h', run 136: of two dying lines breaking nothing, a break a swap away over waiting though lost up to two breaks' time sooner --
+  // 2/8 against run 132's 6/8: removed)
   // 1'f. NO SLAB AT THE FINISH: where the list is the finish (finishAsked), of two that survive alike, the line that sends no slab of two
   // rows or more (a chain of three or longer, the board's own going on included) before one that does, whatever either breaks -- the
   // owner: no big chains at the finish; a chain is played there only where nothing else lives as long

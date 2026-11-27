@@ -177,6 +177,12 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 136 (2026-11-27 01:02 ET), 1'h' -- a break made ready over a dying wait, though lost up to two breaks' time sooner: survived
+  2/8** -- removed. Lost chain s7 6370, thicc s7 2106, insane s7 10233, combo s8 5255, thicc s8 8249, insane s8 18479. Every rule that
+  ranks something above the life count has cost games (runs 129, 134, 136). thicc s7, lost early in runs 135 and 136 (both carried
+  run 135's extra judge work, a column-top pass on every line judged) and alive in 131-133: the opening fired a carry clearing 12 at 498
+  with no garbage near (the opening's keep-panels rule ends at six rows, passed by ~450 at 8 colours), 45 -> 24 panels by the first slab,
+  then buried. Run 137: run 132's bot exactly (judge.c restored) with the opening keeping its panels to seven rows above six colours.
 - **Run 135 (2026-11-27 00:48 ET), the open side a line itself digs beside a resting slab (sideDig): survived 5/8** -- off. thicc s8
   (its target, lost in 132-133) lived; thicc s7 lost at 2411 (buried under 6-wide slabs from 696, 18-36 panels), chain s7 at 16647 (a
   1-wide tower of converted panels on column 0 up to row 11, 3-wide slabs landing on it) and insane s8 at 14025 (backlog 25-29: at

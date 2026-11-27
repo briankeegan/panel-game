@@ -977,10 +977,21 @@ static int compareJudged(const Judge *x, const Judge *y) {
     if (xd || yd) { const Judge *dig = xd ? x : y, *o = xd ? y : x;
       if (o->o.lives || diesAt(o) + rankSave > diesAt(dig)) return (cmpKey = __LINE__, (xd ? 1 : -1)); }
   }
+  // (run 119, CHAOS, ABOVE SIX COLOURS, NO LONG CHAIN FOR NOTHING UNDER GARBAGE: of two lines, one whose whole chain (the board's falling
+  // chain with it) runs past three links breaking no garbage goes after one whose chain stays at three or under, unless that one is lost
+  // a break's time sooner -- a 2x or 3x buys the stop; past it a chain at 8 colours only digs the columns out from under the garbage.
+  // Run 117 8 colours insane s6, 12641-12943: a 7x then 8x breaking nothing emptied columns 0-3 under garbage left on the right towers,
+  // lost at 13029)
+  if (decQ.b->colors > 6 && decF.under && !x->o.dead && !y->o.dead) {
+    int lx4 = x->o.j.chainAll > 3 && x->apBroke <= 0, ly4 = y->o.j.chainAll > 3 && y->apBroke <= 0;
+    if (lx4 != ly4) { const Judge *lng = lx4 ? x : y, *o = lx4 ? y : x;
+      if (o->o.j.chainAll <= 3 && (o->o.lives || diesAt(o) + rankSave > diesAt(lng))) return (cmpKey = __LINE__, (lx4 ? 1 : -1)); }
+  }
   // (run 118, CHAOS, ABOVE SIX COLOURS, A STARVED BOARD BREAKS CHEAPLY: under garbage with fewer than four rows' worth of panels (4 x W),
   // of two lines that break the same garbage and live or are lost alike, the one clearing fewer panels first -- each panel spent is
   // one the next break lacks. Run 117 8 colours insane s5: 16-25 panels from 1264 to the loss at 1957, breaks of 6 clearing 6 each)
-  if (decQ.b->colors > 6 && decF.under && panelsOn(decQ.b) < 4 * W && (lx || lostAlike(x, y)) &&
+  // (run 118: off -- 8 colours s5-6 about 2/8 with it, run 117 5/8)
+  if (0 && decQ.b->colors > 6 && decF.under && panelsOn(decQ.b) < 4 * W && (lx || lostAlike(x, y)) &&
       imax(0, x->apBroke) == imax(0, y->apBroke) && x->o.j.clearedPanels != y->o.j.clearedPanels)
     return (cmpKey = __LINE__, (x->o.j.clearedPanels < y->o.j.clearedPanels ? -1 : 1));
   // (run 55, CHAOS, THE OPENING KEEPS ITS PANELS: before garbage first comes (the opening, decide.c), of two lines that both live and

@@ -177,6 +177,10 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 173 (2026-11-27 09:27 ET), break rules read garbage anywhere on the board: survived 0/8, 76099 frames** -- reverted. The
+  seed-8 opening losses at ~1000 did not happen; every game lost later. chain s8 3083: under garbage on 41-50 panels the aims (decide.c
+  brk -1 from five rows' worth up) were met by 2x chains clearing 9 and breaking nothing, a canyon dug under the garbage. Run 174: garbage
+  resting on the stack -> aims met only by breaks (brk 1), above six colours.
 - **Run 172 (2026-11-27 09:13 ET), break first unless two breaks' time longer: survived 3/8, 128533 frames** -- reverted. thicc s8 lost
   the seed-8 opening at 1139 (661: carry lost at 373 breaking nothing over a break of 15 lost at 252). The fault: decF.under is garbage
   resting on the stack (FACT_US_CONTACT); the slab was on the board, not resting, so every under-garbage break rule was skipped and the

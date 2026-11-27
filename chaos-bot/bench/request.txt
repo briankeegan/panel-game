@@ -562,6 +562,11 @@
 #   (won=k1119 in run 171's log) decided it.
 # run 173 -- run 167's bot plus: above six colours the break rules read garbage anywhere on the board (rank.c underBreak: creditPair's
 #   no-break credit rule and the two break-first rules), not only garbage resting on the stack. 8 colours s7-8
+# run 173 -- (result) survived 0/8, 76099 frames -- reverted. No seed-8 opening loss at ~1000 (combo s8 7664, thicc s8 15403, insane s8
+#   5416), every game lost all the same. chain s8 3083: 2670-2823 under garbage on 41-50 panels, the aims met by 2x chains clearing 9
+#   and breaking nothing (decide.c aims: brk -1 at five rows' worth of panels and up), columns 2-3 dug to a canyon under the garbage.
+# run 174 -- run 167's bot plus: above six colours, garbage resting on the stack -> the aims are met only by lines that break it
+#   (decide.c brk 1 whatever the panels). 8 colours s7-8
 chain_garbage 7 9 9 1 21600 10 colors=8
 combo_storm 7 9 9 1 21600 10 colors=8
 thicc_combo_storm 7 9 9 1 21600 10 colors=8

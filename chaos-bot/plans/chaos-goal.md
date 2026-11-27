@@ -177,6 +177,10 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 169 (2026-11-27 08:20 ET), the 42-panel chain floor in the opening only: survived 0/8, 76062 frames** -- reverted. combo s8
+  (933) and insane s7 (1007): the opening grew to 48 panels, then the chain spent it under the first slab. Run 170 (run 167's bot):
+  insane s7 lost four runs alike (163-167) -- the stack grew to 57-62 panels between waves and the board was left alone for the queue to
+  drop on it; above six colours the board is now left alone only where what waits lands two rows under the ceiling (short of 25 waiting).
 - **Run 168 (2026-11-27 08:06 ET), no chain aims below 42 panels without garbage: survived 1/8, 96679 frames** -- reverted. thicc s7
   lived, but chain s7/s8, combo s8 and thicc s8 lost by 6000: the floor held chains back all game. Run 169: the 42-panel floor in the
   opening only (before garbage first lands), 36 after.

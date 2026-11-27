@@ -540,6 +540,12 @@
 #   thicc s8 5546 lost early: the higher floor held chains back all game.
 # run 169 -- run 167's bot with the seven-row floor in the opening only (before garbage first lands, clock < 600), six rows after
 #   (decide.c). 8 colours s7-8
+# run 169 -- (result) survived 0/8, 76062 frames -- reverted (back to six rows all game). combo s8 lost at 933, insane s7 at 1007: the
+#   opening grew to 48 panels before the chain aim opened, and the chain spent it to 23 under the first slab.
+# run 170 -- run 167's bot, plus: above six colours, short of the queue's last 25, the board is left alone for waiting garbage only where
+#   what waits lands two rows under the ceiling, not at it (decide.c). insane s7 lost runs 163-167 alike: between waves the stack grew to
+#   57-62 panels, the board was left alone with 3 waiting (run 167 at 6647, top at row 10), a 6-wide slab perched at row 12 on one panel,
+#   the waves after buried it (7886). 8 colours s7-8
 chain_garbage 7 9 9 1 21600 10 colors=8
 combo_storm 7 9 9 1 21600 10 colors=8
 thicc_combo_storm 7 9 9 1 21600 10 colors=8

@@ -267,11 +267,9 @@ static int readBoard_(Read *R) {
     // three rows at ~1028, lost at 2000)
     // (run 163: or under six rows' worth of panels whatever the tallest column -- run 161 combo s8 (as 160, 162): between waves, none on
     // the board, 2x/4x/6x chains took 63 panels to 25 (3556-4117) while a tower kept the top at six rows or more, then 20 pieces came)
-    // (run 169: seven rows' worth in the opening only, before garbage first lands -- run 167 thicc s7: the opening rose to exactly 36
-    // panels, a 12-panel chain aim opened and the carry spent the board to 18 before the first slab, lost at 2347; run 156 the same at
-    // 2283. Run 168 had seven rows all game: 1/8, chain s7/s8, combo s8, thicc s8 lost by 6000)
-    int32_t chainFloor = !gambitHit && decQ.b->clock < OPENING_RAISE ? 7 * W : 6 * W;
-    if (!F->known[FACT_US_CONTACT] && (panelTop(decQ.b) < LOW_ROWS || pn < chainFloor)) brk = 1;
+    // (runs 168-169 tried seven rows' worth -- run 167 thicc s7: the opening rose to exactly 36 panels and a 12-panel chain spent the
+    // board to 18 before the first slab: all game 1/8, in the opening only 0/8 (the opening grew to 48 and the chain spent that). Six)
+    if (!F->known[FACT_US_CONTACT] && (panelTop(decQ.b) < LOW_ROWS || pn < 6 * W)) brk = 1;
     L.aim[0].chain.op = OP_EQ; L.aim[0].chain.n = 2; L.aim[0].chain.near = 1; L.aim[0].brk = brk;
     // (run 125 dropped the 3x: 8 colours s5-6 about 2/8 -- back)
     L.aim[1].chain.op = OP_EQ; L.aim[1].chain.n = 3; L.aim[1].chain.near = 1; L.aim[1].brk = brk;
@@ -2284,7 +2282,11 @@ static Played playOf(const Read *R, int n) {
     // (what waits must land without topping the board out; held back further, it only grows and the panels go -- run 9's insane
     // combo storm never let it drop under the stricter ceiling test, letDrop=0, and lost at 3455 with 11 rows dropped at once)
     chaosWaiting = waiting;
-    if (panelTop(decQ.b) + waiting <= h - 1) { P.line = 0; P.deferred = 0; chaosLetDrop++; }
+    // (run 170: above six colours, short of the queue's last 25, the board left alone only where what waits lands two rows under the
+    // ceiling -- insane s7 lost runs 163-167 alike: between waves the stack grew to 57-62 panels, the board was left alone with 3 waiting
+    // (run 167 at 6647, the top at row 10), a 6-wide slab landed on row 12 perched on one panel, and the waves after buried it at 7886)
+    int32_t room = decQ.b->colors > 6 && !queueNear ? 3 : 1;
+    if (panelTop(decQ.b) + waiting <= h - room) { P.line = 0; P.deferred = 0; chaosLetDrop++; }
   }
   // (runs 75-76 tried draining the queue under garbage -- the hold over lines breaking nothing from 25 waiting, then over any line from 40:
   // level 8 6/8 then 5/8, the queue still reaching fifty (CHAOS_QUEUE_LIMIT) with full health -- a hold does not quiet a board whose

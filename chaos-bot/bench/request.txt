@@ -660,11 +660,13 @@
 # run 191 -- THE NEXT MODE: chaos margin (margin=4) at Level 10, 6 colours, seeds 7-8, run 180's bot. margin 4 s7-8
 # run 191 -- (result) chaos margin 4: survived 7/8, 153783 frames -- DONE (7/8). Lost only thicc s7 at 2583; every survivor at health 1.
 # run 192 -- THE NEXT MODE: chaos mode (chaosmode=1) at Level 10, 6 colours, seeds 7-8, run 180's bot. chaos mode s7-8
-chain_garbage 7 9 9 1 21600 10 chaosmode=1
-combo_storm 7 9 9 1 21600 10 chaosmode=1
-thicc_combo_storm 7 9 9 1 21600 10 chaosmode=1
-insane_combo_storm 7 9 9 1 21600 10 chaosmode=1
-chain_garbage 8 9 9 1 21600 10 chaosmode=1
-combo_storm 8 9 9 1 21600 10 chaosmode=1
-thicc_combo_storm 8 9 9 1 21600 10 chaosmode=1
-insane_combo_storm 8 9 9 1 21600 10 chaosmode=1
+# run 192 -- (result) chaos mode: survived 8/8, 172800 frames, every game at full health (13/13) -- DONE.
+# run 193 -- THE NEXT MODE: 1HP (mode=2) at Level 10, 6 colours, seeds 7-8, run 180's bot. 1HP s7-8
+chain_garbage 7 9 9 1 21600 10 mode=2
+combo_storm 7 9 9 1 21600 10 mode=2
+thicc_combo_storm 7 9 9 1 21600 10 mode=2
+insane_combo_storm 7 9 9 1 21600 10 mode=2
+chain_garbage 8 9 9 1 21600 10 mode=2
+combo_storm 8 9 9 1 21600 10 mode=2
+thicc_combo_storm 8 9 9 1 21600 10 mode=2
+insane_combo_storm 8 9 9 1 21600 10 mode=2

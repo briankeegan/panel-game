@@ -156,6 +156,10 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 115 (2026-11-26 19:50 ET), run 113's bot, 8 colours L10, new seeds 5-6: survived 4/8** -- combo s5 4491, insane s5 3804,
+  thicc s6 2938 (all early, no-line), chain s5 19249 (queue backlog). The new report worked: losses.txt held each loss's decisions and
+  ten boards. thicc s6: a 2-row slab on the stack with 3-wide pieces stacked above the top, the row under the slab one panel -- no break
+  within reach, held until the stop ran out. The gap at 8 colours: the row under the garbage kept stocked with near-matches.
 - **Infra (the owner, 2026-11-27: "You need better infra fixed"):** the run's report now tells each loss itself -- its last 900 frames
   of decisions (play, verdict, panels, garbage broken, panels cleared, swaps, stop, lines living, the three best offered) and its last
   ten boards drawn by the bot's own viewer (built in the report job, plays nothing) in losses.txt beside report.txt, and the report

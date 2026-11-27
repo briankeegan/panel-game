@@ -658,11 +658,13 @@
 #   7/8, 152311 frames). Run 189's change out. 7 colours s7-8
 # run 190 -- (result) 7 colours: survived 7/8, 172270 frames -- DONE at the owner's bar (7/8). Lost only combo s8 at 20470.
 # run 191 -- THE NEXT MODE: chaos margin (margin=4) at Level 10, 6 colours, seeds 7-8, run 180's bot. margin 4 s7-8
-chain_garbage 7 9 9 1 21600 10 margin=4
-combo_storm 7 9 9 1 21600 10 margin=4
-thicc_combo_storm 7 9 9 1 21600 10 margin=4
-insane_combo_storm 7 9 9 1 21600 10 margin=4
-chain_garbage 8 9 9 1 21600 10 margin=4
-combo_storm 8 9 9 1 21600 10 margin=4
-thicc_combo_storm 8 9 9 1 21600 10 margin=4
-insane_combo_storm 8 9 9 1 21600 10 margin=4
+# run 191 -- (result) chaos margin 4: survived 7/8, 153783 frames -- DONE (7/8). Lost only thicc s7 at 2583; every survivor at health 1.
+# run 192 -- THE NEXT MODE: chaos mode (chaosmode=1) at Level 10, 6 colours, seeds 7-8, run 180's bot. chaos mode s7-8
+chain_garbage 7 9 9 1 21600 10 chaosmode=1
+combo_storm 7 9 9 1 21600 10 chaosmode=1
+thicc_combo_storm 7 9 9 1 21600 10 chaosmode=1
+insane_combo_storm 7 9 9 1 21600 10 chaosmode=1
+chain_garbage 8 9 9 1 21600 10 chaosmode=1
+combo_storm 8 9 9 1 21600 10 chaosmode=1
+thicc_combo_storm 8 9 9 1 21600 10 chaosmode=1
+insane_combo_storm 8 9 9 1 21600 10 chaosmode=1

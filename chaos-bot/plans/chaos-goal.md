@@ -2,7 +2,7 @@
 
 ## NOW -- the one goal, and the standing orders (the owner, 2026-11-27: "Set your goal so it's clear and you don't keep stopping")
 
-**Goal now (the owner, 2026-11-27 14:30 ET): every mode at chaos Level 10 to 7/8 -- 8 colours done (run 180: 7/8); 7 colours done (run 190: 7/8); now chaos margin -- then back to each for 8/8.** (Was: 8 colours 8/8 twice.)
+**Goal now (the owner, 2026-11-27 14:30 ET): every mode at chaos Level 10 to 7/8 -- 8 colours done (run 180: 7/8); 7 colours done (run 190: 7/8); chaos margin done (run 191: 7/8); now chaos mode -- then back to each for 8/8.** (Was: 8 colours 8/8 twice.)
 Then the next weakest mode, one at a time (7 colours, chaos margin, Line Clear, the queue limit), each to 8/8 twice, never below Level 9,
 the Level 10 six-colour gate kept. Done only when every mode holds. (The owner, 2026-11-27: "Not just the colors... other modes as
 well" -- once colours are done, every other mode: 7 colours, chaos margins 2/3/4, chaos mode, 1HP, NST, BALL, Line Clear, the queue
@@ -181,6 +181,8 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 191 (2026-11-27 14:55 ET), CHAOS MARGIN 4 at L10, run 180's bot: survived 7/8, 153783 frames** -- done. Lost thicc s7 at 2583.
+  Run 192: chaos mode (chaosmode=1) at L10.
 - **Run 190 (2026-11-27 14:45 ET), 7 COLOURS at L10, run 180's bot: survived 7/8, 172270 frames** -- done at the owner's bar. Lost only
   combo s8 at 20470. Run 191: chaos margin (margin=4) at L10, 6 colours, seeds 7-8.
 - **Run 189 (2026-11-27 14:37 ET), no needless-swap hold with garbage on the board: survived 1/8, 80081 frames** -- off. 8 colours

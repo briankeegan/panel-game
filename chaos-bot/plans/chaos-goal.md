@@ -177,6 +177,11 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 140 (2026-11-27 01:54 ET), a starved board's break pays for itself: survived 4/8 -- kept** (a judgement against the noise, said
+  plainly: below run 132's 6/8, but the 132 family has averaged ~4 since, and its frames played, 130640, are second only to run 132's
+  141612 -- runs 137-139 played 96-109k; its losses came later: 6450, 12704, 19489, 5597). insane s8 5597: 16 panels sandwiched between
+  a 3-row slab and the slabs above, no single swap breaking either. Run 141: starving, any break asked first (a combo of three or more
+  breaking garbage ahead of the chain aims).
 - **Run 139 (2026-11-27 01:40 ET), five line-up swaps offered: survived 3/8** -- back to three. Since run 132's 6/8: 5, 1, 5, 2, 4, 3,
   3 -- run 132's own 6/8 was likely high. thicc s7 lost at 911: from 346 to 765 every line was judged living, and the opening's chains
   and then 12-15-panel clears breaking 6 garbage cells took the board from 42 panels to 14, then 8-11 under the next slab. The search

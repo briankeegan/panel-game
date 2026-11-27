@@ -266,6 +266,15 @@ static int readBoard_(Read *R) {
     // more of them than a 2x. Run 121 combo s6, 47-60 panels twelve rows high at the fastest rise, lost at 18990)
     // (run 127: off -- run 126 with it 4/8)
     if (0 && pn >= 8 * W) { Aim c = L.aim[2]; L.aim[2] = L.aim[1]; L.aim[1] = L.aim[0]; L.aim[0] = c; }
+    // (run 141: starving, any break first -- a combo of three or more that breaks garbage, ahead of the chains: every aim above asks a
+    // chain or a combo of four, so a plain three-panel break met nothing and the chain breaks were taken however much they cost. Run 139
+    // thicc s7, 645-765: 12-15-panel chains breaking 6 cells, 27 -> 14 panels, lost at 911)
+    if (brk == 1) {
+      for (int i = L.n; i > 0; i--) L.aim[i] = L.aim[i - 1];
+      memset(&L.aim[0], 0, sizeof L.aim[0]);
+      L.aim[0].combo.op = OP_GE; L.aim[0].combo.n = 3; L.aim[0].combo.near = 1; L.aim[0].brk = 1;
+      L.n++;
+    }
     R->list = L;
   }
   // (EIGHT AND UP -- the owner: 8x plus, 9s and 10s alike: in a list that asks combos and no chain, an entry of exactly eight asks eight

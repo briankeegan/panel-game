@@ -437,6 +437,11 @@
 #   panels on lines judged living: 12-15 panels cleared to break 6 cells), chain s8 5479, thicc s8 16911 (queue 29-33), insane s8 9524.
 # run 140 -- run 132's bot plus (rank.c) a starved board's break pays for itself: under garbage below five rows of panels, of two living
 #   lines both breaking garbage, the one whose cells broken less panels cleared is W or more better first. 8 colours s7-8
+# run 140 -- (result) survived 4/8, kept: the 132 family averages ~4 since run 132's 6/8, and its frames played (130640) are second only
+#   to run 132 (141612; runs 137-139 96-109k), the losses later (6450, 12704, 19489, 5597). insane s8 5597: 16 panels sandwiched
+#   between a 3-row slab and the slabs above, no swap breaking either.
+# run 141 -- starving, any break first (decide.c): a combo of three or more breaking garbage asked ahead of the 2x/3x/combo-4 aims --
+#   a plain three-panel break met no aim, so chain breaks were taken whatever they cost (run 139 thicc s7). 8 colours s7-8
 chain_garbage 7 9 9 1 21600 10 colors=8
 combo_storm 7 9 9 1 21600 10 colors=8
 thicc_combo_storm 7 9 9 1 21600 10 colors=8

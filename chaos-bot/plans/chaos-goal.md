@@ -177,6 +177,11 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 132 (2026-11-27 00:06 ET), starving from five rows' worth of panels (30): survived 6/8 on seeds 7-8** (equal to run 131;
+  kept). Lost chain s7 at 8276 (garbage over the whole top, a canyon in columns 2-3, 33-57 panels, 19 clears breaking none in its
+  last minute; it also lost in run 131) and thicc s8 at 3736 (3-wide slabs towered on columns 0-2 to the top while columns 3-5 sat
+  at row 6, under garbage from frame 705 with 25-46 panels, 17 clears breaking none). Both are starving boards above the 30-panel
+  line choosing clears that break nothing. Run 133: starving from six rows' worth (36).
 - **Run 131 (2026-11-26 23:56 ET), the line-up swaps whenever the swapped panels rest: survived 6/8 on seeds 7-8** (run 130, the
   same bot without it: 3/8) -- the best 8-colour run yet. Kept. chain s7 lost at 4143 (2x/3x breaking nothing took 47 panels to 29,
   then starved), insane s8 at 7738. Run 132: starving from five rows' worth of panels.

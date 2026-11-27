@@ -401,6 +401,10 @@
 # run 131 -- (result) line-up swaps whenever the swapped panels rest, 8 colours s7-8: survived 6/8 (run 130: 3/8) -- best yet; kept.
 #   chain s7 lost at 4143 (2x/3x breaking nothing, 47 -> 29 panels, starved), insane s8 7738
 # run 132 -- starving from five rows' worth of panels (30), not four: the chain aims then need a break (decide.c). 8 colours s7-8
+# run 132 -- (result) survived 6/8 (equal to run 131), kept. Lost chain s7 8276 (garbage over the whole top, a canyon in cols 2-3,
+#   33-57 panels, 19 clears breaking none in its last minute) and thicc s8 3736 (3-wide slabs towered on cols 0-2 to the top while
+#   cols 3-5 sat at row 6; 17 clears breaking none, panels 25-46). chain/insane s8, thicc s7 etc now live.
+# run 133 -- starving from six rows' worth (36): under garbage below 36 panels the aims need a break (decide.c). 8 colours s7-8
 chain_garbage 7 9 9 1 21600 10 colors=8
 combo_storm 7 9 9 1 21600 10 colors=8
 thicc_combo_storm 7 9 9 1 21600 10 colors=8

@@ -177,6 +177,9 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 149 (2026-11-27 03:51 ET), the searches 64 x 5: survived 2/8, 90487 frames** -- back to 64 x 6. The planner's shape at 8 colours:
+  24 x 12 3/8, 28 x 10 4/8, 40 x 7 4/8, 52 x 6 5/8, 64 x 6 5/8 (twice), 64 x 5 2/8 -- best near 52-64 wide, 6 deep. Run 150: the extend
+  search a swap deeper (6 -> 7) above six colours.
 - **Run 148 (2026-11-27 03:38 ET), 1'e (flat first) in the 8-colour opening with garbage told: survived 5/8, 131964 frames -- kept.**
   All four seed-8 games lived, combo s8 (its target) among them. Lost combo s7 9068, insane s7 12576 and thicc s7 2320 -- thicc s7 has
   now lost early in seven runs: the opening leaves column 2 hollow, the first slab lands at 694 on 24 panels, and by 766 rows 7-12 are

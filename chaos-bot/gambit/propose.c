@@ -34,8 +34,11 @@ static int32_t colourExtra(void) { return decQ.b && decQ.b->colors > 6 ? decQ.b-
 // Run 145 follows it: per colour over six, 6 wider and half a swap shallower (8 colours 52 x 6))
 // (run 145, 52 x 6: 5/8, 120708 frames -- kept. Run 147: wider again, 12 a colour over six (8 colours 64 x 6))
 static int32_t gpWidth(int32_t w) { int32_t e = colourExtra(); return w + 12 * e; }
-// (run 149: a swap shallower a colour over six (8 colours 64 x 5) -- runs 144-148: 40 x 7 4/8, 52 x 6 5/8, 64 x 6 5/8 twice)
-static int32_t gpDepth(int32_t d) { int32_t e = colourExtra(); return d - e >= 4 ? d - e : d; }
+// (run 149 tried a swap shallower a colour over six (64 x 5): 2/8, 90487 frames -- back to half a swap (64 x 6))
+static int32_t gpDepth(int32_t d) { int32_t e = colourExtra(); return d - e / 2 >= 4 ? d - e / 2 : d; }
+// (run 150: the extend search -- the chains and breaks grown from the board -- a swap deeper above six colours: at 8 colours a break is a
+// longer walk, and the planner's shape (wider, shallower) has been the lever that moved these seeds)
+static int32_t geDepth(int32_t d) { return colourExtra() ? d + 1 : d; }
 
 // ---- the board's state the proposers read
 static int cascadeLive(Board *b) {
@@ -87,7 +90,7 @@ static void startChains(const Read *R, Found *S, double ms) {
     if (!q.b) continue;
     double left = t0 + ms - nowMs();
     if (left < 2) break;
-    ExtOpts eo = { gpWidth(GP->width ? GP->width : 40), (GP->extendDepth ? GP->extendDepth : 6), &R->guides, R->by ? R->by : NOT_ASKED, R->keepOn ? &R->keep : 0,
+    ExtOpts eo = { gpWidth(GP->width ? GP->width : 40), geDepth(GP->extendDepth ? GP->extendDepth : 6), &R->guides, R->by ? R->by : NOT_ASKED, R->keepOn ? &R->keep : 0,
                    left / (ns - j) };
     Ext E;
     extend(&q, &eo, &E);
@@ -167,7 +170,7 @@ static void searchExt(const Read *R, Found *S, double ms) {
   if ((cascadeLive(board) || R->pop) && !GP->extendOff && (ms >= 20 || (opFall && ms >= 2))) {
     // (the opener's chain falling: the floor is not kept -- the panels are the chain's -- and its longest extension is offered, searched
     // as wide and deep as time attack's chain going: the chain puzzles' furthest)
-    int ew = gpWidth(GP->width ? GP->width : 40), ed = (GP->extendDepth ? GP->extendDepth : 6);
+    int ew = gpWidth(GP->width ? GP->width : 40), ed = geDepth(GP->extendDepth ? GP->extendDepth : 6);
     if (opFall) { ew = imax(ew, OP_FALL_WIDTH); ed = imax(ed, OP_FALL_DEPTH); }
     ExtOpts eo = { ew, ed, &S->xAims, R->by ? R->by : NOT_ASKED, R->keepOn && !opFall ? &R->keep : 0, ms, opFall };
     extend(&decQ, &eo, &S->ex); S->haveEx = 1; extLog = S->ex; extLogged = 1;

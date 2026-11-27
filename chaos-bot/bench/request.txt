@@ -468,6 +468,9 @@
 # run 147 -- (result) survived 5/8 (equal to run 145), 117086 frames, late 0 -- kept. Lost combo s7 3022, thicc s7 5252, combo s8 812
 #   (as in run 145: the opening dug columns 1-5 beside an eight-row tower in column 0, the first 6-wide slab perched on it at 707).
 # run 148 -- 1'e (rank.c, flat first among living lines) above six colours with garbage on its way too, while none is on the board. s7-8
+# run 148 -- (result) survived 5/8, 131964 frames (run 147: 117086), late 0 -- kept. All of seed 8 lived (combo s8 too, its target);
+#   combo s7 9068, thicc s7 2320 (lost early in seven runs: buried under rows 7-12 of garbage by 766 with 24 panels), insane s7 12576.
+# run 149 -- the searches a swap shallower a colour over six (8 colours 64 x 5; propose.c gpDepth). 8 colours s7-8
 chain_garbage 7 9 9 1 21600 10 colors=8
 combo_storm 7 9 9 1 21600 10 colors=8
 thicc_combo_storm 7 9 9 1 21600 10 colors=8

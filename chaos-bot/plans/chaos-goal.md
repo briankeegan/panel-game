@@ -177,6 +177,10 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 148 (2026-11-27 03:38 ET), 1'e (flat first) in the 8-colour opening with garbage told: survived 5/8, 131964 frames -- kept.**
+  All four seed-8 games lived, combo s8 (its target) among them. Lost combo s7 9068, insane s7 12576 and thicc s7 2320 -- thicc s7 has
+  now lost early in seven runs: the opening leaves column 2 hollow, the first slab lands at 694 on 24 panels, and by 766 rows 7-12 are
+  garbage. Run 149: the searches a swap shallower (64 x 5 at 8 colours).
 - **Run 147 (2026-11-27 03:25 ET), the searches 64 x 6 at 8 colours: survived 5/8 (equal to run 145), 117086 frames, 0 late -- kept.**
   combo s8 lost at 812 as in run 145 (866): the opening's clears from 431 dug columns 1-5 to rows 3-6 beside an eight-row tower in
   column 0, and the first 6-wide slab perched on it at 707 out of reach -- a loss seen twice, the same way: a fault, not the noise. 1'e

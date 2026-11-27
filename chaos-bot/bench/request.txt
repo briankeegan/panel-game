@@ -442,6 +442,10 @@
 #   between a 3-row slab and the slabs above, no swap breaking either.
 # run 141 -- starving, any break first (decide.c): a combo of three or more breaking garbage asked ahead of the 2x/3x/combo-4 aims --
 #   a plain three-panel break met no aim, so chain breaks were taken whatever they cost (run 139 thicc s7). 8 colours s7-8
+# run 141 -- (result) survived 3/8, 124684 frames (run 140: 4/8, 130640) -- off. Both thicc lived; chain s7 11883, combo s7 5696,
+#   chain s8 14908, combo s8 10723 (queue 24-30), insane s8 16674 (queue 27-31) lost.
+# run 142 -- run 140's bot with the queue-room rule (rank.c, run 100: of two lines, the one leaving the top row empty) from twenty
+#   waiting above six colours, not thirty-five -- the backlog losses died with 24-36 waiting. 8 colours s7-8
 chain_garbage 7 9 9 1 21600 10 colors=8
 combo_storm 7 9 9 1 21600 10 colors=8
 thicc_combo_storm 7 9 9 1 21600 10 colors=8

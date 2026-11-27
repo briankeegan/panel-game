@@ -269,7 +269,8 @@ static int readBoard_(Read *R) {
     // (run 141: starving, any break first -- a combo of three or more that breaks garbage, ahead of the chains: every aim above asks a
     // chain or a combo of four, so a plain three-panel break met nothing and the chain breaks were taken however much they cost. Run 139
     // thicc s7, 645-765: 12-15-panel chains breaking 6 cells, 27 -> 14 panels, lost at 911)
-    if (brk == 1) {
+    // (run 141: 3/8 against run 140's 4/8 -- off)
+    if (0 && brk == 1) {
       for (int i = L.n; i > 0; i--) L.aim[i] = L.aim[i - 1];
       memset(&L.aim[0], 0, sizeof L.aim[0]);
       L.aim[0].combo.op = OP_GE; L.aim[0].combo.n = 3; L.aim[0].combo.near = 1; L.aim[0].brk = 1;

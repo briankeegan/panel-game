@@ -974,7 +974,10 @@ static int compareJudged(const Judge *x, const Judge *y) {
   // (run 106: off while the searches' shape is measured again -- run 105 with it 1/8)
   if (0 && decQ.b->marginTime == 1 && decQ.b->ninc >= CHAOS_QUEUE_LIMIT - QUEUE_LAST && x->o.j.topRow != y->o.j.topRow && !x->o.dead && !y->o.dead)
     return (cmpKey = __LINE__, (x->o.j.topRow ? 1 : -1));
-  if (decQ.b->marginTime == 1 && decQ.b->ninc >= CHAOS_QUEUE_LIMIT - QUEUE_ROOM && x->o.j.topRow != y->o.j.topRow &&
+  // (run 142: above six colours from twenty waiting, not thirty-five -- the 8-colour backlog losses died with 24-36 waiting (runs 135-141:
+  // insane s7/s8, combo s8, thicc s8, queue 24-31 on average over their last 1200 frames): the queue piled while the top row was taken
+  // and then came down at once)
+  if (decQ.b->marginTime == 1 && decQ.b->ninc >= CHAOS_QUEUE_LIMIT - (decQ.b->colors > 6 ? 2 * QUEUE_ROOM : QUEUE_ROOM) && x->o.j.topRow != y->o.j.topRow &&
       !x->o.dead && !y->o.dead && (x->o.lives || diesAt(x) >= rankSave) && (y->o.lives || diesAt(y) >= rankSave))
     return (cmpKey = __LINE__, (x->o.j.topRow ? 1 : -1));
   // (run 117, CHAOS, ABOVE SIX COLOURS, NO CANYON DUG FOR NOTHING: under garbage, of two lines that break the same garbage -- none -- the

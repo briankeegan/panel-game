@@ -177,6 +177,10 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 141 (2026-11-27 02:07 ET), starving, any break asked first: survived 3/8, 124684 frames** (run 140: 4/8, 130640) -- off. Both
+  thicc games lived; chain s7 11883, combo s7 5696, chain s8 14908, combo s8 10723 and insane s8 16674 lost, the last two to backlog
+  (24-31 waiting). Backlog runs through the late losses of runs 135-141. Run 142: the queue-room rule (the top row left empty) from twenty
+  waiting above six colours, not thirty-five.
 - **Run 140 (2026-11-27 01:54 ET), a starved board's break pays for itself: survived 4/8 -- kept** (a judgement against the noise, said
   plainly: below run 132's 6/8, but the 132 family has averaged ~4 since, and its frames played, 130640, are second only to run 132's
   141612 -- runs 137-139 played 96-109k; its losses came later: 6450, 12704, 19489, 5597). insane s8 5597: 16 panels sandwiched between

@@ -10,7 +10,7 @@ on (268 games). Those results do not count. Every mode is redone from the top on
 a mode's reruns stay on its own seeds; no mode ever plays another mode's seeds. Seeds 7-8 stay only the Level 10 six-colour gate.
 
 **Goal now (the owner, 2026-11-27): every mode at chaos Level 10 to 7/8 on its own seeds, one set at a time, in the table's order --
-then back to each for 8/8 (on its own seeds).** (The owner: "7/8 IS GREAT", "If you have that. GO into next mode", "And once all
+then back to each for 8/8 (on its own seeds).** (The owner, 16:35 ET: "Get to 7 before moving on" -- no mode is left below 7/8 on its own seeds.) (The owner: "7/8 IS GREAT", "If you have that. GO into next mode", "And once all
 modes are that good go back and get them all to 100%"; "Not just the colors... other modes as well".) Never below Level 9.
 
 **Mode table (the owner: "Love this table" -- kept here, updated every run; 4 patterns x the mode's 2 seeds = 8 games):**

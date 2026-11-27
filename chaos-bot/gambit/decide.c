@@ -242,7 +242,9 @@ static int readBoard_(Read *R) {
   // level 10 and only stop time halts it; at 8 colours a combo of 8-10 is seldom there, while a 2x -- colours stacked so one clear drops
   // a panel into the next -- buys stop (40 x 1.1^(c-2)) with six panels. The list asks a 2x, then a 3x, then a combo of four or more;
   // the profile's list as it is at six colours and fewer. Runs 101-109 at 8 colours: about 2/8, 12-14k frames on average)
-  if (decQ.b->colors > 6 && R->list.n > 0) {
+  // (run 155: the 8-colour aims off, the profile's own list kept -- run 110 brought them in on the narrow search (40 x 7), measured now
+  // on the wide one (64 x 6))
+  if (0 && decQ.b->colors > 6 && R->list.n > 0) {
     List L; memset(&L, 0, sizeof L);
     // (run 121: starving -- garbage on the board and under four rows' worth of panels -- each aim is met only by a line that breaks
     // garbage (facts.c: brk 1): a chain breaking nothing spends the panels the next break needs. Run 119 thicc s5, 40 -> 13 panels on

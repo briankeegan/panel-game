@@ -484,6 +484,9 @@
 # run 153 -- (result) survived 4/8, 120772 frames (run 151: 5/8, 128433) -- 117 back on. Lost chain s7 11631, combo s7 13370, chain s8
 #   3378, insane s8 5993.
 # run 154 -- run 151's bot with the perched drops offered under garbage above six colours (propose.c, run 122) off. 8 colours s7-8
+# run 154 -- (result) survived 3/8, 134322 frames -- back on. Checked: no late-game slowdown (heap flat at ~1.77 GB, search work per ms
+#   0.62-0.77 from start to end of a 17184-frame game) -- the late losses are play, not the machine.
+# run 155 -- run 151's bot with the 8-colour aims (decide.c: 2x, 3x, combo 4, run 110) off -- the profile's own list -- on the wide search.
 chain_garbage 7 9 9 1 21600 10 colors=8
 combo_storm 7 9 9 1 21600 10 colors=8
 thicc_combo_storm 7 9 9 1 21600 10 colors=8

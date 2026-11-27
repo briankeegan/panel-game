@@ -177,6 +177,9 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 154 (2026-11-27 04:55 ET), perched drops under garbage off above six colours: survived 3/8, 134322 frames** -- back on. Checked
+  for a late-game slowdown (the losses run late now): heap flat at ~1.77 GB, search work per ms 0.62-0.77 throughout a 17184-frame game --
+  none. Run 155 measures the 8-colour aims (run 110) off on the wide search.
 - **Run 153 (2026-11-27 04:42 ET), rule 117 off: survived 4/8, 120772 frames** -- back on. Run 154 measures the perched drops offered
   under garbage above six colours (run 122) off.
 - **Run 152 (2026-11-27 04:29 ET), the searches 76 x 6: survived 2/8, 111422 frames** -- back to 64 x 6 (width at 8 colours, 6 deep: 52

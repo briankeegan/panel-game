@@ -1966,6 +1966,18 @@ static void sortJudged(Judge **a, int n) {
       while (j < hi) tmp[k++] = a[j++];
       for (k = lo; k < hi; k++) a[k] = tmp[k];
     }
+  // (THE TOP BEATS THE MOST HEAD TO HEAD -- the owner: the order and the line played must not disagree. The keys are not transitive
+  // (each pair is decided by the first rule whose conditions that pair meets; lostAlike buckets losses, so A~B and B~C with A, C apart),
+  // so the merge sort above can end with a top that loses to the next line compared alone: run 180's labels, 502 of 8369 decisions
+  // (won=inv). The line that beats the most others compared alone is put on top -- a line that beats every other wherever there is one;
+  // among equals the sort's own order stands)
+  if (n > 2) {
+    int32_t keep = cmpKey; int best = 0, bestW = -1;
+    for (int i = 0; i < n; i++) { int w = 0; for (int j = 0; j < n; j++) if (j != i && compareJudged(a[i], a[j]) < 0) w++;
+      if (w > bestW) { bestW = w; best = i; } }
+    if (best > 0) { Judge *e = a[best]; for (int q = best; q > 0; q--) a[q] = a[q - 1]; a[0] = e; }
+    cmpKey = keep;
+  }
   outlivingFirst(a, n);
   // (THE EIGHT THAT BEATS THE TOP IS THE TOP: the keys are not transitive -- an eight put first by the finish's own key beside the line
   // on top can end below it through a third line -- so in finish them, the first eight offered whole that the order puts before the top

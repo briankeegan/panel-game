@@ -1220,7 +1220,8 @@ static int ranked(const Read *R, const Found *S) {
   // not transitive, and the cuts above drop lines after the last sort: the two left on top may never have been compared. Where the
   // second beats the top compared alone, the two change places, once, after every cut; a line put on top on purpose above (the hold for a
   // needless swap, rankMoved) stays)
-  if (n > 1 && !rankMoved) { int32_t keep = cmpKey; if (compareJudged(order[1], order[0]) < 0) { Judge *e = order[0]; order[0] = order[1]; order[1] = e; } cmpKey = keep; }
+  // (run 186 did this: 0 inversions over 6985 decisions, survived 5/8 against run 180's 7/8 -- off by the rule kept; the owner may keep it)
+  if (0 && n > 1 && !rankMoved) { int32_t keep = cmpKey; if (compareJudged(order[1], order[0]) < 0) { Judge *e = order[0]; order[0] = order[1]; order[1] = e; } cmpKey = keep; }
   phaseMs[0] = (int32_t)(t1 - t0); phaseMs[1] = (int32_t)(t2 - t1); phaseMs[2] = (int32_t)(nowMs() - t2);
   return n;
 }

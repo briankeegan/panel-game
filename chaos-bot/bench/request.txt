@@ -633,6 +633,12 @@
 #   after the last sort (the wasted three, the window, the short chain, amid the garbage), leaving a top pair never compared.
 # run 186 -- run 180's bot plus: the top pair made to agree at the end of decide.c rank(), after every cut (not where a line was put on
 #   top on purpose). 8 colours s7-8
+# run 186 -- (result) survived 5/8, 125766 frames -- off by the rule kept (run 180: 7/8); 0 order inversions over 6985 decisions (the
+#   owner's ask met: the order and the line played agree), 58 moved on top on purpose, 243 drift (old label state), 324 ties. Lost thicc
+#   s8 992 and insane s8 2221 (the seed-8 opening: from 614 a 2-chain breaking nothing carried 250 frames under the unrested first slab by
+#   the credit step, '1. lives before does not'), chain s7 14553.
+# run 187 -- run 180's bot plus: creditPair's no-break credit rule (rank.c 903-904) reads the first slab not yet resting too (own record
+#   of garbage resting), above six colours; the break-first rules as before. 8 colours s7-8
 chain_garbage 7 9 9 1 21600 10 colors=8
 combo_storm 7 9 9 1 21600 10 colors=8
 thicc_combo_storm 7 9 9 1 21600 10 colors=8

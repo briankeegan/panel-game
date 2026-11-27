@@ -177,6 +177,9 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 186 (2026-11-27 13:10 ET), the top pair agrees at the end of rank(): survived 5/8, 125766 frames, 0 inversions** -- off by the
+  rule kept (run 180 7/8); the owner may keep it (the order and the line played agree on every decision). Run 187: run 180 plus the
+  creditPair rule reading the unrested first slab (the seed-8 opening's 2-chain carried by the credit step).
 - **Run 185 (2026-11-27 12:54 ET), the top pair agrees in the sort: survived 2/8, 114145 frames** -- reverted; inversions not fewer
   (56/6410): rank() drops lines after the last sort. Run 186: the top pair made to agree at the end of rank(), after every cut.
 - **Run 184 (2026-11-27 12:37 ET), the needless-swap hold override off under garbage: survived 4/8, 127662 frames** -- reverted. True

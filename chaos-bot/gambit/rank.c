@@ -634,6 +634,25 @@ static int breakOffered = 1;
 // of cleared panels at two rows' worth: 3/8. Removed)
 // (run 181 had run 176's first-slab break rule on run 180's bot: 3/8, five lost by 2608 -- the break-first rules put breaks of 6 on the
 // unrested slab before building, 541-953 chain s7. Removed)
+// (run 187: the creditPair rule alone -- a no-break line's horizon credit taken back beside a break lost within a break's time of it --
+// reads the first slab not yet resting on the stack too (its own record of garbage resting), above six colours; the break-first rules
+// as before. The seed-8 opening (run 186 thicc s8, as in runs 169-185): from 614 a 2-chain breaking nothing carried for 250 frames
+// under the unrested first slab by the credit step ('1. lives before does not'), lost at 992)
+static int32_t restSeen, restClock = -1;
+static int garbOnBoard(void) {
+  static const Board *atB; static int32_t atClock = -1, on;
+  if (decQ.b != atB || decQ.b->clock != atClock) {
+    atB = decQ.b; atClock = decQ.b->clock; on = 0;
+    for (int r = 1; r < decQ.b->nrows && !on; r++) for (int c = 1; c <= W; c++) if (decQ.b->p[r][c].f[ISGARBAGE]) { on = 1; break; }
+  }
+  return on;
+}
+static int underCredit(void) {
+  if (decQ.b->clock < restClock) restSeen = 0;   // (a new game)
+  restClock = decQ.b->clock;
+  if (decF.under) restSeen = 1;
+  return decF.under || (decQ.b->colors > 6 && !restSeen && garbOnBoard());
+}
 static int32_t waitOf(void);
 static int cascadeLive(Board *b);   // (propose.c: the board still moving of its own)
 // (the window as the next block finds it: at its landing with one on its way, else EARLIEST_LANDING)
@@ -906,8 +925,8 @@ static void creditPair(const Judge *x, const Judge *y, int *lxo, int *lyo) {
   // (nor, under garbage, the credit of a line that breaks nothing beside a break lost within a break's time of it: the break is the way
   // out the board has, the horizon is a promise -- r1363, 14839: a 4x stall in progress lost at 296 kept over a break lost at 282, and no
   // break offered again; r1362, 16120)
-  if (lx && !x->o.lives && decF.under && brokeSeen(x) <= 0 && !y->hold && !y->o.dead && y->apBroke > 0 && diesAt(x) - diesAt(y) < rankSave) lx = 0;
-  if (ly && !y->o.lives && decF.under && brokeSeen(y) <= 0 && !x->hold && !x->o.dead && x->apBroke > 0 && diesAt(y) - diesAt(x) < rankSave) ly = 0;
+  if (lx && !x->o.lives && underCredit() && brokeSeen(x) <= 0 && !y->hold && !y->o.dead && y->apBroke > 0 && diesAt(x) - diesAt(y) < rankSave) lx = 0;
+  if (ly && !y->o.lives && underCredit() && brokeSeen(y) <= 0 && !x->hold && !x->o.dead && x->apBroke > 0 && diesAt(y) - diesAt(x) < rankSave) ly = 0;
   // (IN FINISH THEM, A BOARD THAT STANDS TWICE THE HORIZON IS SAFE -- the owner: survival is not pushed where the board is not dying: a
   // line whose board is lost FINISH_SAFE or more from now, its next moves played (diesAt: its own loss or the life after it), survives as
   // one that lives does, and the combos decide between them)

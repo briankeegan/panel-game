@@ -94,6 +94,24 @@ ACT = {
     'ready': 'readying a break for the garbage coming', 'toward': 'walking toward an attack', 'raise': 'raising', 'setup': 'setting up',
 }
 
+# (the name a key is labelled with: the same reading as the run's report (bench/report.py won_name) -- the rule is the top-level statement
+# holding the return, named by the comment over it; the nearest numbered heading above is not the rule where the key sits between rules)
+_REPORT = None
+def rank_name(n, rules):
+    global _REPORT
+    if _REPORT is None:
+        try:
+            import importlib.util
+            spec = importlib.util.spec_from_file_location('report', os.path.join(HERE, '..', 'bench', 'report.py'))
+            _REPORT = importlib.util.module_from_spec(spec); spec.loader.exec_module(_REPORT)
+        except Exception:
+            _REPORT = False
+    if _REPORT:
+        w = _REPORT.won_name('k%d:x' % n)
+        m = re.match(r'k\d+:x\[rank\.c:(.*)\]$', w)
+        if m: return m.group(1)
+    return rules.get(n, 'rank.c %d' % n)
+
 DECIDED = {'drift': 'first in the order; compared again after the decision the keys no longer put it first (state moved)', 'only': 'the only line offered', 'tie': 'the order\'s keys left it alike with the next (kept first)',
            'raise': 'the raise', 'none': 'nothing offered'}
 _DEC = None
@@ -118,7 +136,7 @@ def describe(l, rules):
     life = 'lives' if f.get('v') == 'lives' else ('every option loses the board' if f.get('v') == 'dies' else '')
     key = f.get('won', '')
     km = re.match(r'k(\d+):(\S+)', key)
-    rule = ('rule: %s (over %s)' % (rules.get(int(km.group(1)), 'rank.c %s' % km.group(1)), km.group(2))) if km else ''
+    rule = ('rule: %s (over %s)' % (rank_name(int(km.group(1)), rules), km.group(2))) if km else ''
     # (every decision labelled: won=d<line> -- decide.c's playOf put another line in the order's first place; only, tie, raise, none)
     dm = re.match(r'd(\d+):(\S+)', key)
     if dm: rule = 'rule: decide.c %s %s (over the order\'s first, %s)' % (dm.group(1), decide_place(int(dm.group(1))), dm.group(2))

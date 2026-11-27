@@ -181,6 +181,9 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 194 (2026-11-27 15:35 ET), NO STOP TIME at L10, run 180's bot: survived 6/8, 145364 frames** -- below 7/8. combo s7 3652: the
+  mode's goals (1b) and the plan kept carried a combo breaking nothing under garbage where combos buy no stop. Run 195: 1b does not decide
+  between two dying lines under garbage in game modes 3+. describe.py's names fixed (bare keys were named after the run-167 rule).
 - **Run 193 (2026-11-27 15:20 ET), 1HP at L10, run 180's bot: survived 8/8** -- done. Run 194: no stop time (mode=3) at L10.
 - **Run 192 (2026-11-27 15:08 ET), CHAOS MODE at L10, run 180's bot: survived 8/8, full health every game** -- done. Run 193: 1HP
   (mode=2) at L10.

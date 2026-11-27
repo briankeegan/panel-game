@@ -1334,7 +1334,10 @@ static int compareJudged(const Judge *x, const Judge *y) {
       if (ox - oy >= rankSave && extCounts(y) && !extCounts(x)) return (cmpKey = __LINE__, -1);
     }
   }
+  // (THE WALK TURNS IT: neither lives, and the walk charged is what puts one ahead -- the later loss on the boards as they are first)
   if (!lx && walkTurns(x, y)) return (cmpKey = __LINE__, (diesAt(y) > diesAt(x) ? 1 : -1));
+  // (SURVIVAL FIRST, THE LATER LOSS: neither lives and the two are not lost alike -- the one lost later first; the '1. (neither lives)
+  // SURVIVAL FIRST' rule above, applied here after the exceptions to it)
   if (!lx && !lostAlike(x, y) && !boughtWithPanels(x, y) && !goalNoSooner && lostOf(x) != lostOf(y)) return (cmpKey = __LINE__, (lostOf(y) > lostOf(x) ? 1 : -1));
   // (neither lives, lost alike, under garbage, the window short) OF TWO BREAKS, THE CHEAPER: the game allows 76 actions in 600 frames, a
   // block lands every 100-150 in factory and a break walks 15-25 -- once the window holds less than three breaks' walks, the break that
@@ -1657,7 +1660,10 @@ static int compareJudged(const Judge *x, const Judge *y) {
     double lo = lostOf(x) < lostOf(y) ? lostOf(x) : lostOf(y), hi = lostOf(x) < lostOf(y) ? lostOf(y) : lostOf(x);
     // (time attack: nothing coming, the rise never still -- of two that do not live the later loss decides, never the goal: a board held
     // for the mode's goal while it climbs is one that runs out of ways to live)
-    if (lx || (!ruleNoEnemy && lo >= rankSave && hi - lo < rankSave)) {
+    // (run 195: nor under garbage where no clear buys stop time (game mode 3 and up: ca.c awardStopTime) -- of two that do not live there
+    // the mode's attack is no way to live. Run 194 no stop time combo s7: 2979 the hold kept by this rule, 3017-3123 a combo of 6 breaking
+    // nothing carried while the board ran from 109 frames to 1, lost at 3652)
+    if (lx || (!ruleNoEnemy && !(decQ.b->gameMode >= 3 && decF.under) && lo >= rankSave && hi - lo < rankSave)) {
       int gx = goalKeyUnder(x), gy = goalKeyUnder(y);
       if (gx != gy) return (cmpKey = __LINE__, (gx - gy));
       // (and of two that make the first entry, or two set-ups toward it, the fewer presses: the owner, the goal first and the shortest

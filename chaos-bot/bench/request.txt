@@ -664,6 +664,12 @@
 # run 193 -- THE NEXT MODE: 1HP (mode=2) at Level 10, 6 colours, seeds 7-8, run 180's bot. 1HP s7-8
 # run 193 -- (result) 1HP: survived 8/8, 172800 frames -- DONE.
 # run 194 -- THE NEXT MODE: no stop time (mode=3) at Level 10, 6 colours, seeds 7-8, run 180's bot. NST s7-8
+# run 194 -- (result) no stop time: survived 6/8, 145364 frames -- below 7/8. Lost combo s7 3652 (2979 the hold kept by rank.c '1b. THE
+#   MODE'S GOALS'; 3017-3123 a combo of 6 breaking nothing carried by THE PLAN KEPT while the board ran from 109 frames to 1) and thicc s7
+#   11312. Labels: describe.py named the bare keys (the later loss first, the walk turns it) after the nearest numbered heading -- the
+#   run-167 rule; it now names them as the report does, and rank.c names those keys.
+# run 195 -- run 180's bot plus: under garbage where no clear buys stop time (game mode 3 and up), rule 1b (the mode's goals) does not
+#   decide between two that do not live (rank.c). No stop time s7-8 again
 chain_garbage 7 9 9 1 21600 10 mode=3
 combo_storm 7 9 9 1 21600 10 mode=3
 thicc_combo_storm 7 9 9 1 21600 10 mode=3

@@ -254,7 +254,9 @@ static int readBoard_(Read *R) {
     // (run 129: with garbage on the board at all, not only starving -- run 128's losses chose 15-25 clears breaking nothing a minute,
     // 140-180 panels, with 19-32 pieces waiting)
     // (run 129 asked it under garbage at all: 3/8 -- back to starving only)
-    int32_t brk = F->known[FACT_US_CONTACT] && pn < 4 * W ? 1 : -1;
+    // (run 132: starving from five rows' worth, not four -- run 131 chain s7, 2x/3x clears breaking nothing took 47 panels to 29 before
+    // the rule began, then starved under garbage held on the right tower, lost at 4143)
+    int32_t brk = F->known[FACT_US_CONTACT] && pn < 5 * W ? 1 : -1;
     L.aim[0].chain.op = OP_EQ; L.aim[0].chain.n = 2; L.aim[0].chain.near = 1; L.aim[0].brk = brk;
     // (run 125 dropped the 3x: 8 colours s5-6 about 2/8 -- back)
     L.aim[1].chain.op = OP_EQ; L.aim[1].chain.n = 3; L.aim[1].chain.near = 1; L.aim[1].brk = brk;

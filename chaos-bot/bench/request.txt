@@ -398,6 +398,9 @@
 # run 130 -- (result) run 122's bot, 8 colours L10 new seeds 7-8: survived 3/8 (thicc s8 73 frames short; combo s7 7880, thicc s7
 #   20056, insane s7 18272, insane s8 1812) -- late losses with 24-36 waiting, no line, 15-22 holds a minute
 # run 131 -- the line-up swaps offered whenever the swapped panels rest, not only on a board with nothing moving (propose.c). s7-8
+# run 131 -- (result) line-up swaps whenever the swapped panels rest, 8 colours s7-8: survived 6/8 (run 130: 3/8) -- best yet; kept.
+#   chain s7 lost at 4143 (2x/3x breaking nothing, 47 -> 29 panels, starved), insane s8 7738
+# run 132 -- starving from five rows' worth of panels (30), not four: the chain aims then need a break (decide.c). 8 colours s7-8
 chain_garbage 7 9 9 1 21600 10 colors=8
 combo_storm 7 9 9 1 21600 10 colors=8
 thicc_combo_storm 7 9 9 1 21600 10 colors=8

@@ -177,6 +177,9 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 131 (2026-11-26 23:56 ET), the line-up swaps whenever the swapped panels rest: survived 6/8 on seeds 7-8** (run 130, the
+  same bot without it: 3/8) -- the best 8-colour run yet. Kept. chain s7 lost at 4143 (2x/3x breaking nothing took 47 panels to 29,
+  then starved), insane s8 at 7738. Run 132: starving from five rows' worth of panels.
 - **Run 130 (2026-11-26 23:45 ET), run 122's bot on new seeds 7-8: survived 3/8** (thicc s8 73 frames short). Late losses with 24-36
   waiting, no line found, 15-22 holds in the last 1200 frames. Run 131: the line-up swaps whenever the swapped panels rest.
 - **Run 129 (2026-11-26 23:35 ET), the chain aims need a break under garbage at all: survived 3/8.** Back. Since run 122 (5/8 on

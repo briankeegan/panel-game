@@ -2,12 +2,13 @@
 
 ## NOW -- the one goal, and the standing orders (the owner, 2026-11-27: "Set your goal so it's clear and you don't keep stopping")
 
-**Goal now: 8 colours at chaos Level 10 survives 8/8 games to 6:00 on a seed set, then 8/8 on a new seed set, the bot unchanged.**
+**Goal now (the owner, 2026-11-27 14:30 ET): every mode at chaos Level 10 to 7/8 -- 8 colours done (run 180: 7/8); now 7 colours -- then back to each for 8/8.** (Was: 8 colours 8/8 twice.)
 Then the next weakest mode, one at a time (7 colours, chaos margin, Line Clear, the queue limit), each to 8/8 twice, never below Level 9,
 the Level 10 six-colour gate kept. Done only when every mode holds. (The owner, 2026-11-27: "Not just the colors... other modes as
 well" -- once colours are done, every other mode: 7 colours, chaos margins 2/3/4, chaos mode, 1HP, NST, BALL, Line Clear, the queue
 limit, training_random, Challenge Mode to Impossible.) (The owner, 2026-11-27 14:30 ET: "7/8 IS GREAT" -- run 180's 7/8 at 8 colours
-counts; after run 189 the best of 180/189 is kept and the next mode begins: 7 colours at Level 10, then the rest in turn.)
+counts; "If you have that. GO into next mode" -- run 190: 7 colours at Level 10 with run 180's bot. "And once all modes are that good
+go back and get them all to 100%" -- every mode to 7/8 first, then each to 8/8.)
 
 **Standing orders -- every step, no exceptions:**
 1. **A run is always going.** The moment a run finishes, the next one is pushed -- before writing to the owner, before reading at

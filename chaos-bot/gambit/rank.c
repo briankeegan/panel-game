@@ -1366,8 +1366,8 @@ static int compareJudged(const Judge *x, const Judge *y) {
   // or are lost alike and break the same garbage, the one leaving more breaks a swap away (judge.c readyOf: a single swap that makes a
   // match touching garbage), then more matches a swap away -- at 8 colours a match seldom arrives by itself, and runs 101-106 found no
   // break on 57% of decisions under garbage
-  // (run 128: off, to measure it -- it decides most ties at 8 colours and was never measured alone on seeds 5-6)
-  if (0 && decQ.b->colors > 6 && (lx || lostAlike(x, y)) && imax(0, x->apBroke) == imax(0, y->apBroke)) {
+  // (run 128 measured it off: 4/8 against 5/8 on -- kept on)
+  if (decQ.b->colors > 6 && (lx || lostAlike(x, y)) && imax(0, x->apBroke) == imax(0, y->apBroke)) {
     if (x->o.j.readyBreak != y->o.j.readyBreak) return (cmpKey = __LINE__, (x->o.j.readyBreak > y->o.j.readyBreak ? -1 : 1));
     if (x->o.j.swapReady != y->o.j.swapReady) return (cmpKey = __LINE__, (x->o.j.swapReady > y->o.j.swapReady ? -1 : 1));
   }

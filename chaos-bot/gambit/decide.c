@@ -251,7 +251,9 @@ static int readBoard_(Read *R) {
     // garbage, 2885-3058 clears of 12-14 panels breaking nothing, 33 -> 15 panels, lost at 3408)
     int32_t pn = panelsOn(decQ.b);
     // (run 124: back to the panels alone -- run 123 with the garbage weighed 4/8)
-    int32_t brk = F->known[FACT_US_CONTACT] && pn < 4 * W ? 1 : -1;
+    // (run 129: with garbage on the board at all, not only starving -- run 128's losses chose 15-25 clears breaking nothing a minute,
+    // 140-180 panels, with 19-32 pieces waiting)
+    int32_t brk = F->known[FACT_US_CONTACT] ? 1 : -1; (void)pn;
     L.aim[0].chain.op = OP_EQ; L.aim[0].chain.n = 2; L.aim[0].chain.near = 1; L.aim[0].brk = brk;
     // (run 125 dropped the 3x: 8 colours s5-6 about 2/8 -- back)
     L.aim[1].chain.op = OP_EQ; L.aim[1].chain.n = 3; L.aim[1].chain.near = 1; L.aim[1].brk = brk;

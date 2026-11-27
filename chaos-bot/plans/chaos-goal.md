@@ -177,6 +177,8 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 128 (2026-11-26 23:24 ET), 1'h off: survived 4/8** (on: 5/8) -- back on. Losses chose 15-25 clears breaking nothing a minute
+  (140-180 panels) with 19-32 pieces waiting. Run 129: under garbage at all the chain aims need a break.
 - **Run 127 (2026-11-26 23:14 ET), panel columns kept even under garbage: survived 1/8.** Off. Ten changes since run 122 all worse;
   the tie-breaking rules above six colours decide most decisions and move far more than the loss aimed at. Run 128: 1'h (colours lined
   up) off, to measure it alone.

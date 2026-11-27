@@ -389,6 +389,9 @@
 # run 127 -- (result) panel columns kept even under garbage, 8 colours s5-6: survived 1/8. Off
 # run 128 -- run 122's bot with 1'h (the colours lined up, run 107) off: it decides most ties at 8 colours and was never measured
 #   alone on these seeds. 8 colours L10 s5-6
+# run 128 -- (result) 1'h off, 8 colours s5-6: survived 4/8 (on: 5/8). Back on
+# run 129 -- with garbage on the board at all the chain aims need a break (decide.c brk 1, not only starving): run 128's losses chose
+#   15-25 clears breaking nothing a minute with 19-32 pieces waiting. 8 colours L10 s5-6
 chain_garbage 5 9 9 1 21600 10 colors=8
 combo_storm 5 9 9 1 21600 10 colors=8
 thicc_combo_storm 5 9 9 1 21600 10 colors=8

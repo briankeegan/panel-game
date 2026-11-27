@@ -28,14 +28,22 @@ cmd() {
   local idle=""; if command -v chrt >/dev/null 2>&1; then idle="chrt -i 0"; fi
   echo "$idle nice -n 19 $pin bash \"$GITHUB_WORKSPACE/dashboard/live_publish.sh\""
 }
+# A publish's lines go out AS THEY COME (they used to wait for it to finish, so a publish that never finished said nothing at all), and one
+# that runs past PUBLISH_MAX (15 min) is stopped and said so: the next publish makes every game again, so nothing is lost by stopping it,
+# while a stuck one would hold back every game after it for the rest of the run (r76, Nov 27: three games, nothing published, nothing said).
+PUBLISH_MAX=${PUBLISH_MAX:-900}
 publish() {
-  local out pid paused=0; out=$(mktemp)
-  setsid bash -c "$(cmd)" >"$out" 2>&1 & pid=$!
+  local pid t0; t0=$(date +%s)
+  setsid bash -c "$(cmd)" > >(sed -u 's/^/[publish] /') 2>&1 & pid=$!
   while kill -0 "$pid" 2>/dev/null; do
     if ! kill -0 "$parent" 2>/dev/null; then kill -TERM -- "-$pid" 2>/dev/null; break; fi
+    if [ $(( $(date +%s) - t0 )) -ge "$PUBLISH_MAX" ]; then
+      echo "[publish] STUCK: still running after $PUBLISH_MAX s -- stopped; the next publish makes every game again"
+      kill -TERM -- "-$pid" 2>/dev/null; sleep 5; kill -KILL -- "-$pid" 2>/dev/null; break
+    fi
     sleep "$WATCH"
   done
-  wait "$pid" 2>/dev/null; sed -u 's/^/[publish] /' < "$out"; rm -f "$out"
+  wait "$pid" 2>/dev/null
 }
 seenGames=0; seenSets=0; pending=0; pendingSince=0; lastPub=$(date +%s)
 while kill -0 "$parent" 2>/dev/null; do

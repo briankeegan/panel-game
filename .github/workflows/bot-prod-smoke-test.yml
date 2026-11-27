@@ -615,7 +615,9 @@ jobs:
           # and at least every 20 minutes while games keep coming): dashboard/live_loop.sh. A side job that never touches the bot; its lines
           # reach this step's log prefixed [publish], so a publish that fails is visible there
           if [ "$kind" = gambit ] && [ "${DASH_LIVE:-1}" = 1 ]; then
-            GH_TOKEN="${{ github.token }}" nice -n 19 bash "$GITHUB_WORKSPACE/dashboard/live_loop.sh" "$$" &
+            # (its lines also go to publish.log, which the heartbeat sends with the bot's log: a publish that fails shows while the run is on --
+            # the step's log cannot be read until the run is over)
+            GH_TOKEN="${{ github.token }}" nice -n 19 bash "$GITHUB_WORKSPACE/dashboard/live_loop.sh" "$$" > >(tee -a "$RUNNER_TEMP/publish.log") 2>&1 &
             livepid=$!
           fi
           # THE BOT AND A WATCHER RUN KEEP EACH OTHER UP. A runner can be taken away (the log ends with "The runner has received a shutdown
@@ -656,6 +658,8 @@ jobs:
                 if [ $((beat % 2)) = 1 ]; then
                   lpath="status/$key-log.txt"
                   ltxt=$(tail -n 150 "$GITHUB_WORKSPACE/bot-prod-smoke.log" 2>/dev/null | cut -c1-300 || true)
+                  # ... and the stats page's side: the last 30 [publish] lines (dashboard/live_loop.sh), in the same file, no extra commit
+                  ltxt="$ltxt"$'\n'"--- publish (the last 30 lines) ---"$'\n'"$(tail -n 30 "$RUNNER_TEMP/publish.log" 2>/dev/null | cut -c1-300 || echo 'nothing yet')"
                   lsha=$(put "$lpath" "$(printf 'run %s, as of %s\n%s\n' "$GITHUB_RUN_ID" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$ltxt" | base64 -w0)" "$lsha")
                 fi
                 # STATUS EVERY MINUTE. Each write is a commit, and GitHub allows ~500 commit-making calls/hour (the secondary limit, tighter

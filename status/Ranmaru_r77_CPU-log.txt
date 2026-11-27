@@ -1,20 +1,4 @@
-run 46065716319, as of 2026-11-27T21:52:56Z
-opponent topped out: clock 930 stopWatch 742 stop 0 pre-stop 0 shake 62 health 51, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 960 stopWatch 772 stop 0 pre-stop 0 shake 32 health 51, top rows r12=gggggg r11=gggggg r10=gggggg
-garbage landed: our stopWatch 797 clock 985, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
-opponent topped out: clock 990 stopWatch 802 stop 0 pre-stop 0 shake 2 health 51, top rows r12=ggg000 r11=gggggg r10=gggggg
-opponent topped out: clock 1020 stopWatch 832 stop 0 pre-stop 0 shake 47 health 51, top rows r12=ggg000 r11=gggggg r10=gggggg
-opponent topped out: clock 1050 stopWatch 862 stop 0 pre-stop 0 shake 17 health 51, top rows r12=ggg000 r11=gggggg r10=gggggg
-opponent topped out: clock 1080 stopWatch 892 stop 0 pre-stop 0 shake 0 health 39, top rows r12=ggg000 r11=gggggg r10=gggggg
-opponent topped out: clock 1080 stopWatch 892 stop 0 pre-stop 0 shake 0 health 39, top rows r12=ggg000 r11=gggggg r10=gggggg
-opponent topped out: clock 1080 stopWatch 892 stop 0 pre-stop 0 shake 0 health 39, top rows r12=ggg000 r11=gggggg r10=gggggg
-opponent topped out: clock 1110 stopWatch 922 stop 0 pre-stop 61 shake 0 health 39, top rows r12=ggg000 r11=gggggg r10=gggggg
-opponent topped out: clock 1140 stopWatch 952 stop 0 pre-stop 31 shake 0 health 39, top rows r12=ggg000 r11=gggggg r10=gggggg
-opponent topped out: clock 1170 stopWatch 982 stop 0 pre-stop 1 shake 0 health 39, top rows r12=ggg000 r11=gggggg r10=gggggg
-opponent topped out: clock 1200 stopWatch 1012 stop 140 pre-stop 61 shake 0 health 39, top rows r12=ggg000 r11=gggggg r10=gggggg
-opponent topped out: clock 1230 stopWatch 1042 stop 140 pre-stop 31 shake 0 health 39, top rows r12=ggg000 r11=gggggg r10=gggggg
-opponent topped out: clock 1260 stopWatch 1072 stop 140 pre-stop 76 shake 0 health 39, top rows r12=ggg000 r11=gggggg r10=gggggg
-opponent topped out: clock 1290 stopWatch 1102 stop 140 pre-stop 46 shake 0 health 39, top rows r12=ggg000 r11=gggggg r10=gggggg
+run 46065716319, as of 2026-11-27T21:55:00Z
 opponent topped out: clock 1320 stopWatch 1132 stop 140 pre-stop 16 shake 0 health 39, top rows r12=ggg000 r11=gggggg r10=gggggg
 garbage landed: our stopWatch 1147 clock 1335, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
 opponent topped out: clock 1350 stopWatch 1162 stop 126 pre-stop 0 shake 0 health 39, top rows r12=ggg000 r11=gggggg r10=gggggg
@@ -149,6 +133,22 @@ match over — bot won (pace: worst 5.84 frames off schedule); waiting for a rem
 memory after match: rss 4406996 kB, threads 9, lua 55905 kB
 game about to start: both players are ready
 set over: the room is closed, back in the lobby
+game about to start: both players are ready
+match start: building the match (seed nil, stage nil, opponent ?)
+match start: the match is built
+match start: the match is started
+match start: gambit: creating the link
+match start: gambit: the link is created
+match start: gambit: the link is starting the match
+match start: gambit: the link has started the match
+both ready — match starting
+garbage landed: our stopWatch 435 clock 623, transits in flight before this frame {}, opponent copy 2 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 440 clock 628, transits in flight before this frame {}, opponent copy 2 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 444 clock 632, transits in flight before this frame {}, opponent copy 2 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 574 clock 762, transits in flight before this frame {574}, opponent copy 2 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 589 clock 777, transits in flight before this frame {}, opponent copy 2 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 1066 clock 1254, transits in flight before this frame {1066}, opponent copy 2 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 1578 clock 1766, transits in flight before this frame {}, opponent copy 2 frames behind, rollbacks so far 0
 --- publish (the last 30 lines) ---
 [publish] 26 games finished so far; between two games of a set; the last publish 61 s ago
 [publish] publishing the games so far (26 finished)

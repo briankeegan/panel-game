@@ -623,6 +623,12 @@
 #   than its walk (and of a line of alike swaps), after the sort, unlabelled.
 # run 184 -- run 180's bot plus: that needless-swap hold override off above six colours under garbage (where run 180 puts a move before
 #   the hold). Every move on top after the sort labelled (won=moved:d<line> decide.c, moved:k<line> rank.c). 8 colours s7-8
+# run 184 -- (result) survived 4/8, 127662 frames -- reverted (back to run 180). The order against itself over 7095 decisions: 79 true
+#   inversions (1.1%; 44 the hold played first), 14 moved on top after the sort (decide.c 1213 x7, 1219 x2, rank.c outlivingFirst x5),
+#   224 drift, 322 ties. The true inversions are the sort's: the keys are not transitive, and inside one half of the merge the top rises
+#   over a line it never meets, through a third.
+# run 185 -- run 180's bot plus: where the second line beats the top compared alone, the two change places after the sort (rank.c
+#   sortJudged) -- nothing else in the order moves. 8 colours s7-8
 chain_garbage 7 9 9 1 21600 10 colors=8
 combo_storm 7 9 9 1 21600 10 colors=8
 thicc_combo_storm 7 9 9 1 21600 10 colors=8

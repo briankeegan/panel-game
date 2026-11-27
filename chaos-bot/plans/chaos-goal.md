@@ -177,6 +177,9 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 184 (2026-11-27 12:37 ET), the needless-swap hold override off under garbage: survived 4/8, 127662 frames** -- reverted. True
+  inversions 1.1% (44/79 the hold first) -- cycles in the merge sort, not the override; post-sort moves 0.2%; drift 3.2%; ties 4.5%.
+  Run 185: the top pair made to agree (the second over the top where it beats it compared alone).
 - **Run 183 (2026-11-27 12:19 ET), high-opening rule capped on run 180: survived 1/8, 78840 frames** -- reverted. The order measured
   in playOf: 1.5% inverted, 2.8% drift (the old label's state), 4.8% ties; 45 of 69 inversions are decide.c rank() putting the hold on top
   after the sort (needless one-swap line). Run 184: that override off above six colours under garbage; post-sort moves labelled.

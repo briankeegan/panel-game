@@ -57,6 +57,12 @@ jobs:
         with:
           path: /tmp/love.tar.gz
           key: chaosbot-love-12.0-linux-x86_64
+      - name: chaos client, cached
+        # (the pinned client zip kept between runs -- run 187 lost 7 of 8 games twice to its download answering 504)
+        uses: actions/cache@v4
+        with:
+          path: /tmp/chaosbot-zip
+          key: chaosbot-client-test-build-v3-ec5baf00
       - name: xvfb, love, clang
         run: |
           APT="-o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o DPkg::Lock::Timeout=120"
@@ -76,6 +82,7 @@ jobs:
           CHAOSBOT_COLORS: ${{ matrix.game.colors }}
           CHAOSBOT_CHALLENGE: ${{ matrix.game.challenge }}
           CHAOSBOT_PROFILE: ${{ matrix.game.profile }}
+          CHAOSBOT_ZIP_CACHE: /tmp/chaosbot-zip
         run: |
           g='${{ toJSON(matrix.game) }}'
           bash chaos-bot/bench/play.sh ${{ matrix.game.pattern }} ${{ matrix.game.seed }} ${{ matrix.game.glevel }} ${{ matrix.game.gspeed }} ${{ matrix.game.queue }} ${{ matrix.game.frames }} out

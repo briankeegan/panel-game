@@ -641,6 +641,8 @@
 #   of garbage resting), above six colours; the break-first rules as before. 8 colours s7-8
 # run 187 -- (not played) 7 of 8 games never started: the game client's download (test-build_v3.zip) answered 504 four times (Actions run
 #   46048659143). The same bot asked again -- no game of it was played.
+# run 187 -- (not played, again) 7 of 8 games never started, the same 504 (Actions run 46050773262). The client zip is now cached between
+#   runs (actions/cache, CHAOSBOT_ZIP_CACHE) and fetched from two hosts with longer waits (game/fetch.sh). The same bot asked again.
 chain_garbage 7 9 9 1 21600 10 colors=8
 combo_storm 7 9 9 1 21600 10 colors=8
 thicc_combo_storm 7 9 9 1 21600 10 colors=8

@@ -17,14 +17,24 @@ out="${1:-$here/build}"
 mkdir -p "$out"
 zip="$out/$ZIP_NAME"
 
+# (a cached copy first -- CHAOSBOT_ZIP_CACHE, kept by the games workflow's actions/cache: run 187 lost 7 of 8 games twice to the
+# download answering 504; the sha256 below checks whatever is used)
+cache="${CHAOSBOT_ZIP_CACHE:-}"
+if [ ! -f "$zip" ] && [ -n "$cache" ] && [ -f "$cache/$ZIP_NAME" ] && echo "$ZIP_SHA256  $cache/$ZIP_NAME" | sha256sum -c --status; then
+  cp "$cache/$ZIP_NAME" "$zip"
+fi
 if [ ! -f "$zip" ] || ! echo "$ZIP_SHA256  $zip" | sha256sum -c --status; then
-  url="https://github.com/$UPSTREAM_REPO/raw/$UPSTREAM_COMMIT/$ZIP_NAME"
-  for attempt in 1 2 3 4; do
-    if curl -fsSL --retry 2 -o "$zip.part" "$url"; then break; fi
+  # (two hosts for the same pinned file, tried in turn, with a longer wait between rounds)
+  urls="https://github.com/$UPSTREAM_REPO/raw/$UPSTREAM_COMMIT/$ZIP_NAME https://raw.githubusercontent.com/$UPSTREAM_REPO/$UPSTREAM_COMMIT/$ZIP_NAME"
+  for attempt in 1 2 3 4 5 6; do
+    ok=0
+    for url in $urls; do if curl -fsSL --retry 2 -o "$zip.part" "$url"; then ok=1; break; fi; done
+    [ "$ok" = 1 ] && break
     echo "download attempt $attempt failed" >&2
-    sleep $((attempt * 5))
+    sleep $((attempt * 15))
   done
   mv "$zip.part" "$zip"
+  if [ -n "$cache" ] && echo "$ZIP_SHA256  $zip" | sha256sum -c --status; then mkdir -p "$cache"; cp "$zip" "$cache/$ZIP_NAME"; fi
 fi
 echo "$ZIP_SHA256  $zip" | sha256sum -c -
 

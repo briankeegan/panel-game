@@ -682,6 +682,11 @@
 # run 197 (seeds 7-8, BALL) -- cancelled by me at the owner's word: every mode had played seeds 7-8, the seeds the bot was fixed on.
 # EACH MODE HAS ITS OWN SEEDS from here (the owner, 16:20 ET); every mode redone on its own (plans/chaos-goal.md table).
 # run 197 -- 8 colours at Level 10 on its own seeds 21-22 (never played), run 196's bot. 8 colours s21-22
+# run 197 -- (result) 8 colours on its own seeds: survived 3/8, 85914 frames (seeds 7-8 had 7/8: the bot was fitted to them). Lost chain
+#   s21 1601, thicc s21 6035, chain s22 3038, combo s22 2453, insane s22 7987. chain s21: rank.c's run-167 rule (above six colours under
+#   garbage, no break offered, the panels kept: k1265) held over a 2-chain lineup lost 63 frames later, five decisions running
+#   (1176-1231: 194 vs 257), 14 panels under seven rows of garbage.
+# run 198 -- that rule never puts first the line lost sooner (rank.c). 8 colours s21-22 again
 chain_garbage 21 9 9 1 21600 10 colors=8
 combo_storm 21 9 9 1 21600 10 colors=8
 thicc_combo_storm 21 9 9 1 21600 10 colors=8

@@ -177,6 +177,10 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 138 (2026-11-27 01:28 ET), run 87's scarce-fuel rule above six colours: survived 3/8** -- off. Lost chain s7 2101, thicc s7
+  2267, insane s8 2065 (not starved: a 6-row slab converted to ~30 panels at 1264 and the next slabs landed on a 10-row board), chain s8
+  9687, combo s8 15234 (queue 31-36). Since run 132 (6/8): 5, 1, 5, 2, 4, 3. Run 139: five line-up swaps offered, not three -- run 131's
+  wider line-ups are the one change that moved these seeds.
 - **Run 137 (2026-11-27 01:15 ET), run 132's bot with the opening keeping its panels to seven rows: survived 4/8** -- back to six.
   thicc s7 met the first slab with 36 panels (24 in run 136) and still starved, lost at 2498; insane s7 8382, combo s8 6949, thicc s8
   4574 lost. **Found: the search is cut by wall-clock time on a single thread** (native.c: the deadline is the frame's start), so the

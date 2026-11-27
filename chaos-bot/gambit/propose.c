@@ -1270,7 +1270,8 @@ static int proposeAll(const Read *R, const Found *S, Cand *out, int cap) {
   // (run 131: whenever the two panels swapped are at rest -- lineUpSwaps swaps only resting panels -- not only on a board with nothing
   // moving: under garbage something is nearly always popping or falling, and run 130's losses held 15-22 times a minute at the end)
   if (decQ.b->colors > 6 && !swapQueued(decQ.b)) {
-    int32_t lu[3]; int nlu = lineUpSwaps(decQ.b, lu, 3);
+    // (run 139: five, not three -- run 131's wider line-ups were the one change that moved s7-8 (3/8 -> 6/8))
+    int32_t lu[5]; int nlu = lineUpSwaps(decQ.b, lu, 5);
     for (int i = 0; i < nlu; i++) { if (seenDigHas(decQ.b, lu[i])) continue; int32_t one = lu[i]; ADD(PLAY_SETUP, &one, 1, -1, 0); }
     // (run 116: and the best pair of swaps, where it beats every single one -- judge.c lineUpPair)
     // (run 117: off -- run 116 with it 2/8, four lost inside 2845 frames)

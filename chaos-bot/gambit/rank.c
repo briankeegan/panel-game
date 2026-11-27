@@ -1089,7 +1089,10 @@ static int compareJudged(const Judge *x, const Judge *y) {
     int32_t bx = imax(0, x->apBroke) / W, by = imax(0, y->apBroke) / W;
     if (bx != by) {
       const Judge *dig = bx > by ? x : y, *other = dig == x ? y : x;
-      if (lostOf(other) - lostOf(dig) < rankSave) return (cmpKey = __LINE__, (dig == x ? -1 : 1));
+      // (run 211: above six colours, never a dig whose own board is lost inside a break's time -- its break is never finished. Run 210 8
+      // colours thicc s21 7318-7820: digs lost at 149, 127, 113, 202 and 123 put over lines lost at 203, 182, 222, 262 and 251, lost at 7771)
+      if (lostOf(other) - lostOf(dig) < rankSave && !(decQ.b->colors > 6 && lostOf(dig) < rankSave && lostOf(other) > lostOf(dig)))
+        return (cmpKey = __LINE__, (dig == x ? -1 : 1));
     }
   }
   // (CHAOS, STOP TIME IS A MAX, NOT A SUM: a new award only replaces what is left (checkMatches.lua awardStopTime), so panels cleared

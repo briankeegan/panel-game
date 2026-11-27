@@ -740,6 +740,10 @@
 # run 210 -- run 204's exact bot plus: above six colours, the horizon credit (a line in progress counted as living) is taken back beside a
 #   board lost a quarter break later (rank.c creditPair). Run 208 chain s21 2664: a carry_wait lost at 232 kept over a convert at 319 by
 #   "1. lives before does not", lost at 3201. 8 colours s21-22
+# run 210 -- (result) survived 3/8, 120364 frames (run 204's bot, last measured: 2/8, 97747) -- kept. Lost thicc s21 7771, chain s22 14331,
+#   combo s22 8300, thicc s22 5065, insane s22 20097. thicc s21 7318-7820: DIG THE BACKLOG put five digs lost at 113-202 over lines lost
+#   at 182-262 -- each dig breaking one row with its own board lost inside a break's time.
+# run 211 -- above six colours, DIG THE BACKLOG never puts first a dig whose own board is lost inside a break's time (rank.c). 8 colours s21-22
 chain_garbage 21 9 9 1 21600 10 colors=8
 combo_storm 21 9 9 1 21600 10 colors=8
 thicc_combo_storm 21 9 9 1 21600 10 colors=8

@@ -177,6 +177,9 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 182 (2026-11-27 12:02 ET), the top beats the most others head to head: survived 4/8, 148207 frames** -- reverted; 0 late. The
+  inversions hardly moved (404/7227): most come from state moving between the order and the label (livedPrev, set after playOf) and lines
+  moved after the sort, not the sort. Run 183: run 180 plus the high-opening rule capped at two rows; the agreement measured in playOf.
 - **Run 181 (2026-11-27 11:46 ET), the first-slab break rules on run 180: survived 3/8, 73894 frames** -- reverted; five early losses
   (breaks of 6 on the unrested slab before building). Run 182: run 180 plus the top of the order chosen as the line beating the most
   others head to head -- the owner, on the order and the line played disagreeing (6% of decisions): look into it.

@@ -611,6 +611,12 @@
 # run 182 -- run 180's bot plus: the top of the order is the line that beats the most others compared alone (rank.c sortJudged, after
 #   the merge sort) -- the keys are not transitive, and run 180's labels show the line played losing to the next compared alone on 502
 #   of 8369 decisions (won=inv). 8 colours s7-8
+# run 182 -- (result) survived 4/8, 148207 frames -- reverted (back to run 180); 0 late, worst think 1.1 ms. The inversions labelled hardly
+#   moved: 404 of 7227 decisions (run 180: 502 of 8369) -- most were not the sort's own: the label compared after answer.c set livedPrev
+#   (read by compareJudged), below playOf, and lines are moved after the sort.
+# run 183 -- run 180's bot plus: the run-160 rule (a high opening makes room) counts cleared panels up to two rows' worth only -- run 180's
+#   one loss, combo s8 1111: that rule kept a 4-chain at 455-473 in the seed-8 opening. The order's agreement now read in playOf with the
+#   state it was made in (won=inv/tie), and won=drift where the key read after the decision no longer puts the line first. 8 colours s7-8
 chain_garbage 7 9 9 1 21600 10 colors=8
 combo_storm 7 9 9 1 21600 10 colors=8
 thicc_combo_storm 7 9 9 1 21600 10 colors=8

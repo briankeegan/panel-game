@@ -94,7 +94,7 @@ ACT = {
     'ready': 'readying a break for the garbage coming', 'toward': 'walking toward an attack', 'raise': 'raising', 'setup': 'setting up',
 }
 
-DECIDED = {'only': 'the only line offered', 'tie': 'the order\'s keys left it alike with the next (kept first)',
+DECIDED = {'drift': 'first in the order; compared again after the decision the keys no longer put it first (state moved)', 'only': 'the only line offered', 'tie': 'the order\'s keys left it alike with the next (kept first)',
            'raise': 'the raise', 'none': 'nothing offered'}
 _DEC = None
 def decide_place(n):

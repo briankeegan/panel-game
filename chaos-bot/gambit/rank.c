@@ -1032,9 +1032,12 @@ static int compareJudged(const Judge *x, const Judge *y) {
   // living lines the one clearing more panels first -- at 8 colours the stack passes six rows by ~440 on set-ups alone, and the first slab
   // (two or three rows, ~700) on an eight-row stack is every line lost the moment it is told. Runs 151 combo s8 and 159 insane s8 (the same
   // board, the same opening): 30 -> 48 panels by 441 on set-ups and zips, every line dying from 545, topped at 768, lost at ~605)
+  // (run 183: counted up to two rows' worth (2 x W) -- room made, not the stack spent. Run 180 combo s8 (its one loss, at 1111): this
+  // rule kept a 4-chain at 455-473 in the seed-8 opening, the board spent before the first slab. Run 178 had it on run 167's bot: 3/8, the
+  // seed-8 opening passed in two of three)
   if (chaosOpenHigh && x->o.lives && y->o.lives && x->apBroke <= 0 && y->apBroke <= 0 &&
-      x->o.j.clearedPanels != y->o.j.clearedPanels)
-    return (cmpKey = __LINE__, (x->o.j.clearedPanels > y->o.j.clearedPanels ? -1 : 1));
+      imin(x->o.j.clearedPanels, 2 * W) != imin(y->o.j.clearedPanels, 2 * W))
+    return (cmpKey = __LINE__, (imin(x->o.j.clearedPanels, 2 * W) > imin(y->o.j.clearedPanels, 2 * W) ? -1 : 1));
   // THE LAST CHANCE: the hold lost inside a break's time, beside a line lost no sooner whose next moves promise a break's time more (the
   // readiness break, the survival search after it): the line first -- holding is the loss for certain. Only against the hold: the
   // promise is never weighed against another line's own life. 244 of 419 lost games held, dying, over such a line.
@@ -1948,18 +1951,8 @@ static void sortJudged(Judge **a, int n) {
       while (j < hi) tmp[k++] = a[j++];
       for (k = lo; k < hi; k++) a[k] = tmp[k];
     }
-  // (THE TOP BEATS THE MOST HEAD TO HEAD -- the owner: the order and the line played must not disagree. The keys are not transitive
-  // (each pair is decided by the first rule whose conditions that pair meets; lostAlike buckets losses, so A~B and B~C with A, C apart),
-  // so the merge sort above can end with a top that loses to the next line compared alone: run 180's labels, 502 of 8369 decisions
-  // (won=inv). The line that beats the most others compared alone is put on top -- a line that beats every other wherever there is one;
-  // among equals the sort's own order stands)
-  if (n > 2) {
-    int32_t keep = cmpKey; int best = 0, bestW = -1;
-    for (int i = 0; i < n; i++) { int w = 0; for (int j = 0; j < n; j++) if (j != i && compareJudged(a[i], a[j]) < 0) w++;
-      if (w > bestW) { bestW = w; best = i; } }
-    if (best > 0) { Judge *e = a[best]; for (int q = best; q > 0; q--) a[q] = a[q - 1]; a[0] = e; }
-    cmpKey = keep;
-  }
+  // (run 182 put the line beating the most others compared alone on top: 4/8, and the inversions labelled hardly moved (404 of 7227) --
+  // most were not the sort's: answer.c's label compared after livedPrev changed (answer.c), and lines are moved after the sort. Removed)
   outlivingFirst(a, n);
   // (THE EIGHT THAT BEATS THE TOP IS THE TOP: the keys are not transitive -- an eight put first by the finish's own key beside the line
   // on top can end below it through a third line -- so in finish them, the first eight offered whole that the order puts before the top

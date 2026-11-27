@@ -7,6 +7,9 @@ static int32_t garbageSeen;   // (garbage has been on the board or on its way th
 // (WHY THE LINE PLAYED, WHEN NOT THE ORDER'S FIRST: the line of playOf that put a line other than the order's first in its place, 0 where
 // the order's first is played -- answer.c logs it as won=d<line>; the order's own key is won=k<line> (rank.c cmpKey))
 static int32_t decWhy;
+// (the order against itself, read in playOf with the state the order was made in: decInv 1 where the line played first is put after the
+// next by the order's own key (decInvKey, decInvRu), 2 where the keys leave the two alike; answer.c logs it as won=inv/won=tie)
+static int32_t decInv, decInvKey, decInvRu;
 static int32_t canRaiseNow, gambitHit, modeRule = -1, hostTopped, surviveAsked, chaosSmallFirst;
 #define OP_FALL_LOST AT_LEVEL(200)   // (frames to the board's loss inside which an extension short of the eight gives way: set 86 combo_storm 7, its extensions lost at 130-193 and a break at 442-465; combo_storm 3's at 205, kept, made its 8; the large slabs', lost at 299-471 a second chain is still made)
 #define OP_KEEP_PANELS 36   // (the panels the opener's chain leaves once landed, at least: six rows -- the owner: keep enough to break)
@@ -2306,6 +2309,10 @@ static Played playOf(const Read *R, int n) {
   // (the opener's trigger handed on now -- its line's last swap, or a plan or trigger it begins with nothing before: the chain it fires is
   // held to from here, its first clear and fall too)
   if (P.line && P.line->k.nseq == 1 && R->rule >= 0 && theTables.r[R->rule].table == 2 && ((opLineOn && P.line->carried) || chainUp >= 2)) opFiredAt = decQ.b->clock;
+  decInv = 0;
+  if (!decWhy && P.top && n > 1) { const Judge *ru = order[0] == P.top ? order[1] : order[0]; int32_t keep = cmpKey;
+    if (ru && ru != P.top) { int c = compareJudged(P.top, ru); if (c > 0) { decInv = 1; decInvKey = cmpKey; decInvRu = ru->hold ? PLAY_HOLD : ru->k.play; } else if (c == 0) decInv = 2; }
+    cmpKey = keep; }
   return P;
 }
 // THE LINE IN PROGRESS (carryOf): the line of the move played, when it has more than one swap and is a play -- not a hold or a clear. It

@@ -244,7 +244,8 @@ static int readBoard_(Read *R) {
   // the profile's list as it is at six colours and fewer. Runs 101-109 at 8 colours: about 2/8, 12-14k frames on average)
   // (run 155: the 8-colour aims off, the profile's own list kept -- run 110 brought them in on the narrow search (40 x 7), measured now
   // on the wide one (64 x 6))
-  if (0 && decQ.b->colors > 6 && R->list.n > 0) {
+  // (run 155 measured them off on the wide search: 2/8 -- back on)
+  if (decQ.b->colors > 6 && R->list.n > 0) {
     List L; memset(&L, 0, sizeof L);
     // (run 121: starving -- garbage on the board and under four rows' worth of panels -- each aim is met only by a line that breaks
     // garbage (facts.c: brk 1): a chain breaking nothing spends the panels the next break needs. Run 119 thicc s5, 40 -> 13 panels on
@@ -276,6 +277,13 @@ static int readBoard_(Read *R) {
       for (int i = L.n; i > 0; i--) L.aim[i] = L.aim[i - 1];
       memset(&L.aim[0], 0, sizeof L.aim[0]);
       L.aim[0].combo.op = OP_GE; L.aim[0].combo.n = 3; L.aim[0].combo.near = 1; L.aim[0].brk = 1;
+      L.n++;
+    }
+    // (run 156: and starving, any break asked last -- after the chains and the combo of four, so a plain three-panel break meets the list
+    // where nothing else does, without ranking over the chains (run 141 asked it first))
+    if (brk == 1) {
+      memset(&L.aim[L.n], 0, sizeof L.aim[L.n]);
+      L.aim[L.n].combo.op = OP_GE; L.aim[L.n].combo.n = 3; L.aim[L.n].combo.near = 1; L.aim[L.n].brk = 1;
       L.n++;
     }
     R->list = L;

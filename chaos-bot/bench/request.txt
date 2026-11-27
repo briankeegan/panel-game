@@ -487,6 +487,9 @@
 # run 154 -- (result) survived 3/8, 134322 frames -- back on. Checked: no late-game slowdown (heap flat at ~1.77 GB, search work per ms
 #   0.62-0.77 from start to end of a 17184-frame game) -- the late losses are play, not the machine.
 # run 155 -- run 151's bot with the 8-colour aims (decide.c: 2x, 3x, combo 4, run 110) off -- the profile's own list -- on the wide search.
+# run 155 -- (result) survived 2/8, 113350 frames -- back on. Four features measured off on the wide search: 1'h neutral (kept off),
+#   rule 117, the perched drops and the 8-colour aims each needed.
+# run 156 -- starving, any break (a combo of three breaking garbage) asked LAST in the aims (decide.c; run 141 asked it first: 3/8). s7-8
 chain_garbage 7 9 9 1 21600 10 colors=8
 combo_storm 7 9 9 1 21600 10 colors=8
 thicc_combo_storm 7 9 9 1 21600 10 colors=8

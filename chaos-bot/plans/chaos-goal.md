@@ -177,6 +177,9 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 155 (2026-11-27 05:08 ET), the 8-colour aims off: survived 2/8, 113350 frames** -- back on. Of the features measured off on the
+  wide search (runs 151, 153-155), only 1'h was neutral; rule 117, the perched drops and the aims each held games. The bot stands at 5/8.
+  Run 156: starving, any break asked last in the aims (run 141 asked it first).
 - **Run 154 (2026-11-27 04:55 ET), perched drops under garbage off above six colours: survived 3/8, 134322 frames** -- back on. Checked
   for a late-game slowdown (the losses run late now): heap flat at ~1.77 GB, search work per ms 0.62-0.77 throughout a 17184-frame game --
   none. Run 155 measures the 8-colour aims (run 110) off on the wide search.

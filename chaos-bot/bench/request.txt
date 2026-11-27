@@ -707,6 +707,9 @@
 #   with 17 and 18 panels (run 201 thicc s21: 14): rank.c's run-160 rule (above six colours, a high opening makes room: of two living
 #   lines the one clearing more first) spent the stack -- run 201 thicc s21 427-618 a 4-, 5- and 6-chain, lost at 2827.
 # run 203 -- run 201's bot plus: the run-160 rule never clears past 30 panels left (rank.c). 8 colours s21-22
+# run 203 -- (result) survived 4/8, 130697 frames -- worse (5/8): OFF, back to run 201's bot. Seed 21 all lost, seed 22 all lived; thicc s21
+#   and combo s21 still met the first garbage with 20 panels (the 30-panel floor did not stop it).
+# run 204 -- run 201's bot with the run-160 high-opening rule turned off (rank.c). 8 colours s21-22
 chain_garbage 21 9 9 1 21600 10 colors=8
 combo_storm 21 9 9 1 21600 10 colors=8
 thicc_combo_storm 21 9 9 1 21600 10 colors=8

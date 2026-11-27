@@ -18,7 +18,16 @@ site_open() {
   git -C "$dir" sparse-checkout init --no-cone >/dev/null 2>&1
   git -C "$dir" sparse-checkout set '/data/*.json' '/data/*/*.json' >/dev/null 2>&1
   git -C "$dir" checkout -q --detach "$SITE_OLD"
-  git -C "$dir" ls-tree -r -l "$SITE_OLD" -- data/ | awk '{p=$5; sub(/^data\//, "", p); print $4, p}' > "$dir/../site-sizes.txt"
+  # THE SIZES FROM ONE API CALL. The checkout has no file contents (--filter=blob:none), and `ls-tree -l` needs each file's size, so git
+  # fetched every replay one at a time to read it -- some 2000 round trips, 14.5 minutes on every run's first publish (r75, r76: 868 s,
+  # 865 s; the later ones, with the blobs then on disk, 10-30 s). GitHub's tree listing has every size at once; ls-tree is the fallback.
+  local sz="$dir/../site-sizes.txt"
+  if ! { command -v gh >/dev/null 2>&1 && [ -n "${GITHUB_REPOSITORY:-}" ] \
+         && gh api "repos/$GITHUB_REPOSITORY/git/trees/$SITE_OLD?recursive=1" \
+              --jq 'if .truncated then error("truncated") else (.tree[] | select(.type == "blob" and (.path | startswith("data/"))) | "\(.size) \(.path | sub("^data/"; ""))") end' \
+              > "$sz" 2>/dev/null; }; then
+    git -C "$dir" ls-tree -r -l "$SITE_OLD" -- data/ | awk '{p=$5; sub(/^data\//, "", p); print $4, p}' > "$sz"
+  fi
   mkdir -p "$dir/data"
 }
 site_push() {

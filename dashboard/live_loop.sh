@@ -29,9 +29,9 @@ cmd() {
   echo "$idle nice -n 19 $pin bash \"$GITHUB_WORKSPACE/dashboard/live_publish.sh\""
 }
 # A publish's lines go out AS THEY COME (they used to wait for it to finish, so a publish that never finished said nothing at all), and one
-# that runs past PUBLISH_MAX (15 min) is stopped and said so: the next publish makes every game again, so nothing is lost by stopping it,
+# that runs past PUBLISH_MAX (30 min) is stopped and said so: the next publish makes every game again, so nothing is lost by stopping it,
 # while a stuck one would hold back every game after it for the rest of the run (r76, Nov 27: three games, nothing published, nothing said).
-PUBLISH_MAX=${PUBLISH_MAX:-900}
+PUBLISH_MAX=${PUBLISH_MAX:-1800}
 publish() {
   local pid t0; t0=$(date +%s)
   setsid bash -c "$(cmd)" > >(sed -u 's/^/[publish] /') 2>&1 & pid=$!

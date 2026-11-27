@@ -1,5 +1,22 @@
-run 46038954801, as of 2026-11-27T17:13:52Z
+run 46038954801, as of 2026-11-27T17:15:57Z
 
 === Bot 'Ranmaru_r75_CPU' (gambit, L10, cursor 4/12, unranked) is idle in the lobby on panelattack.com:49569 ===
     Open your client, CHALLENGE 'Ranmaru_r75_CPU' in the lobby, and play — it auto-accepts.
     Ctrl+C to stop.
+
+game about to start: both players are ready
+match start: building the match (seed nil, stage nil, opponent ?)
+match start: the match is built
+match start: the match is started
+match start: gambit: creating the link
+match start: gambit: the link is created
+match start: gambit: the link is starting the match
+match start: gambit: the link has started the match
+both ready — match starting
+garbage landed: our stopWatch 482 clock 670, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+garbage landed: our stopWatch 486 clock 674, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+opponent topped out: clock 930 stopWatch 742 stop 0 pre-stop 0 shake 22 health 1, top rows r12=ggggg0 r11=ggg000 r10=gggggg
+opponent topped out: clock 960 stopWatch 772 stop 60 pre-stop 63 shake 0 health 1, top rows r12=ggggg0 r11=ggg000 r10=gggggg
+garbage landed: our stopWatch 796 clock 984, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+opponent topped out: clock 990 stopWatch 802 stop 60 pre-stop 33 shake 0 health 1, top rows r12=ggggg0 r11=ggg000 r10=gggggg
+opponent topped out: clock 1020 stopWatch 832 stop 60 pre-stop 3 shake 0 health 1, top rows r12=ggggg0 r11=ggg000 r10=gggggg

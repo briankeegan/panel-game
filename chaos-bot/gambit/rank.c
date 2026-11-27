@@ -972,7 +972,8 @@ static int compareJudged(const Judge *x, const Judge *y) {
   // nothing emptied columns 1-3 from row 4 to 9 under garbage resting on the edge towers, lost at 4491)
   if (decQ.b->colors > 6 && decF.under && !x->o.dead && !y->o.dead && imax(0, x->apBroke) == 0 && imax(0, y->apBroke) == 0 &&
       x->o.j.gap >= 0 && y->o.j.gap >= 0) {
-    int32_t g0 = gapOf(decQ.b), dx = x->o.j.gap - g0, dy = y->o.j.gap - g0;
+    // (run 135: and the open side dug away from a slab by the line itself, judge.c sideDig)
+    int32_t g0 = gapOf(decQ.b), dx = x->o.j.gap - g0 + sideDig(decQ.b, x->o.j.ptop), dy = y->o.j.gap - g0 + sideDig(decQ.b, y->o.j.ptop);
     int xd = dx >= W && dy < W / 2, yd = dy >= W && dx < W / 2;
     if (xd || yd) { const Judge *dig = xd ? x : y, *o = xd ? y : x;
       if (o->o.lives || diesAt(o) + rankSave > diesAt(dig)) return (cmpKey = __LINE__, (xd ? 1 : -1)); }

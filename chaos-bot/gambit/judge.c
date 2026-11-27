@@ -80,6 +80,7 @@ typedef struct {
   int32_t pEven;                // and its panel columns' evenness: the tallest panel column less the lowest, garbage not counted (panelEvenOf)
   int32_t topRow;               // and whether anything rests in its top row or above (topRowOf: no queued garbage drops then)
   int32_t gap;                  // and the empty cells under its garbage, each column's lowest garbage down to what holds it (gapOf; -1 not known)
+  int32_t ptop[W + 2];           // and each column's top panel row, garbage not counted (0 none; run 135, rank.c sideDig)
 } Judged;
 
 static LOCAL Ctx *judgeCtx;   // the judge's own nodes: a search can ask it while its own nodes stand
@@ -318,27 +319,38 @@ static void ownChainOf(const Question *q) {
 // (CHAOS, THE GARBAGE HELD UP: the empty cells between each column's lowest garbage cell and the first thing under it -- the canyon a
 // piece is perched over, out of reach of any break until the panels under it are built back up. Run 92 insane s16 17400-18158: the middle
 // cleared under garbage resting on the edge towers, more landing on top, lost at 18633)
-// (run 134: AND THE OPEN SIDE DUG AWAY FROM IT: a column with no garbage beside one holding garbage, the rows from its top up to that
-// garbage's lowest cell -- a slab is broken from the side only by a panel level with it. Run 133 8 colours thicc s8, 1592-2410: clears on
-// the right left columns 3-5 at rows 3-6 beside 3-wide slabs stacked on columns 0-2 to the top, nothing could touch them, lost at 2609)
 static int32_t gapOf(const Board *b) {
-  int32_t gap = 0, low[W + 2] = {0}, top[W + 2] = {0};
+  int32_t gap = 0;
   for (int c = 1; c <= W; c++) {
     int g = 0;
     for (int r = 1; r < b->nrows; r++) if (b->p[r][c].f[ISGARBAGE]) { g = r; break; }
-    low[c] = g;
-    for (int r = 1; r < b->nrows; r++) if (b->p[r][c].f[COLOR] > 0 && !b->p[r][c].f[ISGARBAGE]) top[c] = r;
     if (!g) continue;
     for (int r = g - 1; r >= 1 && b->p[r][c].f[COLOR] <= 0 && !b->p[r][c].f[ISGARBAGE]; r--) gap++;
   }
+  return gap;
+}
+// (run 135, CHAOS, EACH COLUMN'S TOP PANEL: the highest row holding a panel, garbage not counted; 0 none)
+static void panelTops(const Board *b, int32_t *top) {
+  for (int c = 0; c <= W + 1; c++) top[c] = 0;
+  for (int c = 1; c <= W; c++) for (int r = 1; r < b->nrows; r++) if (b->p[r][c].f[COLOR] > 0 && !b->p[r][c].f[ISGARBAGE]) top[c] = r;
+}
+// (run 135, CHAOS, THE OPEN SIDE DUG AWAY FROM A SLAB, BY THE LINE ITSELF: against the board as it stands (its garbage where it is, in the
+// visible rows), each column with no garbage beside a column holding garbage whose top panel is below that garbage's lowest cell -- the
+// rows the line takes off its top (now less after). A slab is broken from the side only by a panel level with it; digging the open side
+// down leaves nothing that can. Measured on the line's own panel tops, so garbage falling while the line plays adds nothing (run 134
+// counted the whole side gap on the line's board: every clear breaking nothing became a canyon, 1/8). Run 133 thicc s8 1592-2410)
+static int32_t sideDig(const Board *b, const int32_t *after) {
+  int32_t low[W + 2] = {0}, dig = 0, h = b->height ? b->height : 12;
+  int32_t now[W + 2]; panelTops(b, now);
+  for (int c = 1; c <= W; c++) for (int r = 1; r <= h && r < b->nrows; r++) if (b->p[r][c].f[ISGARBAGE]) { low[c] = r; break; }
   for (int c = 1; c <= W; c++) {
     if (low[c]) continue;
     int gb = 0;
     if (c > 1 && low[c - 1]) gb = low[c - 1];
     if (c < W && low[c + 1] && (!gb || low[c + 1] < gb)) gb = low[c + 1];
-    if (gb && top[c] < gb) gap += gb - top[c];
+    if (gb && now[c] < gb && after[c] < now[c]) dig += now[c] - after[c];
   }
-  return gap;
+  return dig;
 }
 // (CHAOS, THE TOP ROW TAKEN: a panel or garbage in the top row or above -- Stack:shouldDropGarbage drops nothing waiting then)
 static int32_t topRowOf(const Board *b) {
@@ -788,7 +800,7 @@ static void judgeOnce(const Question *q, const int32_t *seq, int nseq, const Jud
   for (int z = 4; z < MAXCOMBOS + 64; z++) if (single[z] && j->nsingles < MAXCOMBOS) j->singles[j->nsingles++] = z;
   Node *e = NODE(x, n);
   j->endNode = n;
-  { const Board *eb = ensureBoard(x, n); j->even = eb ? evenOf(eb) : -1; j->gap = eb ? gapOf(eb) : -1;
+  { const Board *eb = ensureBoard(x, n); j->even = eb ? evenOf(eb) : -1; j->gap = eb ? gapOf(eb) : -1; if (eb) panelTops(eb, j->ptop); else memset(j->ptop, 0, sizeof j->ptop);
     // (run 125: off -- run 124 with it 3/8)
     // (run 124, above six colours: the gap read off the board once it has settled -- a chain still falling at the line's end has not
     // dug its canyon yet: run 123 chain s5, a 3x clearing 15 panels breaking nothing emptied columns 2-5 under garbage on the left tower)

@@ -177,6 +177,10 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 134 (2026-11-27 00:34 ET), the canyon counts the whole open side beside a slab: survived 1/8** -- off. Measured on the line's
+  board, the side gap moved with every falling slab and grew with every clear breaking nothing, so rule 117 put down nearly every clear
+  that buys stop: boards starved and topped (lost at 4865-17657; only chain s7 lived) -- the run-129 failure again. Run 135: run 132's bot
+  with only the rows a line itself takes off an open column beside a resting slab (judge.c sideDig, against the board as it stands).
 - **Run 133 (2026-11-27 00:20 ET), starving from six rows' worth (36): survived 5/8** (worse than 6/8) -- back to five rows. chain s7
   lived (lost in runs 131-132), but combo s7 2816, insane s7 16442 and thicc s8 2609 lost: the threshold trades one seed for another.
   thicc s8 (lost in run 132 too), read on the whole-game boards: every garbage width's drop map starts at column 1, so slabs keep landing

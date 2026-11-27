@@ -410,6 +410,10 @@
 #   columns 3-5 at rows 3-6 while 3-wide slabs stacked on columns 0-2 to the top -- no panel level with a slab, so none could break it.
 # run 134 -- starving back at five rows; the canyon (judge.c gapOf, rule 117) also counts an open column beside a slab: the rows from its
 #   top up to the slab's lowest cell. A clear breaking nothing that digs the open side away from the garbage is a canyon. 8 colours s7-8
+# run 134 -- (result) survived 1/8 (run 132: 6/8) -- off. The whole side gap on the line's board made nearly every clear breaking
+#   nothing a canyon (falling garbage moved it too): no stop bought, boards starved and topped (lost 4865-17657; only chain s7 lived).
+# run 135 -- run 132's bot plus the open side dug by the line itself (judge.c sideDig): against the board as it stands, beside a slab in
+#   the visible rows, the rows a line takes off an open column's top that is already below the slab -- added to rule 117's dig. 8 colours s7-8
 chain_garbage 7 9 9 1 21600 10 colors=8
 combo_storm 7 9 9 1 21600 10 colors=8
 thicc_combo_storm 7 9 9 1 21600 10 colors=8

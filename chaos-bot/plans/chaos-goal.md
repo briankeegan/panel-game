@@ -177,6 +177,9 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 123 (2026-11-26 22:32 ET), starving when garbage outweighs panels: survived 4/8.** Back. chain s5 lost at 3318: a 3x
+  clearing 15 breaking nothing dug columns 2-5 under garbage on the left tower -- the no-canyon rule read the board mid-chain. Run 124:
+  the gap read off the settled board.
 - **Run 122 (2026-11-26 22:21 ET), let-down lines under garbage: survived 5/8** (kept, equal) -- chain s5 lost at 21003 (600 frames
   short), insane s5 3408 (30 panels under 7 rows of garbage, clears of 12-14 breaking nothing), insane s6 848 (a 4-4-4 fired under
   garbage still falling: the break lost). Run 123: starving also when garbage outweighs the panels.

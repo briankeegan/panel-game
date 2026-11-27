@@ -375,6 +375,9 @@
 # run 122 -- (result) let-down lines under garbage above six colours, 8 colours s5-6: survived 5/8 (=121, kept) -- chain s5 lost at 21003,
 #   insane s5 3408 (30 panels under 7 rows of garbage, clears of 12-14 breaking nothing), insane s6 848
 # run 123 -- starving also when the garbage on the board outweighs the panels (decide.c): chain aims then need a break. 8 colours s5-6
+# run 123 -- (result) starving when garbage outweighs panels, 8 colours s5-6: survived 4/8 (122: 5/8). Back to the panels alone
+# run 124 -- above six colours, the canyon (gap under garbage) read off the settled board, not the board mid-chain (judge.c): run 123
+#   chain s5, a 3x clearing 15 breaking nothing emptied columns 2-5 under garbage, unseen by the no-canyon rule. 8 colours s5-6
 chain_garbage 5 9 9 1 21600 10 colors=8
 combo_storm 5 9 9 1 21600 10 colors=8
 thicc_combo_storm 5 9 9 1 21600 10 colors=8

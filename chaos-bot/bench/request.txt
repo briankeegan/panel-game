@@ -587,6 +587,13 @@
 #   (A HIGH OPENING MAKES ROOM: the line clearing more panels first, uncapped); 22 panels under the first slab at 815. The same rule
 #   keeps the seed-8 opening's 4-chains at 455-473 (lost at ~950 in runs 169-175).
 # run 178 -- run 167's bot with the run-160 rule counting cleared panels up to two rows' worth (2 x W) only (rank.c). 8 colours s7-8
+# run 178 -- (result) survived 3/8, 120227 frames -- reverted. chain s8, combo s8, insane s8 lived (the seed-8 opening passed in two of
+#   three); every seed-7 game lost (combo s7 8298: breaks of 15-19 played, a canyon in columns 2-5 under full-width garbage between them).
+#   thicc s8 lost at 1591: 45 panels at 499 with the first slab told of, the opening's 2-, 3- and 5-chains breaking nothing at 515-684
+#   (labels: 1b THE MODE'S GOALS, NO CHANGING MINDS, ties) -- decide.c's aims open to chains (brk -1, 36 panels and up) -- 29 panels
+#   under a 6-row slab at 928.
+# run 179 -- run 167's bot plus: above six colours, before garbage has first rested on the stack, while garbage is on its way, chains meet
+#   the aims only as breaks (decide.c brk 1). 8 colours s7-8
 chain_garbage 7 9 9 1 21600 10 colors=8
 combo_storm 7 9 9 1 21600 10 colors=8
 thicc_combo_storm 7 9 9 1 21600 10 colors=8

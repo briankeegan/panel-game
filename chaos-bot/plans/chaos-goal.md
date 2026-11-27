@@ -177,6 +177,9 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 178 (2026-11-27 10:54 ET), the high-opening rule capped at two rows: survived 3/8, 120227 frames** -- reverted. Seed-8 games
+  3/4 lived; every seed-7 game lost. thicc s8 1591: the opening's chains (aims open at 45 panels, the slab told of) spent 45 to 29 before a
+  6-row slab. Run 179: before garbage first rests, while garbage is on its way, chains meet the aims only as breaks.
 - **Run 177 (2026-11-27 10:37 ET), the no-break panels-kept rule only short of panels: survived 3/8, 141456 frames** -- reverted on
   survivals (frames above run 167's). thicc s7 lost at 2743: the labels name rank.c's run-160 rule (A HIGH OPENING MAKES ROOM, the line
   clearing more panels first, uncapped) keeping a 4-chain that cleared 18 of 37 panels before the first slab -- the same rule keeps

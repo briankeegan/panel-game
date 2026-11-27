@@ -630,7 +630,8 @@ static int ruleNoEnemy;   // (the rule in force asks enemy.none: decide.c)
 static int breakOffered = 1;
 // (runs 173, 175, 176 had the break rules read garbage on the board not yet resting on the stack (decF.under is FACT_US_CONTACT): all
 // game 0/8; until garbage first rests 3/8 (gated on gambitHit, which topping sets: it never ran) and 2/8 (own record: no seed-8 opening
-// loss). Run 177 kept the run-167 rule below seven rows' worth of panels: 3/8, 141456 frames. Removed)
+// loss). Run 177 kept the run-167 rule below seven rows' worth of panels: 3/8, 141456 frames. Run 178 capped the run-160 rule's count
+// of cleared panels at two rows' worth: 3/8. Removed)
 static int32_t waitOf(void);
 static int cascadeLive(Board *b);   // (propose.c: the board still moving of its own)
 // (the window as the next block finds it: at its landing with one on its way, else EARLIEST_LANDING)
@@ -1029,12 +1030,9 @@ static int compareJudged(const Judge *x, const Judge *y) {
   // living lines the one clearing more panels first -- at 8 colours the stack passes six rows by ~440 on set-ups alone, and the first slab
   // (two or three rows, ~700) on an eight-row stack is every line lost the moment it is told. Runs 151 combo s8 and 159 insane s8 (the same
   // board, the same opening): 30 -> 48 panels by 441 on set-ups and zips, every line dying from 545, topped at 768, lost at ~605)
-  // (run 178: counted up to two rows' worth (2 x W) -- room made, not the stack spent: the labels of runs 175-177 show this rule
-  // carrying 4-chains of 9-13 panels in the opening (run 177 thicc s7 473-581, a combo of 9 kept by it, the line clearing 18 of 37 panels at 499,
-  // 22 left under the first slab at 815, lost at 2743; the seed-8 opening at 455-473, lost at ~950 in runs 169-175))
   if (chaosOpenHigh && x->o.lives && y->o.lives && x->apBroke <= 0 && y->apBroke <= 0 &&
-      imin(x->o.j.clearedPanels, 2 * W) != imin(y->o.j.clearedPanels, 2 * W))
-    return (cmpKey = __LINE__, (imin(x->o.j.clearedPanels, 2 * W) > imin(y->o.j.clearedPanels, 2 * W) ? -1 : 1));
+      x->o.j.clearedPanels != y->o.j.clearedPanels)
+    return (cmpKey = __LINE__, (x->o.j.clearedPanels > y->o.j.clearedPanels ? -1 : 1));
   // THE LAST CHANCE: the hold lost inside a break's time, beside a line lost no sooner whose next moves promise a break's time more (the
   // readiness break, the survival search after it): the line first -- holding is the loss for certain. Only against the hold: the
   // promise is never weighed against another line's own life. 244 of 419 lost games held, dying, over such a line.

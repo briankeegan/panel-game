@@ -253,9 +253,9 @@ static int readBoard_(Read *R) {
     // (run 124: back to the panels alone -- run 123 with the garbage weighed 4/8)
     int32_t brk = F->known[FACT_US_CONTACT] && pn < 4 * W ? 1 : -1;
     L.aim[0].chain.op = OP_EQ; L.aim[0].chain.n = 2; L.aim[0].chain.near = 1; L.aim[0].brk = brk;
-    L.aim[1].chain.op = OP_EQ; L.aim[1].chain.n = 3; L.aim[1].chain.near = 1; L.aim[1].brk = brk;
-    L.aim[2].combo.op = OP_GE; L.aim[2].combo.n = 4; L.aim[2].combo.near = 1; L.aim[2].brk = brk;
-    L.n = 3; R->list = L;
+    // (run 125: no 3x asked -- a 2x buys the stop; the canyons of runs 115-123 were dug by 3x and longer chains breaking nothing)
+    L.aim[1].combo.op = OP_GE; L.aim[1].combo.n = 4; L.aim[1].combo.near = 1; L.aim[1].brk = brk;
+    L.n = 2; R->list = L;
   }
   // (EIGHT AND UP -- the owner: 8x plus, 9s and 10s alike: in a list that asks combos and no chain, an entry of exactly eight asks eight
   // or more -- a two-column eight of 11 or 12 panels is the attack asked, never a combo outside the list taken out as a wasted three;

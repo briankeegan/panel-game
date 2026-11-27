@@ -765,9 +765,10 @@ static void judgeOnce(const Question *q, const int32_t *seq, int nseq, const Jud
   Node *e = NODE(x, n);
   j->endNode = n;
   { const Board *eb = ensureBoard(x, n); j->even = eb ? evenOf(eb) : -1; j->gap = eb ? gapOf(eb) : -1;
+    // (run 125: off -- run 124 with it 3/8)
     // (run 124, above six colours: the gap read off the board once it has settled -- a chain still falling at the line's end has not
     // dug its canyon yet: run 123 chain s5, a 3x clearing 15 panels breaking nothing emptied columns 2-5 under garbage on the left tower)
-    if (eb && eb->colors > 6) { int ls = settleOf(x, n); if (liveNode(x, ls)) { const Board *sb = ensureBoard(x, ls); if (sb) j->gap = gapOf(sb); } } j->topRow = eb ? topRowOf(eb) : 0; j->swapReady = j->readyBreak = 0; if (eb) readyOf(eb, &j->swapReady, &j->readyBreak); j->spread = eb ? spreadOf(eb) : 0; j->seams = eb ? seamsOf(eb) : 0; }
+    if (0 && eb && eb->colors > 6) { int ls = settleOf(x, n); if (liveNode(x, ls)) { const Board *sb = ensureBoard(x, ls); if (sb) j->gap = gapOf(sb); } } j->topRow = eb ? topRowOf(eb) : 0; j->swapReady = j->readyBreak = 0; if (eb) readyOf(eb, &j->swapReady, &j->readyBreak); j->spread = eb ? spreadOf(eb) : 0; j->seams = eb ? seamsOf(eb) : 0; }
   j->dropAt = j->dead ? 0 : e->t + imax(e->stopTime + e->preStopTime, e->shakeTime);
   j->fire = j->nats ? j->ats[j->nats - 1] : -1;
   if (o->lifeTo >= 0) j->lostAt = j->dead ? j->deadAt : lostAlone(x, n, imax(o->lifeTo, imax(lastAt, o->lifeStop ? j->dropAt : 0) + o->lifeRest));

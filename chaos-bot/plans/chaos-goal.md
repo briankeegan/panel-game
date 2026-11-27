@@ -177,6 +177,8 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 124 (2026-11-26 22:43 ET), the canyon read off the settled board: survived 3/8.** Off. Run 125: the list asks a 2x then a
+  combo of 4+ -- no 3x (the canyons were dug by 3x and longer chains breaking nothing).
 - **Run 123 (2026-11-26 22:32 ET), starving when garbage outweighs panels: survived 4/8.** Back. chain s5 lost at 3318: a 3x
   clearing 15 breaking nothing dug columns 2-5 under garbage on the left tower -- the no-canyon rule read the board mid-chain. Run 124:
   the gap read off the settled board.

@@ -378,6 +378,8 @@
 # run 123 -- (result) starving when garbage outweighs panels, 8 colours s5-6: survived 4/8 (122: 5/8). Back to the panels alone
 # run 124 -- above six colours, the canyon (gap under garbage) read off the settled board, not the board mid-chain (judge.c): run 123
 #   chain s5, a 3x clearing 15 breaking nothing emptied columns 2-5 under garbage, unseen by the no-canyon rule. 8 colours s5-6
+# run 124 -- (result) canyon read off the settled board, 8 colours s5-6: survived 3/8. Off
+# run 125 -- above six colours the list asks a 2x then a combo of 4+, no 3x (decide.c): the canyons were dug by 3x+ chains. s5-6
 chain_garbage 5 9 9 1 21600 10 colors=8
 combo_storm 5 9 9 1 21600 10 colors=8
 thicc_combo_storm 5 9 9 1 21600 10 colors=8

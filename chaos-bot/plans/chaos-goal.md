@@ -177,6 +177,9 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 187 (2026-11-27 14:01 ET, third ask -- two asks lost to the client download answering 504; the zip now cached): survived 4/8,
+  112481 frames** -- reverted. thicc s8 lost the seed-8 opening (615: an entry breaking nothing credited by moves after it over a break
+  of 9 lost no sooner on its own board). Run 188: 'A BREAK IN HAND BEFORE A PROMISE' reads the unrested first slab.
 - **Run 186 (2026-11-27 13:10 ET), the top pair agrees at the end of rank(): survived 5/8, 125766 frames, 0 inversions** -- off by the
   rule kept (run 180 7/8); the owner may keep it (the order and the line played agree on every decision). Run 187: run 180 plus the
   creditPair rule reading the unrested first slab (the seed-8 opening's 2-chain carried by the credit step).

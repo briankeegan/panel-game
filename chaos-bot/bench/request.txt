@@ -643,6 +643,12 @@
 #   46048659143). The same bot asked again -- no game of it was played.
 # run 187 -- (not played, again) 7 of 8 games never started, the same 504 (Actions run 46050773262). The client zip is now cached between
 #   runs (actions/cache, CHAOSBOT_ZIP_CACHE) and fetched from two hosts with longer waits (game/fetch.sh). The same bot asked again.
+# run 187 -- (result, third ask: all 8 played) survived 4/8, 112481 frames -- reverted. thicc s8 lost the seed-8 opening at 933: 615 an
+#   entry breaking nothing, credited to 419 by the moves after it ('then419'), over a break of 9 in progress lost at 268 on its own board
+#   (won=drift); then carried to the loss by the credit step. The rule for this, rank.c 'A BREAK IN HAND BEFORE A PROMISE', tests
+#   decF.under -- 0 there (the first slab not yet resting).
+# run 188 -- run 180's bot plus: that one rule reads the unrested first slab too (rank.c underCredit, own record of garbage resting);
+#   creditPair and the other break-first rule as before. 8 colours s7-8
 chain_garbage 7 9 9 1 21600 10 colors=8
 combo_storm 7 9 9 1 21600 10 colors=8
 thicc_combo_storm 7 9 9 1 21600 10 colors=8

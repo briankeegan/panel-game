@@ -695,6 +695,10 @@
 #   1315. combo s22 12984 a break lost at 241 put over a convert lost at 297 (20 broken each); thicc s21 7959 225 over an entry at 308 (12
 #   each): rank.c lostAlike calls lines under a break's time apart alike, and the rules after it kept the sooner loss.
 # run 200 -- above six colours under garbage, lostAlike only within a quarter of a break's time (rank.c). 8 colours s21-22
+# run 200 -- (result) survived 5/8, 142250 frames -- better (4/8), kept. Lost combo s21 13086, insane s21 1289, chain s22 19875. insane
+#   s21: rank.c 1b (the mode's goals, alike within a break's time) kept the hold lost at 287 over a 7-chain extend lost at 448 (687),
+#   and 166 over 223 (1162).
+# run 201 -- above six colours, 1b decides only within a quarter of a break's time (rank.c). 8 colours s21-22
 chain_garbage 21 9 9 1 21600 10 colors=8
 combo_storm 21 9 9 1 21600 10 colors=8
 thicc_combo_storm 21 9 9 1 21600 10 colors=8

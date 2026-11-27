@@ -1674,7 +1674,10 @@ static int compareJudged(const Judge *x, const Judge *y) {
     // (run 195: nor under garbage where no clear buys stop time (game mode 3 and up: ca.c awardStopTime) -- of two that do not live there
     // the mode's attack is no way to live. Run 194 no stop time combo s7: 2979 the hold kept by this rule, 3017-3123 a combo of 6 breaking
     // nothing carried while the board ran from 109 frames to 1, lost at 3652)
-    if (lx || (!ruleNoEnemy && !(decQ.b->gameMode >= 3 && decF.under) && lo >= rankSave && hi - lo < rankSave)) {
+    // (run 201: above six colours, the goal decides only within a quarter of a break's time -- as lostAlike there (run 200). Run 200 8
+    // colours insane s21: 687 the hold lost at 287 kept over a 7-chain extend lost at 448, 1162 166 over 223; lost at 1289)
+    if (lx || (!ruleNoEnemy && !(decQ.b->gameMode >= 3 && decF.under) && lo >= rankSave &&
+               hi - lo < (decQ.b->colors > 6 ? rankSave / 4 : rankSave))) {
       int gx = goalKeyUnder(x), gy = goalKeyUnder(y);
       if (gx != gy) return (cmpKey = __LINE__, (gx - gy));
       // (and of two that make the first entry, or two set-ups toward it, the fewer presses: the owner, the goal first and the shortest

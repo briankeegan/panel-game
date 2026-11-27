@@ -17,7 +17,7 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 
 | Mode | Level | Seeds | Run | Result |
 |---|---|---|---|---|
-| 8 colours | 10 | 21-22 | 199 | 4/8 (197: 3/8, 198: 3/8), being fixed (run 200) |
+| 8 colours | 10 | 21-22 | 200 | 5/8 (3, 3, 4 before), being fixed (run 201) |
 | 7 colours | 10 | 23-24 | - | to redo (old: 7/8 on seeds 7-8, run 190 -- does not count) |
 | Chaos margin 4 | 10 | 25-26 | - | to redo (old: 7/8 on 7-8, run 191) |
 | Chaos mode | 10 | 27-28 | - | to redo (old: 8/8 on 7-8, run 192) |
@@ -203,6 +203,8 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 200 (2026-11-27 17:06 ET), 8 colours seeds 21-22, + lostAlike a quarter break: 5/8** -- kept. insane s21 lost at 1289: rule 1b
+  (the mode's goals) kept a hold lost at 287 over an extend lost at 448. Run 201: above six colours 1b decides only within a quarter break.
 - **Run 199 (2026-11-27 16:55 ET), 8 colours seeds 21-22, + the plan kept gives way: 4/8** -- kept. Lines lost 56-83 frames later
   were called alike (rank.c lostAlike: under a break's time apart) and lost to the sooner (combo s22 12984 241 vs 297; thicc s21 7959
   225 vs 308). Run 200: above six colours under garbage, alike only within a quarter of a break's time.

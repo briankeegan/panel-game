@@ -430,6 +430,10 @@ static int readBoard_(Read *R) {
   // at 2106; runs 58 and 114: eight rows kept is every line judged dying)
   // (run 137 kept it to seven rows above six colours: 4/8 against 6/8 -- back to six)
   chaosOpenQuiet = opening && panelTop(decQ.b) < LOW_ROWS;
+  // (run 162: above six colours between waves too -- no garbage on the board, the stack under six rows: what is kept is what the next
+  // wave is broken with. Run 161 combo s8 (and run 160, 5028): 63 -> 25 panels between waves (3574-4180, none on the board), then about
+  // eight rows of slabs on three or four rows at ~4690, buried by 4975, lost at 4842)
+  if (!chaosOpenQuiet && decQ.b->colors > 6 && !F->known[FACT_US_CONTACT] && !R->under && panelTop(decQ.b) < LOW_ROWS) chaosOpenQuiet = 1;
   // (run 160: and the other side -- above six colours, the opening's stack at seven rows or more makes room: rank.c)
   chaosOpenHigh = opening && decQ.b->colors > 6 && panelTop(decQ.b) >= LOW_ROWS + 1;
   R->low = to && (opening || refill || taRaise) && rowsUp > 0 && chaosRaisable; R->up = R->low && !cascadeLive(decQ.b) && canRaiseNow;

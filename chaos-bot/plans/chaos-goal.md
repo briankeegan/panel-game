@@ -177,6 +177,10 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 161 (2026-11-27 06:28 ET), no chain aims before garbage on a low stack: survived 4/8, 117188 frames -- kept**, its target fixed:
+  chain s7 lived (lost early in runs 156-160). Two repeating opening losses fixed in two runs. combo s8 now loses at ~5000 each run (5028,
+  4842): between waves, none on the board, the bot cleared 63 -> 25 panels, then ~8 rows of slabs landed on 3-4 rows at ~4690. Run 162:
+  run 55's keep-the-panels rule above six colours between waves too (no garbage on the board, stack under six rows).
 - **Run 160 (2026-11-27 06:13 ET), a high 8-colour opening makes room: survived 4/8, 108422 frames -- kept**, its target fixed: insane
   s8 lived and combo s8 passed the opening (lost at 5028, not ~605). The openings are where the losses repeat: they play the same each
   run (time to spare). chain s7 (early in five runs, 1647-4637): the 8-colour aims fired 2x and 4x chains from 298 to 838 with no garbage

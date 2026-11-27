@@ -506,6 +506,11 @@
 #   no garbage near -- 36 -> 21 -> 15 panels, the stop halting the rise -- then a 6-row slab landed on three rows at ~1028.
 # run 161 -- with no garbage on the board and the stack under six rows, the 8-colour chain aims asked only as breaks (decide.c brk):
 #   nothing to break, so no chain is asked and the opening keeps its panels. 8 colours s7-8
+# run 161 -- (result) survived 4/8, 117188 frames -- kept: its target fixed, chain s7 lived (lost early in runs 156-160). insane s7 1808
+#   (mid-game, a canyon under slabs; lived in most runs), chain s8 17732, combo s8 4842 (as in run 160, 5028: 63 -> 25 panels between
+#   waves with none on the board, then ~8 rows of slabs on 3-4 rows at ~4690), insane s8 6406.
+# run 162 -- run 55's keep-the-panels rule (rank.c chaosOpenQuiet) above six colours between waves too: no garbage on the board, the
+#   stack under six rows (decide.c). 8 colours s7-8
 chain_garbage 7 9 9 1 21600 10 colors=8
 combo_storm 7 9 9 1 21600 10 colors=8
 thicc_combo_storm 7 9 9 1 21600 10 colors=8

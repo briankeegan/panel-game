@@ -1089,10 +1089,7 @@ static int compareJudged(const Judge *x, const Judge *y) {
     int32_t bx = imax(0, x->apBroke) / W, by = imax(0, y->apBroke) / W;
     if (bx != by) {
       const Judge *dig = bx > by ? x : y, *other = dig == x ? y : x;
-      // (run 211: above six colours, never a dig whose own board is lost inside a break's time -- its break is never finished. Run 210 8
-      // colours thicc s21 7318-7820: digs lost at 149, 127, 113, 202 and 123 put over lines lost at 203, 182, 222, 262 and 251, lost at 7771)
-      if (lostOf(other) - lostOf(dig) < rankSave && !(decQ.b->colors > 6 && lostOf(dig) < rankSave && lostOf(other) > lostOf(dig)))
-        return (cmpKey = __LINE__, (dig == x ? -1 : 1));
+      if (lostOf(other) - lostOf(dig) < rankSave) return (cmpKey = __LINE__, (dig == x ? -1 : 1));
     }
   }
   // (CHAOS, STOP TIME IS A MAX, NOT A SUM: a new award only replaces what is left (checkMatches.lua awardStopTime), so panels cleared
@@ -1986,7 +1983,10 @@ static void outlivingFirst(Judge **a, int n) {
   // after the sort, and after the hold is put on top in place of a line that does nothing: decide.c)
   { int32_t keep = cmpKey;
     for (int pass = 0; pass < 4 && n > 1; pass++) { int moved = 0;
-      for (int i = 1; i < n; i++) if (!a[i]->o.dead && outlives(a[i], a[0]) && compareJudged(a[i], a[0]) < 0) {
+      // (run 212: above six colours a quarter of a break's time is outliving -- as lostAlike there (OUT_Q, creditPair). Run 211 8 colours:
+      // the hold on top lost at 118 over an entry at 159 (insane s21 12423), 216 over a carry at 300 (thicc s22 16414), 331 over 376
+      // (insane s22 3371) -- each through a third line)
+      for (int i = 1; i < n; i++) if (!a[i]->o.dead && (outlives(a[i], a[0]) || OUT_Q(a[i], a[0])) && compareJudged(a[i], a[0]) < 0) {
         Judge *e = a[i]; for (int q = i; q > 0; q--) a[q] = a[q - 1]; a[0] = e; moved = 1; rankMoved = -__LINE__; break; }
       if (!moved) break; }
     cmpKey = keep; }

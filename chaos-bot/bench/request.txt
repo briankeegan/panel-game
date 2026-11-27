@@ -744,6 +744,11 @@
 #   combo s22 8300, thicc s22 5065, insane s22 20097. thicc s21 7318-7820: DIG THE BACKLOG put five digs lost at 113-202 over lines lost
 #   at 182-262 -- each dig breaking one row with its own board lost inside a break's time.
 # run 211 -- above six colours, DIG THE BACKLOG never puts first a dig whose own board is lost inside a break's time (rank.c). 8 colours s21-22
+# run 211 -- (result) survived 2/8, 104188 frames -- worse (3/8): OFF, run 210's rank.c restored by hash (c003f96). The hold on top over
+#   lines lost 41-84 frames later, through a third line (UNDER GARBAGE, THE WINDOW SPENT ON BREAKS against an equal line): insane s21
+#   12423 118 over an entry at 159; thicc s22 16414 216 over a carry at 300; insane s22 3371 331 over 376.
+# run 212 -- run 210's bot plus: above six colours, outlivingFirst (the line that outlives the top and beats it alone moves up) counts a
+#   quarter of a break's time as outliving (rank.c). 8 colours s21-22
 chain_garbage 21 9 9 1 21600 10 colors=8
 combo_storm 21 9 9 1 21600 10 colors=8
 thicc_combo_storm 21 9 9 1 21600 10 colors=8

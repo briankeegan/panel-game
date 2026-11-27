@@ -6,11 +6,11 @@
 Then the next weakest mode, one at a time (7 colours, chaos margin, Line Clear, the queue limit), each to 8/8 twice, never below Level 9,
 the Level 10 six-colour gate kept. Done only when every mode holds. (The owner, 2026-11-27: "Not just the colors... other modes as
 well" -- once colours are done, every other mode: 7 colours, chaos margins 2/3/4, chaos mode, 1HP, NST, BALL, Line Clear, the queue
-limit, Challenge Mode to Impossible.) (The owner, 2026-11-27 14:30 ET: "7/8 IS GREAT" -- run 180's 7/8 at 8 colours
+limit, training_random, Challenge Mode to Impossible.) (The owner, 2026-11-27 14:30 ET: "7/8 IS GREAT" -- run 180's 7/8 at 8 colours
 counts; "If you have that. GO into next mode" -- run 190: 7 colours at Level 10 with run 180's bot. "And once all modes are that good
 go back and get them all to 100%" -- every mode to 7/8 first, then each to 8/8.)
 
-**Mode table (training_random dropped -- the owner, 2026-11-27 16:15 ET: "Training random doesn't need to be there because it seems like you did all the other training"; the owner: "Love this table" -- kept here, updated every run; seeds 7-8, 4 patterns each):**
+**Mode table (the owner: "Love this table" -- kept here, updated every run; seeds 7-8, 4 patterns each):**
 
 | Mode | Level | Run | Result |
 |---|---|---|---|
@@ -23,6 +23,7 @@ go back and get them all to 100%" -- every mode to 7/8 first, then each to 8/8.)
 | BALL | 10 | 197 | playing |
 | Line Clear | - | - | to do |
 | Queue limit | 10 | - | to do |
+| training_random | 10 | - | to do (its own pattern: chain and combo garbage mixed at a random balance, Chaos Mode 1 game in 4 -- TrainingMenu.lua createBasicTrainingMode) |
 | Challenge Mode | stage's | - | to do |
 
 **Standing orders -- every step, no exceptions:**

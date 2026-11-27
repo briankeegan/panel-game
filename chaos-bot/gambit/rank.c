@@ -983,7 +983,8 @@ static int compareJudged(const Judge *x, const Judge *y) {
   // Run 117 8 colours insane s6, 12641-12943: a 7x then 8x breaking nothing emptied columns 0-3 under garbage left on the right towers,
   // lost at 13029)
   // (run 120: and with garbage on its way too -- run 119 chain s5, a 5x breaking nothing at 472-568 before the first slab, lost at 660)
-  if (decQ.b->colors > 6 && (decF.under || decQ.narr > 0 || decQ.b->ninc > 0) && !x->o.dead && !y->o.dead) {
+  // (run 121: off -- run 119 4/8, run 120 (garbage on its way too) about 2/8; run 117 without it 5/8)
+  if (0 && decQ.b->colors > 6 && (decF.under || decQ.narr > 0 || decQ.b->ninc > 0) && !x->o.dead && !y->o.dead) {
     int lx4 = x->o.j.chainAll > 3 && x->apBroke <= 0, ly4 = y->o.j.chainAll > 3 && y->apBroke <= 0;
     if (lx4 != ly4) { const Judge *lng = lx4 ? x : y, *o = lx4 ? y : x;
       if (o->o.j.chainAll <= 3 && (o->o.lives || diesAt(o) + rankSave > diesAt(lng))) return (cmpKey = __LINE__, (lx4 ? 1 : -1)); }

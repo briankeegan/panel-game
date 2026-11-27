@@ -244,9 +244,13 @@ static int readBoard_(Read *R) {
   // the profile's list as it is at six colours and fewer. Runs 101-109 at 8 colours: about 2/8, 12-14k frames on average)
   if (decQ.b->colors > 6 && R->list.n > 0) {
     List L; memset(&L, 0, sizeof L);
-    L.aim[0].chain.op = OP_EQ; L.aim[0].chain.n = 2; L.aim[0].chain.near = 1; L.aim[0].brk = -1;
-    L.aim[1].chain.op = OP_EQ; L.aim[1].chain.n = 3; L.aim[1].chain.near = 1; L.aim[1].brk = -1;
-    L.aim[2].combo.op = OP_GE; L.aim[2].combo.n = 4; L.aim[2].combo.near = 1; L.aim[2].brk = -1;
+    // (run 121: starving -- garbage on the board and under four rows' worth of panels -- each aim is met only by a line that breaks
+    // garbage (facts.c: brk 1): a chain breaking nothing spends the panels the next break needs. Run 119 thicc s5, 40 -> 13 panels on
+    // 2x clears breaking nothing for stop, lost at 11927)
+    int32_t brk = F->known[FACT_US_CONTACT] && panelsOn(decQ.b) < 4 * W ? 1 : -1;
+    L.aim[0].chain.op = OP_EQ; L.aim[0].chain.n = 2; L.aim[0].chain.near = 1; L.aim[0].brk = brk;
+    L.aim[1].chain.op = OP_EQ; L.aim[1].chain.n = 3; L.aim[1].chain.near = 1; L.aim[1].brk = brk;
+    L.aim[2].combo.op = OP_GE; L.aim[2].combo.n = 4; L.aim[2].combo.near = 1; L.aim[2].brk = brk;
     L.n = 3; R->list = L;
   }
   // (EIGHT AND UP -- the owner: 8x plus, 9s and 10s alike: in a list that asks combos and no chain, an entry of exactly eight asks eight

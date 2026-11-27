@@ -177,6 +177,8 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 120 (2026-11-26 22:00 ET), no long chain with garbage on its way too: about 2/8.** The long-chain rule is off. Run 121:
+  starving, the chain aims are met only by breaks (run 119 thicc s5: 40 -> 13 panels on 2x clears breaking nothing).
 - **Run 119 (2026-11-26 21:50 ET), no long chain (past 3x) for nothing under garbage, 8 colours s5-6: survived 4/8** -- insane s5 lived
   for the first time; chain s5 lost at 660 to a 5x breaking nothing before the first slab landed (outside the rule's reach). Run 120:
   the rule with garbage on its way too; under 5/8 and it goes.

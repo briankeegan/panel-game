@@ -365,6 +365,9 @@
 # run 119 -- (result) no long chain for nothing under garbage, 8 colours s5-6: survived 4/8 (117: 5/8) -- insane s5 lived (first time);
 #   chain s5 lost at 660 to a 5x breaking nothing before the first slab (outside the rule), thicc s5 11927, chain s6 12117, insane s6 4077
 # run 120 -- the same rule with garbage on its way too (rank.c); if under 5/8 the rule goes. 8 colours L10 s5-6
+# run 120 -- (result) no long chain for nothing with garbage on its way too, 8 colours s5-6: about 2/8. The rule is off
+# run 121 -- run 117's bot, and starving (garbage on the board, under 4 rows of panels) the chains-for-stop aims are met only by lines
+#   breaking garbage (decide.c brk 1): run 119 thicc s5 went 40 -> 13 panels on 2x clears breaking nothing. 8 colours L10 s5-6
 chain_garbage 5 9 9 1 21600 10 colors=8
 combo_storm 5 9 9 1 21600 10 colors=8
 thicc_combo_storm 5 9 9 1 21600 10 colors=8

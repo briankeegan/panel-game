@@ -1,5 +1,4 @@
-run 46065716319, as of 2026-11-27T22:46:35Z
-opponent topped out: clock 4710 stopWatch 4522 stop 24 pre-stop 224 shake 0 health 1, top rows r12=0ggggg r11=gggggg r10=gggggg
+run 46065716319, as of 2026-11-27T22:48:40Z
 opponent topped out: clock 4740 stopWatch 4552 stop 24 pre-stop 194 shake 0 health 1, top rows r12=0ggggg r11=gggggg r10=gggggg
 opponent topped out: clock 4770 stopWatch 4582 stop 24 pre-stop 164 shake 0 health 1, top rows r12=0ggggg r11=gggggg r10=gggggg
 opponent topped out: clock 4800 stopWatch 4612 stop 24 pre-stop 134 shake 0 health 1, top rows r12=0ggggg r11=gggggg r10=gggggg
@@ -149,6 +148,7 @@ match over — bot won (pace: worst 0.30 frames off schedule); waiting for a rem
 memory after match: rss 4614848 kB, threads 9, lua 50736 kB
 game about to start: both players are ready
 set over: the room is closed, back in the lobby
+game about to start: both players are ready
 --- publish (the last 30 lines) ---
 [publish] 27 games finished so far; between two games of a set; the last publish 75 s ago
 [publish] publishing the games so far (27 finished)

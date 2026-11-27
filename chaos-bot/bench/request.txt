@@ -653,6 +653,7 @@
 #   needless-swap override (labelled moved:d1211) over a ready line, the first slab on the board unrested.
 # run 189 -- run 180's bot plus: that needless-swap hold override off above six colours with garbage on the board, resting or not
 #   (decide.c, rank.c underCredit). 8 colours s7-8
+# run 189 -- (result) survived 1/8, 80081 frames -- off; 8 colours closed at run 180's 7/8 (the owner). One set at a time from here.
 # run 190 -- THE NEXT MODE (the owner: "7/8 IS GREAT", "GO into next mode"): 7 colours at Level 10, seeds 7-8, run 180's bot (8 colours
 #   7/8, 152311 frames). Run 189's change out. 7 colours s7-8
 chain_garbage 7 9 9 1 21600 10 colors=7

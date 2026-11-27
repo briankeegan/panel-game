@@ -181,6 +181,8 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 189 (2026-11-27 14:37 ET), no needless-swap hold with garbage on the board: survived 1/8, 80081 frames** -- off. 8 colours
+  closed at run 180's 7/8 (the owner: "7/8 IS GREAT", "focus on one set at a time"). Now 7 colours (run 190).
 - **Run 188 (2026-11-27 14:20 ET), 'a break in hand before a promise' reads the unrested first slab: survived 2/8, 115508 frames** --
   reverted. thicc s8 lost at 609: 604-618 the hold put on top by decide.c's needless-swap override over a ready line, the first slab
   unrested. Run 189: that override off above six colours with garbage on the board, resting or not.

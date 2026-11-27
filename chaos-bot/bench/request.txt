@@ -501,6 +501,11 @@
 #   441 on set-ups and zips, every line dying from 545 once the first slab is told, topped at 768. A loss that repeats: a fault.
 # run 160 -- a high opening makes room (rank.c + decide.c chaosOpenHigh): above six colours, before garbage first comes, with the stack at
 #   seven rows or more, of two living lines the one clearing more panels first. 8 colours s7-8
+# run 160 -- (result) survived 4/8, 108422 frames -- kept: its target fixed (insane s8 lived; combo s8 passed the opening, lost at 5028
+#   instead of ~605). chain s7 lost at 2000 (early in five runs, 1647-4637): the 8-colour aims fired 2x and 4x chains from 298 to 838 with
+#   no garbage near -- 36 -> 21 -> 15 panels, the stop halting the rise -- then a 6-row slab landed on three rows at ~1028.
+# run 161 -- with no garbage on the board and the stack under six rows, the 8-colour chain aims asked only as breaks (decide.c brk):
+#   nothing to break, so no chain is asked and the opening keeps its panels. 8 colours s7-8
 chain_garbage 7 9 9 1 21600 10 colors=8
 combo_storm 7 9 9 1 21600 10 colors=8
 thicc_combo_storm 7 9 9 1 21600 10 colors=8

@@ -261,6 +261,11 @@ static int readBoard_(Read *R) {
     // the rule began, then starved under garbage held on the right tower, lost at 4143)
     // (run 159 tried four rows' worth on the wide search: 3/8 -- back to five)
     int32_t brk = F->known[FACT_US_CONTACT] && pn < 5 * W ? 1 : -1;
+    // (run 161: and with no garbage on the board and the stack under six rows, the chains asked only as breaks -- none can be met, so
+    // nothing is asked: a chain there buys a stop that halts the rise and spends the panels the first slab is broken with. Run 160 chain
+    // s7 (and runs 156-159, 1647-4637): 2x and 4x chains from 298 to 838 with no garbage near, 36 -> 21 -> 15 panels, a 6-row slab on
+    // three rows at ~1028, lost at 2000)
+    if (!F->known[FACT_US_CONTACT] && panelTop(decQ.b) < LOW_ROWS) brk = 1;
     L.aim[0].chain.op = OP_EQ; L.aim[0].chain.n = 2; L.aim[0].chain.near = 1; L.aim[0].brk = brk;
     // (run 125 dropped the 3x: 8 colours s5-6 about 2/8 -- back)
     L.aim[1].chain.op = OP_EQ; L.aim[1].chain.n = 3; L.aim[1].chain.near = 1; L.aim[1].brk = brk;

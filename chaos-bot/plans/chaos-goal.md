@@ -177,6 +177,11 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 160 (2026-11-27 06:13 ET), a high 8-colour opening makes room: survived 4/8, 108422 frames -- kept**, its target fixed: insane
+  s8 lived and combo s8 passed the opening (lost at 5028, not ~605). The openings are where the losses repeat: they play the same each
+  run (time to spare). chain s7 (early in five runs, 1647-4637): the 8-colour aims fired 2x and 4x chains from 298 to 838 with no garbage
+  near -- 36 -> 21 -> 15 panels, each stop halting the rise -- and a 6-row slab landed on three rows at ~1028, lost at 2000. Run 161: with
+  no garbage on the board and the stack under six rows, the chain aims are asked only as breaks (so not at all).
 - **Run 159 (2026-11-27 06:00 ET), starving from four rows: survived 3/8, 94790 frames** -- back to five. insane s8 lost at 605 the very
   way combo s8 lost at 610 in run 151 -- the same board cell for cell: seed 8 starts both patterns alike and the opening, played with time
   to spare, plays the same. 30 -> 48 panels (eight rows) by 441 on set-ups and zips, every line dying from 545 once the first slab is told,

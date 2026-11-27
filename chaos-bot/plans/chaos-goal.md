@@ -177,6 +177,9 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 126 (2026-11-26 23:03 ET), a full board asks the combo first: survived 4/8** (insane s5 221 frames short). Off. thicc s6:
+  columns 3-5 emptied rows 7-10 by 4x chains breaking nothing, the garbage on the left tower. Run 127: panel columns kept even under
+  garbage (garbage never counted -- every canyon read flat to evenOf).
 - **Run 125 (2026-11-26 22:53 ET), no 3x asked: about 2/8.** Back. Runs 118-125: every change but 121-122 worse than 5/8; the best bot
   is run 122's. Run 126: a full board (8 rows of panels) asks the combo first (run 121 combo s6, 47-60 panels 12 rows high, lost late).
 - **Run 124 (2026-11-26 22:43 ET), the canyon read off the settled board: survived 3/8.** Off. Run 125: the list asks a 2x then a

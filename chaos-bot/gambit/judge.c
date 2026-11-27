@@ -77,6 +77,7 @@ typedef struct {
   int32_t spread;               // and how its colours are spread (spreadOf): the pairs a swap from a match less the pairs touching
   int32_t seams;                // and its crossed seams (seamsOf): the swaps on it that finish two colours at once
   int32_t swapReady, readyBreak; // and the single swaps on it that make a match, and of those the matches touching garbage (readyOf)
+  int32_t pEven;                // and its panel columns' evenness: the tallest panel column less the lowest, garbage not counted (panelEvenOf)
   int32_t topRow;               // and whether anything rests in its top row or above (topRowOf: no queued garbage drops then)
   int32_t gap;                  // and the empty cells under its garbage, each column's lowest garbage down to what holds it (gapOf; -1 not known)
 } Judged;
@@ -437,6 +438,17 @@ static int lineUpSwaps(const Board *b, int32_t *out, int max) {
   for (int i = 0; i < n; i++) out[i] = mv[i];
   return n;
 }
+// (CHAOS, THE PANELS' OWN SHAPE: the tallest column of panels less the lowest, garbage never counted -- a canyon under garbage resting on
+// towers reads flat to evenOf, whose tops are the garbage's)
+static int32_t panelEvenOf(const Board *b) {
+  int hi = 0, lo = 1 << 20;
+  for (int c = 1; c <= W; c++) {
+    int h = 0;
+    for (int r = 1; r < b->nrows; r++) { if (b->p[r][c].f[ISGARBAGE]) break; if (b->p[r][c].f[COLOR] > 0) h = r; }
+    if (h > hi) hi = h; if (h < lo) lo = h;
+  }
+  return hi - lo;
+}
 static int32_t evenOf(const Board *b) {
   int hi = 0, lo = 1 << 20;
   for (int c = 1; c <= W; c++) {
@@ -768,7 +780,7 @@ static void judgeOnce(const Question *q, const int32_t *seq, int nseq, const Jud
     // (run 125: off -- run 124 with it 3/8)
     // (run 124, above six colours: the gap read off the board once it has settled -- a chain still falling at the line's end has not
     // dug its canyon yet: run 123 chain s5, a 3x clearing 15 panels breaking nothing emptied columns 2-5 under garbage on the left tower)
-    if (0 && eb && eb->colors > 6) { int ls = settleOf(x, n); if (liveNode(x, ls)) { const Board *sb = ensureBoard(x, ls); if (sb) j->gap = gapOf(sb); } } j->topRow = eb ? topRowOf(eb) : 0; j->swapReady = j->readyBreak = 0; if (eb) readyOf(eb, &j->swapReady, &j->readyBreak); j->spread = eb ? spreadOf(eb) : 0; j->seams = eb ? seamsOf(eb) : 0; }
+    if (0 && eb && eb->colors > 6) { int ls = settleOf(x, n); if (liveNode(x, ls)) { const Board *sb = ensureBoard(x, ls); if (sb) j->gap = gapOf(sb); } } j->topRow = eb ? topRowOf(eb) : 0; j->pEven = eb ? panelEvenOf(eb) : -1; j->swapReady = j->readyBreak = 0; if (eb) readyOf(eb, &j->swapReady, &j->readyBreak); j->spread = eb ? spreadOf(eb) : 0; j->seams = eb ? seamsOf(eb) : 0; }
   j->dropAt = j->dead ? 0 : e->t + imax(e->stopTime + e->preStopTime, e->shakeTime);
   j->fire = j->nats ? j->ats[j->nats - 1] : -1;
   if (o->lifeTo >= 0) j->lostAt = j->dead ? j->deadAt : lostAlone(x, n, imax(o->lifeTo, imax(lastAt, o->lifeStop ? j->dropAt : 0) + o->lifeRest));

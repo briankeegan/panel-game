@@ -259,7 +259,8 @@ static int readBoard_(Read *R) {
     L.n = 3;
     // (run 126: a full board -- eight rows' worth of panels or more -- asks the combo first: it needs panels off it, and a combo takes
     // more of them than a 2x. Run 121 combo s6, 47-60 panels twelve rows high at the fastest rise, lost at 18990)
-    if (pn >= 8 * W) { Aim c = L.aim[2]; L.aim[2] = L.aim[1]; L.aim[1] = L.aim[0]; L.aim[0] = c; }
+    // (run 127: off -- run 126 with it 4/8)
+    if (0 && pn >= 8 * W) { Aim c = L.aim[2]; L.aim[2] = L.aim[1]; L.aim[1] = L.aim[0]; L.aim[0] = c; }
     R->list = L;
   }
   // (EIGHT AND UP -- the owner: 8x plus, 9s and 10s alike: in a list that asks combos and no chain, an entry of exactly eight asks eight

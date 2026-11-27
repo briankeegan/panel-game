@@ -383,6 +383,9 @@
 # run 125 -- (result) no 3x asked, 8 colours s5-6: about 2/8. Back
 # run 126 -- run 122's bot, and a full board (8 rows of panels or more) asks the combo of 4+ before the chains (decide.c): run 121
 #   combo s6 lost at 18990 with 47-60 panels twelve rows high. 8 colours L10 s5-6
+# run 126 -- (result) a full board asks the combo first, 8 colours s5-6: survived 4/8 (insane s5 221 frames short). Off
+# run 127 -- above six colours under garbage, of lines alike breaking the same, panel columns kept even (garbage never counted:
+#   judge.c panelEvenOf, rank.c 1'j) -- every canyon was panel towers beside emptied columns under garbage. 8 colours L10 s5-6
 chain_garbage 5 9 9 1 21600 10 colors=8
 combo_storm 5 9 9 1 21600 10 colors=8
 thicc_combo_storm 5 9 9 1 21600 10 colors=8

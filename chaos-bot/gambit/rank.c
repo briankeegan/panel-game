@@ -1354,6 +1354,13 @@ static int compareJudged(const Judge *x, const Judge *y) {
     for (int i = 0; i < decQ.b->ninc; i++) rows += decQ.b->inc[i].height > 0 ? decQ.b->inc[i].height : 1;
     if (rows > 0 && fullTop(decQ.b) + rows >= h - 1) return (cmpKey = __LINE__, (x->o.topAfter - y->o.topAfter));
   }
+  // 1'j. (run 127, CHAOS) ABOVE SIX COLOURS UNDER GARBAGE, THE PANELS KEPT EVEN: of two that live or are lost alike and break the same
+  // garbage, the one leaving its panel columns two rows or more more even (judge.c panelEvenOf: garbage never counted) first -- every
+  // canyon of runs 115-126 was panel towers beside emptied columns with the garbage resting on the towers (run 126 thicc s6: columns 3-5
+  // emptied from row 7 to 10 by 4x chains breaking nothing, lost at 9240)
+  if (decQ.b->colors > 6 && decF.under && (lx || lostAlike(x, y)) && imax(0, x->apBroke) == imax(0, y->apBroke) &&
+      x->o.j.pEven >= 0 && y->o.j.pEven >= 0 && iabs(x->o.j.pEven - y->o.j.pEven) >= 2)
+    return (cmpKey = __LINE__, (x->o.j.pEven - y->o.j.pEven));
   // 1'h. (run 107, CHAOS) ABOVE SIX COLOURS, THE COLOURS LINED UP (the owner: be more purposeful with colours): of two that both live
   // or are lost alike and break the same garbage, the one leaving more breaks a swap away (judge.c readyOf: a single swap that makes a
   // match touching garbage), then more matches a swap away -- at 8 colours a match seldom arrives by itself, and runs 101-106 found no

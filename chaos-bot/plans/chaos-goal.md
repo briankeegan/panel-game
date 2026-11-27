@@ -177,6 +177,8 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 125 (2026-11-26 22:53 ET), no 3x asked: about 2/8.** Back. Runs 118-125: every change but 121-122 worse than 5/8; the best bot
+  is run 122's. Run 126: a full board (8 rows of panels) asks the combo first (run 121 combo s6, 47-60 panels 12 rows high, lost late).
 - **Run 124 (2026-11-26 22:43 ET), the canyon read off the settled board: survived 3/8.** Off. Run 125: the list asks a 2x then a
   combo of 4+ -- no 3x (the canyons were dug by 3x and longer chains breaking nothing).
 - **Run 123 (2026-11-26 22:32 ET), starving when garbage outweighs panels: survived 4/8.** Back. chain s5 lost at 3318: a 3x

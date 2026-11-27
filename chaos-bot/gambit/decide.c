@@ -253,9 +253,14 @@ static int readBoard_(Read *R) {
     // (run 124: back to the panels alone -- run 123 with the garbage weighed 4/8)
     int32_t brk = F->known[FACT_US_CONTACT] && pn < 4 * W ? 1 : -1;
     L.aim[0].chain.op = OP_EQ; L.aim[0].chain.n = 2; L.aim[0].chain.near = 1; L.aim[0].brk = brk;
-    // (run 125: no 3x asked -- a 2x buys the stop; the canyons of runs 115-123 were dug by 3x and longer chains breaking nothing)
-    L.aim[1].combo.op = OP_GE; L.aim[1].combo.n = 4; L.aim[1].combo.near = 1; L.aim[1].brk = brk;
-    L.n = 2; R->list = L;
+    // (run 125 dropped the 3x: 8 colours s5-6 about 2/8 -- back)
+    L.aim[1].chain.op = OP_EQ; L.aim[1].chain.n = 3; L.aim[1].chain.near = 1; L.aim[1].brk = brk;
+    L.aim[2].combo.op = OP_GE; L.aim[2].combo.n = 4; L.aim[2].combo.near = 1; L.aim[2].brk = brk;
+    L.n = 3;
+    // (run 126: a full board -- eight rows' worth of panels or more -- asks the combo first: it needs panels off it, and a combo takes
+    // more of them than a 2x. Run 121 combo s6, 47-60 panels twelve rows high at the fastest rise, lost at 18990)
+    if (pn >= 8 * W) { Aim c = L.aim[2]; L.aim[2] = L.aim[1]; L.aim[1] = L.aim[0]; L.aim[0] = c; }
+    R->list = L;
   }
   // (EIGHT AND UP -- the owner: 8x plus, 9s and 10s alike: in a list that asks combos and no chain, an entry of exactly eight asks eight
   // or more -- a two-column eight of 11 or 12 panels is the attack asked, never a combo outside the list taken out as a wasted three;

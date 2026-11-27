@@ -33,8 +33,8 @@ static int32_t colourExtra(void) { return decQ.b && decQ.b->colors > 6 ? decQ.b-
 // (run 144, 40 x 7: 4/8, 143378 frames, the most yet -- kept. The frames have followed the shape: 24 x 12 98k, 28 x 10 131k, 40 x 7 143k.
 // Run 145 follows it: per colour over six, 6 wider and half a swap shallower (8 colours 52 x 6))
 // (run 145, 52 x 6: 5/8, 120708 frames -- kept. Run 147: wider again, 12 a colour over six (8 colours 64 x 6))
-// (run 152: 18 a colour over six (8 colours 76 x 6) -- 52 x 6 and 64 x 6 have each held 5/8)
-static int32_t gpWidth(int32_t w) { int32_t e = colourExtra(); return w + 18 * e; }
+// (run 152 tried 18 a colour over six (76 x 6): 2/8, 111422 frames -- back to 12 (64 x 6))
+static int32_t gpWidth(int32_t w) { int32_t e = colourExtra(); return w + 12 * e; }
 // (run 149 tried a swap shallower a colour over six (64 x 5): 2/8, 90487 frames -- back to half a swap (64 x 6))
 static int32_t gpDepth(int32_t d) { int32_t e = colourExtra(); return d - e / 2 >= 4 ? d - e / 2 : d; }
 // (run 150: the extend search -- the chains and breaks grown from the board -- a swap deeper above six colours: at 8 colours a break is a

@@ -177,6 +177,8 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 152 (2026-11-27 04:29 ET), the searches 76 x 6: survived 2/8, 111422 frames** -- back to 64 x 6 (width at 8 colours, 6 deep: 52
+  5/8, 64 5/8 three times, 76 2/8). Run 153 measures rule 117 (no canyon dug for nothing) off on the wider search.
 - **Run 151 (2026-11-27 04:17 ET), 1'h off: survived 5/8, 128433 frames -- equal, kept off (the simpler bot).** combo s8 lost at 610,
   the other way this time: the opening flat but high, 45 panels and nine rows when a 3-row slab landed at 711. Lost also combo s7 5633,
   thicc s7 14190. Run 152: the searches 76 x 6 at 8 colours.

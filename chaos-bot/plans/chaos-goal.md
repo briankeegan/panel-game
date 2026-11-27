@@ -177,6 +177,8 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 153 (2026-11-27 04:42 ET), rule 117 off: survived 4/8, 120772 frames** -- back on. Run 154 measures the perched drops offered
+  under garbage above six colours (run 122) off.
 - **Run 152 (2026-11-27 04:29 ET), the searches 76 x 6: survived 2/8, 111422 frames** -- back to 64 x 6 (width at 8 colours, 6 deep: 52
   5/8, 64 5/8 three times, 76 2/8). Run 153 measures rule 117 (no canyon dug for nothing) off on the wider search.
 - **Run 151 (2026-11-27 04:17 ET), 1'h off: survived 5/8, 128433 frames -- equal, kept off (the simpler bot).** combo s8 lost at 610,

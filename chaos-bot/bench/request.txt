@@ -481,6 +481,9 @@
 # run 152 -- the searches wider: 18 a colour over six (8 colours 76 x 6; propose.c). 8 colours s7-8
 # run 152 -- (result) survived 2/8, 111422 frames -- back to 64 x 6. The planner's width at 8 colours, 6 deep: 52 5/8, 64 5/8 x3, 76 2/8.
 # run 153 -- run 151's bot (64 x 6, 1'h off) with rule 117 (rank.c: no canyon dug for nothing) off, measured on the wider search. s7-8
+# run 153 -- (result) survived 4/8, 120772 frames (run 151: 5/8, 128433) -- 117 back on. Lost chain s7 11631, combo s7 13370, chain s8
+#   3378, insane s8 5993.
+# run 154 -- run 151's bot with the perched drops offered under garbage above six colours (propose.c, run 122) off. 8 colours s7-8
 chain_garbage 7 9 9 1 21600 10 colors=8
 combo_storm 7 9 9 1 21600 10 colors=8
 thicc_combo_storm 7 9 9 1 21600 10 colors=8

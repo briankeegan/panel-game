@@ -177,6 +177,9 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 121 (2026-11-26 22:11 ET), starving, the chain aims need a break: survived 5/8** (equal to run 117) -- both insane games
+  lived; thicc s5 lost at 643 (garbage held up on a 3-panel tower in column 0 over cleared columns 1-5), chain s5 12886, combo s6 18990.
+  Kept. Run 122: the let-down lines offered whenever under garbage above six colours.
 - **Run 120 (2026-11-26 22:00 ET), no long chain with garbage on its way too: about 2/8.** The long-chain rule is off. Run 121:
   starving, the chain aims are met only by breaks (run 119 thicc s5: 40 -> 13 panels on 2x clears breaking nothing).
 - **Run 119 (2026-11-26 21:50 ET), no long chain (past 3x) for nothing under garbage, 8 colours s5-6: survived 4/8** -- insane s5 lived

@@ -1247,7 +1247,9 @@ static int proposeAll(const Read *R, const Found *S, Cand *out, int cap) {
       if (ls >= 0 && liveNode(lx, ls)) { const Board *sb = ensureBoard(lx, ls); if (sb) lb = sb; } }
     static int32_t lv[MAXLINE]; int nl = levelLine(lb, lv, MAXLINE);
     if (nl > 0) { int m0 = n; ADD(PLAY_LEVEL, lv, nl, -1, 0); if (n > m0) out[m0].settled = 1; } }
-  if (R->topped || R->dying) {
+  // (run 122: and above six colours whenever garbage is held up -- run 121 8 colours thicc s5, garbage left on a three-panel tower in
+  // column 0 over cleared columns 1-5 at 658, no break in reach, lost at 643 game frames: the tower walked out from under it lets it down)
+  if (R->topped || R->dying || (decQ.b->colors > 6 && R->under)) {
     static Perches pd; perchedDrops(decQ.b, &pd);
     for (int i = 0; i < pd.n; i++) { int m0 = n; ADD(PLAY_LEVEL, pd.seq[i], pd.len[i], -1, 0); if (n > m0) out[m0].drop = 1; }
   }

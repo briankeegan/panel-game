@@ -177,6 +177,8 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 143 (2026-11-27 02:33 ET), the searches 24 x 12 at 8 colours: survived 3/8, 98270 frames, 0 late** -- back to 28 x 10. All of
+  seed 8 lost (5263-9678) and insane s7 5219. Run 144: no shaping by the colours (40 x 7), the other side of the lever.
 - **Run 142 (2026-11-27 02:19 ET), the top row kept empty from twenty waiting: survived 2/8, 91868 frames** -- back to thirty-five.
   Ten tie-break changes since run 132 (runs 133-142) scored 1-5 of 8; none clearly beats the noise. Run 143 tries the bigger lever, the
   search's reach: above six colours, per colour 8 narrower and 2.5 deeper (8 colours 24 x 12, was 28 x 10).

@@ -85,6 +85,8 @@ jobs:
           CHAOSBOT_ZIP_CACHE: /tmp/chaosbot-zip
         run: |
           g='${{ toJSON(matrix.game) }}'
+          # (the machine each game ran on: the bot's searches stop on the wall clock, so a slower CPU searches less -- logged per game)
+          mkdir -p out && echo "$(lscpu | sed -n 's/^Model name: *//p' | head -1) | $(nproc) cpus | $(sed -n 's/^cpu MHz.*: *//p' /proc/cpuinfo | head -1) MHz" > out/cpu.txt
           bash chaos-bot/bench/play.sh ${{ matrix.game.pattern }} ${{ matrix.game.seed }} ${{ matrix.game.glevel }} ${{ matrix.game.gspeed }} ${{ matrix.game.queue }} ${{ matrix.game.frames }} out
           echo "::notice title=game ${{ matrix.game.n }}::$(cat out/result.txt)"
       - uses: actions/upload-artifact@v4
@@ -115,6 +117,7 @@ jobs:
           STORIES: losses.txt
         run: |
           python3 chaos-bot/bench/report.py games '${{ needs.plan.outputs.games }}' | tee report.txt
+          for d in games/chaosbot-game-*; do n=${d##*-}; [ -f "$d/cpu.txt" ] && echo "cpu game $n: $(cat $d/cpu.txt)"; done | sort -t' ' -k3n | tee -a report.txt
           { echo '```'; cat report.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
           # (EVERY DECISION LABELLED -- the owner: every decision of every game in plain words with the rule that decided it, as the
           # replays had them: describe.py reads each GAMBITD line and quotes rank.c (won=k<line>) or decide.c (won=d<line>) as this

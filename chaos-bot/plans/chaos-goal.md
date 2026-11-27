@@ -17,7 +17,7 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 
 | Mode | Level | Seeds | Run | Result |
 |---|---|---|---|---|
-| 8 colours | 10 | 21-22 | 204 | 5/8 (best; 202, 203, 205, 206 off), being fixed (run 207) |
+| 8 colours | 10 | 21-22 | 204 | 5/8 (best; 202, 203, 205, 206, 207 off), baseline rerun (run 208) |
 | 7 colours | 10 | 23-24 | - | to redo (old: 7/8 on seeds 7-8, run 190 -- does not count) |
 | Chaos margin 4 | 10 | 25-26 | - | to redo (old: 7/8 on 7-8, run 191) |
 | Chaos mode | 10 | 27-28 | - | to redo (old: 8/8 on 7-8, run 192) |
@@ -203,6 +203,9 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 207 (2026-11-27 18:14 ET), lostAlike with garbage queued: 2/8 -- off.** Four changes running worse than run 204's 5/8. Run 208:
+  run 204's bot unchanged as a baseline, with each game's CPU logged (workflow only -- the owner: "Infra solutions are great. Just don't
+  fuck with internals too much").
 - **Run 206 (2026-11-27 18:05 ET), no credit under a backlog: 2/8 -- off.** With garbage queued but none resting, rank.c's 8-colour limits
   (decF.under) never apply: NO CHANGING MINDS kept lines lost 90 frames sooner. Run 207: run 204 + lostAlike's quarter break with garbage
   queued too. (A watcher now reads each run the moment it ends: scratchpad watch.sh, polling the Actions API.)

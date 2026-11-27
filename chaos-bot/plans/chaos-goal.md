@@ -177,6 +177,10 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 119 (2026-11-26 21:50 ET), no long chain (past 3x) for nothing under garbage, 8 colours s5-6: survived 4/8** -- insane s5 lived
+  for the first time; chain s5 lost at 660 to a 5x breaking nothing before the first slab landed (outside the rule's reach). Run 120:
+  the rule with garbage on its way too; under 5/8 and it goes.
+- **Run 118 (2026-11-26 21:40 ET), a starved board breaks cheaply: survived 2/8.** Off.
 - **Run 117 (2026-11-26 21:29 ET), no canyon dug for nothing, 8 colours s5-6: survived 5/8** (run 115: 4/8). combo s5 and thicc s6
   lived; chain s5 lost 35 frames short, insane s5 at 1957 (starved: 16-25 panels, breaks of 6 clearing 6), insane s6 at 13029. Kept.
   Run 118: a starved board breaks cheaply (fewer panels cleared first, under 4 rows of panels, above six colours).

@@ -982,7 +982,8 @@ static int compareJudged(const Judge *x, const Judge *y) {
   // a break's time sooner -- a 2x or 3x buys the stop; past it a chain at 8 colours only digs the columns out from under the garbage.
   // Run 117 8 colours insane s6, 12641-12943: a 7x then 8x breaking nothing emptied columns 0-3 under garbage left on the right towers,
   // lost at 13029)
-  if (decQ.b->colors > 6 && decF.under && !x->o.dead && !y->o.dead) {
+  // (run 120: and with garbage on its way too -- run 119 chain s5, a 5x breaking nothing at 472-568 before the first slab, lost at 660)
+  if (decQ.b->colors > 6 && (decF.under || decQ.narr > 0 || decQ.b->ninc > 0) && !x->o.dead && !y->o.dead) {
     int lx4 = x->o.j.chainAll > 3 && x->apBroke <= 0, ly4 = y->o.j.chainAll > 3 && y->apBroke <= 0;
     if (lx4 != ly4) { const Judge *lng = lx4 ? x : y, *o = lx4 ? y : x;
       if (o->o.j.chainAll <= 3 && (o->o.lives || diesAt(o) + rankSave > diesAt(lng))) return (cmpKey = __LINE__, (lx4 ? 1 : -1)); }

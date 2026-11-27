@@ -177,6 +177,12 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 133 (2026-11-27 00:20 ET), starving from six rows' worth (36): survived 5/8** (worse than 6/8) -- back to five rows. chain s7
+  lived (lost in runs 131-132), but combo s7 2816, insane s7 16442 and thicc s8 2609 lost: the threshold trades one seed for another.
+  thicc s8 (lost in run 132 too), read on the whole-game boards: every garbage width's drop map starts at column 1, so slabs keep landing
+  on the left; clears on the right left columns 3-5 at rows 3-6 (1862) while 3-wide slabs stacked on columns 0-2 to the top (2410-2760) --
+  no panel stood level with a slab, so nothing could break it from the side, and the board topped out with half of it empty. Run 134:
+  the canyon (gapOf, rule 117) also counts an open column beside a slab, the rows from its top up to the slab's lowest cell.
 - **Run 132 (2026-11-27 00:06 ET), starving from five rows' worth of panels (30): survived 6/8 on seeds 7-8** (equal to run 131;
   kept). Lost chain s7 at 8276 (garbage over the whole top, a canyon in columns 2-3, 33-57 panels, 19 clears breaking none in its
   last minute; it also lost in run 131) and thicc s8 at 3736 (3-wide slabs towered on columns 0-2 to the top while columns 3-5 sat

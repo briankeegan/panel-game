@@ -405,6 +405,11 @@
 #   33-57 panels, 19 clears breaking none in its last minute) and thicc s8 3736 (3-wide slabs towered on cols 0-2 to the top while
 #   cols 3-5 sat at row 6; 17 clears breaking none, panels 25-46). chain/insane s8, thicc s7 etc now live.
 # run 133 -- starving from six rows' worth (36): under garbage below 36 panels the aims need a break (decide.c). 8 colours s7-8
+# run 133 -- (result) survived 5/8 (worse than 6/8), back to five rows. chain s7 lived (lost in 131-132) but combo s7 2816, thicc s8
+#   2609 and insane s7 16442 lost. thicc s8 (lost in 132 too): every garbage width drops first at column 1; clears on the right left
+#   columns 3-5 at rows 3-6 while 3-wide slabs stacked on columns 0-2 to the top -- no panel level with a slab, so none could break it.
+# run 134 -- starving back at five rows; the canyon (judge.c gapOf, rule 117) also counts an open column beside a slab: the rows from its
+#   top up to the slab's lowest cell. A clear breaking nothing that digs the open side away from the garbage is a canyon. 8 colours s7-8
 chain_garbage 7 9 9 1 21600 10 colors=8
 combo_storm 7 9 9 1 21600 10 colors=8
 thicc_combo_storm 7 9 9 1 21600 10 colors=8

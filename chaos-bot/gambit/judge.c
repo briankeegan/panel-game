@@ -318,13 +318,25 @@ static void ownChainOf(const Question *q) {
 // (CHAOS, THE GARBAGE HELD UP: the empty cells between each column's lowest garbage cell and the first thing under it -- the canyon a
 // piece is perched over, out of reach of any break until the panels under it are built back up. Run 92 insane s16 17400-18158: the middle
 // cleared under garbage resting on the edge towers, more landing on top, lost at 18633)
+// (run 134: AND THE OPEN SIDE DUG AWAY FROM IT: a column with no garbage beside one holding garbage, the rows from its top up to that
+// garbage's lowest cell -- a slab is broken from the side only by a panel level with it. Run 133 8 colours thicc s8, 1592-2410: clears on
+// the right left columns 3-5 at rows 3-6 beside 3-wide slabs stacked on columns 0-2 to the top, nothing could touch them, lost at 2609)
 static int32_t gapOf(const Board *b) {
-  int32_t gap = 0;
+  int32_t gap = 0, low[W + 2] = {0}, top[W + 2] = {0};
   for (int c = 1; c <= W; c++) {
     int g = 0;
     for (int r = 1; r < b->nrows; r++) if (b->p[r][c].f[ISGARBAGE]) { g = r; break; }
+    low[c] = g;
+    for (int r = 1; r < b->nrows; r++) if (b->p[r][c].f[COLOR] > 0 && !b->p[r][c].f[ISGARBAGE]) top[c] = r;
     if (!g) continue;
     for (int r = g - 1; r >= 1 && b->p[r][c].f[COLOR] <= 0 && !b->p[r][c].f[ISGARBAGE]; r--) gap++;
+  }
+  for (int c = 1; c <= W; c++) {
+    if (low[c]) continue;
+    int gb = 0;
+    if (c > 1 && low[c - 1]) gb = low[c - 1];
+    if (c < W && low[c + 1] && (!gb || low[c + 1] < gb)) gb = low[c + 1];
+    if (gb && top[c] < gb) gap += gb - top[c];
   }
   return gap;
 }

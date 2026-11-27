@@ -6,7 +6,8 @@
 Then the next weakest mode, one at a time (7 colours, chaos margin, Line Clear, the queue limit), each to 8/8 twice, never below Level 9,
 the Level 10 six-colour gate kept. Done only when every mode holds. (The owner, 2026-11-27: "Not just the colors... other modes as
 well" -- once colours are done, every other mode: 7 colours, chaos margins 2/3/4, chaos mode, 1HP, NST, BALL, Line Clear, the queue
-limit, training_random, Challenge Mode to Impossible.)
+limit, training_random, Challenge Mode to Impossible.) (The owner, 2026-11-27 14:30 ET: "7/8 IS GREAT" -- run 180's 7/8 at 8 colours
+counts; after run 189 the best of 180/189 is kept and the next mode begins: 7 colours at Level 10, then the rest in turn.)
 
 **Standing orders -- every step, no exceptions:**
 1. **A run is always going.** The moment a run finishes, the next one is pushed -- before writing to the owner, before reading at

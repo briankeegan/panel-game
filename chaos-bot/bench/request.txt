@@ -353,6 +353,9 @@
 #   Run 113's bot, 8 colours L10, new seeds 5-6
 # run 115 -- (result) run 113's bot, 8 colours L10 s5-6: survived 4/8 (combo s5 4491, insane s5 3804, thicc s6 2938, chain s5 19249)
 # run 116 -- the best pair of line-up swaps offered too, where it beats every single one (judge.c lineUpPair): 8 colours L10 s5-6
+# run 116 -- (result) line-up pairs, 8 colours L10 s5-6: survived 2/8, four lost inside 2845 frames. Off
+# run 117 -- above six colours under garbage, a line breaking nothing that digs W+ empty cells under the garbage goes after one that
+#   does not (rank.c): run 115 combo s5, 5x/6x chains breaking nothing emptied the middle under garbage on the edge towers. s5-6
 chain_garbage 5 9 9 1 21600 10 colors=8
 combo_storm 5 9 9 1 21600 10 colors=8
 thicc_combo_storm 5 9 9 1 21600 10 colors=8

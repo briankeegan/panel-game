@@ -1269,7 +1269,8 @@ static int proposeAll(const Read *R, const Found *S, Cand *out, int cap) {
     int32_t lu[3]; int nlu = lineUpSwaps(decQ.b, lu, 3);
     for (int i = 0; i < nlu; i++) { if (seenDigHas(decQ.b, lu[i])) continue; int32_t one = lu[i]; ADD(PLAY_SETUP, &one, 1, -1, 0); }
     // (run 116: and the best pair of swaps, where it beats every single one -- judge.c lineUpPair)
-    int32_t two[2]; if (lineUpPair(decQ.b, two)) ADD(PLAY_SETUP, two, 2, -1, 0);
+    // (run 117: off -- run 116 with it 2/8, four lost inside 2845 frames)
+    int32_t two[2]; if (0 && lineUpPair(decQ.b, two)) ADD(PLAY_SETUP, two, 2, -1, 0);
   }
   #undef ADD
   // (and from the lines above: the converted row's chain, then every three grown -- the converted lines' own among them)

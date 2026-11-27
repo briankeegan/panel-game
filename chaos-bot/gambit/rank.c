@@ -966,6 +966,17 @@ static int compareJudged(const Judge *x, const Judge *y) {
   if (decQ.b->marginTime == 1 && decQ.b->ninc >= CHAOS_QUEUE_LIMIT - QUEUE_ROOM && x->o.j.topRow != y->o.j.topRow &&
       !x->o.dead && !y->o.dead && (x->o.lives || diesAt(x) >= rankSave) && (y->o.lives || diesAt(y) >= rankSave))
     return (cmpKey = __LINE__, (x->o.j.topRow ? 1 : -1));
+  // (run 117, CHAOS, ABOVE SIX COLOURS, NO CANYON DUG FOR NOTHING: under garbage, of two lines that break the same garbage -- none -- the
+  // one that digs W or more empty cells more under the garbage (judge.c gapOf, against the board as it stands) goes after one that digs
+  // under half of that, unless the other is lost a break's time sooner. Run 115 8 colours combo s5, 3959-4382: 5x and 6x chains breaking
+  // nothing emptied columns 1-3 from row 4 to 9 under garbage resting on the edge towers, lost at 4491)
+  if (decQ.b->colors > 6 && decF.under && !x->o.dead && !y->o.dead && imax(0, x->apBroke) == 0 && imax(0, y->apBroke) == 0 &&
+      x->o.j.gap >= 0 && y->o.j.gap >= 0) {
+    int32_t g0 = gapOf(decQ.b), dx = x->o.j.gap - g0, dy = y->o.j.gap - g0;
+    int xd = dx >= W && dy < W / 2, yd = dy >= W && dx < W / 2;
+    if (xd || yd) { const Judge *dig = xd ? x : y, *o = xd ? y : x;
+      if (o->o.lives || diesAt(o) + rankSave > diesAt(dig)) return (cmpKey = __LINE__, (xd ? 1 : -1)); }
+  }
   // (run 55, CHAOS, THE OPENING KEEPS ITS PANELS: before garbage first comes (the opening, decide.c), of two lines that both live and
   // break no garbage, the one clearing fewer panels first -- the stack rises on its own until then and the first garbage is broken with
   // what is kept; Training's garbage is scripted, so attack before it buys nothing. Run 52 insane s5: entries from frame 192 spent the

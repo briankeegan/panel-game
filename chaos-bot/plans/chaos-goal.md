@@ -177,6 +177,9 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 116 (2026-11-26 21:18 ET), line-up pairs of swaps, 8 colours s5-6: survived 2/8** (four lost inside 2845 frames). Off.
+  Run 117: no canyon dug for nothing (rank.c) -- run 115 combo s5, 5x/6x chains breaking nothing emptied columns 1-3 rows 4-9 under
+  garbage resting on the edge towers.
 - **Run 115 (2026-11-26 19:50 ET), run 113's bot, 8 colours L10, new seeds 5-6: survived 4/8** -- combo s5 4491, insane s5 3804,
   thicc s6 2938 (all early, no-line), chain s5 19249 (queue backlog). The new report worked: losses.txt held each loss's decisions and
   ten boards. thicc s6: a 2-row slab on the stack with 3-wide pieces stacked above the top, the row under the slab one panel -- no break

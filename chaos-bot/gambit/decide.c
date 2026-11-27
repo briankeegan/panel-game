@@ -2285,7 +2285,9 @@ static Played playOf(const Read *R, int n) {
     // (run 170: above six colours, short of the queue's last 25, the board left alone only where what waits lands two rows under the
     // ceiling -- insane s7 lost runs 163-167 alike: between waves the stack grew to 57-62 panels, the board was left alone with 3 waiting
     // (run 167 at 6647, the top at row 10), a 6-wide slab landed on row 12 perched on one panel, and the waves after buried it at 7886)
-    int32_t room = decQ.b->colors > 6 && !queueNear ? 3 : 1;
+    // (run 171: and only once garbage has first landed -- run 170 had it from the start: insane s7 lived, but in chain s7 the opening's
+    // queue was held back and came down as one 6-row slab on 27 panels at 983 (lost at 1765); 3/8)
+    int32_t room = decQ.b->colors > 6 && !queueNear && gambitHit ? 3 : 1;
     if (panelTop(decQ.b) + waiting <= h - room) { P.line = 0; P.deferred = 0; chaosLetDrop++; }
   }
   // (runs 75-76 tried draining the queue under garbage -- the hold over lines breaking nothing from 25 waiting, then over any line from 40:

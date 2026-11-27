@@ -177,6 +177,9 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 170 (2026-11-27 08:38 ET), the board left alone for the queue only two rows under the ceiling: survived 3/8, 110647 frames** --
+  worse than run 167; narrowed. insane s7 lived (first since run 162), but chain s7 lost at 1765: the opening's queue was held back and
+  came down as one 6-row slab on 27 panels. Run 171: the rule only once garbage has first landed.
 - **Run 169 (2026-11-27 08:20 ET), the 42-panel chain floor in the opening only: survived 0/8, 76062 frames** -- reverted. combo s8
   (933) and insane s7 (1007): the opening grew to 48 panels, then the chain spent it under the first slab. Run 170 (run 167's bot):
   insane s7 lost four runs alike (163-167) -- the stack grew to 57-62 panels between waves and the board was left alone for the queue to

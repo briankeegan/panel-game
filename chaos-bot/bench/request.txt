@@ -546,6 +546,11 @@
 #   what waits lands two rows under the ceiling, not at it (decide.c). insane s7 lost runs 163-167 alike: between waves the stack grew to
 #   57-62 panels, the board was left alone with 3 waiting (run 167 at 6647, top at row 10), a 6-wide slab perched at row 12 on one panel,
 #   the waves after buried it (7886). 8 colours s7-8
+# run 170 -- (result) survived 3/8, 110647 frames -- worse than run 167, narrowed. insane s7 lived (first since run 162). Lost chain s7
+#   1765 (the opening's queue held back, one 6-row slab on 27 panels at 983), chain s8 4711, thicc s8 2701 (slabs to a 15-row board),
+#   combo s8 20239, insane s8 16796.
+# run 171 -- run 170's rule only once garbage has first landed (decide.c: gambitHit); the opening leaves the board alone as before.
+#   8 colours s7-8
 chain_garbage 7 9 9 1 21600 10 colors=8
 combo_storm 7 9 9 1 21600 10 colors=8
 thicc_combo_storm 7 9 9 1 21600 10 colors=8

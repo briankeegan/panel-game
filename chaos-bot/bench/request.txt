@@ -594,6 +594,12 @@
 #   under a 6-row slab at 928.
 # run 179 -- run 167's bot plus: above six colours, before garbage has first rested on the stack, while garbage is on its way, chains meet
 #   the aims only as breaks (decide.c brk 1). 8 colours s7-8
+# run 179 -- (result) survived 3/8, 134920 frames -- reverted. thicc s8 lived. insane s8 lost at 2275: 1599-1625, 54 panels under garbage
+#   with 160-134 frames of stop, the hold played first over a walk toward a break and a line-up lost no sooner (labelled won=tie: rank.c
+#   step 11, the nearer first swap, puts the hold first -- the hold presses nothing).
+# run 180 -- run 167's bot plus: above six colours under garbage, of two lines every key leaves equal, a move before the hold (rank.c,
+#   before step 11). Labels: won=tie only where the order's keys leave the two alike; won=inv:k<line> where the line played first is put
+#   after the next by the order's own key. 8 colours s7-8
 chain_garbage 7 9 9 1 21600 10 colors=8
 combo_storm 7 9 9 1 21600 10 colors=8
 thicc_combo_storm 7 9 9 1 21600 10 colors=8

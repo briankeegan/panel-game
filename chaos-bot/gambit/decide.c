@@ -274,10 +274,7 @@ static int readBoard_(Read *R) {
     // board to 18 before the first slab: all game 1/8, in the opening only 0/8 (the opening grew to 48 and the chain spent that). Six)
     if (!F->known[FACT_US_CONTACT] && (panelTop(decQ.b) < LOW_ROWS || pn < 6 * W)) brk = 1;
     // (run 174 tried brk 1 whenever garbage rests on the stack: 2/8, the seed-8 opening lost three times at ~950)
-    // (run 179: and before garbage has first rested on the stack, while garbage is on its way -- run 178 thicc s8: 45 panels at 499, the
-    // first slab told of, the opening played 2-, 3- and 5-chains breaking nothing (515-684), 29 panels under a 6-row slab at 928, lost
-    // at 1591; the seed-8 opening lost so at ~950 in runs 169-175)
-    if (!gambitHit && !F->known[FACT_US_CONTACT] && decQ.narr > 0) brk = 1;
+    // (run 179 tried brk 1 before the first contact while garbage is on its way: 3/8 -- thicc s8 lived, insane s8 lost at 2275)
     L.aim[0].chain.op = OP_EQ; L.aim[0].chain.n = 2; L.aim[0].chain.near = 1; L.aim[0].brk = brk;
     // (run 125 dropped the 3x: 8 colours s5-6 about 2/8 -- back)
     L.aim[1].chain.op = OP_EQ; L.aim[1].chain.n = 3; L.aim[1].chain.near = 1; L.aim[1].brk = brk;

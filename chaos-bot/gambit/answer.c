@@ -942,7 +942,10 @@ static void answerTurn(int32_t qid, int32_t at, int32_t allowanceKnown, int32_t 
   else if (!top || P.ncands < 1) L_s(" won=none");
   else if (P.ncands == 1) L_s(" won=only");
   if (!decWhy && !R.up && top && P.ncands > 1) { const Judge *ru = order[0] == top ? order[1] : order[0]; int32_t keepKey = cmpKey;
-    if (!ru || ru == top || compareJudged(top, ru) >= 0) L_s(" won=tie");
+    // (tie: the order's keys leave the two alike; inv: the line played first though the order's own keys put the next before it -- the
+    // key that does, won=inv:k<line>:<that line>)
+    if (!ru || ru == top) L_s(" won=tie");
+    else { int c = compareJudged(top, ru); if (c == 0) L_s(" won=tie"); else if (c > 0) { L_s(" won=inv:k"); L_i(cmpKey); L_s(":"); L_play(ru->hold ? PLAY_HOLD : ru->k.play); } }
     if (ru && ru != top && compareJudged(top, ru) < 0) { L_s(" won=k"); L_i(cmpKey); L_s(":"); L_play(ru->hold ? PLAY_HOLD : ru->k.play);
       // (both sides as the order read them: the frame each board is lost on, then that less the walk charged -- inf a board that lives)
       const Judge *s2[2] = { top, ru };

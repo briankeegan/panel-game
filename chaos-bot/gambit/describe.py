@@ -122,6 +122,9 @@ def describe(l, rules):
     # (every decision labelled: won=d<line> -- decide.c's playOf put another line in the order's first place; only, tie, raise, none)
     dm = re.match(r'd(\d+):(\S+)', key)
     if dm: rule = 'rule: decide.c %s %s (over the order\'s first, %s)' % (dm.group(1), decide_place(int(dm.group(1))), dm.group(2))
+    elif key.startswith('inv:'):
+        im = re.match(r'inv:k(\d+):(\S+)', key)
+        rule = 'rule: played first though %s puts %s before it (the order inverted)' % (rules.get(int(im.group(1)), 'rank.c %s' % im.group(1)), im.group(2)) if im else 'rule: ' + key
     elif key in DECIDED: rule = 'rule: ' + DECIDED[key]
     elif not key: rule = 'rule: (unlabelled)'
     if play == 'hold' and f.get('held'):

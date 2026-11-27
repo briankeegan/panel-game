@@ -1821,6 +1821,10 @@ static int compareJudged(const Judge *x, const Judge *y) {
   // 10. THE PLAN KEPT (plans/gambit-infra.md F, stable): of two lines every key leaves equal, the one the last decision kept (an
   // intention) -- a plan that does not thrash is one the cursor does not swing for
   if (x->k.kept != y->k.kept) return (cmpKey = __LINE__, (x->k.kept ? -1 : 1));
+  // (run 180, CHAOS: above six colours under garbage, of two lines every key leaves equal, a move before the hold -- the hold goes nowhere
+  // (1'g). Run 179 insane s8, 1599-1625: 54 panels under garbage, 160-134 frames of stop, the hold kept first over a walk toward a break
+  // and a line-up lost no sooner, three decisions running; lost at 2275)
+  if (decQ.b->colors > 6 && decF.under && x->hold != y->hold) return (cmpKey = __LINE__, (x->hold ? 1 : -1));
   // 11. THE NEARER FIRST SWAP: of two lines every key leaves equal, the one whose first swap the cursor reaches in fewer actions
   // (core/nodes.h actionsFor, as the frame loop walks) -- the hold presses nothing, nearest of all
   { int nx = firstWalk(x), ny = firstWalk(y); if (nx != ny) return (cmpKey = __LINE__, (nx - ny)); }

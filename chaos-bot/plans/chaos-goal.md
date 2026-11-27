@@ -177,6 +177,9 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 179 (2026-11-27 11:12 ET), before the first contact chain aims only as breaks: survived 3/8, 134920 frames** -- reverted.
+  insane s8 2275: under garbage on 54 panels with stop running, the hold played first over moves lost no sooner (step 11, the nearer
+  first swap, puts the hold first). Run 180: above six colours under garbage, a move before the hold where every key leaves them equal.
 - **Run 178 (2026-11-27 10:54 ET), the high-opening rule capped at two rows: survived 3/8, 120227 frames** -- reverted. Seed-8 games
   3/4 lived; every seed-7 game lost. thicc s8 1591: the opening's chains (aims open at 45 panels, the slab told of) spent 45 to 29 before a
   6-row slab. Run 179: before garbage first rests, while garbage is on its way, chains meet the aims only as breaks.

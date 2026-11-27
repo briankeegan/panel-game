@@ -931,6 +931,7 @@ static void creditPair(const Judge *x, const Judge *y, int *lxo, int *lyo) {
   *lxo = lx; *lyo = ly;
 }
 static int32_t chaosOpenQuiet;   // (decide.c: the opening -- before garbage first comes)
+static int32_t chaosOpenHigh;    // (decide.c: the opening above six colours with the stack seven rows or more)
 static int compareJudged(const Judge *x, const Judge *y) {
   int lx, ly; creditPair(x, y, &lx, &ly);
   // (run 87, CHAOS, SCARCE FUEL UNDER GARBAGE IS NOT SPENT ON ATTACK: under garbage with fewer than five rows of panels under it
@@ -1021,6 +1022,13 @@ static int compareJudged(const Judge *x, const Judge *y) {
   if (chaosOpenQuiet && x->o.lives && y->o.lives && x->apBroke <= 0 && y->apBroke <= 0 &&
       x->o.j.clearedPanels != y->o.j.clearedPanels)
     return (cmpKey = __LINE__, (x->o.j.clearedPanels < y->o.j.clearedPanels ? -1 : 1));
+  // (run 160, CHAOS, ABOVE SIX COLOURS, A HIGH OPENING MAKES ROOM: before garbage first comes, with the stack seven rows or more, of two
+  // living lines the one clearing more panels first -- at 8 colours the stack passes six rows by ~440 on set-ups alone, and the first slab
+  // (two or three rows, ~700) on an eight-row stack is every line lost the moment it is told. Runs 151 combo s8 and 159 insane s8 (the same
+  // board, the same opening): 30 -> 48 panels by 441 on set-ups and zips, every line dying from 545, topped at 768, lost at ~605)
+  if (chaosOpenHigh && x->o.lives && y->o.lives && x->apBroke <= 0 && y->apBroke <= 0 &&
+      x->o.j.clearedPanels != y->o.j.clearedPanels)
+    return (cmpKey = __LINE__, (x->o.j.clearedPanels > y->o.j.clearedPanels ? -1 : 1));
   // THE LAST CHANCE: the hold lost inside a break's time, beside a line lost no sooner whose next moves promise a break's time more (the
   // readiness break, the survival search after it): the line first -- holding is the loss for certain. Only against the hold: the
   // promise is never weighed against another line's own life. 244 of 419 lost games held, dying, over such a line.

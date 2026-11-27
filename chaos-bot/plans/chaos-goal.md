@@ -177,6 +177,11 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 159 (2026-11-27 06:00 ET), starving from four rows: survived 3/8, 94790 frames** -- back to five. insane s8 lost at 605 the very
+  way combo s8 lost at 610 in run 151 -- the same board cell for cell: seed 8 starts both patterns alike and the opening, played with time
+  to spare, plays the same. 30 -> 48 panels (eight rows) by 441 on set-ups and zips, every line dying from 545 once the first slab is told,
+  topped at 768. Run 55's rule keeps the opening's panels under six rows; nothing makes room above. Run 160: a high opening makes room --
+  above six colours, stack at seven rows or more before garbage first comes, of two living lines the one clearing more first.
 - **Run 158 (2026-11-27 05:47 ET), the line-up swaps off: survived 4/8, 104839 frames** -- back on. Six features measured off on the
   wide search (runs 151, 153-155, 158): only 1'h was dispensable. Since run 145 the bot has scored 5/8 four times and nothing tried has
   moved it past; 8/8 twice needs a different kind of step than another tie-break. Run 159: starving from four rows' worth again.

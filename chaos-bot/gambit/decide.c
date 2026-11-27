@@ -133,7 +133,7 @@ static int carryOpener(void);   // (the line in progress was begun under the ope
 static int32_t twinWaste[5], twinWasteC, twinWasteX, twinWasteN;   // (the two-column eights taken out as wasting a three, by the test that called it so -- rank.c wasteWhy: the log's twinW=)
 static CbSeq opKeepSeq; static CbGrid opKeepPrev; static int opKeepOn; static int32_t opKeepHeld, opKeepAt;   // (the next chain's design carried on, and the decisions it was: the log's keep=)
 static int readBoard_(Read *R) {
-  chaosOpenQuiet = 0;   // (set again below once the raise is asked: never carried from the last decision)
+  chaosOpenQuiet = 0; chaosOpenHigh = 0;   // (set again below once the raise is asked: never carried from the last decision)
   memset(R, 0, sizeof *R);
   FactSet *F = &R->F;
   factsOf(decQ.b, decQ.arr, decQ.narr, hostTopped, F);
@@ -259,8 +259,8 @@ static int readBoard_(Read *R) {
     // (run 129 asked it under garbage at all: 3/8 -- back to starving only)
     // (run 132: starving from five rows' worth, not four -- run 131 chain s7, 2x/3x clears breaking nothing took 47 panels to 29 before
     // the rule began, then starved under garbage held on the right tower, lost at 4143)
-    // (run 159: back to four rows' worth, measured on the wide search -- runs 131 (4) and 132 (5) were equal on the narrow one)
-    int32_t brk = F->known[FACT_US_CONTACT] && pn < 4 * W ? 1 : -1;
+    // (run 159 tried four rows' worth on the wide search: 3/8 -- back to five)
+    int32_t brk = F->known[FACT_US_CONTACT] && pn < 5 * W ? 1 : -1;
     L.aim[0].chain.op = OP_EQ; L.aim[0].chain.n = 2; L.aim[0].chain.near = 1; L.aim[0].brk = brk;
     // (run 125 dropped the 3x: 8 colours s5-6 about 2/8 -- back)
     L.aim[1].chain.op = OP_EQ; L.aim[1].chain.n = 3; L.aim[1].chain.near = 1; L.aim[1].brk = brk;
@@ -425,6 +425,8 @@ static int readBoard_(Read *R) {
   // at 2106; runs 58 and 114: eight rows kept is every line judged dying)
   // (run 137 kept it to seven rows above six colours: 4/8 against 6/8 -- back to six)
   chaosOpenQuiet = opening && panelTop(decQ.b) < LOW_ROWS;
+  // (run 160: and the other side -- above six colours, the opening's stack at seven rows or more makes room: rank.c)
+  chaosOpenHigh = opening && decQ.b->colors > 6 && panelTop(decQ.b) >= LOW_ROWS + 1;
   R->low = to && (opening || refill || taRaise) && rowsUp > 0 && chaosRaisable; R->up = R->low && !cascadeLive(decQ.b) && canRaiseNow;
   refillAsked = refillReady = refillAlive = 0; raiseWait = 0; opRaiseLog[4] = 0;
   // (THE FLOOR'S RAISE, TIMED: a board busy now -- a cascade, panels moving, the shake -- is one the engine would not raise; it is run on,

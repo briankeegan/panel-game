@@ -496,6 +496,11 @@
 # run 158 -- run 151's bot with the line-up swaps (propose.c, runs 113/131) off, measured on the wide search. 8 colours s7-8
 # run 158 -- (result) survived 4/8, 104839 frames -- back on. Of six features measured off on the wide search only 1'h was dispensable.
 # run 159 -- run 151's bot with starving from four rows' worth of panels again (decide.c brk, 5W -> 4W), on the wide search. 8 colours s7-8
+# run 159 -- (result) survived 3/8, 94790 frames -- back to 5W. insane s8 lost at 605 exactly as combo s8 did in run 151 (610): the same
+#   board and the same opening (seed 8 starts both patterns alike, and the opening plays the same with time to spare) -- 30 -> 48 panels by
+#   441 on set-ups and zips, every line dying from 545 once the first slab is told, topped at 768. A loss that repeats: a fault.
+# run 160 -- a high opening makes room (rank.c + decide.c chaosOpenHigh): above six colours, before garbage first comes, with the stack at
+#   seven rows or more, of two living lines the one clearing more panels first. 8 colours s7-8
 chain_garbage 7 9 9 1 21600 10 colors=8
 combo_storm 7 9 9 1 21600 10 colors=8
 thicc_combo_storm 7 9 9 1 21600 10 colors=8

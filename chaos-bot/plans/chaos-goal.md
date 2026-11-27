@@ -177,6 +177,10 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 144 (2026-11-27 02:46 ET), no shaping of the searches by the colours (40 x 7 at 8 colours): survived 4/8, 143378 frames --
+  kept**, the most frames of any 8-colour run (run 132: 141612), every loss late: chain s7 13573, combo s8 15118, thicc s8 16342 (all
+  backlog, 23-35 waiting, full boards under stacked slabs), insane s8 11945. The frames have followed the shape: 24 x 12 98k, 28 x 10
+  131k, 40 x 7 143k. Run 145 follows it: 52 x 6 at 8 colours.
 - **Run 143 (2026-11-27 02:33 ET), the searches 24 x 12 at 8 colours: survived 3/8, 98270 frames, 0 late** -- back to 28 x 10. All of
   seed 8 lost (5263-9678) and insane s7 5219. Run 144: no shaping by the colours (40 x 7), the other side of the lever.
 - **Run 142 (2026-11-27 02:19 ET), the top row kept empty from twenty waiting: survived 2/8, 91868 frames** -- back to thirty-five.

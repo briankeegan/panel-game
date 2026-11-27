@@ -453,6 +453,10 @@
 # run 143 -- (result) survived 3/8, 98270 frames, late 0 -- back. Lost insane s7 5219, chain s8 7848, combo s8 5263, thicc s8 5462,
 #   insane s8 9678; all of s7's others lived.
 # run 144 -- run 140's bot with no shaping by the colours (40 x 7 at 8 colours, as at six) -- the other side of the lever. 8 colours s7-8
+# run 144 -- (result) survived 4/8, 143378 frames -- the most frames yet (run 132: 141612), every loss late: chain s7 13573 (queue 23-30),
+#   combo s8 15118 (queue 33-35), thicc s8 16342 (queue 24-28, a full board under 4 stacked 3-wide slabs), insane s8 11945. Kept.
+# run 145 -- the shape followed the way the frames went (24x12 98k, 28x10 131k, 40x7 143k): per colour over six 6 wider and half a swap
+#   shallower (8 colours 52 x 6; propose.c). 8 colours s7-8
 chain_garbage 7 9 9 1 21600 10 colors=8
 combo_storm 7 9 9 1 21600 10 colors=8
 thicc_combo_storm 7 9 9 1 21600 10 colors=8

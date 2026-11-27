@@ -177,6 +177,8 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 130 (2026-11-26 23:45 ET), run 122's bot on new seeds 7-8: survived 3/8** (thicc s8 73 frames short). Late losses with 24-36
+  waiting, no line found, 15-22 holds in the last 1200 frames. Run 131: the line-up swaps whenever the swapped panels rest.
 - **Run 129 (2026-11-26 23:35 ET), the chain aims need a break under garbage at all: survived 3/8.** Back. Since run 122 (5/8 on
   s5-6: runs 117, 121, 122), thirteen changes all scored worse there: tuning on the same eight games moves their losses around. Run 130:
   run 122's bot exactly on new seeds 7-8 -- new losses to read, and the 5/8 tested off the seeds it was tuned on (not a rerun: new seeds).

@@ -1267,7 +1267,9 @@ static int proposeAll(const Read *R, const Found *S, Cand *out, int cap) {
   if (S->haveAp && S->ap.lowest.set) { int m0 = n; ADD(PLAY_CLEAR, S->ap.lowest.seq, S->ap.lowest.nseq, -1, 0); if (n > m0) xFromPlan(&out[m0], &S->ap.lowest); }
   // LINE UP (run 113, CHAOS, above six colours -- the owner: be more purposeful with colours): the single swaps that leave the most
   // breaks a swap away (judge.c lineUpSwaps), on a board at rest, offered as set-ups and judged as any line (rank.c 1'h prefers them)
-  if (decQ.b->colors > 6 && !hasActivePanels(decQ.b)) {
+  // (run 131: whenever the two panels swapped are at rest -- lineUpSwaps swaps only resting panels -- not only on a board with nothing
+  // moving: under garbage something is nearly always popping or falling, and run 130's losses held 15-22 times a minute at the end)
+  if (decQ.b->colors > 6 && !swapQueued(decQ.b)) {
     int32_t lu[3]; int nlu = lineUpSwaps(decQ.b, lu, 3);
     for (int i = 0; i < nlu; i++) { if (seenDigHas(decQ.b, lu[i])) continue; int32_t one = lu[i]; ADD(PLAY_SETUP, &one, 1, -1, 0); }
     // (run 116: and the best pair of swaps, where it beats every single one -- judge.c lineUpPair)

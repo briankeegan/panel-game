@@ -177,6 +177,9 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 165 (2026-11-27 07:20 ET), the planner 52 wide with the opening fixes: survived 0/8, 112803 frames** -- back to 64. Four lost after
+  18000, with 20-35 waiting for thousands of frames (insane s8: 21-35 from 12000 to 20355). Run 166: the queue let drop (a quiet board while
+  what waits fits under the top) from 25 waiting above six colours, not 35.
 - **Run 164 (2026-11-27 07:07 ET), full board asks the combo first: survived 3/8, 100688 frames** -- off. insane s8 lived; combo s8 lost at
   4656 again (so run 163's fix is partial), thicc s8 at 1954 (slabs piled early), chain s7/s8 early. Run 165: the planner 52 wide again,
   re-measured with the opening fixes in.

@@ -2269,7 +2269,10 @@ static Played playOf(const Read *R, int n) {
   // left alone: the garbage drops while it is small, and is broken from the board.)
   // (run 100: and under garbage too while the queue is QUEUE_ROOM or fewer short of its limit (margin off) and the top row is empty --
   // fifty waiting is the loss, and only a quiet board drops; run 99 L11 8 colours lost both games to the queue at full health)
-  int queueNear = decQ.b->marginTime == 1 && decQ.b->ninc >= CHAOS_QUEUE_LIMIT - QUEUE_ROOM;
+  // (run 166: above six colours from twenty-five waiting, not thirty-five -- the late 8-colour losses carry 20-35 waiting for thousands of
+  // frames (run 165 insane s8: 21-35 from 12000 to the loss at 20355); only a quiet board drops, and from 25 the slabs held back come down
+  // at once. Run 142 lowered the ranking rule (the top row kept empty) instead: 2/8)
+  int queueNear = decQ.b->marginTime == 1 && decQ.b->ninc >= CHAOS_QUEUE_LIMIT - (decQ.b->colors > 6 ? 25 : QUEUE_ROOM);
   if (P.line && (!R->under || queueNear) && !R->up && decQ.b->ninc > 0 && P.line->apBroke <= 0) {
     int32_t waiting = 0;
     for (int i = 0; i < decQ.b->ninc; i++) waiting += decQ.b->inc[i].height > 0 ? decQ.b->inc[i].height : 1;

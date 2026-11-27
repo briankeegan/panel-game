@@ -34,8 +34,8 @@ static int32_t colourExtra(void) { return decQ.b && decQ.b->colors > 6 ? decQ.b-
 // Run 145 follows it: per colour over six, 6 wider and half a swap shallower (8 colours 52 x 6))
 // (run 145, 52 x 6: 5/8, 120708 frames -- kept. Run 147: wider again, 12 a colour over six (8 colours 64 x 6))
 // (run 152 tried 18 a colour over six (76 x 6): 2/8, 111422 frames -- back to 12 (64 x 6))
-// (run 165: 6 a colour over six again (8 colours 52 x 6) -- re-measured with the opening fixes of runs 160-163 in)
-static int32_t gpWidth(int32_t w) { int32_t e = colourExtra(); return w + 6 * e; }
+// (run 165 tried 52 again with the opening fixes: 0/8, 112803 frames -- back to 64)
+static int32_t gpWidth(int32_t w) { int32_t e = colourExtra(); return w + 12 * e; }
 // (run 149 tried a swap shallower a colour over six (64 x 5): 2/8, 90487 frames -- back to half a swap (64 x 6))
 // (run 157 kept the full depth at the wide beam (64 x 7): 2/8, 125777 frames -- back to half a swap shallower (64 x 6))
 static int32_t gpDepth(int32_t d) { int32_t e = colourExtra(); return d - e / 2 >= 4 ? d - e / 2 : d; }

@@ -522,6 +522,10 @@
 # run 164 -- (result) survived 3/8, 100688 frames -- off. insane s8 lived; chain s7 5874, chain s8 3745, combo s8 4656, thicc s8 1954 (slabs piled
 #   early, 19-36 panels), insane s7 19659. No loss repeats a run-163 loss.
 # run 165 -- run 163's bot with the planner 52 wide at 8 colours (propose.c), re-measured with the opening fixes in. 8 colours s7-8
+# run 165 -- (result) survived 0/8, 112803 frames -- back to 64. Four lost after 18000 (combo s7 19047, thicc s7 19990, combo s8 18270, insane s8
+#   20355 -- 21-35 waiting from 12000 to the end).
+# run 166 -- run 163's bot with the queue let drop from 25 waiting above six colours, not 35 (decide.c queueNear: a quiet board while what waits
+#   fits under the top). 8 colours s7-8
 chain_garbage 7 9 9 1 21600 10 colors=8
 combo_storm 7 9 9 1 21600 10 colors=8
 thicc_combo_storm 7 9 9 1 21600 10 colors=8

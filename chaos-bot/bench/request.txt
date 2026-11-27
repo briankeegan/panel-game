@@ -606,6 +606,11 @@
 #   order inverted on ~6% of decisions (won=inv: the line played first is put after the next by the order's own key).
 # run 181 -- run 180's bot plus run 176's rule: above six colours, until garbage first rests on the stack (its own record), the break
 #   rules read garbage anywhere on the board (rank.c underBreak). 8 colours s7-8
+# run 181 -- (result) survived 3/8, 73894 frames -- reverted (back to run 180). Five lost by 2608: chain s7 541-953, the break-first
+#   rules put breaks of 6 on the unrested first slab before building, the board ran down, lost at 1564.
+# run 182 -- run 180's bot plus: the top of the order is the line that beats the most others compared alone (rank.c sortJudged, after
+#   the merge sort) -- the keys are not transitive, and run 180's labels show the line played losing to the next compared alone on 502
+#   of 8369 decisions (won=inv). 8 colours s7-8
 chain_garbage 7 9 9 1 21600 10 colors=8
 combo_storm 7 9 9 1 21600 10 colors=8
 thicc_combo_storm 7 9 9 1 21600 10 colors=8

@@ -177,6 +177,9 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 181 (2026-11-27 11:46 ET), the first-slab break rules on run 180: survived 3/8, 73894 frames** -- reverted; five early losses
+  (breaks of 6 on the unrested slab before building). Run 182: run 180 plus the top of the order chosen as the line beating the most
+  others head to head -- the owner, on the order and the line played disagreeing (6% of decisions): look into it.
 - **Run 180 (2026-11-27 11:29 ET), under garbage a move before the hold where the keys leave them equal: survived 7/8, 152311
   frames** -- KEPT, the best yet (run 167: 5/8). Lost only combo s8 at 1111, the seed-8 opening (the credit step keeping no-break lines
   over breaks while the first slab sat unrested). The order is inverted on ~6% of decisions (won=inv). Run 181: run 176's first-slab

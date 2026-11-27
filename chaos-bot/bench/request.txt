@@ -679,11 +679,14 @@
 #   later than it (rank.c). No stop time s7-8 again
 # run 196 -- (result) no stop time: survived 8/8, 172800 frames, every game at full health (13/13) -- DONE.
 # run 197 -- THE NEXT MODE: BALL (mode=4) at Level 10, 6 colours, seeds 7-8, run 196's bot. BALL s7-8
-chain_garbage 7 9 9 1 21600 10 mode=4
-combo_storm 7 9 9 1 21600 10 mode=4
-thicc_combo_storm 7 9 9 1 21600 10 mode=4
-insane_combo_storm 7 9 9 1 21600 10 mode=4
-chain_garbage 8 9 9 1 21600 10 mode=4
-combo_storm 8 9 9 1 21600 10 mode=4
-thicc_combo_storm 8 9 9 1 21600 10 mode=4
-insane_combo_storm 8 9 9 1 21600 10 mode=4
+# run 197 (seeds 7-8, BALL) -- cancelled by me at the owner's word: every mode had played seeds 7-8, the seeds the bot was fixed on.
+# EACH MODE HAS ITS OWN SEEDS from here (the owner, 16:20 ET); every mode redone on its own (plans/chaos-goal.md table).
+# run 197 -- 8 colours at Level 10 on its own seeds 21-22 (never played), run 196's bot. 8 colours s21-22
+chain_garbage 21 9 9 1 21600 10 colors=8
+combo_storm 21 9 9 1 21600 10 colors=8
+thicc_combo_storm 21 9 9 1 21600 10 colors=8
+insane_combo_storm 21 9 9 1 21600 10 colors=8
+chain_garbage 22 9 9 1 21600 10 colors=8
+combo_storm 22 9 9 1 21600 10 colors=8
+thicc_combo_storm 22 9 9 1 21600 10 colors=8
+insane_combo_storm 22 9 9 1 21600 10 colors=8

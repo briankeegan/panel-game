@@ -2,36 +2,42 @@
 
 ## NOW -- the one goal, and the standing orders (the owner, 2026-11-27: "Set your goal so it's clear and you don't keep stopping")
 
-**Goal now (the owner, 2026-11-27 14:30 ET): every mode at chaos Level 10 to 7/8 -- 8 colours done (run 180: 7/8); 7 colours done (run 190: 7/8); chaos margin done (run 191: 7/8); chaos mode done (run 192: 8/8); 1HP done (run 193: 8/8); no stop time done (run 196: 8/8); now BALL -- then back to each for 8/8.** (Was: 8 colours 8/8 twice.)
-Then the next weakest mode, one at a time (7 colours, chaos margin, Line Clear, the queue limit), each to 8/8 twice, never below Level 9,
-the Level 10 six-colour gate kept. Done only when every mode holds. (The owner, 2026-11-27: "Not just the colors... other modes as
-well" -- once colours are done, every other mode: 7 colours, chaos margins 2/3/4, chaos mode, 1HP, NST, BALL, Line Clear, the queue
-limit, training_random, Challenge Mode to Impossible.) (The owner, 2026-11-27 14:30 ET: "7/8 IS GREAT" -- run 180's 7/8 at 8 colours
-counts; "If you have that. GO into next mode" -- run 190: 7 colours at Level 10 with run 180's bot. "And once all modes are that good
-go back and get them all to 100%" -- every mode to 7/8 first, then each to 8/8.)
+**EACH MODE HAS ITS OWN SEEDS (the owner, 2026-11-27 16:20 ET: "I just want to make sure that when you're doing 8-color, 7-color,
+chaos margin, etc., they're all on different seeds, because I don't want it to just be trained towards just the 8 different seeds";
+"you got to redo all of this and rerun. They have to be on different seeds. Yes, you can rerun on the same seeds, but each mode has to
+have its own seeds"; "Make this clear in your goal as well").** Until then every mode had played seeds 7-8 -- the seeds the bot was fixed
+on (268 games). Those results do not count. Every mode is redone from the top on the seeds in the table below, which no run had played;
+a mode's reruns stay on its own seeds; no mode ever plays another mode's seeds. Seeds 7-8 stay only the Level 10 six-colour gate.
 
-**Mode table (the owner: "Love this table" -- kept here, updated every run; seeds 7-8, 4 patterns each):**
+**Goal now (the owner, 2026-11-27): every mode at chaos Level 10 to 7/8 on its own seeds, one set at a time, in the table's order --
+then back to each for 8/8 (on its own seeds).** (The owner: "7/8 IS GREAT", "If you have that. GO into next mode", "And once all
+modes are that good go back and get them all to 100%"; "Not just the colors... other modes as well".) Never below Level 9.
 
-| Mode | Level | Run | Result |
-|---|---|---|---|
-| 8 colours | 10 | 180 | 7/8 |
-| 7 colours | 10 | 190 | 7/8 |
-| Chaos margin 4 | 10 | 191 | 7/8 |
-| Chaos mode | 10 | 192 | 8/8 |
-| 1 HP | 10 | 193 | 8/8 |
-| No stop time | 10 | 196 | 8/8 |
-| BALL | 10 | 197 | playing |
-| Line Clear | - | - | to do |
-| Queue limit | 10 | - | to do |
-| training_random | 10 | - | to do (its own pattern: chain and combo garbage mixed at a random balance, Chaos Mode 1 game in 4 -- TrainingMenu.lua createBasicTrainingMode) |
-| Challenge Mode | stage's | - | to do |
+**Mode table (the owner: "Love this table" -- kept here, updated every run; 4 patterns x the mode's 2 seeds = 8 games):**
+
+| Mode | Level | Seeds | Run | Result |
+|---|---|---|---|---|
+| 8 colours | 10 | 21-22 | 197 | playing |
+| 7 colours | 10 | 23-24 | - | to redo (old: 7/8 on seeds 7-8, run 190 -- does not count) |
+| Chaos margin 4 | 10 | 25-26 | - | to redo (old: 7/8 on 7-8, run 191) |
+| Chaos mode | 10 | 27-28 | - | to redo (old: 8/8 on 7-8, run 192) |
+| 1 HP | 10 | 29-30 | - | to redo (old: 8/8 on 7-8, run 193) |
+| No stop time | 10 | 31-32 | - | to redo (old: 8/8 on 7-8, run 196) |
+| BALL | 10 | 33-34 | - | to do (run 197 on 7-8 cancelled) |
+| Line Clear | - | 35-36 | - | to do |
+| Queue limit | 10 | 37-38 | - | to do |
+| training_random | 10 | 39-40 | - | to do (its own pattern: chain and combo garbage mixed at a random balance, Chaos Mode 1 game in 4 -- TrainingMenu.lua createBasicTrainingMode) |
+| Challenge Mode | stage's | 41-42 | - | to do |
+
+(8 colours old: 7/8 on seeds 7-8, run 180 -- does not count.)
 
 **Standing orders -- every step, no exceptions:**
 1. **A run is always going.** The moment a run finishes, the next one is pushed -- before writing to the owner, before reading at
    length. Never end a turn, never write a summary, with no run in flight. Never stop to ask; decide from this file.
 2. **Read every loss move by move** in the run's losses.txt (decisions and boards) and figure out what actually went wrong -- the
    report's tags are not the answer. One fix per run, aimed at a loss seen on the board.
-3. **No luck, no reruns.** A loss is a fault to fix. Seeds change only after 8/8.
+3. **No luck.** A loss is a fault to fix. **Each mode plays only its own seeds (the table)** -- reruns on them are fine, never another
+   mode's seeds.
 4. Keep a change only if the run is no worse; otherwise turn it off and say so here.
 5. Record each run's result here, in bench/request.txt (with the next run's push only) and bench/history.txt.
 6. Report to the owner briefly with each result (ET time, survived x/8, what was lost and why, the next run already going).

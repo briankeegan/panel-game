@@ -271,6 +271,11 @@ static double rankHoldOwn = -1; static int32_t rankHoldClock = -1;   // (the hol
 static int extCounts(const Judge *x) {
   if (x->hold || x->extLost == NOT_ASKED) return 0;
   if (lostAtOf(x->o.lostAt, 0) < rankSave) return 0;   // (a board lost inside a break's time presses no promise after it)
+  // (run 206: above six colours under garbage with ten or more queued, no promise is credited -- the next block lands before it is pressed.
+  // Run 204 8 colours, the later loss first by the promise: combo s21 9416 a carry lost at 190 credited 321 over an entry at 240 (17
+  // queued), lost at 9789; insane s22 16810 a lineup at 168 credited 321 over 202, 17249 a carry at 182 credited 284 over 284 (22-23
+  // queued), lost at 17470)
+  if (decQ.b->colors > 6 && decF.under && decQ.b->ninc >= 10) return 0;
   if (rankHoldClock != decQ.b->clock || rankHoldOwn < 0) return 1;
   // (and under garbage, a line that breaks none of it earns the promise only where its own board outlives the hold by the time its walk
   // takes -- the owner: no walking far for nothing: r1427, 3750, a cut walked 8 actions among the slabs, lost at 125 as the hold was,
@@ -1086,9 +1091,7 @@ static int compareJudged(const Judge *x, const Judge *y) {
     int32_t bx = imax(0, x->apBroke) / W, by = imax(0, y->apBroke) / W;
     if (bx != by) {
       const Judge *dig = bx > by ? x : y, *other = dig == x ? y : x;
-      // (run 205: above six colours, unless the other lives a quarter of a break's time longer -- as lostAlike there. Run 204 8 colours
-      // chain s22 1730: a break of one row lost at 197 over a 3-chain lost at 299, lost at 2121)
-      if (lostOf(other) - lostOf(dig) < (decQ.b->colors > 6 ? rankSave / 4 : rankSave)) return (cmpKey = __LINE__, (dig == x ? -1 : 1));
+      if (lostOf(other) - lostOf(dig) < rankSave) return (cmpKey = __LINE__, (dig == x ? -1 : 1));
     }
   }
   // (CHAOS, STOP TIME IS A MAX, NOT A SUM: a new award only replaces what is left (checkMatches.lua awardStopTime), so panels cleared

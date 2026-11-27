@@ -677,11 +677,13 @@
 #   256, 3118 146 over 247; thicc s7 16907 an eight breaking none at 205 over a break of 6 at 213.
 # run 196 -- run 195's bot plus: in game mode 3 and up under garbage, FINISH_8_LIFE does not move an eight over a top line that dies
 #   later than it (rank.c). No stop time s7-8 again
-chain_garbage 7 9 9 1 21600 10 mode=3
-combo_storm 7 9 9 1 21600 10 mode=3
-thicc_combo_storm 7 9 9 1 21600 10 mode=3
-insane_combo_storm 7 9 9 1 21600 10 mode=3
-chain_garbage 8 9 9 1 21600 10 mode=3
-combo_storm 8 9 9 1 21600 10 mode=3
-thicc_combo_storm 8 9 9 1 21600 10 mode=3
-insane_combo_storm 8 9 9 1 21600 10 mode=3
+# run 196 -- (result) no stop time: survived 8/8, 172800 frames, every game at full health (13/13) -- DONE.
+# run 197 -- THE NEXT MODE: BALL (mode=4) at Level 10, 6 colours, seeds 7-8, run 196's bot. BALL s7-8
+chain_garbage 7 9 9 1 21600 10 mode=4
+combo_storm 7 9 9 1 21600 10 mode=4
+thicc_combo_storm 7 9 9 1 21600 10 mode=4
+insane_combo_storm 7 9 9 1 21600 10 mode=4
+chain_garbage 8 9 9 1 21600 10 mode=4
+combo_storm 8 9 9 1 21600 10 mode=4
+thicc_combo_storm 8 9 9 1 21600 10 mode=4
+insane_combo_storm 8 9 9 1 21600 10 mode=4

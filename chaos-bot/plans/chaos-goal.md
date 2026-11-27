@@ -2,7 +2,7 @@
 
 ## NOW -- the one goal, and the standing orders (the owner, 2026-11-27: "Set your goal so it's clear and you don't keep stopping")
 
-**Goal now (the owner, 2026-11-27 14:30 ET): every mode at chaos Level 10 to 7/8 -- 8 colours done (run 180: 7/8); 7 colours done (run 190: 7/8); chaos margin done (run 191: 7/8); chaos mode done (run 192: 8/8); 1HP done (run 193: 8/8); now no stop time -- then back to each for 8/8.** (Was: 8 colours 8/8 twice.)
+**Goal now (the owner, 2026-11-27 14:30 ET): every mode at chaos Level 10 to 7/8 -- 8 colours done (run 180: 7/8); 7 colours done (run 190: 7/8); chaos margin done (run 191: 7/8); chaos mode done (run 192: 8/8); 1HP done (run 193: 8/8); no stop time done (run 196: 8/8); now BALL -- then back to each for 8/8.** (Was: 8 colours 8/8 twice.)
 Then the next weakest mode, one at a time (7 colours, chaos margin, Line Clear, the queue limit), each to 8/8 twice, never below Level 9,
 the Level 10 six-colour gate kept. Done only when every mode holds. (The owner, 2026-11-27: "Not just the colors... other modes as
 well" -- once colours are done, every other mode: 7 colours, chaos margins 2/3/4, chaos mode, 1HP, NST, BALL, Line Clear, the queue
@@ -19,8 +19,8 @@ go back and get them all to 100%" -- every mode to 7/8 first, then each to 8/8.)
 | Chaos margin 4 | 10 | 191 | 7/8 |
 | Chaos mode | 10 | 192 | 8/8 |
 | 1 HP | 10 | 193 | 8/8 |
-| No stop time | 10 | 195 | 6/8 (194: 6/8), being fixed (run 196) |
-| BALL | 10 | - | next |
+| No stop time | 10 | 196 | 8/8 |
+| BALL | 10 | 197 | playing |
 | Line Clear | - | - | to do |
 | Queue limit | 10 | - | to do |
 | training_random | 10 | - | to do |
@@ -197,6 +197,8 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 196 (2026-11-27 16:11 ET), NO STOP TIME at L10, run 195's bot + FINISH_8_LIFE skips an eight dying sooner than the top under
+  garbage in modes 3+: survived 8/8, full health every game** -- done. Run 197: BALL (mode=4) at L10.
 - **Run 195 (2026-11-27 15:55 ET), NO STOP TIME at L10, run 180's bot + 1b off for dying lines under garbage in modes 3+: survived 6/8,
   149728 frames** -- no worse, kept. combo s7 lives now, thicc s7 17012 (was 11312), lost combo s8 3116. In both losses rank.c's
   FINISH_8_LIFE move (k2010) put an eight over a line dying later under garbage (combo s8 3092: 172 over 256; thicc s7 16907: an eight

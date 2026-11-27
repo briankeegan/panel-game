@@ -2,7 +2,7 @@
 
 ## NOW -- the one goal, and the standing orders (the owner, 2026-11-27: "Set your goal so it's clear and you don't keep stopping")
 
-**Goal now (the owner, 2026-11-27 14:30 ET): every mode at chaos Level 10 to 7/8 -- 8 colours done (run 180: 7/8); 7 colours done (run 190: 7/8); chaos margin done (run 191: 7/8); chaos mode done (run 192: 8/8); now 1HP -- then back to each for 8/8.** (Was: 8 colours 8/8 twice.)
+**Goal now (the owner, 2026-11-27 14:30 ET): every mode at chaos Level 10 to 7/8 -- 8 colours done (run 180: 7/8); 7 colours done (run 190: 7/8); chaos margin done (run 191: 7/8); chaos mode done (run 192: 8/8); 1HP done (run 193: 8/8); now no stop time -- then back to each for 8/8.** (Was: 8 colours 8/8 twice.)
 Then the next weakest mode, one at a time (7 colours, chaos margin, Line Clear, the queue limit), each to 8/8 twice, never below Level 9,
 the Level 10 six-colour gate kept. Done only when every mode holds. (The owner, 2026-11-27: "Not just the colors... other modes as
 well" -- once colours are done, every other mode: 7 colours, chaos margins 2/3/4, chaos mode, 1HP, NST, BALL, Line Clear, the queue
@@ -181,6 +181,7 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 193 (2026-11-27 15:20 ET), 1HP at L10, run 180's bot: survived 8/8** -- done. Run 194: no stop time (mode=3) at L10.
 - **Run 192 (2026-11-27 15:08 ET), CHAOS MODE at L10, run 180's bot: survived 8/8, full health every game** -- done. Run 193: 1HP
   (mode=2) at L10.
 - **Run 191 (2026-11-27 14:55 ET), CHAOS MARGIN 4 at L10, run 180's bot: survived 7/8, 153783 frames** -- done. Lost thicc s7 at 2583.

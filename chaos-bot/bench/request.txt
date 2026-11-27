@@ -662,11 +662,13 @@
 # run 192 -- THE NEXT MODE: chaos mode (chaosmode=1) at Level 10, 6 colours, seeds 7-8, run 180's bot. chaos mode s7-8
 # run 192 -- (result) chaos mode: survived 8/8, 172800 frames, every game at full health (13/13) -- DONE.
 # run 193 -- THE NEXT MODE: 1HP (mode=2) at Level 10, 6 colours, seeds 7-8, run 180's bot. 1HP s7-8
-chain_garbage 7 9 9 1 21600 10 mode=2
-combo_storm 7 9 9 1 21600 10 mode=2
-thicc_combo_storm 7 9 9 1 21600 10 mode=2
-insane_combo_storm 7 9 9 1 21600 10 mode=2
-chain_garbage 8 9 9 1 21600 10 mode=2
-combo_storm 8 9 9 1 21600 10 mode=2
-thicc_combo_storm 8 9 9 1 21600 10 mode=2
-insane_combo_storm 8 9 9 1 21600 10 mode=2
+# run 193 -- (result) 1HP: survived 8/8, 172800 frames -- DONE.
+# run 194 -- THE NEXT MODE: no stop time (mode=3) at Level 10, 6 colours, seeds 7-8, run 180's bot. NST s7-8
+chain_garbage 7 9 9 1 21600 10 mode=3
+combo_storm 7 9 9 1 21600 10 mode=3
+thicc_combo_storm 7 9 9 1 21600 10 mode=3
+insane_combo_storm 7 9 9 1 21600 10 mode=3
+chain_garbage 8 9 9 1 21600 10 mode=3
+combo_storm 8 9 9 1 21600 10 mode=3
+thicc_combo_storm 8 9 9 1 21600 10 mode=3
+insane_combo_storm 8 9 9 1 21600 10 mode=3

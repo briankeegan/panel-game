@@ -556,6 +556,12 @@
 #   kept over breaks (664: a carry lost at 370 over a break of 15 lost at 249), 45 panels spent to 23, buried.
 # run 172 -- run 167's bot plus: above six colours under garbage, a line that breaks garbage before one that breaks none unless that one
 #   lasts two breaks' time longer on its own board, not one (rank.c). 8 colours s7-8
+# run 172 -- (result) survived 3/8, 128533 frames -- reverted. thicc s8 lost the seed-8 opening again at 1139: at 661 a carry lost at 373
+#   breaking nothing ranked over a break of 15 lost at 252. The widened rule tests decF.under, and decF.under was 0 there: the slab was on
+#   the board but not resting on the stack (facts.c FACT_US_CONTACT), so no under-garbage break rule ran; rank.c's credit step
+#   (won=k1119 in run 171's log) decided it.
+# run 173 -- run 167's bot plus: above six colours the break rules read garbage anywhere on the board (rank.c underBreak: creditPair's
+#   no-break credit rule and the two break-first rules), not only garbage resting on the stack. 8 colours s7-8
 chain_garbage 7 9 9 1 21600 10 colors=8
 combo_storm 7 9 9 1 21600 10 colors=8
 thicc_combo_storm 7 9 9 1 21600 10 colors=8

@@ -177,6 +177,10 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 172 (2026-11-27 09:13 ET), break first unless two breaks' time longer: survived 3/8, 128533 frames** -- reverted. thicc s8 lost
+  the seed-8 opening at 1139 (661: carry lost at 373 breaking nothing over a break of 15 lost at 252). The fault: decF.under is garbage
+  resting on the stack (FACT_US_CONTACT); the slab was on the board, not resting, so every under-garbage break rule was skipped and the
+  credit step (rank.c, won=k1119) ranked the carry first. Run 173: above six colours those rules read garbage anywhere on the board.
 - **Run 171 (2026-11-27 08:54 ET), the queue room after the first landing: survived 0/8, 57745 frames** -- reverted to run 167's queue
   rule. combo s8 (947) and insane s8 (995) lost the opening run 169's combo s8 lost: under the first slab, chains breaking nothing kept
   over breaks lost a break's time sooner (664: carry lost at 370 over a break of 15 lost at 249), 45 panels spent to 23. Run 172: above six

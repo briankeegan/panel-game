@@ -519,6 +519,9 @@
 #   losses fixed in four runs (insane/combo s8 opening, chain s7 opening, combo s8 between waves). insane s8 6859 (as 161, 6406): a full
 #   board, 54-57 panels and eight rows, under garbage with 13-14 waiting. combo s7 15386, insane s7 10123, thicc s8 19728.
 # run 164 -- run 126's full board asks the combo first (decide.c: 48 panels or more, the combo of four ahead of 2x/3x) on again. s7-8
+# run 164 -- (result) survived 3/8, 100688 frames -- off. insane s8 lived; chain s7 5874, chain s8 3745, combo s8 4656, thicc s8 1954 (slabs piled
+#   early, 19-36 panels), insane s7 19659. No loss repeats a run-163 loss.
+# run 165 -- run 163's bot with the planner 52 wide at 8 colours (propose.c), re-measured with the opening fixes in. 8 colours s7-8
 chain_garbage 7 9 9 1 21600 10 colors=8
 combo_storm 7 9 9 1 21600 10 colors=8
 thicc_combo_storm 7 9 9 1 21600 10 colors=8

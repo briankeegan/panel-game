@@ -177,6 +177,9 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 164 (2026-11-27 07:07 ET), full board asks the combo first: survived 3/8, 100688 frames** -- off. insane s8 lived; combo s8 lost at
+  4656 again (so run 163's fix is partial), thicc s8 at 1954 (slabs piled early), chain s7/s8 early. Run 165: the planner 52 wide again,
+  re-measured with the opening fixes in.
 - **Run 163 (2026-11-27 06:54 ET), no chain aims with no garbage on the board below six rows' worth of panels: survived 4/8, 138496
   frames -- kept**, its target fixed: combo s8 lived (lost at ~4500-5000 in runs 160-162). Three losses that repeated run after run are
   now gone (insane/combo s8's high opening, chain s7's spent opening, combo s8's spent lull). insane s8 lost at 6859 (6406 in run 161): a

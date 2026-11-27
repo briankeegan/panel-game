@@ -278,7 +278,8 @@ static int readBoard_(Read *R) {
     // (run 127: off -- run 126 with it 4/8)
     // (run 164: on again on the wide search -- run 163 insane s8 (and 161, 6406): 54-57 panels, eight rows, under garbage with 13-14
     // waiting, 2x/3x asked first while the board had to come down, lost at 6859)
-    if (pn >= 8 * W) { Aim c = L.aim[2]; L.aim[2] = L.aim[1]; L.aim[1] = L.aim[0]; L.aim[0] = c; }
+    // (run 164 had it on: 3/8, 100688 frames -- off)
+    if (0 && pn >= 8 * W) { Aim c = L.aim[2]; L.aim[2] = L.aim[1]; L.aim[1] = L.aim[0]; L.aim[0] = c; }
     // (run 141: starving, any break first -- a combo of three or more that breaks garbage, ahead of the chains: every aim above asks a
     // chain or a combo of four, so a plain three-panel break met nothing and the chain breaks were taken however much they cost. Run 139
     // thicc s7, 645-765: 12-15-panel chains breaking 6 cells, 27 -> 14 panels, lost at 911)

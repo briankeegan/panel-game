@@ -177,6 +177,10 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 180 (2026-11-27 11:29 ET), under garbage a move before the hold where the keys leave them equal: survived 7/8, 152311
+  frames** -- KEPT, the best yet (run 167: 5/8). Lost only combo s8 at 1111, the seed-8 opening (the credit step keeping no-break lines
+  over breaks while the first slab sat unrested). The order is inverted on ~6% of decisions (won=inv). Run 181: run 176's first-slab
+  break rule on this bot.
 - **Run 179 (2026-11-27 11:12 ET), before the first contact chain aims only as breaks: survived 3/8, 134920 frames** -- reverted.
   insane s8 2275: under garbage on 54 panels with stop running, the hold played first over moves lost no sooner (step 11, the nearer
   first swap, puts the hold first). Run 180: above six colours under garbage, a move before the hold where every key leaves them equal.

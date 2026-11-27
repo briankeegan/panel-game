@@ -600,6 +600,12 @@
 # run 180 -- run 167's bot plus: above six colours under garbage, of two lines every key leaves equal, a move before the hold (rank.c,
 #   before step 11). Labels: won=tie only where the order's keys leave the two alike; won=inv:k<line> where the line played first is put
 #   after the next by the order's own key. 8 colours s7-8
+# run 180 -- (result) survived 7/8, 152311 frames -- KEPT, the best yet at 8 colours L10 (run 167: 5/8 137319). Lost only combo s8 at
+#   1111, the seed-8 opening: 455-473 rank.c's run-160 rule (a high opening makes room) kept a 4-chain, then 552-692 the credit step
+#   ('1. lives before does not') kept lines breaking nothing over breaks while the first slab sat on the board unrested. The labels: the
+#   order inverted on ~6% of decisions (won=inv: the line played first is put after the next by the order's own key).
+# run 181 -- run 180's bot plus run 176's rule: above six colours, until garbage first rests on the stack (its own record), the break
+#   rules read garbage anywhere on the board (rank.c underBreak). 8 colours s7-8
 chain_garbage 7 9 9 1 21600 10 colors=8
 combo_storm 7 9 9 1 21600 10 colors=8
 thicc_combo_storm 7 9 9 1 21600 10 colors=8

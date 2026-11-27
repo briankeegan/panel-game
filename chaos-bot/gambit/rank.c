@@ -628,10 +628,9 @@ static int ruleNoEnemy;   // (the rule in force asks enemy.none: decide.c)
 // (under garbage a reserve is kept only for a break some line of the decision makes: with none offered, the inputs kept are for a break
 // that is not there, and the board that holds them builds none -- decide.c sets it before the order is made)
 static int breakOffered = 1;
-// (run 172 widened the break-first rule to two breaks' time above six colours: 3/8, removed)
 // (runs 173, 175, 176 had the break rules read garbage on the board not yet resting on the stack (decF.under is FACT_US_CONTACT): all
-// game 0/8; only until garbage first rests 3/8 (gated on gambitHit, which topping sets: it never ran) and 2/8 (its own record: no seed-8
-// opening loss, every seed-8 game past 7000). Removed)
+// game 0/8; until garbage first rests 3/8 (gated on gambitHit, which topping sets: it never ran) and 2/8 (own record: no seed-8 opening
+// loss). Run 177 kept the run-167 rule below seven rows' worth of panels: 3/8, 141456 frames. Removed)
 static int32_t waitOf(void);
 static int cascadeLive(Board *b);   // (propose.c: the board still moving of its own)
 // (the window as the next block finds it: at its landing with one on its way, else EARLIEST_LANDING)
@@ -1030,9 +1029,12 @@ static int compareJudged(const Judge *x, const Judge *y) {
   // living lines the one clearing more panels first -- at 8 colours the stack passes six rows by ~440 on set-ups alone, and the first slab
   // (two or three rows, ~700) on an eight-row stack is every line lost the moment it is told. Runs 151 combo s8 and 159 insane s8 (the same
   // board, the same opening): 30 -> 48 panels by 441 on set-ups and zips, every line dying from 545, topped at 768, lost at ~605)
+  // (run 178: counted up to two rows' worth (2 x W) -- room made, not the stack spent: the labels of runs 175-177 show this rule
+  // carrying 4-chains of 9-13 panels in the opening (run 177 thicc s7 473-581, a combo of 9 kept by it, the line clearing 18 of 37 panels at 499,
+  // 22 left under the first slab at 815, lost at 2743; the seed-8 opening at 455-473, lost at ~950 in runs 169-175))
   if (chaosOpenHigh && x->o.lives && y->o.lives && x->apBroke <= 0 && y->apBroke <= 0 &&
-      x->o.j.clearedPanels != y->o.j.clearedPanels)
-    return (cmpKey = __LINE__, (x->o.j.clearedPanels > y->o.j.clearedPanels ? -1 : 1));
+      imin(x->o.j.clearedPanels, 2 * W) != imin(y->o.j.clearedPanels, 2 * W))
+    return (cmpKey = __LINE__, (imin(x->o.j.clearedPanels, 2 * W) > imin(y->o.j.clearedPanels, 2 * W) ? -1 : 1));
   // THE LAST CHANCE: the hold lost inside a break's time, beside a line lost no sooner whose next moves promise a break's time more (the
   // readiness break, the survival search after it): the line first -- holding is the loss for certain. Only against the hold: the
   // promise is never weighed against another line's own life. 244 of 419 lost games held, dying, over such a line.
@@ -1239,9 +1241,7 @@ static int compareJudged(const Judge *x, const Judge *y) {
   // 1. (run 167, CHAOS) ABOVE SIX COLOURS UNDER GARBAGE, NO BREAK OFFERED, THE PANELS KEPT: of two lost alike that break nothing, the
   // one clearing fewer panels first -- the panels a clear spends under garbage are the next break's. Run 166 thicc s8: four rows of
   // full-width garbage on 41 panels, no break offered, levels spent them to 31 (5296-5566) and the next slab buried it, lost at 5395
-  // (run 177: only short of panels, under seven rows' worth -- run 175 thicc s7, 5836-5849: 52 panels and 253 frames of stop, this rule
-  // held over walking toward a break, the stop ran out, the next slabs filled the board to 63 panels, lost at 6196)
-  if (!lx && decQ.b->colors > 6 && decF.under && !breakOffered && materialOn(decQ.b) < 7 * W && lostAlike(x, y) && !(x->apBroke > 0) && !(y->apBroke > 0) &&
+  if (!lx && decQ.b->colors > 6 && decF.under && !breakOffered && lostAlike(x, y) && !(x->apBroke > 0) && !(y->apBroke > 0) &&
       x->o.j.clearedPanels != y->o.j.clearedPanels)
     return (cmpKey = __LINE__, (x->o.j.clearedPanels < y->o.j.clearedPanels ? -1 : 1));
   // (survival as the board is lost: a line that meets the mode's first entry and is lost no sooner is never passed over for the walk the

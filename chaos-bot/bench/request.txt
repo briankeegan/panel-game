@@ -582,6 +582,11 @@
 #   only under seven rows' worth of panels (materialOn < 42). Run 175 (run 167's bot in effect: its rule never ran) thicc s7, labelled:
 #   5836-5849 rank.c's run-167 rule (k1257) held over walking toward a break on 52 panels with 253 frames of stop; the stop ran out,
 #   the next slabs filled the board to 63 panels, lost at 6196. 8 colours s7-8
+# run 177 -- (result) survived 3/8, 141456 frames (more than run 167's 137319; three lost after 20000) -- reverted on survivals. thicc s7
+#   lost at 2743: labelled, the opening's 4-chain (a combo of 9, the line clearing 18 of 37 panels at 499) kept by rank.c's run-160 rule
+#   (A HIGH OPENING MAKES ROOM: the line clearing more panels first, uncapped); 22 panels under the first slab at 815. The same rule
+#   keeps the seed-8 opening's 4-chains at 455-473 (lost at ~950 in runs 169-175).
+# run 178 -- run 167's bot with the run-160 rule counting cleared panels up to two rows' worth (2 x W) only (rank.c). 8 colours s7-8
 chain_garbage 7 9 9 1 21600 10 colors=8
 combo_storm 7 9 9 1 21600 10 colors=8
 thicc_combo_storm 7 9 9 1 21600 10 colors=8

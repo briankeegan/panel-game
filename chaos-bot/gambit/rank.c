@@ -1160,7 +1160,9 @@ static int compareJudged(const Judge *x, const Judge *y) {
         // (run 199: above six colours under garbage, nor over a line lost half a break's time later -- run 198 8 colours, every loss
         // late with a backlog: combo s21 11929-11947 kept lost at 117 and 99 over 193 and 191; insane s22 9876-9903 222 over 299, 195
         // over 272; combo s22 16117-16448 202 over 257, 171 over 223)
-        !(decQ.b->colors > 6 && decF.under && !c->o.lives && !o->o.lives && diesAt(o) - diesAt(c) >= rankSave / 2))
+        // (run 202: garbage resting or not, a quarter of a break's time -- as lostAlike and 1b there. Run 201 combo s22 2543 kept lost at
+        // 220 over 264, lost at 2711; chain s22 15665 132 over 236 with 23 queued, lost at 16201)
+        !(decQ.b->colors > 6 && !c->o.lives && !o->o.lives && diesAt(o) - diesAt(c) >= rankSave / 4))
       return (cmpKey = __LINE__, (x->carried ? -1 : 1));
   }
   // 1. READY WHEN IT LANDS (the owner: just be ready -- the stack raised, the garbage on its way): with garbage on its way and none on the

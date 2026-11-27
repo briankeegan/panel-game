@@ -17,7 +17,7 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 
 | Mode | Level | Seeds | Run | Result |
 |---|---|---|---|---|
-| 8 colours | 10 | 21-22 | 200 | 5/8 (3, 3, 4 before), being fixed (run 201) |
+| 8 colours | 10 | 21-22 | 201 | 5/8 (3, 3, 4, 5 before), being fixed (run 202) |
 | 7 colours | 10 | 23-24 | - | to redo (old: 7/8 on seeds 7-8, run 190 -- does not count) |
 | Chaos margin 4 | 10 | 25-26 | - | to redo (old: 7/8 on 7-8, run 191) |
 | Chaos mode | 10 | 27-28 | - | to redo (old: 8/8 on 7-8, run 192) |
@@ -203,6 +203,8 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 201 (2026-11-27 17:16 ET), 8 colours seeds 21-22, + 1b a quarter break: 5/8** -- kept (count no worse). THE PLAN KEPT still kept
+  lines lost 44-104 frames sooner where garbage was not resting. Run 202: a quarter break, garbage resting or not.
 - **Run 200 (2026-11-27 17:06 ET), 8 colours seeds 21-22, + lostAlike a quarter break: 5/8** -- kept. insane s21 lost at 1289: rule 1b
   (the mode's goals) kept a hold lost at 287 over an extend lost at 448. Run 201: above six colours 1b decides only within a quarter break.
 - **Run 199 (2026-11-27 16:55 ET), 8 colours seeds 21-22, + the plan kept gives way: 4/8** -- kept. Lines lost 56-83 frames later

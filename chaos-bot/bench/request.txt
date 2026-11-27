@@ -699,6 +699,10 @@
 #   s21: rank.c 1b (the mode's goals, alike within a break's time) kept the hold lost at 287 over a 7-chain extend lost at 448 (687),
 #   and 166 over 223 (1162).
 # run 201 -- above six colours, 1b decides only within a quarter of a break's time (rank.c). 8 colours s21-22
+# run 201 -- (result) survived 5/8, 129739 frames (200: 5/8, 142250) -- count no worse, kept. combo s21 and insane s21 now live; lost
+#   thicc s21 2827, combo s22 2711, chain s22 16201. THE PLAN KEPT (run 199's limit: garbage resting, half a break) still kept lines lost
+#   sooner: combo s22 2543 220 over 264; chain s22 15665 132 over 236, 23 queued.
+# run 202 -- above six colours THE PLAN KEPT gives way to a line lost a quarter of a break later, garbage resting or not (rank.c)
 chain_garbage 21 9 9 1 21600 10 colors=8
 combo_storm 21 9 9 1 21600 10 colors=8
 thicc_combo_storm 21 9 9 1 21600 10 colors=8

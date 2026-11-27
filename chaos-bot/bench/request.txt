@@ -656,11 +656,13 @@
 # run 189 -- (result) survived 1/8, 80081 frames -- off; 8 colours closed at run 180's 7/8 (the owner). One set at a time from here.
 # run 190 -- THE NEXT MODE (the owner: "7/8 IS GREAT", "GO into next mode"): 7 colours at Level 10, seeds 7-8, run 180's bot (8 colours
 #   7/8, 152311 frames). Run 189's change out. 7 colours s7-8
-chain_garbage 7 9 9 1 21600 10 colors=7
-combo_storm 7 9 9 1 21600 10 colors=7
-thicc_combo_storm 7 9 9 1 21600 10 colors=7
-insane_combo_storm 7 9 9 1 21600 10 colors=7
-chain_garbage 8 9 9 1 21600 10 colors=7
-combo_storm 8 9 9 1 21600 10 colors=7
-thicc_combo_storm 8 9 9 1 21600 10 colors=7
-insane_combo_storm 8 9 9 1 21600 10 colors=7
+# run 190 -- (result) 7 colours: survived 7/8, 172270 frames -- DONE at the owner's bar (7/8). Lost only combo s8 at 20470.
+# run 191 -- THE NEXT MODE: chaos margin (margin=4) at Level 10, 6 colours, seeds 7-8, run 180's bot. margin 4 s7-8
+chain_garbage 7 9 9 1 21600 10 margin=4
+combo_storm 7 9 9 1 21600 10 margin=4
+thicc_combo_storm 7 9 9 1 21600 10 margin=4
+insane_combo_storm 7 9 9 1 21600 10 margin=4
+chain_garbage 8 9 9 1 21600 10 margin=4
+combo_storm 8 9 9 1 21600 10 margin=4
+thicc_combo_storm 8 9 9 1 21600 10 margin=4
+insane_combo_storm 8 9 9 1 21600 10 margin=4

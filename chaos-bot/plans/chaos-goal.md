@@ -177,6 +177,10 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 145 (2026-11-27 02:59 ET), the searches 52 x 6 at 8 colours: survived 5/8, 120708 frames, 0 late -- kept.** All four seed-7
+  games lived. combo s8 lost at 866: the opening left a one-panel tower in column 0, a 6-wide slab landed on it at 712 with columns 1-5
+  two to four rows lower, and no perched drop was offered -- perchedDrops walks a support past the block's edge, and a full-width block
+  has none. chain s8 3482, insane s8 8360 lost. Run 146: a support under a block with no edge walked to the nearest column it falls in.
 - **Run 144 (2026-11-27 02:46 ET), no shaping of the searches by the colours (40 x 7 at 8 colours): survived 4/8, 143378 frames --
   kept**, the most frames of any 8-colour run (run 132: 141612), every loss late: chain s7 13573, combo s8 15118, thicc s8 16342 (all
   backlog, 23-35 waiting, full boards under stacked slabs), insane s8 11945. The frames have followed the shape: 24 x 12 98k, 28 x 10

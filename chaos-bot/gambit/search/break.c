@@ -162,6 +162,20 @@ static void perchedOf(const Bits *B, Perches *P) {
       for (int k = L; k <= R && ok; k++) {
         if (!(holds >> k & 1)) continue;
         int toL = L - 1, toR = R + 1, to = toL >= 1 && (k - toL <= toR - k || toR > W) ? toL : toR <= W ? toR : 0;
+        // (run 146: a block with no edge to walk past -- full width -- has its support walked along its row under it to the nearest
+        // column it falls down in: the cells it crosses empty, and the cell under the one it reaches empty too. Run 145 8 colours combo
+        // s8, 712-941: a 6-wide slab on a one-panel tower in column 0 over columns 1-5 two to four rows lower, none offered, lost at 866)
+        if (!to && under >= 2) {
+          unsigned full = B->pan[under] | B->gar[under], below = B->pan[under - 1] | B->gar[under - 1];
+          int best = 0;
+          for (int j = 1; j <= W; j++) {
+            if (j == k || (full >> j & 1) || (below >> j & 1)) continue;
+            int lo = j < k ? j : k + 1, hi = j < k ? k - 1 : j, clear = 1;
+            for (int q = lo; q <= hi; q++) if (full >> q & 1) clear = 0;
+            if (clear && (!best || (j > k ? j - k : k - j) < (best > k ? best - k : k - best))) best = j;
+          }
+          to = best;
+        }
         if (!to) { ok = 0; break; }
         int was = n;
         n = walkTo(under, k, to, P->seq[P->n], n);

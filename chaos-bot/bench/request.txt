@@ -457,6 +457,11 @@
 #   combo s8 15118 (queue 33-35), thicc s8 16342 (queue 24-28, a full board under 4 stacked 3-wide slabs), insane s8 11945. Kept.
 # run 145 -- the shape followed the way the frames went (24x12 98k, 28x10 131k, 40x7 143k): per colour over six 6 wider and half a swap
 #   shallower (8 colours 52 x 6; propose.c). 8 colours s7-8
+# run 145 -- (result) survived 5/8 (run 144: 4/8), 120708 frames, late 0 -- kept. All of seed 7 lived; chain s8 3482, combo s8 866
+#   (a 6-wide slab landed at 712 on a one-panel tower in column 0, columns 1-5 two to four rows lower: no perched drop was offered -- a
+#   full-width block has no edge to walk its support past), insane s8 8360.
+# run 146 -- perched drops for a block with no edge (search/break.c perchedOf): the support walked along its row under the block to the
+#   nearest column it falls down in. 8 colours s7-8
 chain_garbage 7 9 9 1 21600 10 colors=8
 combo_storm 7 9 9 1 21600 10 colors=8
 thicc_combo_storm 7 9 9 1 21600 10 colors=8

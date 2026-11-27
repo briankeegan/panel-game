@@ -490,6 +490,8 @@
 # run 155 -- (result) survived 2/8, 113350 frames -- back on. Four features measured off on the wide search: 1'h neutral (kept off),
 #   rule 117, the perched drops and the 8-colour aims each needed.
 # run 156 -- starving, any break (a combo of three breaking garbage) asked LAST in the aims (decide.c; run 141 asked it first: 3/8). s7-8
+# run 156 -- (result) survived 3/8, 99096 frames -- off. Lost chain s7 1647, combo s7 14218, thicc s7 2283, insane s7 11543, combo s8 4605.
+# run 157 -- run 151's bot with the planner's full depth kept at the wide beam (8 colours 64 x 7; propose.c gpDepth). 8 colours s7-8
 chain_garbage 7 9 9 1 21600 10 colors=8
 combo_storm 7 9 9 1 21600 10 colors=8
 thicc_combo_storm 7 9 9 1 21600 10 colors=8

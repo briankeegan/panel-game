@@ -281,7 +281,8 @@ static int readBoard_(Read *R) {
     }
     // (run 156: and starving, any break asked last -- after the chains and the combo of four, so a plain three-panel break meets the list
     // where nothing else does, without ranking over the chains (run 141 asked it first))
-    if (brk == 1) {
+    // (run 156: 3/8 -- off)
+    if (0 && brk == 1) {
       memset(&L.aim[L.n], 0, sizeof L.aim[L.n]);
       L.aim[L.n].combo.op = OP_GE; L.aim[L.n].combo.n = 3; L.aim[L.n].combo.near = 1; L.aim[L.n].brk = 1;
       L.n++;

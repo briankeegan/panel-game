@@ -177,6 +177,8 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 156 (2026-11-27 05:20 ET), starving, any break asked last: survived 3/8, 99096 frames** -- off. Run 157: the planner 64 x 7 (the
+  wide beam with the full depth; late moves have been 0 throughout).
 - **Run 155 (2026-11-27 05:08 ET), the 8-colour aims off: survived 2/8, 113350 frames** -- back on. Of the features measured off on the
   wide search (runs 151, 153-155), only 1'h was neutral; rule 117, the perched drops and the aims each held games. The bot stands at 5/8.
   Run 156: starving, any break asked last in the aims (run 141 asked it first).

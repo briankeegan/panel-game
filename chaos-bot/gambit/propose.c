@@ -36,7 +36,8 @@ static int32_t colourExtra(void) { return decQ.b && decQ.b->colors > 6 ? decQ.b-
 // (run 152 tried 18 a colour over six (76 x 6): 2/8, 111422 frames -- back to 12 (64 x 6))
 static int32_t gpWidth(int32_t w) { int32_t e = colourExtra(); return w + 12 * e; }
 // (run 149 tried a swap shallower a colour over six (64 x 5): 2/8, 90487 frames -- back to half a swap (64 x 6))
-static int32_t gpDepth(int32_t d) { int32_t e = colourExtra(); return d - e / 2 >= 4 ? d - e / 2 : d; }
+// (run 157: the full depth kept with the wide beam (8 colours 64 x 7) -- 40 x 7 4/8, 64 x 6 5/8 three times; late moves 0 throughout)
+static int32_t gpDepth(int32_t d) { return d; }
 // (run 150: the extend search -- the chains and breaks grown from the board -- a swap deeper above six colours: at 8 colours a break is a
 // longer walk, and the planner's shape (wider, shallower) has been the lever that moved these seeds)
 // (run 150 made it a swap deeper above six colours: 1/8, 105996 frames -- back)

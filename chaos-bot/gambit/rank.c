@@ -1232,6 +1232,12 @@ static int compareJudged(const Judge *x, const Judge *y) {
       if (rx >= 0 && ry >= 0 && rx != ry) return (cmpKey = __LINE__, (rx < ry ? -1 : 1));
     }
   }
+  // 1. (run 167, CHAOS) ABOVE SIX COLOURS UNDER GARBAGE, NO BREAK OFFERED, THE PANELS KEPT: of two lost alike that break nothing, the
+  // one clearing fewer panels first -- the panels a clear spends under garbage are the next break's. Run 166 thicc s8: four rows of
+  // full-width garbage on 41 panels, no break offered, levels spent them to 31 (5296-5566) and the next slab buried it, lost at 5395
+  if (!lx && decQ.b->colors > 6 && decF.under && !breakOffered && lostAlike(x, y) && !(x->apBroke > 0) && !(y->apBroke > 0) &&
+      x->o.j.clearedPanels != y->o.j.clearedPanels)
+    return (cmpKey = __LINE__, (x->o.j.clearedPanels < y->o.j.clearedPanels ? -1 : 1));
   // (survival as the board is lost: a line that meets the mode's first entry and is lost no sooner is never passed over for the walk the
   // order charges it -- the mode gives way to survival only)
   int goalNoSooner = goalLine(x) != goalLine(y) && diesAt(goalLine(x) ? x : y) >= diesAt(goalLine(x) ? y : x);

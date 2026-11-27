@@ -177,6 +177,10 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 166 (2026-11-27 07:34 ET), the queue let drop from 25 waiting above six colours: survived 4/8, 133500 frames** -- kept (equal to
+  run 163; combo s8 lived again). Lost chain s7 13565 and insane s7 12851 (backlogs of 15-29), insane s8 15289, thicc s8 5395: four rows
+  of full-width garbage on 41 panels, no break offered, levels spent the panels to 31 and the next slab buried it. Run 167: under garbage
+  with no break offered, of two lost alike breaking nothing, the one clearing fewer panels first.
 - **Run 165 (2026-11-27 07:20 ET), the planner 52 wide with the opening fixes: survived 0/8, 112803 frames** -- back to 64. Four lost after
   18000, with 20-35 waiting for thousands of frames (insane s8: 21-35 from 12000 to 20355). Run 166: the queue let drop (a quiet board while
   what waits fits under the top) from 25 waiting above six colours, not 35.

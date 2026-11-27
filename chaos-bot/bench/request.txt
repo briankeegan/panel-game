@@ -526,6 +526,11 @@
 #   20355 -- 21-35 waiting from 12000 to the end).
 # run 166 -- run 163's bot with the queue let drop from 25 waiting above six colours, not 35 (decide.c queueNear: a quiet board while what waits
 #   fits under the top). 8 colours s7-8
+# run 166 -- (result) survived 4/8, 133500 frames -- kept (equal to run 163); combo s8 lived again. Lost chain s7 13565 (25-29 waiting
+#   late), insane s7 12851 (15-21 waiting from 7000), thicc s8 5395 (four rows of full-width garbage on 41 panels, no break offered, levels
+#   spent them to 31, the next slab buried it), insane s8 15289.
+# run 167 -- run 166's bot plus: above six colours under garbage with no break offered, of two lost alike that break nothing, the one
+#   clearing fewer panels first (rank.c). 8 colours s7-8
 chain_garbage 7 9 9 1 21600 10 colors=8
 combo_storm 7 9 9 1 21600 10 colors=8
 thicc_combo_storm 7 9 9 1 21600 10 colors=8

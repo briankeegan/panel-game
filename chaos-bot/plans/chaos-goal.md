@@ -203,6 +203,9 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Revert fault found (18:20 ET):** "back to the kept bot" took rank.c from the commit before, sometimes the turned-off run's own. Run 204
+  (5/8) really played run 201 + run 202's change (THE PLAN KEPT a quarter break, garbage resting or not) + run-160 off; run 207 also had
+  run 205's change. From now on the kept bot is restored from its run's commit by hash. Run 208 re-pushed with run 204's exact file.
 - **Run 207 (2026-11-27 18:14 ET), lostAlike with garbage queued: 2/8 -- off.** Four changes running worse than run 204's 5/8. Run 208:
   run 204's bot unchanged as a baseline, with each game's CPU logged (workflow only -- the owner: "Infra solutions are great. Just don't
   fuck with internals too much").

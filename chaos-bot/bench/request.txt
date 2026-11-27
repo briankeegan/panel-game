@@ -726,6 +726,11 @@
 #   2/8, 207 2/8) against run 204's 5/8 -- whether run 204's bot holds 5/8 is not known.
 # run 208 -- THE BASELINE: run 204's bot unchanged, and each game's machine logged (lscpu, in the workflow -- infra, the bot untouched): the
 #   searches stop on the wall clock, so the CPU a game drew is part of its result. 8 colours s21-22
+# run 208 -- cancelled by me: the file was not run 204's. MY REVERT FAULT: each "back to the kept bot" took rank.c from the commit before,
+#   which was sometimes the turned-off run's own: run 204 played run 201's bot + run 202's change (THE PLAN KEPT a quarter break,
+#   garbage resting or not) + the run-160 rule off; run 207 played that + run 205's change (dig the backlog a quarter break) + its own;
+#   run 208 had run 206's change in. Fixed: the kept bot is taken from its run's commit by hash (run 204 = 02c3173).
+# run 208 -- THE BASELINE again: rank.c exactly run 204's (02c3173), each game's CPU logged. 8 colours s21-22
 chain_garbage 21 9 9 1 21600 10 colors=8
 combo_storm 21 9 9 1 21600 10 colors=8
 thicc_combo_storm 21 9 9 1 21600 10 colors=8

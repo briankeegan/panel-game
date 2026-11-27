@@ -271,11 +271,6 @@ static double rankHoldOwn = -1; static int32_t rankHoldClock = -1;   // (the hol
 static int extCounts(const Judge *x) {
   if (x->hold || x->extLost == NOT_ASKED) return 0;
   if (lostAtOf(x->o.lostAt, 0) < rankSave) return 0;   // (a board lost inside a break's time presses no promise after it)
-  // (run 206: above six colours under garbage with ten or more queued, no promise is credited -- the next block lands before it is pressed.
-  // Run 204 8 colours, the later loss first by the promise: combo s21 9416 a carry lost at 190 credited 321 over an entry at 240 (17
-  // queued), lost at 9789; insane s22 16810 a lineup at 168 credited 321 over 202, 17249 a carry at 182 credited 284 over 284 (22-23
-  // queued), lost at 17470)
-  if (decQ.b->colors > 6 && decF.under && decQ.b->ninc >= 10) return 0;
   if (rankHoldClock != decQ.b->clock || rankHoldOwn < 0) return 1;
   // (and under garbage, a line that breaks none of it earns the promise only where its own board outlives the hold by the time its walk
   // takes -- the owner: no walking far for nothing: r1427, 3750, a cut walked 8 actions among the slabs, lost at 125 as the hold was,

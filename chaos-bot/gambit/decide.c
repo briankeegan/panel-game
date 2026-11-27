@@ -1216,6 +1216,11 @@ static int ranked(const Read *R, const Found *S) {
     for (int i = 0; i < J->k.nseq && all; i++) if (!(i < 64 && (J->o.j.sames >> i & 1))) all = 0;
     if (all) for (int i = 1; i < n; i++) if (order[i]->hold) { Judge *h = order[i]; for (int k = i; k > 0; k--) order[k] = order[k - 1]; order[0] = h; samesTrimmed = 2; outlivingFirst(order, n); if (!rankMoved) rankMoved = __LINE__; break; }
   }
+  // (run 186, THE TOP PAIR AGREES, ON THE ORDER AS IT IS LEFT -- the owner: the order and the line played must not disagree. The keys are
+  // not transitive, and the cuts above drop lines after the last sort: the two left on top may never have been compared. Where the
+  // second beats the top compared alone, the two change places, once, after every cut; a line put on top on purpose above (the hold for a
+  // needless swap, rankMoved) stays)
+  if (n > 1 && !rankMoved) { int32_t keep = cmpKey; if (compareJudged(order[1], order[0]) < 0) { Judge *e = order[0]; order[0] = order[1]; order[1] = e; } cmpKey = keep; }
   phaseMs[0] = (int32_t)(t1 - t0); phaseMs[1] = (int32_t)(t2 - t1); phaseMs[2] = (int32_t)(nowMs() - t2);
   return n;
 }

@@ -177,6 +177,8 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 185 (2026-11-27 12:54 ET), the top pair agrees in the sort: survived 2/8, 114145 frames** -- reverted; inversions not fewer
+  (56/6410): rank() drops lines after the last sort. Run 186: the top pair made to agree at the end of rank(), after every cut.
 - **Run 184 (2026-11-27 12:37 ET), the needless-swap hold override off under garbage: survived 4/8, 127662 frames** -- reverted. True
   inversions 1.1% (44/79 the hold first) -- cycles in the merge sort, not the override; post-sort moves 0.2%; drift 3.2%; ties 4.5%.
   Run 185: the top pair made to agree (the second over the top where it beats it compared alone).

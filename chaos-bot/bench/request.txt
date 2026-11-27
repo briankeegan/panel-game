@@ -629,6 +629,10 @@
 #   over a line it never meets, through a third.
 # run 185 -- run 180's bot plus: where the second line beats the top compared alone, the two change places after the sort (rank.c
 #   sortJudged) -- nothing else in the order moves. 8 colours s7-8
+# run 185 -- (result) survived 2/8, 114145 frames -- reverted. Inversions labelled 56 of 6410 (not fewer): decide.c rank() drops lines
+#   after the last sort (the wasted three, the window, the short chain, amid the garbage), leaving a top pair never compared.
+# run 186 -- run 180's bot plus: the top pair made to agree at the end of decide.c rank(), after every cut (not where a line was put on
+#   top on purpose). 8 colours s7-8
 chain_garbage 7 9 9 1 21600 10 colors=8
 combo_storm 7 9 9 1 21600 10 colors=8
 thicc_combo_storm 7 9 9 1 21600 10 colors=8

@@ -1960,7 +1960,8 @@ static void sortJudged(Judge **a, int n) {
   // half of the merge the top can rise above a line it never meets, through a third (the hold over A, A over B, B over the hold). Read in
   // playOf, run 184 had 79 of 7095 decisions with the line played losing to the next compared alone, 44 of them the hold. Where the
   // second beats the top compared alone, the two change places -- nothing else in the order moves)
-  if (n > 1) { int32_t keep = cmpKey; if (compareJudged(a[1], a[0]) < 0) { Judge *e = a[0]; a[0] = a[1]; a[1] = e; } cmpKey = keep; }
+  // (run 185 did it here: 2/8, and the inversions labelled hardly moved (56 of 6410) -- decide.c rank() drops lines after the last sort
+  // (the wasted three, the window, the short chain, amid the garbage), and a top pair never compared is left. Done at rank()'s end now)
   outlivingFirst(a, n);
   // (THE EIGHT THAT BEATS THE TOP IS THE TOP: the keys are not transitive -- an eight put first by the finish's own key beside the line
   // on top can end below it through a third line -- so in finish them, the first eight offered whole that the order puts before the top

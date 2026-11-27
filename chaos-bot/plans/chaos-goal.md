@@ -177,6 +177,9 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 127 (2026-11-26 23:14 ET), panel columns kept even under garbage: survived 1/8.** Off. Ten changes since run 122 all worse;
+  the tie-breaking rules above six colours decide most decisions and move far more than the loss aimed at. Run 128: 1'h (colours lined
+  up) off, to measure it alone.
 - **Run 126 (2026-11-26 23:03 ET), a full board asks the combo first: survived 4/8** (insane s5 221 frames short). Off. thicc s6:
   columns 3-5 emptied rows 7-10 by 4x chains breaking nothing, the garbage on the left tower. Run 127: panel columns kept even under
   garbage (garbage never counted -- every canyon read flat to evenOf).

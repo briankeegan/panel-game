@@ -1358,14 +1358,16 @@ static int compareJudged(const Judge *x, const Judge *y) {
   // garbage, the one leaving its panel columns two rows or more more even (judge.c panelEvenOf: garbage never counted) first -- every
   // canyon of runs 115-126 was panel towers beside emptied columns with the garbage resting on the towers (run 126 thicc s6: columns 3-5
   // emptied from row 7 to 10 by 4x chains breaking nothing, lost at 9240)
-  if (decQ.b->colors > 6 && decF.under && (lx || lostAlike(x, y)) && imax(0, x->apBroke) == imax(0, y->apBroke) &&
+  // (run 128: off -- run 127 with it 1/8)
+  if (0 && decQ.b->colors > 6 && decF.under && (lx || lostAlike(x, y)) && imax(0, x->apBroke) == imax(0, y->apBroke) &&
       x->o.j.pEven >= 0 && y->o.j.pEven >= 0 && iabs(x->o.j.pEven - y->o.j.pEven) >= 2)
     return (cmpKey = __LINE__, (x->o.j.pEven - y->o.j.pEven));
   // 1'h. (run 107, CHAOS) ABOVE SIX COLOURS, THE COLOURS LINED UP (the owner: be more purposeful with colours): of two that both live
   // or are lost alike and break the same garbage, the one leaving more breaks a swap away (judge.c readyOf: a single swap that makes a
   // match touching garbage), then more matches a swap away -- at 8 colours a match seldom arrives by itself, and runs 101-106 found no
   // break on 57% of decisions under garbage
-  if (decQ.b->colors > 6 && (lx || lostAlike(x, y)) && imax(0, x->apBroke) == imax(0, y->apBroke)) {
+  // (run 128: off, to measure it -- it decides most ties at 8 colours and was never measured alone on seeds 5-6)
+  if (0 && decQ.b->colors > 6 && (lx || lostAlike(x, y)) && imax(0, x->apBroke) == imax(0, y->apBroke)) {
     if (x->o.j.readyBreak != y->o.j.readyBreak) return (cmpKey = __LINE__, (x->o.j.readyBreak > y->o.j.readyBreak ? -1 : 1));
     if (x->o.j.swapReady != y->o.j.swapReady) return (cmpKey = __LINE__, (x->o.j.swapReady > y->o.j.swapReady ? -1 : 1));
   }

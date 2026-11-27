@@ -177,6 +177,9 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 122 (2026-11-26 22:21 ET), let-down lines under garbage: survived 5/8** (kept, equal) -- chain s5 lost at 21003 (600 frames
+  short), insane s5 3408 (30 panels under 7 rows of garbage, clears of 12-14 breaking nothing), insane s6 848 (a 4-4-4 fired under
+  garbage still falling: the break lost). Run 123: starving also when garbage outweighs the panels.
 - **Run 121 (2026-11-26 22:11 ET), starving, the chain aims need a break: survived 5/8** (equal to run 117) -- both insane games
   lived; thicc s5 lost at 643 (garbage held up on a 3-panel tower in column 0 over cleared columns 1-5), chain s5 12886, combo s6 18990.
   Kept. Run 122: the let-down lines offered whenever under garbage above six colours.

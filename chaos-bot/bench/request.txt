@@ -372,6 +372,9 @@
 #   (garbage held up on a 3-panel tower in column 0 over cleared columns), chain s5 12886, combo s6 18990. Kept
 # run 122 -- above six colours, the let-down lines (walk a tower out from under held-up garbage) offered whenever under garbage, not
 #   only topped or dying (propose.c perchedDrops). 8 colours L10 s5-6
+# run 122 -- (result) let-down lines under garbage above six colours, 8 colours s5-6: survived 5/8 (=121, kept) -- chain s5 lost at 21003,
+#   insane s5 3408 (30 panels under 7 rows of garbage, clears of 12-14 breaking nothing), insane s6 848
+# run 123 -- starving also when the garbage on the board outweighs the panels (decide.c): chain aims then need a break. 8 colours s5-6
 chain_garbage 5 9 9 1 21600 10 colors=8
 combo_storm 5 9 9 1 21600 10 colors=8
 thicc_combo_storm 5 9 9 1 21600 10 colors=8

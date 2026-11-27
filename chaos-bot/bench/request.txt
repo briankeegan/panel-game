@@ -474,6 +474,8 @@
 # run 149 -- (result) survived 2/8, 90487 frames -- back to 64 x 6. Lost chain s7 6195, combo s7 15873, thicc s7 2097, insane s7 14044,
 #   chain s8 6172, insane s8 2906.
 # run 150 -- run 148's bot with the extend search a swap deeper above six colours (propose.c geDepth, 6 -> 7). 8 colours s7-8
+# run 150 -- (result) survived 1/8, 105996 frames -- back. Only thicc s7 lived; combo s8 19493, insane s8 20428, chain s7 16619 lost late.
+# run 151 -- run 148's bot with 1'h (rank.c: the colours lined up, a tie-break above six colours) off, measured on the wider search. s7-8
 chain_garbage 7 9 9 1 21600 10 colors=8
 combo_storm 7 9 9 1 21600 10 colors=8
 thicc_combo_storm 7 9 9 1 21600 10 colors=8

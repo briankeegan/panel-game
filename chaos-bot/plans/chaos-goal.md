@@ -177,6 +177,9 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 150 (2026-11-27 04:03 ET), the extend search a swap deeper at 8 colours: survived 1/8, 105996 frames** -- back. The bot of runs
+  145, 147 and 148 scored 5/8 each: that is where it stands; 1-2 of 8 is a real regression, 4-6 the noise. Run 151 measures a feature
+  off instead of adding one: 1'h (the colours lined up, a tie-break) off on the wider search.
 - **Run 149 (2026-11-27 03:51 ET), the searches 64 x 5: survived 2/8, 90487 frames** -- back to 64 x 6. The planner's shape at 8 colours:
   24 x 12 3/8, 28 x 10 4/8, 40 x 7 4/8, 52 x 6 5/8, 64 x 6 5/8 (twice), 64 x 5 2/8 -- best near 52-64 wide, 6 deep. Run 150: the extend
   search a swap deeper (6 -> 7) above six colours.

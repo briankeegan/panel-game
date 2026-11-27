@@ -38,7 +38,8 @@ static int32_t gpWidth(int32_t w) { int32_t e = colourExtra(); return w + 12 * e
 static int32_t gpDepth(int32_t d) { int32_t e = colourExtra(); return d - e / 2 >= 4 ? d - e / 2 : d; }
 // (run 150: the extend search -- the chains and breaks grown from the board -- a swap deeper above six colours: at 8 colours a break is a
 // longer walk, and the planner's shape (wider, shallower) has been the lever that moved these seeds)
-static int32_t geDepth(int32_t d) { return colourExtra() ? d + 1 : d; }
+// (run 150 made it a swap deeper above six colours: 1/8, 105996 frames -- back)
+static int32_t geDepth(int32_t d) { return d; }
 
 // ---- the board's state the proposers read
 static int cascadeLive(Board *b) {

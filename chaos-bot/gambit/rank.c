@@ -1386,7 +1386,8 @@ static int compareJudged(const Judge *x, const Judge *y) {
   // match touching garbage), then more matches a swap away -- at 8 colours a match seldom arrives by itself, and runs 101-106 found no
   // break on 57% of decisions under garbage
   // (run 128 measured it off: 4/8 against 5/8 on -- kept on)
-  if (decQ.b->colors > 6 && (lx || lostAlike(x, y)) && imax(0, x->apBroke) == imax(0, y->apBroke)) {
+  // (run 151: off, measured on the wider search (64 x 6) -- run 128 measured it off at 4/8 against 5/8, within the noise)
+  if (0 && decQ.b->colors > 6 && (lx || lostAlike(x, y)) && imax(0, x->apBroke) == imax(0, y->apBroke)) {
     if (x->o.j.readyBreak != y->o.j.readyBreak) return (cmpKey = __LINE__, (x->o.j.readyBreak > y->o.j.readyBreak ? -1 : 1));
     if (x->o.j.swapReady != y->o.j.swapReady) return (cmpKey = __LINE__, (x->o.j.swapReady > y->o.j.swapReady ? -1 : 1));
   }

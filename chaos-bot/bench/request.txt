@@ -356,6 +356,9 @@
 # run 116 -- (result) line-up pairs, 8 colours L10 s5-6: survived 2/8, four lost inside 2845 frames. Off
 # run 117 -- above six colours under garbage, a line breaking nothing that digs W+ empty cells under the garbage goes after one that
 #   does not (rank.c): run 115 combo s5, 5x/6x chains breaking nothing emptied the middle under garbage on the edge towers. s5-6
+# run 117 -- (result) no canyon dug for nothing, 8 colours L10 s5-6: survived 5/8 (run 115: 4/8) -- combo s5 and thicc s6 lived; chain s5
+#   lost 35 frames short (21565), insane s5 1957 (starved: 16-25 panels), insane s6 13029. Kept
+# run 118 -- above six colours, a starved board (under 4 rows of panels) under garbage breaks cheaply: fewer panels cleared first (rank.c)
 chain_garbage 5 9 9 1 21600 10 colors=8
 combo_storm 5 9 9 1 21600 10 colors=8
 thicc_combo_storm 5 9 9 1 21600 10 colors=8

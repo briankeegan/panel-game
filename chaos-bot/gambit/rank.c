@@ -977,6 +977,12 @@ static int compareJudged(const Judge *x, const Judge *y) {
     if (xd || yd) { const Judge *dig = xd ? x : y, *o = xd ? y : x;
       if (o->o.lives || diesAt(o) + rankSave > diesAt(dig)) return (cmpKey = __LINE__, (xd ? 1 : -1)); }
   }
+  // (run 118, CHAOS, ABOVE SIX COLOURS, A STARVED BOARD BREAKS CHEAPLY: under garbage with fewer than four rows' worth of panels (4 x W),
+  // of two lines that break the same garbage and live or are lost alike, the one clearing fewer panels first -- each panel spent is
+  // one the next break lacks. Run 117 8 colours insane s5: 16-25 panels from 1264 to the loss at 1957, breaks of 6 clearing 6 each)
+  if (decQ.b->colors > 6 && decF.under && panelsOn(decQ.b) < 4 * W && (lx || lostAlike(x, y)) &&
+      imax(0, x->apBroke) == imax(0, y->apBroke) && x->o.j.clearedPanels != y->o.j.clearedPanels)
+    return (cmpKey = __LINE__, (x->o.j.clearedPanels < y->o.j.clearedPanels ? -1 : 1));
   // (run 55, CHAOS, THE OPENING KEEPS ITS PANELS: before garbage first comes (the opening, decide.c), of two lines that both live and
   // break no garbage, the one clearing fewer panels first -- the stack rises on its own until then and the first garbage is broken with
   // what is kept; Training's garbage is scripted, so attack before it buys nothing. Run 52 insane s5: entries from frame 192 spent the

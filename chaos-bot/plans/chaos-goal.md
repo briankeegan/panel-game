@@ -177,6 +177,9 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 117 (2026-11-26 21:29 ET), no canyon dug for nothing, 8 colours s5-6: survived 5/8** (run 115: 4/8). combo s5 and thicc s6
+  lived; chain s5 lost 35 frames short, insane s5 at 1957 (starved: 16-25 panels, breaks of 6 clearing 6), insane s6 at 13029. Kept.
+  Run 118: a starved board breaks cheaply (fewer panels cleared first, under 4 rows of panels, above six colours).
 - **Run 116 (2026-11-26 21:18 ET), line-up pairs of swaps, 8 colours s5-6: survived 2/8** (four lost inside 2845 frames). Off.
   Run 117: no canyon dug for nothing (rank.c) -- run 115 combo s5, 5x/6x chains breaking nothing emptied columns 1-3 rows 4-9 under
   garbage resting on the edge towers.

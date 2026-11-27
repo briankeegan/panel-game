@@ -17,7 +17,7 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 
 | Mode | Level | Seeds | Run | Result |
 |---|---|---|---|---|
-| 8 colours | 10 | 21-22 | 201 | 5/8 (3, 3, 4, 5 before), being fixed (run 202) |
+| 8 colours | 10 | 21-22 | 201 | 5/8 (202: 2/8, off), being fixed (run 203) |
 | 7 colours | 10 | 23-24 | - | to redo (old: 7/8 on seeds 7-8, run 190 -- does not count) |
 | Chaos margin 4 | 10 | 25-26 | - | to redo (old: 7/8 on 7-8, run 191) |
 | Chaos mode | 10 | 27-28 | - | to redo (old: 8/8 on 7-8, run 192) |
@@ -203,6 +203,8 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 202 (2026-11-27 17:26 ET), the plan kept a quarter break everywhere: 2/8 -- off.** Openings spent: the first garbage met with
+  14-18 panels, by rank.c's run-160 high-opening rule (clear more panels first). Run 203: run 201's bot + that rule stops at 30 panels left.
 - **Run 201 (2026-11-27 17:16 ET), 8 colours seeds 21-22, + 1b a quarter break: 5/8** -- kept (count no worse). THE PLAN KEPT still kept
   lines lost 44-104 frames sooner where garbage was not resting. Run 202: a quarter break, garbage resting or not.
 - **Run 200 (2026-11-27 17:06 ET), 8 colours seeds 21-22, + lostAlike a quarter break: 5/8** -- kept. insane s21 lost at 1289: rule 1b

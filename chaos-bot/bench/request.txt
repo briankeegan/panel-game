@@ -703,6 +703,10 @@
 #   thicc s21 2827, combo s22 2711, chain s22 16201. THE PLAN KEPT (run 199's limit: garbage resting, half a break) still kept lines lost
 #   sooner: combo s22 2543 220 over 264; chain s22 15665 132 over 236, 23 queued.
 # run 202 -- above six colours THE PLAN KEPT gives way to a line lost a quarter of a break later, garbage resting or not (rank.c)
+# run 202 -- (result) survived 2/8, 87282 frames -- worse (5/8): OFF, back to run 201's bot. insane s21 and thicc s21 met the first garbage
+#   with 17 and 18 panels (run 201 thicc s21: 14): rank.c's run-160 rule (above six colours, a high opening makes room: of two living
+#   lines the one clearing more first) spent the stack -- run 201 thicc s21 427-618 a 4-, 5- and 6-chain, lost at 2827.
+# run 203 -- run 201's bot plus: the run-160 rule never clears past 30 panels left (rank.c). 8 colours s21-22
 chain_garbage 21 9 9 1 21600 10 colors=8
 combo_storm 21 9 9 1 21600 10 colors=8
 thicc_combo_storm 21 9 9 1 21600 10 colors=8

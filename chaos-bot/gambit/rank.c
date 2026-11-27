@@ -1055,8 +1055,11 @@ static int compareJudged(const Judge *x, const Judge *y) {
   // (two or three rows, ~700) on an eight-row stack is every line lost the moment it is told. Runs 151 combo s8 and 159 insane s8 (the same
   // board, the same opening): 30 -> 48 panels by 441 on set-ups and zips, every line dying from 545, topped at 768, lost at ~605)
   // (run 183 counted cleared panels up to two rows' worth on run 180's bot: 1/8. Back)
+  // (run 203: and never past 30 panels left -- run 201 8 colours thicc s21 427-618 a 4-, 5- and 6-chain put first by this rule, the first
+  // garbage met with 14 panels, lost at 2827; run 202 insane s21 and thicc s21 met it with 17 and 18, lost at 2335 and 4056)
   if (chaosOpenHigh && x->o.lives && y->o.lives && x->apBroke <= 0 && y->apBroke <= 0 &&
-      x->o.j.clearedPanels != y->o.j.clearedPanels)
+      x->o.j.clearedPanels != y->o.j.clearedPanels &&
+      panelsOn(decQ.b) - imax(x->o.j.clearedPanels, y->o.j.clearedPanels) >= 30)
     return (cmpKey = __LINE__, (x->o.j.clearedPanels > y->o.j.clearedPanels ? -1 : 1));
   // THE LAST CHANCE: the hold lost inside a break's time, beside a line lost no sooner whose next moves promise a break's time more (the
   // readiness break, the survival search after it): the line first -- holding is the loss for certain. Only against the hold: the
@@ -1160,9 +1163,7 @@ static int compareJudged(const Judge *x, const Judge *y) {
         // (run 199: above six colours under garbage, nor over a line lost half a break's time later -- run 198 8 colours, every loss
         // late with a backlog: combo s21 11929-11947 kept lost at 117 and 99 over 193 and 191; insane s22 9876-9903 222 over 299, 195
         // over 272; combo s22 16117-16448 202 over 257, 171 over 223)
-        // (run 202: garbage resting or not, a quarter of a break's time -- as lostAlike and 1b there. Run 201 combo s22 2543 kept lost at
-        // 220 over 264, lost at 2711; chain s22 15665 132 over 236 with 23 queued, lost at 16201)
-        !(decQ.b->colors > 6 && !c->o.lives && !o->o.lives && diesAt(o) - diesAt(c) >= rankSave / 4))
+        !(decQ.b->colors > 6 && decF.under && !c->o.lives && !o->o.lives && diesAt(o) - diesAt(c) >= rankSave / 2))
       return (cmpKey = __LINE__, (x->carried ? -1 : 1));
   }
   // 1. READY WHEN IT LANDS (the owner: just be ready -- the stack raised, the garbage on its way): with garbage on its way and none on the

@@ -628,6 +628,20 @@ static int ruleNoEnemy;   // (the rule in force asks enemy.none: decide.c)
 // (under garbage a reserve is kept only for a break some line of the decision makes: with none offered, the inputs kept are for a break
 // that is not there, and the board that holds them builds none -- decide.c sets it before the order is made)
 static int breakOffered = 1;
+// (run 173, CHAOS: GARBAGE ON THE BOARD FOR THE BREAK RULES -- decF.under is garbage resting on the stack (facts.c FACT_US_CONTACT); a
+// slab on the board not yet resting on it is breakable all the same. Above six colours the break rules read garbage anywhere on the
+// board. Run 171 insane s8, 664: under=0 with a break of 15 offered; creditPair's no-break credit rule and the break-first rules tested
+// decF.under, none ran, and the credit step (won=k1119) put a carry lost at 370 breaking nothing over the break lost at 249; 45 panels
+// spent to 23, lost at 995)
+static int garbOnBoard(void) {
+  static const Board *atB; static int32_t atClock = -1, on;
+  if (decQ.b != atB || decQ.b->clock != atClock) {
+    atB = decQ.b; atClock = decQ.b->clock; on = 0;
+    for (int r = 1; r < decQ.b->nrows && !on; r++) for (int c = 1; c <= W; c++) if (decQ.b->p[r][c].f[ISGARBAGE]) { on = 1; break; }
+  }
+  return on;
+}
+static int underBreak(void) { return decF.under || (decQ.b->colors > 6 && garbOnBoard()); }
 static int32_t waitOf(void);
 static int cascadeLive(Board *b);   // (propose.c: the board still moving of its own)
 // (the window as the next block finds it: at its landing with one on its way, else EARLIEST_LANDING)
@@ -900,8 +914,8 @@ static void creditPair(const Judge *x, const Judge *y, int *lxo, int *lyo) {
   // (nor, under garbage, the credit of a line that breaks nothing beside a break lost within a break's time of it: the break is the way
   // out the board has, the horizon is a promise -- r1363, 14839: a 4x stall in progress lost at 296 kept over a break lost at 282, and no
   // break offered again; r1362, 16120)
-  if (lx && !x->o.lives && decF.under && brokeSeen(x) <= 0 && !y->hold && !y->o.dead && y->apBroke > 0 && diesAt(x) - diesAt(y) < rankSave) lx = 0;
-  if (ly && !y->o.lives && decF.under && brokeSeen(y) <= 0 && !x->hold && !x->o.dead && x->apBroke > 0 && diesAt(y) - diesAt(x) < rankSave) ly = 0;
+  if (lx && !x->o.lives && underBreak() && brokeSeen(x) <= 0 && !y->hold && !y->o.dead && y->apBroke > 0 && diesAt(x) - diesAt(y) < rankSave) lx = 0;
+  if (ly && !y->o.lives && underBreak() && brokeSeen(y) <= 0 && !x->hold && !x->o.dead && x->apBroke > 0 && diesAt(y) - diesAt(x) < rankSave) ly = 0;
   // (IN FINISH THEM, A BOARD THAT STANDS TWICE THE HORIZON IS SAFE -- the owner: survival is not pushed where the board is not dying: a
   // line whose board is lost FINISH_SAFE or more from now, its next moves played (diesAt: its own loss or the life after it), survives as
   // one that lives does, and the combos decide between them)
@@ -1247,7 +1261,7 @@ static int compareJudged(const Judge *x, const Judge *y) {
   // the break first -- the moves after are planned again each decision, on the window the line spent, and the break is on the board now.
   // r1350, 5110: a ready lost at 98, then344, over a break in progress lost at 273; the 344 was never kept and the board was lost at
   // 5287. The finish's eight keeps its own rule: finishEightBy)
-  if (!lx && decF.under) {
+  if (!lx && underBreak()) {
     int bx = !x->hold && !x->o.dead && x->apBroke > 0, by = !y->hold && !y->o.dead && y->apBroke > 0;
     if (bx != by) {
       const Judge *b = bx ? x : y, *p = bx ? y : x;
@@ -1290,7 +1304,7 @@ static int compareJudged(const Judge *x, const Judge *y) {
   // that breaks garbage before one that breaks none -- the hold too -- unless that one's own board, not what its next moves promise,
   // outlives the break's by a break's time: 4538 combo_storm 3, 4887, a chain breaking nothing lost at 409, promising 697, played over a
   // break of 16 lost at 429; the panels drained and the breaks after it came too late)
-  if (!lx && decF.under) {
+  if (!lx && underBreak()) {
     int bx = !x->hold && !x->o.dead && x->apBroke > 0, by = !y->hold && !y->o.dead && y->apBroke > 0;
     if (bx != by) {
       const Judge *b = bx ? x : y, *o = bx ? y : x;

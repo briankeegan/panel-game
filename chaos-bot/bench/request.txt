@@ -392,11 +392,14 @@
 # run 128 -- (result) 1'h off, 8 colours s5-6: survived 4/8 (on: 5/8). Back on
 # run 129 -- with garbage on the board at all the chain aims need a break (decide.c brk 1, not only starving): run 128's losses chose
 #   15-25 clears breaking nothing a minute with 19-32 pieces waiting. 8 colours L10 s5-6
-chain_garbage 5 9 9 1 21600 10 colors=8
-combo_storm 5 9 9 1 21600 10 colors=8
-thicc_combo_storm 5 9 9 1 21600 10 colors=8
-insane_combo_storm 5 9 9 1 21600 10 colors=8
-chain_garbage 6 9 9 1 21600 10 colors=8
-combo_storm 6 9 9 1 21600 10 colors=8
-thicc_combo_storm 6 9 9 1 21600 10 colors=8
-insane_combo_storm 6 9 9 1 21600 10 colors=8
+# run 129 -- (result) chain aims need a break under garbage at all, 8 colours s5-6: survived 3/8. Back to starving only
+# run 130 -- run 122's bot exactly, 8 colours L10, NEW seeds 7-8: thirteen changes on s5-6 since run 122 all worse -- tuning on
+#   the same eight games moves their losses around; new seeds give new losses to read and test the 5/8 off these seeds
+chain_garbage 7 9 9 1 21600 10 colors=8
+combo_storm 7 9 9 1 21600 10 colors=8
+thicc_combo_storm 7 9 9 1 21600 10 colors=8
+insane_combo_storm 7 9 9 1 21600 10 colors=8
+chain_garbage 8 9 9 1 21600 10 colors=8
+combo_storm 8 9 9 1 21600 10 colors=8
+thicc_combo_storm 8 9 9 1 21600 10 colors=8
+insane_combo_storm 8 9 9 1 21600 10 colors=8

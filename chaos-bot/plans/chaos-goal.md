@@ -177,6 +177,9 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 129 (2026-11-26 23:35 ET), the chain aims need a break under garbage at all: survived 3/8.** Back. Since run 122 (5/8 on
+  s5-6: runs 117, 121, 122), thirteen changes all scored worse there: tuning on the same eight games moves their losses around. Run 130:
+  run 122's bot exactly on new seeds 7-8 -- new losses to read, and the 5/8 tested off the seeds it was tuned on (not a rerun: new seeds).
 - **Run 128 (2026-11-26 23:24 ET), 1'h off: survived 4/8** (on: 5/8) -- back on. Losses chose 15-25 clears breaking nothing a minute
   (140-180 panels) with 19-32 pieces waiting. Run 129: under garbage at all the chain aims need a break.
 - **Run 127 (2026-11-26 23:14 ET), panel columns kept even under garbage: survived 1/8.** Off. Ten changes since run 122 all worse;

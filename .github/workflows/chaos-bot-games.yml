@@ -98,11 +98,21 @@ jobs:
         with:
           pattern: chaosbot-game-*
           path: games
+      - name: Board viewer
+        run: |
+          # (the test build of the bot's own code, for its board viewer: each loss's boards drawn in the report -- reads logs, plays nothing)
+          cd chaos-bot/gambit && (gcc -O1 -pthread -DPA_HEAP -DGB_TEST -w native.c host.c test/main.c -lm -lz -o /tmp/gtest || (sudo apt-get install -y zlib1g-dev && gcc -O1 -pthread -DPA_HEAP -DGB_TEST -w native.c host.c test/main.c -lm -lz -o /tmp/gtest)) || true
       - name: Report
+        env:
+          GTEST: /tmp/gtest
+          STORIES: losses.txt
         run: |
           python3 chaos-bot/bench/report.py games '${{ needs.plan.outputs.games }}' | tee report.txt
+          { echo '```'; cat report.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: chaosbot-report
-          path: report.txt
+          path: |
+            report.txt
+            losses.txt

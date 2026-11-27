@@ -347,11 +347,15 @@
 # run 113 -- (result) line-up swaps, 8 colours L10 s3-4: survived 4/8 -- chain s4 (its target) lived; insane s3 3031 and s4 1007 lost early,
 #   thicc s3 8752, combo s4 13775. Kept. insane s4: the opening only set up (30 -> 48 panels by 458), the opening-keeps-panels rule on
 # run 114 -- the opening keeps its panels only at six colours or fewer (decide.c chaosOpenQuiet): 8 colours L10 s3-4
-chain_garbage 3 9 9 1 21600 10 colors=8
-combo_storm 3 9 9 1 21600 10 colors=8
-thicc_combo_storm 3 9 9 1 21600 10 colors=8
-insane_combo_storm 3 9 9 1 21600 10 colors=8
-chain_garbage 4 9 9 1 21600 10 colors=8
-combo_storm 4 9 9 1 21600 10 colors=8
-thicc_combo_storm 4 9 9 1 21600 10 colors=8
-insane_combo_storm 4 9 9 1 21600 10 colors=8
+# run 114 -- (result) the opening keeps panels only at <=6 colours, 8 colours L10 s3-4: survived 2/8. Back (run 113's bot)
+# run 115 -- the report tells each loss itself (the owner: better infra): its last 900 frames of decisions and its boards drawn
+#   (losses.txt in the report artifact, the run's summary on the Actions page), and each game's earlier runs (bench/history.txt).
+#   Run 113's bot, 8 colours L10, new seeds 5-6
+chain_garbage 5 9 9 1 21600 10 colors=8
+combo_storm 5 9 9 1 21600 10 colors=8
+thicc_combo_storm 5 9 9 1 21600 10 colors=8
+insane_combo_storm 5 9 9 1 21600 10 colors=8
+chain_garbage 6 9 9 1 21600 10 colors=8
+combo_storm 6 9 9 1 21600 10 colors=8
+thicc_combo_storm 6 9 9 1 21600 10 colors=8
+insane_combo_storm 6 9 9 1 21600 10 colors=8

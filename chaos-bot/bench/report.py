@@ -117,6 +117,56 @@ def death(path, frames, health, reason):
         round(sum(qs) / len(qs)) if qs else "?", max(qs) if qs else "?", round(sum(stops) / len(stops)) if stops else "?", holdonly,
         spentN, spent, first[0] if first else "-", fpan if fpan is not None else "-", dying)
 
+def history(path):
+    """EARLIER RUNS OF THE SAME GAME (bench/history.txt: run pattern seed level colors mode margin chaosmode frames survived, one a line,
+    written with each run's result): what this game did before, so a change is read game by game"""
+    h = {}
+    if os.path.exists(path):
+        for line in open(path):
+            f = line.split()
+            if len(f) >= 10 and not line.startswith("#"):
+                h.setdefault(tuple(f[1:8]), []).append((f[0], f[8], f[9]))
+    return h
+
+def story(d, gtest, last=900, boards=10):
+    """A LOSS TOLD ON THE BOARD: the decisions of the last `last` frames (frame, play, verdict, panels, garbage broken, panels cleared,
+    swaps, stop, lines living/offered, the three best lines offered) and the last `boards` board snapshots drawn (G garbage, digits the
+    colours), read off gambit.log -- so a loss is read from the run's own report, not by hand"""
+    log = os.path.join(d, "gambit.log")
+    if not os.path.exists(log):
+        return "no gambit.log"
+    dec, snaps = [], []
+    for line in open(log, errors="replace"):
+        if line.startswith("GAMBITD "):
+            f = line.split()
+            try: dec.append((int(f[1]), line))
+            except ValueError: pass
+        elif line.startswith("GAMBITB "):
+            try: snaps.append(int(line.split()[1]))
+            except ValueError: pass
+    if not dec:
+        return "no decisions"
+    end = max(fr for fr, _ in dec)
+    out = []
+    keys = ("play", "v", "pan", "broke", "clr", "swaps", "stop", "live", "q")
+    seen = set()
+    for fr, line in dec:
+        if fr < end - last or fr in seen: continue
+        seen.add(fr)
+        kv = _kv(line)
+        opts = ",".join(kv.get("opts", "").split(",")[:3])
+        out.append("  %6d " % fr + " ".join("%s=%s" % (k, kv.get(k, "-")) for k in keys) + " opts=" + opts)
+    if gtest and os.path.exists(gtest):
+        import subprocess
+        for fr in sorted(set(snaps))[-boards:]:
+            try:
+                b = subprocess.run([gtest, "test", "board", log, str(fr)], capture_output=True, text=True, timeout=20).stdout
+                rows = [l.rstrip() for l in b.splitlines()[:15] if l.strip()]
+                out.append("  board " + " | ".join(rows))
+            except Exception as e:
+                out.append("  board %d: %s" % (fr, e))
+    return "\n".join(out)
+
 def main():
     games_dir, asked = sys.argv[1], json.loads(sys.argv[2])
     rows, survived, late, diverged, overruns, arrivals, surprises = [], 0, 0, 0, 0, 0, 0
@@ -138,7 +188,17 @@ def main():
             r.get("gpm", -1), s.get("late", "?"), s.get("diverged", "?"), r.get("overruns", "?"), r.get("worstMs", "?"), s.get("surprises", "?"), s.get("arrivals", "?"), s.get("noticeMin", "?"), vl, vl + vd, vr, vf[0], vf[1], vf[2], r.get("reason", "?")))
     for row in rows:
         print(row)
+    hist = history(os.path.join(os.path.dirname(os.path.abspath(__file__)), "history.txt"))
+    for g in asked:
+        d = os.path.join(games_dir, "chaosbot-game-%d" % g["n"])
+        r = parse_result(os.path.join(d, "result.txt")) or {}
+        key = (g["pattern"], str(g["seed"]), str(r.get("level", g.get("level", 9))), str(r.get("colors", g.get("colors", 6))),
+               str(r.get("gamemode", g.get("mode", 1))), str(r.get("margin", g.get("margin", 1))), str(r.get("chaosmode", g.get("chaosmode", 0))))
+        before = hist.get(key, [])
+        if before:
+            print("before game %d %s seed %s: %s" % (g["n"], g["pattern"], g["seed"], " ".join("%s:%s%s" % (rn, fr, "+" if sv == "1" else "x") for rn, fr, sv in before[-8:])))
     causes = {}
+    stories = [] if os.environ.get("STORIES") else None
     for g in asked:
         d = os.path.join(games_dir, "chaosbot-game-%d" % g["n"])
         r = parse_result(os.path.join(d, "result.txt")) or {"reason": "noresult"}
@@ -153,12 +213,17 @@ def main():
             print("death game %d %s seed %d at %s: %s" % (g["n"], g["pattern"], g["seed"], r.get("frames", "?"), why))
             for t in why.split("|")[0].replace("tags=", "").strip().split(","):
                 causes[t] = causes.get(t, 0) + 1
+        if stories is not None:
+            stories.append("== game %d %s seed %d lost at %s (health %s, %s)\n%s" % (g["n"], g["pattern"], g["seed"], r.get("frames", "?"),
+                           r.get("health", "?"), r.get("reason", "?"), story(d, os.environ.get("GTEST"))))
     if causes:
         print("deaths by cause: " + ", ".join("%s %d" % (k, v) for k, v in sorted(causes.items(), key=lambda kv: -kv[1])))
     from zoneinfo import ZoneInfo
     et = datetime.datetime.now(ZoneInfo("America/New_York"))
     print("run games %d survived %d/%d late %d diverged %d overruns %d surprises %d/%d gpm %.2f finished %s ET" % (
         len(asked), survived, len(asked), late, diverged, overruns, surprises, arrivals, sent * 3600 / played if played else 0, et.strftime("%Y-%m-%d %H:%M")))
+    if stories:
+        open(os.environ["STORIES"], "w").write("\n\n".join(stories) + "\n")
     if len(rows) != len(asked):
         print("report: read %d games of %d asked" % (len(rows), len(asked)))
         sys.exit(1)

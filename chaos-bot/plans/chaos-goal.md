@@ -156,6 +156,11 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Infra (the owner, 2026-11-27: "You need better infra fixed"):** the run's report now tells each loss itself -- its last 900 frames
+  of decisions (play, verdict, panels, garbage broken, panels cleared, swaps, stop, lines living, the three best offered) and its last
+  ten boards drawn by the bot's own viewer (built in the report job, plays nothing) in losses.txt beside report.txt, and the report
+  shown on the run's Actions page; and every game's earlier results (bench/history.txt, written with each run's result) printed beside
+  it. No log is downloaded by hand to read a loss. Run 115: run 113's bot, 8 colours L10, new seeds 5-6.
 - **Run 114 (2026-11-26 13:32 ET): the opening keeps its panels only at six colours or fewer -- survived 2/8.** Openings lower
   (30-38 panels at the first garbage), insane s4 1007 -> 10262, but thicc s4, chain s3 and combo s3 (run 113's survivors) lost. Back.
   8 colours, seeds 3-4, the bot of run 113 (chains for stop, colours lined up, line-up swaps): 4/8; run 110 (without the swaps) 5/8.

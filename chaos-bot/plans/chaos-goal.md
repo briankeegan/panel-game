@@ -1,5 +1,26 @@
 # The chaos bot's goal
 
+## NOW -- the one goal, and the standing orders (the owner, 2026-11-27: "Set your goal so it's clear and you don't keep stopping")
+
+**Goal now: 8 colours at chaos Level 10 survives 8/8 games to 6:00 on a seed set, then 8/8 on a new seed set, the bot unchanged.**
+Then the next weakest mode, one at a time (7 colours, chaos margin, Line Clear, the queue limit), each to 8/8 twice, never below Level 9,
+the Level 10 six-colour gate kept. Done only when every mode holds.
+
+**Standing orders -- every step, no exceptions:**
+1. **A run is always going.** The moment a run finishes, the next one is pushed -- before writing to the owner, before reading at
+   length. Never end a turn, never write a summary, with no run in flight. Never stop to ask; decide from this file.
+2. **Read every loss move by move** in the run's losses.txt (decisions and boards) and figure out what actually went wrong -- the
+   report's tags are not the answer. One fix per run, aimed at a loss seen on the board.
+3. **No luck, no reruns.** A loss is a fault to fix. Seeds change only after 8/8.
+4. Keep a change only if the run is no worse; otherwise turn it off and say so here.
+5. Record each run's result here, in bench/request.txt (with the next run's push only) and bench/history.txt.
+6. Report to the owner briefly with each result (ET time, survived x/8, what was lost and why, the next run already going).
+7. Never raise the decision budget, never change hand speed, games only on GitHub Actions, never more than 8 games a run.
+
+**Reminders:** a scheduled check-in fires into this session every hour ("Chaos bot: is a run going? ...") -- on it, check the latest
+run, and if none is going, push the next one at once.
+
+
 **The target: a bot that survives every game of the chaos benchmark to the end -- 6 minutes (21,600 frames) at chaos Level 10 --
 8/8, then 8/8 again on a new set of seeds (the owner, 2026-11-25 18:08 ET: not twice in a row on the same seeds), with 0 divergences,
 0 late moves and 0 frames over the think budget. Then as much garbage sent as survival allows.**

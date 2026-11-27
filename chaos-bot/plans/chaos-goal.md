@@ -17,7 +17,7 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 
 | Mode | Level | Seeds | Run | Result |
 |---|---|---|---|---|
-| 8 colours | 10 | 21-22 | 204 | 5/8 (best; 202, 203, 205 off), being fixed (run 206) |
+| 8 colours | 10 | 21-22 | 204 | 5/8 (best; 202, 203, 205, 206 off), being fixed (run 207) |
 | 7 colours | 10 | 23-24 | - | to redo (old: 7/8 on seeds 7-8, run 190 -- does not count) |
 | Chaos margin 4 | 10 | 25-26 | - | to redo (old: 7/8 on 7-8, run 191) |
 | Chaos mode | 10 | 27-28 | - | to redo (old: 8/8 on 7-8, run 192) |
@@ -203,6 +203,9 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 206 (2026-11-27 18:05 ET), no credit under a backlog: 2/8 -- off.** With garbage queued but none resting, rank.c's 8-colour limits
+  (decF.under) never apply: NO CHANGING MINDS kept lines lost 90 frames sooner. Run 207: run 204 + lostAlike's quarter break with garbage
+  queued too. (A watcher now reads each run the moment it ends: scratchpad watch.sh, polling the Actions API.)
 - **Run 205 (2026-11-27 17:55 ET), + dig the backlog a quarter break: 4/8 -- off.** Run 206: run 204's bot + no next-moves credit above six
   colours under garbage with 10+ queued (SURVIVAL FIRST put lines lost sooner first on promises: combo s21 9416, insane s22 16810/17249).
 - **Run 204 (2026-11-27 17:46 ET), run 201 with the run-160 high-opening rule off: 5/8, 137380 frames** -- kept; openings now meet the

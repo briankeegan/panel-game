@@ -718,6 +718,10 @@
 # run 206 -- run 204's bot plus: above six colours under garbage with 10+ queued, no next-moves credit (rank.c extCounts). Run 204 combo
 #   s21 9416 a carry lost at 190 credited 321 put over an entry at 240 by SURVIVAL FIRST (17 queued); insane s22 16810 168 credited 321 over
 #   202, 17249 182 credited 284 over 284 (22-23 queued). 8 colours s21-22
+# run 206 -- (result) survived 2/8, 105669 frames -- worse: OFF, back to run 204's bot. NO CHANGING MINDS kept lines lost 90 frames sooner
+#   with garbage queued but none resting (combo s21 14484 182 over 272, 22 queued; insane s22 14168 186 over 279, 17 queued): run 200's
+#   lostAlike limit reads only resting garbage.
+# run 207 -- run 204's bot plus: above six colours, lostAlike within a quarter break with garbage queued too, not only resting (rank.c)
 chain_garbage 21 9 9 1 21600 10 colors=8
 combo_storm 21 9 9 1 21600 10 colors=8
 thicc_combo_storm 21 9 9 1 21600 10 colors=8

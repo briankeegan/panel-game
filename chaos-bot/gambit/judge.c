@@ -376,6 +376,40 @@ static void readyOf(const Board *b, int32_t *ready, int32_t *readyBreak) {
   int nr = gridOf(b, g);
   gridReady(g, nr, ready, readyBreak);
 }
+// (run 116, CHAOS, TWO SWAPS THAT LINE COLOURS UP: the best pair of swaps -- the first making no match, the second any swap after it
+// making none -- by the breaks a swap away they leave (4 each) then the matches a swap away, where the pair beats every single swap: at
+// 8 colours the row under the garbage seldom needs one move to be stocked (run 115 thicc s6: one panel under a 2-row slab, no break in
+// reach, held until the stop ran out). Moves as row * 8 + column into out[0..1]; 1 found, 0 none)
+static int lineUpPair(const Board *b, int32_t *out) {
+  static LOCAL int g[64][W + 2];
+  int nr = gridOf(b, g);
+  int32_t r0, b0; gridReady(g, nr, &r0, &b0);
+  int32_t base = 4 * b0 + r0, best1 = base, best2 = base; int32_t m1 = -1, m2 = -1;
+  for (int r = 1; r < nr; r++) for (int c = 1; c < W; c++) {
+    int a = g[r][c], bb = g[r][c + 1];
+    if (a <= 0 || bb <= 0 || a == bb) continue;
+    g[r][c] = bb; g[r][c + 1] = a;
+    int t = 0;
+    if (!(gridMatchAt(g, nr, r, c, &t) | gridMatchAt(g, nr, r, c + 1, &t))) {
+      int32_t rr, rb; gridReady(g, nr, &rr, &rb); if (4 * rb + rr > best1) best1 = 4 * rb + rr;
+      for (int r2 = (r > 2 ? r - 2 : 1); r2 < nr && r2 <= r + 2; r2++) for (int c2 = 1; c2 < W; c2++) {
+        if (r2 == r && c2 == c) continue;
+        int a2 = g[r2][c2], b2 = g[r2][c2 + 1];
+        if (a2 <= 0 || b2 <= 0 || a2 == b2) continue;
+        g[r2][c2] = b2; g[r2][c2 + 1] = a2;
+        int t2 = 0;
+        if (!(gridMatchAt(g, nr, r2, c2, &t2) | gridMatchAt(g, nr, r2, c2 + 1, &t2))) {
+          int32_t r3, b3; gridReady(g, nr, &r3, &b3);
+          if (4 * b3 + r3 > best2) { best2 = 4 * b3 + r3; m1 = r * 8 + c; m2 = r2 * 8 + c2; }
+        }
+        g[r2][c2] = a2; g[r2][c2 + 1] = b2;
+      }
+    }
+    g[r][c] = a; g[r][c + 1] = bb;
+  }
+  if (m1 < 0 || best2 <= best1) return 0;
+  out[0] = m1; out[1] = m2; return 1;
+}
 // (run 113, CHAOS, THE SWAPS THAT LINE COLOURS UP: of the single swaps on the board -- two resting panels side by side, making no match
 // themselves -- the best `max` by the breaks a swap away they leave (4 each), then the matches a swap away, and only those better than
 // the board as it stands; at 8 colours the board's waiting time is spent on these, not the hold (run 110 chain s4: 284 frames of stop

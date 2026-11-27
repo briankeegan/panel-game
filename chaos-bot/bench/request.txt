@@ -351,6 +351,8 @@
 # run 115 -- the report tells each loss itself (the owner: better infra): its last 900 frames of decisions and its boards drawn
 #   (losses.txt in the report artifact, the run's summary on the Actions page), and each game's earlier runs (bench/history.txt).
 #   Run 113's bot, 8 colours L10, new seeds 5-6
+# run 115 -- (result) run 113's bot, 8 colours L10 s5-6: survived 4/8 (combo s5 4491, insane s5 3804, thicc s6 2938, chain s5 19249)
+# run 116 -- the best pair of line-up swaps offered too, where it beats every single one (judge.c lineUpPair): 8 colours L10 s5-6
 chain_garbage 5 9 9 1 21600 10 colors=8
 combo_storm 5 9 9 1 21600 10 colors=8
 thicc_combo_storm 5 9 9 1 21600 10 colors=8

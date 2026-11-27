@@ -177,6 +177,9 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 151 (2026-11-27 04:17 ET), 1'h off: survived 5/8, 128433 frames -- equal, kept off (the simpler bot).** combo s8 lost at 610,
+  the other way this time: the opening flat but high, 45 panels and nine rows when a 3-row slab landed at 711. Lost also combo s7 5633,
+  thicc s7 14190. Run 152: the searches 76 x 6 at 8 colours.
 - **Run 150 (2026-11-27 04:03 ET), the extend search a swap deeper at 8 colours: survived 1/8, 105996 frames** -- back. The bot of runs
   145, 147 and 148 scored 5/8 each: that is where it stands; 1-2 of 8 is a real regression, 4-6 the noise. Run 151 measures a feature
   off instead of adding one: 1'h (the colours lined up, a tie-break) off on the wider search.

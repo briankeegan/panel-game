@@ -465,6 +465,9 @@
 # run 146 -- (result) survived 2/8, 80654 frames -- removed. Four early losses: chain s7 3020, insane s7 3775, chain s8 3516, thicc s8
 #   4132; combo s7 9332, combo s8 13679.
 # run 147 -- run 145's bot with the searches wider again: 12 a colour over six (8 colours 64 x 6; propose.c). 8 colours s7-8
+# run 147 -- (result) survived 5/8 (equal to run 145), 117086 frames, late 0 -- kept. Lost combo s7 3022, thicc s7 5252, combo s8 812
+#   (as in run 145: the opening dug columns 1-5 beside an eight-row tower in column 0, the first 6-wide slab perched on it at 707).
+# run 148 -- 1'e (rank.c, flat first among living lines) above six colours with garbage on its way too, while none is on the board. s7-8
 chain_garbage 7 9 9 1 21600 10 colors=8
 combo_storm 7 9 9 1 21600 10 colors=8
 thicc_combo_storm 7 9 9 1 21600 10 colors=8

@@ -177,6 +177,11 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 147 (2026-11-27 03:25 ET), the searches 64 x 6 at 8 colours: survived 5/8 (equal to run 145), 117086 frames, 0 late -- kept.**
+  combo s8 lost at 812 as in run 145 (866): the opening's clears from 431 dug columns 1-5 to rows 3-6 beside an eight-row tower in
+  column 0, and the first 6-wide slab perched on it at 707 out of reach -- a loss seen twice, the same way: a fault, not the noise. 1'e
+  (flat first) never acts in an 8-colour opening: garbage is told nearly the whole time. Run 148: 1'e above six colours with garbage on its
+  way too, while none is on the board. Lost also combo s7 3022, thicc s7 5252.
 - **Run 146 (2026-11-27 03:13 ET), perched drops for full-width blocks: survived 2/8, 80654 frames** -- removed. Four early losses
   (chain s7 3020, insane s7 3775, chain s8 3516, thicc s8 4132). Run 147: run 145's bot with the searches wider again (64 x 6 at 8 colours).
 - **Run 145 (2026-11-27 02:59 ET), the searches 52 x 6 at 8 colours: survived 5/8, 120708 frames, 0 late -- kept.** All four seed-7

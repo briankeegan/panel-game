@@ -177,6 +177,11 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 171 (2026-11-27 08:54 ET), the queue room after the first landing: survived 0/8, 57745 frames** -- reverted to run 167's queue
+  rule. combo s8 (947) and insane s8 (995) lost the opening run 169's combo s8 lost: under the first slab, chains breaking nothing kept
+  over breaks lost a break's time sooner (664: carry lost at 370 over a break of 15 lost at 249), 45 panels spent to 23. Run 172: above six
+  colours under garbage, the break first unless the other lasts two breaks' time longer, not one. (The owner, 2026-11-27: the noise rule
+  stands -- no reruns, every loss is a fault to fix.)
 - **Run 170 (2026-11-27 08:38 ET), the board left alone for the queue only two rows under the ceiling: survived 3/8, 110647 frames** --
   worse than run 167; narrowed. insane s7 lived (first since run 162), but chain s7 lost at 1765: the opening's queue was held back and
   came down as one 6-row slab on 27 panels. Run 171: the rule only once garbage has first landed.

@@ -1295,7 +1295,11 @@ static int compareJudged(const Judge *x, const Judge *y) {
     if (bx != by) {
       const Judge *b = bx ? x : y, *o = bx ? y : x;
       double bb = lostAtOf(b->o.lostAt, 0), ob = lostAtOf(o->o.lostAt, o->hold);
-      if (!o->o.lives && bb >= rankSave && ob - bb < rankSave) return (cmpKey = __LINE__, (bx ? -1 : 1));
+      // (run 172: above six colours two breaks' time -- run 171 insane s8 (as run 169 combo s8): under the first slab, chains breaking
+      // nothing kept over breaks a break's time and more sooner lost, 664 a carry lost at 370 over a break of 15 lost at 249, 45 panels
+      // spent to 23 breaking nothing, lost at 995)
+      double bw = decQ.b->colors > 6 ? 2 * rankSave : rankSave;
+      if (!o->o.lives && bb >= rankSave && ob - bb < bw) return (cmpKey = __LINE__, (bx ? -1 : 1));
     }
   }
   // (A PROMISE NEVER BEATS A LIFE: of two that do not live, one whose own board -- no next moves credited, the walk pressed on the

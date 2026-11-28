@@ -182,6 +182,13 @@ here" is never the answer — check the workflows first.
   Upstream assigns account ids itself, so the run commits a new name's id
   back to that branch; the next run logs back in.
 
+- **Never push a workflow GitHub cannot parse.** A broken workflow refuses EVERY dispatch (HTTP 422), so the
+  bot cannot restart or hand over and nothing can be deployed. GitHub caps any value containing `${{ }}` at 21000
+  characters, and a whole `run:` script counts as one value. The lobby step hit this once (cbf10204b). Before
+  pushing a workflow change, run `python3 .github/scripts/check_workflow_limits.py` (it fails at 18000). Turn on
+  the pre-push hook that runs it with `git config core.hooksPath .githooks`; `workflow-limits.yml` runs it on push.
+  To shrink a long step, put the `${{ }}` in the step's `env:` and read `$VARS` in the script.
+
 - **Runner CPU rule:** a deploy never puts the bot on a slow runner CPU model (Xeon 8573C, EPYC 7763, EPYC 9V74): the new
   bot checks `lscpu` first and the deploy re-runs it until it lands on a fast one, with no cap, while the old bot keeps the
   lobby. Rule, numbers and how the workflow applies it: `docs/RUNNER_CPU_RULE.md`.

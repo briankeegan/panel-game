@@ -1,0 +1,10 @@
+#!/bin/sh
+# Refuse a push whose workflows GitHub could not parse (a broken workflow refuses every dispatch, so the bots
+# cannot restart or hand over). Enable once per clone: git config core.hooksPath .githooks
+command -v python3 >/dev/null || exit 0
+python3 -c 'import yaml' 2>/dev/null || { echo "pre-push: python3-yaml missing, workflow limits NOT checked" >&2; exit 0; }
+python3 .github/scripts/check_workflow_limits.py >/dev/null || {
+  python3 .github/scripts/check_workflow_limits.py | grep '::error' >&2
+  echo "pre-push: refused -- fix the workflow first (see .github/scripts/check_workflow_limits.py)" >&2
+  exit 1
+}

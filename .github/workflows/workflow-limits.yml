@@ -1,0 +1,14 @@
+name: Workflow limits
+# A workflow GitHub cannot parse refuses every dispatch, which leaves the bots unable to restart or hand over.
+# This fails the push that would do that (see .github/scripts/check_workflow_limits.py).
+on:
+  push:
+    paths: ['.github/workflows/**', '.github/scripts/check_workflow_limits.py']
+  pull_request:
+    paths: ['.github/workflows/**', '.github/scripts/check_workflow_limits.py']
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 .github/scripts/check_workflow_limits.py

@@ -28,7 +28,7 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 | 1 HP | 10 | 29-30 | 238 | **8/8 -- done** |
 | No stop time | 10 | 31-32 | 239 | **8/8 -- done** |
 | BALL | 10 | 33-34 | 241 | **8/8 -- done** |
-| Line Clear (15:3-6) | stage's | 35-36 | 271 | won 6/8 (15:6 won once), being fixed (run 272) |
+| Line Clear (15:3-6) | stage's | 35-36 | 272 | won 6/8, being fixed (run 273) |
 | Queue limit | 10 | 37-38 | - | to do |
 | training_random | 10 | 39-40 | - | to do (its own pattern: chain and combo garbage mixed at a random balance, Chaos Mode 1 game in 4 -- TrainingMenu.lua createBasicTrainingMode) |
 | Challenge Mode | stage's | 41-42 | - | to do |
@@ -210,6 +210,9 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 272 (03:07-03:11 ET), 1'e a row more with nobody across above six colours: WON 6/8 -- kept (1d42fe1)** (no worse by games).
+  Both 15:5 won; both 15:6 lost (20.7, 19.8) on 29-38 panels. Run 273: above six colours the raise asks the raised board to stand 3/4 of
+  TA_STAND; the report prints the chains as they fell, by length.
 - **Run 271 (03:01-03:05 ET), every line held near the wall while a chain falls: WON 6/8 -- kept (bcf00f3).** 15:6 won for the first
   time (s36 at 7094); lost 15:5 s35 and 15:6 s35 (24.7, 24.1), whose time went ~1200 frames to flattening. Run 272: 1'e asks one row more
   with nobody across above six colours.

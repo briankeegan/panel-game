@@ -59,7 +59,7 @@ def chain_stats(path):
     log/links/swaps/ms/on: the design's state): how often a next link was found, the time given it, and the design's log codes"""
     if not os.path.exists(path):
         return None
-    asked = found = 0; ms = 0; gain = 0; zero = 0; ta = {}; built = []; last = None
+    asked = found = 0; ms = 0; gain = 0; zero = 0; ta = {}; built = []; last = None; eps = []; cur = 0
     for line in open(path, errors="replace"):
         if not line.startswith("GAMBITD "):
             continue
@@ -71,6 +71,9 @@ def chain_stats(path):
                 continue
             asked += 1; ms += m
             if l > b: found += 1; gain += l - b
+            # (a chain's length as it falls: the cascade's own chain, left alone, read decision by decision -- it drops when a new chain begins)
+            if b < cur: eps.append(cur)
+            cur = b if b < cur else max(cur, b)
             if m <= 5: zero += 1
         if "ta" in d:
             f = d["ta"].split("/")
@@ -82,9 +85,13 @@ def chain_stats(path):
             if k == "2" and last: built.append(last); last = None
     if not asked and not ta:
         return None
-    return "chain going asked %d found %d (%d%%) links +%.1f when found, ms avg %.0f, ms<=5 %d | designs fired %d, links avg %.1f swaps avg %.1f | ta log %s" % (
+    if cur: eps.append(cur)
+    eps = [e for e in eps if e >= 2]
+    hist = " ".join("%d:%d" % (k, sum(1 for e in eps if e == k)) for k in sorted(set(eps)))
+    return "chain going asked %d found %d (%d%%) links +%.1f when found, ms avg %.0f, ms<=5 %d | designs fired %d, links avg %.1f swaps avg %.1f | chains %d (sum of links-1 %d) by length %s | ta log %s" % (
         asked, found, 100 * found // max(1, asked), gain / max(1, found), ms / max(1, asked), zero,
         len(built), sum(b[0] for b in built) / max(1, len(built)), sum(b[1] for b in built) / max(1, len(built)),
+        len(eps), sum(min(12, e - 1) for e in eps), hist,
         " ".join("%s:%d" % (k, v) for k, v in sorted(ta.items(), key=lambda kv: -kv[1])[:10]))
 
 def death(path, frames, health, reason):

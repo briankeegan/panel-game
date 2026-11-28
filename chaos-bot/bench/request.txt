@@ -1010,6 +1010,10 @@
 #   time went ~1200 frames to flattening, the wins' ~800-1000.
 # run 272 -- run 271's bot plus: rank 1'e (FLAT) with nobody across above six colours asks FLAT_ROWS + 1 rows flatter, not FLAT_ROWS
 #   (rank.c). Line Clear 15:3-6 s35-36
+# run 272 -- (result, 03:07-03:11 ET) 1'e a row more with nobody across above six colours: WON 6/8 -- no worse by games: KEPT (1d42fe1).
+#   Both 15:5 won (32.3, 25.9); both 15:6 lost (20.7, 19.8). Their boards stood on 29-38 panels the last 1200 frames.
+# run 273 -- run 272's bot plus: above six colours time attack's raise needs the board raised to stand 3/4 of TA_STAND, not all (decide.c
+#   taRaiseRows). The report also prints each game's chains as they fell, by length. Line Clear 15:3-6 s35-36
 challenge 35 9 9 1 21600 10 challenge=15:3 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:4 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:5 profile=lineclear

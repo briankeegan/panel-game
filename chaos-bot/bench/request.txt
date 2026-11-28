@@ -1153,6 +1153,10 @@
 # run 304 -- run 299 plus vanilla's perch floor (GameCreator 64b8b34c54, 14e8ee600c, 198ad00744): with garbage on the board or coming, of two
 #   lines alike in living, where either leaves the lowest garbage resting on one or two columns 5+ rows over the lowest column under it,
 #   the one leaving it lower first (judge.c restsFewOf, rank.c). training_random s39-40
+# run 304 -- (result, 07:44-07:52 ET) vanilla's perch floor: survived 5/8 -- worse: OFF. Seed 39 level 11 lived; lost s39 level 10 at 2036
+#   (early), s40 level 10 at 10804 and level 11 at 17284.
+# run 305 -- run 299 plus the three vanilla garbage floors as the one unit vanilla plays them in: a break kept in reach under garbage (run
+#   302), the flatness floor (run 303) and the perch floor (run 304) together (rank.c, decide.c, judge.c). training_random s39-40
 training_random 39 8 8 1 21600 10
 training_random 39 9 9 1 21600 10
 training_random 39 10 10 1 21600 10

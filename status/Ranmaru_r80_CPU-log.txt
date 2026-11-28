@@ -1,6 +1,4 @@
-run 46100559306, as of 2026-11-28T04:00:36Z
-garbage landed: our stopWatch 3938 clock 4126, transits in flight before this frame {}, opponent copy 0 frames behind, rollbacks so far 0
-garbage landed: our stopWatch 3942 clock 4130, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
+run 46100559306, as of 2026-11-28T04:02:40Z
 opponent topped out: clock 4200 stopWatch 4012 stop 48 pre-stop 147 shake 0 health 1, top rows r12=ggg000 r11=gggggg r10=gggggg
 opponent topped out: clock 4200 stopWatch 4012 stop 48 pre-stop 147 shake 0 health 1, top rows r12=ggg000 r11=gggggg r10=gggggg
 opponent topped out: clock 4230 stopWatch 4042 stop 48 pre-stop 117 shake 0 health 1, top rows r12=ggg000 r11=gggggg r10=gggggg
@@ -149,6 +147,8 @@ REPLAY {"mine":1,"partial":true,"settings":{"engineVersion":"049","rules":{"stac
 match against id: 12154
 match over — bot unfinished (pace: worst 0.16 frames off schedule); waiting for a rematch
 memory after match: rss 4467908 kB, threads 9, lua 46336 kB
+game about to start: both players are ready
+set over: the room is closed, back in the lobby
 --- publish (the last 30 lines) ---
 [publish] 6 games finished so far; between two games of a set; the last publish 60 s ago
 [publish] publishing the games so far (6 finished)

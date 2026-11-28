@@ -1123,6 +1123,11 @@
 #   level 11 at 17072, s40 level 9 at 1224 (early, judged living 70 frames before) and level 11 at 20703.
 # run 298 -- run 295 (two workers) plus run 289's let-drop of the next three pieces with no garbage on the board (decide.c; run 289, one
 #   worker, had no early loss and 5/8; the two workers took the late losses later). training_random s39-40
+# run 298 -- (result, 06:41-06:49 ET) two workers + the three-piece let-drop: survived 5/8 -- worse: OFF, decide.c back to run 295's
+#   (e7f7255). Seed 40 all four lived (level 11 too); seed 39 lost level 9 at 1674 (early, starved under garbage from 1049), 10 at 13452,
+#   11 at 20968.
+# run 299 -- run 295 plus: DIG THE BACKLOG only with four or more waiting, not one (rank.c; run 297's early loss: a break lost 93 frames
+#   sooner put first with one waiting). training_random s39-40
 training_random 39 8 8 1 21600 10
 training_random 39 9 9 1 21600 10
 training_random 39 10 10 1 21600 10

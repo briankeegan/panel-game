@@ -30,7 +30,7 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 | BALL | 10 | 33-34 | 241 | **8/8 -- done** |
 | Line Clear (15:3-6) | stage's | 35-36 | 282 | **8/8 -- done** |
 | Queue limit (qlimit=1) | 10 | 37-38 | 283 | **8/8 -- done** |
-| training_random | 10 | 39-40 | 295 | 6/8 (two search workers; 296-297 off), being fixed (run 298) -- garbage level/speed 8-11 a seed (its own pattern: chain and combo garbage mixed at a random balance, Chaos Mode 1 game in 4 -- TrainingMenu.lua createBasicTrainingMode) |
+| training_random | 10 | 39-40 | 295 | 6/8 (two search workers; 296-298 off), being fixed (run 299) -- garbage level/speed 8-11 a seed (its own pattern: chain and combo garbage mixed at a random balance, Chaos Mode 1 game in 4 -- TrainingMenu.lua createBasicTrainingMode) |
 | Challenge Mode | stage's | 41-42 | - | to do |
 
 (8 colours old: 7/8 on seeds 7-8, run 180 -- does not count.)
@@ -210,6 +210,8 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 298 (06:41-06:49 ET), two workers + three-piece let-drop: 5/8 -- off** (seed 40 4/4; seed 39 three lost). Run 299: DIG THE
+  BACKLOG only with four or more waiting.
 - **Run 297 (06:32-06:39 ET), two workers pinned: 5/8 -- off.** Run 298: two workers with run 289's let-drop of the next three pieces when
   no garbage is on the board (289 had no early loss).
 - **Run 296 (06:22-06:30 ET), three workers: 4/8 -- off** (fewer rows: the four cpus are two cores' worth). Run 297: two workers pinned

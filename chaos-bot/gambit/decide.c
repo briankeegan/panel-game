@@ -2339,11 +2339,7 @@ static Played playOf(const Read *R, int n) {
   int queueNear = decQ.b->marginTime == 1 && decQ.b->ninc >= CHAOS_QUEUE_LIMIT - (decQ.b->colors > 6 ? 35 : QUEUE_ROOM);
   if (P.line && (!R->under || queueNear) && !R->up && decQ.b->ninc > 0 && P.line->apBroke <= 0) {
     int32_t waiting = 0;
-    // (run 289, on again in run 298 with two search workers: with no garbage on the board, the next three pieces only, not all that waits -- a quiet board drops them one at a time, each
-    // landing before the next (Stack:tryDropGarbage), and twelve waiting never fit whole: runs 286 and 288 training_random lost at 1499,
-    // 3334, 2442 and 3172 starved -- 7-19 panels, 9-16 waiting, the board clearing its own panels while nothing came down to break)
-    int nw = !R->under && decQ.b->ninc > 3 ? 3 : decQ.b->ninc;
-    for (int i = 0; i < nw; i++) waiting += decQ.b->inc[i].height > 0 ? decQ.b->inc[i].height : 1;
+    for (int i = 0; i < decQ.b->ninc; i++) waiting += decQ.b->inc[i].height > 0 ? decQ.b->inc[i].height : 1;
     int32_t h = decQ.b->height ? decQ.b->height : 12;
     // (what waits must land without topping the board out; held back further, it only grows and the panels go -- run 9's insane
     // combo storm never let it drop under the stricter ceiling test, letDrop=0, and lost at 3455 with 11 rows dropped at once)

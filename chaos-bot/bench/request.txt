@@ -937,6 +937,10 @@
 #   More rows (31.1 a minute; 15:6 s35 30.2) but lost 15:5 s36 (24.3) and 15:6 both.
 # run 257 -- run 253's bot plus: above six colours a design is searched from 3 full rows, not 4 (decide.c; run 253 15:6 s35 went 740
 #   frames with no design after a chain, on 24-36 panels, sending nothing). Line Clear 15:3-6 s35-36
+# run 257 -- (result, 01:31-01:36 ET) designs from 3 full rows above six colours: won 5/8 -- worse: OFF, decide.c back to run 253's
+#   (3931d36). Lost 15:5 s36 (23.8, 11 health off the top) and 15:6 both (23.3, 25.9).
+# run 258 -- run 253's bot plus: above six colours time attack's raise top is not lowered for an uneven stack (decide.c taTo; panelTop is
+#   already the tallest column's and taRaiseRows keeps it standing). Line Clear 15:3-6 s35-36
 challenge 35 9 9 1 21600 10 challenge=15:3 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:4 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:5 profile=lineclear

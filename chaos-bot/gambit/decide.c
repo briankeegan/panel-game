@@ -423,7 +423,10 @@ static int readBoard_(Read *R) {
   // (TIME ATTACK'S RAISE: no design being built and the stack under its top -- the owner: flatten, raise to the top, then the chain; no
   // garbage is coming, so the rows are raised as they are, never held to a break's readiness. The top is TA_TOP less each row the tallest
   // column stands over the shortest past TA_EVEN: an uneven stack raised to TA_TOP puts its tallest column where the rise ends it)
-  int32_t taTo = TA_TOP - imax(0, evenOf(decQ.b) - TA_EVEN);
+  // (run 258: above six colours the top is not lowered for an uneven stack -- panelTop is already the tallest column's, and taRaiseRows
+  // keeps the board raised standing TA_STAND frames; run 253 Line Clear 15:6 s35 stood on 24-36 panels for 740 frames after a chain with a
+  // tall column, never raised (cut, held, a set-up carried), and sent nothing -- seven colours flatten slowly)
+  int32_t taTo = TA_TOP - (decQ.b->colors > 6 ? 0 : imax(0, evenOf(decQ.b) - TA_EVEN));
   int taRaise = ruleNoEnemy && !opening && !refill && !R->topped && !R->taDying && !taOn && panelTop(decQ.b) < taTo;
   if (taRaise) to = taTo;
   // (run 253: and with nobody across the opening raises to time attack's top too, not to the chaos ceiling, which keeps room for blocks
@@ -2220,10 +2223,7 @@ static Played playOf(const Read *R, int n) {
     // is played as any is, levelled and raised)
     // (run 251: above six colours from 4 full rows, not 6 -- run 250 Line Clear 15:5 (7 colours): the design never built in 312 decisions,
     // 190 of them never searched, the chains only those taken on as they fell; 23-28 rows a minute where 26-32 were asked)
-    // (run 257: above six colours from 3 full rows, not 4 -- run 253 Line Clear 15:6 s35: after its chain ended at 2125 the board stood on
-    // 24-36 panels, fewer than 4 full rows, so no design was searched for 740 frames; the rank's lines (cut, a two-column set-up carried
-    // to 33 frames from the top) sent nothing, and the next chain began at 2867)
-    if (!taOn && nfull < (decQ.b->colors > 6 ? 3 : TA_FULL)) { if (taHave) { taReset(); taLog = -4; } }
+    if (!taOn && nfull < (decQ.b->colors > 6 ? 4 : TA_FULL)) { if (taHave) { taReset(); taLog = -4; } }
     else if (!taOn) {
       double left = C2.due ? C2.due - C2.margin - nowMs() : 100, ms = left * 0.7; if (ms < 2) ms = 2;
       readyStop();

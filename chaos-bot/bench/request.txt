@@ -1246,6 +1246,10 @@
 # run 329 -- (result, 11:37-11:41 ET) Line Clear on run 323's bot: won 5/8 (run 282's: 8/8). Lost 15:5 s35 (21.7 rows a minute), 15:6 both
 #   (24.3, 25.7). Since run 282, at seven colours with nobody across only the flatness floor (run 310) and the two search workers differ.
 # run 330 -- run 323's bot with the flatness floor never with nobody across (rank.c). Line Clear 15:3-6 s35-36
+# run 330 -- (result, 11:42-11:46 ET) the flatness floor off with nobody across: Line Clear won 5/8 again (lost 15:5 s35, 15:6 both). Kept
+#   (no worse; a tower floor has no business in a stage with no garbage).
+# run 331 -- run 330 with no search workers in a Challenge stage (bench/play.sh: GC_GAMBIT_WORKERS=0 where CHAOSBOT_CHALLENGE is set) -- with
+#   nobody across the workers are now all that differ from run 282's bot. Line Clear 15:3-6 s35-36
 challenge 35 9 9 1 21600 10 challenge=15:3 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:4 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:5 profile=lineclear

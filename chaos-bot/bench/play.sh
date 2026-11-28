@@ -32,6 +32,9 @@ export GC_GAMBIT_DIR="$gd" GC_GAMBIT_WORDS="$gd/gambit.words" GC_GAMBIT_LOG="$ou
 # hostWorkers), and no run set it: the runners have 4 cpus, the game's thread and Gambit's take two. Each decision gets the same wall-clock
 # time, so the workers are more search in it -- the owner's runner data: a slower model searches less and loses more)
 export GC_GAMBIT_WORKERS="${GC_GAMBIT_WORKERS:-2}"
+# (run 331: none in a Challenge stage (CHAOSBOT_CHALLENGE) -- a test: run 330 Line Clear 5/8 with the flatness floor off there too, so with
+# nobody across the two workers are all that differ from run 282's bot, 8/8)
+[ -n "${CHAOSBOT_CHALLENGE:-}" ] && export GC_GAMBIT_WORKERS=0
 export CHAOSBOT_SEED="$seed" CHAOSBOT_PATTERN="$pattern" CHAOSBOT_GLEVEL="$glevel" CHAOSBOT_GSPEED="$gspeed" CHAOSBOT_QUEUE="$queue"
 export CHAOSBOT_FRAMES="$frames" CHAOSBOT_OUT="$out/result.txt" CHAOSBOT_LEVEL="${CHAOSBOT_LEVEL:-9}"
 # a game of FRAMES frames at 60 a second, plus the client's boot, plus room for frames the runner falls behind on

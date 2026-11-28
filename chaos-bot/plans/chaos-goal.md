@@ -28,7 +28,7 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 | 1 HP | 10 | 29-30 | 238 | **8/8 -- done**; on run 323's bot 7/8 (run 326) |
 | No stop time | 10 | 31-32 | 239 | **8/8 -- done**; on run 323's bot **8/8** (run 327) |
 | BALL | 10 | 33-34 | 241 | **8/8 -- done**; on run 323's bot 7/8 (run 328) |
-| Line Clear (15:3-6) | stage's | 35-36 | 282 | **8/8 -- done**; on run 323's bot 5/8 (run 329); run 330 |
+| Line Clear (15:3-6) | stage's | 35-36 | 282 | **8/8 -- done**; on run 323's bot 5/8 (run 329); floor off there 5/8 (run 330); no workers: run 331 |
 | Queue limit (qlimit=1) | 10 | 37-38 | 283 | **8/8 -- done** |
 | training_random | 10 | 39-40 | 306 | **8/8 -- done** (garbage level/speed 8-11 a seed); on run 323's bot 5/8 (run 324); dive from 15 not with chaos garbage 4/8 (run 325) |
 | Challenge Mode (Impossible 11:5-8) | stage's | 41-42 | 307 | **8/8 -- done** |
@@ -210,6 +210,8 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 330 (11:42-11:46 ET), the flatness floor off with nobody across: Line Clear 5/8** -- kept. Run 331: no search workers in a Challenge
+  stage, to test the one difference left from run 282's bot.
 - **Run 329 (11:37-11:41 ET), Line Clear on run 323's bot: 5/8** (282's: 8/8). Run 330: the flatness floor never with nobody across.
 - **Run 328 (11:27-11:35 ET), BALL on run 323's bot: 7/8** (insane s34 at 20973). Run 329: Line Clear on it.
 - **Run 327 (11:18-11:26 ET), no stop time on run 323's bot: 8/8.** Run 328: BALL on it.

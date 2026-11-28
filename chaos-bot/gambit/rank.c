@@ -1216,7 +1216,11 @@ static int compareJudged(const Judge *x, const Judge *y) {
   // 1. NO CHANGING MINDS (the owner: efficiency, no mistakes, no changing minds): of two that survive alike -- both live, or lost alike --
   // the line in progress before the other, the hold too, where it breaks as much garbage: every swap pressed of a line put down is the input budget
   // spent for nothing, and only a break's time of life, or more garbage broken, is worth it
-  if (x->carried != y->carried && (lx || lostAlike(x, y))) {
+  // (run 215: above six colours, two counted living only by the credit are held to the quarter break here too, as 1b (run 214) --
+  // run 214 8 colours thicc s22 2985-3021: carries lost at 149, 131, 113 kept over lines lost at 222, 207, 189, lost at 3645; chain s22
+  // 18350 297 over 397)
+  int credOnlyNc = decQ.b->colors > 6 && !x->o.lives && !y->o.lives && (lostOf(x) > lostOf(y) ? lostOf(x) - lostOf(y) : lostOf(y) - lostOf(x)) >= rankSave / 4;
+  if (x->carried != y->carried && ((lx && !credOnlyNc) || lostAlike(x, y))) {
     const Judge *c = x->carried ? x : y, *o = x->carried ? y : x;
     // (and never over a board that outlives it: that is the break's time of life worth the switch)
     // (nor over a line that meets the mode's first entry where it does not, and breaks as much garbage: the same break made as the mode

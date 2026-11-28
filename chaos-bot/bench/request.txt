@@ -758,6 +758,10 @@
 #   rule 1b (the mode's goals) put the hold lost at 175, 162, 148 over entries lost at 267, 213, 240 -- both counted living by the credit
 #   (the finish's safe board), where 1b skips its loss test. Lost at 3444.
 # run 214 -- run 212's bot plus: above six colours, 1b holds two lines counted living only by the credit to the quarter break (rank.c). 8 colours s21-22
+# run 214 -- (result) survived 4/8, 122115 frames -- better (3/8), kept. Lost combo s21 5501, chain s22 18934, thicc s22 3645, insane s22
+#   7635. NO CHANGING MINDS (7 times) kept carries lost 40-100 frames sooner where both counted living by the credit (it skips lostAlike
+#   then): thicc s22 2985-3021 149/131/113 over 222/207/189; chain s22 18350 297 over 397.
+# run 215 -- above six colours, NO CHANGING MINDS holds credited-only pairs to the quarter break, as 1b (rank.c). 8 colours s21-22
 chain_garbage 21 9 9 1 21600 10 colors=8
 combo_storm 21 9 9 1 21600 10 colors=8
 thicc_combo_storm 21 9 9 1 21600 10 colors=8

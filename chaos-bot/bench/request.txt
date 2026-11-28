@@ -822,6 +822,10 @@
 # run 228 -- THE HELD-OUT CHECK (the owner: generic, not tuned to the seeds): 8 colours at Level 10 on seeds 51-52, never played, run 227's
 #   bot unchanged. First run with the runner skip by model (8573C, 7763, 9V74 skipped; the fourth try plays on whatever it draws).
 #   8 colours held-out s51-52
+# run 228 -- (result) HELD-OUT: survived 6/8, 131973 frames -- below 7/8. Two early losses: combo s51 1407; thicc s52 966 -- set-ups and zips
+#   raised the stack to 54 panels before the first block (688), every line dying from 536. 7 of 8 games on Xeon 6975P, 1 on EPYC 9V45.
+# run 229 -- run 227's bot plus: the run-160 high-opening rule back, bounded -- only on a stack of 48+ panels, never past 36 left (rank.c).
+#   Fixed as a loss like any other; played on the held-out seeds where it was lost, then 21-22 again before 7 colours. 8 colours s51-52
 chain_garbage 51 9 9 1 21600 10 colors=8
 combo_storm 51 9 9 1 21600 10 colors=8
 thicc_combo_storm 51 9 9 1 21600 10 colors=8

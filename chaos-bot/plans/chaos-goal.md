@@ -24,7 +24,7 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 
 | Mode | Level | Seeds | Run | Result |
 |---|---|---|---|---|
-| 8 colours | 10 | 21-22 | 227 | **7/8** -- held-out check on 51-52 (run 228) |
+| 8 colours | 10 | 21-22 | 227 | **7/8**; held-out 51-52: 6/8 (run 228), being fixed (run 229) |
 | 7 colours | 10 | 23-24 | - | to redo (old: 7/8 on seeds 7-8, run 190 -- does not count) |
 | Chaos margin 4 | 10 | 25-26 | - | to redo (old: 7/8 on 7-8, run 191) |
 | Chaos mode | 10 | 27-28 | - | to redo (old: 8/8 on 7-8, run 192) |
@@ -210,6 +210,9 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 228 (2026-11-27 21:36 ET), HELD-OUT 8 colours seeds 51-52, run 227's bot: 6/8** -- below 7/8. thicc s52 lost at 966: the stack
+  raised to 54 panels before the first block. Run 229: the run-160 high-opening rule back, bounded (48+ panels, never past 36), on 51-52;
+  then 21-22 again before 7 colours.
 - **Run 227 (2026-11-27 21:19 ET), run 218 + the canyon rule letting a dig through at a quarter break: 7/8, 167677 frames -- 8 COLOURS
   AT 7/8 ON ITS OWN SEEDS.** Lost only insane s21 at 16477. Run 228: the held-out check, 8 colours on seeds 51-52 with this bot unchanged.
 - **RUNNER SKIP BY MODEL -- the owner's rule, 21:30 ET, for every workflow that plays games (here: chaos-bot-games.yml; chaos-bot-checks.yml

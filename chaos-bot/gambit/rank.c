@@ -1063,8 +1063,12 @@ static int compareJudged(const Judge *x, const Judge *y) {
   // (run 204: OFF -- built on seed 8's opening (runs 151, 159); on 8 colours' own seeds 21-22 it spends the stack before the first garbage:
   // run 201 thicc s21 a 4-, 5- and 6-chain put first by it (427-618), the garbage met with 14 panels, lost at 2827; run 203 with a 30-panel
   // floor still met it with 20, 4/8)
-  if (0 && chaosOpenHigh && x->o.lives && y->o.lives && x->apBroke <= 0 && y->apBroke <= 0 &&
-      x->o.j.clearedPanels != y->o.j.clearedPanels)
+  // (run 229: back, bounded on both sides -- only on a stack of 48 panels or more (eight rows), and never past 36 left: run 228 8 colours
+  // held-out thicc s52, set-ups and zips raised the stack to 54 panels before the first block (688), lost at 966; run 201 thicc s21, the
+  // rule unbounded spent it to 14, lost at 2827)
+  if (chaosOpenHigh && panelsOn(decQ.b) >= 48 && x->o.lives && y->o.lives && x->apBroke <= 0 && y->apBroke <= 0 &&
+      x->o.j.clearedPanels != y->o.j.clearedPanels &&
+      panelsOn(decQ.b) - imax(x->o.j.clearedPanels, y->o.j.clearedPanels) >= 36)
     return (cmpKey = __LINE__, (x->o.j.clearedPanels > y->o.j.clearedPanels ? -1 : 1));
   // THE LAST CHANCE: the hold lost inside a break's time, beside a line lost no sooner whose next moves promise a break's time more (the
   // readiness break, the survival search after it): the line first -- holding is the loss for certain. Only against the hold: the

@@ -1208,11 +1208,15 @@
 # run 317 -- (result, 09:46-09:53 ET) margin 4 on run 306's bot: survived 7/8 (run 313's: 6/8). Lost insane s25 at 1529 (early).
 # run 318 -- run 313's bot (d0481f8) with its three 8-colour rules -- the flatness floor (run 310), the opening cap (311), the READY fix (313)
 #   -- above six colours only (rank.c, decide.c). margin 4 s25-26
-chain_garbage 25 9 9 1 21600 10 margin=4
-combo_storm 25 9 9 1 21600 10 margin=4
-thicc_combo_storm 25 9 9 1 21600 10 margin=4
-insane_combo_storm 25 9 9 1 21600 10 margin=4
-chain_garbage 26 9 9 1 21600 10 margin=4
-combo_storm 26 9 9 1 21600 10 margin=4
-thicc_combo_storm 26 9 9 1 21600 10 margin=4
-insane_combo_storm 26 9 9 1 21600 10 margin=4
+# run 318 -- (result, 09:55-10:03 ET) runs 310-313's rules above six colours only: margin 4 survived 5/8. At six colours this bot plays as run
+#   306's does (the three rules gated off), and run 306's bot had 7/8 on the same games in run 317: the same play at six colours, 7/8 then
+#   5/8 -- the runners' timing moves a game or two. Kept as the bot of the second pass: run 306's play at six colours, run 313's above.
+# run 319 -- the second pass's standings on run 318's bot (ff9bc66), unchanged: chaos mode, done 8/8 (run 237), seeds 27-28. chaos mode s27-28
+chain_garbage 27 9 9 1 21600 10 chaosmode=1
+combo_storm 27 9 9 1 21600 10 chaosmode=1
+thicc_combo_storm 27 9 9 1 21600 10 chaosmode=1
+insane_combo_storm 27 9 9 1 21600 10 chaosmode=1
+chain_garbage 28 9 9 1 21600 10 chaosmode=1
+combo_storm 28 9 9 1 21600 10 chaosmode=1
+thicc_combo_storm 28 9 9 1 21600 10 chaosmode=1
+insane_combo_storm 28 9 9 1 21600 10 chaosmode=1

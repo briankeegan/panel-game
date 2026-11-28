@@ -1094,9 +1094,7 @@ static int compareJudged(const Judge *x, const Judge *y) {
   // unless the other lives a break's time (rankSave, read off the level) longer. Garbage broken is panels made and the backlog shrunk;
   // a life bought with stop time spends the panels the next break needs -- run 16 insane_combo_storm s1: 15-24 pieces queued for 1,700
   // frames, panels 40 to 7 on survive lines breaking nothing, then the top-out)
-  // (run 299: a backlog -- four or more waiting, not one: with a piece or two queued the later loss stands; run 297 training_random s40
-  // level 9 lost at 1224, the rule putting a break lost 93 frames sooner first at 1173 with one waiting (run 286 1499, 291 2909 alike early))
-  if (decF.under && decQ.b->ninc >= 4 && !x->o.lives && !y->o.lives) {
+  if (decF.under && decQ.b->ninc > 0 && !x->o.lives && !y->o.lives) {
     int32_t bx = imax(0, x->apBroke) / W, by = imax(0, y->apBroke) / W;
     if (bx != by) {
       const Judge *dig = bx > by ? x : y, *other = dig == x ? y : x;
@@ -1187,37 +1185,11 @@ static int compareJudged(const Judge *x, const Judge *y) {
           lostAtOf(o->o.lostAt, o->hold) - lostAtOf(c->o.lostAt, c->hold) >= rankSave / 4))
       return (cmpKey = __LINE__, (x->carried ? -1 : 1));
   }
-  // 1. THE FLATNESS FLOOR (vanilla GameCreator 8de2105d76/dbc07addca/7882e43c6a/1b522c7753, ported run 303, on again run 310 at 8 colours; the owner: it prefers not
-  // dying, and flatness -- both floors): of two that do not live, the one that leaves the stack towered -- its tallest panel column TOWER_ROWS
-  // or more over its lowest (judge.c panelEvenOf, pEven) -- goes after one that leaves it under, and of two towered, the one TOWER_STEP rows
-  // taller after -- only where the flatter is lost alike or no sooner, its board stands a break's time, it breaks no less garbage (or the
-  // other none) and walks no more than WALK_EARN actions (or is the hold). Where either leaves a tower TOWER_HIGH rows or more with garbage on
-  // the board or on its way, the flatter goes first by a row, lost sooner or not: a tall column is where garbage rests out of every break's
-  // reach, and where the top row fills and nothing queued drops (runs 284-302 training_random: the queue's fiftieth under garbage)
-  #define TOWER_ROWS 4
-  #define TOWER_STEP 2
-  #define TOWER_HIGH 6
-  // (run 318: above six colours only -- added at 8 colours (run 310); margin 4, 6 colours, went 8/8 to 6/8 on the bot with it, 7/8 without)
-  if (decQ.b->colors > 6 && !lx && !ly && x->o.j.pEven >= 0 && y->o.j.pEven >= 0) {
-    int tx = x->o.j.pEven, ty = y->o.j.pEven;
-    int tall = imax(tx, ty) >= TOWER_HIGH && (decF.under || garbageComing());
-    int differ = (tx >= TOWER_ROWS) != (ty >= TOWER_ROWS) || (tx >= TOWER_ROWS && ty >= TOWER_ROWS && iabs(tx - ty) >= (tall ? 1 : TOWER_STEP));
-    if (differ) {
-      const Judge *f = tx < ty ? x : y, *t = tx < ty ? y : x;
-      if (!f->o.dead && diesAt(f) >= rankSave && diesAt(f) < 1e299 && (tall || lostAlike(f, t) || lostOf(f) >= lostOf(t)) &&
-          (imax(0, f->apBroke) >= imax(0, t->apBroke) || !(t->apBroke > 0)) && (f->hold || lineWalk(f) <= WALK_EARN))
-        return (cmpKey = __LINE__, (f == x ? -1 : 1));
-    }
-  }
   // 1. READY WHEN IT LANDS (the owner: just be ready -- the stack raised, the garbage on its way): with garbage on its way and none on the
   // board, of two that live or are lost alike, the one that leaves a break ready once everything lands (judge.c breaksAfterLanding, the
   // window counted) goes first: the break is in place when the block arrives, not walked to after it
-  // (run 313: and of two that do not live, only where the ready one is lost no sooner -- alike within a break is not alike enough before the
-  // first block lands: run 312 8 colours thicc s22 at 580 put a ready line lost at 143 over the line in progress lost at 192, a survive at
-  // 409 behind them, lost at 1262)
   if (lx == ly && !decF.under && garbageComing() && (lx || lostAlike(x, y)) && x->readyNext != NOT_ASKED && y->readyNext != NOT_ASKED &&
-      (x->readyNext == 1) != (y->readyNext == 1) &&
-      (lx || decQ.b->colors <= 6 || lostOf(x->readyNext == 1 ? x : y) >= lostOf(x->readyNext == 1 ? y : x)))   // (run 318: the run-313 test above six colours only)
+      (x->readyNext == 1) != (y->readyNext == 1))
     return (cmpKey = __LINE__, (x->readyNext == 1 ? -1 : 1));
   // 1. NOTHING AMID THE GARBAGE (amidGarbage): under garbage, of two that do not live, a line that swaps among the slabs and breaks nothing
   // after one that does not -- unless it keeps the board a break's time (rankSave) longer

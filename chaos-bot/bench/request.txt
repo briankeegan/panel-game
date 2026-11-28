@@ -1212,6 +1212,10 @@
 #   306's does (the three rules gated off), and run 306's bot had 7/8 on the same games in run 317: the same play at six colours, 7/8 then
 #   5/8 -- the runners' timing moves a game or two. Kept as the bot of the second pass: run 306's play at six colours, run 313's above.
 # run 319 -- the second pass's standings on run 318's bot (ff9bc66), unchanged: chaos mode, done 8/8 (run 237), seeds 27-28. chaos mode s27-28
+# run 319 -- (result, 10:04-10:12 ET) chaos mode on run 318's bot: survived 4/8 (run 237's bot: 8/8). Lost chain s27 3899 and thicc s28 2016
+#   (early, starved), chain s28 17704, combo s28 9220.
+# run 320 -- chaos mode on run 282's bot (43a7572, restored by hash: run 241's rules and the Line Clear work, before the two search workers,
+#   the dig at four waiting and the break-search dive of runs 295-306) -- to find the change that costs chaos mode. chaos mode s27-28
 chain_garbage 27 9 9 1 21600 10 chaosmode=1
 combo_storm 27 9 9 1 21600 10 chaosmode=1
 thicc_combo_storm 27 9 9 1 21600 10 chaosmode=1

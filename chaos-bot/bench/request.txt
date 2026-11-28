@@ -910,6 +910,10 @@
 #   minute) -- OFF, decide.c back to run 241's.
 # run 250 -- run 241's bot + time attack's lineclear.words, plus: above six colours a design is built after half the search (TA_DESIGN_MS/2;
 #   the board is left alone while it is searched) (decide.c). Line Clear 15:3-6 s35-36
+# run 250 -- (result, 00:49-00:54 ET) half the design search above six colours: won 4/8 -- OFF, decide.c back to run 241's. The game
+#   logs: the design never built (ta= on 0 every decision) in 15:5 nor 15:3; at 7 colours 190 of 312 decisions never searched one.
+# run 251 -- run 241's bot + time attack's lineclear.words, plus: above six colours the design is searched from 4 full rows, not 6
+#   (decide.c TA_FULL). Line Clear 15:3-6 s35-36
 challenge 35 9 9 1 21600 10 challenge=15:3 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:4 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:5 profile=lineclear

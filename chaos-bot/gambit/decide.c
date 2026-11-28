@@ -2214,7 +2214,9 @@ static Played playOf(const Read *R, int n) {
     int nfull = 0; for (int r = 1; r <= G.rows; r++) nfull += cbFull(&G, r);
     // (flattened and raised first -- the owner's order: a design is searched only on a board with TA_FULL full rows; till then the board
     // is played as any is, levelled and raised)
-    if (!taOn && nfull < TA_FULL) { if (taHave) { taReset(); taLog = -4; } }
+    // (run 251: above six colours from 4 full rows, not 6 -- run 250 Line Clear 15:5 (7 colours): the design never built in 312 decisions,
+    // 190 of them never searched, the chains only those taken on as they fell; 23-28 rows a minute where 26-32 were asked)
+    if (!taOn && nfull < (decQ.b->colors > 6 ? 4 : TA_FULL)) { if (taHave) { taReset(); taLog = -4; } }
     else if (!taOn) {
       double left = C2.due ? C2.due - C2.margin - nowMs() : 100, ms = left * 0.7; if (ms < 2) ms = 2;
       readyStop();
@@ -2226,9 +2228,7 @@ static Played playOf(const Read *R, int n) {
       int32_t v = cbDesignAll(&G, taHave ? &taD : 0, ms, &D, &tr, &links, &sw);
       taMs += ms;
       if (tr && v > 0 && (!taHave || v >= taVal)) { taD = D; taTr = tr; taLinks = links; taSwaps = sw; taVal = v; taHave = 1; }
-      // (run 250: above six colours half the search before the design is built -- the board is left alone while it is searched, and at seven
-      // colours a long design is rarely there to find: run 249 and 245 Line Clear 15:5-6, 20-31 rows a minute where 26-32 were asked)
-      if (taHave && (taLinks >= TA_LINKS || taMs >= (decQ.b->colors > 6 ? TA_DESIGN_MS / 2 : TA_DESIGN_MS) || panelTop(decQ.b) >= TA_TOP)) taOn = 1;
+      if (taHave && (taLinks >= TA_LINKS || taMs >= TA_DESIGN_MS || panelTop(decQ.b) >= TA_TOP)) taOn = 1;
       // (and while it is searched, the board is left as it is -- a swap played meanwhile changes the rows the design is of -- unless it
       // is dying or raised: a raise only lifts the rows)
       else if (taHave && !R->taDying && !R->up && taHoldNoSooner(P.line, n)) decWhy = __LINE__, P.line = 0;

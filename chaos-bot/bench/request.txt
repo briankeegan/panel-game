@@ -1241,11 +1241,13 @@
 # run 327 -- the standings on run 323's bot, unchanged: no stop time (mode=3), done 8/8 (run 239), seeds 31-32. NST s31-32
 # run 327 -- (result, 11:18-11:26 ET) no stop time on run 323's bot: survived 8/8 -- holds.
 # run 328 -- the standings on run 323's bot, unchanged: BALL (mode=4), done 8/8 (run 241), seeds 33-34. BALL s33-34
-chain_garbage 33 9 9 1 21600 10 mode=4
-combo_storm 33 9 9 1 21600 10 mode=4
-thicc_combo_storm 33 9 9 1 21600 10 mode=4
-insane_combo_storm 33 9 9 1 21600 10 mode=4
-chain_garbage 34 9 9 1 21600 10 mode=4
-combo_storm 34 9 9 1 21600 10 mode=4
-thicc_combo_storm 34 9 9 1 21600 10 mode=4
-insane_combo_storm 34 9 9 1 21600 10 mode=4
+# run 328 -- (result, 11:27-11:35 ET) BALL on run 323's bot: survived 7/8 (run 241's: 8/8). Lost insane s34 at 20973 (no-line).
+# run 329 -- the standings on run 323's bot, unchanged: Line Clear 15:3-6, done 8/8 (run 282), seeds 35-36. Line Clear 15:3-6 s35-36
+challenge 35 9 9 1 21600 10 challenge=15:3 profile=lineclear
+challenge 35 9 9 1 21600 10 challenge=15:4 profile=lineclear
+challenge 35 9 9 1 21600 10 challenge=15:5 profile=lineclear
+challenge 35 9 9 1 21600 10 challenge=15:6 profile=lineclear
+challenge 36 9 9 1 21600 10 challenge=15:3 profile=lineclear
+challenge 36 9 9 1 21600 10 challenge=15:4 profile=lineclear
+challenge 36 9 9 1 21600 10 challenge=15:5 profile=lineclear
+challenge 36 9 9 1 21600 10 challenge=15:6 profile=lineclear

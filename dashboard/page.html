@@ -594,6 +594,39 @@ html.set-chaos .gs h1 { color: var(--set-accent); }
 #gw-s1.gw-st { min-height: 112px; }
 #gw-s2.gw-st { min-height: 72px; }
 .gw-plainr { min-height: 62px; }
+/* HOW RANMARU DECIDES (#sec-brain): a two-question tree, the decision loop, the move ladder; terms explained on hover/tap */
+html.set-chaos #sec-brain, html.set-chaos .gs-nav a[href="#sec-brain"] { display: none; }
+#sec-brain h3 { font-size: var(--cds-font-size-body); font-weight: 600; margin: 18px 0 8px; }
+#sec-brain h3:first-of-type { margin-top: 6px; }
+.dt { display: flex; flex-direction: column; gap: 4px; }
+.dt-row { display: grid; grid-template-columns: minmax(0, 1fr) 3.2rem minmax(0, 1.3fr); gap: 12px; align-items: center; }
+.dt-q { padding: 10px 14px; border: 1px dashed var(--color-border-line); border-radius: 10px; font-weight: 500; }
+.dt-q.dt-else { border-style: solid; border-color: transparent; color: var(--color-fg-muted); font-weight: 400; }
+.dt-a { color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); white-space: nowrap; text-align: center; }
+.dt-down { color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); padding-left: 18px; }
+.dt-m { padding: 10px 14px; border-radius: 10px; background: var(--color-bg); border: 1px solid var(--color-border-line); border-left: 4px solid var(--dt-c, var(--color-fg)); }
+.dt-m b { display: block; letter-spacing: .04em; font-size: .82rem; }
+.dt-m span { color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); }
+.dt-open { --dt-c: #3b82f6; } .dt-fill { --dt-c: #e3a936; } .dt-fin { --dt-c: #ef6a66; }
+.dt-over { margin-top: 10px; padding: 10px 14px; border-radius: 10px; background: color-mix(in srgb, var(--color-bad) 9%, transparent); border: 1px solid color-mix(in srgb, var(--color-bad) 35%, transparent); font-size: var(--cds-font-size-caption); }
+.dt-arc { margin-top: 8px; color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); }
+.dl-steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9.5rem), 1fr)); gap: 8px; counter-reset: dl; }
+.dl-steps li { counter-increment: dl; padding: 10px 12px; border: 1px solid var(--color-border-line); border-radius: 10px; background: var(--color-bg); font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+.dl-steps li::before { content: counter(dl); display: inline-grid; place-items: center; width: 1.4em; height: 1.4em; border-radius: 50%; background: var(--color-fg); color: var(--color-bg); font-size: .75rem; margin-right: 6px; }
+.dl-steps li b { color: var(--color-fg); }
+.dr { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.dr li { display: grid; grid-template-columns: 2rem minmax(0, 1fr); gap: 10px; align-items: baseline; padding: 8px 12px; border-radius: 8px; background: var(--color-bg); border: 1px solid var(--color-border-line); font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+.dr li b { color: var(--color-fg); }
+.dr .dr-n { font-family: var(--font-serif); font-size: 1.15rem; color: var(--color-fg); text-align: center; }
+.dr .dr-top { border-color: var(--color-ok); }
+.dt-t { text-decoration: underline dotted; text-underline-offset: 3px; cursor: help; color: inherit; font: inherit; background: none; border: 0; padding: 0; }
+.dt-t:focus-visible { outline: 2px solid var(--color-fg); outline-offset: 1px; border-radius: 2px; }
+#dt-tip { position: fixed; z-index: 80; max-width: min(300px, calc(100vw - 32px)); padding: 9px 12px; border-radius: 8px; background: var(--color-fg); color: var(--color-bg); font-size: .82rem; line-height: 1.4; pointer-events: none; box-shadow: 0 6px 20px rgba(0,0,0,.25); }
+#dt-tip[hidden] { display: none; }
+@media (max-width: 640px) {
+  .dt-row { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .dt-a { text-align: left; padding-left: 18px; }
+}
 </style>
 
 <div class="gs" id="gs">
@@ -633,7 +666,7 @@ html.set-chaos .gs h1 { color: var(--set-accent); }
     <div class="gs-kpi"><div class="gs-kl">Longest game</div><div class="gs-kv" id="k-lg" data-source="games">—</div><div class="gs-kn" id="k-lg-n"></div></div>
   </section>
 
-  <nav class="gs-nav" aria-label="Sections"><a href="#sec-form">Recent</a><a href="#sec-watch">Watch a game</a><a href="#sec-garbage">Garbage sent</a><a href="#sec-opp">Opponents</a><a href="#sec-table">Versions</a><a href="#sec-len">Game length</a><button type="button" class="gs-link" id="copy-link" title="Copy a link that opens this exact view">Copy link to this view</button></nav>
+  <nav class="gs-nav" aria-label="Sections"><a href="#sec-form">Recent</a><a href="#sec-watch">Watch a game</a><a href="#sec-garbage">Garbage sent</a><a href="#sec-opp">Opponents</a><a href="#sec-table">Versions</a><a href="#sec-len">Game length</a><a href="#sec-brain">How it decides</a><button type="button" class="gs-link" id="copy-link" title="Copy a link that opens this exact view">Copy link to this view</button></nav>
 
 
   
@@ -748,6 +781,78 @@ html.set-chaos .gs h1 { color: var(--set-accent); }
       <span class="gs-count" id="c-loss"></span></div>
     <div class="gs-scroll tall" data-source="games versions"><table class="gs-tbl" id="t-loss"></table></div>
   </section>
+
+  <section class="gs-card" id="sec-brain">
+    <h2>How Ranmaru decides</h2>
+    <p class="gs-note">Ranmaru plays like a person at the controls: it sees only what you see and presses one key at a time. Underlined words explain themselves on hover or tap.</p>
+
+    <h3>1 · Which mode it plays</h3>
+    <div class="dt">
+      <div class="dt-row">
+      <div class="dt-q">First 10 seconds, and no garbage has reached the board yet?</div>
+      <div class="dt-a">yes →</div>
+      <div class="dt-m dt-open"><b>OPENER</b><span>Build one big <button type="button" class="dt-t" data-tip="Matches that set off more matches as panels fall. Each link after the first sends a full-width row of garbage.">chain</button>: an 8-chain, or a 6, or a 4, fired before the first garbage lands.</span></div>
+      </div>
+      <div class="dt-down">no ↓</div>
+      <div class="dt-row">
+      <div class="dt-q">Is the opponent's stack 11 or more rows high?</div>
+      <div class="dt-a">yes →</div>
+      <div class="dt-m dt-fin"><b>FINISH THEM</b><span>Fire a <button type="button" class="dt-t" data-tip="Four or more panels cleared in one match. The garbage lands quickly, so a nearly-full opponent has no time to dig out.">combo</button> of 8, else 9, 10, 5, 6 or 4 panels. They're one row from losing; the combo ends it.</span></div>
+      </div>
+      <div class="dt-down">no ↓</div>
+      <div class="dt-row">
+      <div class="dt-q dt-else">Otherwise (opponent under 11 rows)</div>
+      <div class="dt-a">→</div>
+      <div class="dt-m dt-fill"><b>FILL</b><span>Build the longest chain whose garbage fits the opponent's <button type="button" class="dt-t" data-tip="Free rows above their stack when the garbage lands. Ranmaru counts the rows they'll rise while its chain is still being made and while the garbage is in the air.">free rows</button>, leaving them exactly one row.</span></div>
+      </div>
+    </div>
+    <p class="dt-arc">So a typical game runs <b>Opener → Fill → Finish them</b>. It checks again every decision, and a new mode has to hold for one second before it switches.</p>
+    <div class="dt-over"><b>Garbage on Ranmaru's own board overrides all of this:</b> every mode puts <button type="button" class="dt-t" data-tip="Clearing panels touching a garbage slab turns its bottom row back into panels. Any plain match of three that touches it counts.">breaking it</button> first, and its attacks come after.</div>
+
+    <h3>2 · Each decision, about four times a second</h3>
+    <ol class="dl-steps">
+      <li><b>Read</b> its board, the opponent's height and the <button type="button" class="dt-t" data-tip="The garbage the opponent has already sent, shown before it lands. Ranmaru can't see an attack that hasn't been sent yet.">telegraph</button>.</li>
+      <li><b>Propose</b> short swap sequences: break, attack, carry on, set up, level, survive, or hold.</li>
+      <li><b>Play each one out</b> on a copy of the game's own engine, garbage landing on time, up to its <button type="button" class="dt-t" data-tip="How far ahead it looks: about 7 steps deep and 40 lines wide per decision. Garbage landing beyond that is seen late.">horizon</button>.</li>
+      <li><b>Cut</b> lines it may not play: undoing the last swap, leaving fewer than 40 panels (the <button type="button" class="dt-t" data-tip="The panels it keeps on the board, at least 40. Breaks are made from panels, so a bare board can't defend itself.">floor</button>), or attacks that land too late.</li>
+      <li><b>Rank</b> what's left (below).</li>
+      <li><b>Press</b> the winner's keys within its <button type="button" class="dt-t" data-tip="At most 76 actions every 10 seconds. Every cursor step and every swap costs one, and it waits 12 frames to react and 12 between swaps, like a person.">action budget</button>.</li>
+    </ol>
+
+    <h3>3 · Which move wins</h3>
+    <ol class="dr">
+      <li class="dr-top"><span class="dr-n">0</span><span><b>A move that keeps it alive beats one that doesn't.</b> If every move loses, it takes the one that loses latest.</span></li>
+      <li><span class="dr-n">1</span><span><b>Breaks garbage</b>, the faster the better.</span></li>
+      <li><span class="dr-n">2</span><span><b>Makes the mode's aim</b>, earlier in its list first (an 8-combo beats a 9 in Finish them).</span></li>
+      <li><span class="dr-n">3</span><span><b>Any other attack</b>: the one that sends the most garbage.</span></li>
+      <li><span class="dr-n">4</span><span><b>Sets up</b> a later attack or break without clearing anything.</span></li>
+      <li><span class="dr-n">5</span><span><b>A plain clear</b> that does nothing else.</span></li>
+    </ol>
+    <p class="gs-note" style="margin-top:8px">It never makes a chain longer than 13, and it raises the stack itself to keep enough panels to work with.</p>
+  </section>
+  <div id="dt-tip" role="tooltip" hidden></div>
+  <script>
+  (function () {
+    var tip = document.getElementById('dt-tip'), cur = null;
+    function show(el) {
+      cur = el; tip.textContent = el.getAttribute('data-tip'); tip.hidden = false;
+      var r = el.getBoundingClientRect(), w = tip.offsetWidth, h = tip.offsetHeight;
+      var x = Math.max(16, Math.min(window.innerWidth - w - 16, r.left + r.width / 2 - w / 2));
+      var y = r.top - h - 8; if (y < 8) y = r.bottom + 8;
+      tip.style.left = x + 'px'; tip.style.top = y + 'px';
+    }
+    function hide() { cur = null; tip.hidden = true; }
+    document.querySelectorAll('#sec-brain .dt-t').forEach(function (el) {
+      el.addEventListener('mouseenter', function () { show(el); });
+      el.addEventListener('mouseleave', hide);
+      el.addEventListener('focus', function () { show(el); });
+      el.addEventListener('blur', hide);
+      el.addEventListener('click', function (e) { e.stopPropagation(); cur === el ? hide() : show(el); });
+    });
+    document.addEventListener('click', hide);
+    window.addEventListener('scroll', hide, { passive: true });
+  })();
+  </script>
 
   <details>
     <summary>Definitions and what this leaves out</summary>

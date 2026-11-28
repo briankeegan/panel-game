@@ -1202,6 +1202,9 @@
 #   chain s24 8745.
 # run 316 -- the second pass's standings on run 313's bot (d0481f8), unchanged: chaos margin 4, done 8/8 (run 236), seeds 25-26.
 #   margin 4 s25-26
+# run 316 -- (result, 09:36-09:44 ET) margin 4 on run 313's bot: survived 6/8 (run 236's bot: 8/8). Lost thicc s25 20852, insane s25 11515.
+# run 317 -- margin 4 on run 306's bot (88a8486, restored by hash: before the flatness floor, the opening cap and the READY fix of runs
+#   310-313) -- to tell whether those three, added for 8 colours, cost the 6-colour modes. margin 4 s25-26
 chain_garbage 25 9 9 1 21600 10 margin=4
 combo_storm 25 9 9 1 21600 10 margin=4
 thicc_combo_storm 25 9 9 1 21600 10 margin=4

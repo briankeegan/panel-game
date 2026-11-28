@@ -22,7 +22,7 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 | Mode | Level | Seeds | Run | Result |
 |---|---|---|---|---|
 | 8 colours | 10 | 21-22 | 227 | **7/8 -- done** |
-| 7 colours | 10 | 23-24 | 230 | 3/8, being fixed (run 231) |
+| 7 colours | 10 | 23-24 | 231 | 5/8, being fixed (run 232) |
 | Chaos margin 4 | 10 | 25-26 | - | to redo (old: 7/8 on 7-8, run 191) |
 | Chaos mode | 10 | 27-28 | - | to redo (old: 8/8 on 7-8, run 192) |
 | 1 HP | 10 | 29-30 | - | to redo (old: 8/8 on 7-8, run 193) |
@@ -207,6 +207,8 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 231 (restarted 22:17:29, done 22:25 ET; per-game retries), the line in progress outlived gives up the top: 7 colours 5/8** -- kept.
+  combo s24: the carry waited on six times under a backlog. Run 232: pressed now before waited, above six colours under garbage.
 - **Run 230 (2026-11-27 22:02 ET), 7 COLOURS on seeds 23-24, run 227's bot: 3/8.** combo s24: the line in progress kept on top over an entry
   lost 73-82 frames later. Run 231: the line in progress outlived by a third of a break gives up the top.
 - **Run 228 (2026-11-27 21:36 ET), HELD-OUT 8 colours seeds 51-52, run 227's bot: 6/8** -- below 7/8. thicc s52 lost at 966: the stack

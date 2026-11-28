@@ -836,6 +836,11 @@
 #   much whose own board is lost a third of a break later (rank.c, after outlivingFirst). 7 colours s23-24
 # run 231 -- cancelled by me at the owner's word (22:13 ET: "stop it all and start again"): its retries waited on whole rounds. Restarted as
 #   run 231 again -- the same bot (78ea092), the same 8 games -- on the per-game retry chains (a skipped runner's next try starts at once).
+# run 231 -- (result, restarted 22:17:29 ET, done 22:25) 7 colours: survived 5/8, 135830 frames -- better (3/8), kept. All 8 on Xeon 6975P.
+#   Lost chain s24 1442, combo s24 7340 (panels to 5), thicc s24 19048. combo s24 6776-7008: the line in progress waited on (carry_wait)
+#   put first six times by the next break's material (6), garbage resting and queued, the board run from 395 frames to 196.
+# run 232 -- run 231's bot plus: above six colours, garbage resting and more queued, the line pressed now before the same line waited on
+#   (rank.c, before rule 6). 7 colours s23-24
 chain_garbage 23 9 9 1 21600 10 colors=7
 combo_storm 23 9 9 1 21600 10 colors=7
 thicc_combo_storm 23 9 9 1 21600 10 colors=7

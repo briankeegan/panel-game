@@ -1785,6 +1785,13 @@ static int compareJudged(const Judge *x, const Judge *y) {
   // walks much less is played (the owner: no big corner-to-corner moves; the far idea is still there next decision, nearer)
   if (lx && x->met >= 0 && y->met >= 0 && !x->hold && !y->hold) { int wx = lineWalk(x), wy = lineWalk(y); if (iabs(wx - wy) > WALK_EARN) return (cmpKey = __LINE__, (wx - wy)); }
   if (lx) { int ax = x->met >= 0 ? x->met : MAXAIMS, ay = y->met >= 0 ? y->met : MAXAIMS; if (ax != ay) return (cmpKey = __LINE__, (ax - ay)); }
+  // (run 232, ABOVE SIX COLOURS, NO WAITING UNDER A BACKLOG: garbage on the board and more queued, of the line in progress pressed now and
+  // the same line waited on, the one pressed now -- every frame waited is the next block's. Run 231 7 colours combo s24 6776-7008: the wait
+  // put first six times by the next break's material (6), the board run from 395 frames to 196 without the break pressed, lost at 7340)
+  if (decQ.b->colors > 6 && decF.under && decQ.b->ninc > 0 && !x->hold && !y->hold && x->apBroke > 0 && y->apBroke > 0 &&
+      ((x->k.play == PLAY_CARRYWAIT && y->k.play == PLAY_CARRY) || (x->k.play == PLAY_CARRY && y->k.play == PLAY_CARRYWAIT)) &&
+      lostAlike(x, y))
+    return (cmpKey = __LINE__, (x->k.play == PLAY_CARRYWAIT ? 1 : -1));
   // 6. THE NEXT BREAK'S MATERIAL: of two breaks under garbage, the one that leaves a break to build (outcome.c nextBuild) and keeps the
   // board's floor -- before the list's entry: the list orders the breaks the board can afford
   if (x->material >= 0 && y->material >= 0 && x->material != y->material) return (cmpKey = __LINE__, (x->material - y->material));

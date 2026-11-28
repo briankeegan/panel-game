@@ -2228,6 +2228,17 @@ static Played playOf(const Read *R, int n) {
         else taLog = -20 - lastDrop;
       }
     }
+    // (run 282: THE LINE BEGUN KEPT -- a new answer takes the place of the line the frame loop is pressing (front.c), so a line whose
+    // deciding swap is due after the next decision is planned again and again and never pressed: run 281's 15:6 s35 played the chain going
+    // five decisions running at 1981-2093 and 391-475, each time a 2-chain foreseen in 1-3 swaps and none made. So the line in progress
+    // (carried) that makes the chain at least as long, and lives as long, is played on in the new line's place)
+    if (taLog == 3 && P.line) {
+      const Judge *NL = P.line;
+      for (int i = 0; i < n; i++) { const Judge *J = order[i];
+        if (!J->carried || J == NL || J->o.dead || J->o.j.made.chain < NL->o.j.made.chain || J->o.j.made.chain <= 0) continue;
+        if (!(J->o.lives || diesAt(J) >= diesAt(NL))) continue;
+        decWhy = __LINE__, P.line = J; taLog = 4; break; }
+    }
     clockDue = keepDue; clockShare = keepShare;
   }
   else if (ruleNoEnemy && !R->under && !R->topped && clockFrameOut && !clockFrameOut() && !cascadeLive(decQ.b) && !R->pop) {

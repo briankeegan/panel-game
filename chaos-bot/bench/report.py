@@ -59,8 +59,12 @@ def chain_stats(path):
     log/links/swaps/ms/on: the design's state): how often a next link was found, the time given it, and the design's log codes"""
     if not os.path.exists(path):
         return None
-    asked = found = 0; ms = 0; gain = 0; zero = 0; ta = {}; built = []; last = None; eps = []; cur = 0; peps = []; pmax = 0
+    asked = found = 0; ms = 0; gain = 0; zero = 0; ta = {}; built = []; last = None; eps = []; cur = 0; peps = []; pmax = 0; ends = {}
     for line in open(path, errors="replace"):
+        if line.startswith("GAMBITE "):
+            f = line.split()
+            if len(f) >= 4: ends[f[2]] = ends.get(f[2], 0) + 1
+            continue
         if not line.startswith("GAMBITD "):
             continue
         d = _kv(line)
@@ -90,10 +94,10 @@ def chain_stats(path):
     short = sum(max(0, p - e) for e, p in zip(eps, peps) if e >= 2)
     eps = [e for e in eps if e >= 2]
     hist = " ".join("%d:%d" % (k, sum(1 for e in eps if e == k)) for k in sorted(set(eps)))
-    return "chain going asked %d found %d (%d%%) links +%.1f when found, ms avg %.0f, ms<=5 %d | designs fired %d, links avg %.1f swaps avg %.1f | chains %d (sum of links-1 %d, links foreseen and not made %d) by length %s | ta log %s" % (
+    return "chain going asked %d found %d (%d%%) links +%.1f when found, ms avg %.0f, ms<=5 %d | designs fired %d, links avg %.1f swaps avg %.1f | chains %d (sum of links-1 %d, links foreseen and not made %d) by length %s | lines not played out by why %s | ta log %s" % (
         asked, found, 100 * found // max(1, asked), gain / max(1, found), ms / max(1, asked), zero,
         len(built), sum(b[0] for b in built) / max(1, len(built)), sum(b[1] for b in built) / max(1, len(built)),
-        len(eps), sum(min(12, e - 1) for e in eps), short, hist,
+        len(eps), sum(min(12, e - 1) for e in eps), short, hist, " ".join("%s:%d" % kv for kv in sorted(ends.items())),
         " ".join("%s:%d" % (k, v) for k, v in sorted(ta.items(), key=lambda kv: -kv[1])[:10]))
 
 def death(path, frames, health, reason):

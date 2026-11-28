@@ -28,7 +28,7 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 | 1 HP | 10 | 29-30 | 238 | **8/8 -- done** |
 | No stop time | 10 | 31-32 | 239 | **8/8 -- done** |
 | BALL | 10 | 33-34 | 241 | **8/8 -- done** |
-| Line Clear (15:3-6) | stage's | 35-36 | 280 | won 6/8, being fixed (run 281) |
+| Line Clear (15:3-6) | stage's | 35-36 | 281 | won 6/8 (34.0 rows a minute), being fixed (run 282) |
 | Queue limit | 10 | 37-38 | - | to do |
 | training_random | 10 | 39-40 | - | to do (its own pattern: chain and combo garbage mixed at a random balance, Chaos Mode 1 game in 4 -- TrainingMenu.lua createBasicTrainingMode) |
 | Challenge Mode | stage's | 41-42 | - | to do |
@@ -210,6 +210,9 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 281 (04:00-04:04 ET), raise top lowered only past TA_EVEN + 1 above six colours: WON 6/8 -- kept (238061a).** 34.0 rows a minute;
+  15:6 near (31.2, 29.2). Its ta lines show the chain going foreseeing a 2-chain five decisions running and none made: each new answer
+  replaces the line being pressed. Run 282: the line in progress that makes the chain as long is played on in the new one's place.
 - **Run 280 (03:54-03:58 ET), no just-in-time hold with nobody across: WON 6/8 -- kept (899968f).** 15:6 lost both (21.0, 24.3). Run
   281: above six colours the raise top lowered only past TA_EVEN + 1 rows of unevenness; the artifact carries decisions/ta-N.txt.
 - **Run 279 (03:49-03:53 ET), the chain started only where no design is searched: won 5/8 -- off.** Run 280: no just-in-time hold with

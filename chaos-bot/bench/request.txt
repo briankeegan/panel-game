@@ -771,6 +771,10 @@
 #   insane s21 7768 125 credited 286 over 195, 7694 95 credited 215.
 # run 217 -- above six colours with 10+ queued, the promise adds at most a quarter break to a line's own loss (rank.c extCapped; run 206
 #   took it away altogether: 2/8). 8 colours s21-22
+# run 217 -- (result) survived 2/8, 95651 frames -- worse (5/8): OFF, run 216's rank.c restored by hash (c837aba).
+# run 218 -- run 216's bot plus: above six colours, NO CHANGING MINDS lets the line in progress go for one that outlives it by a quarter
+#   break (OUT_Q), not a whole break (rank.c). Run 216 insane s21 7195 a carry lost at 225 kept over an entry at 289; 7607/7621 137/123
+#   over 181/171, lost at 7746. 8 colours s21-22
 chain_garbage 21 9 9 1 21600 10 colors=8
 combo_storm 21 9 9 1 21600 10 colors=8
 thicc_combo_storm 21 9 9 1 21600 10 colors=8

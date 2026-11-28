@@ -278,18 +278,9 @@ static int extCounts(const Judge *x) {
   if (decF.under && !(x->apBroke > 0) && lostAtOf(x->o.lostAt, 0) - rankHoldOwn < (double)WALK_FRAMES * lineWalk(x)) return 0;
   return lostAtOf(x->o.lostAt, 0) >= rankHoldOwn;
 }
-// (run 217: THE PROMISE CAPPED UNDER A BACKLOG -- above six colours with ten or more blocks queued, the next moves add at most a quarter
-// of a break's time to a line's own loss: the next block lands before they are pressed. Run 216 8 colours, the later loss read on the
-// promise: combo s21 7524 an entry lost at 130 credited 231 put over a toward at 193 (13 queued), lost at 7593; insane s21 7768 a survive
-// lost at 125 credited 286 over 195, 7694 a carry lost at 95 credited 215 (15-18 queued), lost at 7746. Run 206 took the credit away
-// altogether there: 2/8)
-static double extCapped(double own, double ext) {
-  if (decQ.b && decQ.b->colors > 6 && decQ.b->ninc >= 10 && own >= 0 && own < 1e299 && ext > own + rankSave / 4) return own + rankSave / 4;
-  return ext;
-}
 static double diesAt(const Judge *x) {
   double own = lostAtOf(x->o.lostAt, x->hold);
-  if (extCounts(x)) { double ext = extCapped(own, lostAtOf(x->extLost, 0)); if (ext > own) own = ext; }
+  if (extCounts(x)) { double ext = lostAtOf(x->extLost, 0); if (ext > own) own = ext; }
   return own;
 }
 // (THE WALK NEVER TURNS A LIFE INTO A DEATH: two boards lost a break's time apart or more on the frame each is lost, the later of them,
@@ -363,7 +354,7 @@ static double nextBreakDelay(int walk);
 static double lostOf(const Judge *x) {
   if (x->idle) return x->idleLost;   // (a move must beat doing nothing: markIdle)
   double own = lostAtOf(x->o.lostAt, x->hold);
-  if (extCounts(x)) { double ext = extCapped(own, lostAtOf(x->extLost, 0)); if (ext > own) own = ext; }
+  if (extCounts(x)) { double ext = lostAtOf(x->extLost, 0); if (ext > own) own = ext; }
   if (x->hold || own >= 1e299 || own < 0 || waitWalks(x)) return own;
   int walk = lineWalk(x);
   double charge = (double)WALK_FRAMES * walk, delay = nextBreakDelay(walk);
@@ -1243,7 +1234,9 @@ static int compareJudged(const Judge *x, const Judge *y) {
     // (and a line whose chain stays at 2x or less over one in progress that runs past it -- the owner: combos, not chains; set 86
     // combo_storm 1, 2806-2857: a 4x in progress lost at 365 kept over a break that stops the chain lost at 466)
     if (finishAsked() && !o->hold && !o->o.dead && chainPastTwo(c) && !chainPastTwo(o) && diesAt(o) >= diesAt(c)) modeOver = 1;
-    if (!c->hold && !modeOver && imax(0, brokeSeen(c)) >= imax(0, brokeSeen(o)) && !c->o.dead && (!outlives(o, c) || calmKept(c, o))) return (cmpKey = __LINE__, (x->carried ? -1 : 1));
+    // (run 218: above six colours a quarter of a break's time is outliving here too (OUT_Q, creditPair) -- run 216 8 colours insane s21
+    // 7195 a carry lost at 225 kept over an entry lost at 289, 7607/7621 137 and 123 over 181 and 171 (10-12 queued), lost at 7746)
+    if (!c->hold && !modeOver && imax(0, brokeSeen(c)) >= imax(0, brokeSeen(o)) && !c->o.dead && ((!outlives(o, c) && !OUT_Q(o, c)) || calmKept(c, o))) return (cmpKey = __LINE__, (x->carried ? -1 : 1));
   }
   // 1. THE MODE, AMONG LINES THAT LIVE (the owner: just don't die; the mode is respected, garbage on the board or not): a line off the
   // mode after one that keeps to it and lives -- where the one keeping to it does not live, the later loss decides. Under garbage, only

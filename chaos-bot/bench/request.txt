@@ -961,6 +961,11 @@
 #   (3931d36). Won 15:5 s36 (35.5); lost 15:5 s35 (23.3), 15:6 both (24.0 -- 16 health off the top --, 21.5).
 # run 263 -- run 253's bot plus: rank 1'e (FLAT) not with nobody across above six colours (rank.c; the 7-colour losses of run 262 spent
 #   ~1500 frames flattening, the win ~680). Line Clear 15:3-6 s35-36
+# run 263 -- (result, 02:10-02:14 ET) 1'e off with nobody across above six colours: won 4/8 -- worse: OFF, rank.c back to run 253's
+#   (3931d36). Both 15:5 (23.0, 24.0) and both 15:6 (22.4, 27.1) lost; the flattening fell to 370-1170 frames, the eights' set-ups rose
+#   to 600-850.
+# run 264 -- run 253's bot plus: no two-column eights offered with nobody across above six colours (propose.c twinLines; an eight sends
+#   7/6 of a row, built over hundreds of frames). Line Clear 15:3-6 s35-36
 challenge 35 9 9 1 21600 10 challenge=15:3 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:4 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:5 profile=lineclear

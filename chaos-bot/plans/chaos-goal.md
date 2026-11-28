@@ -28,7 +28,7 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 | 1 HP | 10 | 29-30 | 238 | **8/8 -- done** |
 | No stop time | 10 | 31-32 | 239 | **8/8 -- done** |
 | BALL | 10 | 33-34 | 241 | **8/8 -- done** |
-| Line Clear (15:3-6) | stage's | 35-36 | 253 | won 6/8 (254-262 off), being fixed (run 263) |
+| Line Clear (15:3-6) | stage's | 35-36 | 253 | won 6/8 (254-263 off), being fixed (run 264) |
 | Queue limit | 10 | 37-38 | - | to do |
 | training_random | 10 | 39-40 | - | to do (its own pattern: chain and combo garbage mixed at a random balance, Chaos Mode 1 game in 4 -- TrainingMenu.lua createBasicTrainingMode) |
 | Challenge Mode | stage's | 41-42 | - | to do |
@@ -210,6 +210,8 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 263 (02:10-02:14 ET), 1'e off with nobody across above six colours: won 4/8 -- off.** The eights' set-ups took 600-850 frames a
+  7-colour game. Run 264: no two-column eights offered with nobody across above six colours.
 - **Run 262 (02:03-02:07 ET), the chain going's ties broken by rows sent: won 5/8 -- off.** Its 7-colour losses spent ~1500 frames
   flattening (rank 1'e), its win ~680. Run 263: 1'e off with nobody across above six colours (no garbage, no well to bury).
 - **Run 261 (01:57-02:01 ET), a chain of 3 after the 8 in time attack's list: won 4/8 -- off.** Run 262: the chain going's longest line,

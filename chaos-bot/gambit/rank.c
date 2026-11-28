@@ -1427,10 +1427,7 @@ static int compareJudged(const Judge *x, const Judge *y) {
   // (run 148: above six colours with garbage on its way too, so long as none is on the board -- at 8 colours garbage is told nearly the
   // whole opening, so the rule never acted there. Run 147 combo s8 (and run 145): the opening's clears from 431 dug columns 1-5 to rows
   // 3-6 beside an eight-row tower in column 0; the first 6-wide slab perched on it at 707 out of every break's reach, lost at 812)
-  // (run 263: not with nobody across above six colours -- no garbage ever comes, so no well is ever buried, and time attack's raise keeps
-  // its own evenness (decide.c TA_EVEN); run 262 Line Clear 15:5 s35 and 15:6 s36 spent ~1500 frames of their 7230 flattening at seven
-  // colours, the 15:5 s36 it won ~680)
-  if ((lx || lostAlike(x, y)) && !decF.under && !(ruleNoEnemy && decQ.b->colors > 6) && ((decQ.narr == 0 && decF.next == NOT_ASKED) || decQ.b->colors > 6) && decQ.b->chainCounter < 2 &&
+  if ((lx || lostAlike(x, y)) && !decF.under && ((decQ.narr == 0 && decF.next == NOT_ASKED) || decQ.b->colors > 6) && decQ.b->chainCounter < 2 &&
       x->o.j.even >= 0 && y->o.j.even >= 0 && iabs(x->o.j.even - y->o.j.even) >= FLAT_ROWS)
     return (cmpKey = __LINE__, (x->o.j.even - y->o.j.even));
   // (run 98: off -- 1'g alone L10 seeds 15-16 7/8, the gate's bot 7/8; with the other changes seeds 13-16 13-14/16, the gate's 14/16)

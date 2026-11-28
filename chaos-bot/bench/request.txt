@@ -1054,11 +1054,17 @@
 # run 282 -- run 281's bot plus: THE LINE BEGUN KEPT -- the line in progress (carried) that makes the chain at least as long as the chain
 #   going's new line, and lives as long, is played on in its place (decide.c). The report counts lines not played out (GAMBITE) by why.
 #   Line Clear 15:3-6 s35-36
-challenge 35 9 9 1 21600 10 challenge=15:3 profile=lineclear
-challenge 35 9 9 1 21600 10 challenge=15:4 profile=lineclear
-challenge 35 9 9 1 21600 10 challenge=15:5 profile=lineclear
-challenge 35 9 9 1 21600 10 challenge=15:6 profile=lineclear
-challenge 36 9 9 1 21600 10 challenge=15:3 profile=lineclear
-challenge 36 9 9 1 21600 10 challenge=15:4 profile=lineclear
-challenge 36 9 9 1 21600 10 challenge=15:5 profile=lineclear
-challenge 36 9 9 1 21600 10 challenge=15:6 profile=lineclear
+# run 282 -- (result, 04:07-04:11 ET) the line in progress kept over a new chain-going line no longer: WON 8/8 -- LINE CLEAR DONE
+#   (seeds 35-36, 15:3-6). Both 15:6 won (31.1 at 7190, 33.7 at 6977). It played the line in progress 27-68 times a game (ta=4).
+#   Kept: run 282's bot (43a7572).
+# run 283 -- THE NEXT MODE: queue limit (qlimit=1: the attack engine's limit on -- a pattern sends only while six or fewer of its attacks
+#   are in transit, AttackEngine.lua; training patterns have it off) at Level 10, 6 colours, on its own seeds 37-38 (never played), run
+#   282's bot. The launcher reads CHAOSBOT_QLIMIT (training.lua), the workflow passes the request's qlimit=. Queue limit s37-38
+chain_garbage 37 9 9 1 21600 10 qlimit=1
+combo_storm 37 9 9 1 21600 10 qlimit=1
+thicc_combo_storm 37 9 9 1 21600 10 qlimit=1
+insane_combo_storm 37 9 9 1 21600 10 qlimit=1
+chain_garbage 38 9 9 1 21600 10 qlimit=1
+combo_storm 38 9 9 1 21600 10 qlimit=1
+thicc_combo_storm 38 9 9 1 21600 10 qlimit=1
+insane_combo_storm 38 9 9 1 21600 10 qlimit=1

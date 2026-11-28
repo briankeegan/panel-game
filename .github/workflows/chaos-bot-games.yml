@@ -36,7 +36,7 @@ jobs:
               # (1 off, 2 colors, 3 modoki, 4 chaos), chaosmode (0/1), colors, profile (profiles/<name>.words; default chaos)
               kv = dict(x.split("=", 1) for x in f[6:] if "=" in x)
               games.append({"pattern": p, "seed": int(seed), "glevel": int(gl), "gspeed": int(gs), "queue": int(q), "frames": int(frames), "level": level,
-                            "mode": int(kv.get("mode", 1)), "margin": int(kv.get("margin", 1)), "chaosmode": int(kv.get("chaosmode", 0)), "colors": int(kv.get("colors", 6)), "challenge": kv.get("challenge", ""), "profile": kv.get("profile", "chaos"),
+                            "mode": int(kv.get("mode", 1)), "margin": int(kv.get("margin", 1)), "chaosmode": int(kv.get("chaosmode", 0)), "colors": int(kv.get("colors", 6)), "challenge": kv.get("challenge", ""), "profile": kv.get("profile", "chaos"), "qlimit": int(kv.get("qlimit", 0)),
                             "n": len(games) + 1})
           assert games, "no games in request.txt"
           print("games=" + json.dumps(games))
@@ -106,6 +106,7 @@ jobs:
           CHAOSBOT_CHAOSMODE: ${{ fromJSON(needs.plan.outputs.games)[0].chaosmode }}
           CHAOSBOT_COLORS: ${{ fromJSON(needs.plan.outputs.games)[0].colors }}
           CHAOSBOT_CHALLENGE: ${{ fromJSON(needs.plan.outputs.games)[0].challenge }}
+          CHAOSBOT_QLIMIT: ${{ fromJSON(needs.plan.outputs.games)[0].qlimit }}
           CHAOSBOT_PROFILE: ${{ fromJSON(needs.plan.outputs.games)[0].profile }}
           CHAOSBOT_ZIP_CACHE: /tmp/chaosbot-zip
         run: |
@@ -184,6 +185,7 @@ jobs:
           CHAOSBOT_CHAOSMODE: ${{ fromJSON(needs.plan.outputs.games)[0].chaosmode }}
           CHAOSBOT_COLORS: ${{ fromJSON(needs.plan.outputs.games)[0].colors }}
           CHAOSBOT_CHALLENGE: ${{ fromJSON(needs.plan.outputs.games)[0].challenge }}
+          CHAOSBOT_QLIMIT: ${{ fromJSON(needs.plan.outputs.games)[0].qlimit }}
           CHAOSBOT_PROFILE: ${{ fromJSON(needs.plan.outputs.games)[0].profile }}
           CHAOSBOT_ZIP_CACHE: /tmp/chaosbot-zip
         run: |
@@ -262,6 +264,7 @@ jobs:
           CHAOSBOT_CHAOSMODE: ${{ fromJSON(needs.plan.outputs.games)[0].chaosmode }}
           CHAOSBOT_COLORS: ${{ fromJSON(needs.plan.outputs.games)[0].colors }}
           CHAOSBOT_CHALLENGE: ${{ fromJSON(needs.plan.outputs.games)[0].challenge }}
+          CHAOSBOT_QLIMIT: ${{ fromJSON(needs.plan.outputs.games)[0].qlimit }}
           CHAOSBOT_PROFILE: ${{ fromJSON(needs.plan.outputs.games)[0].profile }}
           CHAOSBOT_ZIP_CACHE: /tmp/chaosbot-zip
         run: |
@@ -340,6 +343,7 @@ jobs:
           CHAOSBOT_CHAOSMODE: ${{ fromJSON(needs.plan.outputs.games)[0].chaosmode }}
           CHAOSBOT_COLORS: ${{ fromJSON(needs.plan.outputs.games)[0].colors }}
           CHAOSBOT_CHALLENGE: ${{ fromJSON(needs.plan.outputs.games)[0].challenge }}
+          CHAOSBOT_QLIMIT: ${{ fromJSON(needs.plan.outputs.games)[0].qlimit }}
           CHAOSBOT_PROFILE: ${{ fromJSON(needs.plan.outputs.games)[0].profile }}
           CHAOSBOT_ZIP_CACHE: /tmp/chaosbot-zip
         run: |
@@ -418,6 +422,7 @@ jobs:
           CHAOSBOT_CHAOSMODE: ${{ fromJSON(needs.plan.outputs.games)[1].chaosmode }}
           CHAOSBOT_COLORS: ${{ fromJSON(needs.plan.outputs.games)[1].colors }}
           CHAOSBOT_CHALLENGE: ${{ fromJSON(needs.plan.outputs.games)[1].challenge }}
+          CHAOSBOT_QLIMIT: ${{ fromJSON(needs.plan.outputs.games)[1].qlimit }}
           CHAOSBOT_PROFILE: ${{ fromJSON(needs.plan.outputs.games)[1].profile }}
           CHAOSBOT_ZIP_CACHE: /tmp/chaosbot-zip
         run: |
@@ -496,6 +501,7 @@ jobs:
           CHAOSBOT_CHAOSMODE: ${{ fromJSON(needs.plan.outputs.games)[1].chaosmode }}
           CHAOSBOT_COLORS: ${{ fromJSON(needs.plan.outputs.games)[1].colors }}
           CHAOSBOT_CHALLENGE: ${{ fromJSON(needs.plan.outputs.games)[1].challenge }}
+          CHAOSBOT_QLIMIT: ${{ fromJSON(needs.plan.outputs.games)[1].qlimit }}
           CHAOSBOT_PROFILE: ${{ fromJSON(needs.plan.outputs.games)[1].profile }}
           CHAOSBOT_ZIP_CACHE: /tmp/chaosbot-zip
         run: |
@@ -574,6 +580,7 @@ jobs:
           CHAOSBOT_CHAOSMODE: ${{ fromJSON(needs.plan.outputs.games)[1].chaosmode }}
           CHAOSBOT_COLORS: ${{ fromJSON(needs.plan.outputs.games)[1].colors }}
           CHAOSBOT_CHALLENGE: ${{ fromJSON(needs.plan.outputs.games)[1].challenge }}
+          CHAOSBOT_QLIMIT: ${{ fromJSON(needs.plan.outputs.games)[1].qlimit }}
           CHAOSBOT_PROFILE: ${{ fromJSON(needs.plan.outputs.games)[1].profile }}
           CHAOSBOT_ZIP_CACHE: /tmp/chaosbot-zip
         run: |
@@ -652,6 +659,7 @@ jobs:
           CHAOSBOT_CHAOSMODE: ${{ fromJSON(needs.plan.outputs.games)[1].chaosmode }}
           CHAOSBOT_COLORS: ${{ fromJSON(needs.plan.outputs.games)[1].colors }}
           CHAOSBOT_CHALLENGE: ${{ fromJSON(needs.plan.outputs.games)[1].challenge }}
+          CHAOSBOT_QLIMIT: ${{ fromJSON(needs.plan.outputs.games)[1].qlimit }}
           CHAOSBOT_PROFILE: ${{ fromJSON(needs.plan.outputs.games)[1].profile }}
           CHAOSBOT_ZIP_CACHE: /tmp/chaosbot-zip
         run: |
@@ -730,6 +738,7 @@ jobs:
           CHAOSBOT_CHAOSMODE: ${{ fromJSON(needs.plan.outputs.games)[2].chaosmode }}
           CHAOSBOT_COLORS: ${{ fromJSON(needs.plan.outputs.games)[2].colors }}
           CHAOSBOT_CHALLENGE: ${{ fromJSON(needs.plan.outputs.games)[2].challenge }}
+          CHAOSBOT_QLIMIT: ${{ fromJSON(needs.plan.outputs.games)[2].qlimit }}
           CHAOSBOT_PROFILE: ${{ fromJSON(needs.plan.outputs.games)[2].profile }}
           CHAOSBOT_ZIP_CACHE: /tmp/chaosbot-zip
         run: |
@@ -808,6 +817,7 @@ jobs:
           CHAOSBOT_CHAOSMODE: ${{ fromJSON(needs.plan.outputs.games)[2].chaosmode }}
           CHAOSBOT_COLORS: ${{ fromJSON(needs.plan.outputs.games)[2].colors }}
           CHAOSBOT_CHALLENGE: ${{ fromJSON(needs.plan.outputs.games)[2].challenge }}
+          CHAOSBOT_QLIMIT: ${{ fromJSON(needs.plan.outputs.games)[2].qlimit }}
           CHAOSBOT_PROFILE: ${{ fromJSON(needs.plan.outputs.games)[2].profile }}
           CHAOSBOT_ZIP_CACHE: /tmp/chaosbot-zip
         run: |
@@ -886,6 +896,7 @@ jobs:
           CHAOSBOT_CHAOSMODE: ${{ fromJSON(needs.plan.outputs.games)[2].chaosmode }}
           CHAOSBOT_COLORS: ${{ fromJSON(needs.plan.outputs.games)[2].colors }}
           CHAOSBOT_CHALLENGE: ${{ fromJSON(needs.plan.outputs.games)[2].challenge }}
+          CHAOSBOT_QLIMIT: ${{ fromJSON(needs.plan.outputs.games)[2].qlimit }}
           CHAOSBOT_PROFILE: ${{ fromJSON(needs.plan.outputs.games)[2].profile }}
           CHAOSBOT_ZIP_CACHE: /tmp/chaosbot-zip
         run: |
@@ -964,6 +975,7 @@ jobs:
           CHAOSBOT_CHAOSMODE: ${{ fromJSON(needs.plan.outputs.games)[2].chaosmode }}
           CHAOSBOT_COLORS: ${{ fromJSON(needs.plan.outputs.games)[2].colors }}
           CHAOSBOT_CHALLENGE: ${{ fromJSON(needs.plan.outputs.games)[2].challenge }}
+          CHAOSBOT_QLIMIT: ${{ fromJSON(needs.plan.outputs.games)[2].qlimit }}
           CHAOSBOT_PROFILE: ${{ fromJSON(needs.plan.outputs.games)[2].profile }}
           CHAOSBOT_ZIP_CACHE: /tmp/chaosbot-zip
         run: |
@@ -1042,6 +1054,7 @@ jobs:
           CHAOSBOT_CHAOSMODE: ${{ fromJSON(needs.plan.outputs.games)[3].chaosmode }}
           CHAOSBOT_COLORS: ${{ fromJSON(needs.plan.outputs.games)[3].colors }}
           CHAOSBOT_CHALLENGE: ${{ fromJSON(needs.plan.outputs.games)[3].challenge }}
+          CHAOSBOT_QLIMIT: ${{ fromJSON(needs.plan.outputs.games)[3].qlimit }}
           CHAOSBOT_PROFILE: ${{ fromJSON(needs.plan.outputs.games)[3].profile }}
           CHAOSBOT_ZIP_CACHE: /tmp/chaosbot-zip
         run: |
@@ -1120,6 +1133,7 @@ jobs:
           CHAOSBOT_CHAOSMODE: ${{ fromJSON(needs.plan.outputs.games)[3].chaosmode }}
           CHAOSBOT_COLORS: ${{ fromJSON(needs.plan.outputs.games)[3].colors }}
           CHAOSBOT_CHALLENGE: ${{ fromJSON(needs.plan.outputs.games)[3].challenge }}
+          CHAOSBOT_QLIMIT: ${{ fromJSON(needs.plan.outputs.games)[3].qlimit }}
           CHAOSBOT_PROFILE: ${{ fromJSON(needs.plan.outputs.games)[3].profile }}
           CHAOSBOT_ZIP_CACHE: /tmp/chaosbot-zip
         run: |
@@ -1198,6 +1212,7 @@ jobs:
           CHAOSBOT_CHAOSMODE: ${{ fromJSON(needs.plan.outputs.games)[3].chaosmode }}
           CHAOSBOT_COLORS: ${{ fromJSON(needs.plan.outputs.games)[3].colors }}
           CHAOSBOT_CHALLENGE: ${{ fromJSON(needs.plan.outputs.games)[3].challenge }}
+          CHAOSBOT_QLIMIT: ${{ fromJSON(needs.plan.outputs.games)[3].qlimit }}
           CHAOSBOT_PROFILE: ${{ fromJSON(needs.plan.outputs.games)[3].profile }}
           CHAOSBOT_ZIP_CACHE: /tmp/chaosbot-zip
         run: |
@@ -1276,6 +1291,7 @@ jobs:
           CHAOSBOT_CHAOSMODE: ${{ fromJSON(needs.plan.outputs.games)[3].chaosmode }}
           CHAOSBOT_COLORS: ${{ fromJSON(needs.plan.outputs.games)[3].colors }}
           CHAOSBOT_CHALLENGE: ${{ fromJSON(needs.plan.outputs.games)[3].challenge }}
+          CHAOSBOT_QLIMIT: ${{ fromJSON(needs.plan.outputs.games)[3].qlimit }}
           CHAOSBOT_PROFILE: ${{ fromJSON(needs.plan.outputs.games)[3].profile }}
           CHAOSBOT_ZIP_CACHE: /tmp/chaosbot-zip
         run: |
@@ -1354,6 +1370,7 @@ jobs:
           CHAOSBOT_CHAOSMODE: ${{ fromJSON(needs.plan.outputs.games)[4].chaosmode }}
           CHAOSBOT_COLORS: ${{ fromJSON(needs.plan.outputs.games)[4].colors }}
           CHAOSBOT_CHALLENGE: ${{ fromJSON(needs.plan.outputs.games)[4].challenge }}
+          CHAOSBOT_QLIMIT: ${{ fromJSON(needs.plan.outputs.games)[4].qlimit }}
           CHAOSBOT_PROFILE: ${{ fromJSON(needs.plan.outputs.games)[4].profile }}
           CHAOSBOT_ZIP_CACHE: /tmp/chaosbot-zip
         run: |
@@ -1432,6 +1449,7 @@ jobs:
           CHAOSBOT_CHAOSMODE: ${{ fromJSON(needs.plan.outputs.games)[4].chaosmode }}
           CHAOSBOT_COLORS: ${{ fromJSON(needs.plan.outputs.games)[4].colors }}
           CHAOSBOT_CHALLENGE: ${{ fromJSON(needs.plan.outputs.games)[4].challenge }}
+          CHAOSBOT_QLIMIT: ${{ fromJSON(needs.plan.outputs.games)[4].qlimit }}
           CHAOSBOT_PROFILE: ${{ fromJSON(needs.plan.outputs.games)[4].profile }}
           CHAOSBOT_ZIP_CACHE: /tmp/chaosbot-zip
         run: |
@@ -1510,6 +1528,7 @@ jobs:
           CHAOSBOT_CHAOSMODE: ${{ fromJSON(needs.plan.outputs.games)[4].chaosmode }}
           CHAOSBOT_COLORS: ${{ fromJSON(needs.plan.outputs.games)[4].colors }}
           CHAOSBOT_CHALLENGE: ${{ fromJSON(needs.plan.outputs.games)[4].challenge }}
+          CHAOSBOT_QLIMIT: ${{ fromJSON(needs.plan.outputs.games)[4].qlimit }}
           CHAOSBOT_PROFILE: ${{ fromJSON(needs.plan.outputs.games)[4].profile }}
           CHAOSBOT_ZIP_CACHE: /tmp/chaosbot-zip
         run: |
@@ -1588,6 +1607,7 @@ jobs:
           CHAOSBOT_CHAOSMODE: ${{ fromJSON(needs.plan.outputs.games)[4].chaosmode }}
           CHAOSBOT_COLORS: ${{ fromJSON(needs.plan.outputs.games)[4].colors }}
           CHAOSBOT_CHALLENGE: ${{ fromJSON(needs.plan.outputs.games)[4].challenge }}
+          CHAOSBOT_QLIMIT: ${{ fromJSON(needs.plan.outputs.games)[4].qlimit }}
           CHAOSBOT_PROFILE: ${{ fromJSON(needs.plan.outputs.games)[4].profile }}
           CHAOSBOT_ZIP_CACHE: /tmp/chaosbot-zip
         run: |
@@ -1666,6 +1686,7 @@ jobs:
           CHAOSBOT_CHAOSMODE: ${{ fromJSON(needs.plan.outputs.games)[5].chaosmode }}
           CHAOSBOT_COLORS: ${{ fromJSON(needs.plan.outputs.games)[5].colors }}
           CHAOSBOT_CHALLENGE: ${{ fromJSON(needs.plan.outputs.games)[5].challenge }}
+          CHAOSBOT_QLIMIT: ${{ fromJSON(needs.plan.outputs.games)[5].qlimit }}
           CHAOSBOT_PROFILE: ${{ fromJSON(needs.plan.outputs.games)[5].profile }}
           CHAOSBOT_ZIP_CACHE: /tmp/chaosbot-zip
         run: |
@@ -1744,6 +1765,7 @@ jobs:
           CHAOSBOT_CHAOSMODE: ${{ fromJSON(needs.plan.outputs.games)[5].chaosmode }}
           CHAOSBOT_COLORS: ${{ fromJSON(needs.plan.outputs.games)[5].colors }}
           CHAOSBOT_CHALLENGE: ${{ fromJSON(needs.plan.outputs.games)[5].challenge }}
+          CHAOSBOT_QLIMIT: ${{ fromJSON(needs.plan.outputs.games)[5].qlimit }}
           CHAOSBOT_PROFILE: ${{ fromJSON(needs.plan.outputs.games)[5].profile }}
           CHAOSBOT_ZIP_CACHE: /tmp/chaosbot-zip
         run: |
@@ -1822,6 +1844,7 @@ jobs:
           CHAOSBOT_CHAOSMODE: ${{ fromJSON(needs.plan.outputs.games)[5].chaosmode }}
           CHAOSBOT_COLORS: ${{ fromJSON(needs.plan.outputs.games)[5].colors }}
           CHAOSBOT_CHALLENGE: ${{ fromJSON(needs.plan.outputs.games)[5].challenge }}
+          CHAOSBOT_QLIMIT: ${{ fromJSON(needs.plan.outputs.games)[5].qlimit }}
           CHAOSBOT_PROFILE: ${{ fromJSON(needs.plan.outputs.games)[5].profile }}
           CHAOSBOT_ZIP_CACHE: /tmp/chaosbot-zip
         run: |
@@ -1900,6 +1923,7 @@ jobs:
           CHAOSBOT_CHAOSMODE: ${{ fromJSON(needs.plan.outputs.games)[5].chaosmode }}
           CHAOSBOT_COLORS: ${{ fromJSON(needs.plan.outputs.games)[5].colors }}
           CHAOSBOT_CHALLENGE: ${{ fromJSON(needs.plan.outputs.games)[5].challenge }}
+          CHAOSBOT_QLIMIT: ${{ fromJSON(needs.plan.outputs.games)[5].qlimit }}
           CHAOSBOT_PROFILE: ${{ fromJSON(needs.plan.outputs.games)[5].profile }}
           CHAOSBOT_ZIP_CACHE: /tmp/chaosbot-zip
         run: |
@@ -1978,6 +2002,7 @@ jobs:
           CHAOSBOT_CHAOSMODE: ${{ fromJSON(needs.plan.outputs.games)[6].chaosmode }}
           CHAOSBOT_COLORS: ${{ fromJSON(needs.plan.outputs.games)[6].colors }}
           CHAOSBOT_CHALLENGE: ${{ fromJSON(needs.plan.outputs.games)[6].challenge }}
+          CHAOSBOT_QLIMIT: ${{ fromJSON(needs.plan.outputs.games)[6].qlimit }}
           CHAOSBOT_PROFILE: ${{ fromJSON(needs.plan.outputs.games)[6].profile }}
           CHAOSBOT_ZIP_CACHE: /tmp/chaosbot-zip
         run: |
@@ -2056,6 +2081,7 @@ jobs:
           CHAOSBOT_CHAOSMODE: ${{ fromJSON(needs.plan.outputs.games)[6].chaosmode }}
           CHAOSBOT_COLORS: ${{ fromJSON(needs.plan.outputs.games)[6].colors }}
           CHAOSBOT_CHALLENGE: ${{ fromJSON(needs.plan.outputs.games)[6].challenge }}
+          CHAOSBOT_QLIMIT: ${{ fromJSON(needs.plan.outputs.games)[6].qlimit }}
           CHAOSBOT_PROFILE: ${{ fromJSON(needs.plan.outputs.games)[6].profile }}
           CHAOSBOT_ZIP_CACHE: /tmp/chaosbot-zip
         run: |
@@ -2134,6 +2160,7 @@ jobs:
           CHAOSBOT_CHAOSMODE: ${{ fromJSON(needs.plan.outputs.games)[6].chaosmode }}
           CHAOSBOT_COLORS: ${{ fromJSON(needs.plan.outputs.games)[6].colors }}
           CHAOSBOT_CHALLENGE: ${{ fromJSON(needs.plan.outputs.games)[6].challenge }}
+          CHAOSBOT_QLIMIT: ${{ fromJSON(needs.plan.outputs.games)[6].qlimit }}
           CHAOSBOT_PROFILE: ${{ fromJSON(needs.plan.outputs.games)[6].profile }}
           CHAOSBOT_ZIP_CACHE: /tmp/chaosbot-zip
         run: |
@@ -2212,6 +2239,7 @@ jobs:
           CHAOSBOT_CHAOSMODE: ${{ fromJSON(needs.plan.outputs.games)[6].chaosmode }}
           CHAOSBOT_COLORS: ${{ fromJSON(needs.plan.outputs.games)[6].colors }}
           CHAOSBOT_CHALLENGE: ${{ fromJSON(needs.plan.outputs.games)[6].challenge }}
+          CHAOSBOT_QLIMIT: ${{ fromJSON(needs.plan.outputs.games)[6].qlimit }}
           CHAOSBOT_PROFILE: ${{ fromJSON(needs.plan.outputs.games)[6].profile }}
           CHAOSBOT_ZIP_CACHE: /tmp/chaosbot-zip
         run: |
@@ -2290,6 +2318,7 @@ jobs:
           CHAOSBOT_CHAOSMODE: ${{ fromJSON(needs.plan.outputs.games)[7].chaosmode }}
           CHAOSBOT_COLORS: ${{ fromJSON(needs.plan.outputs.games)[7].colors }}
           CHAOSBOT_CHALLENGE: ${{ fromJSON(needs.plan.outputs.games)[7].challenge }}
+          CHAOSBOT_QLIMIT: ${{ fromJSON(needs.plan.outputs.games)[7].qlimit }}
           CHAOSBOT_PROFILE: ${{ fromJSON(needs.plan.outputs.games)[7].profile }}
           CHAOSBOT_ZIP_CACHE: /tmp/chaosbot-zip
         run: |
@@ -2368,6 +2397,7 @@ jobs:
           CHAOSBOT_CHAOSMODE: ${{ fromJSON(needs.plan.outputs.games)[7].chaosmode }}
           CHAOSBOT_COLORS: ${{ fromJSON(needs.plan.outputs.games)[7].colors }}
           CHAOSBOT_CHALLENGE: ${{ fromJSON(needs.plan.outputs.games)[7].challenge }}
+          CHAOSBOT_QLIMIT: ${{ fromJSON(needs.plan.outputs.games)[7].qlimit }}
           CHAOSBOT_PROFILE: ${{ fromJSON(needs.plan.outputs.games)[7].profile }}
           CHAOSBOT_ZIP_CACHE: /tmp/chaosbot-zip
         run: |
@@ -2446,6 +2476,7 @@ jobs:
           CHAOSBOT_CHAOSMODE: ${{ fromJSON(needs.plan.outputs.games)[7].chaosmode }}
           CHAOSBOT_COLORS: ${{ fromJSON(needs.plan.outputs.games)[7].colors }}
           CHAOSBOT_CHALLENGE: ${{ fromJSON(needs.plan.outputs.games)[7].challenge }}
+          CHAOSBOT_QLIMIT: ${{ fromJSON(needs.plan.outputs.games)[7].qlimit }}
           CHAOSBOT_PROFILE: ${{ fromJSON(needs.plan.outputs.games)[7].profile }}
           CHAOSBOT_ZIP_CACHE: /tmp/chaosbot-zip
         run: |
@@ -2524,6 +2555,7 @@ jobs:
           CHAOSBOT_CHAOSMODE: ${{ fromJSON(needs.plan.outputs.games)[7].chaosmode }}
           CHAOSBOT_COLORS: ${{ fromJSON(needs.plan.outputs.games)[7].colors }}
           CHAOSBOT_CHALLENGE: ${{ fromJSON(needs.plan.outputs.games)[7].challenge }}
+          CHAOSBOT_QLIMIT: ${{ fromJSON(needs.plan.outputs.games)[7].qlimit }}
           CHAOSBOT_PROFILE: ${{ fromJSON(needs.plan.outputs.games)[7].profile }}
           CHAOSBOT_ZIP_CACHE: /tmp/chaosbot-zip
         run: |

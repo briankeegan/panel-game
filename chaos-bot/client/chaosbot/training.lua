@@ -87,7 +87,9 @@ local function createBasicTrainingMode(name, width, height, difficulty, garbage_
   local attackPatterns = {}
   local GarbageQueueType = queue_type
   local ChaosMode = false
-  local disableQueueLimit = true
+  -- (QUEUE LIMIT, the launcher's CHAOSBOT_QLIMIT=1 -- the owner's mode table: the attack engine's limit on, so a pattern sends only while
+  -- six or fewer of its attacks are in transit (AttackEngine.lua); off, as a training pattern has it, by default)
+  local disableQueueLimit = os.getenv("CHAOSBOT_QLIMIT") ~= "1"
   -- set the pattern name in the replay correctly
   local patternName = tostring(name .. " - Difficulty " .. difficulty .. "-" .. garbage_speed)
   if name == "" then

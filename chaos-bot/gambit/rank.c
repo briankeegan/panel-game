@@ -1024,7 +1024,9 @@ static int compareJudged(const Judge *x, const Judge *y) {
     int32_t g0 = gapOf(decQ.b), dx = x->o.j.gap - g0, dy = y->o.j.gap - g0;
     int xd = dx >= W && dy < W / 2, yd = dy >= W && dx < W / 2;
     if (xd || yd) { const Judge *dig = xd ? x : y, *o = xd ? y : x;
-      if (o->o.lives || diesAt(o) + rankSave > diesAt(dig)) return (cmpKey = __LINE__, (xd ? 1 : -1)); }
+      // (run 227: unless the dig outlives it by a quarter of a break's time, as the other rules above six colours -- run 226 8 colours combo
+      // s22 9918-9947 (24 queued): the hold lost at 201, 187, 172 kept over a dig lost at 258, lost at 10343)
+      if (o->o.lives || diesAt(o) + rankSave / 4 > diesAt(dig)) return (cmpKey = __LINE__, (xd ? 1 : -1)); }
   }
   // (run 119, CHAOS, ABOVE SIX COLOURS, NO LONG CHAIN FOR NOTHING UNDER GARBAGE: of two lines, one whose whole chain (the board's falling
   // chain with it) runs past three links breaking no garbage goes after one whose chain stays at three or under, unless that one is lost
@@ -1594,12 +1596,7 @@ static int compareJudged(const Judge *x, const Judge *y) {
   // (and once the opener is over, with garbage on its way and none on the board yet: the stack it lands on is the one built now --
   // towers left at the edges over cleared middle columns perch it, and no break is in reach under it for hundreds of frames, g4453
   // factory 8, 610-993. Not in the opener: there the set-ups walked the window down before the first blocks landed, g4456)
-  // (run 226: above six colours, two counted living only by the credit are held to the quarter break here too, as 1b (run 214) -- run 225
-  // 8 colours chain s22 11519-11564 (15 queued): the hold lost at 170, 155, 140, 125 kept over entries lost at 246, 231, 216, 201, lost
-  // at 12143)
-  int credOnlyW = decQ.b->colors > 6 && !x->o.lives && !y->o.lives &&
-                  (lostOf(x) > lostOf(y) ? lostOf(x) - lostOf(y) : lostOf(y) - lostOf(x)) >= rankSave / 4;
-  if ((decF.under || (!inOpener && garbageComing())) && pressAllowance >= 0 && ((lx && !credOnlyW) || lostAlike(x, y))) {
+  if ((decF.under || (!inOpener && garbageComing())) && pressAllowance >= 0 && (lx || lostAlike(x, y))) {
     int bx = breaksFirst(x, lx), by = breaksFirst(y, lx);
     // (but not over the mode's first entry thrown where the break meets none of it: the mode is played under garbage too -- the goal
     // decides between them, 1b)

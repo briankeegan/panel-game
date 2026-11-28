@@ -24,7 +24,7 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 
 | Mode | Level | Seeds | Run | Result |
 |---|---|---|---|---|
-| 8 colours | 10 | 21-22 | 218 | 5/8 (219-225 off), being fixed (run 226) |
+| 8 colours | 10 | 21-22 | 218 | 5/8 (219-226 off), being fixed (run 227) |
 | 7 colours | 10 | 23-24 | - | to redo (old: 7/8 on seeds 7-8, run 190 -- does not count) |
 | Chaos margin 4 | 10 | 25-26 | - | to redo (old: 7/8 on 7-8, run 191) |
 | Chaos mode | 10 | 27-28 | - | to redo (old: 8/8 on 7-8, run 192) |
@@ -210,6 +210,9 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 226 (2026-11-27 21:09 ET), 1'' credited-only: 2/8 -- off.** The owner asked how to tell the runners apart: by CPU -- runs 208-225,
+  Intel Xeon 6975P 37/76 survived (49%), AMD EPYC 7763/9V74/9V45 10/52 (19%); not the clock (the 9V45 runs fastest). The report now
+  prints survivals by CPU family. Run 227: the canyon rule lets a dig through at a quarter break (combo s22 9918-9947).
 - **Run 225 (2026-11-27 21:00 ET), promise-vs-break a quarter break: 3/8 -- off.** Run 226: 1'' holds credited-only pairs to the quarter
   break (the hold kept 76 frames sooner, chain s22 11519-11564).
 - **Run 224 (2026-11-27 20:51 ET), the garbage let down guarded: 2/8 -- off.** Six changes running at 2-4 against 218's 5/8. Run 225: A

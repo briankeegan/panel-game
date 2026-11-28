@@ -812,6 +812,11 @@
 #   (under garbage, the window spent on breaks) kept the hold lost at 170-125 over entries lost at 246-201, both counted living by the
 #   credit, where it skips lostAlike.
 # run 226 -- run 218's bot plus: above six colours, 1'' holds credited-only pairs to the quarter break, as 1b (run 214) (rank.c). 8 colours s21-22
+# run 226 -- (result) survived 2/8, 116659 frames -- worse: OFF, run 218's rank.c restored by hash (b3967e9). combo s22 9918-9947: rule run
+#   117 (above six colours, no canyon dug for nothing) kept the hold lost at 201/187/172 over a dig lost at 258 -- it asks a dig to outlive
+#   by a whole break. The machines: in runs 208-225 the bot survived 49% of its games on Intel Xeon 6975P and 19% on AMD EPYC (7763,
+#   9V74, 9V45) -- the AMD games are where it is weakest; the report now gives survivals by CPU family.
+# run 227 -- run 218's bot plus: the canyon rule lets a dig through that outlives the hold by a quarter break (rank.c). 8 colours s21-22
 chain_garbage 21 9 9 1 21600 10 colors=8
 combo_storm 21 9 9 1 21600 10 colors=8
 thicc_combo_storm 21 9 9 1 21600 10 colors=8

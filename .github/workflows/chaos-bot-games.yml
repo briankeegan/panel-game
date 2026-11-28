@@ -118,6 +118,17 @@ jobs:
         run: |
           python3 chaos-bot/bench/report.py games '${{ needs.plan.outputs.games }}' | tee report.txt
           for d in games/chaosbot-game-*; do n=${d##*-}; [ -f "$d/cpu.txt" ] && echo "cpu game $n: $(cat $d/cpu.txt)"; done | sort -t' ' -k3n | tee -a report.txt
+          # (survivals by machine family -- Intel against AMD: the bot survived 49% of its games on Intel Xeon 6975P and 19% on AMD EPYC in
+          # runs 208-225, so each run's result is read against the machines it drew)
+          python3 - <<'PY' | tee -a report.txt
+          import re
+          t = open('report.txt').read()
+          cpu = {int(m.group(1)): ('AMD' if 'AMD' in m.group(2).upper() else 'Intel') for m in re.finditer(r'^cpu game (\d+): (.*)$', t, re.M)}
+          tot, won = {}, {}
+          for m in re.finditer(r'^game (\d+) .* survived (\d)', t, re.M):
+              f = cpu.get(int(m.group(1)), '?'); tot[f] = tot.get(f, 0) + 1; won[f] = won.get(f, 0) + int(m.group(2))
+          print('cpu families: ' + ', '.join(f'{f} {won[f]}/{tot[f]}' for f in sorted(tot)))
+          PY
           { echo '```'; cat report.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
           # (EVERY DECISION LABELLED -- the owner: every decision of every game in plain words with the rule that decided it, as the
           # replays had them: describe.py reads each GAMBITD line and quotes rank.c (won=k<line>) or decide.c (won=d<line>) as this

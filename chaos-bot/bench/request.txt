@@ -1239,11 +1239,13 @@
 # run 326 -- the second pass's standings on run 323's bot (232d74d), unchanged: 1 HP (mode=2), done 8/8 (run 238), seeds 29-30. 1HP s29-30
 # run 326 -- (result, 11:09-11:17 ET) 1 HP on run 323's bot: survived 7/8 (run 238's: 8/8). Lost insane s30 at 10540 (starved).
 # run 327 -- the standings on run 323's bot, unchanged: no stop time (mode=3), done 8/8 (run 239), seeds 31-32. NST s31-32
-chain_garbage 31 9 9 1 21600 10 mode=3
-combo_storm 31 9 9 1 21600 10 mode=3
-thicc_combo_storm 31 9 9 1 21600 10 mode=3
-insane_combo_storm 31 9 9 1 21600 10 mode=3
-chain_garbage 32 9 9 1 21600 10 mode=3
-combo_storm 32 9 9 1 21600 10 mode=3
-thicc_combo_storm 32 9 9 1 21600 10 mode=3
-insane_combo_storm 32 9 9 1 21600 10 mode=3
+# run 327 -- (result, 11:18-11:26 ET) no stop time on run 323's bot: survived 8/8 -- holds.
+# run 328 -- the standings on run 323's bot, unchanged: BALL (mode=4), done 8/8 (run 241), seeds 33-34. BALL s33-34
+chain_garbage 33 9 9 1 21600 10 mode=4
+combo_storm 33 9 9 1 21600 10 mode=4
+thicc_combo_storm 33 9 9 1 21600 10 mode=4
+insane_combo_storm 33 9 9 1 21600 10 mode=4
+chain_garbage 34 9 9 1 21600 10 mode=4
+combo_storm 34 9 9 1 21600 10 mode=4
+thicc_combo_storm 34 9 9 1 21600 10 mode=4
+insane_combo_storm 34 9 9 1 21600 10 mode=4

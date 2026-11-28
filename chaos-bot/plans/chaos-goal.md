@@ -26,8 +26,8 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 | Chaos margin 4 | 10 | 25-26 | 236 | **8/8 -- done**; on run 313's bot 6/8 (run 316); on run 306's 7/8 (run 317); on run 318's 5/8 -- the same six-colour play as 306's |
 | Chaos mode | 10 | 27-28 | 237 | **8/8 -- done**; on run 318's bot 4/8 (run 319); on run 282's 8/8 (run 320); on run 299's 7/8 (run 321) -- the dive costs it; dive from 15 waiting 5/8 (run 322); **dive from 25 waiting 8/8 (run 323)** |
 | 1 HP | 10 | 29-30 | 238 | **8/8 -- done**; on run 323's bot 7/8 (run 326) |
-| No stop time | 10 | 31-32 | 239 | **8/8 -- done**; on run 323's bot: run 327 |
-| BALL | 10 | 33-34 | 241 | **8/8 -- done** |
+| No stop time | 10 | 31-32 | 239 | **8/8 -- done**; on run 323's bot **8/8** (run 327) |
+| BALL | 10 | 33-34 | 241 | **8/8 -- done**; on run 323's bot: run 328 |
 | Line Clear (15:3-6) | stage's | 35-36 | 282 | **8/8 -- done** |
 | Queue limit (qlimit=1) | 10 | 37-38 | 283 | **8/8 -- done** |
 | training_random | 10 | 39-40 | 306 | **8/8 -- done** (garbage level/speed 8-11 a seed); on run 323's bot 5/8 (run 324); dive from 15 not with chaos garbage 4/8 (run 325) |
@@ -210,6 +210,7 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 327 (11:18-11:26 ET), no stop time on run 323's bot: 8/8.** Run 328: BALL on it.
 - **Run 326 (11:09-11:17 ET), 1 HP on run 323's bot: 7/8** (insane s30 starved). Run 327: no stop time on it.
 - **Run 325 (11:00-11:08 ET), the dive from 15 waiting, never with chaos garbage: training_random 4/8 -- not kept** (an early loss with 3
   queued, no dive). Back to run 323's bot. Run 326: 1 HP on it (the standings).

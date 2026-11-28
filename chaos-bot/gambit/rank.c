@@ -278,9 +278,18 @@ static int extCounts(const Judge *x) {
   if (decF.under && !(x->apBroke > 0) && lostAtOf(x->o.lostAt, 0) - rankHoldOwn < (double)WALK_FRAMES * lineWalk(x)) return 0;
   return lostAtOf(x->o.lostAt, 0) >= rankHoldOwn;
 }
+// (run 217: THE PROMISE CAPPED UNDER A BACKLOG -- above six colours with ten or more blocks queued, the next moves add at most a quarter
+// of a break's time to a line's own loss: the next block lands before they are pressed. Run 216 8 colours, the later loss read on the
+// promise: combo s21 7524 an entry lost at 130 credited 231 put over a toward at 193 (13 queued), lost at 7593; insane s21 7768 a survive
+// lost at 125 credited 286 over 195, 7694 a carry lost at 95 credited 215 (15-18 queued), lost at 7746. Run 206 took the credit away
+// altogether there: 2/8)
+static double extCapped(double own, double ext) {
+  if (decQ.b && decQ.b->colors > 6 && decQ.b->ninc >= 10 && own >= 0 && own < 1e299 && ext > own + rankSave / 4) return own + rankSave / 4;
+  return ext;
+}
 static double diesAt(const Judge *x) {
   double own = lostAtOf(x->o.lostAt, x->hold);
-  if (extCounts(x)) { double ext = lostAtOf(x->extLost, 0); if (ext > own) own = ext; }
+  if (extCounts(x)) { double ext = extCapped(own, lostAtOf(x->extLost, 0)); if (ext > own) own = ext; }
   return own;
 }
 // (THE WALK NEVER TURNS A LIFE INTO A DEATH: two boards lost a break's time apart or more on the frame each is lost, the later of them,
@@ -354,7 +363,7 @@ static double nextBreakDelay(int walk);
 static double lostOf(const Judge *x) {
   if (x->idle) return x->idleLost;   // (a move must beat doing nothing: markIdle)
   double own = lostAtOf(x->o.lostAt, x->hold);
-  if (extCounts(x)) { double ext = lostAtOf(x->extLost, 0); if (ext > own) own = ext; }
+  if (extCounts(x)) { double ext = extCapped(own, lostAtOf(x->extLost, 0)); if (ext > own) own = ext; }
   if (x->hold || own >= 1e299 || own < 0 || waitWalks(x)) return own;
   int walk = lineWalk(x);
   double charge = (double)WALK_FRAMES * walk, delay = nextBreakDelay(walk);

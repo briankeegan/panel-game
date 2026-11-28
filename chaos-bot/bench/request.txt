@@ -766,6 +766,11 @@
 # run 216 -- run 214's bot plus: above six colours, THE PLAN KEPT also gives way where the other's own board (no promise either side) is
 #   lost a quarter break later (rank.c). Run 214 insane s22 7060-7100, 11 queued: a carry lost at 213/195/173 promising 369/351/329 kept
 #   over entries lost at 304/286/225 promising 349/331/347, lost at 7635. 8 colours s21-22
+# run 216 -- (result) survived 5/8, 136383 frames -- better (4/8), kept. Lost combo s21 7593, insane s21 7746, combo s22 13044. With 12-18
+#   queued, SURVIVAL FIRST read the later loss on the promise: combo s21 7524 an entry lost at 130 credited 231 over a toward at 193;
+#   insane s21 7768 125 credited 286 over 195, 7694 95 credited 215.
+# run 217 -- above six colours with 10+ queued, the promise adds at most a quarter break to a line's own loss (rank.c extCapped; run 206
+#   took it away altogether: 2/8). 8 colours s21-22
 chain_garbage 21 9 9 1 21600 10 colors=8
 combo_storm 21 9 9 1 21600 10 colors=8
 thicc_combo_storm 21 9 9 1 21600 10 colors=8

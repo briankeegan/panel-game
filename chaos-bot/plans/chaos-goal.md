@@ -28,12 +28,15 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 | 1 HP | 10 | 29-30 | 238 | **8/8 -- done** |
 | No stop time | 10 | 31-32 | 239 | **8/8 -- done** |
 | BALL | 10 | 33-34 | 241 | **8/8 -- done** |
-| Line Clear (15:3-6) | stage's | 35-36 | 242 | 0/8 (rows sent short), being fixed (run 243) |
+| Line Clear (15:3-6) | stage's | 35-36 | 242 | won 0/8 (rows sent short), being fixed (run 243) |
 | Queue limit | 10 | 37-38 | - | to do |
 | training_random | 10 | 39-40 | - | to do (its own pattern: chain and combo garbage mixed at a random balance, Chaos Mode 1 game in 4 -- TrainingMenu.lua createBasicTrainingMode) |
 | Challenge Mode | stage's | 41-42 | - | to do |
 
 (8 colours old: 7/8 on seeds 7-8, run 180 -- does not count.)
+
+**Line Clear is won, not survived (the owner, 00:13 ET: "it's not 6 minutes, just has to win. That's fine, just adjust it"):** a stage counts
+when the challenger is beaten -- its rows sent before the two-minute wall -- not for lasting 6:00. 7/8 means 7 of 8 stages won.
 
 **Standing orders -- every step, no exceptions:**
 1. **A run is always going.** The moment a run finishes, the next one is pushed -- before writing to the owner, before reading at

@@ -423,10 +423,7 @@ static int readBoard_(Read *R) {
   // (TIME ATTACK'S RAISE: no design being built and the stack under its top -- the owner: flatten, raise to the top, then the chain; no
   // garbage is coming, so the rows are raised as they are, never held to a break's readiness. The top is TA_TOP less each row the tallest
   // column stands over the shortest past TA_EVEN: an uneven stack raised to TA_TOP puts its tallest column where the rise ends it)
-  // (run 258: above six colours the top is not lowered for an uneven stack -- panelTop is already the tallest column's, and taRaiseRows
-  // keeps the board raised standing TA_STAND frames; run 253 Line Clear 15:6 s35 stood on 24-36 panels for 740 frames after a chain with a
-  // tall column, never raised (cut, held, a set-up carried), and sent nothing -- seven colours flatten slowly)
-  int32_t taTo = TA_TOP - (decQ.b->colors > 6 ? 0 : imax(0, evenOf(decQ.b) - TA_EVEN));
+  int32_t taTo = TA_TOP - imax(0, evenOf(decQ.b) - TA_EVEN);
   int taRaise = ruleNoEnemy && !opening && !refill && !R->topped && !R->taDying && !taOn && panelTop(decQ.b) < taTo;
   if (taRaise) to = taTo;
   // (run 253: and with nobody across the opening raises to time attack's top too, not to the chaos ceiling, which keeps room for blocks
@@ -2199,7 +2196,9 @@ static Played playOf(const Read *R, int n) {
     double left = C2.due ? C2.due - C2.margin - nowMs() : 100, ms = left * 0.8; if (ms < 2) ms = 2;
     readyStop();
     List L; memset(&L, 0, sizeof L); L.n = 1; L.aim[0].chain.op = OP_GE; L.aim[0].chain.n = 2; L.aim[0].brk = -1;
-    ExtOpts eo = { TA_EXT_WIDTH, TA_EXT_DEPTH, &L, NOT_ASKED, 0, ms };
+    // (run 259: above six colours the chain going is searched 9 swaps deep, not 8 -- the chain puzzles' furthest (above); at seven colours a
+    // link is rarer and lies further: run 258 Line Clear 15:5 s36 ended its chains at 3-5 links, run 253's same game at 8-12)
+    ExtOpts eo = { TA_EXT_WIDTH, decQ.b->colors > 6 ? TA_EXT_DEPTH + 1 : TA_EXT_DEPTH, &L, NOT_ASKED, 0, ms };
     static Ext E; extend(&decQ, &eo, &E);
     taxBase = E.baseChain; taxLong = E.longest.set ? E.longest.chain : 0; taxN = E.longest.set ? E.longest.nseq : 0; taxMs = (int32_t)ms;
     if (E.longest.set && E.longest.nseq > 0) {

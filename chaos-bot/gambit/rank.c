@@ -2003,6 +2003,19 @@ static void outlivingFirst(Judge **a, int n) {
         Judge *e = a[i]; for (int q = i; q > 0; q--) a[q] = a[q - 1]; a[0] = e; moved = 1; rankMoved = -__LINE__; break; }
       if (!moved) break; }
     cmpKey = keep; }
+  // (run 231, ABOVE SIX COLOURS, THE LINE IN PROGRESS OUTLIVED IS PUT DOWN: the line in progress on top and dying, a line breaking at least as
+  // much garbage whose own board -- no promise counted -- is lost a third of a break's time later takes the top, beaten head to head or not:
+  // the line in progress stayed on top through its twin. Run 230 7 colours combo s24 1465 a carry lost at 288 over an entry lost at 361,
+  // 1478 275 over 357, lost at 2167; run 227 8 colours insane s21 13702 211 over a convert at 290)
+  if (decQ.b->colors > 6 && n > 1 && a[0]->carried && !a[0]->o.lives && !a[0]->o.dead) {
+    double t0 = lostAtOf(a[0]->o.lostAt, a[0]->hold); int best = 0; double bt = t0;
+    for (int i = 1; i < n; i++) { const Judge *e = a[i];
+      if (e->o.dead || e->hold || e->carried || imax(0, e->apBroke) < imax(0, a[0]->apBroke)) continue;
+      double te = e->o.lives ? 1e300 : lostAtOf(e->o.lostAt, 0);
+      if (te >= 1e299 && !e->o.lives) continue;
+      if (te - t0 >= rankSave / 3 && te > bt) { best = i; bt = te; } }
+    if (best > 0) { Judge *e = a[best]; for (int q = best; q > 0; q--) a[q] = a[q - 1]; a[0] = e; rankMoved = -__LINE__; }
+  }
 }
 static void sortJudged(Judge **a, int n) {
   static Judge *tmp[512];

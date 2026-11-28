@@ -22,7 +22,7 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 | Mode | Level | Seeds | Run | Result |
 |---|---|---|---|---|
 | 8 colours | 10 | 21-22 | 227 | **7/8 -- done** |
-| 7 colours | 10 | 23-24 | 230 | playing |
+| 7 colours | 10 | 23-24 | 230 | 3/8, being fixed (run 231) |
 | Chaos margin 4 | 10 | 25-26 | - | to redo (old: 7/8 on 7-8, run 191) |
 | Chaos mode | 10 | 27-28 | - | to redo (old: 8/8 on 7-8, run 192) |
 | 1 HP | 10 | 29-30 | - | to redo (old: 8/8 on 7-8, run 193) |
@@ -207,6 +207,8 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 230 (2026-11-27 22:02 ET), 7 COLOURS on seeds 23-24, run 227's bot: 3/8.** combo s24: the line in progress kept on top over an entry
+  lost 73-82 frames later. Run 231: the line in progress outlived by a third of a break gives up the top.
 - **Run 228 (2026-11-27 21:36 ET), HELD-OUT 8 colours seeds 51-52, run 227's bot: 6/8** -- below 7/8. thicc s52 lost at 966: the stack
   raised to 54 panels before the first block. Run 229: the run-160 high-opening rule back, bounded (48+ panels, never past 36), on 51-52;
   then 21-22 again before 7 colours.

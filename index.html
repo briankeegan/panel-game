@@ -2917,7 +2917,8 @@ function projectPlan(G, seq, cursor) {
   URLSTATE.apply(location.hash, true);
   {
     const sec = new URLSearchParams(location.hash.replace(/^#/, '')).get('sec');
-    if (sec && document.getElementById(sec)) setTimeout(() => document.getElementById(sec).scrollIntoView({ block: 'start' }), 500);
+    // (a link to a collapsible section opens it: #...&sec=sec-brain lands on the section expanded)
+    if (sec && document.getElementById(sec)) { const t = document.getElementById(sec); if (t.tagName === 'DETAILS') t.open = true; setTimeout(() => t.scrollIntoView({ block: 'start' }), 500); }
   }
   document.querySelectorAll('.gs-card[id]:not(#sec-podium):not(#sec-last)').forEach((el) => {
     const b = document.createElement('button');
@@ -2937,7 +2938,7 @@ function projectPlan(G, seq, cursor) {
     const links = [].slice.call(nav.querySelectorAll('a[href^="#sec-"]'));
     const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
     links.forEach((a) => { const t = document.getElementById(a.getAttribute('href').slice(1)); if (!t) return; const sync = () => { a.hidden = t.hidden; }; sync(); new MutationObserver(sync).observe(t, { attributes: true, attributeFilter: ['hidden'] }); });
-    links.forEach((a) => a.addEventListener('click', (e) => { const t = document.getElementById(a.getAttribute('href').slice(1)); if (!t) return; e.preventDefault(); t.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' }); }));
+    links.forEach((a) => a.addEventListener('click', (e) => { const t = document.getElementById(a.getAttribute('href').slice(1)); if (!t) return; e.preventDefault(); if (t.tagName === 'DETAILS') t.open = true; t.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' }); }));
     if (!('IntersectionObserver' in window)) return;
     const vis = {};
     const io = new IntersectionObserver((es) => { es.forEach((en) => { vis[en.target.id] = en.isIntersecting; });

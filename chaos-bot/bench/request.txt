@@ -1250,11 +1250,14 @@
 #   (no worse; a tower floor has no business in a stage with no garbage).
 # run 331 -- run 330 with no search workers in a Challenge stage (bench/play.sh: GC_GAMBIT_WORKERS=0 where CHAOSBOT_CHALLENGE is set) -- with
 #   nobody across the workers are now all that differ from run 282's bot. Line Clear 15:3-6 s35-36
-challenge 35 9 9 1 21600 10 challenge=15:3 profile=lineclear
-challenge 35 9 9 1 21600 10 challenge=15:4 profile=lineclear
-challenge 35 9 9 1 21600 10 challenge=15:5 profile=lineclear
-challenge 35 9 9 1 21600 10 challenge=15:6 profile=lineclear
-challenge 36 9 9 1 21600 10 challenge=15:3 profile=lineclear
-challenge 36 9 9 1 21600 10 challenge=15:4 profile=lineclear
-challenge 36 9 9 1 21600 10 challenge=15:5 profile=lineclear
-challenge 36 9 9 1 21600 10 challenge=15:6 profile=lineclear
+# run 331 -- (result, 11:47-11:51 ET) no search workers in a Challenge stage: Line Clear won 6/8 -- better: KEPT (cdd97c5). Lost 15:6 both
+#   (25.9, 27.5). With nobody across this is run 282's play again (the dig and the dive never act without garbage), which won 8/8 then.
+# run 332 -- the standings on run 331's bot, unchanged: queue limit (qlimit=1), done 8/8 (run 283), seeds 37-38. Queue limit s37-38
+chain_garbage 37 9 9 1 21600 10 qlimit=1
+combo_storm 37 9 9 1 21600 10 qlimit=1
+thicc_combo_storm 37 9 9 1 21600 10 qlimit=1
+insane_combo_storm 37 9 9 1 21600 10 qlimit=1
+chain_garbage 38 9 9 1 21600 10 qlimit=1
+combo_storm 38 9 9 1 21600 10 qlimit=1
+thicc_combo_storm 38 9 9 1 21600 10 qlimit=1
+insane_combo_storm 38 9 9 1 21600 10 qlimit=1

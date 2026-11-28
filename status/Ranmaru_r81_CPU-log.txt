@@ -1,5 +1,4 @@
-run 46119251008, as of 2026-11-28T08:21:30Z
-match start: gambit: the link is created
+run 46119251008, as of 2026-11-28T08:23:34Z
 match start: gambit: the link is starting the match
 match start: gambit: the link has started the match
 both ready — match starting
@@ -149,6 +148,7 @@ match over — bot won (pace: worst 0.26 frames off schedule); waiting for a rem
 memory after match: rss 4370020 kB, threads 9, lua 49726 kB
 game about to start: both players are ready
 set over: the room is closed, back in the lobby
+game about to start: both players are ready
 --- publish (the last 30 lines) ---
 [publish] 1 games finished so far; between two games of a set; the last publish 4249 s ago
 [publish] publishing the games so far (1 finished)

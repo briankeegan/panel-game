@@ -804,6 +804,10 @@
 #   108, over a carry lost at 121, alike on the credit; lost at 5128.
 # run 224 -- run 218's bot plus: above six colours, THE GARBAGE LET DOWN never puts first a line whose own board is lost a quarter break
 #   sooner (rank.c). 8 colours s21-22
+# run 224 -- (result) survived 2/8, 102846 frames -- worse: OFF, run 218's rank.c restored by hash (b3967e9). Six changes running scored
+#   2-4 against run 218's 5/8. insane s21 15069: A PROMISE NEVER BEATS A BREAK put a 3-cell break, ten swaps, lost at 223 over a carry
+#   lost at 310 (19 queued).
+# run 225 -- run 218's bot plus: above six colours, A PROMISE NEVER BEATS A BREAK gives way to a board lost a quarter break later (rank.c).
 chain_garbage 21 9 9 1 21600 10 colors=8
 combo_storm 21 9 9 1 21600 10 colors=8
 thicc_combo_storm 21 9 9 1 21600 10 colors=8

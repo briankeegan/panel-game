@@ -1271,12 +1271,7 @@ static int compareJudged(const Judge *x, const Judge *y) {
     int dx = letsDown(x), dy = letsDown(y);
     // (never over a line that breaks garbage -- the line in progress, an entry: letting the garbage down stands in for a break, and that
     // line is one)
-    // (run 224: and above six colours, never one whose own board -- no promise counted -- is lost a quarter break sooner: run 223 8 colours
-    // chain s21 5104 (13 queued) a level lost at 69, credited 108, put over a carry lost at 121 as alike, lost at 5128)
-    if (dx != dy) { const Judge *d = dx ? x : y, *o = dx ? y : x;
-      int ownSooner = decQ.b->colors > 6 && !o->o.dead && !o->o.lives &&
-                      lostAtOf(o->o.lostAt, o->hold) - lostAtOf(d->o.lostAt, d->hold) >= rankSave / 4;
-      if (!(o->apBroke > 0) && !ownSooner && (lostOf(d) >= lostOf(o) || lostAlike(d, o))) return (cmpKey = __LINE__, (dx ? -1 : 1)); }
+    if (dx != dy) { const Judge *d = dx ? x : y, *o = dx ? y : x; if (!(o->apBroke > 0) && (lostOf(d) >= lostOf(o) || lostAlike(d, o))) return (cmpKey = __LINE__, (dx ? -1 : 1)); }
     // (and of two lost alike that break nothing, the one whose board at rest leaves the garbage nearer coming down onto the stack
     // (restOn, outcome.c restOf): a perch built up is a break put further off -- the garbage on two towers over a well, every break
     // walked to it a support at a time)
@@ -1351,7 +1346,10 @@ static int compareJudged(const Judge *x, const Judge *y) {
     if (bx != by) {
       const Judge *b = bx ? x : y, *o = bx ? y : x;
       double bb = lostAtOf(b->o.lostAt, 0), ob = lostAtOf(o->o.lostAt, o->hold);
-      if (!o->o.lives && bb >= rankSave && ob - bb < rankSave) return (cmpKey = __LINE__, (bx ? -1 : 1));
+      // (run 225: above six colours, unless the other's own board outlives the break's by a quarter of a break's time -- as the other rules
+      // there. Run 224 8 colours insane s21 15069 (19 queued): a break of 3 cells, ten swaps, lost at 223 over a carry lost at 310, lost at
+      // 15480; chain s21 12112 273 over an entry at 319, lost at 12563)
+      if (!o->o.lives && bb >= rankSave && ob - bb < (decQ.b->colors > 6 ? rankSave / 4 : rankSave)) return (cmpKey = __LINE__, (bx ? -1 : 1));
     }
   }
   // (A PROMISE NEVER BEATS A LIFE: of two that do not live, one whose own board -- no next moves credited, the walk pressed on the

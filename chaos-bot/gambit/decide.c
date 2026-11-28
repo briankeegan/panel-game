@@ -2208,7 +2208,9 @@ static Played playOf(const Read *R, int n) {
   if (ruleNoEnemy && !R->under && !R->topped && clockFrameOut && !clockFrameOut() && (cascadeLive(decQ.b) || decQ.b->chainCounter > 0) &&
       !taWallNear(decQ.b)) {
     double keepDue = clockDue, keepShare = clockShare; clockDue = 0; clockShare = 0;
-    double left = C2.due ? C2.due - C2.margin - nowMs() : 100, ms = left * 0.8; if (ms < 2) ms = 2;
+    // (run 275: above six colours 95% of the decision's time, not 80% -- the chain going found a next link 60-77% of the time in runs 267-274
+    // (~130 ms), and a chain not taken on ends: their 15:6 chains, 14-20 a game, most of 2-4 links)
+    double left = C2.due ? C2.due - C2.margin - nowMs() : 100, ms = left * (decQ.b->colors > 6 ? 0.95 : 0.8); if (ms < 2) ms = 2;
     readyStop();
     List L; memset(&L, 0, sizeof L); L.n = 1; L.aim[0].chain.op = OP_GE; L.aim[0].chain.n = 2; L.aim[0].brk = -1;
     ExtOpts eo = { TA_EXT_WIDTH, TA_EXT_DEPTH, &L, NOT_ASKED, 0, ms };
@@ -2258,9 +2260,7 @@ static Played playOf(const Read *R, int n) {
     // whose tall column a clear brings down is never held up while the rise takes it to the top)
     // (and till a design is on, nothing cleared on a board that lives -- the owner: flatten, raise, then the chain that uses every block; a
     // clear made on the way spends the panels the design is made of, and starts a chain too short to take to 13)
-    // (run 274: not above six colours -- there the design fired holds about two links (run 268-273: 1.5-3 links, under a swap), so the clear
-    // held for it is a row given up for nothing: a combo sends width x height / 6, and a clear starts a chain the chain going takes on)
-    if (!taOn && !R->taDying && decQ.b->colors <= 6 && P.line && taClears(P.line) && taHoldNoSooner(P.line, n)) decWhy = __LINE__, P.line = 0;
+    if (!taOn && !R->taDying && P.line && taClears(P.line) && taHoldNoSooner(P.line, n)) decWhy = __LINE__, P.line = 0;
     if (taOn) {
       int32_t seq[CB_MAXSWAPS + 1]; int n = cbOrder(&G, &taD, taTr, seq, CB_MAXSWAPS + 1);
       // (never a build the board does not live through -- the owner: you can't choose to die: the swaps left and the trigger, walked and

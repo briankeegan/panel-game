@@ -28,7 +28,7 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 | 1 HP | 10 | 29-30 | 238 | **8/8 -- done** |
 | No stop time | 10 | 31-32 | 239 | **8/8 -- done** |
 | BALL | 10 | 33-34 | 241 | **8/8 -- done** |
-| Line Clear (15:3-6) | stage's | 35-36 | 272 | won 6/8 (273 off), being fixed (run 274) |
+| Line Clear (15:3-6) | stage's | 35-36 | 272 | won 6/8 (273-274 off), being fixed (run 275) |
 | Queue limit | 10 | 37-38 | - | to do |
 | training_random | 10 | 39-40 | - | to do (its own pattern: chain and combo garbage mixed at a random balance, Chaos Mode 1 game in 4 -- TrainingMenu.lua createBasicTrainingMode) |
 | Challenge Mode | stage's | 41-42 | - | to do |
@@ -210,6 +210,8 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 274 (03:19-03:23 ET), clears not held till a design is on above six colours: won 4/8 -- off.** Run 275: the chain going gets 95%
+  of the decision's time above six colours; the report prints links foreseen and not made.
 - **Run 273 (03:13-03:17 ET), the raise asking 3/4 of TA_STAND: won 5/8 -- off.** Its 15:6 chains: 14-17 a game, most of 2-4 links.
   Run 274: above six colours clears no longer held till a design is on (the designs there hold ~2 links).
 - **Run 272 (03:07-03:11 ET), 1'e a row more with nobody across above six colours: WON 6/8 -- kept (1d42fe1)** (no worse by games).

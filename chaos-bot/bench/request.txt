@@ -1018,6 +1018,10 @@
 #   272's (1d42fe1). Lost 15:5 s35 (24.5), 15:6 both (23.8, 23.2). The chains as they fell: 15:6 games 14 and 17 chains, most of 2-4 links.
 # run 274 -- run 272's bot plus: above six colours a clear is no longer held till a design is on (decide.c taClears hold; the designs fired
 #   there hold ~2 links). Line Clear 15:3-6 s35-36
+# run 274 -- (result, 03:19-03:23 ET) clears not held till a design is on above six colours: won 4/8 -- worse: OFF, decide.c back to run
+#   272's (1d42fe1). All four 7-colour stages lost (24.5, 26.8, 22.8, 24.1); 16-23 chains a game, most of 2-4 links.
+# run 275 -- run 272's bot plus: above six colours the chain going gets 95% of the decision's time, not 80% (decide.c). The report also
+#   prints the links the chain going foresaw and the chain did not make. Line Clear 15:3-6 s35-36
 challenge 35 9 9 1 21600 10 challenge=15:3 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:4 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:5 profile=lineclear

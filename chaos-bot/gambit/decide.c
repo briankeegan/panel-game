@@ -506,9 +506,10 @@ static int readBoard_(Read *R) {
     #define OPEN_TOP 6
     // (run 318: above six colours only -- added at 8 colours (run 311))
     // (run 334: off -- run 333 7 colours lost thicc s23 at 2515 and thicc s24 at 1284, both early, with it on)
-    // (run 336: back on at 8 colours only -- run 335 8 colours with it off lost thicc s21 at 2128 and thicc s22 at 5780, both early; 7
-    // colours keeps it off)
-    if (opening && !ruleNoEnemy && rq.b->colors > 7) rows = imin(rows, OPEN_TOP - panelTop(rq.b));
+    // (run 337: the same in every game, by what the board shows, never by the mode -- the owner: the bot plays the same whatever the
+    // mode, as it will on the server. The cap holds while garbage is told of, queued or on the board: run 335 8 colours with it off lost
+    // thicc s21 at 2128 and thicc s22 at 5780, both early under garbage; run 333 7 colours with it on in every opening lost two early)
+    if (opening && !ruleNoEnemy && (rq.narr > 0 || R->under || rq.b->ninc > 0)) rows = imin(rows, OPEN_TOP - panelTop(rq.b));
     if (rows <= 0) { R->up = R->low = 0; raiseWait = 0; } else to = fullTop(rq.b) + rows;
   }
   R->to = to;

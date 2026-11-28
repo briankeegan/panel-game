@@ -1197,3 +1197,7 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
   LuaJIT's math.min/max keep the NaN and no stop time is awarded. ca.c does the same.
 - run 335 (12:20-12:28 ET): 8 colours on run 334's bot (opening cap off) survived 5/8 -- thicc s21 2128, thicc s22 5780 (early), chain s22 8206.
 - run 336: opening cap back on at 8 colours only (colors > 7); 7 colours keeps it off. 8 colours s21-22.
+- run 336 CANCELLED. OWNER (12:32 ET): "all of the modes have to work the same ... It can do things differently in different situations
+  depending on what's on the board, but it has to be able to work regardless" -- the modes are tests; it will play on the real server.
+  No gates by mode (colour count, CHAOSBOT_CHALLENGE); conditions only on what the board shows. Existing colour gates to be replaced one a run.
+- run 337: opening raise cap by board state (garbage told of/queued/on board), any colours. 8 colours s21-22.

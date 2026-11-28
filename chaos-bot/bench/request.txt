@@ -1267,7 +1267,9 @@
 # run 335 -- 8 colours on run 334's bot (the cap it was added for, now off), to check it holds 7/8. 8 colours s21-22
 # run 335 -- (result, 12:20-12:28 ET) 8 colours with the opening cap off: survived 5/8. Lost thicc s21 at 2128 and thicc s22 at 5780
 #   (both early), chain s22 at 8206 (no line).
-# run 336 -- the opening raise cap back on at 8 colours only (7 colours keeps it off). 8 colours s21-22
+# run 336 -- the opening raise cap back on at 8 colours only. CANCELLED (12:33 ET): the owner -- every mode plays the same, by the board,
+#   never by the mode.
+# run 337 -- the opening raise cap in every game while garbage is told of, queued or on the board (no colour gate). 8 colours s21-22
 chain_garbage 21 9 9 1 21600 10 colors=8
 combo_storm 21 9 9 1 21600 10 colors=8
 thicc_combo_storm 21 9 9 1 21600 10 colors=8

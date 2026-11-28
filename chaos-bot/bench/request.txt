@@ -841,6 +841,11 @@
 #   put first six times by the next break's material (6), garbage resting and queued, the board run from 395 frames to 196.
 # run 232 -- run 231's bot plus: above six colours, garbage resting and more queued, the line pressed now before the same line waited on
 #   (rank.c, before rule 6). 7 colours s23-24
+# run 232 -- (result, 22:28-22:36 ET) 7 colours: survived 6/8, 151586 frames -- better (5/8), kept. Lost chain s24 2973, thicc s24 19013.
+#   chain s24 2646-2702: the wait on a line breaking nothing, counted living as the line in progress, put over the same line pressed now
+#   five times by "1. lives before does not" -- both lost at the same frame; run 232's rule covered breaking lines only.
+# run 233 -- run 232's bot plus: above six colours under garbage, the line waited on and the same line pressed now share one credit, and the
+#   press-now rule holds whether the line breaks garbage or not (rank.c). 7 colours s23-24
 chain_garbage 23 9 9 1 21600 10 colors=7
 combo_storm 23 9 9 1 21600 10 colors=7
 thicc_combo_storm 23 9 9 1 21600 10 colors=7

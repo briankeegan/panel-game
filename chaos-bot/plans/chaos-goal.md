@@ -22,7 +22,7 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 | Mode | Level | Seeds | Run | Result |
 |---|---|---|---|---|
 | 8 colours | 10 | 21-22 | 227 | **7/8 -- done** |
-| 7 colours | 10 | 23-24 | 231 | 5/8, being fixed (run 232) |
+| 7 colours | 10 | 23-24 | 232 | 6/8, being fixed (run 233) |
 | Chaos margin 4 | 10 | 25-26 | - | to redo (old: 7/8 on 7-8, run 191) |
 | Chaos mode | 10 | 27-28 | - | to redo (old: 8/8 on 7-8, run 192) |
 | 1 HP | 10 | 29-30 | - | to redo (old: 8/8 on 7-8, run 193) |
@@ -207,6 +207,8 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 232 (22:28-22:36 ET), no waiting under a backlog: 7 colours 6/8** -- kept. chain s24: the wait on a line breaking nothing kept over
+  the same line pressed now by its horizon credit. Run 233: the two share one credit, and press-now holds for any line.
 - **Run 231 (restarted 22:17:29, done 22:25 ET; per-game retries), the line in progress outlived gives up the top: 7 colours 5/8** -- kept.
   combo s24: the carry waited on six times under a backlog. Run 232: pressed now before waited, above six colours under garbage.
 - **Run 230 (2026-11-27 22:02 ET), 7 COLOURS on seeds 23-24, run 227's bot: 3/8.** combo s24: the line in progress kept on top over an entry

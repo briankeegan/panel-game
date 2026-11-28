@@ -1226,11 +1226,15 @@
 # run 322 -- (result, 10:32-10:40 ET) the dive from 15 waiting: chaos mode survived 5/8 (lost chain s27 4216 early, chain s28 17484, insane
 #   s28 20578 -- queues of 15-22 at the end). Not kept.
 # run 323 -- run 318's bot with the dive only under a deep backlog, twenty-five or more waiting (search/break.c). chaos mode s27-28
-chain_garbage 27 9 9 1 21600 10 chaosmode=1
-combo_storm 27 9 9 1 21600 10 chaosmode=1
-thicc_combo_storm 27 9 9 1 21600 10 chaosmode=1
-insane_combo_storm 27 9 9 1 21600 10 chaosmode=1
-chain_garbage 28 9 9 1 21600 10 chaosmode=1
-combo_storm 28 9 9 1 21600 10 chaosmode=1
-thicc_combo_storm 28 9 9 1 21600 10 chaosmode=1
-insane_combo_storm 28 9 9 1 21600 10 chaosmode=1
+# run 323 -- (result, 10:42-10:49 ET) the dive only from 25 waiting: chaos mode survived 8/8, full health -- KEPT (232d74d): the second pass's
+#   bot. Run 306's play at six colours, run 313's above; the dive only under a deep backlog.
+# run 324 -- training_random (done 8/8 on run 306's bot, the dive always on) on run 323's bot, to see the dive from 25 waiting still holds it
+#   (its losses' queues ran 25-48). training_random s39-40
+training_random 39 8 8 1 21600 10
+training_random 39 9 9 1 21600 10
+training_random 39 10 10 1 21600 10
+training_random 39 11 11 1 21600 10
+training_random 40 8 8 1 21600 10
+training_random 40 9 9 1 21600 10
+training_random 40 10 10 1 21600 10
+training_random 40 11 11 1 21600 10

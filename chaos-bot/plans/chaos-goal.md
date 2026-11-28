@@ -24,13 +24,13 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 | 8 colours | 10 | 21-22 | 227 | **7/8 -- done**; for 8/8: **7/8 on run 313's bot** (314 off) |
 | 7 colours | 10 | 23-24 | 234 | **7/8 -- done**; on run 313's bot 5/8 (run 315) |
 | Chaos margin 4 | 10 | 25-26 | 236 | **8/8 -- done**; on run 313's bot 6/8 (run 316); on run 306's 7/8 (run 317); on run 318's 5/8 -- the same six-colour play as 306's |
-| Chaos mode | 10 | 27-28 | 237 | **8/8 -- done**; on run 318's bot 4/8 (run 319); on run 282's 8/8 (run 320); on run 299's 7/8 (run 321) -- the dive costs it; dive from 15 waiting 5/8 (run 322); run 323 |
+| Chaos mode | 10 | 27-28 | 237 | **8/8 -- done**; on run 318's bot 4/8 (run 319); on run 282's 8/8 (run 320); on run 299's 7/8 (run 321) -- the dive costs it; dive from 15 waiting 5/8 (run 322); **dive from 25 waiting 8/8 (run 323)** |
 | 1 HP | 10 | 29-30 | 238 | **8/8 -- done** |
 | No stop time | 10 | 31-32 | 239 | **8/8 -- done** |
 | BALL | 10 | 33-34 | 241 | **8/8 -- done** |
 | Line Clear (15:3-6) | stage's | 35-36 | 282 | **8/8 -- done** |
 | Queue limit (qlimit=1) | 10 | 37-38 | 283 | **8/8 -- done** |
-| training_random | 10 | 39-40 | 306 | **8/8 -- done** (garbage level/speed 8-11 a seed) |
+| training_random | 10 | 39-40 | 306 | **8/8 -- done** (garbage level/speed 8-11 a seed); on run 323's bot: run 324 |
 | Challenge Mode (Impossible 11:5-8) | stage's | 41-42 | 307 | **8/8 -- done** |
 
 (8 colours old: 7/8 on seeds 7-8, run 180 -- does not count.)
@@ -210,6 +210,8 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 323 (10:42-10:49 ET), the dive only from 25 waiting: chaos mode 8/8, full health -- kept (232d74d), the second pass's bot.** Run
+  324: training_random on it (the dive won it at 8/8 in run 306).
 - **Run 322 (10:32-10:40 ET), the dive from 15 waiting: chaos mode 5/8** (its queues reach 15-22). Run 323: the dive from 25 waiting.
 - **Run 321 (10:22-10:30 ET), chaos mode on run 299's bot: 7/8** -- with run 320's 8/8, the dive (run 306) is what cost chaos mode (4/8).
   Run 322: the dive only under a backlog of 15+ waiting.

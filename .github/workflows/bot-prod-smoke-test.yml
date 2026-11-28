@@ -470,6 +470,9 @@ jobs:
       - name: Sit in the lobby (beta, ${{ inputs.bot }})
         if: env.MODE == 'live' && (env.SERVER_EFF == env.BETA_SERVER || env.SERVER_EFF == env.PROD_SERVER || env.SERVER_EFF == env.CHAOS_SERVER) && (env.BOT_KIND == 'wasm' || env.BOT_KIND == 'bitbot' || env.BOT_KIND == 'gambit')
         id: betalink
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HOURS: ${{ inputs.hours }}
         run: |
           set -eu
           eval "$(luarocks path --local --lua-version 5.1)"
@@ -477,7 +480,7 @@ jobs:
           # the chaos bot: chaos-bot/gambit beside chaos-bot/profiles (GambitNative is found at GC_EVAL_DIR/../gambit), its words file as is
           [ "${CHAOS:-}" != 1 ] || export GC_EVAL_DIR="$GITHUB_WORKSPACE/chaosbot/chaos-bot/profiles" PA_LEVEL_MIRROR="$CHAOS_LEVEL_FROM"
           # name is "BOT" or "BOT,OPPONENT": the second half is a lobby name this bot challenges
-          name='${{ env.BOT_NAME }}'
+          name="$BOT_NAME"
           # "BOT,OPPONENT" or "BOT,OPPONENT,GAMES": after GAMES finished games against OPPONENT the bot stops challenging
           # and sits in the lobby accepting whoever challenges
           games=""
@@ -487,7 +490,7 @@ jobs:
           first=""; case "$games" in first*) first=${games#first}; games="";; esac
           [ -n "$name" ] && [ ${#name} -le 16 ] || { echo "name '$name' must be 1-16 characters"; exit 1; }
           echo "::notice::$([ "${CHAOS:-}" = 1 ] && echo "the chaos bot" || echo GameCreator) at $(git -C "$GC_EVAL_DIR" log -1 --format='%h %s' | cut -c1-120)"
-          kind='${{ env.BOT_KIND }}'
+          kind="$BOT_KIND"
           pin=""
           if [ "$kind" = bitbot ]; then
             line=$(grep -E '^clang .* -shared .*libbit\.so' "$GC_EVAL_DIR/native/build.sh" | head -1)
@@ -506,14 +509,14 @@ jobs:
               export GC_GAMBIT_DIR="$G"
             else
             gp=survivor-profiles/gambit.json
-            case '${{ env.PROFILE }}' in survivor-profiles/*) gp='${{ env.PROFILE }}';; esac
+            case "$PROFILE" in survivor-profiles/*) gp="$PROFILE";; esac
             [ -f "$GC_EVAL_DIR/$gp" ] || { echo "no Gambit profile $GC_EVAL_DIR/$gp"; exit 1; }
             sh "$G/build.sh" native > gambit-build.log 2>&1 || { cat gambit-build.log; echo "libgambit.so did not build"; exit 1; }
             GC_SURVIVOR_PROFILE="$GC_EVAL_DIR/$gp" node "$G/words.js" > "$PWD/gambit.words" 2>> gambit-build.log || { cat gambit-build.log; echo "Gambit's profile did not encode"; exit 1; }
             fi
             echo "setup: Gambit profile encoded"
             gc=$(git -C "$GC_EVAL_DIR" log -1 --format=%h)
-            [ -z "${GAMBIT_COMMIT:-}" ] || gc="${GAMBIT_COMMIT:0:8} (gambit_from '${{ env.GAMBIT_FROM }}'; main is $gc)"
+            [ -z "${GAMBIT_COMMIT:-}" ] || gc="${GAMBIT_COMMIT:0:8} (gambit_from '${GAMBIT_FROM:-}'; main is $gc)"
             echo "::notice::Gambit built from GameCreator $gc, profile $gp"
             echo "${gc%% *}" > "$GITHUB_WORKSPACE/gambit-commit.txt"      # for the stats page, which shows games before the run is over
             export GC_GAMBIT_WORDS="$PWD/gambit.words" GC_GAMBIT_LOG="$PWD/gambit-$name.log"
@@ -531,7 +534,7 @@ jobs:
             brain=gambit
             echo "setup: Gambit ready"
           else
-            prof='${{ env.PROFILE }}'
+            prof="$PROFILE"
             prof_abs=""
             case "$prof" in
               *.wasm.json)
@@ -577,8 +580,8 @@ jobs:
               sleep 2
             done
           ) > "$GITHUB_WORKSPACE/save-id-$name.log" 2>&1 &
-          secs=$(( ${{ inputs.hours }} * 3600 ))
-          echo "::notice::$name ($brain) joining $BOT_HOST:$BOT_PORT for ${{ inputs.hours }}h"
+          secs=$(( $HOURS * 3600 ))
+          echo "::notice::$name ($brain) joining $BOT_HOST:$BOT_PORT for ${HOURS}h"
           set -o pipefail
           # A deploy's new bot is built by now and waits, not logged in, until every older bot on this server has left
           if [ "${STANDBY:-}" = 1 ] || [ -n "${AFTER:-}" ]; then
@@ -589,7 +592,7 @@ jobs:
             echo standby > "$RUNNER_TEMP/bot-state"
             began=$(date -u +%s)
             while :; do
-              out=$(GH_TOKEN="${{ github.token }}" gh api "repos/${{ github.repository }}/actions/runs?per_page=50" --jq "[ ([.workflow_runs[] | select(.status != \"completed\") | select(.id < $GITHUB_RUN_ID) | select(.display_title | startswith(\"$who\"))] | length), ([.workflow_runs[] | select(.display_title == \"bot-handoff · $BOT_HOST:$BOT_PORT\") | select((.created_at | fromdateiso8601) > $began)] | length) ] | @tsv" 2>/dev/null || echo "1 0")
+              out=$(GH_TOKEN="$GH_TOKEN" gh api "repos/$GITHUB_REPOSITORY/actions/runs?per_page=50" --jq "[ ([.workflow_runs[] | select(.status != \"completed\") | select(.id < $GITHUB_RUN_ID) | select(.display_title | startswith(\"$who\"))] | length), ([.workflow_runs[] | select(.display_title == \"bot-handoff · $BOT_HOST:$BOT_PORT\") | select((.created_at | fromdateiso8601) > $began)] | length) ] | @tsv" 2>/dev/null || echo "1 0")
               set -- $out; older=${1:-1}; handoff=${2:-0}
               # every check is visible: the status feed shows it, and the log prints each change
               printf 'older live bots=%s, handoff seen=%s, checked %s\n' "$older" "$handoff" "$(date -u +%H:%M:%S)" > "$RUNNER_TEMP/standby-check"
@@ -630,13 +633,13 @@ jobs:
               if [ -n "$why" ]; then
                 date -u +%s > "$RUNNER_TEMP/restart-deploy"
                 echo "$why: starting a deploy of the latest code to take over after the current game"
-                GH_TOKEN="${{ github.token }}" gh workflow run bot-prod-smoke-test.yml --repo "${{ github.repository }}" --ref "${{ github.ref_name }}" \
+                GH_TOKEN="$GH_TOKEN" gh workflow run bot-prod-smoke-test.yml --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME" \
                   -f mode=ranmaru-deploy -f server="$BOT_HOST:$BOT_PORT" -f bot=gambit -f name='Ranmaru_p#_CPU' -f advanced=force \
                   || echo "$why: the deploy could not be started (the fallback below takes over in 40 minutes)"
               fi
               if [ -e "$RUNNER_TEMP/restart-deploy" ] && [ ! -e "$RUNNER_TEMP/planned-restart" ] && [ $(( $(date -u +%s) - $(cat "$RUNNER_TEMP/restart-deploy") )) -ge 2400 ] \
-                 && GH_TOKEN="${{ github.token }}" gh api "repos/${{ github.repository }}/actions/runs?per_page=30" \
-                      --jq ".workflow_runs[] | select(.id != ${{ github.run_id }} and .status != \"completed\" and (.display_title | startswith(\"live · $BOT_HOST:$BOT_PORT · \"))) | .id" 2>/dev/null | grep -q .; then
+                 && GH_TOKEN="$GH_TOKEN" gh api "repos/$GITHUB_REPOSITORY/actions/runs?per_page=30" \
+                      --jq ".workflow_runs[] | select(.id != $GITHUB_RUN_ID and .status != \"completed\" and (.display_title | startswith(\"live · $BOT_HOST:$BOT_PORT · \"))) | .id" 2>/dev/null | grep -q .; then
                 # a newer bot is still finding a fast runner (the deploy re-runs it as long as it takes): stay, and look again in 40 minutes
                 date -u +%s > "$RUNNER_TEMP/restart-deploy"; echo "the replacement is still finding a fast runner: staying"
               fi
@@ -645,7 +648,7 @@ jobs:
               fi
               # one listing serves both checks. A stop counts whether or not it has finished yet (it was made after this bot started),
               # so a stop run quicker than the 30 s between checks is not missed.
-              runsjson=$(GH_TOKEN="${{ github.token }}" gh api "repos/${{ github.repository }}/actions/runs?per_page=50" 2>/dev/null || echo '{"workflow_runs":[]}')
+              runsjson=$(GH_TOKEN="$GH_TOKEN" gh api "repos/$GITHUB_REPOSITORY/actions/runs?per_page=50" 2>/dev/null || echo '{"workflow_runs":[]}')
               ids=$(printf '%s' "$runsjson" | jq -r ".workflow_runs[] | select(.display_title | test(\"^(ranmaru-stop|fight-start) · $BOT_HOST:$BOT_PORT( · .*)?\$\")) | select((.created_at | fromdateiso8601) > $started) | select(((.display_title | capture(\"except=(?<x>[0-9]+)\")? | .x) // \"0\") != \"$GITHUB_RUN_ID\") | .id" 2>/dev/null || true)
               # the NEWEST live bot on this server is never asked to leave (the one with the latest code): a stop only removes older bots
               newest=$(printf '%s' "$runsjson" | jq -r "[.workflow_runs[] | select(.status == \"in_progress\") | select(.display_title | startswith(\"live · $BOT_HOST:$BOT_PORT · \")) | .id] | max // 0" 2>/dev/null || echo 0)
@@ -655,7 +658,7 @@ jobs:
                 # the bot sits out its last seconds after a game; the next bot comes in during them
                 for _ in $(seq 1 14400); do
                   if [ -e "$PA_STOP_FILE.grace" ]; then
-                    GH_TOKEN="${{ github.token }}" gh workflow run bot-prod-smoke-test.yml --repo "${{ github.repository }}" --ref "${{ github.ref_name }}" -f mode=bot-handoff -f server="$BOT_HOST:$BOT_PORT" || true
+                    GH_TOKEN="$GH_TOKEN" gh workflow run bot-prod-smoke-test.yml --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME" -f mode=bot-handoff -f server="$BOT_HOST:$BOT_PORT" || true
                     break
                   fi
                   sleep 0.5
@@ -669,7 +672,7 @@ jobs:
           if [ "$kind" = gambit ] && [ "${DASH_LIVE:-1}" = 1 ]; then
             # (its lines also go to publish.log, which the heartbeat sends with the bot's log: a publish that fails shows while the run is on --
             # the step's log cannot be read until the run is over)
-            GH_TOKEN="${{ github.token }}" nice -n 19 bash "$GITHUB_WORKSPACE/dashboard/live_loop.sh" "$$" > >(tee -a "$RUNNER_TEMP/publish.log") 2>&1 &
+            GH_TOKEN="$GH_TOKEN" nice -n 19 bash "$GITHUB_WORKSPACE/dashboard/live_loop.sh" "$$" > >(tee -a "$RUNNER_TEMP/publish.log") 2>&1 &
             livepid=$!
           fi
           # THE BOT AND A WATCHER RUN KEEP EACH OTHER UP. A runner can be taken away (the log ends with "The runner has received a shutdown
@@ -687,9 +690,9 @@ jobs:
           # Heartbeat (for the agent): every minute the bot's status is written to the bot-status branch, file status/<bot>.txt,
           # with the time it was written. A frozen bot shows an old time while the run still looks alive. Never fails the run.
           if [ "$kind" = gambit ]; then
-            ( parent=$$; export GH_TOKEN="${{ github.token }}"; repo="$GITHUB_REPOSITORY"
+            ( parent=$$; export GH_TOKEN="$GH_TOKEN"; repo="$GITHUB_REPOSITORY"
               key=$(printf '%s' "$name" | tr -c 'A-Za-z0-9_-' '_'); path="status/$key.txt"
-              gh api "repos/$repo/git/ref/heads/bot-status" >/dev/null 2>&1 || gh api -X POST "repos/$repo/git/refs" -f ref=refs/heads/bot-status -f sha="${{ github.sha }}" >/dev/null 2>&1 || true
+              gh api "repos/$repo/git/ref/heads/bot-status" >/dev/null 2>&1 || gh api -X POST "repos/$repo/git/refs" -f ref=refs/heads/bot-status -f sha="$GITHUB_SHA" >/dev/null 2>&1 || true
               # put FILE CONTENT: write a file on bot-status, reusing the sha the last write returned (2 calls per beat, not 4); only
               # when that write is refused (no file yet, or the sha moved) is the sha looked up and the write tried once more
               sha=""; lsha=""; beat=0
@@ -735,7 +738,7 @@ jobs:
           if [ -n "${livepid:-}" ]; then
             kill "$livepid" 2>/dev/null || true; pkill -TERM -f dashboard/live_publish.sh 2>/dev/null || true; sleep 2
             echo "[publish] the bot has left: publishing every game it finished"
-            GH_TOKEN="${{ github.token }}" bash "$GITHUB_WORKSPACE/dashboard/live_publish.sh" 2>&1 | sed 's/^/[publish] /' || true
+            GH_TOKEN="$GH_TOKEN" bash "$GITHUB_WORKSPACE/dashboard/live_publish.sh" 2>&1 | sed 's/^/[publish] /' || true
           fi
           case "$rc" in 0|124|75) : ;; *) exit "$rc";; esac
 

@@ -1198,11 +1198,15 @@
 #   (d0481f8). Lost chain s21 6094, thicc s22 3447 and insane s22 3173 (early).
 # run 315 -- THE SECOND PASS, mode by mode on the current bot (run 313's, d0481f8: 8 colours 7/8 on it): 7 colours, done at 7/8 (run 234), its
 #   own seeds 23-24 -- each mode's standing on one bot first, then the fixes for 8/8 where it stands lowest. 7 colours s23-24
-chain_garbage 23 9 9 1 21600 10 colors=7
-combo_storm 23 9 9 1 21600 10 colors=7
-thicc_combo_storm 23 9 9 1 21600 10 colors=7
-insane_combo_storm 23 9 9 1 21600 10 colors=7
-chain_garbage 24 9 9 1 21600 10 colors=7
-combo_storm 24 9 9 1 21600 10 colors=7
-thicc_combo_storm 24 9 9 1 21600 10 colors=7
-insane_combo_storm 24 9 9 1 21600 10 colors=7
+# run 315 -- (result, 09:27-09:34 ET) 7 colours on run 313's bot: survived 5/8 (run 234's bot: 7/8). Lost chain s23 20598, insane s23 6858,
+#   chain s24 8745.
+# run 316 -- the second pass's standings on run 313's bot (d0481f8), unchanged: chaos margin 4, done 8/8 (run 236), seeds 25-26.
+#   margin 4 s25-26
+chain_garbage 25 9 9 1 21600 10 margin=4
+combo_storm 25 9 9 1 21600 10 margin=4
+thicc_combo_storm 25 9 9 1 21600 10 margin=4
+insane_combo_storm 25 9 9 1 21600 10 margin=4
+chain_garbage 26 9 9 1 21600 10 margin=4
+combo_storm 26 9 9 1 21600 10 margin=4
+thicc_combo_storm 26 9 9 1 21600 10 margin=4
+insane_combo_storm 26 9 9 1 21600 10 margin=4

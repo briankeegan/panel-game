@@ -40,8 +40,8 @@ jobs:
           assert games, "no games in request.txt"
           print("games=" + json.dumps(games))
           PY
-  play:
-    needs: plan
+  play1:
+    needs: [plan]
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     strategy:
@@ -49,21 +49,41 @@ jobs:
       max-parallel: 8
       matrix:
         game: ${{ fromJSON(needs.plan.outputs.games) }}
-    name: game ${{ matrix.game.n }} L${{ matrix.game.level }} ${{ matrix.game.pattern }} seed ${{ matrix.game.seed }} mode ${{ matrix.game.mode }} margin ${{ matrix.game.margin }} chaos ${{ matrix.game.chaosmode }} colors ${{ matrix.game.colors }} challenge ${{ matrix.game.challenge }} ${{ matrix.game.profile }}
+    name: try 1 game ${{ matrix.game.n }} L${{ matrix.game.level }} ${{ matrix.game.pattern }} seed ${{ matrix.game.seed }} mode ${{ matrix.game.mode }} margin ${{ matrix.game.margin }} chaos ${{ matrix.game.chaosmode }} colors ${{ matrix.game.colors }} challenge ${{ matrix.game.challenge }} ${{ matrix.game.profile }}
     steps:
+      - id: gate
+        # (THE RUNNER CHOSEN -- the owner, 2026-11-27: "if we get a bad runner... we just skip it.... and wait for another". In runs
+        # 208-226 the bot survived 49% of its games on Intel Xeon 6975P and 17-22% on AMD EPYC 7763/9V74/9V45: a game that lands on an
+        # AMD machine is not played here and waits for the next attempt's runner; the last attempt plays on whatever it draws. A game
+        # already played in an earlier attempt -- its artifact is in the run -- is not played again.)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          n=${{ matrix.game.n }}; attempt=1; last=4
+          names=$(curl -s -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts?per_page=100" | python3 -c "import json,sys; print(' '.join(a['name'] for a in json.load(sys.stdin).get('artifacts', [])))")
+          if echo " $names " | grep -q " chaosbot-game-$n "; then echo "go=false" >> "$GITHUB_OUTPUT"; echo "game $n: played already"; exit 0; fi
+          model=$(lscpu | sed -n 's/^Model name: *//p' | head -1)
+          if [ "$attempt" -lt "$last" ] && echo "$model" | grep -qi amd; then
+            echo "go=false" >> "$GITHUB_OUTPUT"; echo "::notice title=game $n::attempt $attempt drew $model -- skipped, waiting for another runner"; exit 0
+          fi
+          echo "go=true" >> "$GITHUB_OUTPUT"; echo "game $n: attempt $attempt plays on $model"
       - uses: actions/checkout@v4
+        if: steps.gate.outputs.go == 'true'
       - name: love, cached
+        if: steps.gate.outputs.go == 'true'
         uses: actions/cache@v4
         with:
           path: /tmp/love.tar.gz
           key: chaosbot-love-12.0-linux-x86_64
       - name: chaos client, cached
+        if: steps.gate.outputs.go == 'true'
         # (the pinned client zip kept between runs -- run 187 lost 7 of 8 games twice to its download answering 504)
         uses: actions/cache@v4
         with:
           path: /tmp/chaosbot-zip
           key: chaosbot-client-test-build-v3-ec5baf00
       - name: xvfb, love, clang
+        if: steps.gate.outputs.go == 'true'
         run: |
           APT="-o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o DPkg::Lock::Timeout=120"
           for i in 1 2 3; do timeout 240 sudo apt-get $APT update && timeout 240 sudo apt-get $APT install -y libfuse2 xvfb clang && break; sleep 10; done
@@ -73,6 +93,7 @@ jobs:
           mv ~/love2d/*.AppImage ~/love2d/love.AppImage
           chmod +x ~/love2d/love.AppImage
       - name: Play
+        if: steps.gate.outputs.go == 'true'
         env:
           LOVE: /home/runner/love2d/love.AppImage
           CHAOSBOT_LEVEL: ${{ matrix.game.level }}
@@ -90,14 +111,248 @@ jobs:
           bash chaos-bot/bench/play.sh ${{ matrix.game.pattern }} ${{ matrix.game.seed }} ${{ matrix.game.glevel }} ${{ matrix.game.gspeed }} ${{ matrix.game.queue }} ${{ matrix.game.frames }} out
           echo "::notice title=game ${{ matrix.game.n }}::$(cat out/result.txt)"
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: steps.gate.outputs.go == 'true' && (always())
+        with:
+          name: chaosbot-game-${{ matrix.game.n }}
+          path: out/
+          if-no-files-found: warn
+          retention-days: 14
+  play2:
+    needs: [plan, play1]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix:
+        game: ${{ fromJSON(needs.plan.outputs.games) }}
+    name: try 2 game ${{ matrix.game.n }} L${{ matrix.game.level }} ${{ matrix.game.pattern }} seed ${{ matrix.game.seed }} mode ${{ matrix.game.mode }} margin ${{ matrix.game.margin }} chaos ${{ matrix.game.chaosmode }} colors ${{ matrix.game.colors }} challenge ${{ matrix.game.challenge }} ${{ matrix.game.profile }}
+    steps:
+      - id: gate
+        # (THE RUNNER CHOSEN -- the owner, 2026-11-27: "if we get a bad runner... we just skip it.... and wait for another". In runs
+        # 208-226 the bot survived 49% of its games on Intel Xeon 6975P and 17-22% on AMD EPYC 7763/9V74/9V45: a game that lands on an
+        # AMD machine is not played here and waits for the next attempt's runner; the last attempt plays on whatever it draws. A game
+        # already played in an earlier attempt -- its artifact is in the run -- is not played again.)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          n=${{ matrix.game.n }}; attempt=2; last=4
+          names=$(curl -s -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts?per_page=100" | python3 -c "import json,sys; print(' '.join(a['name'] for a in json.load(sys.stdin).get('artifacts', [])))")
+          if echo " $names " | grep -q " chaosbot-game-$n "; then echo "go=false" >> "$GITHUB_OUTPUT"; echo "game $n: played already"; exit 0; fi
+          model=$(lscpu | sed -n 's/^Model name: *//p' | head -1)
+          if [ "$attempt" -lt "$last" ] && echo "$model" | grep -qi amd; then
+            echo "go=false" >> "$GITHUB_OUTPUT"; echo "::notice title=game $n::attempt $attempt drew $model -- skipped, waiting for another runner"; exit 0
+          fi
+          echo "go=true" >> "$GITHUB_OUTPUT"; echo "game $n: attempt $attempt plays on $model"
+      - uses: actions/checkout@v4
+        if: steps.gate.outputs.go == 'true'
+      - name: love, cached
+        if: steps.gate.outputs.go == 'true'
+        uses: actions/cache@v4
+        with:
+          path: /tmp/love.tar.gz
+          key: chaosbot-love-12.0-linux-x86_64
+      - name: chaos client, cached
+        if: steps.gate.outputs.go == 'true'
+        # (the pinned client zip kept between runs -- run 187 lost 7 of 8 games twice to its download answering 504)
+        uses: actions/cache@v4
+        with:
+          path: /tmp/chaosbot-zip
+          key: chaosbot-client-test-build-v3-ec5baf00
+      - name: xvfb, love, clang
+        if: steps.gate.outputs.go == 'true'
+        run: |
+          APT="-o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o DPkg::Lock::Timeout=120"
+          for i in 1 2 3; do timeout 240 sudo apt-get $APT update && timeout 240 sudo apt-get $APT install -y libfuse2 xvfb clang && break; sleep 10; done
+          mkdir -p ~/love2d
+          [ -s /tmp/love.tar.gz ] || for i in 1 2 3 4 5 6; do curl -fsSL "https://github.com/panel-attack/panel-game/releases/download/love2d-12.0/love-12.0-linux-x86_64.tar.gz" -o /tmp/love.tar.gz && break; sleep $((i * 15)); done
+          tar -xzf /tmp/love.tar.gz -C ~/love2d
+          mv ~/love2d/*.AppImage ~/love2d/love.AppImage
+          chmod +x ~/love2d/love.AppImage
+      - name: Play
+        if: steps.gate.outputs.go == 'true'
+        env:
+          LOVE: /home/runner/love2d/love.AppImage
+          CHAOSBOT_LEVEL: ${{ matrix.game.level }}
+          CHAOSBOT_GAMEMODE: ${{ matrix.game.mode }}
+          CHAOSBOT_MARGIN: ${{ matrix.game.margin }}
+          CHAOSBOT_CHAOSMODE: ${{ matrix.game.chaosmode }}
+          CHAOSBOT_COLORS: ${{ matrix.game.colors }}
+          CHAOSBOT_CHALLENGE: ${{ matrix.game.challenge }}
+          CHAOSBOT_PROFILE: ${{ matrix.game.profile }}
+          CHAOSBOT_ZIP_CACHE: /tmp/chaosbot-zip
+        run: |
+          g='${{ toJSON(matrix.game) }}'
+          # (the machine each game ran on: the bot's searches stop on the wall clock, so a slower CPU searches less -- logged per game)
+          mkdir -p out && echo "$(lscpu | sed -n 's/^Model name: *//p' | head -1) | $(nproc) cpus | $(sed -n 's/^cpu MHz.*: *//p' /proc/cpuinfo | head -1) MHz" > out/cpu.txt
+          bash chaos-bot/bench/play.sh ${{ matrix.game.pattern }} ${{ matrix.game.seed }} ${{ matrix.game.glevel }} ${{ matrix.game.gspeed }} ${{ matrix.game.queue }} ${{ matrix.game.frames }} out
+          echo "::notice title=game ${{ matrix.game.n }}::$(cat out/result.txt)"
+      - uses: actions/upload-artifact@v4
+        if: steps.gate.outputs.go == 'true' && (always())
+        with:
+          name: chaosbot-game-${{ matrix.game.n }}
+          path: out/
+          if-no-files-found: warn
+          retention-days: 14
+  play3:
+    needs: [plan, play1, play2]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix:
+        game: ${{ fromJSON(needs.plan.outputs.games) }}
+    name: try 3 game ${{ matrix.game.n }} L${{ matrix.game.level }} ${{ matrix.game.pattern }} seed ${{ matrix.game.seed }} mode ${{ matrix.game.mode }} margin ${{ matrix.game.margin }} chaos ${{ matrix.game.chaosmode }} colors ${{ matrix.game.colors }} challenge ${{ matrix.game.challenge }} ${{ matrix.game.profile }}
+    steps:
+      - id: gate
+        # (THE RUNNER CHOSEN -- the owner, 2026-11-27: "if we get a bad runner... we just skip it.... and wait for another". In runs
+        # 208-226 the bot survived 49% of its games on Intel Xeon 6975P and 17-22% on AMD EPYC 7763/9V74/9V45: a game that lands on an
+        # AMD machine is not played here and waits for the next attempt's runner; the last attempt plays on whatever it draws. A game
+        # already played in an earlier attempt -- its artifact is in the run -- is not played again.)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          n=${{ matrix.game.n }}; attempt=3; last=4
+          names=$(curl -s -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts?per_page=100" | python3 -c "import json,sys; print(' '.join(a['name'] for a in json.load(sys.stdin).get('artifacts', [])))")
+          if echo " $names " | grep -q " chaosbot-game-$n "; then echo "go=false" >> "$GITHUB_OUTPUT"; echo "game $n: played already"; exit 0; fi
+          model=$(lscpu | sed -n 's/^Model name: *//p' | head -1)
+          if [ "$attempt" -lt "$last" ] && echo "$model" | grep -qi amd; then
+            echo "go=false" >> "$GITHUB_OUTPUT"; echo "::notice title=game $n::attempt $attempt drew $model -- skipped, waiting for another runner"; exit 0
+          fi
+          echo "go=true" >> "$GITHUB_OUTPUT"; echo "game $n: attempt $attempt plays on $model"
+      - uses: actions/checkout@v4
+        if: steps.gate.outputs.go == 'true'
+      - name: love, cached
+        if: steps.gate.outputs.go == 'true'
+        uses: actions/cache@v4
+        with:
+          path: /tmp/love.tar.gz
+          key: chaosbot-love-12.0-linux-x86_64
+      - name: chaos client, cached
+        if: steps.gate.outputs.go == 'true'
+        # (the pinned client zip kept between runs -- run 187 lost 7 of 8 games twice to its download answering 504)
+        uses: actions/cache@v4
+        with:
+          path: /tmp/chaosbot-zip
+          key: chaosbot-client-test-build-v3-ec5baf00
+      - name: xvfb, love, clang
+        if: steps.gate.outputs.go == 'true'
+        run: |
+          APT="-o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o DPkg::Lock::Timeout=120"
+          for i in 1 2 3; do timeout 240 sudo apt-get $APT update && timeout 240 sudo apt-get $APT install -y libfuse2 xvfb clang && break; sleep 10; done
+          mkdir -p ~/love2d
+          [ -s /tmp/love.tar.gz ] || for i in 1 2 3 4 5 6; do curl -fsSL "https://github.com/panel-attack/panel-game/releases/download/love2d-12.0/love-12.0-linux-x86_64.tar.gz" -o /tmp/love.tar.gz && break; sleep $((i * 15)); done
+          tar -xzf /tmp/love.tar.gz -C ~/love2d
+          mv ~/love2d/*.AppImage ~/love2d/love.AppImage
+          chmod +x ~/love2d/love.AppImage
+      - name: Play
+        if: steps.gate.outputs.go == 'true'
+        env:
+          LOVE: /home/runner/love2d/love.AppImage
+          CHAOSBOT_LEVEL: ${{ matrix.game.level }}
+          CHAOSBOT_GAMEMODE: ${{ matrix.game.mode }}
+          CHAOSBOT_MARGIN: ${{ matrix.game.margin }}
+          CHAOSBOT_CHAOSMODE: ${{ matrix.game.chaosmode }}
+          CHAOSBOT_COLORS: ${{ matrix.game.colors }}
+          CHAOSBOT_CHALLENGE: ${{ matrix.game.challenge }}
+          CHAOSBOT_PROFILE: ${{ matrix.game.profile }}
+          CHAOSBOT_ZIP_CACHE: /tmp/chaosbot-zip
+        run: |
+          g='${{ toJSON(matrix.game) }}'
+          # (the machine each game ran on: the bot's searches stop on the wall clock, so a slower CPU searches less -- logged per game)
+          mkdir -p out && echo "$(lscpu | sed -n 's/^Model name: *//p' | head -1) | $(nproc) cpus | $(sed -n 's/^cpu MHz.*: *//p' /proc/cpuinfo | head -1) MHz" > out/cpu.txt
+          bash chaos-bot/bench/play.sh ${{ matrix.game.pattern }} ${{ matrix.game.seed }} ${{ matrix.game.glevel }} ${{ matrix.game.gspeed }} ${{ matrix.game.queue }} ${{ matrix.game.frames }} out
+          echo "::notice title=game ${{ matrix.game.n }}::$(cat out/result.txt)"
+      - uses: actions/upload-artifact@v4
+        if: steps.gate.outputs.go == 'true' && (always())
+        with:
+          name: chaosbot-game-${{ matrix.game.n }}
+          path: out/
+          if-no-files-found: warn
+          retention-days: 14
+  play4:
+    needs: [plan, play1, play2, play3]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix:
+        game: ${{ fromJSON(needs.plan.outputs.games) }}
+    name: try 4 game ${{ matrix.game.n }} L${{ matrix.game.level }} ${{ matrix.game.pattern }} seed ${{ matrix.game.seed }} mode ${{ matrix.game.mode }} margin ${{ matrix.game.margin }} chaos ${{ matrix.game.chaosmode }} colors ${{ matrix.game.colors }} challenge ${{ matrix.game.challenge }} ${{ matrix.game.profile }}
+    steps:
+      - id: gate
+        # (THE RUNNER CHOSEN -- the owner, 2026-11-27: "if we get a bad runner... we just skip it.... and wait for another". In runs
+        # 208-226 the bot survived 49% of its games on Intel Xeon 6975P and 17-22% on AMD EPYC 7763/9V74/9V45: a game that lands on an
+        # AMD machine is not played here and waits for the next attempt's runner; the last attempt plays on whatever it draws. A game
+        # already played in an earlier attempt -- its artifact is in the run -- is not played again.)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          n=${{ matrix.game.n }}; attempt=4; last=4
+          names=$(curl -s -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts?per_page=100" | python3 -c "import json,sys; print(' '.join(a['name'] for a in json.load(sys.stdin).get('artifacts', [])))")
+          if echo " $names " | grep -q " chaosbot-game-$n "; then echo "go=false" >> "$GITHUB_OUTPUT"; echo "game $n: played already"; exit 0; fi
+          model=$(lscpu | sed -n 's/^Model name: *//p' | head -1)
+          if [ "$attempt" -lt "$last" ] && echo "$model" | grep -qi amd; then
+            echo "go=false" >> "$GITHUB_OUTPUT"; echo "::notice title=game $n::attempt $attempt drew $model -- skipped, waiting for another runner"; exit 0
+          fi
+          echo "go=true" >> "$GITHUB_OUTPUT"; echo "game $n: attempt $attempt plays on $model"
+      - uses: actions/checkout@v4
+        if: steps.gate.outputs.go == 'true'
+      - name: love, cached
+        if: steps.gate.outputs.go == 'true'
+        uses: actions/cache@v4
+        with:
+          path: /tmp/love.tar.gz
+          key: chaosbot-love-12.0-linux-x86_64
+      - name: chaos client, cached
+        if: steps.gate.outputs.go == 'true'
+        # (the pinned client zip kept between runs -- run 187 lost 7 of 8 games twice to its download answering 504)
+        uses: actions/cache@v4
+        with:
+          path: /tmp/chaosbot-zip
+          key: chaosbot-client-test-build-v3-ec5baf00
+      - name: xvfb, love, clang
+        if: steps.gate.outputs.go == 'true'
+        run: |
+          APT="-o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o DPkg::Lock::Timeout=120"
+          for i in 1 2 3; do timeout 240 sudo apt-get $APT update && timeout 240 sudo apt-get $APT install -y libfuse2 xvfb clang && break; sleep 10; done
+          mkdir -p ~/love2d
+          [ -s /tmp/love.tar.gz ] || for i in 1 2 3 4 5 6; do curl -fsSL "https://github.com/panel-attack/panel-game/releases/download/love2d-12.0/love-12.0-linux-x86_64.tar.gz" -o /tmp/love.tar.gz && break; sleep $((i * 15)); done
+          tar -xzf /tmp/love.tar.gz -C ~/love2d
+          mv ~/love2d/*.AppImage ~/love2d/love.AppImage
+          chmod +x ~/love2d/love.AppImage
+      - name: Play
+        if: steps.gate.outputs.go == 'true'
+        env:
+          LOVE: /home/runner/love2d/love.AppImage
+          CHAOSBOT_LEVEL: ${{ matrix.game.level }}
+          CHAOSBOT_GAMEMODE: ${{ matrix.game.mode }}
+          CHAOSBOT_MARGIN: ${{ matrix.game.margin }}
+          CHAOSBOT_CHAOSMODE: ${{ matrix.game.chaosmode }}
+          CHAOSBOT_COLORS: ${{ matrix.game.colors }}
+          CHAOSBOT_CHALLENGE: ${{ matrix.game.challenge }}
+          CHAOSBOT_PROFILE: ${{ matrix.game.profile }}
+          CHAOSBOT_ZIP_CACHE: /tmp/chaosbot-zip
+        run: |
+          g='${{ toJSON(matrix.game) }}'
+          # (the machine each game ran on: the bot's searches stop on the wall clock, so a slower CPU searches less -- logged per game)
+          mkdir -p out && echo "$(lscpu | sed -n 's/^Model name: *//p' | head -1) | $(nproc) cpus | $(sed -n 's/^cpu MHz.*: *//p' /proc/cpuinfo | head -1) MHz" > out/cpu.txt
+          bash chaos-bot/bench/play.sh ${{ matrix.game.pattern }} ${{ matrix.game.seed }} ${{ matrix.game.glevel }} ${{ matrix.game.gspeed }} ${{ matrix.game.queue }} ${{ matrix.game.frames }} out
+          echo "::notice title=game ${{ matrix.game.n }}::$(cat out/result.txt)"
+      - uses: actions/upload-artifact@v4
+        if: steps.gate.outputs.go == 'true' && (always())
         with:
           name: chaosbot-game-${{ matrix.game.n }}
           path: out/
           if-no-files-found: warn
           retention-days: 14
   report:
-    needs: [plan, play]
+    needs: [plan, play1, play2, play3, play4]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 10

@@ -556,9 +556,6 @@ static int calmGap(const Board *next) {
   // a board that lives is no reason to wait: run 276's 7-colour Line Clears spent their time between chains on flattening, set-ups and
   // designs walked a swap at a time, each swap after the first waiting the profile's gap (20) and a jitter (to 16) once the hold lived)
   if (ruleNoEnemy) return -1;
-  // (run 291: nor with a backlog -- fifteen or more waiting: the queue's fiftieth is a loss whatever the health, and every frame waited is
-  // garbage not broken; runs 284-290 training_random at garbage level 10-11 lost 17 games with the queue climbing a piece every ~300 frames)
-  if (next->ninc >= 15) return -1;
   if (F.gap < 0 || !F.haveSwapEnd || !F.havePace || !F.lastHold || F.lastUrgent) return -1;
   if (next->chainCounter > 0 || cascadeLive(next)) return -1;
   int32_t stop = next->stopTime + next->preStopTime;

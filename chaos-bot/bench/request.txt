@@ -1095,6 +1095,10 @@
 #   282's (43a7572). Lost s39 17739, s40 17449 and 17284 -- the queue 38-50 under garbage. Game 7 (s40, level 10) has now lost in runs 285-290.
 # run 291 -- run 282's bot plus: no calm slack with a backlog of 15 or more waiting (front.c calmGap: a swap after a living hold waited the
 #   profile's gap and a jitter, 20-36 frames, while the queue climbed). training_random s39-40
+# run 291 -- (result, 05:34-05:42 ET) no calm slack with a backlog: survived 3/8 -- worse: OFF, front.c back to run 282's (43a7572). Lost s39
+#   7583 and 17555, s40 2909 (early, opening-high: first garbage on 46 panels), 18616 (opening-high) and 15996.
+# run 292 -- run 282's bot plus: the opening raise only while nothing is on its way (decide.c opening: no telegraphed arrival, none queued).
+#   training_random s39-40
 training_random 39 8 8 1 21600 10
 training_random 39 9 9 1 21600 10
 training_random 39 10 10 1 21600 10

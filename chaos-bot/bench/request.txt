@@ -987,6 +987,11 @@
 # run 268 -- run 253's bot plus: above six colours the board is held while a design is searched whenever it is not dying, not only where
 #   the hold tops out no sooner than the rank's line (decide.c; the rank's lines played over the search let the designs go). Line Clear
 #   15:3-6 s35-36
+# run 268 -- (result, 02:42-02:45 ET) the board held while a design is searched above six colours: won 5/8 -- worse: OFF, decide.c back
+#   to run 253's (3931d36). Designs let go fell to 1-2 a game, but lost 15:5 s35 (22.9), 15:6 both (22.8 -- 15 health off the top --,
+#   23.0). Its new numbers: 7-colour designs fired held 1.8-2.4 links (1-1.4 swaps); 6-colour ones 6.5 links.
+# run 269 -- run 253's bot plus: above six colours the search's time builds a design of 4 links or more only; a shorter one waits for the
+#   stack at the top (decide.c taOn). Line Clear 15:3-6 s35-36
 challenge 35 9 9 1 21600 10 challenge=15:3 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:4 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:5 profile=lineclear

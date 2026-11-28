@@ -2224,16 +2224,6 @@ static Played playOf(const Read *R, int n) {
         else taLog = -20 - lastDrop;
       }
     }
-    // (run 276: AND THE LINE BEGUN KEPT -- where this decision's search finds no line that takes the chain on, the chain going's line begun
-    // a decision before (carried, its swaps not all pressed) is played on where it still lengthens the chain and lives as long: runs 275's
-    // 7-colour Line Clears foresaw 29-37 links a game that the chain never made, against 63-81 made -- a line begun and dropped the
-    // decision its search came up empty is a link given up -- the line in progress, whatever play began it, that takes the chain on)
-    if (taLog != 3) {
-      for (int i = 0; i < n; i++) { const Judge *J = order[i];
-        if (!J->carried || J->o.dead || J->o.j.made.chain <= 0) continue;
-        if (!(J->o.lives || !P.line || diesAt(J) >= diesAt(P.line))) continue;
-        decWhy = __LINE__, P.line = J; taLog = 4; break; }
-    }
     clockDue = keepDue; clockShare = keepShare;
   }
   else if (ruleNoEnemy && !R->under && !R->topped && clockFrameOut && !clockFrameOut() && !cascadeLive(decQ.b) && !R->pop) {

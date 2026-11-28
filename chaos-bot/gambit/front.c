@@ -552,6 +552,10 @@ static uint32_t frand(void) { F.rnd = F.rnd * 1664525u + 1013904223u; return F.r
 // (never while a chain of ours falls: its links are pressed in the frames they were judged in -- a link pressed a gap late is no link, set 86
 // large_garbage 2, a swap judged for 353 pressed at 358 and a 5 come down a 3)
 static int calmGap(const Board *next) {
+  // (run 277: never with nobody across -- time attack's stage is won against the clock (a Line Clear: its rows sent in two minutes), so
+  // a board that lives is no reason to wait: run 276's 7-colour Line Clears spent their time between chains on flattening, set-ups and
+  // designs walked a swap at a time, each swap after the first waiting the profile's gap (20) and a jitter (to 16) once the hold lived)
+  if (ruleNoEnemy) return -1;
   if (F.gap < 0 || !F.haveSwapEnd || !F.havePace || !F.lastHold || F.lastUrgent) return -1;
   if (next->chainCounter > 0 || cascadeLive(next)) return -1;
   int32_t stop = next->stopTime + next->preStopTime;

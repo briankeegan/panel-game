@@ -1027,6 +1027,10 @@
 #   7-colour game that the chain never made, against 63-81 made.
 # run 276 -- run 272's bot plus: where the chain going's search finds no line this decision, the line in progress that takes the chain on
 #   (carried) is played on where it lives as long (decide.c). Line Clear 15:3-6 s35-36
+# run 276 -- (result, 03:31-03:35 ET) the line in progress kept when the chain going finds none: won 5/8 -- worse: OFF, decide.c back to
+#   run 272's (1d42fe1). It acted 0-1 times a game (ta=4); lost 15:5 s36 (22.1), 15:6 both (25.0, 25.3).
+# run 277 -- run 272's bot plus: no calm slack with nobody across (front.c calmGap: after a swap with the hold living, the next waited the
+#   profile's gap, 20 frames, and a jitter to 16 -- the stage is against the clock). Line Clear 15:3-6 s35-36
 challenge 35 9 9 1 21600 10 challenge=15:3 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:4 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:5 profile=lineclear

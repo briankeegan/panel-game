@@ -21,7 +21,7 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 
 | Mode | Level | Seeds | Run | Result |
 |---|---|---|---|---|
-| 8 colours | 10 | 21-22 | 227 | **7/8 -- done** |
+| 8 colours | 10 | 21-22 | 227 | **7/8 -- done**; for 8/8 on run 306's bot: run 308 |
 | 7 colours | 10 | 23-24 | 234 | **7/8 -- done** |
 | Chaos margin 4 | 10 | 25-26 | 236 | **8/8 -- done** |
 | Chaos mode | 10 | 27-28 | 237 | **8/8 -- done** |
@@ -31,7 +31,7 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 | Line Clear (15:3-6) | stage's | 35-36 | 282 | **8/8 -- done** |
 | Queue limit (qlimit=1) | 10 | 37-38 | 283 | **8/8 -- done** |
 | training_random | 10 | 39-40 | 306 | **8/8 -- done** (garbage level/speed 8-11 a seed) |
-| Challenge Mode (Impossible 11:5-8) | stage's | 41-42 | 307 | being played |
+| Challenge Mode (Impossible 11:5-8) | stage's | 41-42 | 307 | **8/8 -- done** |
 
 (8 colours old: 7/8 on seeds 7-8, run 180 -- does not count.)
 
@@ -210,6 +210,8 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 307 (08:13-08:17 ET), Challenge Mode Impossible 11:5-8: won 8/8 -- CHALLENGE MODE DONE. Every mode at 7/8 or better.** Run 308:
+  back to each mode for 8/8 on run 306's bot, first 8 colours (seeds 21-22).
 - **Run 306 (08:03-08:11 ET), vanilla's break-search dive (GameCreator ace9dcb6d6): survived 8/8, full health -- TRAINING_RANDOM DONE
   (88a8486).** Run 307: the last mode, Challenge Mode Impossible stages 5-8 on seeds 41-42.
 - **Run 305 (07:54-08:01 ET), the three vanilla floors together: 5/8 -- off.** Run 306: vanilla's break-search dive (break.c touchBeam).

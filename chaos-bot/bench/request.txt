@@ -1166,11 +1166,15 @@
 # run 307 -- THE LAST MODE: Challenge Mode, Impossible (difficulty 11: "every difficulty to Impossible"), its hardest stages 5-8 (level 8-9,
 #   chaos margin, 4-7 colours), on its own seeds 41-42 (never played), run 306's bot. A stage counts when the challenger is beaten.
 #   Challenge 11:5-8 s41-42
-challenge 41 9 9 1 21600 10 challenge=11:5
-challenge 41 9 9 1 21600 10 challenge=11:6
-challenge 41 9 9 1 21600 10 challenge=11:7
-challenge 41 9 9 1 21600 10 challenge=11:8
-challenge 42 9 9 1 21600 10 challenge=11:5
-challenge 42 9 9 1 21600 10 challenge=11:6
-challenge 42 9 9 1 21600 10 challenge=11:7
-challenge 42 9 9 1 21600 10 challenge=11:8
+# run 307 -- (result, 08:13-08:17 ET) Challenge Mode Impossible 11:5-8: won 8/8 -- CHALLENGE MODE DONE (seeds 41-42). EVERY MODE AT 7/8 OR
+#   BETTER.
+# run 308 -- BACK TO EVERY MODE FOR 8/8 (the owner: "then back to each mode for 8/8"), on the current bot (run 306's, 88a8486: two search
+#   workers, vanilla's break-search dive). First 8 colours, done at 7/8 (run 227), its own seeds 21-22. 8 colours s21-22
+chain_garbage 21 9 9 1 21600 10 colors=8
+combo_storm 21 9 9 1 21600 10 colors=8
+thicc_combo_storm 21 9 9 1 21600 10 colors=8
+insane_combo_storm 21 9 9 1 21600 10 colors=8
+chain_garbage 22 9 9 1 21600 10 colors=8
+combo_storm 22 9 9 1 21600 10 colors=8
+thicc_combo_storm 22 9 9 1 21600 10 colors=8
+insane_combo_storm 22 9 9 1 21600 10 colors=8

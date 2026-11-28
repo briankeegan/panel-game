@@ -30,7 +30,7 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 | BALL | 10 | 33-34 | 241 | **8/8 -- done** |
 | Line Clear (15:3-6) | stage's | 35-36 | 282 | **8/8 -- done** |
 | Queue limit (qlimit=1) | 10 | 37-38 | 283 | **8/8 -- done** |
-| training_random | 10 | 39-40 | 299 | 6/8, being fixed (run 300) -- garbage level/speed 8-11 a seed (its own pattern: chain and combo garbage mixed at a random balance, Chaos Mode 1 game in 4 -- TrainingMenu.lua createBasicTrainingMode) |
+| training_random | 10 | 39-40 | 299 | 6/8 (300 off), being fixed (run 301) -- garbage level/speed 8-11 a seed (its own pattern: chain and combo garbage mixed at a random balance, Chaos Mode 1 game in 4 -- TrainingMenu.lua createBasicTrainingMode) |
 | Challenge Mode | stage's | 41-42 | - | to do |
 
 (8 colours old: 7/8 on seeds 7-8, run 180 -- does not count.)
@@ -210,6 +210,12 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 300 (07:01-07:09 ET), queue-last on at six colours: 5/8 -- off.** Run 301: the CPUs laid out as the vanilla bot's (GameCreator
+  training.sh): client on CPU 0 with one render thread, Gambit alone on the other core, workers on the rest.
+- **VANILLA LEARNINGS (owner, 07:10 ET: "There may be some learnings you should take from it"):** GameCreator main (2286518b, every vanilla
+  mode 28/28) is 145 Gambit commits past this copy's b32ed9b. To port, one per run: the CPU layout and workers (run 301); then the rank.c
+  floors under garbage (perch, edge, hollow, tower, well), "a full board ranks by the life its panels leave", the opening's raise capped at
+  6-7 rows for the tallest column, the board played on (one policy) ordering lines.
 - **Run 299 (06:51-06:59 ET), DIG THE BACKLOG only with 4+ waiting: 6/8 -- kept (0222399).** Seed 39 4/4; s40 level 10 lost 27 frames
   short (21573). Run 300: run 105's queue-last rule on again at six colours or fewer.
 - **Run 298 (06:41-06:49 ET), two workers + three-piece let-drop: 5/8 -- off** (seed 40 4/4; seed 39 three lost). Run 299: DIG THE

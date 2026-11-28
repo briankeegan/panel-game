@@ -1132,6 +1132,11 @@
 #   (level 11 lived); lost s40 level 10 at 21573 (27 frames short) and level 11 at 18628, the queue's fifty.
 # run 300 -- run 299 plus: run 105's queue-last rule on again at six colours or fewer -- within QUEUE_LAST (6) of fifty the line leaving the
 #   top row empty first whatever either is lost at (rank.c). training_random s39-40
+# run 300 -- (result, 07:01-07:09 ET) the queue-last rule on at six colours: survived 5/8 -- worse: OFF, rank.c back to run 299's (0222399).
+#   Lost s39 level 11 at 20454, s40 level 10 at 18756 and 11 at 17956.
+# run 301 -- run 299's bot, the machine laid out as the vanilla bot's (GameCreator eval/training.sh, read after the owner's go-ahead): the
+#   client pinned to CPU 0 with one llvmpipe render thread (LP_NUM_THREADS=1), Gambit's thread on a CPU of the other core (/sys topology),
+#   the two workers on the rest (bench/play.sh; cpus.txt per game). training_random s39-40
 training_random 39 8 8 1 21600 10
 training_random 39 9 9 1 21600 10
 training_random 39 10 10 1 21600 10

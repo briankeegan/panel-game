@@ -2235,8 +2235,10 @@ static Played playOf(const Read *R, int n) {
     // going, a swap a link as the chain falls; so on a board at rest the chain going's own search is asked first, for a line that starts a
     // chain of 3 or more within its swaps -- pressed as the cascade runs, the way it takes a falling chain on -- and that line is played
     // where it lives as long as the rank's; else the design is searched as before)
+    // (run 279: only where no design is searched -- fewer than 4 full rows, none held: run 278 asked it in place of the design too and lost
+    // 15:5 s35; the decisions with no design (ta=0) were 40-100 a 7-colour game, the rank's flattening and set-ups their lines)
     int taStarted = 0;
-    if (decQ.b->colors > 6 && !taOn && !R->taDying) {
+    if (decQ.b->colors > 6 && !taOn && !taHave && nfull < 4 && !R->taDying) {
       double left = C2.due ? C2.due - C2.margin - nowMs() : 100, ms = left * 0.6; if (ms < 2) ms = 2;
       readyStop();
       List L; memset(&L, 0, sizeof L); L.n = 1; L.aim[0].chain.op = OP_GE; L.aim[0].chain.n = 2; L.aim[0].brk = -1;

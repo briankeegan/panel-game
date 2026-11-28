@@ -28,7 +28,7 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 | 1 HP | 10 | 29-30 | 238 | **8/8 -- done** |
 | No stop time | 10 | 31-32 | 239 | **8/8 -- done** |
 | BALL | 10 | 33-34 | 241 | **8/8 -- done** |
-| Line Clear (15:3-6) | stage's | 35-36 | 277 | won 6/8 (31.2 rows a minute), being fixed (run 278) |
+| Line Clear (15:3-6) | stage's | 35-36 | 277 | won 6/8 (278 off), being fixed (run 279) |
 | Queue limit | 10 | 37-38 | - | to do |
 | training_random | 10 | 39-40 | - | to do (its own pattern: chain and combo garbage mixed at a random balance, Chaos Mode 1 game in 4 -- TrainingMenu.lua createBasicTrainingMode) |
 | Challenge Mode | stage's | 41-42 | - | to do |
@@ -210,6 +210,8 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 278 (03:43-03:47 ET), a chain started by the chain going's search: won 5/8 -- off.** Run 279: the same only where no design is
+  searched (fewer than 4 full rows).
 - **Run 277 (03:37-03:41 ET), no calm slack with nobody across: WON 6/8 -- kept (12fc901).** Both 15:5 won; both 15:6 lost (24.6, 24.2).
   Run 278: above six colours, on a board at rest, the chain going's search is asked first for a line starting a chain of 3+ (the designs
   there hold ~2 links); else the design as before.

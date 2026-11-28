@@ -1036,6 +1036,10 @@
 # run 278 -- run 277's bot plus: A CHAIN STARTED -- above six colours, on a board at rest, the chain going's own search is asked first for a
 #   line that starts a chain of 3 or more (pressed as the cascade runs), played where it lives as long; else the design as before (decide.c).
 #   Line Clear 15:3-6 s35-36
+# run 278 -- (result, 03:43-03:47 ET) a chain started by the chain going's search above six colours: won 5/8 -- worse: OFF, decide.c back
+#   to run 277's (12fc901). It started 14-21 chains a game (ta=5); 15:6 a little up (24.7, 26.8) but lost 15:5 s35 (22.3).
+# run 279 -- run 277's bot plus: the chain started so only where no design is searched (fewer than 4 full rows, none held) (decide.c).
+#   Line Clear 15:3-6 s35-36
 challenge 35 9 9 1 21600 10 challenge=15:3 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:4 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:5 profile=lineclear

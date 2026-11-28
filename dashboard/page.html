@@ -352,6 +352,7 @@
 .gs details dl { margin: 10px 0 0; display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; }
 .gs details dt { color: var(--color-fg); } .gs details dd { margin: 0; max-width: 70ch; }
 @media (max-width: 640px) { .gs-tbl .hide-s { display: none; } .gs-tbl td, .gs-tbl th { white-space: normal; } .gs-tbl td { padding: 7px 5px; } .gs-th { padding: 8px 5px; } .gs-wr i { display: none; } .gs-tbl .gw-t { display: none; } .gs-watch { padding: 5px 10px; font-size: 13px; } .gs-chip { padding: 1px 6px; } .gs-tbl td { padding: 7px 4px; overflow-wrap: anywhere; } .gs h1 { font-size: 1.4rem; } .gs-bar { position: static; } }
+@media (max-width: 640px) { .gs-tbl td.n { white-space: nowrap; overflow-wrap: normal; } }   /* (numbers never break mid-number: "32" stays on one line) */
 @media (prefers-reduced-motion: no-preference) { .gs-kv, .gs-take { transition: opacity var(--cds-dur-slow) var(--cds-ease-out); } }
 /* ---- polish pass ---- */
 .gs { --gs-shadow: 0 1px 2px rgba(20,24,40,.05), 0 6px 18px -10px rgba(20,24,40,.18); gap: 22px; }
@@ -513,17 +514,18 @@ html.set-chaos .gs h1 { color: var(--set-accent); }
 @media (max-width: 640px) { .gs-latest .gs-watch { padding: 6px 12px; font-size: 14px; } .gs-latest td, .gs-latest th { padding-inline: 5px !important; } }
 /* a card whose whole body folds away: the header row is the button */
 .gs details.gs-card { padding: 0; color: var(--color-fg); font-size: inherit; display: block; }
-.gs-collapse > summary { display: flex; align-items: center; gap: 12px; padding: 18px 22px; cursor: pointer; list-style: none; border-radius: 14px; }
+.gs-collapse > summary { display: flex; align-items: center; gap: 12px; padding: 18px 64px 18px 22px; cursor: pointer; list-style: none; border-radius: 14px; }
 .gs-collapse > summary::-webkit-details-marker { display: none; }
-.gs-collapse > summary::before { content: '▸'; color: var(--color-fg-muted); width: 1em; transition: transform .15s; }
-.gs-collapse[open] > summary::before { transform: rotate(90deg); }
+/* one chevron for every collapsible card: points right closed, down open */
+.gs-collapse > summary::before, .gs-defs > summary::before { content: ''; flex: none; width: 7px; height: 7px; margin: 0 4px 0 2px; border-right: 2px solid var(--color-fg-muted); border-bottom: 2px solid var(--color-fg-muted); transform: rotate(-45deg); transition: transform .15s; }
+.gs-collapse[open] > summary::before, .gs-defs[open] > summary::before { transform: rotate(45deg); }
 .gs-collapse > summary:hover { background: color-mix(in srgb, var(--color-fg) 4%, transparent); }
 .gs-collapse > summary:focus-visible { outline: 2px solid var(--color-fg); outline-offset: -2px; }
 .gs-collapse > summary h2 { flex: 0 0 auto; }
 .gs-collapse > summary .gs-count { margin-left: auto; text-align: right; }
 .gs-collapse > :not(summary) { margin-inline: 22px; }
 .gs-collapse > :last-child { margin-bottom: 18px; }
-@media (max-width: 520px) { .gs-collapse > summary { padding: 14px 16px; } .gs-collapse > :not(summary) { margin-inline: 16px; } .gs-collapse > :last-child { margin-bottom: 14px; } }
+@media (max-width: 520px) { .gs-collapse > summary { padding: 14px 60px 14px 16px; } .gs-collapse > :not(summary) { margin-inline: 16px; } .gs-collapse > :last-child { margin-bottom: 14px; } }
 .gw-cap .whyline.expl { color: var(--color-fg); font-size: 13px; line-height: 1.35; }
 .gw-optsb { display: flex; flex-direction: column; gap: 2px; max-height: 16em; overflow-y: auto; font-size: 12.5px; }
 .gw-optsb .gw-note2 { color: var(--color-fg-muted); padding: 2px 2px 6px; line-height: 1.4; }
@@ -598,7 +600,6 @@ html.set-chaos .gs h1 { color: var(--set-accent); }
 html.set-chaos #sec-brain, html.set-chaos .gs-nav a[href="#sec-brain"] { display: none; }
 #sec-brain h3 { font-size: var(--cds-font-size-body); font-weight: 600; margin: 18px 22px 8px; }
 #sec-brain h3:first-of-type { margin-top: 6px; }
-#sec-brain > summary { padding-right: 64px; }
 .dt { display: flex; flex-direction: column; gap: 4px; }
 .dt-row { display: grid; grid-template-columns: minmax(0, 1fr) 3.2rem minmax(0, 1.3fr); gap: 12px; align-items: center; }
 .dt-q { padding: 10px 14px; border: 1px dashed var(--color-border-line); border-radius: 10px; font-weight: 500; }
@@ -642,6 +643,8 @@ html.set-chaos #sec-brain, html.set-chaos .gs-nav a[href="#sec-brain"] { display
   .dt-a { text-align: left; padding-left: 18px; }
   .dt-else + .dt-a { display: none; } .dt-q.dt-else::after { content: " ↓"; }
 }
+.gs-defs > summary { display: flex; align-items: center; gap: 12px; cursor: pointer; list-style: none; }
+.gs-defs > summary::-webkit-details-marker { display: none; }
 </style>
 
 <div class="gs" id="gs">
@@ -901,7 +904,7 @@ html.set-chaos #sec-brain, html.set-chaos .gs-nav a[href="#sec-brain"] { display
   })();
   </script>
 
-  <details>
+  <details class="gs-defs">
     <summary>Definitions and what this leaves out</summary>
     <dl>
       <dt>Version</dt><dd>A build of Ranmaru. Bots on the same build share a row.</dd>

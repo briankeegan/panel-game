@@ -1,13 +1,4 @@
-run 46119251008, as of 2026-11-28T09:13:08Z
-opponent topped out: clock 23760 stopWatch 23572 stop 34 pre-stop 109 shake 56 health 1, top rows r12=gggggg r11=gggggg r10=ggggg0
-opponent topped out: clock 23790 stopWatch 23602 stop 34 pre-stop 79 shake 26 health 1, top rows r12=gggggg r11=gggggg r10=ggggg0
-opponent topped out: clock 23820 stopWatch 23632 stop 34 pre-stop 49 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=ggggg0
-opponent topped out: clock 23850 stopWatch 23662 stop 34 pre-stop 19 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=ggggg0
-opponent topped out: clock 23880 stopWatch 23692 stop 90 pre-stop 56 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=214520
-opponent topped out: clock 23910 stopWatch 23722 stop 90 pre-stop 26 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=214520
-opponent topped out: clock 23940 stopWatch 23752 stop 86 pre-stop 0 shake 0 health 1, top rows r12=gggggg r11=gggggg r10=214520
-garbage landed: our stopWatch 23886 clock 24074, transits in flight before this frame {23906}, opponent copy 1 frames behind, rollbacks so far 0
-garbage landed: our stopWatch 23892 clock 24080, transits in flight before this frame {23906}, opponent copy 1 frames behind, rollbacks so far 0
+run 46119251008, as of 2026-11-28T09:15:12Z
 garbage landed: our stopWatch 24374 clock 24562, transits in flight before this frame {24400}, opponent copy 1 frames behind, rollbacks so far 0
 garbage landed: our stopWatch 24378 clock 24566, transits in flight before this frame {24400}, opponent copy 1 frames behind, rollbacks so far 0
 opponent topped out: clock 24570 stopWatch 24382 stop 26 pre-stop 179 shake 64 health 1, top rows r12=gggggg r11=ggg000 r10=gggggg
@@ -149,6 +140,15 @@ game about to start: both players are ready
 game about to start: both players are ready
 game about to start: both players are ready
 set over: the room is closed, back in the lobby
+game about to start: both players are ready
+match start: building the match (seed nil, stage nil, opponent ?)
+match start: the match is built
+match start: the match is started
+match start: gambit: creating the link
+match start: gambit: the link is created
+match start: gambit: the link is starting the match
+match start: gambit: the link has started the match
+both ready — match starting
 --- publish (the last 30 lines) ---
 [publish] 10 games finished so far; between two games of a set; the last publish 166 s ago
 [publish] publishing the games so far (10 finished)

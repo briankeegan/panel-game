@@ -1040,6 +1040,9 @@
 #   to run 277's (12fc901). It started 14-21 chains a game (ta=5); 15:6 a little up (24.7, 26.8) but lost 15:5 s35 (22.3).
 # run 279 -- run 277's bot plus: the chain started so only where no design is searched (fewer than 4 full rows, none held) (decide.c).
 #   Line Clear 15:3-6 s35-36
+# run 279 -- (result, 03:49-03:53 ET) the chain started only where no design is searched: won 5/8 -- worse: OFF, decide.c back to run
+#   277's (12fc901). Lost 15:5 s35 (25.0), 15:6 both (29.6, 26.2).
+# run 280 -- run 277's bot plus: no just-in-time hold (held=timing) with nobody across above six colours (decide.c). Line Clear 15:3-6 s35-36
 challenge 35 9 9 1 21600 10 challenge=15:3 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:4 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:5 profile=lineclear

@@ -1638,7 +1638,9 @@ static Played playOf(const Read *R, int n) {
   // is gone -- a line that saves it is played now)
   int holdLives = 0;
   for (int i = 0; i < n; i++) if (order[i]->hold && !order[i]->o.dead) { holdLost = lostOf(order[i]); holdLives = !!order[i]->o.lives; }
-  if (P.line && holdLives && P.line->apNats >= 2 && P.line->apAts[1] - P.line->apAts[0] > 2 * rankReact && holdLost > P.line->apAts[1] &&
+  // (run 280: never with nobody across above six colours -- the stage is against the clock, and the decisions held so (held=timing) were
+  // 1-13 a 7-colour Line Clear in runs 271-279, each a swap pressed a decision later than it could be)
+  if (P.line && holdLives && !(ruleNoEnemy && decQ.b->colors > 6) && P.line->apNats >= 2 && P.line->apAts[1] - P.line->apAts[0] > 2 * rankReact && holdLost > P.line->apAts[1] &&
       firstClear(&decQ, P.line->k.seq, P.line->k.nseq, 0) != 0 && !clockOut()) {
     const Judge *L = P.line;
     Outcome d = outcomeOf(L->k.seq, L->k.nseq, L->settled, 0, L->apAts[1] - rankReact);
@@ -2231,32 +2233,6 @@ static Played playOf(const Read *R, int n) {
     static CbGrid G; cbOfBoard(decQ.b, &G);
     if (taHave) { int sft = cbShiftOf(&G, &taD); if (sft < 0) { taReset(); taLog = -1; } else cbShiftUp(&taD, &G, sft); }
     int nfull = 0; for (int r = 1; r <= G.rows; r++) nfull += cbFull(&G, r);
-    // (run 278: A CHAIN STARTED, ABOVE SIX COLOURS -- there the design fired holds ~2 links (runs 268-277), and the links come from the chain
-    // going, a swap a link as the chain falls; so on a board at rest the chain going's own search is asked first, for a line that starts a
-    // chain of 3 or more within its swaps -- pressed as the cascade runs, the way it takes a falling chain on -- and that line is played
-    // where it lives as long as the rank's; else the design is searched as before)
-    // (run 279: only where no design is searched -- fewer than 4 full rows, none held: run 278 asked it in place of the design too and lost
-    // 15:5 s35; the decisions with no design (ta=0) were 40-100 a 7-colour game, the rank's flattening and set-ups their lines)
-    int taStarted = 0;
-    if (decQ.b->colors > 6 && !taOn && !taHave && nfull < 4 && !R->taDying) {
-      double left = C2.due ? C2.due - C2.margin - nowMs() : 100, ms = left * 0.6; if (ms < 2) ms = 2;
-      readyStop();
-      List L; memset(&L, 0, sizeof L); L.n = 1; L.aim[0].chain.op = OP_GE; L.aim[0].chain.n = 2; L.aim[0].brk = -1;
-      ExtOpts eo = { TA_EXT_WIDTH, TA_EXT_DEPTH, &L, NOT_ASKED, 0, ms };
-      static Ext E2; extend(&decQ, &eo, &E2);
-      taxBase = E2.baseChain; taxLong = E2.longest.set ? E2.longest.chain : 0; taxN = E2.longest.set ? E2.longest.nseq : 0; taxMs = (int32_t)ms;
-      if (E2.longest.set && E2.longest.nseq > 0 && E2.longest.chain >= 3) {
-        static Judge CU2; Cand k;
-        if (candOf(&k, PLAY_EXTEND, E2.longest.seq, E2.longest.nseq, -1, 1)) {
-          k.settled = 0; lastDrop = -1;
-          if (judgeCand(R, &k, &CU2) && !CU2.o.dead && (CU2.o.lives || !P.line || diesAt(&CU2) >= diesAt(P.line))) {
-            decWhy = __LINE__, P.line = &CU2; taLog = 5; taStarted = 1; if (taHave) taReset();
-          }
-        }
-      }
-    }
-    if (taStarted) {}
-    else
     // (flattened and raised first -- the owner's order: a design is searched only on a board with TA_FULL full rows; till then the board
     // is played as any is, levelled and raised)
     // (run 251: above six colours from 4 full rows, not 6 -- run 250 Line Clear 15:5 (7 colours): the design never built in 312 decisions,
@@ -2284,7 +2260,7 @@ static Played playOf(const Read *R, int n) {
     // whose tall column a clear brings down is never held up while the rise takes it to the top)
     // (and till a design is on, nothing cleared on a board that lives -- the owner: flatten, raise, then the chain that uses every block; a
     // clear made on the way spends the panels the design is made of, and starts a chain too short to take to 13)
-    if (!taStarted && !taOn && !R->taDying && P.line && taClears(P.line) && taHoldNoSooner(P.line, n)) decWhy = __LINE__, P.line = 0;
+    if (!taOn && !R->taDying && P.line && taClears(P.line) && taHoldNoSooner(P.line, n)) decWhy = __LINE__, P.line = 0;
     if (taOn) {
       int32_t seq[CB_MAXSWAPS + 1]; int n = cbOrder(&G, &taD, taTr, seq, CB_MAXSWAPS + 1);
       // (never a build the board does not live through -- the owner: you can't choose to die: the swaps left and the trigger, walked and

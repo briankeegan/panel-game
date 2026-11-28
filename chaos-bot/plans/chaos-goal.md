@@ -1195,3 +1195,5 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
   Still open for the gate: running it on every push (the workflow, waiting on the owner's answer in section 6).
 - 2026-11-25 -- the one difference found on the way: at the chaos margin's last step with an empty queue the stop time is 0/0;
   LuaJIT's math.min/max keep the NaN and no stop time is awarded. ca.c does the same.
+- run 335 (12:20-12:28 ET): 8 colours on run 334's bot (opening cap off) survived 5/8 -- thicc s21 2128, thicc s22 5780 (early), chain s22 8206.
+- run 336: opening cap back on at 8 colours only (colors > 7); 7 colours keeps it off. 8 colours s21-22.

@@ -506,7 +506,9 @@ static int readBoard_(Read *R) {
     #define OPEN_TOP 6
     // (run 318: above six colours only -- added at 8 colours (run 311))
     // (run 334: off -- run 333 7 colours lost thicc s23 at 2515 and thicc s24 at 1284, both early, with it on)
-    if (0 && opening && !ruleNoEnemy && rq.b->colors > 6) rows = imin(rows, OPEN_TOP - panelTop(rq.b));
+    // (run 336: back on at 8 colours only -- run 335 8 colours with it off lost thicc s21 at 2128 and thicc s22 at 5780, both early; 7
+    // colours keeps it off)
+    if (opening && !ruleNoEnemy && rq.b->colors > 7) rows = imin(rows, OPEN_TOP - panelTop(rq.b));
     if (rows <= 0) { R->up = R->low = 0; raiseWait = 0; } else to = fullTop(rq.b) + rows;
   }
   R->to = to;

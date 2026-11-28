@@ -1128,6 +1128,10 @@
 #   11 at 20968.
 # run 299 -- run 295 plus: DIG THE BACKLOG only with four or more waiting, not one (rank.c; run 297's early loss: a break lost 93 frames
 #   sooner put first with one waiting). training_random s39-40
+# run 299 -- (result, 06:51-06:59 ET) DIG THE BACKLOG only with four or more waiting: survived 6/8 -- no worse: KEPT (0222399). Seed 39 4/4
+#   (level 11 lived); lost s40 level 10 at 21573 (27 frames short) and level 11 at 18628, the queue's fifty.
+# run 300 -- run 299 plus: run 105's queue-last rule on again at six colours or fewer -- within QUEUE_LAST (6) of fifty the line leaving the
+#   top row empty first whatever either is lost at (rank.c). training_random s39-40
 training_random 39 8 8 1 21600 10
 training_random 39 9 9 1 21600 10
 training_random 39 10 10 1 21600 10

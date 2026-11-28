@@ -1004,7 +1004,9 @@ static int compareJudged(const Judge *x, const Judge *y) {
   // topped board costs health, never the game, where fifty waiting is the game: run 104 chain s2 and combo s2 lost to the queue at
   // 21591 and 21485 with health 13 and 6 left, boards of ~50 panels kept topped)
   // (run 106: off while the searches' shape is measured again -- run 105 with it 1/8)
-  if (0 && decQ.b->marginTime == 1 && decQ.b->ninc >= CHAOS_QUEUE_LIMIT - QUEUE_LAST && x->o.j.topRow != y->o.j.topRow && !x->o.dead && !y->o.dead)
+  // (run 300: on again at six colours or fewer -- run 299 training_random s40 level 10 lost to the queue's fiftieth at 21573, 27 frames short
+  // of the end, health full: run 104's losses again)
+  if (decQ.b->colors <= 6 && decQ.b->marginTime == 1 && decQ.b->ninc >= CHAOS_QUEUE_LIMIT - QUEUE_LAST && x->o.j.topRow != y->o.j.topRow && !x->o.dead && !y->o.dead)
     return (cmpKey = __LINE__, (x->o.j.topRow ? 1 : -1));
   // (run 142: above six colours from twenty waiting, not thirty-five -- the 8-colour backlog losses died with 24-36 waiting (runs 135-141:
   // insane s7/s8, combo s8, thicc s8, queue 24-31 on average over their last 1200 frames): the queue piled while the top row was taken

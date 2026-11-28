@@ -30,7 +30,7 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 | BALL | 10 | 33-34 | 241 | **8/8 -- done** |
 | Line Clear (15:3-6) | stage's | 35-36 | 282 | **8/8 -- done** |
 | Queue limit (qlimit=1) | 10 | 37-38 | 283 | **8/8 -- done** |
-| training_random | 10 | 39-40 | 284 | 6/8 (285-287 off), being fixed (run 288) -- garbage level/speed 8-11 a seed (its own pattern: chain and combo garbage mixed at a random balance, Chaos Mode 1 game in 4 -- TrainingMenu.lua createBasicTrainingMode) |
+| training_random | 10 | 39-40 | 284 | 6/8 (285-288 off), being fixed (run 289) -- garbage level/speed 8-11 a seed (its own pattern: chain and combo garbage mixed at a random balance, Chaos Mode 1 game in 4 -- TrainingMenu.lua createBasicTrainingMode) |
 | Challenge Mode | stage's | 41-42 | - | to do |
 
 (8 colours old: 7/8 on seeds 7-8, run 180 -- does not count.)
@@ -210,6 +210,8 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 288 (05:03-05:13 ET), QUEUE_ROOM 25: 3/8 -- off.** Two early losses starved (7-19 panels, 9-15 waiting). Run 289: with no
+  garbage on the board, the queue let drop where the next three pieces fit (a quiet board drops them one at a time).
 - **Run 287 (04:53-05:00 ET), three-piece let-drop with the hold lost no sooner: 5/8 -- off.** All three losses the queue's fifty at
   garbage level 11. Run 288: QUEUE_ROOM 25 (the top row kept empty from 25 waiting).
 - **Run 286 (04:43-04:51 ET), the queue near its limit from 15 in every number of colours: 3/8 -- off.** Run 287: from 15 waiting, the

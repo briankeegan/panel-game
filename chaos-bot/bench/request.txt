@@ -1082,6 +1082,10 @@
 #   every ~300 frames from 1500 on, 25-48 for thousands of frames on boards of 30-58 panels.
 # run 288 -- run 282's bot plus: QUEUE_ROOM 25, not 15 (rank.c: from 25 waiting the top row kept empty -- a topped row holds every piece
 #   back; and decide.c's queue-near at six colours from 25). training_random s39-40
+# run 288 -- (result, 05:03-05:13 ET) QUEUE_ROOM 25: survived 3/8 -- worse: OFF, rank.c back to run 282's (43a7572). Lost s39 at 2442 and
+#   3172 (early, starved: 7-19 panels, 9-15 waiting), 17902; s40 at 21011 and 14753 (the queue's fifty).
+# run 289 -- run 282's bot plus: with no garbage on the board the queue is let drop where the next three pieces land under the ceiling, not
+#   only where all that waits does (decide.c; a quiet board drops them one at a time). training_random s39-40
 training_random 39 8 8 1 21600 10
 training_random 39 9 9 1 21600 10
 training_random 39 10 10 1 21600 10

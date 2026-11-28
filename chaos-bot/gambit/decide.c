@@ -869,9 +869,8 @@ static int ranked(const Read *R, const Found *S) {
   }
   readyShare(0); readyFresh = 0; readyKnownOnly = 0;
   sortJudged(order, n);
-  // (none lives, or garbage is on the board or on its way (vanilla 7f4d709234, ported run 302): each is asked too whether a break is in reach
-  // once the next block lands -- the order puts those first)
-  if (!(n && order[0]->o.lives) || decF.under || garbageComing()) {
+  // (none lives: each is asked too whether a break is in reach once the next block lands -- the order puts those first)
+  if (!(n && order[0]->o.lives)) {
     int own = 0; for (int i = 0; i < n; i++) own += !EXTRA(order[i]);
     for (int i = 0; i < n; i++) if (!EXTRA(order[i])) { readyShare(own--); readyNextFor(order[i]); }
     readyShare(0); sortJudged(order, n);

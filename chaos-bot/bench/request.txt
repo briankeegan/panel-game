@@ -1157,6 +1157,10 @@
 #   (early), s40 level 10 at 10804 and level 11 at 17284.
 # run 305 -- run 299 plus the three vanilla garbage floors as the one unit vanilla plays them in: a break kept in reach under garbage (run
 #   302), the flatness floor (run 303) and the perch floor (run 304) together (rank.c, decide.c, judge.c). training_random s39-40
+# run 305 -- (result, 07:54-08:01 ET) the three vanilla floors together: survived 5/8 -- worse: OFF, back to run 299's (0222399). Lost s39
+#   level 10 at 6132 and 11 at 17496, s40 level 11 at 2009 (early).
+# run 306 -- run 299 plus vanilla's break-search dive (GameCreator ace9dcb6d6, applied as it is): each level of the touch beam, its first 30
+#   lines played on along their own board's nearest break before the level grows (search/break.c touchBeam). training_random s39-40
 training_random 39 8 8 1 21600 10
 training_random 39 9 9 1 21600 10
 training_random 39 10 10 1 21600 10

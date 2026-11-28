@@ -13,6 +13,7 @@
 // ends with what it has.
 
 #define TOUCH_DEPTH 12
+#define DIVE_N 30        // the beam's lines dived from each level (touchBeam): measured on 1729 lost games' boards, 224 breaks taken where 212 were
 #define CHEAP_BREAK 6    // the actions a break may walk for before the level after it is searched for a cheaper one
 #define TOUCH_BEAM 30
 #define TOUCH_WIDE 100     // TOUCH_WIDER, the one wider beam
@@ -484,6 +485,32 @@ static int touchBeam(BS *s, Line **firsts, int nfirsts) {
         }
       ntl = nk;
       for (int i = 0; i < nk; i++) tl[i] = kept[i];
+      // (THE DIVE: each of the beam's first lines played on along its own board's nearest break -- breakNear's line, its panels walked to
+      // it -- k steps where the level grows every swap of every line)
+      int64_t diveB = -1; int32_t diveKey = 0, diveLen = 0, diveAt = 0, diveCarried = 0, divePath[MAXPATH];
+      for (int i = 0; i < ntl && i < DIVE_N && !SEARCH_OUT(); i++) {
+        Line *l = tl[i]; static LOCAL int32_t dl[MAXPATH]; int dn = 0;
+        const Board *db = ensureBoard(x, l->n);
+        if (!db || breakNearLine(db, dl, &dn) >= NEAR_MISS || dn <= 0 || l->len + dn > MAXPATH) continue;
+        int32_t path[MAXPATH]; int len = l->len, node = l->n, ok = 1;
+        for (int k = 0; k < len; k++) path[k] = l->path[k];
+        for (int k = 0; k < dn && ok; k++) {
+          if (pressAllowance >= 0) {
+            const Board *nb = ensureBoard(x, node);
+            int left = allowLeftAt(NODE(x, node)->t - NODE(x, s->root)->t, spentOn(s, path, len));
+            if (!nb || actionsFor(nb->curRow, nb->curCol, CR(dl[k]), CC(dl[k]), left) > left) { ok = 0; break; }
+          }
+          if (!legalAt(x, node, CR(dl[k]), CC(dl[k]))) { ok = 0; break; }
+          node = stepMarked(s, node, MK_SWAP, dl[k], 0); path[len++] = dl[k];
+          ok = liveNode(x, node) && within(s, node);
+        }
+        if (!ok || !breaksAt(s, node, path, len)) continue;
+        int32_t mat, br = brokeSettled(x, node, &mat);
+        int acts = 0;
+        { const Board *rb0 = ensureBoard(x, s->root); if (pressAllowance >= 0 && rb0) { int r = rb0->curRow, c = rb0->curCol; for (int k = 0; k < len; k++) { acts += actionsFor(r, c, CR(path[k]), CC(path[k]), pressAllowance - acts); r = CR(path[k]); c = CC(path[k]); } } }
+        int64_t bk = ((int64_t)keepsOwnChain(x, node) << 40) + ((int64_t)breakCat(x, node) << 32) + ((int64_t)(255 - imin(acts, 255)) << 24) + ((int64_t)imin(mat, 4095) << 8) + imin(br, 255);
+        if (bk > diveB) { diveB = bk; diveKey = l->key; diveCarried = l->carried; diveLen = len; diveAt = NODE(x, node)->t; for (int k = 0; k < len; k++) divePath[k] = path[k]; }
+      }
       int ntn = 0, ar = td & 1;
       arenaN[ar] = 0;   // (the level before last: its lines are let go)
       // (the level's swaps stepped on every thread first, then taken in this order: core/nodes.h stepBatch)
@@ -531,6 +558,7 @@ static int touchBeam(BS *s, Line **firsts, int nfirsts) {
         }
       }
       batchDone();
+      if (diveB > bestB) { bestB = diveB; bestKey = diveKey; bestCarried = diveCarried; bestLen = diveLen; bestAt = diveAt; for (int k = 0; k < diveLen; k++) bestPath[k] = divePath[k]; }
       if (bestB >= 0 && bestB > heldB) { found(o, bestKey); setPath(o, bestPath, bestLen); o->at = bestAt; heldB = bestB; o->fresh = s->resume && s->resume->n && !bestCarried; }
       if (bestB >= 0 && foundTd < 0) foundTd = td;
       if (foundTd >= 0 && (!starved || td > foundTd || 255 - ((heldB >> 24) & 255) <= CHEAP_BREAK || td == TOUCH_DEPTH)) tpath = 1;

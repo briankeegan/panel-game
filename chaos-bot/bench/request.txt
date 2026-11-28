@@ -1069,6 +1069,10 @@
 #   land under the ceiling (forty pieces never do), and at six colours it began only at 35 waiting.
 # run 285 -- run 282's bot plus: under a backlog (15+ waiting, every number of colours) the board is left alone where the next three pieces
 #   land under the ceiling (decide.c queueNear, waiting). training_random s39-40
+# run 285 -- (result, 04:33-04:41 ET) the board left alone for the next three pieces: survived 2/8 -- worse: OFF, decide.c back to run
+#   282's (43a7572). The hold it put first (d2358) was lost sooner, again and again (game 2, game 7); three still lost to the queue's fifty.
+# run 286 -- run 282's bot plus: the queue near its limit from 15 waiting in every number of colours (as run 234 has it above six), all that
+#   waits still to fit under the ceiling (decide.c queueNear). training_random s39-40
 training_random 39 8 8 1 21600 10
 training_random 39 9 9 1 21600 10
 training_random 39 10 10 1 21600 10

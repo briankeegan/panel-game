@@ -834,6 +834,8 @@
 #   twin, the entry below them.
 # run 231 -- run 227's bot plus: above six colours, the line in progress on top and dying gives the top to a line breaking at least as
 #   much whose own board is lost a third of a break later (rank.c, after outlivingFirst). 7 colours s23-24
+# run 231 -- cancelled by me at the owner's word (22:13 ET: "stop it all and start again"): its retries waited on whole rounds. Restarted as
+#   run 231 again -- the same bot (78ea092), the same 8 games -- on the per-game retry chains (a skipped runner's next try starts at once).
 chain_garbage 23 9 9 1 21600 10 colors=7
 combo_storm 23 9 9 1 21600 10 colors=7
 thicc_combo_storm 23 9 9 1 21600 10 colors=7

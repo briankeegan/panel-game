@@ -973,6 +973,10 @@
 #   count combos above what they are worth)
 # run 265 -- run 253's bot plus: above six colours a design is built after a third of the search, not half (decide.c; run 252's half sent
 #   more rows than the whole). Line Clear 15:3-6 s35-36
+# run 265 -- (result, 02:23-02:27 ET) the design built after a third of the search above six colours: won 4/8 -- worse: OFF, decide.c
+#   back to run 253's (3931d36). Both 15:5 (26.5, 23.0) and both 15:6 (20.8, 24.1 -- 12 health off the top) lost.
+# run 266 -- run 253's bot plus: above six colours a design may take 12 swaps, not 10 (decide.c cbJMaxSw; run 256's 14 sent the most rows
+#   at seven colours after 253's but lost 15:5 s36). Line Clear 15:3-6 s35-36
 challenge 35 9 9 1 21600 10 challenge=15:3 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:4 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:5 profile=lineclear

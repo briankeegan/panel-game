@@ -2227,16 +2227,16 @@ static Played playOf(const Read *R, int n) {
       static CbGrid D; int32_t tr = 0; int links = 0, sw = 0;
       // (no more swaps than the board lives to press: the frames it has left alone, a swap's frames each, TA_MARGIN to spare)
       int32_t dies = R->F.known[FACT_US_DIES] && R->F.v[FACT_US_DIES] > 0 ? (int32_t)R->F.v[FACT_US_DIES] : NOT_ASKED;
-      cbJMaxSw = imin(TA_MAXSW, dies == NOT_ASKED ? CB_MAXSWAPS : imax(1, (dies - TA_MARGIN) / TA_SWAP_FRAMES - 1));
+      // (run 266: above six colours a design may take 12 swaps, not 10 -- run 256's 14 sent the most rows at seven colours after run 253
+      // (15:5 s35 35.7, 15:6 s35 30.2 a minute) but lost 15:5 s36; the board's own life still caps it, as below)
+      cbJMaxSw = imin(decQ.b->colors > 6 ? 12 : TA_MAXSW, dies == NOT_ASKED ? CB_MAXSWAPS : imax(1, (dies - TA_MARGIN) / TA_SWAP_FRAMES - 1));
       if (taHave && cbSwapsTo(&G, &taD) > cbJMaxSw) { taReset(); taLog = -3; }
       int32_t v = cbDesignAll(&G, taHave ? &taD : 0, ms, &D, &tr, &links, &sw);
       taMs += ms;
       if (tr && v > 0 && (!taHave || v >= taVal)) { taD = D; taTr = tr; taLinks = links; taSwaps = sw; taVal = v; taHave = 1; }
-      // (run 265: a third, not half -- run 252's half sent more rows than the whole (30.6 a minute against 28.2) and won 15:5; the stage needs
-      // the chains sooner: 60 rows in 7230 frames at 15:6 (ChallengeMode.lua difficulty 15: 10 + 10 a stage), and run 264's 15:6 s36 sent ~46)
       // (run 252: above six colours built after half the search -- searched from 4 full rows now (run 251), the design was let go 18 times in
       // run 251 Line Clear 15:6 s35 (the board no longer held it) and never built, 67 decisions searching; 15:5 s36 built it 11 times and won)
-      if (taHave && (taLinks >= TA_LINKS || taMs >= (decQ.b->colors > 6 ? TA_DESIGN_MS / 3 : TA_DESIGN_MS) || panelTop(decQ.b) >= TA_TOP)) taOn = 1;
+      if (taHave && (taLinks >= TA_LINKS || taMs >= (decQ.b->colors > 6 ? TA_DESIGN_MS / 2 : TA_DESIGN_MS) || panelTop(decQ.b) >= TA_TOP)) taOn = 1;
       // (and while it is searched, the board is left as it is -- a swap played meanwhile changes the rows the design is of -- unless it
       // is dying or raised: a raise only lifts the rows)
       else if (taHave && !R->taDying && !R->up && taHoldNoSooner(P.line, n)) decWhy = __LINE__, P.line = 0;

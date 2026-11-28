@@ -1219,6 +1219,10 @@
 # run 320 -- (result, 10:13-10:21 ET) chaos mode on run 282's bot: survived 8/8, full health -- the cost is in runs 295-306.
 # run 321 -- chaos mode on run 299's bot (0222399, restored by hash: run 282's plus the two search workers and the dig at four waiting, no
 #   dive) -- the dive (run 306) or the two before it. chaos mode s27-28
+# run 321 -- (result, 10:22-10:30 ET) chaos mode on run 299's bot: survived 7/8 (lost combo s27 at 4587, early). At six colours run 318's bot
+#   is run 299's plus the dive alone: 4/8 with it, 7/8 and 8/8 without -- the dive.
+# run 322 -- run 318's bot (ff9bc66) with the dive only under a backlog, fifteen or more waiting (search/break.c touchBeam; training_random's
+#   queues ran 25-48, chaos mode's under 16). chaos mode s27-28
 chain_garbage 27 9 9 1 21600 10 chaosmode=1
 combo_storm 27 9 9 1 21600 10 chaosmode=1
 thicc_combo_storm 27 9 9 1 21600 10 chaosmode=1

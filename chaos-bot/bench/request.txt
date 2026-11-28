@@ -1262,11 +1262,14 @@
 # run 333 -- (result, 12:02-12:10 ET) 7 colours on the current bot: survived 5/8. Lost thicc s23 at 2515 and thicc s24 at 1284 (both early),
 #   insane s23 at 6579.
 # run 334 -- the current bot with the opening raise cap (run 311, above six colours) off. 7 colours s23-24
-chain_garbage 23 9 9 1 21600 10 colors=7
-combo_storm 23 9 9 1 21600 10 colors=7
-thicc_combo_storm 23 9 9 1 21600 10 colors=7
-insane_combo_storm 23 9 9 1 21600 10 colors=7
-chain_garbage 24 9 9 1 21600 10 colors=7
-combo_storm 24 9 9 1 21600 10 colors=7
-thicc_combo_storm 24 9 9 1 21600 10 colors=7
-insane_combo_storm 24 9 9 1 21600 10 colors=7
+# run 334 -- (result, 12:12-12:19 ET) the opening raise cap off: 7 colours survived 7/8 -- KEPT (d4fca59). Lost chain s24 at 16775 (starved,
+#   backlog). The cap was added at 8 colours (run 311).
+# run 335 -- 8 colours on run 334's bot (the cap it was added for, now off), to check it holds 7/8. 8 colours s21-22
+chain_garbage 21 9 9 1 21600 10 colors=8
+combo_storm 21 9 9 1 21600 10 colors=8
+thicc_combo_storm 21 9 9 1 21600 10 colors=8
+insane_combo_storm 21 9 9 1 21600 10 colors=8
+chain_garbage 22 9 9 1 21600 10 colors=8
+combo_storm 22 9 9 1 21600 10 colors=8
+thicc_combo_storm 22 9 9 1 21600 10 colors=8
+insane_combo_storm 22 9 9 1 21600 10 colors=8

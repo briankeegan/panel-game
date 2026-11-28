@@ -22,7 +22,7 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 | Mode | Level | Seeds | Run | Result |
 |---|---|---|---|---|
 | 8 colours | 10 | 21-22 | 227 | **7/8 -- done**; for 8/8: **7/8 on run 313's bot** (314 off) |
-| 7 colours | 10 | 23-24 | 234 | **7/8 -- done**; on run 313's bot 5/8 (run 315); on the current bot 5/8 (run 333); being fixed (run 334) |
+| 7 colours | 10 | 23-24 | 234 | **7/8 -- done**; on run 313's bot 5/8 (run 315); on the current bot 5/8 (run 333); **opening cap off 7/8 (run 334)** |
 | Chaos margin 4 | 10 | 25-26 | 236 | **8/8 -- done**; on run 313's bot 6/8 (run 316); on run 306's 7/8 (run 317); on run 318's 5/8 -- the same six-colour play as 306's |
 | Chaos mode | 10 | 27-28 | 237 | **8/8 -- done**; on run 318's bot 4/8 (run 319); on run 282's 8/8 (run 320); on run 299's 7/8 (run 321) -- the dive costs it; dive from 15 waiting 5/8 (run 322); **dive from 25 waiting 8/8 (run 323)** |
 | 1 HP | 10 | 29-30 | 238 | **8/8 -- done**; on run 323's bot 7/8 (run 326) |
@@ -213,6 +213,8 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 - **THE OWNER, 11:52 ET: "you need to rerun anything that did less than 7 until it gets there."** Every mode under 7/8 on the current bot is
   worked until it is there: 7 colours (5/8), training_random (5/8), margin 4 (5-7/8), then Line Clear (6/8); a mode re-run on the same bot
   to confirm; every change checked on the modes it reaches.
+- **Run 334 (12:12-12:19 ET), the opening raise cap off: 7 colours 7/8 -- kept (d4fca59).** Run 335: 8 colours on it (the cap was added
+  there).
 - **Run 333 (12:02-12:10 ET), 7 colours on the current bot: 5/8** (two thicc lost early). Run 334: the opening raise cap off.
 - **Run 332 (11:52-12:00 ET), queue limit on run 331's bot: 7/8.** Run 333: 7 colours on the current bot.
 - **Run 331 (11:47-11:51 ET), no search workers in a Challenge stage: Line Clear 6/8 -- kept (cdd97c5).** Run 332: queue limit on it.

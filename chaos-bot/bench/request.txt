@@ -1170,6 +1170,11 @@
 #   BETTER.
 # run 308 -- BACK TO EVERY MODE FOR 8/8 (the owner: "then back to each mode for 8/8"), on the current bot (run 306's, 88a8486: two search
 #   workers, vanilla's break-search dive). First 8 colours, done at 7/8 (run 227), its own seeds 21-22. 8 colours s21-22
+# run 308 -- (result, 08:19-08:27 ET) 8 colours on run 306's bot: survived 6/8 (run 227's bot: 7/8). Lost chain s21 at 9499 (opening-spent,
+#   no-line: the last 900 frames under garbage, every line breaking none, 53 panels to 20) and thicc s21 at 19840 (backlog).
+# run 309 -- run 306's bot plus vanilla's break kept in reach under garbage (GameCreator 7f4d709234 + 16a84cc3b5, as run 302 tried at
+#   training_random): with garbage on the board or coming every line is asked whether a break is in reach once the next block lands, and
+#   the ready one goes first under garbage too (rank.c, decide.c). 8 colours s21-22
 chain_garbage 21 9 9 1 21600 10 colors=8
 combo_storm 21 9 9 1 21600 10 colors=8
 thicc_combo_storm 21 9 9 1 21600 10 colors=8

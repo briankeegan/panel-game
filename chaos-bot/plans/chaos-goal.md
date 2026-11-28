@@ -21,7 +21,7 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 
 | Mode | Level | Seeds | Run | Result |
 |---|---|---|---|---|
-| 8 colours | 10 | 21-22 | 227 | **7/8 -- done**; for 8/8 on run 306's bot: run 308 |
+| 8 colours | 10 | 21-22 | 227 | **7/8 -- done**; for 8/8: run 306's bot 6/8 (run 308), being fixed (run 309) |
 | 7 colours | 10 | 23-24 | 234 | **7/8 -- done** |
 | Chaos margin 4 | 10 | 25-26 | 236 | **8/8 -- done** |
 | Chaos mode | 10 | 27-28 | 237 | **8/8 -- done** |
@@ -210,6 +210,8 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 308 (08:19-08:27 ET), 8 colours on run 306's bot: 6/8** (chain s21 9499 breaking nothing under garbage for 900 frames; thicc s21
+  19840). Run 309: vanilla's break kept in reach under garbage.
 - **Run 307 (08:13-08:17 ET), Challenge Mode Impossible 11:5-8: won 8/8 -- CHALLENGE MODE DONE. Every mode at 7/8 or better.** Run 308:
   back to each mode for 8/8 on run 306's bot, first 8 colours (seeds 21-22).
 - **Run 306 (08:03-08:11 ET), vanilla's break-search dive (GameCreator ace9dcb6d6): survived 8/8, full health -- TRAINING_RANDOM DONE

@@ -945,6 +945,10 @@
 #   back to run 253's (3931d36). Lost 15:5 s36 (22.2; chains ended at 3-5 links where run 253's ran 8-12) and 15:6 both (26.4, 28.5).
 # run 259 -- run 253's bot plus: above six colours the chain going is searched 9 swaps deep, not 8 (decide.c TA_EXT_DEPTH; the chain
 #   puzzles' furthest). Line Clear 15:3-6 s35-36
+# run 259 -- (result, 01:44-01:48 ET) the chain going 9 swaps deep above six colours: won 4/8 -- worse: OFF, decide.c back to run 253's
+#   (3931d36). Both 15:5 and both 15:6 lost; 22.2 rows a minute at seven colours, the fewest of any run (253: 29.1).
+# run 260 -- run 253's bot plus: above six colours the chain going is searched 7 swaps deep, not 8 (decide.c; run 259's 9 sent the fewest
+#   rows). Line Clear 15:3-6 s35-36
 challenge 35 9 9 1 21600 10 challenge=15:3 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:4 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:5 profile=lineclear

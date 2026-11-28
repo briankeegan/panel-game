@@ -30,8 +30,8 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 | BALL | 10 | 33-34 | 241 | **8/8 -- done** |
 | Line Clear (15:3-6) | stage's | 35-36 | 282 | **8/8 -- done** |
 | Queue limit (qlimit=1) | 10 | 37-38 | 283 | **8/8 -- done** |
-| training_random | 10 | 39-40 | 299 | 6/8 (300-305 off), being fixed (run 306) -- garbage level/speed 8-11 a seed (its own pattern: chain and combo garbage mixed at a random balance, Chaos Mode 1 game in 4 -- TrainingMenu.lua createBasicTrainingMode) |
-| Challenge Mode | stage's | 41-42 | - | to do |
+| training_random | 10 | 39-40 | 306 | **8/8 -- done** (garbage level/speed 8-11 a seed) |
+| Challenge Mode (Impossible 11:5-8) | stage's | 41-42 | 307 | being played |
 
 (8 colours old: 7/8 on seeds 7-8, run 180 -- does not count.)
 
@@ -210,6 +210,8 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 306 (08:03-08:11 ET), vanilla's break-search dive (GameCreator ace9dcb6d6): survived 8/8, full health -- TRAINING_RANDOM DONE
+  (88a8486).** Run 307: the last mode, Challenge Mode Impossible stages 5-8 on seeds 41-42.
 - **Run 305 (07:54-08:01 ET), the three vanilla floors together: 5/8 -- off.** Run 306: vanilla's break-search dive (break.c touchBeam).
 - **Run 304 (07:44-07:52 ET), vanilla's perch floor: 5/8 -- off.** Run 305: the three vanilla garbage floors together (break in reach,
   flatness floor, perch floor), as vanilla plays them.

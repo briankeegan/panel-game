@@ -1161,11 +1161,16 @@
 #   level 10 at 6132 and 11 at 17496, s40 level 11 at 2009 (early).
 # run 306 -- run 299 plus vanilla's break-search dive (GameCreator ace9dcb6d6, applied as it is): each level of the touch beam, its first 30
 #   lines played on along their own board's nearest break before the level grows (search/break.c touchBeam). training_random s39-40
-training_random 39 8 8 1 21600 10
-training_random 39 9 9 1 21600 10
-training_random 39 10 10 1 21600 10
-training_random 39 11 11 1 21600 10
-training_random 40 8 8 1 21600 10
-training_random 40 9 9 1 21600 10
-training_random 40 10 10 1 21600 10
-training_random 40 11 11 1 21600 10
+# run 306 -- (result, 08:03-08:11 ET) vanilla's break-search dive: survived 8/8, 172800 frames, full health -- TRAINING_RANDOM DONE
+#   (seeds 39-40, garbage level/speed 8-11). Kept: run 306's bot (88a8486) = run 299's + the dive, two search workers.
+# run 307 -- THE LAST MODE: Challenge Mode, Impossible (difficulty 11: "every difficulty to Impossible"), its hardest stages 5-8 (level 8-9,
+#   chaos margin, 4-7 colours), on its own seeds 41-42 (never played), run 306's bot. A stage counts when the challenger is beaten.
+#   Challenge 11:5-8 s41-42
+challenge 41 9 9 1 21600 10 challenge=11:5
+challenge 41 9 9 1 21600 10 challenge=11:6
+challenge 41 9 9 1 21600 10 challenge=11:7
+challenge 41 9 9 1 21600 10 challenge=11:8
+challenge 42 9 9 1 21600 10 challenge=11:5
+challenge 42 9 9 1 21600 10 challenge=11:6
+challenge 42 9 9 1 21600 10 challenge=11:7
+challenge 42 9 9 1 21600 10 challenge=11:8

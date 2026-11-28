@@ -2021,7 +2021,9 @@ static void outlivingFirst(Judge **a, int n) {
   // much garbage whose own board -- no promise counted -- is lost a third of a break's time later takes the top, beaten head to head or not:
   // the line in progress stayed on top through its twin. Run 230 7 colours combo s24 1465 a carry lost at 288 over an entry lost at 361,
   // 1478 275 over 357, lost at 2167; run 227 8 colours insane s21 13702 211 over a convert at 290)
-  if (decQ.b->colors > 6 && n > 1 && a[0]->carried && !a[0]->o.lives && !a[0]->o.dead) {
+  // (run 241: every number of colours -- run 240 BALL (6 colours) chain s34 17209: the line in progress lost at 150 kept on top through its
+  // twin over a break of 6 lost at 304, lost at 17722)
+  if (n > 1 && a[0]->carried && !a[0]->o.lives && !a[0]->o.dead) {
     double t0 = lostAtOf(a[0]->o.lostAt, a[0]->hold); int best = 0; double bt = t0;
     for (int i = 1; i < n; i++) { const Judge *e = a[i];
       if (e->o.dead || e->hold || e->carried || imax(0, e->apBroke) < imax(0, a[0]->apBroke)) continue;

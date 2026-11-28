@@ -867,6 +867,10 @@
 # run 239 -- THE NEXT MODE: no stop time (mode=3) at Level 10, 6 colours, on its own seeds 31-32 (never played), run 236's bot. NST s31-32
 # run 239 -- (result, 23:34-23:43 ET) survived 8/8, 172800 frames, full health -- NO STOP TIME DONE (seeds 31-32).
 # run 240 -- THE NEXT MODE: BALL (mode=4) at Level 10, 6 colours, on its own seeds 33-34 (never played), run 236's bot. BALL s33-34
+# run 240 -- (result, 23:44-23:52 ET) BALL: survived 6/8, 167620 frames. Lost chain s34 17722, insane s34 20298. chain s34 17209: the line in
+#   progress lost at 150 kept on top through its twin over a break of 6 lost at 304 -- run 231's move covers above six colours only.
+# run 241 -- run 236's bot plus: the line in progress outlived by a third of a break gives up the top in every number of colours (rank.c).
+#   BALL s33-34
 chain_garbage 33 9 9 1 21600 10 mode=4
 combo_storm 33 9 9 1 21600 10 mode=4
 thicc_combo_storm 33 9 9 1 21600 10 mode=4

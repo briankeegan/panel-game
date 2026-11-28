@@ -1087,9 +1087,6 @@ static int compareJudged(const Judge *x, const Judge *y) {
   // frames, panels 40 to 7 on survive lines breaking nothing, then the top-out)
   if (decF.under && decQ.b->ninc > 0 && !x->o.lives && !y->o.lives) {
     int32_t bx = imax(0, x->apBroke) / W, by = imax(0, y->apBroke) / W;
-    // (run 220: a row more is a row's worth of cells more, not a row boundary crossed -- run 218 8 colours insane s22 13879 (22 queued): a
-    // break of 6 cells lost at 97 put over a carry breaking 5 lost at 222, one cell more counted a row, lost at 13916)
-    if (iabs(imax(0, x->apBroke) - imax(0, y->apBroke)) < W) bx = by;
     if (bx != by) {
       const Judge *dig = bx > by ? x : y, *other = dig == x ? y : x;
       if (lostOf(other) - lostOf(dig) < rankSave) return (cmpKey = __LINE__, (dig == x ? -1 : 1));
@@ -1673,7 +1670,9 @@ static int compareJudged(const Judge *x, const Judge *y) {
     // lost at 580, both three breaks off)
     // (and never over a line the engine has outliving it by a break's time, its walk already pressed there -- run 4608, combo_storm 1,
     // 506: a survive lost at 227 read below the line in progress lost at 115 for the walk charged again, the board lost at 115)
-    int oOutlives = !lx && !o->o.dead && oOwn < 1e299 && cOwn < 1e299 && oOwn - cOwn >= rankSave;
+    // (run 221: above six colours, a quarter of a break's time on the boards as they are, as the other rules there -- run 220 8 colours
+    // insane s21 4474 (11 queued): a carry lost at 171 kept over a survive lost at 224, both breaking 13, lost at 4786)
+    int oOutlives = !lx && !o->o.dead && oOwn < 1e299 && cOwn < 1e299 && oOwn - cOwn >= (decQ.b->colors > 6 ? rankSave / 4 : rankSave);
     int keep = lx ? !(o->met >= 0 && (c->met < 0 || o->met < c->met)) : (lostOf(o) <= lostOf(c) || (finishAsked() ? finishAlike(c, o) : lostAlike(c, o))) && !oBreaks && !oOutlives;
     // (and under garbage, a break in progress over another break that costs more presses than what is left of it -- switching spends the
     // window on swaps pressed for nothing -- unless the one in progress is lost within a break's time)

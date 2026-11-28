@@ -24,7 +24,7 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 
 | Mode | Level | Seeds | Run | Result |
 |---|---|---|---|---|
-| 8 colours | 10 | 21-22 | 218 | 5/8 (219: 4/8, off), being fixed (run 220) |
+| 8 colours | 10 | 21-22 | 218 | 5/8 (219, 220 off), being fixed (run 221) |
 | 7 colours | 10 | 23-24 | - | to redo (old: 7/8 on seeds 7-8, run 190 -- does not count) |
 | Chaos margin 4 | 10 | 25-26 | - | to redo (old: 7/8 on 7-8, run 191) |
 | Chaos mode | 10 | 27-28 | - | to redo (old: 8/8 on 7-8, run 192) |
@@ -210,6 +210,8 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 220 (2026-11-27 20:13 ET), dig the backlog's row count: 3/8 -- off** (218 restored by hash). Run 221: 1a (the line in progress kept)
+  lets go at a quarter break above six colours (insane s21 4474, 171 kept over 224).
 - **Run 219 (2026-11-27 20:04 ET), dig down under stop time: 4/8 -- off** (218 restored by hash). Run 220: DIG THE BACKLOG's row count
   fixed (6 cells vs 5 counted as a row more: insane s22 13879, 97 put over 222).
 - **Run 218 (2026-11-27 19:55 ET), no changing minds lets go at a quarter break: 5/8** -- kept; 5 sooner-lost picks in the run (was

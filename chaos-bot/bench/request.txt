@@ -1111,6 +1111,10 @@
 #   s39 2158 (early, starved) and 13148, s40 16833 and 14085 (the queue's fifty).
 # run 295 -- run 282's bot (no code change) on TWO SEARCH WORKERS: bench/play.sh sets GC_GAMBIT_WORKERS=2 -- no run ever set it, so every
 #   search ran on Gambit's thread alone on 4-cpu runners (host.c hostWorkers). training_random s39-40
+# run 295 -- (result, 06:13-06:21 ET) two search workers: survived 6/8 -- no worse: KEPT (e7f7255). Game 7 (s40 level 10, lost runs 285-294)
+#   lived; lost s39 level 11 at 20968 and s40 level 11 at 19257 (later than ever), the queue's fifty. 16.9 rows a minute (15.6 before);
+#   late 0, worst frame 3.1 ms.
+# run 296 -- run 295 with three search workers (bench/play.sh GC_GAMBIT_WORKERS=3). training_random s39-40
 training_random 39 8 8 1 21600 10
 training_random 39 9 9 1 21600 10
 training_random 39 10 10 1 21600 10

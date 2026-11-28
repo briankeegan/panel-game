@@ -31,7 +31,9 @@ export GC_GAMBIT_DIR="$gd" GC_GAMBIT_WORDS="$gd/gambit.words" GC_GAMBIT_LOG="$ou
 # (run 295: TWO SEARCH WORKERS -- Gambit's searches run on its own thread alone unless GC_GAMBIT_WORKERS names workers (host.c
 # hostWorkers), and no run set it: the runners have 4 cpus, the game's thread and Gambit's take two. Each decision gets the same wall-clock
 # time, so the workers are more search in it -- the owner's runner data: a slower model searches less and loses more)
-export GC_GAMBIT_WORKERS="${GC_GAMBIT_WORKERS:-2}"
+# (run 296: three -- run 295's two kept 6/8 with both losses later (20968, 19257, was 13718-17647) and the frame loop on time (late 0,
+# worst frame 3.1 ms): the game's thread, Gambit's and three workers on four cpus)
+export GC_GAMBIT_WORKERS="${GC_GAMBIT_WORKERS:-3}"
 export CHAOSBOT_SEED="$seed" CHAOSBOT_PATTERN="$pattern" CHAOSBOT_GLEVEL="$glevel" CHAOSBOT_GSPEED="$gspeed" CHAOSBOT_QUEUE="$queue"
 export CHAOSBOT_FRAMES="$frames" CHAOSBOT_OUT="$out/result.txt" CHAOSBOT_LEVEL="${CHAOSBOT_LEVEL:-9}"
 # a game of FRAMES frames at 60 a second, plus the client's boot, plus room for frames the runner falls behind on

@@ -28,7 +28,7 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 | 1 HP | 10 | 29-30 | 238 | **8/8 -- done** |
 | No stop time | 10 | 31-32 | 239 | **8/8 -- done** |
 | BALL | 10 | 33-34 | 241 | **8/8 -- done** |
-| Line Clear (15:3-6) | stage's | 35-36 | 272 | won 6/8 (273-276 off), being fixed (run 277) |
+| Line Clear (15:3-6) | stage's | 35-36 | 277 | won 6/8 (31.2 rows a minute), being fixed (run 278) |
 | Queue limit | 10 | 37-38 | - | to do |
 | training_random | 10 | 39-40 | - | to do (its own pattern: chain and combo garbage mixed at a random balance, Chaos Mode 1 game in 4 -- TrainingMenu.lua createBasicTrainingMode) |
 | Challenge Mode | stage's | 41-42 | - | to do |
@@ -210,6 +210,9 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 277 (03:37-03:41 ET), no calm slack with nobody across: WON 6/8 -- kept (12fc901).** Both 15:5 won; both 15:6 lost (24.6, 24.2).
+  Run 278: above six colours, on a board at rest, the chain going's search is asked first for a line starting a chain of 3+ (the designs
+  there hold ~2 links); else the design as before.
 - **Run 276 (03:31-03:35 ET), the line in progress kept when the chain going finds none: won 5/8 -- off** (it acted 0-1 times a game).
   Run 277: no calm slack with nobody across -- after a swap with the hold living, the frame loop waited the profile's gap (20 frames) and
   a jitter (to 16) before the next; a Line Clear is against the clock.

@@ -1031,6 +1031,11 @@
 #   run 272's (1d42fe1). It acted 0-1 times a game (ta=4); lost 15:5 s36 (22.1), 15:6 both (25.0, 25.3).
 # run 277 -- run 272's bot plus: no calm slack with nobody across (front.c calmGap: after a swap with the hold living, the next waited the
 #   profile's gap, 20 frames, and a jitter to 16 -- the stage is against the clock). Line Clear 15:3-6 s35-36
+# run 277 -- (result, 03:37-03:41 ET) no calm slack with nobody across: WON 6/8 -- no worse: KEPT (12fc901). 31.2 rows a minute; 15:3-4
+#   faster (34.6-43.0); both 15:5 won (27.3, 30.2); both 15:6 lost (24.6, 24.2).
+# run 278 -- run 277's bot plus: A CHAIN STARTED -- above six colours, on a board at rest, the chain going's own search is asked first for a
+#   line that starts a chain of 3 or more (pressed as the cascade runs), played where it lives as long; else the design as before (decide.c).
+#   Line Clear 15:3-6 s35-36
 challenge 35 9 9 1 21600 10 challenge=15:3 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:4 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:5 profile=lineclear

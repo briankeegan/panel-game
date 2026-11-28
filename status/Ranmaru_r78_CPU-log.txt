@@ -1,4 +1,4 @@
-run 46089766007, as of 2026-11-28T01:04:56Z
+run 46089766007, as of 2026-11-28T01:07:00Z
 garbage landed: our stopWatch 3341 clock 3529, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
 garbage landed: our stopWatch 3348 clock 3536, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
 opponent topped out: clock 3630 stopWatch 3442 stop 0 pre-stop 0 shake 54 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
@@ -150,12 +150,6 @@ memory after match: rss 4539628 kB, threads 9, lua 63970 kB
 game about to start: both players are ready
 set over: the room is closed, back in the lobby
 --- publish (the last 30 lines) ---
-[publish] 1 games finished so far; the set is over; the last publish 105 s ago
-[publish] publishing the games so far (1 finished)
-[publish] run 46089766007: 1 games added (r78, 65b9bef3, 1 new replays)
-[publish] privacy: 1 games checked, 1 shown with the opponent's name, 0 made anonymous (0 players), 0 replays dropped
-[publish] asked for the Cloudflare Pages copy
-[publish] published (attempt 1)
 [publish] 2 games finished so far; the set is over; the last publish 647 s ago
 [publish] publishing the games so far (2 finished)
 [publish] run 46089766007: 1 games added (r78, 65b9bef3, 1 new replays)
@@ -176,6 +170,12 @@ set over: the room is closed, back in the lobby
 [publish] published (attempt 2)
 [publish] 4 games finished so far; between two games of a set; the last publish 60 s ago
 [publish] publishing the games so far (4 finished)
+[publish] run 46089766007: 1 games added (r78, 65b9bef3, 1 new replays)
+[publish] privacy: 1 games checked, 1 shown with the opponent's name, 0 made anonymous (0 players), 0 replays dropped
+[publish] asked for the Cloudflare Pages copy
+[publish] published (attempt 1)
+[publish] 5 games finished so far; the set is over; the last publish 60 s ago
+[publish] publishing the games so far (5 finished)
 [publish] run 46089766007: 1 games added (r78, 65b9bef3, 1 new replays)
 [publish] privacy: 1 games checked, 1 shown with the opponent's name, 0 made anonymous (0 players), 0 replays dropped
 [publish] asked for the Cloudflare Pages copy

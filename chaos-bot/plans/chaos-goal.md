@@ -17,7 +17,7 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 
 | Mode | Level | Seeds | Run | Result |
 |---|---|---|---|---|
-| 8 colours | 10 | 21-22 | 218 | 5/8 (216: 5/8), being fixed (run 219) |
+| 8 colours | 10 | 21-22 | 218 | 5/8 (219: 4/8, off), being fixed (run 220) |
 | 7 colours | 10 | 23-24 | - | to redo (old: 7/8 on seeds 7-8, run 190 -- does not count) |
 | Chaos margin 4 | 10 | 25-26 | - | to redo (old: 7/8 on 7-8, run 191) |
 | Chaos mode | 10 | 27-28 | - | to redo (old: 8/8 on 7-8, run 192) |
@@ -203,6 +203,8 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 219 (2026-11-27 20:04 ET), dig down under stop time: 4/8 -- off** (218 restored by hash). Run 220: DIG THE BACKLOG's row count
+  fixed (6 cells vs 5 counted as a row more: insane s22 13879, 97 put over 222).
 - **Run 218 (2026-11-27 19:55 ET), no changing minds lets go at a quarter break: 5/8** -- kept; 5 sooner-lost picks in the run (was
   10-20). combo s22: nine rows under the garbage, stop 205-259, nothing dug. Run 219: DIG DOWN TO THE GARBAGE above six colours while
   the stop time covers a break.

@@ -1087,6 +1087,9 @@ static int compareJudged(const Judge *x, const Judge *y) {
   // frames, panels 40 to 7 on survive lines breaking nothing, then the top-out)
   if (decF.under && decQ.b->ninc > 0 && !x->o.lives && !y->o.lives) {
     int32_t bx = imax(0, x->apBroke) / W, by = imax(0, y->apBroke) / W;
+    // (run 220: a row more is a row's worth of cells more, not a row boundary crossed -- run 218 8 colours insane s22 13879 (22 queued): a
+    // break of 6 cells lost at 97 put over a carry breaking 5 lost at 222, one cell more counted a row, lost at 13916)
+    if (iabs(imax(0, x->apBroke) - imax(0, y->apBroke)) < W) bx = by;
     if (bx != by) {
       const Judge *dig = bx > by ? x : y, *other = dig == x ? y : x;
       if (lostOf(other) - lostOf(dig) < rankSave) return (cmpKey = __LINE__, (dig == x ? -1 : 1));
@@ -1126,11 +1129,7 @@ static int compareJudged(const Judge *x, const Judge *y) {
   // nothing in reach, holds while the stack rose to the loss)
   // (run 41: off -- survived 5/8, three new losses on seed 9 (insane at 1926): clearing panels whenever they are plenty spends the
   // fuel the next minute needs)
-  // (run 219: back above six colours while the stop time covers a break's time -- the stack frozen, the panels cleared bring the garbage
-  // within reach and cost no rise. Run 218 8 colours combo s22 2312-2560: nine rows of panels under four of garbage, stop 205-259, carries
-  // and set-ups breaking nothing played, lost at 3209)
-  if (decQ.b->colors > 6 && imax(decQ.b->stopTime + decQ.b->preStopTime, decQ.b->shakeTime) >= rankSave &&
-      decF.under && materialOn(decQ.b) >= 2 * W && !x->o.lives && !y->o.lives && x->apBroke <= 0 && y->apBroke <= 0 &&
+  if (0 && decF.under && materialOn(decQ.b) >= 2 * W && !x->o.lives && !y->o.lives && x->apBroke <= 0 && y->apBroke <= 0 &&
       x->o.topAfter >= 0 && y->o.topAfter >= 0 && x->o.topAfter != y->o.topAfter) {
     const Judge *low = x->o.topAfter < y->o.topAfter ? x : y, *hi = low == x ? y : x;
     if (lostOf(hi) - lostOf(low) < rankSave) return (cmpKey = __LINE__, (low == x ? -1 : 1));

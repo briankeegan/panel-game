@@ -426,6 +426,10 @@ static int readBoard_(Read *R) {
   int32_t taTo = TA_TOP - imax(0, evenOf(decQ.b) - TA_EVEN);
   int taRaise = ruleNoEnemy && !opening && !refill && !R->topped && !R->taDying && !taOn && panelTop(decQ.b) < taTo;
   if (taRaise) to = taTo;
+  // (run 247: and with nobody across the opening raises to time attack's top too, not to the chaos ceiling -- the ceiling keeps room for
+  // blocks that cannot come there. Run 245 Line Clear 15:5-6 (no garbage for two minutes): chains of 6-9 thrown, but 24-30 rows a minute
+  // where 33-40 were asked; the opening raised only to the ceiling for its first 600 frames)
+  if (ruleNoEnemy && opening && !R->topped && taTo > to) to = taTo;
   raiseRefill = refill; raiseOpening = opening; raiseTo = to;
   int32_t rowsUp = to - (opening ? fullTop(decQ.b) : panelTop(decQ.b));
   if (chaosFuelRaise) { to = panelTop(decQ.b) + 1; rowsUp = 1; }   // (one row at a time: the next decision asks again)

@@ -52,10 +52,11 @@ jobs:
     name: try 1 game ${{ matrix.game.n }} L${{ matrix.game.level }} ${{ matrix.game.pattern }} seed ${{ matrix.game.seed }} mode ${{ matrix.game.mode }} margin ${{ matrix.game.margin }} chaos ${{ matrix.game.chaosmode }} colors ${{ matrix.game.colors }} challenge ${{ matrix.game.challenge }} ${{ matrix.game.profile }}
     steps:
       - id: gate
-        # (THE RUNNER CHOSEN -- the owner, 2026-11-27: "if we get a bad runner... we just skip it.... and wait for another". In runs
-        # 208-226 the bot survived 49% of its games on Intel Xeon 6975P and 17-22% on AMD EPYC 7763/9V74/9V45: a game that lands on an
-        # AMD machine is not played here and waits for the next attempt's runner; the last attempt plays on whatever it draws. A game
-        # already played in an earlier attempt -- its artifact is in the run -- is not played again.)
+        # (THE RUNNER CHOSEN, BY MODEL -- the owner, 2026-11-27: "if we get a bad runner... we just skip it.... and wait for another";
+        # "Skip by model, not by vendor". Gambit-24's 43 runs (#4799-#4848), each model's loss rate against its own runs': Xeon Platinum
+        # 8573C 1.73 (the worst), EPYC 7763 1.46, EPYC 9V74 1.33, Xeon 6975P-C 0.78, EPYC 9V45 0.56 (the best). A game that lands on one of
+        # the three worst models is not played here and waits for the next attempt's runner; the last attempt plays on whatever it draws.
+        # A model not named is played. A game already played in an earlier attempt -- its artifact is in the run -- is not played again.)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -63,7 +64,7 @@ jobs:
           names=$(curl -s -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts?per_page=100" | python3 -c "import json,sys; print(' '.join(a['name'] for a in json.load(sys.stdin).get('artifacts', [])))")
           if echo " $names " | grep -q " chaosbot-game-$n "; then echo "go=false" >> "$GITHUB_OUTPUT"; echo "game $n: played already"; exit 0; fi
           model=$(lscpu | sed -n 's/^Model name: *//p' | head -1)
-          if [ "$attempt" -lt "$last" ] && echo "$model" | grep -qi amd; then
+          if [ "$attempt" -lt "$last" ] && echo "$model" | grep -Eqi 'PLATINUM 8573C|EPYC 7763|EPYC 9V74'; then
             echo "go=false" >> "$GITHUB_OUTPUT"; echo "::notice title=game $n::attempt $attempt drew $model -- skipped, waiting for another runner"; exit 0
           fi
           echo "go=true" >> "$GITHUB_OUTPUT"; echo "game $n: attempt $attempt plays on $model"
@@ -130,10 +131,11 @@ jobs:
     name: try 2 game ${{ matrix.game.n }} L${{ matrix.game.level }} ${{ matrix.game.pattern }} seed ${{ matrix.game.seed }} mode ${{ matrix.game.mode }} margin ${{ matrix.game.margin }} chaos ${{ matrix.game.chaosmode }} colors ${{ matrix.game.colors }} challenge ${{ matrix.game.challenge }} ${{ matrix.game.profile }}
     steps:
       - id: gate
-        # (THE RUNNER CHOSEN -- the owner, 2026-11-27: "if we get a bad runner... we just skip it.... and wait for another". In runs
-        # 208-226 the bot survived 49% of its games on Intel Xeon 6975P and 17-22% on AMD EPYC 7763/9V74/9V45: a game that lands on an
-        # AMD machine is not played here and waits for the next attempt's runner; the last attempt plays on whatever it draws. A game
-        # already played in an earlier attempt -- its artifact is in the run -- is not played again.)
+        # (THE RUNNER CHOSEN, BY MODEL -- the owner, 2026-11-27: "if we get a bad runner... we just skip it.... and wait for another";
+        # "Skip by model, not by vendor". Gambit-24's 43 runs (#4799-#4848), each model's loss rate against its own runs': Xeon Platinum
+        # 8573C 1.73 (the worst), EPYC 7763 1.46, EPYC 9V74 1.33, Xeon 6975P-C 0.78, EPYC 9V45 0.56 (the best). A game that lands on one of
+        # the three worst models is not played here and waits for the next attempt's runner; the last attempt plays on whatever it draws.
+        # A model not named is played. A game already played in an earlier attempt -- its artifact is in the run -- is not played again.)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -141,7 +143,7 @@ jobs:
           names=$(curl -s -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts?per_page=100" | python3 -c "import json,sys; print(' '.join(a['name'] for a in json.load(sys.stdin).get('artifacts', [])))")
           if echo " $names " | grep -q " chaosbot-game-$n "; then echo "go=false" >> "$GITHUB_OUTPUT"; echo "game $n: played already"; exit 0; fi
           model=$(lscpu | sed -n 's/^Model name: *//p' | head -1)
-          if [ "$attempt" -lt "$last" ] && echo "$model" | grep -qi amd; then
+          if [ "$attempt" -lt "$last" ] && echo "$model" | grep -Eqi 'PLATINUM 8573C|EPYC 7763|EPYC 9V74'; then
             echo "go=false" >> "$GITHUB_OUTPUT"; echo "::notice title=game $n::attempt $attempt drew $model -- skipped, waiting for another runner"; exit 0
           fi
           echo "go=true" >> "$GITHUB_OUTPUT"; echo "game $n: attempt $attempt plays on $model"
@@ -208,10 +210,11 @@ jobs:
     name: try 3 game ${{ matrix.game.n }} L${{ matrix.game.level }} ${{ matrix.game.pattern }} seed ${{ matrix.game.seed }} mode ${{ matrix.game.mode }} margin ${{ matrix.game.margin }} chaos ${{ matrix.game.chaosmode }} colors ${{ matrix.game.colors }} challenge ${{ matrix.game.challenge }} ${{ matrix.game.profile }}
     steps:
       - id: gate
-        # (THE RUNNER CHOSEN -- the owner, 2026-11-27: "if we get a bad runner... we just skip it.... and wait for another". In runs
-        # 208-226 the bot survived 49% of its games on Intel Xeon 6975P and 17-22% on AMD EPYC 7763/9V74/9V45: a game that lands on an
-        # AMD machine is not played here and waits for the next attempt's runner; the last attempt plays on whatever it draws. A game
-        # already played in an earlier attempt -- its artifact is in the run -- is not played again.)
+        # (THE RUNNER CHOSEN, BY MODEL -- the owner, 2026-11-27: "if we get a bad runner... we just skip it.... and wait for another";
+        # "Skip by model, not by vendor". Gambit-24's 43 runs (#4799-#4848), each model's loss rate against its own runs': Xeon Platinum
+        # 8573C 1.73 (the worst), EPYC 7763 1.46, EPYC 9V74 1.33, Xeon 6975P-C 0.78, EPYC 9V45 0.56 (the best). A game that lands on one of
+        # the three worst models is not played here and waits for the next attempt's runner; the last attempt plays on whatever it draws.
+        # A model not named is played. A game already played in an earlier attempt -- its artifact is in the run -- is not played again.)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -219,7 +222,7 @@ jobs:
           names=$(curl -s -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts?per_page=100" | python3 -c "import json,sys; print(' '.join(a['name'] for a in json.load(sys.stdin).get('artifacts', [])))")
           if echo " $names " | grep -q " chaosbot-game-$n "; then echo "go=false" >> "$GITHUB_OUTPUT"; echo "game $n: played already"; exit 0; fi
           model=$(lscpu | sed -n 's/^Model name: *//p' | head -1)
-          if [ "$attempt" -lt "$last" ] && echo "$model" | grep -qi amd; then
+          if [ "$attempt" -lt "$last" ] && echo "$model" | grep -Eqi 'PLATINUM 8573C|EPYC 7763|EPYC 9V74'; then
             echo "go=false" >> "$GITHUB_OUTPUT"; echo "::notice title=game $n::attempt $attempt drew $model -- skipped, waiting for another runner"; exit 0
           fi
           echo "go=true" >> "$GITHUB_OUTPUT"; echo "game $n: attempt $attempt plays on $model"
@@ -286,10 +289,11 @@ jobs:
     name: try 4 game ${{ matrix.game.n }} L${{ matrix.game.level }} ${{ matrix.game.pattern }} seed ${{ matrix.game.seed }} mode ${{ matrix.game.mode }} margin ${{ matrix.game.margin }} chaos ${{ matrix.game.chaosmode }} colors ${{ matrix.game.colors }} challenge ${{ matrix.game.challenge }} ${{ matrix.game.profile }}
     steps:
       - id: gate
-        # (THE RUNNER CHOSEN -- the owner, 2026-11-27: "if we get a bad runner... we just skip it.... and wait for another". In runs
-        # 208-226 the bot survived 49% of its games on Intel Xeon 6975P and 17-22% on AMD EPYC 7763/9V74/9V45: a game that lands on an
-        # AMD machine is not played here and waits for the next attempt's runner; the last attempt plays on whatever it draws. A game
-        # already played in an earlier attempt -- its artifact is in the run -- is not played again.)
+        # (THE RUNNER CHOSEN, BY MODEL -- the owner, 2026-11-27: "if we get a bad runner... we just skip it.... and wait for another";
+        # "Skip by model, not by vendor". Gambit-24's 43 runs (#4799-#4848), each model's loss rate against its own runs': Xeon Platinum
+        # 8573C 1.73 (the worst), EPYC 7763 1.46, EPYC 9V74 1.33, Xeon 6975P-C 0.78, EPYC 9V45 0.56 (the best). A game that lands on one of
+        # the three worst models is not played here and waits for the next attempt's runner; the last attempt plays on whatever it draws.
+        # A model not named is played. A game already played in an earlier attempt -- its artifact is in the run -- is not played again.)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -297,7 +301,7 @@ jobs:
           names=$(curl -s -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts?per_page=100" | python3 -c "import json,sys; print(' '.join(a['name'] for a in json.load(sys.stdin).get('artifacts', [])))")
           if echo " $names " | grep -q " chaosbot-game-$n "; then echo "go=false" >> "$GITHUB_OUTPUT"; echo "game $n: played already"; exit 0; fi
           model=$(lscpu | sed -n 's/^Model name: *//p' | head -1)
-          if [ "$attempt" -lt "$last" ] && echo "$model" | grep -qi amd; then
+          if [ "$attempt" -lt "$last" ] && echo "$model" | grep -Eqi 'PLATINUM 8573C|EPYC 7763|EPYC 9V74'; then
             echo "go=false" >> "$GITHUB_OUTPUT"; echo "::notice title=game $n::attempt $attempt drew $model -- skipped, waiting for another runner"; exit 0
           fi
           echo "go=true" >> "$GITHUB_OUTPUT"; echo "game $n: attempt $attempt plays on $model"

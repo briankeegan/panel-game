@@ -212,8 +212,12 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 - **THE RUNNER CHOSEN (21:15 ET, the owner: "Which model is the worst? Look historical... if we get a bad runner... we just skip it....
   and wait for another").** Runs 208-226 by CPU: AMD EPYC 7763 4/23 (17%), EPYC 9V45 2/10 (20%), EPYC 9V74 5/23 (22%), Intel Xeon 8573C
-  2/7, Intel Xeon 6975P-C 38/78 (49%). From run 228 the workflow plays each game in up to four tries (play1-play4): a try that draws an
-  AMD machine is skipped and the game waits for the next try's runner; the fourth plays on whatever it draws. Results from run 228 on are
+  2/7, Intel Xeon 6975P-C 38/78 (49%). From run 228 the workflow plays each game in up to four tries (play1-play4): a try that draws one
+  of the named worst MODELS -- Xeon Platinum 8573C, EPYC 7763, EPYC 9V74 -- is skipped and the game waits for the next try's runner; the
+  fourth plays on whatever it draws. (The owner, 21:20 ET: "Skip by model, not by vendor" -- gambit-24's 43 runs #4799-#4848, loss rate
+  against each model's own runs: 8573C 1.73, 7763 1.46, 9V74 1.33, 6975P-C 0.78, 9V45 0.56; a vendor rule kept the worst model and threw
+  away the best. Chaos-bot's "run N" is this file's own count of chaos-bot-games runs on panel-game -- 8 colours, Level 10, the chaos
+  client -- not gambit-24's numbering; its survival rates are of those games.) Results from run 228 on are
   on the runners kept, not comparable one-to-one with earlier runs.
 - **Run 226 (2026-11-27 21:09 ET), 1'' credited-only: 2/8 -- off.** The owner asked how to tell the runners apart: by CPU -- runs 208-225,
   Intel Xeon 6975P 37/76 survived (49%), AMD EPYC 7763/9V74/9V45 10/52 (19%); not the clock (the 9V45 runs fastest). The report now

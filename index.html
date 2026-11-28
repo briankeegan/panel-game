@@ -559,15 +559,15 @@ html.set-chaos .gs h1 { color: var(--set-accent); }
 .gs-collapse > summary { display: flex; align-items: center; gap: 12px; padding: 18px 64px 18px 22px; cursor: pointer; list-style: none; border-radius: 14px; }
 .gs-collapse > summary::-webkit-details-marker { display: none; }
 /* one chevron for every collapsible card: points right closed, down open */
-.gs-collapse > summary::before, .gs-defs > summary::before { content: ''; flex: none; width: 7px; height: 7px; margin: 0 4px 0 2px; border-right: 2px solid var(--color-fg-muted); border-bottom: 2px solid var(--color-fg-muted); transform: rotate(-45deg); transition: transform .15s; }
-.gs-collapse[open] > summary::before, .gs-defs[open] > summary::before { transform: rotate(45deg); }
+.gs-collapse > summary::before { content: ''; flex: none; width: 7px; height: 7px; margin: 0 4px 0 2px; border-right: 2px solid var(--color-fg-muted); border-bottom: 2px solid var(--color-fg-muted); transform: rotate(-45deg); transition: transform .15s; }
+.gs-collapse[open] > summary::before { transform: rotate(45deg); }
 .gs-collapse > summary:hover { background: color-mix(in srgb, var(--color-fg) 4%, transparent); }
 .gs-collapse > summary:focus-visible { outline: 2px solid var(--color-fg); outline-offset: -2px; }
 .gs-collapse > summary h2 { flex: 0 0 auto; }
 .gs-collapse > summary .gs-count { margin-left: auto; text-align: right; }
 .gs-collapse > :not(summary) { margin-inline: 22px; }
 .gs-collapse > :last-child { margin-bottom: 18px; }
-@media (max-width: 520px) { .gs-collapse > summary { padding: 14px 60px 14px 16px; } .gs-collapse > :not(summary) { margin-inline: 16px; } .gs-collapse > :last-child { margin-bottom: 14px; } }
+@media (max-width: 520px) { .gs-collapse > summary { padding: 14px 72px 14px 16px; flex-wrap: wrap; row-gap: 4px; } .gs-collapse > summary .gs-count { flex-basis: 100%; margin-left: 0; padding-left: 25px; text-align: left; } .gs-collapse > :not(summary) { margin-inline: 16px; } .gs-collapse > :last-child { margin-bottom: 14px; } }
 .gw-cap .whyline.expl { color: var(--color-fg); font-size: 13px; line-height: 1.35; }
 .gw-optsb { display: flex; flex-direction: column; gap: 2px; max-height: 16em; overflow-y: auto; font-size: 12.5px; }
 .gw-optsb .gw-note2 { color: var(--color-fg-muted); padding: 2px 2px 6px; line-height: 1.4; }
@@ -685,8 +685,8 @@ html.set-chaos #sec-brain, html.set-chaos .gs-nav a[href="#sec-brain"] { display
   .dt-a { text-align: left; padding-left: 18px; }
   .dt-else + .dt-a { display: none; } .dt-q.dt-else::after { content: " ↓"; }
 }
-.gs-defs > summary { display: flex; align-items: center; gap: 12px; cursor: pointer; list-style: none; }
-.gs-defs > summary::-webkit-details-marker { display: none; }
+.gs details.gs-defs dl { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); margin: 0 22px 18px; }
+@media (max-width: 520px) { .gs details.gs-defs dl { margin: 0 16px 14px; grid-template-columns: minmax(0, 1fr); gap: 2px; } .gs details.gs-defs dd { margin-bottom: 8px; } }
 </style>
 
 <div class="gs" id="gs">
@@ -945,8 +945,8 @@ html.set-chaos #sec-brain, html.set-chaos .gs-nav a[href="#sec-brain"] { display
   })();
   </script>
 
-  <details class="gs-defs">
-    <summary>Definitions and what this leaves out</summary>
+  <details class="gs-card gs-collapse gs-defs" id="sec-defs">
+    <summary><h2>Definitions and limits</h2></summary>
     <dl>
       <dt>Version</dt><dd>A build of Ranmaru. Bots on the same build share a row.</dd>
       <dt>Win rate</dt><dd>Wins out of games played, on panelattack.com. Fights are not counted.</dd>

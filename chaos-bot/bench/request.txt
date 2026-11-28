@@ -1186,6 +1186,10 @@
 # run 311 -- (result, 08:48-08:55 ET) the opening raise cap: survived 6/8 -- no worse: KEPT (c54c965). Both insane lived; lost chain s21 at
 #   6729 (no-line: 39 lines clearing none in the last minute, SURVIVAL FIRST's later loss) and thicc s21 at 19942 (starved, backlog).
 # run 312 -- run 311 plus vanilla's perch floor (as run 304 tried at training_random; judge.c restsFewOf, rank.c). 8 colours s21-22
+# run 312 -- (result, 08:58-09:05 ET) the perch floor at 8 colours: survived 5/8 -- worse: OFF, back to run 311's (c54c965). Lost insane s21
+#   12226, thicc s22 1262 (early: READY WHEN IT LANDS put a ready line lost at 143 over one lost at 192 at 580), insane s22 14278.
+# run 313 -- run 311 plus: READY WHEN IT LANDS between two lines not living only where the ready one is lost no sooner (rank.c). 8 colours
+#   s21-22
 chain_garbage 21 9 9 1 21600 10 colors=8
 combo_storm 21 9 9 1 21600 10 colors=8
 thicc_combo_storm 21 9 9 1 21600 10 colors=8

@@ -1208,24 +1208,15 @@ static int compareJudged(const Judge *x, const Judge *y) {
         return (cmpKey = __LINE__, (f == x ? -1 : 1));
     }
   }
-  // 1. THE PERCH FLOOR (vanilla GameCreator 64b8b34c54/198ad00744, ported run 304, on again run 312 at 8 colours; the owner: it prefers not dying, and flatness -- both
-  // floors): with garbage on the board or on its way, of two that both live or both do not, where either leaves the lowest garbage resting on
-  // one or two columns PERCH_HIGH rows or more over the lowest column under it (judge.c restsFewOf), the one that leaves it lower goes first,
-  // lost sooner or not -- where it lives or its board stands a break's time, breaks no less garbage (or the other none) and is the hold or
-  // walks no more than WALK_EARN actions: a block resting on the columns few panels touch is the break that cannot be made
-  #define PERCH_HIGH 5
-  if (lx == ly && x->o.j.perch >= 0 && y->o.j.perch >= 0 && x->o.j.perch != y->o.j.perch && imax(x->o.j.perch, y->o.j.perch) >= PERCH_HIGH &&
-      (decF.under || garbageComing())) {
-    const Judge *f = x->o.j.perch < y->o.j.perch ? x : y, *t = f == x ? y : x;
-    if ((lx || (!f->o.dead && diesAt(f) >= rankSave && diesAt(f) < 1e299)) && (imax(0, f->apBroke) >= imax(0, t->apBroke) || !(t->apBroke > 0)) &&
-        (f->hold || lineWalk(f) <= WALK_EARN))
-      return (cmpKey = __LINE__, (f == x ? -1 : 1));
-  }
   // 1. READY WHEN IT LANDS (the owner: just be ready -- the stack raised, the garbage on its way): with garbage on its way and none on the
   // board, of two that live or are lost alike, the one that leaves a break ready once everything lands (judge.c breaksAfterLanding, the
   // window counted) goes first: the break is in place when the block arrives, not walked to after it
+  // (run 313: and of two that do not live, only where the ready one is lost no sooner -- alike within a break is not alike enough before the
+  // first block lands: run 312 8 colours thicc s22 at 580 put a ready line lost at 143 over the line in progress lost at 192, a survive at
+  // 409 behind them, lost at 1262)
   if (lx == ly && !decF.under && garbageComing() && (lx || lostAlike(x, y)) && x->readyNext != NOT_ASKED && y->readyNext != NOT_ASKED &&
-      (x->readyNext == 1) != (y->readyNext == 1))
+      (x->readyNext == 1) != (y->readyNext == 1) &&
+      (lx || lostOf(x->readyNext == 1 ? x : y) >= lostOf(x->readyNext == 1 ? y : x)))
     return (cmpKey = __LINE__, (x->readyNext == 1 ? -1 : 1));
   // 1. NOTHING AMID THE GARBAGE (amidGarbage): under garbage, of two that do not live, a line that swaps among the slabs and breaks nothing
   // after one that does not -- unless it keeps the board a break's time (rankSave) longer

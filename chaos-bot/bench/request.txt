@@ -826,11 +826,14 @@
 #   raised the stack to 54 panels before the first block (688), every line dying from 536. 7 of 8 games on Xeon 6975P, 1 on EPYC 9V45.
 # run 229 -- run 227's bot plus: the run-160 high-opening rule back, bounded -- only on a stack of 48+ panels, never past 36 left (rank.c).
 #   Fixed as a loss like any other; played on the held-out seeds where it was lost, then 21-22 again before 7 colours. 8 colours s51-52
-chain_garbage 51 9 9 1 21600 10 colors=8
-combo_storm 51 9 9 1 21600 10 colors=8
-thicc_combo_storm 51 9 9 1 21600 10 colors=8
-insane_combo_storm 51 9 9 1 21600 10 colors=8
-chain_garbage 52 9 9 1 21600 10 colors=8
-combo_storm 52 9 9 1 21600 10 colors=8
-thicc_combo_storm 52 9 9 1 21600 10 colors=8
-insane_combo_storm 52 9 9 1 21600 10 colors=8
+# run 229 -- cancelled by me: the owner, 21:40 ET: "for 8 color you can run the same seeds" -- no held-out step. 8 colours is DONE at
+#   7/8 on its own seeds 21-22 (run 227). Run 229's change (the high-opening rule bounded) is not kept.
+# run 230 -- THE NEXT MODE: 7 colours at Level 10 on its own seeds 23-24 (never played), run 227's bot (3188633). 7 colours s23-24
+chain_garbage 23 9 9 1 21600 10 colors=7
+combo_storm 23 9 9 1 21600 10 colors=7
+thicc_combo_storm 23 9 9 1 21600 10 colors=7
+insane_combo_storm 23 9 9 1 21600 10 colors=7
+chain_garbage 24 9 9 1 21600 10 colors=7
+combo_storm 24 9 9 1 21600 10 colors=7
+thicc_combo_storm 24 9 9 1 21600 10 colors=7
+insane_combo_storm 24 9 9 1 21600 10 colors=7

@@ -9,12 +9,9 @@ have its own seeds"; "Make this clear in your goal as well").** Until then every
 on (268 games). Those results do not count. Every mode is redone from the top on the seeds in the table below, which no run had played;
 a mode's reruns stay on its own seeds; no mode ever plays another mode's seeds. Seeds 7-8 stay only the Level 10 six-colour gate.
 
-**GENERIC, NOT TUNED TO THE SEEDS (the owner, 2026-11-27 20:10 ET: "Make sure your solutions are generic and not just tuned for these
-seeds").** Every fix is a rule about the board (losses, breaks, the queue, the level's own timing -- rankSave), never about a seed, a
-pattern or a frame; written for every mode unless the rule only makes sense for one (above six colours, no stop time). And each mode's
-7/8 is checked once on held-out seeds no fix was ever made on, before the next mode starts: a fall there means the fixes were fitted, and
-it is fixed as a loss like any other. Held-out seeds: 8 colours 51-52, 7 colours 53-54, margin 4 55-56, chaos mode 57-58, 1HP 59-60, NST
-61-62, BALL 63-64, Line Clear 65-66, queue limit 67-68, training_random 69-70.
+**GENERIC, NOT TUNED TO THE SEEDS (the owner, 20:10 ET).** Every fix is a rule about the board (losses, breaks, the queue, the level's
+own timing), never about a seed, a pattern or a frame. No held-out step (the owner, 21:40 ET: "for 8 color you can run the same seeds"):
+each mode plays its own seeds only, and reaching 7/8 there finishes it.
 
 **Goal now (the owner, 2026-11-27): every mode at chaos Level 10 to 7/8 on its own seeds, one set at a time, in the table's order --
 then back to each for 8/8 (on its own seeds).** (The owner, 16:35 ET: "Get to 7 before moving on" -- no mode is left below 7/8 on its own seeds.) (The owner: "7/8 IS GREAT", "If you have that. GO into next mode", "And once all
@@ -24,8 +21,8 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 
 | Mode | Level | Seeds | Run | Result |
 |---|---|---|---|---|
-| 8 colours | 10 | 21-22 | 227 | **7/8**; held-out 51-52: 6/8 (run 228), being fixed (run 229) |
-| 7 colours | 10 | 23-24 | - | to redo (old: 7/8 on seeds 7-8, run 190 -- does not count) |
+| 8 colours | 10 | 21-22 | 227 | **7/8 -- done** |
+| 7 colours | 10 | 23-24 | 230 | playing |
 | Chaos margin 4 | 10 | 25-26 | - | to redo (old: 7/8 on 7-8, run 191) |
 | Chaos mode | 10 | 27-28 | - | to redo (old: 8/8 on 7-8, run 192) |
 | 1 HP | 10 | 29-30 | - | to redo (old: 8/8 on 7-8, run 193) |

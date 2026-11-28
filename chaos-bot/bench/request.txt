@@ -1183,6 +1183,9 @@
 #   lost insane s21 at 4115 and insane s22 at 2762, both early.
 # run 311 -- run 310 plus vanilla's opening raise cap (GameCreator 97d4a50f78 + 33e255e18d): the opening's raise never takes the tallest
 #   column past 6 rows, with somebody across (decide.c OPEN_TOP). 8 colours s21-22
+# run 311 -- (result, 08:48-08:55 ET) the opening raise cap: survived 6/8 -- no worse: KEPT (c54c965). Both insane lived; lost chain s21 at
+#   6729 (no-line: 39 lines clearing none in the last minute, SURVIVAL FIRST's later loss) and thicc s21 at 19942 (starved, backlog).
+# run 312 -- run 311 plus vanilla's perch floor (as run 304 tried at training_random; judge.c restsFewOf, rank.c). 8 colours s21-22
 chain_garbage 21 9 9 1 21600 10 colors=8
 combo_storm 21 9 9 1 21600 10 colors=8
 thicc_combo_storm 21 9 9 1 21600 10 colors=8

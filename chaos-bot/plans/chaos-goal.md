@@ -21,7 +21,7 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 
 | Mode | Level | Seeds | Run | Result |
 |---|---|---|---|---|
-| 8 colours | 10 | 21-22 | 227 | **7/8 -- done**; for 8/8: 6/8 on run 310's bot (flatness floor), being fixed (run 311) |
+| 8 colours | 10 | 21-22 | 227 | **7/8 -- done**; for 8/8: 6/8 on run 311's bot (flatness floor, opening cap), being fixed (run 312) |
 | 7 colours | 10 | 23-24 | 234 | **7/8 -- done** |
 | Chaos margin 4 | 10 | 25-26 | 236 | **8/8 -- done** |
 | Chaos mode | 10 | 27-28 | 237 | **8/8 -- done** |
@@ -210,6 +210,8 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 311 (08:48-08:55 ET), vanilla's opening raise cap: 6/8 -- kept (c54c965)** (insane both lived; chain s21 and thicc s21 lost). Run
+  312: vanilla's perch floor at 8 colours.
 - **Run 310 (08:38-08:46 ET), vanilla's flatness floor at 8 colours: 6/8 -- kept (cf4ecdf)** (both insane lost early). Run 311: vanilla's
   opening raise cap (the tallest column never past 6 rows).
 - **Run 309 (08:29-08:36 ET), break kept in reach at 8 colours: 5/8 -- off.** Run 310: vanilla's flatness floor at 8 colours.

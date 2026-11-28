@@ -59,3 +59,9 @@ So the live bot differs from the rule above in step 5.
   and its notice; the stats page does not show it yet.
 
 To change the list: edit `SLOW_CPU_MODELS` in the workflow. Model numbers only.
+
+## Log and stop
+
+- Every check adds one line to `status/runner-cpu.log` on the `bot-status` branch: time, `played` / `skipped`, run, attempt, bot, CPU model. Skips are logged too. The file is never overwritten; it keeps the last 2000 lines.
+- The heartbeat (`status/<bot>.txt`) carries a `runner:` line with the model the live bot is on.
+- A skipped runner stops at once: the check step fails the job, and no later step runs. That includes the `always()` ones (account save, summary, log upload, "bring the bot back"), because each is gated on `steps.cpucheck.outcome != 'failure'`. The deploy then re-runs the job for a new runner.

@@ -236,6 +236,7 @@ jobs:
       # (the same run, so the old bot keeps the lobby meanwhile), as many times as it takes: a deployed bot never plays on a slow model.
       # Any other run (a bot started by hand, the chaos bot) always plays. The model goes to cpu.txt and the run's notice either way.
       - name: Runner check (slow CPU models)
+        id: cpucheck
         if: ${{ env.MODE == 'live' }}
         env:
           GH_TOKEN: ${{ github.token }}
@@ -246,6 +247,17 @@ jobs:
           echo "$model" > "$GITHUB_WORKSPACE/cpu.txt"; echo "RUNNER_CPU=$model" >> "$GITHUB_ENV"
           slow=""; for m in $SLOW_CPU_MODELS; do printf '%s\n' "$model" | grep -qiw -- "$m" && slow=$m; done
           echo "::notice::runner CPU: $model (attempt $ATTEMPT)${slow:+ -- a slow model ($slow)}"
+          # Every check, played or skipped, adds one line to status/runner-cpu.log on bot-status (kept, never overwritten).
+          if [ -z "$slow" ]; then verdict=played; elif [ "${STANDBY:-}" != 1 ]; then verdict="played (slow, not a deploy)"; else verdict=skipped; fi
+          line=$(printf '%s  %-9s run %s attempt %s  %s  %s' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$verdict" "$GITHUB_RUN_ID" "$ATTEMPT" "$BOT_NAME" "$model")
+          for k in 1 2 3 4 5; do
+            cur=$(gh api "repos/$GITHUB_REPOSITORY/contents/status/runner-cpu.log?ref=bot-status" 2>/dev/null || true)
+            lsha=$(printf '%s' "$cur" | jq -r '.sha // empty' 2>/dev/null || true)
+            old=$(printf '%s' "$cur" | jq -r '.content // empty' 2>/dev/null | base64 -d 2>/dev/null || true)
+            gh api -X PUT "repos/$GITHUB_REPOSITORY/contents/status/runner-cpu.log" -f message="runner cpu: $verdict ($BOT_NAME)" \
+              -f content="$({ [ -z "$old" ] || printf '%s\n' "$old"; printf '%s\n' "$line"; } | sed '/^$/d' | tail -n 2000 | base64 -w0)" -f branch=bot-status ${lsha:+-f sha="$lsha"} >/dev/null 2>&1 && break
+            sleep $((k * 2))
+          done
           [ -n "$slow" ] || exit 0
           if [ "${STANDBY:-}" != 1 ]; then echo "a slow model, but not a deploy's new bot: it plays"; exit 0; fi
           echo "skipped runner: $model (attempt $ATTEMPT)" >> "$GITHUB_STEP_SUMMARY"
@@ -691,7 +703,7 @@ jobs:
                 st=$(cat "$PA_STATUS_FILE" 2>/dev/null || echo "no status yet")
                 # the repo's API budget left this hour (reading it costs nothing): GITHUB_TOKEN allows 1000 calls/hour for the whole repo
                 api=$(gh api rate_limit --jq '.resources.core | "\(.remaining)/\(.limit), resets \(.reset | todate)"' 2>/dev/null || echo unknown)
-                body=$(printf 'run %s\nbot %s\nbot wrote: %s\nsent: %s\napi left: %s\nwatch loop: %s\n' "$GITHUB_RUN_ID" "$name" "$st" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$api" "$(cat "$RUNNER_TEMP/watch-alive" 2>/dev/null || echo 'not started')")
+                body=$(printf 'run %s\nbot %s\nbot wrote: %s\nsent: %s\napi left: %s\nwatch loop: %s\nrunner: %s\n' "$GITHUB_RUN_ID" "$name" "$st" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$api" "$(cat "$RUNNER_TEMP/watch-alive" 2>/dev/null || echo 'not started')" "${RUNNER_CPU:-unknown}")
                 sha=$(put "$path" "$(printf '%s' "$body" | base64 -w0)" "$sha")
                 # the bot's recent log (its last 150 lines) goes to status/<bot>-log.txt the same way, every OTHER beat (every 2 min)
                 beat=$((beat + 1))
@@ -788,7 +800,7 @@ jobs:
       # commits it to UPSTREAM_BOT_REF so the next run logs back in instead of
       # being denied as "already taken". Not secret, on purpose: bot accounts.
       - name: Save the account id
-        if: always() && (env.SERVER_EFF == env.BETA_SERVER || env.SERVER_EFF == env.PROD_SERVER || env.SERVER_EFF == env.CHAOS_SERVER)
+        if: always() && steps.cpucheck.outcome != 'failure' && (env.SERVER_EFF == env.BETA_SERVER || env.SERVER_EFF == env.PROD_SERVER || env.SERVER_EFF == env.CHAOS_SERVER)
         run: |
           set -eu
           n='${{ env.BOT_NAME }}'; n=${n%%,*}   # (a "BOT,OPPONENT" name: the account is the bot's)
@@ -880,7 +892,7 @@ jobs:
           echo "::error::could not save account ids for$added"; exit 1
 
       - name: Per-game sanity (gambit)
-        if: always() && env.MODE == 'live' && env.BOT_KIND == 'gambit'
+        if: always() && steps.cpucheck.outcome != 'failure' && env.MODE == 'live' && env.BOT_KIND == 'gambit'
         run: |
           # Gambit carries state between games when something is not reset per game. These checks show it:
           # every game must open in "opener", no game may fall back to "time attack" after its first
@@ -915,7 +927,7 @@ jobs:
           PY
 
       - name: Summary
-        if: always()
+        if: always() && steps.cpucheck.outcome != 'failure'
         run: |
           {
             echo "## Bot (${{ env.MODE }}) — ${{ env.SERVER_EFF }}"
@@ -931,7 +943,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload log
-        if: always()
+        if: always() && steps.cpucheck.outcome != 'failure'
         uses: actions/upload-artifact@v4
         with:
           name: bot-prod-smoke-log
@@ -955,7 +967,7 @@ jobs:
       # It starts the same name with versus-player (no deploy, no rename).
       - name: Bring the bot back if it ended on its own
         # never on a cancel: a cancelled run starts nothing (a cancel is someone stopping it on purpose)
-        if: ${{ always() && !cancelled() && env.MODE == 'live' && env.BOT_KIND == 'gambit' && env.CHAOS != '1' && !contains(inputs.advanced, 'no-restart') && !contains(inputs.advanced, 'bot_run') }}
+        if: ${{ always() && !cancelled() && steps.cpucheck.outcome != 'failure' && env.MODE == 'live' && env.BOT_KIND == 'gambit' && env.CHAOS != '1' && !contains(inputs.advanced, 'no-restart') && !contains(inputs.advanced, 'bot_run') }}
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}

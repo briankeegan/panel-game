@@ -914,6 +914,10 @@
 #   logs: the design never built (ta= on 0 every decision) in 15:5 nor 15:3; at 7 colours 190 of 312 decisions never searched one.
 # run 251 -- run 241's bot + time attack's lineclear.words, plus: above six colours the design is searched from 4 full rows, not 6
 #   (decide.c TA_FULL). Line Clear 15:3-6 s35-36
+# run 251 -- (result, 00:55-00:59 ET) the design searched from 4 full rows above six colours: won 5/8 -- no worse, kept (2c9a606). 15:5
+#   s36 won (35 rows a minute; the design built 11 times); 15:5 s35 lost at 26.4; 15:6 lost both (20, 24) -- in 15:6 s35 the design was
+#   let go 18 times (the board no longer held it) and never built.
+# run 252 -- run 251's bot plus: above six colours the design is built after half the search (decide.c). Line Clear 15:3-6 s35-36
 challenge 35 9 9 1 21600 10 challenge=15:3 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:4 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:5 profile=lineclear

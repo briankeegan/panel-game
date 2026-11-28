@@ -28,7 +28,7 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 | 1 HP | 10 | 29-30 | 238 | **8/8 -- done** |
 | No stop time | 10 | 31-32 | 239 | **8/8 -- done** |
 | BALL | 10 | 33-34 | 241 | **8/8 -- done** |
-| Line Clear (15:3-6) | stage's | 35-36 | 253 | won 6/8 (254, 255 off), being fixed (run 256) |
+| Line Clear (15:3-6) | stage's | 35-36 | 253 | won 6/8 (254-256 off), being fixed (run 257) |
 | Queue limit | 10 | 37-38 | - | to do |
 | training_random | 10 | 39-40 | - | to do (its own pattern: chain and combo garbage mixed at a random balance, Chaos Mode 1 game in 4 -- TrainingMenu.lua createBasicTrainingMode) |
 | Challenge Mode | stage's | 41-42 | - | to do |
@@ -210,6 +210,8 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 256 (01:25-01:29 ET), 14 design swaps above six colours: won 5/8 -- off.** More rows sent, but 15:5 s36 lost. Run 257: designs
+  searched from 3 full rows above six colours (run 253 15:6 s35 went 740 frames with no design on 24-36 panels).
 - **Run 255 (01:17-01:22 ET), time attack a row higher above six colours: won 5/8 -- off.** 15:6 s35 topped out at 20 rows a minute.
   Run 256: above six colours a design may take 14 swaps, not 10 (the board's life still caps it).
 - **Run 254 (01:12-01:16 ET), a 10-link design built at once: won 4/8 -- off.** Run 255: time attack a row higher above six colours.

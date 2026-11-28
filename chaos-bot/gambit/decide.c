@@ -2220,16 +2220,17 @@ static Played playOf(const Read *R, int n) {
     // is played as any is, levelled and raised)
     // (run 251: above six colours from 4 full rows, not 6 -- run 250 Line Clear 15:5 (7 colours): the design never built in 312 decisions,
     // 190 of them never searched, the chains only those taken on as they fell; 23-28 rows a minute where 26-32 were asked)
-    if (!taOn && nfull < (decQ.b->colors > 6 ? 4 : TA_FULL)) { if (taHave) { taReset(); taLog = -4; } }
+    // (run 257: above six colours from 3 full rows, not 4 -- run 253 Line Clear 15:6 s35: after its chain ended at 2125 the board stood on
+    // 24-36 panels, fewer than 4 full rows, so no design was searched for 740 frames; the rank's lines (cut, a two-column set-up carried
+    // to 33 frames from the top) sent nothing, and the next chain began at 2867)
+    if (!taOn && nfull < (decQ.b->colors > 6 ? 3 : TA_FULL)) { if (taHave) { taReset(); taLog = -4; } }
     else if (!taOn) {
       double left = C2.due ? C2.due - C2.margin - nowMs() : 100, ms = left * 0.7; if (ms < 2) ms = 2;
       readyStop();
       static CbGrid D; int32_t tr = 0; int links = 0, sw = 0;
       // (no more swaps than the board lives to press: the frames it has left alone, a swap's frames each, TA_MARGIN to spare)
       int32_t dies = R->F.known[FACT_US_DIES] && R->F.v[FACT_US_DIES] > 0 ? (int32_t)R->F.v[FACT_US_DIES] : NOT_ASKED;
-      // (run 256: above six colours a design may take 14 swaps, not 10 -- at seven colours the long designs need more sorting: Line Clear 15:6
-      // the stage left at 27-28 rows a minute (run 253), about 32 asked; the board's own life still caps it, as below)
-      cbJMaxSw = imin(decQ.b->colors > 6 ? 14 : TA_MAXSW, dies == NOT_ASKED ? CB_MAXSWAPS : imax(1, (dies - TA_MARGIN) / TA_SWAP_FRAMES - 1));
+      cbJMaxSw = imin(TA_MAXSW, dies == NOT_ASKED ? CB_MAXSWAPS : imax(1, (dies - TA_MARGIN) / TA_SWAP_FRAMES - 1));
       if (taHave && cbSwapsTo(&G, &taD) > cbJMaxSw) { taReset(); taLog = -3; }
       int32_t v = cbDesignAll(&G, taHave ? &taD : 0, ms, &D, &tr, &links, &sw);
       taMs += ms;

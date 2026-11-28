@@ -933,6 +933,10 @@
 #   (3931d36). Lost 15:5 s35 (24.3 rows a minute), 15:6 both (20.1 -- topped out, 13 health off the top -- and 23.1).
 # run 256 -- run 253's bot plus: above six colours a time-attack design may take 14 swaps, not 10 (decide.c cbJMaxSw; the board's own
 #   life still caps it). Line Clear 15:3-6 s35-36
+# run 256 -- (result, 01:25-01:29 ET) 14 design swaps above six colours: won 5/8 -- worse: OFF, decide.c back to run 253's (3931d36).
+#   More rows (31.1 a minute; 15:6 s35 30.2) but lost 15:5 s36 (24.3) and 15:6 both.
+# run 257 -- run 253's bot plus: above six colours a design is searched from 3 full rows, not 4 (decide.c; run 253 15:6 s35 went 740
+#   frames with no design after a chain, on 24-36 panels, sending nothing). Line Clear 15:3-6 s35-36
 challenge 35 9 9 1 21600 10 challenge=15:3 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:4 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:5 profile=lineclear

@@ -24,7 +24,7 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 
 | Mode | Level | Seeds | Run | Result |
 |---|---|---|---|---|
-| 8 colours | 10 | 21-22 | 218 | 5/8 (219-224 off), being fixed (run 225) |
+| 8 colours | 10 | 21-22 | 218 | 5/8 (219-225 off), being fixed (run 226) |
 | 7 colours | 10 | 23-24 | - | to redo (old: 7/8 on seeds 7-8, run 190 -- does not count) |
 | Chaos margin 4 | 10 | 25-26 | - | to redo (old: 7/8 on 7-8, run 191) |
 | Chaos mode | 10 | 27-28 | - | to redo (old: 8/8 on 7-8, run 192) |
@@ -210,6 +210,8 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 225 (2026-11-27 21:00 ET), promise-vs-break a quarter break: 3/8 -- off.** Run 226: 1'' holds credited-only pairs to the quarter
+  break (the hold kept 76 frames sooner, chain s22 11519-11564).
 - **Run 224 (2026-11-27 20:51 ET), the garbage let down guarded: 2/8 -- off.** Six changes running at 2-4 against 218's 5/8. Run 225: A
   PROMISE NEVER BEATS A BREAK gives way at a quarter break above six colours (a 3-cell break lost at 223 over 310).
 - **Run 223 (2026-11-27 20:41 ET), the same break lost later to the top: 4/8, 136784 frames -- off** (one game fewer; two losses in the last

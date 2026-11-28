@@ -846,14 +846,18 @@
 #   five times by "1. lives before does not" -- both lost at the same frame; run 232's rule covered breaking lines only.
 # run 233 -- run 232's bot plus: above six colours under garbage, the line waited on and the same line pressed now share one credit, and the
 #   press-now rule holds whether the line breaks garbage or not (rank.c). 7 colours s23-24
-# run 233 -- (result, 22:38-22:46 ET) survived 5/8, 139666 frames -- worse (6/8): OFF, run 232's rank.c restored by hash (f43fda0).
+# run 233 -- (result, 22:38-22:46 ET) survived 5/8, 139266 frames -- worse (6/8): OFF, run 232's rank.c restored by hash (f43fda0).
 # run 234 -- run 232's bot plus: above six colours the board is left quiet for the queue to drop from 15 waiting, not 25 (decide.c queueNear).
 #   Run 232 thicc s24 17000-19013: 26-32 waiting for a thousand frames on 14-20 panels, breaks of three cells, lost at 19013. 7 colours s23-24
-chain_garbage 23 9 9 1 21600 10 colors=7
-combo_storm 23 9 9 1 21600 10 colors=7
-thicc_combo_storm 23 9 9 1 21600 10 colors=7
-insane_combo_storm 23 9 9 1 21600 10 colors=7
-chain_garbage 24 9 9 1 21600 10 colors=7
-combo_storm 24 9 9 1 21600 10 colors=7
-thicc_combo_storm 24 9 9 1 21600 10 colors=7
-insane_combo_storm 24 9 9 1 21600 10 colors=7
+# run 234 -- (result, 22:48-22:56 ET) survived 7/8, 169952 frames -- 7 COLOURS AT 7/8 ON ITS OWN SEEDS (23-24), DONE. Lost only insane
+#   s23 at 18752 (26-31 waiting). Kept: run 234's bot (5210c9e).
+# run 235 -- THE NEXT MODE: chaos margin 4 (margin=4) at Level 10, 6 colours, on its own seeds 25-26 (never played), run 234's bot.
+#   margin 4 s25-26
+chain_garbage 25 9 9 1 21600 10 margin=4
+combo_storm 25 9 9 1 21600 10 margin=4
+thicc_combo_storm 25 9 9 1 21600 10 margin=4
+insane_combo_storm 25 9 9 1 21600 10 margin=4
+chain_garbage 26 9 9 1 21600 10 margin=4
+combo_storm 26 9 9 1 21600 10 margin=4
+thicc_combo_storm 26 9 9 1 21600 10 margin=4
+insane_combo_storm 26 9 9 1 21600 10 margin=4

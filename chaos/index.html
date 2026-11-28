@@ -657,13 +657,25 @@ html.set-chaos #sec-brain, html.set-chaos .gs-nav a[href="#sec-brain"] { display
 .dl-steps li { counter-increment: dl; padding: 10px 12px; border: 1px solid var(--color-border-line); border-radius: 10px; background: var(--color-bg); font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
 .dl-steps li::before { content: counter(dl); display: inline-grid; place-items: center; width: 1.4em; height: 1.4em; border-radius: 50%; background: var(--color-fg); color: var(--color-bg); font-size: .75rem; margin-right: 6px; }
 .dl-steps li b { color: var(--color-fg); }
-.dr { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
-.dr li { display: grid; grid-template-columns: 2rem minmax(0, 1fr); gap: 10px; align-items: baseline; padding: 8px 12px; border-radius: 8px; background: var(--color-bg); border: 1px solid var(--color-border-line); font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
-.dr li b { color: var(--color-fg); }
-.dr .dr-n { font-family: var(--font-serif); font-size: 1.15rem; color: var(--color-fg); text-align: center; }
-.dr .dr-top { border-color: var(--color-ok); }
 .dt-t { text-decoration: underline dotted; text-underline-offset: 3px; cursor: help; color: inherit; font: inherit; background: none; border: 0; padding: 0; }
 .dt-t:focus-visible { outline: 2px solid var(--color-fg); outline-offset: 1px; border-radius: 2px; }
+.mt { display: flex; flex-direction: column; gap: 4px; }
+.mt-step { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 12px; align-items: center; }
+.mt-q { padding: 10px 14px; border: 1px dashed var(--color-border-line); border-radius: 10px; font-weight: 500; }
+.mt-n { display: inline-grid; place-items: center; width: 1.5em; height: 1.5em; border-radius: 50%; background: var(--color-fg); color: var(--color-bg); font-size: .75rem; margin-right: 8px; }
+.mt-side { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+.mt-side b { color: var(--color-fg); }
+.mt-arrow { color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); padding-left: 18px; }
+.mt-safe { color: var(--color-ok) !important; } .mt-risk { color: var(--color-bad) !important; }
+.mt-fork { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 4px; }
+.mt-branch { padding: 12px 14px; border-radius: 10px; background: var(--color-bg); border: 1px solid var(--color-border-line); border-top: 4px solid var(--mt-c); }
+.mt-b-risk { --mt-c: var(--color-bad); } .mt-b-safe { --mt-c: var(--color-ok); }
+.mt-h { font-weight: 600; margin-bottom: 6px; }
+.mt-branch ol { margin: 0; padding-left: 1.3em; display: flex; flex-direction: column; gap: 5px; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+.mt-branch ol b { color: var(--color-fg); }
+.mt-mode { background: color-mix(in srgb, #e3a936 16%, transparent); border-radius: 6px; padding: 2px 6px; margin-left: -6px; }
+.mt-foot { margin-top: 8px !important; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); font-style: italic; }
+@media (max-width: 640px) { .mt-step, .mt-fork { grid-template-columns: minmax(0, 1fr); gap: 4px 12px; } .mt-side { padding-left: 18px; } }
 #dt-tip { position: fixed; z-index: 80; max-width: min(300px, calc(100vw - 32px)); padding: 9px 12px; border-radius: 8px; background: var(--color-fg); color: var(--color-bg); font-size: .82rem; line-height: 1.4; pointer-events: none; box-shadow: 0 6px 20px rgba(0,0,0,.25); }
 #dt-tip[hidden] { display: none; }
 @media (max-width: 640px) {
@@ -827,9 +839,9 @@ html.set-chaos #sec-brain, html.set-chaos .gs-nav a[href="#sec-brain"] { display
 
   <section class="gs-card" id="sec-brain">
     <h2>How Ranmaru decides</h2>
-    <p class="gs-note">Ranmaru plays like a person at the controls: it sees only what you see and presses one key at a time. Underlined words explain themselves on hover or tap.</p>
+    <p class="gs-note">Ranmaru plays like a person at the controls: it sees only what you see and presses one key at a time. <b>Staying alive always comes first: the mode only chooses between moves that are equally safe.</b> Tap or hover an underlined word for its meaning.</p>
 
-    <h3>1 · Which mode it plays</h3>
+    <h3>1 · The game plan: which mode it plays</h3>
     <div class="dt">
       <div class="dt-row">
       <div class="dt-q">First 10 seconds, and no garbage has reached the board yet?</div>
@@ -853,24 +865,49 @@ html.set-chaos #sec-brain, html.set-chaos .gs-nav a[href="#sec-brain"] { display
     <div class="dt-over"><b>Garbage on Ranmaru's own board overrides all of this:</b> every mode puts <button type="button" class="dt-t" data-tip="Clearing panels touching a garbage slab turns its bottom row back into panels. Any plain match of three that touches it counts.">breaking it</button> first, and its attacks come after.</div>
 
     <h3>2 · Each decision, about four times a second</h3>
+    <p class="gs-note" style="margin-bottom:8px">It doesn't pick one move and go. It lists dozens of candidates and plays every one out before choosing.</p>
     <ol class="dl-steps">
       <li><b>Read</b> its board, the opponent's height and the <button type="button" class="dt-t" data-tip="The garbage the opponent has already sent, shown before it lands. Ranmaru can't see an attack that hasn't been sent yet.">telegraph</button>.</li>
       <li><b>Propose</b> short swap sequences: break, attack, carry on, set up, <button type="button" class="dt-t" data-tip="Move a colour to one swap away from its partner, not touching it. Nothing clears now, but a single swap fires the match later, when Ranmaru chooses.">zip</button>, <button type="button" class="dt-t" data-tip="Swaps that clear nothing but even out the columns, so the stack has no towers or holes.">flatten</button>, survive, or hold.</li>
       <li><b>Play each one out</b> on a copy of the game's own engine, garbage landing on time, up to its <button type="button" class="dt-t" data-tip="How far ahead it looks: about 7 steps deep and 40 lines wide per decision. Garbage landing beyond that is seen late.">horizon</button>.</li>
       <li><b>Cut</b> lines it may not play: undoing the last swap, leaving fewer than 40 panels (the <button type="button" class="dt-t" data-tip="The panels it keeps on the board, at least 40. Breaks are made from panels, so a bare board can't defend itself.">floor</button>), or attacks that land too late.</li>
-      <li><b>Rank</b> what's left (below).</li>
+      <li><b>Pick</b> one with the tree below.</li>
       <li><b>Press</b> the winner's keys within its <button type="button" class="dt-t" data-tip="At most 76 actions every 10 seconds. Every cursor step and every swap costs one, and it waits 12 frames to react and 12 between swaps, like a person.">action budget</button>.</li>
     </ol>
 
-    <h3>3 · Which move wins</h3>
-    <ol class="dr">
-      <li class="dr-top"><span class="dr-n">0</span><span><b>A move that keeps it alive beats one that doesn't.</b> If every move loses, it takes the one that loses latest.</span></li>
-      <li><span class="dr-n">1</span><span><b>Breaks garbage</b>, the faster the better.</span></li>
-      <li><span class="dr-n">2</span><span><b>Makes the mode's aim</b>, earlier in its list first (an 8-combo beats a 9 in Finish them).</span></li>
-      <li><span class="dr-n">3</span><span><b>Any other attack</b>: the one that sends the most garbage.</span></li>
-      <li><span class="dr-n">4</span><span><b>Sets up</b> without clearing anything. In order: a set-up for the next break, then one toward the mode's aim, then a zip (a colour left one swap from its match), then flattening last. While it waits for garbage to land, it walks toward where it's needed and zips or flattens on the way.</span></li>
-      <li><span class="dr-n">5</span><span><b>A plain clear</b> that does nothing else.</span></li>
-    </ol>
+    <h3>3 · How it picks a move</h3>
+    <div class="mt">
+      <div class="mt-step"><div class="mt-q"><span class="mt-n">A</span>Can the move be pressed in time?</div><div class="mt-side">No → <b>dropped</b>: not enough <button type="button" class="dt-t" data-tip="At most 76 actions every 10 seconds. Every cursor step and every swap costs one, and they come back only as the 10 seconds roll on.">inputs</button> left, it undoes the last swap, it lands after the garbage, or it leaves fewer than 40 panels without breaking garbage.</div></div>
+      <div class="mt-arrow">yes ↓</div>
+      <div class="mt-step"><div class="mt-q"><span class="mt-n">B</span>Is Ranmaru still alive at the end of the <button type="button" class="dt-t" data-tip="How far ahead each move is played out: about 7 steps deep, with the garbage already sent landing on time. Lives = the board is still standing at the end of it.">horizon</button>?</div><div class="mt-side">It sorts every move into <b class="mt-safe">safe</b> and <b class="mt-risk">dying</b>. One safe move beats every dying one, whatever the mode wants.</div></div>
+      <div class="mt-arrow">↓</div>
+      <div class="mt-fork">
+        <div class="mt-branch mt-b-risk">
+          <div class="mt-h">No safe move: buy time</div>
+          <ol>
+            <li><b>The move that dies latest wins.</b> Two that die within <button type="button" class="dt-t" data-tip="The time it takes to break one row of garbage. Two moves that die less than this far apart count as equally bad.">a break's time</button> of each other count as a tie.</li>
+            <li>Never sits <button type="button" class="dt-t" data-tip="Pressing nothing and letting the board play on. It is a candidate like any other, and it loses to a move that does better.">holding</button> into a loss: if doing nothing dies sooner, it moves.</li>
+            <li>Ties go to the move that <b>breaks garbage now</b> over one that only promises to later.</li>
+            <li>Then the one that leaves the stack workable: no <button type="button" class="dt-t" data-tip="A tower is a column far taller than the rest. A perch is garbage resting on one or two tall columns over an empty gap. Garbage resting like that can't be reached, so it can't be broken.">towers and perches</button>, nothing hollow under the garbage.</li>
+            <li>Then the one that keeps enough inputs for the next break and has a break ready when the next garbage lands.</li>
+          </ol>
+          <p class="mt-foot">The mode barely counts here: it only splits moves that are still tied after all of this.</p>
+        </div>
+        <div class="mt-branch mt-b-safe">
+          <div class="mt-h">Several safe moves: first one to differ wins</div>
+          <ol>
+            <li><b>Keep the <button type="button" class="dt-t" data-tip="The sequence it was already pressing at the last decision. Dropping it halfway wastes every input already spent on it.">move in progress</button></b>, unless another breaks more garbage.</li>
+            <li>Skip any <button type="button" class="dt-t" data-tip="For example a chain while finishing them, or a combo while filling. Those panels are the next real attack, so they aren't spent on the wrong one.">attack the mode didn't ask for</button>.</li>
+            <li>A chain already falling: <b>extend it</b>.</li>
+            <li>Garbage on the board: <b>break it</b>.</li>
+            <li>Leave a break ready for the next garbage.</li>
+            <li>Spend fewer inputs: stay near the cursor, never undo a swap.</li>
+            <li class="mt-mode"><b>The mode's aim</b>: its first choice, then the fallbacks in order.</li>
+            <li>Set up: a break, then the mode's aim, then a <button type="button" class="dt-t" data-tip="Move a colour to one swap away from its partner, not touching it. Nothing clears now, but a single swap fires the match later.">zip</button>, then <button type="button" class="dt-t" data-tip="Swaps that clear nothing but even out the columns.">flatten</button>. Then a plain clear. Holding comes last, unless no move beats it.</li>
+          </ol>
+        </div>
+      </div>
+    </div>
     <p class="gs-note" style="margin-top:8px">It never makes a chain longer than 13, and it raises the stack itself to keep enough panels to work with.</p>
   </section>
   <div id="dt-tip" role="tooltip" hidden></div>

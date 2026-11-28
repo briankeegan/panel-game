@@ -1253,11 +1253,17 @@
 # run 331 -- (result, 11:47-11:51 ET) no search workers in a Challenge stage: Line Clear won 6/8 -- better: KEPT (cdd97c5). Lost 15:6 both
 #   (25.9, 27.5). With nobody across this is run 282's play again (the dig and the dive never act without garbage), which won 8/8 then.
 # run 332 -- the standings on run 331's bot, unchanged: queue limit (qlimit=1), done 8/8 (run 283), seeds 37-38. Queue limit s37-38
-chain_garbage 37 9 9 1 21600 10 qlimit=1
-combo_storm 37 9 9 1 21600 10 qlimit=1
-thicc_combo_storm 37 9 9 1 21600 10 qlimit=1
-insane_combo_storm 37 9 9 1 21600 10 qlimit=1
-chain_garbage 38 9 9 1 21600 10 qlimit=1
-combo_storm 38 9 9 1 21600 10 qlimit=1
-thicc_combo_storm 38 9 9 1 21600 10 qlimit=1
-insane_combo_storm 38 9 9 1 21600 10 qlimit=1
+# run 332 -- (result, 11:52-12:00 ET) queue limit on run 331's bot: survived 7/8 (run 283's: 8/8). Lost insane s37 at 7024 (no-line; DIG THE
+#   BACKLOG put a carry lost at 103 first at 6713 where 418 was offered).
+# THE OWNER, 11:52 ET: "you need to rerun anything that did less than 7 until it gets there". Order: 7 colours, training_random, margin 4,
+#   Line Clear -- each worked to 7/8 or better, a mode re-run on the same bot to confirm, every change checked on the modes it reaches.
+# run 333 -- 7 colours on the current bot (run 331's, cdd97c5: the dive only from 25 waiting -- run 315's 5/8 had it always on). 7 colours
+#   s23-24
+chain_garbage 23 9 9 1 21600 10 colors=7
+combo_storm 23 9 9 1 21600 10 colors=7
+thicc_combo_storm 23 9 9 1 21600 10 colors=7
+insane_combo_storm 23 9 9 1 21600 10 colors=7
+chain_garbage 24 9 9 1 21600 10 colors=7
+combo_storm 24 9 9 1 21600 10 colors=7
+thicc_combo_storm 24 9 9 1 21600 10 colors=7
+insane_combo_storm 24 9 9 1 21600 10 colors=7

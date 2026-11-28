@@ -29,7 +29,7 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 | No stop time | 10 | 31-32 | 239 | **8/8 -- done**; on run 323's bot **8/8** (run 327) |
 | BALL | 10 | 33-34 | 241 | **8/8 -- done**; on run 323's bot 7/8 (run 328) |
 | Line Clear (15:3-6) | stage's | 35-36 | 282 | **8/8 -- done**; on run 323's bot 5/8 (run 329); floor off there 5/8 (run 330); no workers in a Challenge stage 6/8 (run 331) |
-| Queue limit (qlimit=1) | 10 | 37-38 | 283 | **8/8 -- done**; on run 331's bot: run 332 |
+| Queue limit (qlimit=1) | 10 | 37-38 | 283 | **8/8 -- done**; on run 331's bot 7/8 (run 332) |
 | training_random | 10 | 39-40 | 306 | **8/8 -- done** (garbage level/speed 8-11 a seed); on run 323's bot 5/8 (run 324); dive from 15 not with chaos garbage 4/8 (run 325) |
 | Challenge Mode (Impossible 11:5-8) | stage's | 41-42 | 307 | **8/8 -- done** |
 
@@ -210,6 +210,10 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **THE OWNER, 11:52 ET: "you need to rerun anything that did less than 7 until it gets there."** Every mode under 7/8 on the current bot is
+  worked until it is there: 7 colours (5/8), training_random (5/8), margin 4 (5-7/8), then Line Clear (6/8); a mode re-run on the same bot
+  to confirm; every change checked on the modes it reaches.
+- **Run 332 (11:52-12:00 ET), queue limit on run 331's bot: 7/8.** Run 333: 7 colours on the current bot.
 - **Run 331 (11:47-11:51 ET), no search workers in a Challenge stage: Line Clear 6/8 -- kept (cdd97c5).** Run 332: queue limit on it.
 - **Run 330 (11:42-11:46 ET), the flatness floor off with nobody across: Line Clear 5/8** -- kept. Run 331: no search workers in a Challenge
   stage, to test the one difference left from run 282's bot.

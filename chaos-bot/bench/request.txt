@@ -1086,6 +1086,11 @@
 #   3172 (early, starved: 7-19 panels, 9-15 waiting), 17902; s40 at 21011 and 14753 (the queue's fifty).
 # run 289 -- run 282's bot plus: with no garbage on the board the queue is let drop where the next three pieces land under the ceiling, not
 #   only where all that waits does (decide.c; a quiet board drops them one at a time). training_random s39-40
+# run 289 -- (result, 05:14-05:22 ET) the next three pieces let drop with no garbage on the board: survived 5/8 -- worse: OFF, decide.c
+#   back to run 282's (43a7572). No early loss this time; lost s39 13718, s40 16149 and 15526, all the queue's fifty under a board of garbage
+#   to the top (nothing drops onto a topped board), held 47 for hundreds of frames.
+# run 290 -- run 282's bot plus: DIG THE BACKLOG also between two lines that both live once the queue is QUEUE_ROOM short of fifty (rank.c:
+#   the judge counts health, not the queue). training_random s39-40
 training_random 39 8 8 1 21600 10
 training_random 39 9 9 1 21600 10
 training_random 39 10 10 1 21600 10

@@ -1064,6 +1064,14 @@ static int compareJudged(const Judge *x, const Judge *y) {
   if (0 && chaosOpenHigh && x->o.lives && y->o.lives && x->apBroke <= 0 && y->apBroke <= 0 &&
       x->o.j.clearedPanels != y->o.j.clearedPanels)
     return (cmpKey = __LINE__, (x->o.j.clearedPanels > y->o.j.clearedPanels ? -1 : 1));
+  // (run 222, ABOVE SIX COLOURS, THE MATERIAL KEPT FOR THE FIRST BLOCK: garbage on its way and none on the board, of two living lines that
+  // break nothing, the one leaving 30 panels or more before one leaving fewer -- under eight colours a break needs material, and the
+  // games lost met their first block with 14-24 panels where the games kept met it with 30-40 (runs 216-221). Run 221 chain s21: the first
+  // block met with 18 panels, lost at 1036)
+  if (decQ.b->colors > 6 && !decF.under && garbageComing() && x->o.lives && y->o.lives && x->apBroke <= 0 && y->apBroke <= 0) {
+    int kx = panelsOn(decQ.b) - x->o.j.clearedPanels >= 30, ky = panelsOn(decQ.b) - y->o.j.clearedPanels >= 30;
+    if (kx != ky) return (cmpKey = __LINE__, (kx ? -1 : 1));
+  }
   // THE LAST CHANCE: the hold lost inside a break's time, beside a line lost no sooner whose next moves promise a break's time more (the
   // readiness break, the survival search after it): the line first -- holding is the loss for certain. Only against the hold: the
   // promise is never weighed against another line's own life. 244 of 419 lost games held, dying, over such a line.
@@ -1670,9 +1678,7 @@ static int compareJudged(const Judge *x, const Judge *y) {
     // lost at 580, both three breaks off)
     // (and never over a line the engine has outliving it by a break's time, its walk already pressed there -- run 4608, combo_storm 1,
     // 506: a survive lost at 227 read below the line in progress lost at 115 for the walk charged again, the board lost at 115)
-    // (run 221: above six colours, a quarter of a break's time on the boards as they are, as the other rules there -- run 220 8 colours
-    // insane s21 4474 (11 queued): a carry lost at 171 kept over a survive lost at 224, both breaking 13, lost at 4786)
-    int oOutlives = !lx && !o->o.dead && oOwn < 1e299 && cOwn < 1e299 && oOwn - cOwn >= (decQ.b->colors > 6 ? rankSave / 4 : rankSave);
+    int oOutlives = !lx && !o->o.dead && oOwn < 1e299 && cOwn < 1e299 && oOwn - cOwn >= rankSave;
     int keep = lx ? !(o->met >= 0 && (c->met < 0 || o->met < c->met)) : (lostOf(o) <= lostOf(c) || (finishAsked() ? finishAlike(c, o) : lostAlike(c, o))) && !oBreaks && !oOutlives;
     // (and under garbage, a break in progress over another break that costs more presses than what is left of it -- switching spends the
     // window on swaps pressed for nothing -- unless the one in progress is lost within a break's time)

@@ -789,6 +789,11 @@
 #   queued): "1a. THE LINE IN PROGRESS KEPT" kept a carry lost at 171 over a survive lost at 224, both breaking 13 -- its "the other
 #   outlives it" test asks a whole break on the boards as they are. Lost at 4786.
 # run 221 -- run 218's bot plus: above six colours, 1a's outliving test is a quarter of a break's time (rank.c). 8 colours s21-22
+# run 221 -- (result) survived 3/8, 116150 frames -- worse (5/8): OFF, run 218's rank.c restored by hash (b3967e9). Only 4 sooner-lost
+#   picks: the losses are the board's. Games lost met their first block with 14-24 panels, games kept with 30-40 (runs 216-221); chain s21
+#   met it with 18, lost at 1036.
+# run 222 -- run 218's bot plus: above six colours, garbage on its way and none on the board, of two living lines breaking nothing, the one
+#   leaving 30+ panels first (rank.c). 8 colours s21-22
 chain_garbage 21 9 9 1 21600 10 colors=8
 combo_storm 21 9 9 1 21600 10 colors=8
 thicc_combo_storm 21 9 9 1 21600 10 colors=8

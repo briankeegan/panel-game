@@ -925,9 +925,7 @@ static void creditPair(const Judge *x, const Judge *y, int *lxo, int *lyo) {
   // lives or is lost a break's time later, is a line that is lost -- death is never an option)
   // (run 210: above six colours, nor beside a board lost a quarter of a break's time later -- as lostAlike there. Run 208 8 colours chain
   // s21 2664: a carry_wait lost at 232 kept by the horizon credit over a convert lost at 319 (1. lives before does not), lost at 3201)
-  // (run 213: the line in progress on its own board, not what its next moves promise -- run 212 insane s21 19265/19279, 27 queued: a carry
-  // lost at 283 and 269 credited 409 and 395 kept over lines lost at 355 and 372 by the horizon credit, lost at 19485)
-  #define OUT_Q(A, B) (decQ.b->colors > 6 && !(A)->o.dead && ((A)->o.lives || diesAt(A) - lostAtOf((B)->o.lostAt, (B)->hold) >= rankSave / 4))
+  #define OUT_Q(A, B) (decQ.b->colors > 6 && !(A)->o.dead && ((A)->o.lives || diesAt(A) - diesAt(B) >= rankSave / 4))
   if (lx && !x->o.lives && (outlives(y, x) || OUT_Q(y, x)) && !calmKept(x, y)) lx = 0;
   if (ly && !y->o.lives && (outlives(x, y) || OUT_Q(x, y)) && !calmKept(y, x)) ly = 0;
   // (nor, under garbage, the credit of a line that breaks nothing beside a break lost within a break's time of it: the break is the way
@@ -1686,7 +1684,11 @@ static int compareJudged(const Judge *x, const Judge *y) {
     // nothing carried while the board ran from 109 frames to 1, lost at 3652)
     // (run 201: above six colours, the goal decides only within a quarter of a break's time -- as lostAlike there (run 200). Run 200 8
     // colours insane s21: 687 the hold lost at 287 kept over a 7-chain extend lost at 448, 1162 166 over 223; lost at 1289)
-    if (lx || (!ruleNoEnemy && !(decQ.b->gameMode >= 3 && decF.under) && lo >= rankSave &&
+    // (run 214: and above six colours, two counted living only by the credit (the horizon, the finish's safe board) are held to the same
+    // quarter break -- run 213 chain s21 3085-3112 (9 queued): the hold lost at 175, 162, 148 put over entries lost at 267, 213, 240 by the
+    // goal, both counted safe, lost at 3444)
+    int credOnly = decQ.b->colors > 6 && !x->o.lives && !y->o.lives && hi - lo >= rankSave / 4;
+    if ((lx && !credOnly) || (!ruleNoEnemy && !(decQ.b->gameMode >= 3 && decF.under) && lo >= rankSave &&
                hi - lo < (decQ.b->colors > 6 ? rankSave / 4 : rankSave))) {
       int gx = goalKeyUnder(x), gy = goalKeyUnder(y);
       if (gx != gy) return (cmpKey = __LINE__, (gx - gy));

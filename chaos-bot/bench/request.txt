@@ -754,6 +754,10 @@
 #   run 210's quarter-break take-back, which compared credited losses.
 # run 213 -- the quarter-break test (OUT_Q: creditPair's take-back and outlivingFirst) reads the line in progress's own loss, not its
 #   promise (rank.c). 8 colours s21-22
+# run 213 -- (result) survived 2/8, 114049 frames -- worse (3/8): OFF, run 212's rank.c restored by hash (906ad26). chain s21 3085-3112:
+#   rule 1b (the mode's goals) put the hold lost at 175, 162, 148 over entries lost at 267, 213, 240 -- both counted living by the credit
+#   (the finish's safe board), where 1b skips its loss test. Lost at 3444.
+# run 214 -- run 212's bot plus: above six colours, 1b holds two lines counted living only by the credit to the quarter break (rank.c). 8 colours s21-22
 chain_garbage 21 9 9 1 21600 10 colors=8
 combo_storm 21 9 9 1 21600 10 colors=8
 thicc_combo_storm 21 9 9 1 21600 10 colors=8

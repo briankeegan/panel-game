@@ -30,7 +30,7 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 | BALL | 10 | 33-34 | 241 | **8/8 -- done** |
 | Line Clear (15:3-6) | stage's | 35-36 | 282 | **8/8 -- done** |
 | Queue limit (qlimit=1) | 10 | 37-38 | 283 | **8/8 -- done** |
-| training_random | 10 | 39-40 | 284 | 6/8 (285-291 off), being fixed (run 292) -- garbage level/speed 8-11 a seed (its own pattern: chain and combo garbage mixed at a random balance, Chaos Mode 1 game in 4 -- TrainingMenu.lua createBasicTrainingMode) |
+| training_random | 10 | 39-40 | 284 | 6/8 (285-292 off), being fixed (run 293) -- garbage level/speed 8-11 a seed (its own pattern: chain and combo garbage mixed at a random balance, Chaos Mode 1 game in 4 -- TrainingMenu.lua createBasicTrainingMode) |
 | Challenge Mode | stage's | 41-42 | - | to do |
 
 (8 colours old: 7/8 on seeds 7-8, run 180 -- does not count.)
@@ -210,6 +210,8 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 292 (05:44-05:52 ET), the opening raise only while nothing is on its way: 5/8 -- off** (the same three games lost). Run 293: DIG
+  THE BACKLOG whatever the other dying line lives, near the queue's limit.
 - **Run 291 (05:34-05:42 ET), no calm slack with a backlog: 3/8 -- off.** Two losses tagged opening-high (first garbage on 46-58 panels).
   Run 292: the opening raise only while nothing is telegraphed or queued.
 - **Run 290 (05:24-05:32 ET), DIG THE BACKLOG between living lines near the limit: 5/8 -- off.** Run 291: no calm slack (the 20-36

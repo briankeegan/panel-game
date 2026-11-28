@@ -1099,6 +1099,10 @@
 #   7583 and 17555, s40 2909 (early, opening-high: first garbage on 46 panels), 18616 (opening-high) and 15996.
 # run 292 -- run 282's bot plus: the opening raise only while nothing is on its way (decide.c opening: no telegraphed arrival, none queued).
 #   training_random s39-40
+# run 292 -- (result, 05:44-05:52 ET) the opening raise only while nothing is on its way: survived 5/8 -- worse: OFF, decide.c back to run
+#   282's (43a7572). The same three lost as in runs 285-291: s39 level 11 (17647), s40 level 10 (20957) and 11 (13950), the queue 47-50.
+# run 293 -- run 282's bot plus: DIG THE BACKLOG between two dying lines whatever the other lives once the queue is QUEUE_ROOM short of
+#   fifty (rank.c). training_random s39-40
 training_random 39 8 8 1 21600 10
 training_random 39 9 9 1 21600 10
 training_random 39 10 10 1 21600 10

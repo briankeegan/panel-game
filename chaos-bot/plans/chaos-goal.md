@@ -30,7 +30,7 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 | BALL | 10 | 33-34 | 241 | **8/8 -- done** |
 | Line Clear (15:3-6) | stage's | 35-36 | 282 | **8/8 -- done** |
 | Queue limit (qlimit=1) | 10 | 37-38 | 283 | **8/8 -- done** |
-| training_random | 10 | 39-40 | 306 | **8/8 -- done** (garbage level/speed 8-11 a seed); on run 323's bot: run 324 |
+| training_random | 10 | 39-40 | 306 | **8/8 -- done** (garbage level/speed 8-11 a seed); on run 323's bot 5/8 (run 324: the dive from 25 too late); run 325 |
 | Challenge Mode (Impossible 11:5-8) | stage's | 41-42 | 307 | **8/8 -- done** |
 
 (8 colours old: 7/8 on seeds 7-8, run 180 -- does not count.)
@@ -210,6 +210,8 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 324 (10:50-10:58 ET), training_random on run 323's bot: 5/8** (the dive from 25 waiting is too late for it). Run 325: the dive from
+  15 waiting, never with chaos mode's merged garbage.
 - **Run 323 (10:42-10:49 ET), the dive only from 25 waiting: chaos mode 8/8, full health -- kept (232d74d), the second pass's bot.** Run
   324: training_random on it (the dive won it at 8/8 in run 306).
 - **Run 322 (10:32-10:40 ET), the dive from 15 waiting: chaos mode 5/8** (its queues reach 15-22). Run 323: the dive from 25 waiting.

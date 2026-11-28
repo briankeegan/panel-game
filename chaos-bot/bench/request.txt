@@ -1230,6 +1230,10 @@
 #   bot. Run 306's play at six colours, run 313's above; the dive only under a deep backlog.
 # run 324 -- training_random (done 8/8 on run 306's bot, the dive always on) on run 323's bot, to see the dive from 25 waiting still holds it
 #   (its losses' queues ran 25-48). training_random s39-40
+# run 324 -- (result, 10:50-10:58 ET) training_random on run 323's bot (the dive from 25 waiting): survived 5/8 (306's, always on: 8/8).
+#   Lost s39 level 11 at 13637, s40 level 8 at 21567 and level 11 at 18628 -- the backlog the dive held back builds before 25.
+# run 325 -- run 323's bot with the dive from 15 waiting but never with chaos mode's garbage (incoming.ChaosMode: a combo's pieces merged into
+#   one block) (search/break.c). training_random s39-40
 training_random 39 8 8 1 21600 10
 training_random 39 9 9 1 21600 10
 training_random 39 10 10 1 21600 10

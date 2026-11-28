@@ -817,11 +817,16 @@
 #   by a whole break. The machines: in runs 208-225 the bot survived 49% of its games on Intel Xeon 6975P and 19% on AMD EPYC (7763,
 #   9V74, 9V45) -- the AMD games are where it is weakest; the report now gives survivals by CPU family.
 # run 227 -- run 218's bot plus: the canyon rule lets a dig through that outlives the hold by a quarter break (rank.c). 8 colours s21-22
-chain_garbage 21 9 9 1 21600 10 colors=8
-combo_storm 21 9 9 1 21600 10 colors=8
-thicc_combo_storm 21 9 9 1 21600 10 colors=8
-insane_combo_storm 21 9 9 1 21600 10 colors=8
-chain_garbage 22 9 9 1 21600 10 colors=8
-combo_storm 22 9 9 1 21600 10 colors=8
-thicc_combo_storm 22 9 9 1 21600 10 colors=8
-insane_combo_storm 22 9 9 1 21600 10 colors=8
+# run 227 -- (result) survived 7/8, 167677 frames -- 8 COLOURS AT 7/8 ON ITS OWN SEEDS (21-22). Lost only insane s21 at 16477 (the first
+#   block met with 18 panels). Kept: run 227's bot (3188633) = run 218's + the canyon rule letting a dig through at a quarter break.
+# run 228 -- THE HELD-OUT CHECK (the owner: generic, not tuned to the seeds): 8 colours at Level 10 on seeds 51-52, never played, run 227's
+#   bot unchanged. First run with the runner skip by model (8573C, 7763, 9V74 skipped; the fourth try plays on whatever it draws).
+#   8 colours held-out s51-52
+chain_garbage 51 9 9 1 21600 10 colors=8
+combo_storm 51 9 9 1 21600 10 colors=8
+thicc_combo_storm 51 9 9 1 21600 10 colors=8
+insane_combo_storm 51 9 9 1 21600 10 colors=8
+chain_garbage 52 9 9 1 21600 10 colors=8
+combo_storm 52 9 9 1 21600 10 colors=8
+thicc_combo_storm 52 9 9 1 21600 10 colors=8
+insane_combo_storm 52 9 9 1 21600 10 colors=8

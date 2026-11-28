@@ -28,7 +28,7 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 | 1 HP | 10 | 29-30 | 238 | **8/8 -- done** |
 | No stop time | 10 | 31-32 | 239 | **8/8 -- done** |
 | BALL | 10 | 33-34 | 241 | **8/8 -- done** |
-| Line Clear (15:3-6) | stage's | 35-36 | 244 | won 4/8 (15:3-4), being fixed (run 245) |
+| Line Clear (15:3-6) | stage's | 35-36 | 245 | won 5/8, being fixed (run 246) |
 | Queue limit | 10 | 37-38 | - | to do |
 | training_random | 10 | 39-40 | - | to do (its own pattern: chain and combo garbage mixed at a random balance, Chaos Mode 1 game in 4 -- TrainingMenu.lua createBasicTrainingMode) |
 | Challenge Mode | stage's | 41-42 | - | to do |
@@ -210,6 +210,8 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 245 (00:20-00:25 ET), lineclear.words on time attack: WON 5/8** (24-35 rows a minute) -- kept. 15:6 asks 40. Run 246: pressure
+  (chains of 4 and 3 within 240 frames).
 - **Run 244 (00:15-00:19 ET), lineclear.words with big chain: WON 4/8** -- 15:3-4 both seeds at 22-27 rows a minute; 15:5-6 (7 colours)
   held 71-89 times a game, 11-12 a minute. Run 245: lineclear.words with time attack (its chain designer).
 - **Run 243 (00:09-00:13 ET), gambit-finish profile: won 0/8, no more rows.** The mode in force all game was finish them (combos, half-rows).

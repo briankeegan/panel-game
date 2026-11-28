@@ -890,6 +890,10 @@
 #   stages): 11-12 a minute, the hold put first 71-89 times a game by the mode's goals where no line met the big chain list.
 # run 245 -- the same 8 games on lineclear.words with the mode in force 0, "time attack" (its chain designer) -- the profile only.
 #   Line Clear 15:3-6 s35-36
+# run 245 -- (result, 00:20-00:25 ET) time attack: WON 5/8 -- 15:3, 15:4 both seeds, 15:5 s35; lost 15:5 s36 (24 rows a minute), 15:6 both
+#   (24, 30 -- 40 asked). Kept. The chains thrown were 6-9 links, many; they took too long to build.
+# run 246 -- lineclear.words with the mode in force 4, "pressure" (chains of 4 and 3 within 240 frames) -- the profile only.
+#   Line Clear 15:3-6 s35-36
 challenge 35 9 9 1 21600 10 challenge=15:3 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:4 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:5 profile=lineclear

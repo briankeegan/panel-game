@@ -2208,9 +2208,7 @@ static Played playOf(const Read *R, int n) {
   if (ruleNoEnemy && !R->under && !R->topped && clockFrameOut && !clockFrameOut() && (cascadeLive(decQ.b) || decQ.b->chainCounter > 0) &&
       !taWallNear(decQ.b)) {
     double keepDue = clockDue, keepShare = clockShare; clockDue = 0; clockShare = 0;
-    // (run 275: above six colours 95% of the decision's time, not 80% -- the chain going found a next link 60-77% of the time in runs 267-274
-    // (~130 ms), and a chain not taken on ends: their 15:6 chains, 14-20 a game, most of 2-4 links)
-    double left = C2.due ? C2.due - C2.margin - nowMs() : 100, ms = left * (decQ.b->colors > 6 ? 0.95 : 0.8); if (ms < 2) ms = 2;
+    double left = C2.due ? C2.due - C2.margin - nowMs() : 100, ms = left * 0.8; if (ms < 2) ms = 2;
     readyStop();
     List L; memset(&L, 0, sizeof L); L.n = 1; L.aim[0].chain.op = OP_GE; L.aim[0].chain.n = 2; L.aim[0].brk = -1;
     ExtOpts eo = { TA_EXT_WIDTH, TA_EXT_DEPTH, &L, NOT_ASKED, 0, ms };
@@ -2225,6 +2223,16 @@ static Played playOf(const Read *R, int n) {
         if (judgeCand(R, &k, &CU) && !CU.o.dead && (CU.o.lives || !P.line || diesAt(&CU) >= diesAt(P.line))) { decWhy = __LINE__, P.line = &CU; taLog = 3; }
         else taLog = -20 - lastDrop;
       }
+    }
+    // (run 276: AND THE LINE BEGUN KEPT -- where this decision's search finds no line that takes the chain on, the chain going's line begun
+    // a decision before (carried, its swaps not all pressed) is played on where it still lengthens the chain and lives as long: runs 275's
+    // 7-colour Line Clears foresaw 29-37 links a game that the chain never made, against 63-81 made -- a line begun and dropped the
+    // decision its search came up empty is a link given up -- the line in progress, whatever play began it, that takes the chain on)
+    if (taLog != 3) {
+      for (int i = 0; i < n; i++) { const Judge *J = order[i];
+        if (!J->carried || J->o.dead || J->o.j.made.chain <= 0) continue;
+        if (!(J->o.lives || !P.line || diesAt(J) >= diesAt(P.line))) continue;
+        decWhy = __LINE__, P.line = J; taLog = 4; break; }
     }
     clockDue = keepDue; clockShare = keepShare;
   }

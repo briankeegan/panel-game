@@ -1022,6 +1022,11 @@
 #   272's (1d42fe1). All four 7-colour stages lost (24.5, 26.8, 22.8, 24.1); 16-23 chains a game, most of 2-4 links.
 # run 275 -- run 272's bot plus: above six colours the chain going gets 95% of the decision's time, not 80% (decide.c). The report also
 #   prints the links the chain going foresaw and the chain did not make. Line Clear 15:3-6 s35-36
+# run 275 -- (result, 03:25-03:29 ET) the chain going given 95% of the decision above six colours: won 4/8 -- worse: OFF, decide.c back
+#   to run 272's (1d42fe1). All four 7-colour stages lost (22.4, 29.6, 20.9, 26.5). Its new number: the chain going foresaw 29-37 links a
+#   7-colour game that the chain never made, against 63-81 made.
+# run 276 -- run 272's bot plus: where the chain going's search finds no line this decision, the line in progress that takes the chain on
+#   (carried) is played on where it lives as long (decide.c). Line Clear 15:3-6 s35-36
 challenge 35 9 9 1 21600 10 challenge=15:3 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:4 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:5 profile=lineclear

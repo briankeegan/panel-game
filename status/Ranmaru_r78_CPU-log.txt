@@ -1,30 +1,4 @@
-run 46089766007, as of 2026-11-28T02:21:19Z
-garbage landed: our stopWatch 3341 clock 3529, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
-garbage landed: our stopWatch 3348 clock 3536, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
-opponent topped out: clock 3630 stopWatch 3442 stop 0 pre-stop 0 shake 54 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 3630 stopWatch 3442 stop 0 pre-stop 0 shake 54 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
-opponent topped out: clock 3660 stopWatch 3472 stop 0 pre-stop 0 shake 54 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
-garbage landed: our stopWatch 3494 clock 3682, transits in flight before this frame {}, opponent copy 1 frames behind, rollbacks so far 0
-opponent topped out: clock 3690 stopWatch 3502 stop 0 pre-stop 0 shake 24 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
-REPLAY {"settings":{"stacks":[{"stackType":1,"inputMethod":"controller","stackBehaviours":{"passiveRaise":true,"allowManualRaise":true,"swapStallingMode":1,"swapStallingPunish":4},"inputs":"","levelData":{"speedIncreaseMode":1,"shockFrequency":41,"shockCap":3,"colors":6,"maxHealth":1,"adjacentDenial
-engine rolled our stack back 0 times for late garbage this match
-match against: Jdawson
-match against id: 10592
-match over — bot won (pace: worst 0.29 frames off schedule); waiting for a rematch
-memory after match: rss 4411892 kB, threads 9, lua 54921 kB
-game about to start: both players are ready
-set over: the room is closed, back in the lobby
-game about to start: both players are ready
-match start: building the match (seed nil, stage nil, opponent ?)
-match start: the match is built
-match start: the match is started
-match start: gambit: creating the link
-match start: gambit: the link is created
-match start: gambit: the link is starting the match
-match start: gambit: the link has started the match
-both ready — match starting
-garbage landed: our stopWatch 371 clock 559, transits in flight before this frame {380}, opponent copy 0 frames behind, rollbacks so far 0
-garbage landed: our stopWatch 380 clock 568, transits in flight before this frame {380}, opponent copy 0 frames behind, rollbacks so far 0
+run 46089766007, as of 2026-11-28T02:23:23Z
 garbage landed: our stopWatch 678 clock 866, transits in flight before this frame {}, opponent copy 2 frames behind, rollbacks so far 0
 garbage landed: our stopWatch 1029 clock 1217, transits in flight before this frame {}, opponent copy 0 frames behind, rollbacks so far 0
 opponent topped out: clock 1320 stopWatch 1132 stop 36 pre-stop 159 shake 53 health 1, top rows r12=gggggg r11=gggggg r10=gggggg
@@ -149,6 +123,32 @@ match over — bot won (pace: worst 0.32 frames off schedule); waiting for a rem
 memory after match: rss 4539628 kB, threads 9, lua 63970 kB
 game about to start: both players are ready
 set over: the room is closed, back in the lobby
+game about to start: both players are ready
+match start: building the match (seed nil, stage nil, opponent ?)
+match start: the match is built
+match start: the match is started
+match start: gambit: creating the link
+match start: gambit: the link is created
+match start: gambit: the link is starting the match
+match start: gambit: the link has started the match
+both ready — match starting
+REPLAY {"settings":{"stacks":[{"stackType":1,"inputMethod":"controller","stackBehaviours":{"passiveRaise":true,"allowManualRaise":true,"swapStallingMode":1,"swapStallingPunish":4},"inputs":"","levelData":{"speedIncreaseMode":1,"shockFrequency":41,"shockCap":3,"colors":6,"maxHealth":1,"adjacentDenial
+engine rolled our stack back 0 times for late garbage this match
+match against: Jdawson
+match against id: 10592
+match over — bot won (pace: worst 0.25 frames off schedule); waiting for a rematch
+memory after match: rss 5348772 kB, threads 9, lua 57902 kB
+game about to start: both players are ready
+set over: the room is closed, back in the lobby
+game about to start: both players are ready
+match start: building the match (seed nil, stage nil, opponent ?)
+match start: the match is built
+match start: the match is started
+match start: gambit: creating the link
+match start: gambit: the link is created
+match start: gambit: the link is starting the match
+match start: gambit: the link has started the match
+both ready — match starting
 --- publish (the last 30 lines) ---
 [publish] 2 games finished so far; the set is over; the last publish 647 s ago
 [publish] publishing the games so far (2 finished)

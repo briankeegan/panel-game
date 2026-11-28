@@ -30,7 +30,7 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 | BALL | 10 | 33-34 | 241 | **8/8 -- done** |
 | Line Clear (15:3-6) | stage's | 35-36 | 282 | **8/8 -- done** |
 | Queue limit (qlimit=1) | 10 | 37-38 | 283 | **8/8 -- done** |
-| training_random | 10 | 39-40 | 295 | 6/8 (two search workers), being fixed (run 296) -- garbage level/speed 8-11 a seed (its own pattern: chain and combo garbage mixed at a random balance, Chaos Mode 1 game in 4 -- TrainingMenu.lua createBasicTrainingMode) |
+| training_random | 10 | 39-40 | 295 | 6/8 (two search workers; 296 off), being fixed (run 297) -- garbage level/speed 8-11 a seed (its own pattern: chain and combo garbage mixed at a random balance, Chaos Mode 1 game in 4 -- TrainingMenu.lua createBasicTrainingMode) |
 | Challenge Mode | stage's | 41-42 | - | to do |
 
 (8 colours old: 7/8 on seeds 7-8, run 180 -- does not count.)
@@ -210,6 +210,8 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 296 (06:22-06:30 ET), three workers: 4/8 -- off** (fewer rows: the four cpus are two cores' worth). Run 297: two workers pinned
+  (Gambit cpu 1, workers 2-3, the game cpu 0).
 - **Run 295 (06:13-06:21 ET), TWO SEARCH WORKERS: 6/8 -- kept (e7f7255).** Game 7 lived for the first time since run 284; the two level-11
   losses came later than ever (20968, 19257). Frame loop on time. Run 296: three workers.
 - **Run 294 (06:04-06:12 ET), a brief quiet under a backlog: 4/8 -- off.** Run 295: INFRA -- GC_GAMBIT_WORKERS=2 (two search workers;

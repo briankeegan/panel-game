@@ -1115,6 +1115,10 @@
 #   lived; lost s39 level 11 at 20968 and s40 level 11 at 19257 (later than ever), the queue's fifty. 16.9 rows a minute (15.6 before);
 #   late 0, worst frame 3.1 ms.
 # run 296 -- run 295 with three search workers (bench/play.sh GC_GAMBIT_WORKERS=3). training_random s39-40
+# run 296 -- (result, 06:22-06:30 ET) three search workers: survived 4/8 -- worse: OFF, play.sh back to run 295's (e7f7255): 14.7 rows a
+#   minute (16.9 with two); lost s39 21263 and 7812, s40 18929 and 17284.
+# run 297 -- run 295 (two workers) with the threads pinned: Gambit's on cpu 1, the workers on 2-3, cpu 0 left to the game (bench/play.sh
+#   GC_GAMBIT_CPUS, GC_GAMBIT_WORKER_CPUS). training_random s39-40
 training_random 39 8 8 1 21600 10
 training_random 39 9 9 1 21600 10
 training_random 39 10 10 1 21600 10

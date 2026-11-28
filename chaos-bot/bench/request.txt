@@ -863,11 +863,13 @@
 #   chaos mode s27-28
 # run 237 -- (result, 23:16-23:24 ET) survived 8/8, 172800 frames, every game at full health -- CHAOS MODE DONE (seeds 27-28).
 # run 238 -- THE NEXT MODE: 1HP (mode=2) at Level 10, 6 colours, on its own seeds 29-30 (never played), run 236's bot. 1HP s29-30
-chain_garbage 29 9 9 1 21600 10 mode=2
-combo_storm 29 9 9 1 21600 10 mode=2
-thicc_combo_storm 29 9 9 1 21600 10 mode=2
-insane_combo_storm 29 9 9 1 21600 10 mode=2
-chain_garbage 30 9 9 1 21600 10 mode=2
-combo_storm 30 9 9 1 21600 10 mode=2
-thicc_combo_storm 30 9 9 1 21600 10 mode=2
-insane_combo_storm 30 9 9 1 21600 10 mode=2
+# run 238 -- (result, 23:25-23:34 ET) survived 8/8, 172800 frames -- 1HP DONE (seeds 29-30).
+# run 239 -- THE NEXT MODE: no stop time (mode=3) at Level 10, 6 colours, on its own seeds 31-32 (never played), run 236's bot. NST s31-32
+chain_garbage 31 9 9 1 21600 10 mode=3
+combo_storm 31 9 9 1 21600 10 mode=3
+thicc_combo_storm 31 9 9 1 21600 10 mode=3
+insane_combo_storm 31 9 9 1 21600 10 mode=3
+chain_garbage 32 9 9 1 21600 10 mode=3
+combo_storm 32 9 9 1 21600 10 mode=3
+thicc_combo_storm 32 9 9 1 21600 10 mode=3
+insane_combo_storm 32 9 9 1 21600 10 mode=3

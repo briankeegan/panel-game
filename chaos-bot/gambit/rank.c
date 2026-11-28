@@ -928,11 +928,6 @@ static void creditPair(const Judge *x, const Judge *y, int *lxo, int *lyo) {
   #define OUT_Q(A, B) (decQ.b->colors > 6 && !(A)->o.dead && ((A)->o.lives || diesAt(A) - diesAt(B) >= rankSave / 4))
   if (lx && !x->o.lives && (outlives(y, x) || OUT_Q(y, x)) && !calmKept(x, y)) lx = 0;
   if (ly && !y->o.lives && (outlives(x, y) || OUT_Q(x, y)) && !calmKept(y, x)) ly = 0;
-  // (run 233: above six colours under garbage, the line in progress waited on and the same line pressed now share one credit -- run 232 7
-  // colours chain s24 2646-2702: the wait, counted living as the line in progress, put over the same line pressed now five times by
-  // "1. lives before does not", both lost at the same frame, lost at 2973)
-  if (decQ.b->colors > 6 && decF.under && ((x->k.play == PLAY_CARRYWAIT && y->k.play == PLAY_CARRY) || (x->k.play == PLAY_CARRY && y->k.play == PLAY_CARRYWAIT))) {
-    int l = lx || ly; lx = ly = l; }
   // (nor, under garbage, the credit of a line that breaks nothing beside a break lost within a break's time of it: the break is the way
   // out the board has, the horizon is a promise -- r1363, 14839: a 4x stall in progress lost at 296 kept over a break lost at 282, and no
   // break offered again; r1362, 16120)
@@ -1793,8 +1788,7 @@ static int compareJudged(const Judge *x, const Judge *y) {
   // (run 232, ABOVE SIX COLOURS, NO WAITING UNDER A BACKLOG: garbage on the board and more queued, of the line in progress pressed now and
   // the same line waited on, the one pressed now -- every frame waited is the next block's. Run 231 7 colours combo s24 6776-7008: the wait
   // put first six times by the next break's material (6), the board run from 395 frames to 196 without the break pressed, lost at 7340)
-  // (run 233: whether the line breaks garbage or not)
-  if (decQ.b->colors > 6 && decF.under && decQ.b->ninc > 0 && !x->hold && !y->hold &&
+  if (decQ.b->colors > 6 && decF.under && decQ.b->ninc > 0 && !x->hold && !y->hold && x->apBroke > 0 && y->apBroke > 0 &&
       ((x->k.play == PLAY_CARRYWAIT && y->k.play == PLAY_CARRY) || (x->k.play == PLAY_CARRY && y->k.play == PLAY_CARRYWAIT)) &&
       lostAlike(x, y))
     return (cmpKey = __LINE__, (x->k.play == PLAY_CARRYWAIT ? 1 : -1));

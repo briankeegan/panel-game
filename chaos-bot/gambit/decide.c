@@ -2290,7 +2290,9 @@ static Played playOf(const Read *R, int n) {
   // (run 166: above six colours from twenty-five waiting, not thirty-five -- the late 8-colour losses carry 20-35 waiting for thousands of
   // frames (run 165 insane s8: 21-35 from 12000 to the loss at 20355); only a quiet board drops, and from 25 the slabs held back come down
   // at once. Run 142 lowered the ranking rule (the top row kept empty) instead: 2/8)
-  int queueNear = decQ.b->marginTime == 1 && decQ.b->ninc >= CHAOS_QUEUE_LIMIT - (decQ.b->colors > 6 ? 25 : QUEUE_ROOM);
+  // (run 234: above six colours from fifteen waiting -- run 232 7 colours thicc s24 17000-19013: 26-32 waiting for a thousand frames with
+  // 14-20 panels on the board, the breaks three cells each, lost at 19013; what drops and is broken is the panels the board was short of)
+  int queueNear = decQ.b->marginTime == 1 && decQ.b->ninc >= CHAOS_QUEUE_LIMIT - (decQ.b->colors > 6 ? 35 : QUEUE_ROOM);
   if (P.line && (!R->under || queueNear) && !R->up && decQ.b->ninc > 0 && P.line->apBroke <= 0) {
     int32_t waiting = 0;
     for (int i = 0; i < decQ.b->ninc; i++) waiting += decQ.b->inc[i].height > 0 ? decQ.b->inc[i].height : 1;

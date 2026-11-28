@@ -17,3 +17,6 @@ lineclear.words, run 245: the mode in force 0, "time attack" (its chain designer
 lineclear.words, run 246: the mode in force 4, "pressure" (chains of 4 and 3 within 240 frames) -- run 245's time attack (chains of 8
 and more) won 5/8 at 24-35 rows a minute; 15:6 asks 40, and the chains it threw (6-9 links) took too long to build.
 lineclear.words, run 247: back to time attack (mode 0) -- run 246's pressure won 1/8 at 11-17 rows a minute.
+lineclear.words, run 261: time attack's list (rule 0) is a chain of 8 or more, then a chain of 3 or more (was the 8 alone) -- at seven
+colours no line came near 8, and the rank's lines between chains set up two-column combos (500-1000 frames a game in run 253's 15:5-6),
+which send a row where a chain's link sends one each.

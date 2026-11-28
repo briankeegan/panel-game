@@ -2196,10 +2196,7 @@ static Played playOf(const Read *R, int n) {
     double left = C2.due ? C2.due - C2.margin - nowMs() : 100, ms = left * 0.8; if (ms < 2) ms = 2;
     readyStop();
     List L; memset(&L, 0, sizeof L); L.n = 1; L.aim[0].chain.op = OP_GE; L.aim[0].chain.n = 2; L.aim[0].brk = -1;
-    // (run 260: above six colours the chain going is searched 7 swaps deep, not 8 -- run 259 searched 9 and sent the fewest rows of any run
-    // at seven colours (22.2 a minute, run 253 29.1): a deeper line's later swaps come too late for the falling chain, or the search spends its
-    // time on depth the decision cannot afford)
-    ExtOpts eo = { TA_EXT_WIDTH, decQ.b->colors > 6 ? TA_EXT_DEPTH - 1 : TA_EXT_DEPTH, &L, NOT_ASKED, 0, ms };
+    ExtOpts eo = { TA_EXT_WIDTH, TA_EXT_DEPTH, &L, NOT_ASKED, 0, ms };
     static Ext E; extend(&decQ, &eo, &E);
     taxBase = E.baseChain; taxLong = E.longest.set ? E.longest.chain : 0; taxN = E.longest.set ? E.longest.nseq : 0; taxMs = (int32_t)ms;
     if (E.longest.set && E.longest.nseq > 0) {

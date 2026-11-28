@@ -28,7 +28,7 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 | 1 HP | 10 | 29-30 | 238 | **8/8 -- done** |
 | No stop time | 10 | 31-32 | 239 | **8/8 -- done** |
 | BALL | 10 | 33-34 | 241 | **8/8 -- done** |
-| Line Clear (15:3-6) | stage's | 35-36 | 253 | won 6/8 (254-259 off), being fixed (run 260) |
+| Line Clear (15:3-6) | stage's | 35-36 | 253 | won 6/8 (254-260 off), being fixed (run 261) |
 | Queue limit | 10 | 37-38 | - | to do |
 | training_random | 10 | 39-40 | - | to do (its own pattern: chain and combo garbage mixed at a random balance, Chaos Mode 1 game in 4 -- TrainingMenu.lua createBasicTrainingMode) |
 | Challenge Mode | stage's | 41-42 | - | to do |
@@ -210,6 +210,8 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 260 (01:50-01:54 ET), the chain going 7 swaps deep: won 5/8 -- off.** Run 261: lineclear.words' time attack list gets a chain
+  of 3 or more after the 8 (run 253's 7-colour games spent 500-1000 frames setting up two-column combos between chains).
 - **Run 259 (01:44-01:48 ET), the chain going 9 swaps deep: won 4/8 -- off.** 22.2 rows a minute at seven colours, the fewest yet.
   Run 260: the other way, 7 swaps deep above six colours.
 - **Run 258 (01:38-01:42 ET), the raise top not lowered for an uneven stack: won 5/8 -- off.** 15:5 s36's chains ended at 3-5 links.

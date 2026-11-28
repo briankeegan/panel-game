@@ -1014,6 +1014,10 @@
 #   Both 15:5 won (32.3, 25.9); both 15:6 lost (20.7, 19.8). Their boards stood on 29-38 panels the last 1200 frames.
 # run 273 -- run 272's bot plus: above six colours time attack's raise needs the board raised to stand 3/4 of TA_STAND, not all (decide.c
 #   taRaiseRows). The report also prints each game's chains as they fell, by length. Line Clear 15:3-6 s35-36
+# run 273 -- (result, 03:13-03:17 ET) the raise asking 3/4 of TA_STAND above six colours: won 5/8 -- worse: OFF, decide.c back to run
+#   272's (1d42fe1). Lost 15:5 s35 (24.5), 15:6 both (23.8, 23.2). The chains as they fell: 15:6 games 14 and 17 chains, most of 2-4 links.
+# run 274 -- run 272's bot plus: above six colours a clear is no longer held till a design is on (decide.c taClears hold; the designs fired
+#   there hold ~2 links). Line Clear 15:3-6 s35-36
 challenge 35 9 9 1 21600 10 challenge=15:3 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:4 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:5 profile=lineclear

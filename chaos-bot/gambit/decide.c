@@ -120,8 +120,6 @@ static void fillList(List *L) {
 static int decisionFloor(const Board *b) { return floorKeepOn ? keepsFloor(&floorKeep, b, 0) : -1; }
 // (TIME ATTACK'S RAISE, ON THE ENGINE'S CLOCK: the rows the board, raised, still stands `stand` frames through left alone -- the rise never
 // stops, and a raise brings the top nearer by every row it lifts: a board raised into its last frames has no time left to build on)
-// (run 273: above six colours the board raised need stand three quarters of TA_STAND, not all of it -- run 272's 7-colour Line Clears
-// stood on 29-38 panels a minute before the wall, and the chain going finds its next link among the panels there are: 60-70% of the time)
 static int32_t taRaiseRows(const Board *b, int32_t rows, int32_t stand) {
   static Board *st; if (!st) st = nb_new();
   if (!st || rows <= 0) return 0;
@@ -482,7 +480,7 @@ static int readBoard_(Read *R) {
   if (R->up) {
     double l = leftMs(); if (l < 1) l = 1;
     raiseOpens = opening;
-    int32_t rows = taRaise ? taRaiseRows(rq.b, rowsUp, AT_LEVEL(rq.b->colors > 6 ? TA_STAND * 3 / 4 : TA_STAND)) : raiseReady(&rq, rowsUp, l < RAISE_MS ? l : RAISE_MS);
+    int32_t rows = taRaise ? taRaiseRows(rq.b, rowsUp, AT_LEVEL(TA_STAND)) : raiseReady(&rq, rowsUp, l < RAISE_MS ? l : RAISE_MS);
     // (THE FLOOR'S RAISE ON A BOARD TOO SHORT TO BREAK: below the floor, no row count leaves a break once everything lands -- the panels
     // a break is made of are what the board lacks -- so the rows the board lives through once everything lands are raised all the same:
     // the panels are the next break's material, and the opening's raise is held to readiness, never the floor's)
@@ -2260,7 +2258,9 @@ static Played playOf(const Read *R, int n) {
     // whose tall column a clear brings down is never held up while the rise takes it to the top)
     // (and till a design is on, nothing cleared on a board that lives -- the owner: flatten, raise, then the chain that uses every block; a
     // clear made on the way spends the panels the design is made of, and starts a chain too short to take to 13)
-    if (!taOn && !R->taDying && P.line && taClears(P.line) && taHoldNoSooner(P.line, n)) decWhy = __LINE__, P.line = 0;
+    // (run 274: not above six colours -- there the design fired holds about two links (run 268-273: 1.5-3 links, under a swap), so the clear
+    // held for it is a row given up for nothing: a combo sends width x height / 6, and a clear starts a chain the chain going takes on)
+    if (!taOn && !R->taDying && decQ.b->colors <= 6 && P.line && taClears(P.line) && taHoldNoSooner(P.line, n)) decWhy = __LINE__, P.line = 0;
     if (taOn) {
       int32_t seq[CB_MAXSWAPS + 1]; int n = cbOrder(&G, &taD, taTr, seq, CB_MAXSWAPS + 1);
       // (never a build the board does not live through -- the owner: you can't choose to die: the swaps left and the trigger, walked and

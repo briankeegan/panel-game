@@ -775,6 +775,11 @@
 # run 218 -- run 216's bot plus: above six colours, NO CHANGING MINDS lets the line in progress go for one that outlives it by a quarter
 #   break (OUT_Q), not a whole break (rank.c). Run 216 insane s21 7195 a carry lost at 225 kept over an entry at 289; 7607/7621 137/123
 #   over 181/171, lost at 7746. 8 colours s21-22
+# run 218 -- (result) survived 5/8, 130792 frames (216: 5/8) -- count no worse, kept. Only 5 sooner-lost picks in the run (was 10-20).
+#   Lost chain s21 5667, combo s22 3209, insane s22 13916. combo s22 2312-2560: nine rows of panels under four of garbage, stop 205-259,
+#   carries and set-ups breaking nothing played while the stack stood frozen.
+# run 219 -- run 218's bot plus: DIG DOWN TO THE GARBAGE (off since run 41) back above six colours while the stop time covers a break's
+#   time (rank.c). 8 colours s21-22
 chain_garbage 21 9 9 1 21600 10 colors=8
 combo_storm 21 9 9 1 21600 10 colors=8
 thicc_combo_storm 21 9 9 1 21600 10 colors=8

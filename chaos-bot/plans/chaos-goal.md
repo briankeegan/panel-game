@@ -17,7 +17,7 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 
 | Mode | Level | Seeds | Run | Result |
 |---|---|---|---|---|
-| 8 colours | 10 | 21-22 | 216 | 5/8 (217: 2/8, off), being fixed (run 218) |
+| 8 colours | 10 | 21-22 | 218 | 5/8 (216: 5/8), being fixed (run 219) |
 | 7 colours | 10 | 23-24 | - | to redo (old: 7/8 on seeds 7-8, run 190 -- does not count) |
 | Chaos margin 4 | 10 | 25-26 | - | to redo (old: 7/8 on 7-8, run 191) |
 | Chaos mode | 10 | 27-28 | - | to redo (old: 8/8 on 7-8, run 192) |
@@ -203,6 +203,9 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 218 (2026-11-27 19:55 ET), no changing minds lets go at a quarter break: 5/8** -- kept; 5 sooner-lost picks in the run (was
+  10-20). combo s22: nine rows under the garbage, stop 205-259, nothing dug. Run 219: DIG DOWN TO THE GARBAGE above six colours while
+  the stop time covers a break.
 - **Run 217 (2026-11-27 19:45 ET), the promise capped: 2/8 -- off** (216 restored by hash). Run 218: NO CHANGING MINDS lets go for a line
   that outlives the carry by a quarter break (insane s21 7195: 225 kept over 289).
 - **Run 216 (2026-11-27 19:36 ET), the plan kept on own boards: 5/8, 136383 frames** -- kept. With 12-18 queued, lines put first on their

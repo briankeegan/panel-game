@@ -1126,7 +1126,11 @@ static int compareJudged(const Judge *x, const Judge *y) {
   // nothing in reach, holds while the stack rose to the loss)
   // (run 41: off -- survived 5/8, three new losses on seed 9 (insane at 1926): clearing panels whenever they are plenty spends the
   // fuel the next minute needs)
-  if (0 && decF.under && materialOn(decQ.b) >= 2 * W && !x->o.lives && !y->o.lives && x->apBroke <= 0 && y->apBroke <= 0 &&
+  // (run 219: back above six colours while the stop time covers a break's time -- the stack frozen, the panels cleared bring the garbage
+  // within reach and cost no rise. Run 218 8 colours combo s22 2312-2560: nine rows of panels under four of garbage, stop 205-259, carries
+  // and set-ups breaking nothing played, lost at 3209)
+  if (decQ.b->colors > 6 && imax(decQ.b->stopTime + decQ.b->preStopTime, decQ.b->shakeTime) >= rankSave &&
+      decF.under && materialOn(decQ.b) >= 2 * W && !x->o.lives && !y->o.lives && x->apBroke <= 0 && y->apBroke <= 0 &&
       x->o.topAfter >= 0 && y->o.topAfter >= 0 && x->o.topAfter != y->o.topAfter) {
     const Judge *low = x->o.topAfter < y->o.topAfter ? x : y, *hi = low == x ? y : x;
     if (lostOf(hi) - lostOf(low) < rankSave) return (cmpKey = __LINE__, (low == x ? -1 : 1));

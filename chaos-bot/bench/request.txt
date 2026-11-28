@@ -918,6 +918,10 @@
 #   s36 won (35 rows a minute; the design built 11 times); 15:5 s35 lost at 26.4; 15:6 lost both (20, 24) -- in 15:6 s35 the design was
 #   let go 18 times (the board no longer held it) and never built.
 # run 252 -- run 251's bot plus: above six colours the design is built after half the search (decide.c). Line Clear 15:3-6 s35-36
+# run 252 -- (result, 01:01-01:05 ET) the design built after half the search above six colours: won 5/8, 30.6 rows a minute (251: 28.2)
+#   -- kept (34e95da). Won 15:5 s35; lost 15:5 s36 (24), 15:6 both (28.6, 28.7 -- about 32 asked).
+# run 253 -- run 252's bot plus: with nobody across the opening raises to time attack's top, not the chaos ceiling (decide.c; run 247
+#   tried it on run 241's bot, when the design never built). Line Clear 15:3-6 s35-36
 challenge 35 9 9 1 21600 10 challenge=15:3 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:4 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:5 profile=lineclear

@@ -426,6 +426,10 @@ static int readBoard_(Read *R) {
   int32_t taTo = TA_TOP - imax(0, evenOf(decQ.b) - TA_EVEN);
   int taRaise = ruleNoEnemy && !opening && !refill && !R->topped && !R->taDying && !taOn && panelTop(decQ.b) < taTo;
   if (taRaise) to = taTo;
+  // (run 253: and with nobody across the opening raises to time attack's top too, not to the chaos ceiling, which keeps room for blocks
+  // that cannot come there -- run 247 tried it on run 241's bot (the design never built then): rows a minute up, one stage fewer. Now the
+  // design is searched and built (runs 251-252): Line Clear 15:6 at 28-29 rows a minute where about 32 are asked)
+  if (ruleNoEnemy && opening && !R->topped && taTo > to) to = taTo;
   raiseRefill = refill; raiseOpening = opening; raiseTo = to;
   int32_t rowsUp = to - (opening ? fullTop(decQ.b) : panelTop(decQ.b));
   if (chaosFuelRaise) { to = panelTop(decQ.b) + 1; rowsUp = 1; }   // (one row at a time: the next decision asks again)

@@ -28,7 +28,7 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 | 1 HP | 10 | 29-30 | 238 | **8/8 -- done** |
 | No stop time | 10 | 31-32 | 239 | **8/8 -- done** |
 | BALL | 10 | 33-34 | 241 | **8/8 -- done** |
-| Line Clear (15:3-6) | stage's | 35-36 | 251 | won 5/8, being fixed (run 252) |
+| Line Clear (15:3-6) | stage's | 35-36 | 252 | won 5/8, being fixed (run 253) |
 | Queue limit | 10 | 37-38 | - | to do |
 | training_random | 10 | 39-40 | - | to do (its own pattern: chain and combo garbage mixed at a random balance, Chaos Mode 1 game in 4 -- TrainingMenu.lua createBasicTrainingMode) |
 | Challenge Mode | stage's | 41-42 | - | to do |
@@ -210,6 +210,8 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 252 (01:01-01:05 ET), built after half the search: won 5/8, 30.6 rows a minute -- kept.** 15:6 at 28.6-28.7 (about 32 asked). Run
+  253: the opening raised to time attack's top with nobody across.
 - **Run 251 (00:55-00:59 ET), the design searched from 4 full rows above six colours: won 5/8 -- kept.** 15:5 s36 won with the design built.
   Run 252: and built after half the search.
 - **Run 250 (00:49-00:54 ET), half the design search: won 4/8 -- off.** The design never built at all (game logs); at 7 colours most decisions

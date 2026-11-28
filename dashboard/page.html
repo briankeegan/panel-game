@@ -606,7 +606,8 @@ html.set-chaos #sec-brain, html.set-chaos .gs-nav a[href="#sec-brain"] { display
 .dt-down { color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); padding-left: 18px; }
 .dt-m { padding: 10px 14px; border-radius: 10px; background: var(--color-bg); border: 1px solid var(--color-border-line); border-left: 4px solid var(--dt-c, var(--color-fg)); }
 .dt-m b { display: block; letter-spacing: .04em; font-size: .82rem; }
-.dt-m span { color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); }
+.dt-m span { display: block; color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); }
+.dt-m .dt-ex { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--color-border-line); }
 .dt-open { --dt-c: #3b82f6; } .dt-fill { --dt-c: #e3a936; } .dt-fin { --dt-c: #ef6a66; }
 .dt-over { margin-top: 10px; padding: 10px 14px; border-radius: 10px; background: color-mix(in srgb, var(--color-bad) 9%, transparent); border: 1px solid color-mix(in srgb, var(--color-bad) 35%, transparent); font-size: var(--cds-font-size-caption); }
 .dt-arc { margin-top: 8px; color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); }
@@ -791,19 +792,19 @@ html.set-chaos #sec-brain, html.set-chaos .gs-nav a[href="#sec-brain"] { display
       <div class="dt-row">
       <div class="dt-q">First 10 seconds, and no garbage has reached the board yet?</div>
       <div class="dt-a">yes →</div>
-      <div class="dt-m dt-open"><b>OPENER</b><span>Build one big <button type="button" class="dt-t" data-tip="Matches that set off more matches as panels fall. Each link after the first sends a full-width row of garbage.">chain</button>: an 8-chain, or a 6, or a 4, fired before the first garbage lands.</span></div>
+      <div class="dt-m dt-open"><b>OPENER</b><span>Build one big <button type="button" class="dt-t" data-tip="Matches that set off more matches as panels fall. Each link after the first sends a full-width row of garbage.">chain</button>: an 8-chain, or a 6, or a 4, fired before the first garbage lands.</span><span class="dt-ex">First it <button type="button" class="dt-t" data-tip="Swaps that clear nothing but even out the columns, so the stack has no towers or holes.">flattens</button> the stack and raises it, never past 6 rows in the tallest column.</span></div>
       </div>
       <div class="dt-down">no ↓</div>
       <div class="dt-row">
       <div class="dt-q">Is the opponent's stack 11 or more rows high?</div>
       <div class="dt-a">yes →</div>
-      <div class="dt-m dt-fin"><b>FINISH THEM</b><span>Fire a <button type="button" class="dt-t" data-tip="Four or more panels cleared in one match. The garbage lands quickly, so a nearly-full opponent has no time to dig out.">combo</button> of 8, else 9, 10, 5, 6 or 4 panels. They're one row from losing; the combo ends it.</span></div>
+      <div class="dt-m dt-fin"><b>FINISH THEM</b><span>They're one row from losing, so speed beats size. A <button type="button" class="dt-t" data-tip="Four or more panels cleared in one match. Its garbage drops as soon as the match is made; a chain's comes only after every link has fallen.">combo</button>'s garbage drops straight away, and any block that lands tops them out.</span><span class="dt-ex">Its order: 8, 9, 10, then 5, 6, 4 panels. 8 to 10 drop <i>two</i> blocks at once, which is harder to dig out of than one; 8 is the quickest of those to make. 5, 6 and 4 drop one block, used when no bigger combo is in reach.</span></div>
       </div>
       <div class="dt-down">no ↓</div>
       <div class="dt-row">
       <div class="dt-q dt-else">Otherwise (opponent under 11 rows)</div>
       <div class="dt-a">→</div>
-      <div class="dt-m dt-fill"><b>FILL</b><span>Build the longest chain whose garbage fits the opponent's <button type="button" class="dt-t" data-tip="Free rows above their stack when the garbage lands. Ranmaru counts the rows they'll rise while its chain is still being made and while the garbage is in the air.">free rows</button>, leaving them exactly one row.</span></div>
+      <div class="dt-m dt-fill"><b>FILL</b><span>Fill the opponent's stack to one row from the top with a <button type="button" class="dt-t" data-tip="Matches that set off more matches as panels fall. Each link after the first sends a full-width row of garbage, so an n-chain sends n − 1 rows.">chain</button>, sized to their <button type="button" class="dt-t" data-tip="The rows above their stack when the garbage lands. Ranmaru subtracts the rows they'll rise while its chain is still building and the garbage is in the air.">free rows</button>.</span><span class="dt-ex">Example: their stack is 4 rows tall, so 8 rows are free. An 8-chain sends 7 rows and leaves them at 11, one from the top, and then Finish them takes over. If an 8 isn't in reach, it tries a 7, then 6, down to 3. It never sends more than fits: garbage past the top would be wasted.</span></div>
       </div>
     </div>
     <p class="dt-arc">So a typical game runs <b>Opener → Fill → Finish them</b>. It checks again every decision, and a new mode has to hold for one second before it switches.</p>
@@ -812,7 +813,7 @@ html.set-chaos #sec-brain, html.set-chaos .gs-nav a[href="#sec-brain"] { display
     <h3>2 · Each decision, about four times a second</h3>
     <ol class="dl-steps">
       <li><b>Read</b> its board, the opponent's height and the <button type="button" class="dt-t" data-tip="The garbage the opponent has already sent, shown before it lands. Ranmaru can't see an attack that hasn't been sent yet.">telegraph</button>.</li>
-      <li><b>Propose</b> short swap sequences: break, attack, carry on, set up, level, survive, or hold.</li>
+      <li><b>Propose</b> short swap sequences: break, attack, carry on, set up, <button type="button" class="dt-t" data-tip="Move a colour to one swap away from its partner, not touching it. Nothing clears now, but a single swap fires the match later, when Ranmaru chooses.">zip</button>, <button type="button" class="dt-t" data-tip="Swaps that clear nothing but even out the columns, so the stack has no towers or holes.">flatten</button>, survive, or hold.</li>
       <li><b>Play each one out</b> on a copy of the game's own engine, garbage landing on time, up to its <button type="button" class="dt-t" data-tip="How far ahead it looks: about 7 steps deep and 40 lines wide per decision. Garbage landing beyond that is seen late.">horizon</button>.</li>
       <li><b>Cut</b> lines it may not play: undoing the last swap, leaving fewer than 40 panels (the <button type="button" class="dt-t" data-tip="The panels it keeps on the board, at least 40. Breaks are made from panels, so a bare board can't defend itself.">floor</button>), or attacks that land too late.</li>
       <li><b>Rank</b> what's left (below).</li>
@@ -825,7 +826,7 @@ html.set-chaos #sec-brain, html.set-chaos .gs-nav a[href="#sec-brain"] { display
       <li><span class="dr-n">1</span><span><b>Breaks garbage</b>, the faster the better.</span></li>
       <li><span class="dr-n">2</span><span><b>Makes the mode's aim</b>, earlier in its list first (an 8-combo beats a 9 in Finish them).</span></li>
       <li><span class="dr-n">3</span><span><b>Any other attack</b>: the one that sends the most garbage.</span></li>
-      <li><span class="dr-n">4</span><span><b>Sets up</b> a later attack or break without clearing anything.</span></li>
+      <li><span class="dr-n">4</span><span><b>Sets up</b> without clearing anything. In order: a set-up for the next break, then one toward the mode's aim, then a zip (a colour left one swap from its match), then flattening last. While it waits for garbage to land, it walks toward where it's needed and zips or flattens on the way.</span></li>
       <li><span class="dr-n">5</span><span><b>A plain clear</b> that does nothing else.</span></li>
     </ol>
     <p class="gs-note" style="margin-top:8px">It never makes a chain longer than 13, and it raises the stack itself to keep enough panels to work with.</p>
@@ -834,7 +835,9 @@ html.set-chaos #sec-brain, html.set-chaos .gs-nav a[href="#sec-brain"] { display
   <script>
   (function () {
     var tip = document.getElementById('dt-tip'), cur = null;
+    var shownAt = 0;
     function show(el) {
+      if (cur !== el) shownAt = Date.now();
       cur = el; tip.textContent = el.getAttribute('data-tip'); tip.hidden = false;
       var r = el.getBoundingClientRect(), w = tip.offsetWidth, h = tip.offsetHeight;
       var x = Math.max(16, Math.min(window.innerWidth - w - 16, r.left + r.width / 2 - w / 2));
@@ -842,12 +845,14 @@ html.set-chaos #sec-brain, html.set-chaos .gs-nav a[href="#sec-brain"] { display
       tip.style.left = x + 'px'; tip.style.top = y + 'px';
     }
     function hide() { cur = null; tip.hidden = true; }
+    var touched = 0;
     document.querySelectorAll('#sec-brain .dt-t').forEach(function (el) {
-      el.addEventListener('mouseenter', function () { show(el); });
-      el.addEventListener('mouseleave', hide);
-      el.addEventListener('focus', function () { show(el); });
+      el.addEventListener('pointerenter', function (e) { if (e.pointerType === 'mouse') show(el); });
+      el.addEventListener('pointerleave', function (e) { if (e.pointerType === 'mouse') hide(); });
+      el.addEventListener('pointerdown', function () { touched = Date.now(); });
+      el.addEventListener('focus', function () { if (Date.now() - touched > 600) show(el); });
       el.addEventListener('blur', hide);
-      el.addEventListener('click', function (e) { e.stopPropagation(); cur === el ? hide() : show(el); });
+      el.addEventListener('click', function (e) { e.stopPropagation(); cur === el && Date.now() - shownAt > 400 ? hide() : show(el); });
     });
     document.addEventListener('click', hide);
     window.addEventListener('scroll', hide, { passive: true });

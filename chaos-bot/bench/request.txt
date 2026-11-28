@@ -886,6 +886,10 @@
 #   modeRule = 1), and finish them asks combos -- half-rows -- where a Line Clear stage is won by rows.
 # run 244 -- the same 8 games on profiles/lineclear.words: chaos.words with the mode in force 3, "big chain" -- the profile only,
 #   run 241's bot. Line Clear 15:3-6 s35-36
+# run 244 -- (result, 00:15-00:19 ET) big chain: WON 4/8 -- 15:3 and 15:4 on both seeds (22-27 rows a minute). Lost 15:5-6 (the 7-colour
+#   stages): 11-12 a minute, the hold put first 71-89 times a game by the mode's goals where no line met the big chain list.
+# run 245 -- the same 8 games on lineclear.words with the mode in force 0, "time attack" (its chain designer) -- the profile only.
+#   Line Clear 15:3-6 s35-36
 challenge 35 9 9 1 21600 10 challenge=15:3 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:4 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:5 profile=lineclear

@@ -12,3 +12,5 @@ by the panels on the board instead (decide.c, run 97): smallest first at or unde
 lineclear.words (run 244, 2026-11-28): chaos.words with the mode in force 3, "big chain", in place of 1, "finish them" (the profile line's
 first number is answer.c gb_profile's modeRule: the mode played all game). A Line Clear stage is won by rows sent in two minutes with
 no garbage coming (ChallengeMode.lua lineHeightToKill), and a chain sends rows where finish them's combos send half-rows.
+lineclear.words, run 245: the mode in force 0, "time attack" (its chain designer, search/chainbuild.c) -- run 244's "big chain" won
+15:3-4 (22-27 rows a minute) and held where no line met its list at 7 colours (15:5-6, 11-12 a minute, 71-89 holds a game).

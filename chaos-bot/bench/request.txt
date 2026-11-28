@@ -799,6 +799,11 @@
 #   breaking as much and lost later below them (insane s21 13702 211 over a convert at 290; insane s22 4562 240 over 289).
 # run 223 -- run 218's bot plus: above six colours, the top dying, a line breaking at least as much garbage whose own board is lost a
 #   quarter break later moves to the top (rank.c, after outlivingFirst). 8 colours s21-22
+# run 223 -- (result) survived 4/8, 136784 frames (218: 5/8, 130792) -- one game fewer: OFF, run 218's rank.c restored by hash (b3967e9).
+#   Two losses inside the last minute (21389, 20935, 44-49 queued). chain s21 5104: THE GARBAGE LET DOWN put a level lost at 69, credited
+#   108, over a carry lost at 121, alike on the credit; lost at 5128.
+# run 224 -- run 218's bot plus: above six colours, THE GARBAGE LET DOWN never puts first a line whose own board is lost a quarter break
+#   sooner (rank.c). 8 colours s21-22
 chain_garbage 21 9 9 1 21600 10 colors=8
 combo_storm 21 9 9 1 21600 10 colors=8
 thicc_combo_storm 21 9 9 1 21600 10 colors=8

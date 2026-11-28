@@ -1271,7 +1271,12 @@ static int compareJudged(const Judge *x, const Judge *y) {
     int dx = letsDown(x), dy = letsDown(y);
     // (never over a line that breaks garbage -- the line in progress, an entry: letting the garbage down stands in for a break, and that
     // line is one)
-    if (dx != dy) { const Judge *d = dx ? x : y, *o = dx ? y : x; if (!(o->apBroke > 0) && (lostOf(d) >= lostOf(o) || lostAlike(d, o))) return (cmpKey = __LINE__, (dx ? -1 : 1)); }
+    // (run 224: and above six colours, never one whose own board -- no promise counted -- is lost a quarter break sooner: run 223 8 colours
+    // chain s21 5104 (13 queued) a level lost at 69, credited 108, put over a carry lost at 121 as alike, lost at 5128)
+    if (dx != dy) { const Judge *d = dx ? x : y, *o = dx ? y : x;
+      int ownSooner = decQ.b->colors > 6 && !o->o.dead && !o->o.lives &&
+                      lostAtOf(o->o.lostAt, o->hold) - lostAtOf(d->o.lostAt, d->hold) >= rankSave / 4;
+      if (!(o->apBroke > 0) && !ownSooner && (lostOf(d) >= lostOf(o) || lostAlike(d, o))) return (cmpKey = __LINE__, (dx ? -1 : 1)); }
     // (and of two lost alike that break nothing, the one whose board at rest leaves the garbage nearer coming down onto the stack
     // (restOn, outcome.c restOf): a perch built up is a break put further off -- the garbage on two towers over a well, every break
     // walked to it a support at a time)
@@ -2001,19 +2006,6 @@ static void outlivingFirst(Judge **a, int n) {
         Judge *e = a[i]; for (int q = i; q > 0; q--) a[q] = a[q - 1]; a[0] = e; moved = 1; rankMoved = -__LINE__; break; }
       if (!moved) break; }
     cmpKey = keep; }
-  // (run 223, ABOVE SIX COLOURS, THE SAME BREAK LOST LATER IS THE TOP: the top dying, a line breaking at least as much garbage whose own board
-  // -- no promise counted -- is lost a quarter of a break's time later moves up, beaten head to head or not: the order kept a sooner loss
-  // through a third line. Run 221 8 colours insane s21 13702 a carry lost at 211 over a convert lost at 290, both breaking 11; combo s21
-  // 19469 199 over 244; insane s22 4562 240 over 289, both breaking 6)
-  if (decQ.b->colors > 6 && n > 1 && !a[0]->o.lives && !a[0]->o.dead) {
-    double t0 = lostAtOf(a[0]->o.lostAt, a[0]->hold); int best = 0; double bt = t0;
-    for (int i = 1; i < n; i++) { const Judge *e = a[i];
-      if (e->o.dead || e->hold || imax(0, e->apBroke) < imax(0, a[0]->apBroke)) continue;
-      double te = e->o.lives ? 1e300 : lostAtOf(e->o.lostAt, 0);
-      if (te >= 1e299 && !e->o.lives) continue;
-      if (te - t0 >= rankSave / 4 && te > bt) { best = i; bt = te; } }
-    if (best > 0) { Judge *e = a[best]; for (int q = best; q > 0; q--) a[q] = a[q - 1]; a[0] = e; rankMoved = -__LINE__; }
-  }
 }
 static void sortJudged(Judge **a, int n) {
   static Judge *tmp[512];

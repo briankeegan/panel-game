@@ -1094,11 +1094,7 @@ static int compareJudged(const Judge *x, const Judge *y) {
   // unless the other lives a break's time (rankSave, read off the level) longer. Garbage broken is panels made and the backlog shrunk;
   // a life bought with stop time spends the panels the next break needs -- run 16 insane_combo_storm s1: 15-24 pieces queued for 1,700
   // frames, panels 40 to 7 on survive lines breaking nothing, then the top-out)
-  // (run 290: and of two that both live too with the queue QUEUE_ROOM or fewer short of its limit (margin off) -- fifty waiting is the
-  // loss and the judge counts health, not the queue: runs 284-289 training_random at garbage level 10-11 lost 14 games to the fiftieth,
-  // the queue 42-48 for thousands of frames, the board under garbage to the top and lines judged living played over the breaks)
-  if (decF.under && decQ.b->ninc > 0 && ((!x->o.lives && !y->o.lives) ||
-      (x->o.lives && y->o.lives && decQ.b->marginTime == 1 && decQ.b->ninc >= CHAOS_QUEUE_LIMIT - QUEUE_ROOM))) {
+  if (decF.under && decQ.b->ninc > 0 && !x->o.lives && !y->o.lives) {
     int32_t bx = imax(0, x->apBroke) / W, by = imax(0, y->apBroke) / W;
     if (bx != by) {
       const Judge *dig = bx > by ? x : y, *other = dig == x ? y : x;

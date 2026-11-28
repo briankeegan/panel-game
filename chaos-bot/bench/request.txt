@@ -1091,6 +1091,10 @@
 #   to the top (nothing drops onto a topped board), held 47 for hundreds of frames.
 # run 290 -- run 282's bot plus: DIG THE BACKLOG also between two lines that both live once the queue is QUEUE_ROOM short of fifty (rank.c:
 #   the judge counts health, not the queue). training_random s39-40
+# run 290 -- (result, 05:24-05:32 ET) DIG THE BACKLOG between living lines near the limit: survived 5/8 -- worse: OFF, rank.c back to run
+#   282's (43a7572). Lost s39 17739, s40 17449 and 17284 -- the queue 38-50 under garbage. Game 7 (s40, level 10) has now lost in runs 285-290.
+# run 291 -- run 282's bot plus: no calm slack with a backlog of 15 or more waiting (front.c calmGap: a swap after a living hold waited the
+#   profile's gap and a jitter, 20-36 frames, while the queue climbed). training_random s39-40
 training_random 39 8 8 1 21600 10
 training_random 39 9 9 1 21600 10
 training_random 39 10 10 1 21600 10

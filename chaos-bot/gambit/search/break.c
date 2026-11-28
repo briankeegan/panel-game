@@ -488,10 +488,10 @@ static int touchBeam(BS *s, Line **firsts, int nfirsts) {
       // (THE DIVE: each of the beam's first lines played on along its own board's nearest break -- breakNear's line, its panels walked to
       // it -- k steps where the level grows every swap of every line)
       int64_t diveB = -1; int32_t diveKey = 0, diveLen = 0, diveAt = 0, diveCarried = 0, divePath[MAXPATH];
-      // (run 322: only under a backlog -- fifteen or more waiting: the dive finished training_random at garbage level 10-11 (run 306), queues
+      // (run 323: only under a deep backlog -- twenty-five or more waiting (run 322 at fifteen: chaos mode 5/8, its queues reaching 16-22): the dive finished training_random at garbage level 10-11 (run 306), queues
       // of 25-48, and cost chaos mode, 6 colours, queues under 16 -- 8/8 and 7/8 without it (runs 320-321), 4/8 with it (run 319): its
       // search time is the beam's)
-      for (int i = 0; i < ntl && i < DIVE_N && decQ.b && decQ.b->ninc >= 15 && !SEARCH_OUT(); i++) {
+      for (int i = 0; i < ntl && i < DIVE_N && decQ.b && decQ.b->ninc >= 25 && !SEARCH_OUT(); i++) {
         Line *l = tl[i]; static LOCAL int32_t dl[MAXPATH]; int dn = 0;
         const Board *db = ensureBoard(x, l->n);
         if (!db || breakNearLine(db, dl, &dn) >= NEAR_MISS || dn <= 0 || l->len + dn > MAXPATH) continue;

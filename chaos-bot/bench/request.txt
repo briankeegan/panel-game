@@ -1223,6 +1223,9 @@
 #   is run 299's plus the dive alone: 4/8 with it, 7/8 and 8/8 without -- the dive.
 # run 322 -- run 318's bot (ff9bc66) with the dive only under a backlog, fifteen or more waiting (search/break.c touchBeam; training_random's
 #   queues ran 25-48, chaos mode's under 16). chaos mode s27-28
+# run 322 -- (result, 10:32-10:40 ET) the dive from 15 waiting: chaos mode survived 5/8 (lost chain s27 4216 early, chain s28 17484, insane
+#   s28 20578 -- queues of 15-22 at the end). Not kept.
+# run 323 -- run 318's bot with the dive only under a deep backlog, twenty-five or more waiting (search/break.c). chaos mode s27-28
 chain_garbage 27 9 9 1 21600 10 chaosmode=1
 combo_storm 27 9 9 1 21600 10 chaosmode=1
 thicc_combo_storm 27 9 9 1 21600 10 chaosmode=1

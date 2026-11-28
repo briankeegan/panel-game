@@ -1137,6 +1137,12 @@
 # run 301 -- run 299's bot, the machine laid out as the vanilla bot's (GameCreator eval/training.sh, read after the owner's go-ahead): the
 #   client pinned to CPU 0 with one llvmpipe render thread (LP_NUM_THREADS=1), Gambit's thread on a CPU of the other core (/sys topology),
 #   the two workers on the rest (bench/play.sh; cpus.txt per game). training_random s39-40
+# run 301 -- (result, 07:15-07:23 ET) the vanilla CPU layout: survived 4/8 -- worse: OFF, play.sh back to run 299's (0222399). Lost s39 level
+#   11 at 17902; s40 level 9 at 18812 (starved), level 10 at 16948 (starved), level 11 at 19257.
+# run 302 -- run 299 plus vanilla's "a break kept in reach under garbage" (GameCreator 7f4d709234 + 16a84cc3b5): with garbage on the board or
+#   on its way every line, the living too, is asked whether a break is in reach once the next block lands, and READY WHEN IT LANDS ranks it
+#   under garbage too -- of two not living, the ready one first where its board stands a break's time and keeps the panels (rank.c,
+#   decide.c). training_random s39-40
 training_random 39 8 8 1 21600 10
 training_random 39 9 9 1 21600 10
 training_random 39 10 10 1 21600 10

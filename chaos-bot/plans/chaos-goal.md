@@ -30,7 +30,7 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 | BALL | 10 | 33-34 | 241 | **8/8 -- done** |
 | Line Clear (15:3-6) | stage's | 35-36 | 282 | **8/8 -- done** |
 | Queue limit (qlimit=1) | 10 | 37-38 | 283 | **8/8 -- done** |
-| training_random | 10 | 39-40 | 299 | 6/8 (300 off), being fixed (run 301) -- garbage level/speed 8-11 a seed (its own pattern: chain and combo garbage mixed at a random balance, Chaos Mode 1 game in 4 -- TrainingMenu.lua createBasicTrainingMode) |
+| training_random | 10 | 39-40 | 299 | 6/8 (300-301 off), being fixed (run 302) -- garbage level/speed 8-11 a seed (its own pattern: chain and combo garbage mixed at a random balance, Chaos Mode 1 game in 4 -- TrainingMenu.lua createBasicTrainingMode) |
 | Challenge Mode | stage's | 41-42 | - | to do |
 
 (8 colours old: 7/8 on seeds 7-8, run 180 -- does not count.)
@@ -210,6 +210,9 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 301 (07:15-07:23 ET), the vanilla CPU layout: 4/8 -- off.** Run 302: vanilla's "a break kept in reach under garbage" (7f4d709234 +
+  16a84cc3b5), the first of the ranked vanilla rules (break in reach, tower floor, perch floor, window's floor, break-search dive, the board
+  played on).
 - **Run 300 (07:01-07:09 ET), queue-last on at six colours: 5/8 -- off.** Run 301: the CPUs laid out as the vanilla bot's (GameCreator
   training.sh): client on CPU 0 with one render thread, Gambit alone on the other core, workers on the rest.
 - **VANILLA LEARNINGS (owner, 07:10 ET: "There may be some learnings you should take from it"):** GameCreator main (2286518b, every vanilla

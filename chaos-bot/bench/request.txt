@@ -1077,6 +1077,11 @@
 #   back to run 282's (43a7572). Lost s39 at 12333 and 17072 (queue fifty), s40 at 1499, 3334 (early, every line lost) and 12539 (backlog).
 # run 287 -- run 282's bot plus: from 15 waiting (every number of colours) the board is left alone where the next three pieces land under
 #   the ceiling AND the hold is lost no sooner than the line (decide.c; run 285 had no such check). training_random s39-40
+# run 287 -- (result, 04:53-05:00 ET) the three-piece let-drop with the hold lost no sooner: survived 5/8 -- worse: OFF, decide.c back to
+#   run 282's (43a7572). All three losses the queue's fifty at garbage level 11 (s39 13718; s40 20173, 13950): the queue climbed a piece
+#   every ~300 frames from 1500 on, 25-48 for thousands of frames on boards of 30-58 panels.
+# run 288 -- run 282's bot plus: QUEUE_ROOM 25, not 15 (rank.c: from 25 waiting the top row kept empty -- a topped row holds every piece
+#   back; and decide.c's queue-near at six colours from 25). training_random s39-40
 training_random 39 8 8 1 21600 10
 training_random 39 9 9 1 21600 10
 training_random 39 10 10 1 21600 10

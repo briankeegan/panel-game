@@ -575,7 +575,10 @@ static int cutsShort(const Judge *J) {
 #define FLAT_ROWS 2
 #define CHAOS_QUEUE_LIMIT 50   // (the chaos queue limit, as decide.c names it)
 #define QUEUE_LAST 6    // (run 105: pieces short of the queue's limit from which the top row is emptied whatever the lines' losses)
-#define QUEUE_ROOM 15   // (run 100: pieces short of the queue's limit from which the top row is kept empty)
+#define QUEUE_ROOM 25   // (run 100: pieces short of the queue's limit from which the top row is kept empty)
+                        // (run 288: 25, not 15 -- runs 284 and 287 training_random at garbage level 11, 6 colours: the queue climbed a piece
+                        // every ~300 frames from 1500 on and sat at 25-48 for thousands of frames on boards of 30-58 panels, a topped row
+                        // holding every piece back (Stack:shouldDropGarbage), lost to the fiftieth; run 142 tried 20 at 8 colours: 2/8)
 #define GAP_CELLS 3   // (1'g: three empty cells under the garbage, a column half dug out, or three columns a row each)
 #define BREAK_WALK 20   // the actions a break's line is pressed in, as the allowance keeps them (an estimate: a few swaps and their walks)
 static int downtime(void) {

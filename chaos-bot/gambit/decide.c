@@ -2336,17 +2336,10 @@ static Played playOf(const Read *R, int n) {
   // at once. Run 142 lowered the ranking rule (the top row kept empty) instead: 2/8)
   // (run 234: above six colours from fifteen waiting -- run 232 7 colours thicc s24 17000-19013: 26-32 waiting for a thousand frames with
   // 14-20 panels on the board, the breaks three cells each, lost at 19013; what drops and is broken is the panels the board was short of)
-  // (run 287: from fifteen waiting in every number of colours, as run 234 has it above six -- run 284 training_random at garbage level 11,
-  // 6 colours: the queue grew from 13 at 1434 to 42-48 and was never let drop, lost at 13149 and 17956)
-  int queueNear = decQ.b->marginTime == 1 && decQ.b->ninc >= CHAOS_QUEUE_LIMIT - 35;
+  int queueNear = decQ.b->marginTime == 1 && decQ.b->ninc >= CHAOS_QUEUE_LIMIT - (decQ.b->colors > 6 ? 35 : QUEUE_ROOM);
   if (P.line && (!R->under || queueNear) && !R->up && decQ.b->ninc > 0 && P.line->apBroke <= 0) {
     int32_t waiting = 0;
-    // (run 287: with the queue near its limit, the next three pieces -- a quiet board drops some of a backlog, and forty waiting never fit
-    // whole -- and then only where the hold is lost no sooner than the line: run 285 counted three without that and held lines lost
-    // sooner again and again, 2/8)
-    int nw = queueNear && decQ.b->ninc > 3 ? 3 : decQ.b->ninc;
-    for (int i = 0; i < nw; i++) waiting += decQ.b->inc[i].height > 0 ? decQ.b->inc[i].height : 1;
-    if (nw < decQ.b->ninc && !taHoldNoSooner(P.line, n)) waiting = 1 << 20;
+    for (int i = 0; i < decQ.b->ninc; i++) waiting += decQ.b->inc[i].height > 0 ? decQ.b->inc[i].height : 1;
     int32_t h = decQ.b->height ? decQ.b->height : 12;
     // (what waits must land without topping the board out; held back further, it only grows and the panels go -- run 9's insane
     // combo storm never let it drop under the stricter ceiling test, letDrop=0, and lost at 3455 with 11 rows dropped at once)

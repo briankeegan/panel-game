@@ -802,75 +802,74 @@ html.set-chaos #sec-brain, html.set-chaos .gs-nav a[href="#sec-brain"] { display
 
   <details class="gs-card gs-collapse" id="sec-brain">
     <summary><h2>How Ranmaru decides</h2></summary>
-    <p class="gs-note">Ranmaru is a program (Gambit, written in C). It reads its own board, the opponent's stack height and the garbage already sent, and nothing else: no unseen rows, no future attacks. Its inputs are capped at 76 actions per 10 seconds. <b>Survival comes first: the mode only chooses between moves that are equally safe.</b> Tap or hover an underlined word for its meaning.</p>
+    <p class="gs-note">Ranmaru is a program (Gambit, written in C). It sees its board, the opponent's height and garbage already sent. Nothing else. It gets 76 inputs per 10 seconds. <b>Survival comes first. The mode only picks between equally safe moves.</b> Tap or hover underlined words.</p>
 
-    <h3>1 · The game plan: which mode it plays</h3>
+    <h3>1 · The game plan</h3>
     <div class="dt">
       <div class="dt-row">
       <div class="dt-q">Has it thrown its opening 8 links yet?</div>
       <div class="dt-a">no →</div>
-      <div class="dt-m dt-open"><b>OPENER</b><span>Throw <button type="button" class="dt-t" data-tip="Matches that set off more matches as panels fall. Each link after the first sends a full-width row of garbage.">chain</button>s that add up to 8 links: one 8-chain, or a 5 then a 3, or two 4s. A 2-chain doesn't count.</span><span class="dt-ex">Aims: an 8, else a 6 or 7, else a 4 or 5. After the first chain, whatever is still missing (3 or more). Ends at 8 links, after three chains, or when the opponent tops out. In danger it pauses to dig out, then resumes. Until the first garbage arrives it also <button type="button" class="dt-t" data-tip="Swaps that clear nothing but even out the columns, so the stack has no towers or holes.">flattens</button> and raises the stack, the tallest column no higher than 6 rows.</span></div>
+      <div class="dt-m dt-open"><b>OPENER</b><span><button type="button" class="dt-t" data-tip="Matches that set off more matches as panels fall. An n-chain sends n − 1 rows of garbage.">Chains</button> adding up to 8 links: an 8, a 5 + 3, or 4 + 4. 2-chains don't count.</span><span class="dt-ex">Aims for 8, then 6–7, then 4–5. Ends at 8 links, 3 chains, or when the opponent tops out. Pauses if its own board is in danger. Before the first garbage, it <button type="button" class="dt-t" data-tip="Swaps that clear nothing but even out the columns.">flattens</button> and raises the stack to at most 6 rows.</span></div>
       </div>
       <div class="dt-down">yes ↓</div>
       <div class="dt-row">
-      <div class="dt-q">Is the opponent's stack 11 or more rows high?</div>
+      <div class="dt-q">Is the opponent at 11+ rows?</div>
       <div class="dt-a">yes →</div>
-      <div class="dt-m dt-fin"><b>FINISH THEM</b><span>They're one row from losing, so speed beats size. A <button type="button" class="dt-t" data-tip="Four or more panels cleared in one match. Its garbage drops as soon as the match is made; a chain's comes only after every link has fallen.">combo</button>'s garbage drops straight away, and any block that lands tops them out.</span><span class="dt-ex">Its order: 8 or more panels, then 5, then 6, then 4 or 7. A combo of 8 or more drops <i>two or more</i> blocks at once, which is harder to dig out of than one. The smaller ones drop one block and are used when no 8 is in reach.</span></div>
+      <div class="dt-m dt-fin"><b>FINISH THEM</b><span>They're one row from dead. A <button type="button" class="dt-t" data-tip="4 or more panels cleared in one match. Its garbage drops at once.">combo</button> lands at once and tops them out.</span><span class="dt-ex">Order: 8, 9, 10 or more, then 5, then 6, then 4 or 7. No long chains.</span></div>
       </div>
       <div class="dt-down">no ↓</div>
       <div class="dt-row">
-      <div class="dt-q dt-else">Otherwise (opponent under 11 rows)</div>
+      <div class="dt-q dt-else">Otherwise (under 11 rows)</div>
       <div class="dt-a">→</div>
-      <div class="dt-m dt-fill"><b>FILL</b><span>Fill the opponent's stack to one row from the top with a <button type="button" class="dt-t" data-tip="Matches that set off more matches as panels fall. Each link after the first sends a full-width row of garbage, so an n-chain sends n − 1 rows.">chain</button>, sized to their <button type="button" class="dt-t" data-tip="The rows above their stack when the garbage lands. Ranmaru subtracts the rows they'll rise while its chain is still building and the garbage is in the air.">free rows</button>.</span><span class="dt-ex">Example: their stack is 4 rows tall, so 8 rows are free. An 8-chain sends 7 rows and leaves them at 11, one from the top, and Finish them takes over. Their stack keeps rising while the chain is built, so it often picks a 6 or 7 instead. If the best size isn't in reach it tries one shorter, down to 3. It never sends more than fits.</span></div>
+      <div class="dt-m dt-fill"><b>FILL</b><span>A <button type="button" class="dt-t" data-tip="Matches that set off more matches as panels fall. An n-chain sends n − 1 rows of garbage.">chain</button> that fills their <button type="button" class="dt-t" data-tip="Empty rows above their stack, minus the rows it will rise before the garbage lands.">free rows</button> and leaves them 1.</span><span class="dt-ex">Example: 8 free rows → an 8-chain (7 rows of garbage). Their stack rises meanwhile, so it's often a 6 or 7. Can't reach it? It tries one shorter, down to 3.</span></div>
       </div>
     </div>
-    <p class="dt-arc">So a typical game runs <b>Opener → Fill → Finish them</b>. It checks again every decision, and a new mode has to hold for one second before it switches.</p>
-    <div class="dt-over"><b>Garbage on Ranmaru's own board overrides all of this:</b> every mode puts <button type="button" class="dt-t" data-tip="Clearing panels touching a garbage slab turns its bottom row back into panels. Any plain match of three that touches it counts.">breaking it</button> first, and its attacks come after.</div>
+    <p class="dt-arc">A typical game: <b>Opener → Fill → Finish them</b>. A new mode must hold 1 second before it switches.</p>
+    <div class="dt-over"><b>Garbage on its own board?</b> Every mode looks for a <button type="button" class="dt-t" data-tip="Clear panels touching garbage to turn its bottom row back into panels. Any match of 3 counts.">break</button> first.</div>
 
     <h3>2 · Each decision (several a second)</h3>
-    <p class="gs-note" style="margin-bottom:8px">It doesn't pick one move and go. It lists dozens of candidates and plays every one out before choosing.</p>
     <ol class="dl-steps">
-      <li><b>Read</b> its board, the opponent's height and the <button type="button" class="dt-t" data-tip="The garbage the opponent has already sent, shown before it lands. Ranmaru can't see an attack that hasn't been sent yet.">telegraph</button>.</li>
-      <li><b>Propose</b> short swap sequences: break, attack, carry on, set up, <button type="button" class="dt-t" data-tip="Move a colour to one swap away from its partner, not touching it. Nothing clears now, but a single swap fires the match later, when Ranmaru chooses.">zip</button>, <button type="button" class="dt-t" data-tip="Swaps that clear nothing but even out the columns, so the stack has no towers or holes.">flatten</button>, survive, or hold.</li>
-      <li><b>Play each one out</b> on a copy of the game's own engine, garbage landing on time, up to its <button type="button" class="dt-t" data-tip="How far ahead each move is played out: about 4 seconds, and at least 2 seconds past the move's last swap, with the garbage already sent landing on time.">horizon</button>.</li>
-      <li><b>Pick</b> one, with the tree below.</li>
-      <li><b>Press</b> the winner's keys within its <button type="button" class="dt-t" data-tip="At most 76 actions every 10 seconds. Every cursor step and every swap costs one. It also waits 12 frames before reacting and 12 frames between swaps.">action budget</button>.</li>
+      <li><b>Read</b> both boards and the <button type="button" class="dt-t" data-tip="Garbage the opponent has already sent, shown before it lands.">telegraph</button>.</li>
+      <li><b>List</b> dozens of moves: break, attack, extend, set up, <button type="button" class="dt-t" data-tip="Move a panel one swap from its match without clearing it, so one swap fires it later.">zip</button>, <button type="button" class="dt-t" data-tip="Swaps that clear nothing but even out the columns.">flatten</button>, survive, wait.</li>
+      <li><b>Play each one out</b> on the game's own engine, up to its <button type="button" class="dt-t" data-tip="About 4 seconds ahead, with the garbage already sent landing on time.">horizon</button>.</li>
+      <li><b>Pick</b> one with the tree below.</li>
+      <li><b>Press</b> its keys within the <button type="button" class="dt-t" data-tip="76 actions per 10 seconds. Every cursor step and every swap costs one.">input budget</button>.</li>
     </ol>
 
     <h3>3 · How it picks a move</h3>
     <div class="mt">
-      <div class="mt-step"><div class="mt-q"><span class="mt-n">A</span>Can the move be pressed in time?</div><div class="mt-side">No → <b>dropped</b>: not enough <button type="button" class="dt-t" data-tip="At most 76 actions every 10 seconds. Every cursor step and every swap costs one, and they come back only as the 10 seconds roll on.">inputs</button> left, it undoes the last swap, its attack would come too late, or it leaves fewer than 40 panels without breaking garbage (breaks are built from panels).</div></div>
+      <div class="mt-step"><div class="mt-q"><span class="mt-n">A</span>Can it be pressed in time?</div><div class="mt-side">No → <b>dropped</b>. Too few inputs left, undoes the last swap, attacks too late, or leaves under 40 panels without a break.</div></div>
       <div class="mt-arrow">yes ↓</div>
-      <div class="mt-step"><div class="mt-q"><span class="mt-n">B</span>Is Ranmaru still alive at the end of the <button type="button" class="dt-t" data-tip="How far ahead each move is played out: about 4 seconds, and at least 2 seconds past the move's last swap, with the garbage already sent landing on time.">horizon</button>?</div><div class="mt-side">It sorts every move into <b class="mt-safe">safe</b> and <b class="mt-risk">dying</b>. One safe move beats every dying one, whatever the mode wants.</div></div>
+      <div class="mt-step"><div class="mt-q"><span class="mt-n">B</span>Still alive at the <button type="button" class="dt-t" data-tip="About 4 seconds ahead, with the garbage already sent landing on time.">horizon</button>?</div><div class="mt-side">Splits moves into <b class="mt-safe">safe</b> and <b class="mt-risk">dying</b>. Any safe move beats every dying one, whatever the mode wants.</div></div>
       <div class="mt-arrow">↓</div>
       <div class="mt-fork">
         <div class="mt-branch mt-b-risk">
           <div class="mt-h">No safe move: buy time</div>
           <ol>
-            <li><b>The move that dies latest wins</b>, judged by playing on after it. Two that die within <button type="button" class="dt-t" data-tip="The time it takes to break one row of garbage. Two moves that die less than this far apart count as equally bad.">a break's time</button> of each other count as a tie.</li>
-            <li>Never sits <button type="button" class="dt-t" data-tip="Pressing nothing and letting the board play on. It is a candidate like any other, and it loses to a move that does better.">holding</button> into a loss: if doing nothing dies sooner, it moves.</li>
-            <li>Ties go to the move that <b>breaks garbage now</b> over one that only promises to later. A falling chain is still taken from 2 to 3, but not longer at the cost of a break.</li>
-            <li>Then the one that leaves the stack workable: no <button type="button" class="dt-t" data-tip="A tower is a column far taller than the rest. A perch is garbage resting on one or two tall columns over an empty gap. Garbage resting like that can't be reached, so it can't be broken.">towers and perches</button>, nothing hollow under the garbage.</li>
-            <li>Then the one that keeps enough inputs for the next break and has a break ready when the next garbage lands.</li>
+            <li><b>Dies latest wins.</b> Within <button type="button" class="dt-t" data-tip="The time it takes to break one row of garbage.">a break's time</button> counts as a tie.</li>
+            <li>Never waits into a loss.</li>
+            <li>Ties: <b>breaking garbage now</b> wins.</li>
+            <li>Then: no <button type="button" class="dt-t" data-tip="A tower is a column far taller than the rest. A perch is garbage resting on tall columns over a gap. Neither can be broken easily.">towers or perches</button>, no holes under garbage.</li>
+            <li>Then: inputs and a break left for the next garbage.</li>
           </ol>
-          <p class="mt-foot">The mode barely counts here: it only splits moves that are still tied after all of this.</p>
+          <p class="mt-foot">The mode barely counts here.</p>
         </div>
         <div class="mt-branch mt-b-safe">
-          <div class="mt-h">Several safe moves: go down this list, and the first rule that tells them apart decides</div>
+          <div class="mt-h">Several safe moves: first rule that splits them wins</div>
           <ol>
-            <li><b>Keep the <button type="button" class="dt-t" data-tip="The sequence it was already pressing at the last decision. Dropping it halfway wastes every input already spent on it.">move in progress</button></b>, unless another breaks more garbage.</li>
-            <li>Skip any <button type="button" class="dt-t" data-tip="For example a chain while finishing them, or a combo while filling. Those panels are the next real attack, so they aren't spent on the wrong one.">attack the mode didn't ask for</button>.</li>
-            <li>A chain already falling: <b>extend it</b>, but only up to the length the mode wants (Fill: the size that fits; Opener: 8) and never with the inputs the next break needs. In Finish them it does the opposite and cuts the chain short, to 2 if it can.</li>
+            <li><b>Keep the <button type="button" class="dt-t" data-tip="The swaps it was already pressing. Dropping them wastes the inputs spent.">move in progress</button></b>, unless another breaks more garbage.</li>
+            <li>No <button type="button" class="dt-t" data-tip="Like a long chain in Finish them, or a combo in Fill.">attacks the mode didn't ask for</button>.</li>
+            <li>A chain falling: <b>extend it</b>, up to what the mode wants. Finish them cuts it to 2.</li>
             <li>Garbage on the board: <b>break it</b>.</li>
             <li>Leave a break ready for the next garbage.</li>
-            <li>Spend fewer inputs: stay near the cursor, never undo a swap.</li>
-            <li class="mt-mode"><b>The mode's aim</b>: its first choice, then the fallbacks in order.</li>
-            <li>Set up for later: a break first, then the mode's aim, then a <button type="button" class="dt-t" data-tip="Move a colour to one swap away from its partner, not touching it. Nothing clears now, but a single swap fires the match later.">zip</button>, then <button type="button" class="dt-t" data-tip="Swaps that clear nothing but even out the columns.">flatten</button>. A set-up has to leave the board better than doing nothing, and doing nothing beats a clear that achieves nothing.</li>
+            <li>Fewer inputs. Stay near the cursor.</li>
+            <li class="mt-mode"><b>The mode's aim</b>, in its order.</li>
+            <li>Set up: a break, the mode's aim, a <button type="button" class="dt-t" data-tip="Move a panel one swap from its match without clearing it, so one swap fires it later.">zip</button>, then <button type="button" class="dt-t" data-tip="Swaps that clear nothing but even out the columns.">flatten</button>. Must beat waiting.</li>
           </ol>
         </div>
       </div>
     </div>
-    <p class="gs-note" style="margin-top:8px">It never makes a chain longer than 13, and it raises the stack itself to keep enough panels to work with.</p>
+    <p class="gs-note" style="margin-top:8px">Chains are capped at 13. It raises the stack itself to keep enough panels.</p>
   </details>
   <div id="dt-tip" role="tooltip" hidden></div>
   <script>

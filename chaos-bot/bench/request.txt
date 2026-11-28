@@ -853,6 +853,10 @@
 #   s23 at 18752 (26-31 waiting). Kept: run 234's bot (5210c9e).
 # run 235 -- THE NEXT MODE: chaos margin 4 (margin=4) at Level 10, 6 colours, on its own seeds 25-26 (never played), run 234's bot.
 #   margin 4 s25-26
+# run 235 -- (result, 22:57-23:05 ET) chaos margin 4: survived 6/8, 147629 frames. Lost combo s25 4737, insane s26 13692; every survivor at
+#   health 1. combo s25 192-605: three attack combos (6, 8, 6) from 30 panels in the opener, the first block met with 22 at 691, starved.
+# run 236 -- run 234's bot plus: in the opener, no garbage on the board, of two living lines breaking nothing, the one leaving 30+ panels
+#   first -- every mode (rank.c). margin 4 s25-26
 chain_garbage 25 9 9 1 21600 10 margin=4
 combo_storm 25 9 9 1 21600 10 margin=4
 thicc_combo_storm 25 9 9 1 21600 10 margin=4

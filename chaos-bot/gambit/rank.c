@@ -1066,6 +1066,13 @@ static int compareJudged(const Judge *x, const Judge *y) {
   if (0 && chaosOpenHigh && x->o.lives && y->o.lives && x->apBroke <= 0 && y->apBroke <= 0 &&
       x->o.j.clearedPanels != y->o.j.clearedPanels)
     return (cmpKey = __LINE__, (x->o.j.clearedPanels > y->o.j.clearedPanels ? -1 : 1));
+  // (run 236, THE OPENER KEEPS ITS MATERIAL -- every mode: in the opener, no garbage on the board yet, of two living lines that break nothing,
+  // the one leaving 30 panels or more before one leaving fewer: the first block is broken with what the opener kept. Run 235 margin 4 combo
+  // s25 192-605: three attack combos (6, 8, 6) fired from 30 panels, the first block met with 22 at 691, starved, lost at 4737)
+  if (inOpener && !decF.under && x->o.lives && y->o.lives && x->apBroke <= 0 && y->apBroke <= 0) {
+    int kx = panelsOn(decQ.b) - x->o.j.clearedPanels >= 30, ky = panelsOn(decQ.b) - y->o.j.clearedPanels >= 30;
+    if (kx != ky) return (cmpKey = __LINE__, (kx ? -1 : 1));
+  }
   // THE LAST CHANCE: the hold lost inside a break's time, beside a line lost no sooner whose next moves promise a break's time more (the
   // readiness break, the survival search after it): the line first -- holding is the loss for certain. Only against the hold: the
   // promise is never weighed against another line's own life. 244 of 419 lost games held, dying, over such a line.

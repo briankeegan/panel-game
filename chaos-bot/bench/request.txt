@@ -1005,6 +1005,11 @@
 #   link).
 # run 271 -- run 270's bot plus: near the wall any line is held while a chain falls, not only one judged to lengthen it, and no line on the
 #   way to the action put in the hold's place; from 150 frames, not 120 (decide.c wallHold). Line Clear 15:3-6 s35-36
+# run 271 -- (result, 03:01-03:05 ET) every line held near the wall while a chain falls: WON 6/8 -- as good as run 270: KEPT (bcf00f3).
+#   15:6 WON for the first time (s36, 34.1 rows a minute, at 7094); 15:5 s36 won (26.9). Lost 15:5 s35 (24.7) and 15:6 s35 (24.1): their
+#   time went ~1200 frames to flattening, the wins' ~800-1000.
+# run 272 -- run 271's bot plus: rank 1'e (FLAT) with nobody across above six colours asks FLAT_ROWS + 1 rows flatter, not FLAT_ROWS
+#   (rank.c). Line Clear 15:3-6 s35-36
 challenge 35 9 9 1 21600 10 challenge=15:3 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:4 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:5 profile=lineclear

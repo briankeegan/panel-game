@@ -1424,11 +1424,13 @@ static int compareJudged(const Judge *x, const Judge *y) {
   // 1'e. FLAT, NO GARBAGE ON ITS WAY (the stack at speed: a well between towers is where the board dies -- a canyon is never dug out at
   // forty-seven frames a row): with no garbage on the board, held or due, and the board not chaining, of two that survive alike the
   // one that leaves the board flatter by FLAT_ROWS or more, whatever the window holds
+  // (run 272: with nobody across above six colours by FLAT_ROWS + 1 -- run 271's 7-colour Line Clears it lost spent ~1200 frames of 7200
+  // flattening, those it won ~800-1000; no garbage comes to bury a well, and taking 1'e off whole (run 263) gave its time to set-ups)
   // (run 148: above six colours with garbage on its way too, so long as none is on the board -- at 8 colours garbage is told nearly the
   // whole opening, so the rule never acted there. Run 147 combo s8 (and run 145): the opening's clears from 431 dug columns 1-5 to rows
   // 3-6 beside an eight-row tower in column 0; the first 6-wide slab perched on it at 707 out of every break's reach, lost at 812)
   if ((lx || lostAlike(x, y)) && !decF.under && ((decQ.narr == 0 && decF.next == NOT_ASKED) || decQ.b->colors > 6) && decQ.b->chainCounter < 2 &&
-      x->o.j.even >= 0 && y->o.j.even >= 0 && iabs(x->o.j.even - y->o.j.even) >= FLAT_ROWS)
+      x->o.j.even >= 0 && y->o.j.even >= 0 && iabs(x->o.j.even - y->o.j.even) >= FLAT_ROWS + (ruleNoEnemy && decQ.b->colors > 6))
     return (cmpKey = __LINE__, (x->o.j.even - y->o.j.even));
   // (run 98: off -- 1'g alone L10 seeds 15-16 7/8, the gate's bot 7/8; with the other changes seeds 13-16 13-14/16, the gate's 14/16)
   // 1'g. (run 94, CHAOS) UNDER GARBAGE, NO CANYON UNDER IT: garbage on the board, of two that both live or are lost alike and break

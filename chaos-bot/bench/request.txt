@@ -1107,6 +1107,10 @@
 #   (43a7572). Lost s39 2363 (early) and 16400, s40 20342 and 14085 (the queue's fifty).
 # run 294 -- run 282's bot plus: A BRIEF QUIET UNDER A BACKLOG -- 25+ waiting, garbage on the board, the line breaking none: left alone
 #   where the board stands two breaks' time alone (FACT_US_DIES) and the top two rows are clear (decide.c). training_random s39-40
+# run 294 -- (result, 06:04-06:12 ET) a brief quiet under a backlog: survived 4/8 -- worse: OFF, decide.c back to run 282's (43a7572). Lost
+#   s39 2158 (early, starved) and 13148, s40 16833 and 14085 (the queue's fifty).
+# run 295 -- run 282's bot (no code change) on TWO SEARCH WORKERS: bench/play.sh sets GC_GAMBIT_WORKERS=2 -- no run ever set it, so every
+#   search ran on Gambit's thread alone on 4-cpu runners (host.c hostWorkers). training_random s39-40
 training_random 39 8 8 1 21600 10
 training_random 39 9 9 1 21600 10
 training_random 39 10 10 1 21600 10

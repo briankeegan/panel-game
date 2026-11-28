@@ -2351,15 +2351,6 @@ static Played playOf(const Read *R, int n) {
     int32_t room = 1;
     if (panelTop(decQ.b) + waiting <= h - room) { decWhy = __LINE__, P.line = 0; P.deferred = 0; chaosLetDrop++; }
   }
-  // (run 294: A BRIEF QUIET UNDER A BACKLOG -- twenty-five or more waiting (margin off), garbage on the board, the line breaking none: the
-  // board is left alone where it stands two breaks' time left alone (the engine's own count, the garbage shown landing as it lands) and
-  // the top two rows are clear -- a quiet board drops one piece at a time, each landing before the next, and the next decision breaks
-  // again; runs 284-293 lost the same three training_random games to the queue's fiftieth (42-50 for thousands of frames), the judge's
-  // hold, every piece dropped over its horizon, never ranked first)
-  if (P.line && R->under && !R->up && decQ.b->marginTime == 1 && decQ.b->ninc >= 25 && P.line->apBroke <= 0 &&
-      fullTop(decQ.b) <= (decQ.b->height ? decQ.b->height : 12) - 2 && R->F.known[FACT_US_DIES] && R->F.v[FACT_US_DIES] >= 2 * rankSave) {
-    decWhy = __LINE__, P.line = 0; P.deferred = 0; chaosLetDrop++;
-  }
   // (runs 75-76 tried draining the queue under garbage -- the hold over lines breaking nothing from 25 waiting, then over any line from 40:
   // level 8 6/8 then 5/8, the queue still reaching fifty (CHAOS_QUEUE_LIMIT) with full health -- a hold does not quiet a board whose
   // garbage pops slowly, and the breaks put off grow the queue. Reverted: the queue's limit at levels 7-8 is open)

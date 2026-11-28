@@ -30,7 +30,7 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 | BALL | 10 | 33-34 | 241 | **8/8 -- done** |
 | Line Clear (15:3-6) | stage's | 35-36 | 282 | **8/8 -- done** |
 | Queue limit (qlimit=1) | 10 | 37-38 | 283 | **8/8 -- done** |
-| training_random | 10 | 39-40 | 284 | 6/8 (285-293 off), being fixed (run 294) -- garbage level/speed 8-11 a seed (its own pattern: chain and combo garbage mixed at a random balance, Chaos Mode 1 game in 4 -- TrainingMenu.lua createBasicTrainingMode) |
+| training_random | 10 | 39-40 | 284 | 6/8 (285-294 off), being fixed (run 295) -- garbage level/speed 8-11 a seed (its own pattern: chain and combo garbage mixed at a random balance, Chaos Mode 1 game in 4 -- TrainingMenu.lua createBasicTrainingMode) |
 | Challenge Mode | stage's | 41-42 | - | to do |
 
 (8 colours old: 7/8 on seeds 7-8, run 180 -- does not count.)
@@ -210,6 +210,8 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 294 (06:04-06:12 ET), a brief quiet under a backlog: 4/8 -- off.** Run 295: INFRA -- GC_GAMBIT_WORKERS=2 (two search workers;
+  never set before, every search on one thread with 4 cpus on the runner), run 282's bot unchanged.
 - **Run 293 (05:54-06:01 ET), DIG THE BACKLOG whatever the life: 4/8 -- off.** Run 294: a brief quiet under a backlog of 25+ where the
   board stands two breaks' time left alone and the top two rows are clear (a quiet board drops a piece at a time).
 - **Run 292 (05:44-05:52 ET), the opening raise only while nothing is on its way: 5/8 -- off** (the same three games lost). Run 293: DIG

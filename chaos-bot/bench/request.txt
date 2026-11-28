@@ -1073,6 +1073,10 @@
 #   282's (43a7572). The hold it put first (d2358) was lost sooner, again and again (game 2, game 7); three still lost to the queue's fifty.
 # run 286 -- run 282's bot plus: the queue near its limit from 15 waiting in every number of colours (as run 234 has it above six), all that
 #   waits still to fit under the ceiling (decide.c queueNear). training_random s39-40
+# run 286 -- (result, 04:43-04:51 ET) the queue near its limit from 15 in every number of colours: survived 3/8 -- worse: OFF, decide.c
+#   back to run 282's (43a7572). Lost s39 at 12333 and 17072 (queue fifty), s40 at 1499, 3334 (early, every line lost) and 12539 (backlog).
+# run 287 -- run 282's bot plus: from 15 waiting (every number of colours) the board is left alone where the next three pieces land under
+#   the ceiling AND the hold is lost no sooner than the line (decide.c; run 285 had no such check). training_random s39-40
 training_random 39 8 8 1 21600 10
 training_random 39 9 9 1 21600 10
 training_random 39 10 10 1 21600 10

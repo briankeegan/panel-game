@@ -1234,11 +1234,14 @@
 #   Lost s39 level 11 at 13637, s40 level 8 at 21567 and level 11 at 18628 -- the backlog the dive held back builds before 25.
 # run 325 -- run 323's bot with the dive from 15 waiting but never with chaos mode's garbage (incoming.ChaosMode: a combo's pieces merged into
 #   one block) (search/break.c). training_random s39-40
-training_random 39 8 8 1 21600 10
-training_random 39 9 9 1 21600 10
-training_random 39 10 10 1 21600 10
-training_random 39 11 11 1 21600 10
-training_random 40 8 8 1 21600 10
-training_random 40 9 9 1 21600 10
-training_random 40 10 10 1 21600 10
-training_random 40 11 11 1 21600 10
+# run 325 -- (result, 11:00-11:08 ET) the dive from 15 waiting, never with chaos mode's garbage: training_random survived 4/8 -- not kept;
+#   back to run 323's (232d74d). Lost s39 level 10 at 4905 (early, queue 3: no dive there), s40 levels 8, 10, 11.
+# run 326 -- the second pass's standings on run 323's bot (232d74d), unchanged: 1 HP (mode=2), done 8/8 (run 238), seeds 29-30. 1HP s29-30
+chain_garbage 29 9 9 1 21600 10 mode=2
+combo_storm 29 9 9 1 21600 10 mode=2
+thicc_combo_storm 29 9 9 1 21600 10 mode=2
+insane_combo_storm 29 9 9 1 21600 10 mode=2
+chain_garbage 30 9 9 1 21600 10 mode=2
+combo_storm 30 9 9 1 21600 10 mode=2
+thicc_combo_storm 30 9 9 1 21600 10 mode=2
+insane_combo_storm 30 9 9 1 21600 10 mode=2

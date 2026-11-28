@@ -491,10 +491,7 @@ static int touchBeam(BS *s, Line **firsts, int nfirsts) {
       // (run 323: only under a deep backlog -- twenty-five or more waiting (run 322 at fifteen: chaos mode 5/8, its queues reaching 16-22): the dive finished training_random at garbage level 10-11 (run 306), queues
       // of 25-48, and cost chaos mode, 6 colours, queues under 16 -- 8/8 and 7/8 without it (runs 320-321), 4/8 with it (run 319): its
       // search time is the beam's)
-      // (run 325: from fifteen waiting again, but never with chaos mode's garbage (incoming.ChaosMode: the pieces of a combo merged into one
-      // block, CHAOS_RULES.md) -- run 324 training_random with the dive from 25 waiting: 5/8 (306's, always on: 8/8); chaos mode lost 3-4
-      // with it from 15 or always (runs 319, 322), 8/8 at 25 (323))
-      for (int i = 0; i < ntl && i < DIVE_N && decQ.b && decQ.b->ninc >= 15 && !decQ.b->incChaos && !SEARCH_OUT(); i++) {
+      for (int i = 0; i < ntl && i < DIVE_N && decQ.b && decQ.b->ninc >= 25 && !SEARCH_OUT(); i++) {
         Line *l = tl[i]; static LOCAL int32_t dl[MAXPATH]; int dn = 0;
         const Board *db = ensureBoard(x, l->n);
         if (!db || breakNearLine(db, dl, &dn) >= NEAR_MISS || dn <= 0 || l->len + dn > MAXPATH) continue;

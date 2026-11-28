@@ -182,6 +182,10 @@ here" is never the answer — check the workflows first.
   Upstream assigns account ids itself, so the run commits a new name's id
   back to that branch; the next run logs back in.
 
+- **Runner CPU rule:** a deploy never puts the bot on a slow runner CPU model (Xeon 8573C, EPYC 7763, EPYC 9V74): the new
+  bot checks `lscpu` first and the deploy re-runs it until it lands on a fast one, with no cap, while the old bot keeps the
+  lobby. Rule, numbers and how the workflow applies it: `docs/RUNNER_CPU_RULE.md`.
+
 ## Who fights who: `bot/fight.sh` / `mode: fight`
 
 - **A fight account is named for the profile it plays**, every time: `bot/pair.sh wasm-vs LOBBY_PROFILE CHALLENGER_PROFILE [HOURS]`

@@ -500,11 +500,6 @@ static int readBoard_(Read *R) {
     // (the opening's raise a row a decision: the next decision looks again, and garbage told of meanwhile stops it where the board lives
     // through it -- set 86 large_garbage 2 finish: four rows raised at 192 in one go, a tall block told of at 209, the board lost at 744)
     if (opening && rows > 1) rows = 1;
-    // (and the opening's raise never takes the tallest column past OPEN_TOP rows (vanilla GameCreator 97d4a50f78 + 33e255e18d, ported run
-    // 311) -- garbage is coming in every game with somebody across: run 310 8 colours lost insane s21 at 4115 and s22 at 2762, both early;
-    // vanilla: a start whose column stood seven rows raised to nine, blocks landing on it at 455, lost by 900. Time attack keeps its own top)
-    #define OPEN_TOP 6
-    if (opening && !ruleNoEnemy) rows = imin(rows, OPEN_TOP - panelTop(rq.b));
     if (rows <= 0) { R->up = R->low = 0; raiseWait = 0; } else to = fullTop(rq.b) + rows;
   }
   R->to = to;

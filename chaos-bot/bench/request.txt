@@ -906,6 +906,10 @@
 #   7-colour stages held 40-47 times a game (7-18 at six colours), put first by the survival rules on a stack raised to TA_TOP.
 # run 249 -- run 241's bot + time attack's lineclear.words, plus: above six colours time attack raises two rows lower (decide.c taTo).
 #   Line Clear 15:3-6 s35-36
+# run 249 -- (result, 00:44-00:48 ET) time attack two rows lower above six colours: won 4/8, the 7-colour stages worse (19-26 rows a
+#   minute) -- OFF, decide.c back to run 241's.
+# run 250 -- run 241's bot + time attack's lineclear.words, plus: above six colours a design is built after half the search (TA_DESIGN_MS/2;
+#   the board is left alone while it is searched) (decide.c). Line Clear 15:3-6 s35-36
 challenge 35 9 9 1 21600 10 challenge=15:3 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:4 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:5 profile=lineclear

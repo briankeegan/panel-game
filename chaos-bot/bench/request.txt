@@ -1064,6 +1064,11 @@
 # run 284 -- THE NEXT MODE: training_random (the chaos training menu's random generator: chain and combo garbage at a random balance,
 #   Chaos Mode one game in four) at Level 10, 6 colours, on its own seeds 39-40 (never played), run 282's bot. One pattern, so the four
 #   games a seed are its garbage level/speed 8, 9, 10 and 11. training_random s39-40
+# run 284 -- (result, 04:23-04:31 ET) training_random: survived 6/8. Lost both at garbage level 11: s39 13149 (health), s40 17956 (queue
+#   fifty). Each queue grew from ~13 at 1500 to 42-48 and held there 3000 frames: never let drop -- the let-drop needs all that waits to
+#   land under the ceiling (forty pieces never do), and at six colours it began only at 35 waiting.
+# run 285 -- run 282's bot plus: under a backlog (15+ waiting, every number of colours) the board is left alone where the next three pieces
+#   land under the ceiling (decide.c queueNear, waiting). training_random s39-40
 training_random 39 8 8 1 21600 10
 training_random 39 9 9 1 21600 10
 training_random 39 10 10 1 21600 10

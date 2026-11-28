@@ -426,10 +426,6 @@ static int readBoard_(Read *R) {
   int32_t taTo = TA_TOP - imax(0, evenOf(decQ.b) - TA_EVEN);
   int taRaise = ruleNoEnemy && !opening && !refill && !R->topped && !R->taDying && !taOn && panelTop(decQ.b) < taTo;
   if (taRaise) to = taTo;
-  // (run 247: and with nobody across the opening raises to time attack's top too, not to the chaos ceiling -- the ceiling keeps room for
-  // blocks that cannot come there. Run 245 Line Clear 15:5-6 (no garbage for two minutes): chains of 6-9 thrown, but 24-30 rows a minute
-  // where 33-40 were asked; the opening raised only to the ceiling for its first 600 frames)
-  if (ruleNoEnemy && opening && !R->topped && taTo > to) to = taTo;
   raiseRefill = refill; raiseOpening = opening; raiseTo = to;
   int32_t rowsUp = to - (opening ? fullTop(decQ.b) : panelTop(decQ.b));
   if (chaosFuelRaise) { to = panelTop(decQ.b) + 1; rowsUp = 1; }   // (one row at a time: the next decision asks again)
@@ -2230,7 +2226,10 @@ static Played playOf(const Read *R, int n) {
       int32_t v = cbDesignAll(&G, taHave ? &taD : 0, ms, &D, &tr, &links, &sw);
       taMs += ms;
       if (tr && v > 0 && (!taHave || v >= taVal)) { taD = D; taTr = tr; taLinks = links; taSwaps = sw; taVal = v; taHave = 1; }
-      if (taHave && (taLinks >= TA_LINKS || taMs >= TA_DESIGN_MS || panelTop(decQ.b) >= TA_TOP)) taOn = 1;
+      // (run 248: above six colours a design of 10 links is built at once, not 13 -- a 13-link design is rarely found there, and the search
+      // runs on to TA_DESIGN_MS each time: run 245 Line Clear 15:5-6 (7 colours), chains of 6-9 thrown at 24-31 rows a minute, short of the
+      // stages by a few rows; at 6 colours (15:3-4) the 13 stands, won in 1:00-1:35)
+      if (taHave && (taLinks >= (decQ.b->colors > 6 ? 10 : TA_LINKS) || taMs >= TA_DESIGN_MS || panelTop(decQ.b) >= TA_TOP)) taOn = 1;
       // (and while it is searched, the board is left as it is -- a swap played meanwhile changes the rows the design is of -- unless it
       // is dying or raised: a raise only lifts the rows)
       else if (taHave && !R->taDying && !R->up && taHoldNoSooner(P.line, n)) decWhy = __LINE__, P.line = 0;

@@ -845,7 +845,7 @@ html.set-chaos #sec-brain, html.set-chaos .gs-nav a[href="#sec-brain"] { display
           <ol>
             <li><b>The move that dies latest wins.</b> Two that die within <button type="button" class="dt-t" data-tip="The time it takes to break one row of garbage. Two moves that die less than this far apart count as equally bad.">a break's time</button> of each other count as a tie.</li>
             <li>Never sits <button type="button" class="dt-t" data-tip="Pressing nothing and letting the board play on. It is a candidate like any other, and it loses to a move that does better.">holding</button> into a loss: if doing nothing dies sooner, it moves.</li>
-            <li>Ties go to the move that <b>breaks garbage now</b> over one that only promises to later.</li>
+            <li>Ties go to the move that <b>breaks garbage now</b> over one that only promises to later. A falling chain is still taken from 2 to 3, but not longer at the cost of a break.</li>
             <li>Then the one that leaves the stack workable: no <button type="button" class="dt-t" data-tip="A tower is a column far taller than the rest. A perch is garbage resting on one or two tall columns over an empty gap. Garbage resting like that can't be reached, so it can't be broken.">towers and perches</button>, nothing hollow under the garbage.</li>
             <li>Then the one that keeps enough inputs for the next break and has a break ready when the next garbage lands.</li>
           </ol>
@@ -856,7 +856,7 @@ html.set-chaos #sec-brain, html.set-chaos .gs-nav a[href="#sec-brain"] { display
           <ol>
             <li><b>Keep the <button type="button" class="dt-t" data-tip="The sequence it was already pressing at the last decision. Dropping it halfway wastes every input already spent on it.">move in progress</button></b>, unless another breaks more garbage.</li>
             <li>Skip any <button type="button" class="dt-t" data-tip="For example a chain while finishing them, or a combo while filling. Those panels are the next real attack, so they aren't spent on the wrong one.">attack the mode didn't ask for</button>.</li>
-            <li>A chain already falling: <b>extend it</b>.</li>
+            <li>A chain already falling: <b>extend it</b>, but only up to the length the mode wants (Fill: the size that fits; Opener: 8) and never with the inputs the next break needs. In Finish them it does the opposite and cuts the chain short, to 2 if it can.</li>
             <li>Garbage on the board: <b>break it</b>.</li>
             <li>Leave a break ready for the next garbage.</li>
             <li>Spend fewer inputs: stay near the cursor, never undo a swap.</li>

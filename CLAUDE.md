@@ -189,6 +189,10 @@ here" is never the answer — check the workflows first.
   the pre-push hook that runs it with `git config core.hooksPath .githooks`; `workflow-limits.yml` runs it on push.
   To shrink a long step, put the `${{ }}` in the step's `env:` and read `$VARS` in the script.
 
+- **Stats page changes (`dashboard/page.html`):** always check a phone width (an emulated iPhone) as well as desktop, light and dark, and
+  that the chaos page (`/chaos/`) is unaffected, before publishing. A page change goes live with `mode: stats-rebuild` (it rebuilds
+  the page from the newest `dashboard/` and copies it to Cloudflare); `mode: ranmaru-site` only re-copies the page already built.
+
 - **Runner CPU rule:** a deploy never puts the bot on a slow runner CPU model (Xeon 8573C, EPYC 7763, EPYC 9V74): the new
   bot checks `lscpu` first and the deploy re-runs it until it lands on a fast one, with no cap, while the old bot keeps the
   lobby. Rule, numbers and how the workflow applies it: `docs/RUNNER_CPU_RULE.md`.

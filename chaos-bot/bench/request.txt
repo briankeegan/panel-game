@@ -1103,6 +1103,10 @@
 #   282's (43a7572). The same three lost as in runs 285-291: s39 level 11 (17647), s40 level 10 (20957) and 11 (13950), the queue 47-50.
 # run 293 -- run 282's bot plus: DIG THE BACKLOG between two dying lines whatever the other lives once the queue is QUEUE_ROOM short of
 #   fifty (rank.c). training_random s39-40
+# run 293 -- (result, 05:54-06:01 ET) DIG THE BACKLOG whatever the life near the limit: survived 4/8 -- worse: OFF, rank.c back to run 282's
+#   (43a7572). Lost s39 2363 (early) and 16400, s40 20342 and 14085 (the queue's fifty).
+# run 294 -- run 282's bot plus: A BRIEF QUIET UNDER A BACKLOG -- 25+ waiting, garbage on the board, the line breaking none: left alone
+#   where the board stands two breaks' time alone (FACT_US_DIES) and the top two rows are clear (decide.c). training_random s39-40
 training_random 39 8 8 1 21600 10
 training_random 39 9 9 1 21600 10
 training_random 39 10 10 1 21600 10

@@ -1098,11 +1098,7 @@ static int compareJudged(const Judge *x, const Judge *y) {
     int32_t bx = imax(0, x->apBroke) / W, by = imax(0, y->apBroke) / W;
     if (bx != by) {
       const Judge *dig = bx > by ? x : y, *other = dig == x ? y : x;
-      // (run 293: whatever the other lives once the queue is QUEUE_ROOM short of fifty (margin off) -- the fiftieth ends the game where a
-      // later top-out would not have: runs 284-292 training_random lost the same three games (level 10-11) to a queue of 42-50 under a
-      // board of garbage, lines breaking none chosen for the life they bought, 10-26 a minute)
-      if (lostOf(other) - lostOf(dig) < rankSave || (decQ.b->marginTime == 1 && decQ.b->ninc >= CHAOS_QUEUE_LIMIT - QUEUE_ROOM))
-        return (cmpKey = __LINE__, (dig == x ? -1 : 1));
+      if (lostOf(other) - lostOf(dig) < rankSave) return (cmpKey = __LINE__, (dig == x ? -1 : 1));
     }
   }
   // (CHAOS, STOP TIME IS A MAX, NOT A SUM: a new award only replaces what is left (checkMatches.lua awardStopTime), so panels cleared

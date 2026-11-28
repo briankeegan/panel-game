@@ -210,6 +210,12 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **RUNNER SKIP BY MODEL -- the owner's rule, 21:30 ET, for every workflow that plays games (here: chaos-bot-games.yml; chaos-bot-checks.yml
+  replays recordings in the engine, no clock).** Skip on the model NUMBER only (8573C, 7763, 9V74), never a vendor or brand word; the
+  first step reads lscpu's model and keeps it as the game's cpu.txt; a skip prints "skipped runner: <model>" to the job summary and plays
+  nothing; the fourth try plays on whatever it has; the report lists games and losses by model and flags any game played on a skip-list
+  model. The retry is a next try inside the same run (play1-play4), not a re-run of failed jobs: a run cannot re-run its own jobs while
+  it is going, and a re-run from outside waits on the session.
 - **THE RUNNER CHOSEN (21:15 ET, the owner: "Which model is the worst? Look historical... if we get a bad runner... we just skip it....
   and wait for another").** Runs 208-226 by CPU: AMD EPYC 7763 4/23 (17%), EPYC 9V45 2/10 (20%), EPYC 9V74 5/23 (22%), Intel Xeon 8573C
   2/7, Intel Xeon 6975P-C 38/78 (49%). From run 228 the workflow plays each game in up to four tries (play1-play4): a try that draws one

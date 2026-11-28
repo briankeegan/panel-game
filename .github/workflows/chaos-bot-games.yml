@@ -64,10 +64,13 @@ jobs:
           names=$(curl -s -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts?per_page=100" | python3 -c "import json,sys; print(' '.join(a['name'] for a in json.load(sys.stdin).get('artifacts', [])))")
           if echo " $names " | grep -q " chaosbot-game-$n "; then echo "go=false" >> "$GITHUB_OUTPUT"; echo "game $n: played already"; exit 0; fi
           model=$(lscpu | sed -n 's/^Model name: *//p' | head -1)
-          if [ "$attempt" -lt "$last" ] && echo "$model" | grep -Eqi 'PLATINUM 8573C|EPYC 7763|EPYC 9V74'; then
-            echo "go=false" >> "$GITHUB_OUTPUT"; echo "::notice title=game $n::attempt $attempt drew $model -- skipped, waiting for another runner"; exit 0
+          # (the model NUMBER, never a vendor or brand word: "Platinum" would skip the 8370C too, which lost 0 of 24 -- the owner)
+          if [ "$attempt" -lt "$last" ] && echo "$model" | grep -Eqi '8573C|7763|9V74'; then
+            echo "go=false" >> "$GITHUB_OUTPUT"; echo "skipped runner: $model" >> "$GITHUB_STEP_SUMMARY"
+            echo "::notice title=game $n::skipped runner: $model (try $attempt; the game waits for the next try's runner)"; exit 0
           fi
-          echo "go=true" >> "$GITHUB_OUTPUT"; echo "game $n: attempt $attempt plays on $model"
+          echo "$model | $(nproc) cpus | $(sed -n 's/^cpu MHz.*: *//p' /proc/cpuinfo | head -1) MHz" > "$RUNNER_TEMP/cpu.txt"   # (checkout cleans the workspace: the Play step copies it into out/)
+          echo "go=true" >> "$GITHUB_OUTPUT"; echo "game $n: try $attempt plays on $model"
       - uses: actions/checkout@v4
         if: steps.gate.outputs.go == 'true'
       - name: love, cached
@@ -107,8 +110,7 @@ jobs:
           CHAOSBOT_ZIP_CACHE: /tmp/chaosbot-zip
         run: |
           g='${{ toJSON(matrix.game) }}'
-          # (the machine each game ran on: the bot's searches stop on the wall clock, so a slower CPU searches less -- logged per game)
-          mkdir -p out && echo "$(lscpu | sed -n 's/^Model name: *//p' | head -1) | $(nproc) cpus | $(sed -n 's/^cpu MHz.*: *//p' /proc/cpuinfo | head -1) MHz" > out/cpu.txt
+          mkdir -p out && cp "$RUNNER_TEMP/cpu.txt" out/cpu.txt
           bash chaos-bot/bench/play.sh ${{ matrix.game.pattern }} ${{ matrix.game.seed }} ${{ matrix.game.glevel }} ${{ matrix.game.gspeed }} ${{ matrix.game.queue }} ${{ matrix.game.frames }} out
           echo "::notice title=game ${{ matrix.game.n }}::$(cat out/result.txt)"
       - uses: actions/upload-artifact@v4
@@ -143,10 +145,13 @@ jobs:
           names=$(curl -s -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts?per_page=100" | python3 -c "import json,sys; print(' '.join(a['name'] for a in json.load(sys.stdin).get('artifacts', [])))")
           if echo " $names " | grep -q " chaosbot-game-$n "; then echo "go=false" >> "$GITHUB_OUTPUT"; echo "game $n: played already"; exit 0; fi
           model=$(lscpu | sed -n 's/^Model name: *//p' | head -1)
-          if [ "$attempt" -lt "$last" ] && echo "$model" | grep -Eqi 'PLATINUM 8573C|EPYC 7763|EPYC 9V74'; then
-            echo "go=false" >> "$GITHUB_OUTPUT"; echo "::notice title=game $n::attempt $attempt drew $model -- skipped, waiting for another runner"; exit 0
+          # (the model NUMBER, never a vendor or brand word: "Platinum" would skip the 8370C too, which lost 0 of 24 -- the owner)
+          if [ "$attempt" -lt "$last" ] && echo "$model" | grep -Eqi '8573C|7763|9V74'; then
+            echo "go=false" >> "$GITHUB_OUTPUT"; echo "skipped runner: $model" >> "$GITHUB_STEP_SUMMARY"
+            echo "::notice title=game $n::skipped runner: $model (try $attempt; the game waits for the next try's runner)"; exit 0
           fi
-          echo "go=true" >> "$GITHUB_OUTPUT"; echo "game $n: attempt $attempt plays on $model"
+          echo "$model | $(nproc) cpus | $(sed -n 's/^cpu MHz.*: *//p' /proc/cpuinfo | head -1) MHz" > "$RUNNER_TEMP/cpu.txt"   # (checkout cleans the workspace: the Play step copies it into out/)
+          echo "go=true" >> "$GITHUB_OUTPUT"; echo "game $n: try $attempt plays on $model"
       - uses: actions/checkout@v4
         if: steps.gate.outputs.go == 'true'
       - name: love, cached
@@ -186,8 +191,7 @@ jobs:
           CHAOSBOT_ZIP_CACHE: /tmp/chaosbot-zip
         run: |
           g='${{ toJSON(matrix.game) }}'
-          # (the machine each game ran on: the bot's searches stop on the wall clock, so a slower CPU searches less -- logged per game)
-          mkdir -p out && echo "$(lscpu | sed -n 's/^Model name: *//p' | head -1) | $(nproc) cpus | $(sed -n 's/^cpu MHz.*: *//p' /proc/cpuinfo | head -1) MHz" > out/cpu.txt
+          mkdir -p out && cp "$RUNNER_TEMP/cpu.txt" out/cpu.txt
           bash chaos-bot/bench/play.sh ${{ matrix.game.pattern }} ${{ matrix.game.seed }} ${{ matrix.game.glevel }} ${{ matrix.game.gspeed }} ${{ matrix.game.queue }} ${{ matrix.game.frames }} out
           echo "::notice title=game ${{ matrix.game.n }}::$(cat out/result.txt)"
       - uses: actions/upload-artifact@v4
@@ -222,10 +226,13 @@ jobs:
           names=$(curl -s -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts?per_page=100" | python3 -c "import json,sys; print(' '.join(a['name'] for a in json.load(sys.stdin).get('artifacts', [])))")
           if echo " $names " | grep -q " chaosbot-game-$n "; then echo "go=false" >> "$GITHUB_OUTPUT"; echo "game $n: played already"; exit 0; fi
           model=$(lscpu | sed -n 's/^Model name: *//p' | head -1)
-          if [ "$attempt" -lt "$last" ] && echo "$model" | grep -Eqi 'PLATINUM 8573C|EPYC 7763|EPYC 9V74'; then
-            echo "go=false" >> "$GITHUB_OUTPUT"; echo "::notice title=game $n::attempt $attempt drew $model -- skipped, waiting for another runner"; exit 0
+          # (the model NUMBER, never a vendor or brand word: "Platinum" would skip the 8370C too, which lost 0 of 24 -- the owner)
+          if [ "$attempt" -lt "$last" ] && echo "$model" | grep -Eqi '8573C|7763|9V74'; then
+            echo "go=false" >> "$GITHUB_OUTPUT"; echo "skipped runner: $model" >> "$GITHUB_STEP_SUMMARY"
+            echo "::notice title=game $n::skipped runner: $model (try $attempt; the game waits for the next try's runner)"; exit 0
           fi
-          echo "go=true" >> "$GITHUB_OUTPUT"; echo "game $n: attempt $attempt plays on $model"
+          echo "$model | $(nproc) cpus | $(sed -n 's/^cpu MHz.*: *//p' /proc/cpuinfo | head -1) MHz" > "$RUNNER_TEMP/cpu.txt"   # (checkout cleans the workspace: the Play step copies it into out/)
+          echo "go=true" >> "$GITHUB_OUTPUT"; echo "game $n: try $attempt plays on $model"
       - uses: actions/checkout@v4
         if: steps.gate.outputs.go == 'true'
       - name: love, cached
@@ -265,8 +272,7 @@ jobs:
           CHAOSBOT_ZIP_CACHE: /tmp/chaosbot-zip
         run: |
           g='${{ toJSON(matrix.game) }}'
-          # (the machine each game ran on: the bot's searches stop on the wall clock, so a slower CPU searches less -- logged per game)
-          mkdir -p out && echo "$(lscpu | sed -n 's/^Model name: *//p' | head -1) | $(nproc) cpus | $(sed -n 's/^cpu MHz.*: *//p' /proc/cpuinfo | head -1) MHz" > out/cpu.txt
+          mkdir -p out && cp "$RUNNER_TEMP/cpu.txt" out/cpu.txt
           bash chaos-bot/bench/play.sh ${{ matrix.game.pattern }} ${{ matrix.game.seed }} ${{ matrix.game.glevel }} ${{ matrix.game.gspeed }} ${{ matrix.game.queue }} ${{ matrix.game.frames }} out
           echo "::notice title=game ${{ matrix.game.n }}::$(cat out/result.txt)"
       - uses: actions/upload-artifact@v4
@@ -301,10 +307,13 @@ jobs:
           names=$(curl -s -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts?per_page=100" | python3 -c "import json,sys; print(' '.join(a['name'] for a in json.load(sys.stdin).get('artifacts', [])))")
           if echo " $names " | grep -q " chaosbot-game-$n "; then echo "go=false" >> "$GITHUB_OUTPUT"; echo "game $n: played already"; exit 0; fi
           model=$(lscpu | sed -n 's/^Model name: *//p' | head -1)
-          if [ "$attempt" -lt "$last" ] && echo "$model" | grep -Eqi 'PLATINUM 8573C|EPYC 7763|EPYC 9V74'; then
-            echo "go=false" >> "$GITHUB_OUTPUT"; echo "::notice title=game $n::attempt $attempt drew $model -- skipped, waiting for another runner"; exit 0
+          # (the model NUMBER, never a vendor or brand word: "Platinum" would skip the 8370C too, which lost 0 of 24 -- the owner)
+          if [ "$attempt" -lt "$last" ] && echo "$model" | grep -Eqi '8573C|7763|9V74'; then
+            echo "go=false" >> "$GITHUB_OUTPUT"; echo "skipped runner: $model" >> "$GITHUB_STEP_SUMMARY"
+            echo "::notice title=game $n::skipped runner: $model (try $attempt; the game waits for the next try's runner)"; exit 0
           fi
-          echo "go=true" >> "$GITHUB_OUTPUT"; echo "game $n: attempt $attempt plays on $model"
+          echo "$model | $(nproc) cpus | $(sed -n 's/^cpu MHz.*: *//p' /proc/cpuinfo | head -1) MHz" > "$RUNNER_TEMP/cpu.txt"   # (checkout cleans the workspace: the Play step copies it into out/)
+          echo "go=true" >> "$GITHUB_OUTPUT"; echo "game $n: try $attempt plays on $model"
       - uses: actions/checkout@v4
         if: steps.gate.outputs.go == 'true'
       - name: love, cached
@@ -344,8 +353,7 @@ jobs:
           CHAOSBOT_ZIP_CACHE: /tmp/chaosbot-zip
         run: |
           g='${{ toJSON(matrix.game) }}'
-          # (the machine each game ran on: the bot's searches stop on the wall clock, so a slower CPU searches less -- logged per game)
-          mkdir -p out && echo "$(lscpu | sed -n 's/^Model name: *//p' | head -1) | $(nproc) cpus | $(sed -n 's/^cpu MHz.*: *//p' /proc/cpuinfo | head -1) MHz" > out/cpu.txt
+          mkdir -p out && cp "$RUNNER_TEMP/cpu.txt" out/cpu.txt
           bash chaos-bot/bench/play.sh ${{ matrix.game.pattern }} ${{ matrix.game.seed }} ${{ matrix.game.glevel }} ${{ matrix.game.gspeed }} ${{ matrix.game.queue }} ${{ matrix.game.frames }} out
           echo "::notice title=game ${{ matrix.game.n }}::$(cat out/result.txt)"
       - uses: actions/upload-artifact@v4
@@ -377,16 +385,17 @@ jobs:
         run: |
           python3 chaos-bot/bench/report.py games '${{ needs.plan.outputs.games }}' | tee report.txt
           for d in games/chaosbot-game-*; do n=${d##*-}; [ -f "$d/cpu.txt" ] && echo "cpu game $n: $(cat $d/cpu.txt)"; done | sort -t' ' -k3n | tee -a report.txt
-          # (survivals by machine family -- Intel against AMD: the bot survived 49% of its games on Intel Xeon 6975P and 19% on AMD EPYC in
-          # runs 208-225, so each run's result is read against the machines it drew)
+          # (games and losses by runner model, any game played on a skip-list model flagged -- the owner's rule)
           python3 - <<'PY' | tee -a report.txt
           import re
           t = open('report.txt').read()
-          cpu = {int(m.group(1)): ('AMD' if 'AMD' in m.group(2).upper() else 'Intel') for m in re.finditer(r'^cpu game (\d+): (.*)$', t, re.M)}
-          tot, won = {}, {}
+          cpu = {int(m.group(1)): m.group(2).split('|')[0].strip() for m in re.finditer(r'^cpu game (\d+): (.*)$', t, re.M)}
+          tot, lost = {}, {}
           for m in re.finditer(r'^game (\d+) .* survived (\d)', t, re.M):
-              f = cpu.get(int(m.group(1)), '?'); tot[f] = tot.get(f, 0) + 1; won[f] = won.get(f, 0) + int(m.group(2))
-          print('cpu families: ' + ', '.join(f'{f} {won[f]}/{tot[f]}' for f in sorted(tot)))
+              mod = cpu.get(int(m.group(1)), '?'); tot[mod] = tot.get(mod, 0) + 1; lost[mod] = lost.get(mod, 0) + (1 - int(m.group(2)))
+          for mod in sorted(tot, key=lambda k: -tot[k]):
+              flag = '  << SKIP-LIST MODEL (played on the last try)' if re.search(r'8573C|7763|9V74', mod, re.I) else ''
+              print(f'cpu model: {tot[mod]} games, {lost[mod]} lost  {mod}{flag}')
           PY
           { echo '```'; cat report.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
           # (EVERY DECISION LABELLED -- the owner: every decision of every game in plain words with the rule that decided it, as the

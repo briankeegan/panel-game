@@ -926,6 +926,9 @@
 #   15:5 won on both seeds; lost only 15:6 both (27.4, 28.3 rows a minute; about 32 asked).
 # run 254 -- run 253's bot plus: above six colours a design of 10 links is built at once, not 13 (decide.c; run 248 tried it before the
 #   design was searched). Line Clear 15:3-6 s35-36
+# run 254 -- (result, 01:12-01:16 ET) a 10-link design built at once above six colours: won 4/8 -- worse: OFF, decide.c back to run
+#   253's (3931d36). Both 15:5 lost (21.8, 25.3 rows a minute).
+# run 255 -- run 253's bot plus: above six colours time attack raises a row higher (row 11) (decide.c taTo). Line Clear 15:3-6 s35-36
 challenge 35 9 9 1 21600 10 challenge=15:3 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:4 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:5 profile=lineclear

@@ -130,6 +130,11 @@ env:
   # the deployed commit, runs use exactly that build (see the fetch step).
   UPSTREAM_DEPLOYED_TAG: betaserver-live
   UPSTREAM_BOT_REF: claude/game-bot-creation-action-0e7emk
+  # RUNNER CPU MODELS a deploy's new bot will not play on (GitHub hands out several; each decision gets the same wall-clock time, so a slower
+  # model searches less and loses more -- gambit-24, 43 runs, losses against what each model's own runs predicted: 8573C 1.73x, 7763 1.46x,
+  # 9V74 1.33x; 6975P-C 0.78x, 9V45 0.56x). Model NUMBERS, matched as whole words, never a vendor or brand word ("Platinum" would also catch
+  # the 8370C, 0 losses in 24). A model not named plays.
+  SLOW_CPU_MODELS: 8573C 7763 9V74
   # THE CHAOS BUILD (chaos9520's fork of Panel Attack, its own server): a third server, upstream-protocol like the beta one (network
   # 005), with its own bot -- Gambit rebuilt on the chaos engine (chaos-bot/ on CHAOS_BOT_REF of this repo). The game is the v3 test
   # build, pinned by commit AND checksum (chaos-bot/game/fetch.sh), and the bot is a named commit, never a branch tip: bot=chaos with
@@ -225,6 +230,35 @@ jobs:
           LOOP
           chmod +x "$RUNNER_TEMP/status-loop.sh"
           setsid nohup "$RUNNER_TEMP/status-loop.sh" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" "$BOT_NAME" "$PPID" >/dev/null 2>&1 < /dev/null &
+
+      # THE RUNNER'S CPU, before anything is built or connected. A deploy's new bot (standby) on a slow model (SLOW_CPU_MODELS) stops here --
+      # nothing is played or counted -- and says "skipped" in its status; the deploy, which is waiting for it, re-runs it on another runner
+      # (the same run, so the old bot keeps the lobby meanwhile), as many times as it takes: a deployed bot never plays on a slow model.
+      # Any other run (a bot started by hand, the chaos bot) always plays. The model goes to cpu.txt and the run's notice either way.
+      - name: Runner check (slow CPU models)
+        if: ${{ env.MODE == 'live' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          set -u
+          model=$(lscpu | sed -n 's/^Model name: *//p' | head -1)
+          echo "$model" > "$GITHUB_WORKSPACE/cpu.txt"; echo "RUNNER_CPU=$model" >> "$GITHUB_ENV"
+          slow=""; for m in $SLOW_CPU_MODELS; do printf '%s\n' "$model" | grep -qiw -- "$m" && slow=$m; done
+          echo "::notice::runner CPU: $model (attempt $ATTEMPT)${slow:+ -- a slow model ($slow)}"
+          [ -n "$slow" ] || exit 0
+          if [ "${STANDBY:-}" != 1 ]; then echo "a slow model, but not a deploy's new bot: it plays"; exit 0; fi
+          echo "skipped runner: $model (attempt $ATTEMPT)" >> "$GITHUB_STEP_SUMMARY"
+          # the status the deploy reads: "bot wrote: <now> skipped" (written here at once; the setup status loop would take up to a minute)
+          echo skipped > "$RUNNER_TEMP/bot-state"
+          key=$(printf '%s' "$BOT_NAME" | tr -c 'A-Za-z0-9_-' '_'); path="status/$key.txt"
+          body=$(printf 'run %s\nbot %s\nbot wrote: %s skipped\nrunner: %s (attempt %s)\nsent: %s\n' "$GITHUB_RUN_ID" "$BOT_NAME" "$(date +%s)" "$model" "$ATTEMPT" "$(date -u +%Y-%m-%dT%H:%M:%SZ)")
+          for k in 1 2 3; do
+            sha=$(gh api "repos/$GITHUB_REPOSITORY/contents/$path?ref=bot-status" --jq .sha 2>/dev/null || true)
+            gh api -X PUT "repos/$GITHUB_REPOSITORY/contents/$path" -f message="status: $key (skipped runner)" -f content="$(printf '%s' "$body" | base64 -w0)" -f branch=bot-status ${sha:+-f sha="$sha"} >/dev/null 2>&1 && break
+            sleep 3
+          done
+          exit 1
 
       - name: Install luajit + luarocks
         run: |
@@ -587,6 +621,12 @@ jobs:
                 GH_TOKEN="${{ github.token }}" gh workflow run bot-prod-smoke-test.yml --repo "${{ github.repository }}" --ref "${{ github.ref_name }}" \
                   -f mode=ranmaru-deploy -f server="$BOT_HOST:$BOT_PORT" -f bot=gambit -f name='Ranmaru_p#_CPU' -f advanced=force \
                   || echo "$why: the deploy could not be started (the fallback below takes over in 40 minutes)"
+              fi
+              if [ -e "$RUNNER_TEMP/restart-deploy" ] && [ ! -e "$RUNNER_TEMP/planned-restart" ] && [ $(( $(date -u +%s) - $(cat "$RUNNER_TEMP/restart-deploy") )) -ge 2400 ] \
+                 && GH_TOKEN="${{ github.token }}" gh api "repos/${{ github.repository }}/actions/runs?per_page=30" \
+                      --jq ".workflow_runs[] | select(.id != ${{ github.run_id }} and .status != \"completed\" and (.display_title | startswith(\"live · $BOT_HOST:$BOT_PORT · \"))) | .id" 2>/dev/null | grep -q .; then
+                # a newer bot is still finding a fast runner (the deploy re-runs it as long as it takes): stay, and look again in 40 minutes
+                date -u +%s > "$RUNNER_TEMP/restart-deploy"; echo "the replacement is still finding a fast runner: staying"
               fi
               if [ -e "$RUNNER_TEMP/restart-deploy" ] && [ ! -e "$RUNNER_TEMP/planned-restart" ] && [ $(( $(date -u +%s) - $(cat "$RUNNER_TEMP/restart-deploy") )) -ge 2400 ]; then
                 : > "$RUNNER_TEMP/planned-restart"; touch "$PA_STOP_FILE"; echo "a restart deploy was started 40 min ago and no replacement came: leaving after the current game, then starting again"
@@ -1100,11 +1140,24 @@ jobs:
           [ -n "$id" ] || { echo "::error::the new bot's run did not appear: the old bots are left alone"; exit 1; }
           # the old bots leave only once the NEW bot is confirmed up: its status says idle or starting, written in the last 5 minutes.
           # If that never happens, the old bots are left alone (the step fails; nothing is asked to leave).
-          key=$(printf '%s' "$NEWNAME" | tr -c 'A-Za-z0-9_-' '_'); up=""
-          for _ in $(seq 1 180); do
+          key=$(printf '%s' "$NEWNAME" | tr -c 'A-Za-z0-9_-' '_'); up=""; waited=0
+          # (30 minutes of waiting for it to come up; the time it spends finding a fast runner does not count -- there is no limit on that)
+          while [ "$waited" -lt 180 ]; do
             read -r e st < <(gh api "repos/$repo/contents/status/$key.txt?ref=bot-status" --jq .content 2>/dev/null | base64 -d 2>/dev/null | sed -n 's/^bot wrote: \([0-9][0-9]*\) \([a-z]*\).*/\1 \2/p') || true   # no status yet is not an error: the loop keeps waiting
             now_s=$(date +%s)
             if [ -n "${e:-}" ] && [ $((now_s - e)) -lt 300 ] && { [ "${st:-}" = idle ] || [ "${st:-}" = starting ] || [ "${st:-}" = standby ]; }; then up=1; break; fi
+            # it got a slow CPU model and stopped before playing: once that attempt is over, run it again on another runner (the same run)
+            if [ "${st:-}" = skipped ]; then
+              waited=$((waited - 1))
+              rs=$(gh api "repos/$repo/actions/runs/$id" --jq '"\(.status) \(.run_attempt)"' 2>/dev/null || true)
+              if [ "${rs%% *}" = completed ]; then
+                gh api -X POST "repos/$repo/actions/runs/$id/rerun-failed-jobs" >/dev/null 2>&1 \
+                  && echo "$NEWNAME got a slow runner (attempt ${rs##* }): re-run on another" >> "$GITHUB_STEP_SUMMARY" \
+                  || echo "::warning::could not re-run $NEWNAME's run $id"
+                sleep 20
+              fi
+            fi
+            waited=$((waited + 1))
             sleep 10
           done
           [ -n "$up" ] || { echo "::error::$NEWNAME did not come up in the lobby in 30 minutes: the old bots are left alone"; exit 1; }

@@ -795,8 +795,8 @@ html.set-chaos #sec-brain, html.set-chaos .gs-nav a[href="#sec-brain"] { display
     <div class="gs-scroll tall" data-source="games versions"><table class="gs-tbl" id="t-loss"></table></div>
   </section>
 
-  <section class="gs-card" id="sec-brain">
-    <h2>How Ranmaru decides</h2>
+  <details class="gs-card gs-collapse" id="sec-brain">
+    <summary><h2>How Ranmaru decides</h2><span class="gs-count">survival first</span></summary>
     <p class="gs-note">Ranmaru plays like a person at the controls: it sees only what you see and presses one key at a time. <b>Staying alive always comes first: the mode only chooses between moves that are equally safe.</b> Tap or hover an underlined word for its meaning.</p>
 
     <h3>1 · The game plan: which mode it plays</h3>
@@ -867,7 +867,7 @@ html.set-chaos #sec-brain, html.set-chaos .gs-nav a[href="#sec-brain"] { display
       </div>
     </div>
     <p class="gs-note" style="margin-top:8px">It never makes a chain longer than 13, and it raises the stack itself to keep enough panels to work with.</p>
-  </section>
+  </details>
   <div id="dt-tip" role="tooltip" hidden></div>
   <script>
   (function () {
@@ -882,6 +882,10 @@ html.set-chaos #sec-brain, html.set-chaos .gs-nav a[href="#sec-brain"] { display
       tip.style.left = x + 'px'; tip.style.top = y + 'px';
     }
     function hide() { cur = null; tip.hidden = true; }
+    // (the section is closed by default: the nav link, or a link to #sec-brain, opens it)
+    function openBrain() { if (location.hash === '#sec-brain') document.getElementById('sec-brain').open = true; }
+    document.querySelectorAll('a[href="#sec-brain"]').forEach(function (a) { a.addEventListener('click', function () { document.getElementById('sec-brain').open = true; }); });
+    window.addEventListener('hashchange', openBrain); openBrain();
     var touched = 0;
     document.querySelectorAll('#sec-brain .dt-t').forEach(function (el) {
       el.addEventListener('pointerenter', function (e) { if (e.pointerType === 'mouse') show(el); });

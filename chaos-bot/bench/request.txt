@@ -1179,6 +1179,10 @@
 #   10719, insane s21 9849, combo s22 16783.
 # run 310 -- run 306's bot plus vanilla's flatness floor (as run 303 at training_random: a panel tower of 4+ goes after the flatter, 6+ a
 #   floor under garbage; rank.c). 8 colours s21-22
+# run 310 -- (result, 08:38-08:46 ET) the flatness floor at 8 colours: survived 6/8 -- no worse: KEPT (cf4ecdf). Chain s21 and thicc s21 lived;
+#   lost insane s21 at 4115 and insane s22 at 2762, both early.
+# run 311 -- run 310 plus vanilla's opening raise cap (GameCreator 97d4a50f78 + 33e255e18d): the opening's raise never takes the tallest
+#   column past 6 rows, with somebody across (decide.c OPEN_TOP). 8 colours s21-22
 chain_garbage 21 9 9 1 21600 10 colors=8
 combo_storm 21 9 9 1 21600 10 colors=8
 thicc_combo_storm 21 9 9 1 21600 10 colors=8

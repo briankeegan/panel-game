@@ -922,6 +922,10 @@
 #   -- kept (34e95da). Won 15:5 s35; lost 15:5 s36 (24), 15:6 both (28.6, 28.7 -- about 32 asked).
 # run 253 -- run 252's bot plus: with nobody across the opening raises to time attack's top, not the chaos ceiling (decide.c; run 247
 #   tried it on run 241's bot, when the design never built). Line Clear 15:3-6 s35-36
+# run 253 -- (result, 01:06-01:11 ET) the opening raised to time attack's top with nobody across: WON 6/8 -- better, kept (3931d36).
+#   15:5 won on both seeds; lost only 15:6 both (27.4, 28.3 rows a minute; about 32 asked).
+# run 254 -- run 253's bot plus: above six colours a design of 10 links is built at once, not 13 (decide.c; run 248 tried it before the
+#   design was searched). Line Clear 15:3-6 s35-36
 challenge 35 9 9 1 21600 10 challenge=15:3 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:4 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:5 profile=lineclear

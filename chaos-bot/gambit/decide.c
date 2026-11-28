@@ -2234,7 +2234,9 @@ static Played playOf(const Read *R, int n) {
       if (tr && v > 0 && (!taHave || v >= taVal)) { taD = D; taTr = tr; taLinks = links; taSwaps = sw; taVal = v; taHave = 1; }
       // (run 252: above six colours built after half the search -- searched from 4 full rows now (run 251), the design was let go 18 times in
       // run 251 Line Clear 15:6 s35 (the board no longer held it) and never built, 67 decisions searching; 15:5 s36 built it 11 times and won)
-      if (taHave && (taLinks >= TA_LINKS || taMs >= (decQ.b->colors > 6 ? TA_DESIGN_MS / 2 : TA_DESIGN_MS) || panelTop(decQ.b) >= TA_TOP)) taOn = 1;
+      // (run 254: and a design of 10 links built at once above six colours, not 13 -- run 248 tried it when the design was never searched;
+      // now it is (runs 251-253) and Line Clear 15:6 (7 colours) is the one stage left, 27-28 rows a minute where about 32 are asked)
+      if (taHave && (taLinks >= (decQ.b->colors > 6 ? 10 : TA_LINKS) || taMs >= (decQ.b->colors > 6 ? TA_DESIGN_MS / 2 : TA_DESIGN_MS) || panelTop(decQ.b) >= TA_TOP)) taOn = 1;
       // (and while it is searched, the board is left as it is -- a swap played meanwhile changes the rows the design is of -- unless it
       // is dying or raised: a raise only lifts the rows)
       else if (taHave && !R->taDying && !R->up && taHoldNoSooner(P.line, n)) decWhy = __LINE__, P.line = 0;

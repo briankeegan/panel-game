@@ -2578,6 +2578,9 @@ jobs:
           # commit has them)
           mkdir -p decisions
           for d in games/chaosbot-game-*; do n=${d##*-}; [ -f "$d/gambit.log" ] && python3 chaos-bot/gambit/describe.py "$d/gambit.log" > "decisions/game-$n.txt" 2>&1 || true; done
+          # (the time attack's own numbers, decision by decision -- the frame, the play, the chain going (tx=), the design (ta=), the aim --
+          # for the games played with nobody across: the chain going read move by move, not only as the report's sums)
+          for d in games/chaosbot-game-*; do n=${d##*-}; [ -f "$d/gambit.log" ] && grep '^GAMBITD .* t[xa]=' "$d/gambit.log" | awk '{o=$1" "$2; for(i=3;i<=NF;i++) if($i ~ /^(play|aim|tx|ta|pan|chain|alone|won)=/) o=o" "$i; print o}' > "decisions/ta-$n.txt" 2>/dev/null || true; done
       - uses: actions/upload-artifact@v4
         if: always()
         with:

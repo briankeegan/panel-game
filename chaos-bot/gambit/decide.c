@@ -423,7 +423,9 @@ static int readBoard_(Read *R) {
   // (TIME ATTACK'S RAISE: no design being built and the stack under its top -- the owner: flatten, raise to the top, then the chain; no
   // garbage is coming, so the rows are raised as they are, never held to a break's readiness. The top is TA_TOP less each row the tallest
   // column stands over the shortest past TA_EVEN: an uneven stack raised to TA_TOP puts its tallest column where the rise ends it)
-  int32_t taTo = TA_TOP - imax(0, evenOf(decQ.b) - TA_EVEN);
+  // (run 281: above six colours the top lowered only past TA_EVEN + 1 rows of unevenness -- seven colours flatten slowly, and runs 277-280's
+  // 15:6 stood on ~30 panels: the chain going takes a falling chain on with the panels there are; run 258 took the lowering off whole)
+  int32_t taTo = TA_TOP - imax(0, evenOf(decQ.b) - (decQ.b->colors > 6 ? TA_EVEN + 1 : TA_EVEN));
   int taRaise = ruleNoEnemy && !opening && !refill && !R->topped && !R->taDying && !taOn && panelTop(decQ.b) < taTo;
   if (taRaise) to = taTo;
   // (run 253: and with nobody across the opening raises to time attack's top too, not to the chaos ceiling, which keeps room for blocks

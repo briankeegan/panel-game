@@ -902,6 +902,10 @@
 #   a minute (run 245 won 15:5 with ~53 rows sent: the threshold reads about 0.8 of the table's).
 # run 248 -- run 241's bot + time attack's lineclear.words, plus: above six colours a design of 10 links is built at once, not 13
 #   (decide.c). Line Clear 15:3-6 s35-36
+# run 248 -- (result, 00:38-00:42 ET) a 10-link design built at once above six colours: won 4/8 -- OFF, decide.c back to run 241's. The
+#   7-colour stages held 40-47 times a game (7-18 at six colours), put first by the survival rules on a stack raised to TA_TOP.
+# run 249 -- run 241's bot + time attack's lineclear.words, plus: above six colours time attack raises two rows lower (decide.c taTo).
+#   Line Clear 15:3-6 s35-36
 challenge 35 9 9 1 21600 10 challenge=15:3 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:4 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:5 profile=lineclear

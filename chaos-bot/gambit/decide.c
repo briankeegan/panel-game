@@ -423,7 +423,9 @@ static int readBoard_(Read *R) {
   // (TIME ATTACK'S RAISE: no design being built and the stack under its top -- the owner: flatten, raise to the top, then the chain; no
   // garbage is coming, so the rows are raised as they are, never held to a break's readiness. The top is TA_TOP less each row the tallest
   // column stands over the shortest past TA_EVEN: an uneven stack raised to TA_TOP puts its tallest column where the rise ends it)
-  int32_t taTo = TA_TOP - imax(0, evenOf(decQ.b) - TA_EVEN);
+  // (run 249: above six colours two rows lower -- run 248 Line Clear 15:5-6 (7 colours): the stack raised to TA_TOP, lines judged dying, the
+  // hold put first 40-47 times a game by the survival rules against 7-18 at six colours, 21-29 rows a minute where 26-32 were asked)
+  int32_t taTo = TA_TOP - (decQ.b->colors > 6 ? 2 : 0) - imax(0, evenOf(decQ.b) - TA_EVEN);
   int taRaise = ruleNoEnemy && !opening && !refill && !R->topped && !R->taDying && !taOn && panelTop(decQ.b) < taTo;
   if (taRaise) to = taTo;
   raiseRefill = refill; raiseOpening = opening; raiseTo = to;
@@ -2226,10 +2228,7 @@ static Played playOf(const Read *R, int n) {
       int32_t v = cbDesignAll(&G, taHave ? &taD : 0, ms, &D, &tr, &links, &sw);
       taMs += ms;
       if (tr && v > 0 && (!taHave || v >= taVal)) { taD = D; taTr = tr; taLinks = links; taSwaps = sw; taVal = v; taHave = 1; }
-      // (run 248: above six colours a design of 10 links is built at once, not 13 -- a 13-link design is rarely found there, and the search
-      // runs on to TA_DESIGN_MS each time: run 245 Line Clear 15:5-6 (7 colours), chains of 6-9 thrown at 24-31 rows a minute, short of the
-      // stages by a few rows; at 6 colours (15:3-4) the 13 stands, won in 1:00-1:35)
-      if (taHave && (taLinks >= (decQ.b->colors > 6 ? 10 : TA_LINKS) || taMs >= TA_DESIGN_MS || panelTop(decQ.b) >= TA_TOP)) taOn = 1;
+      if (taHave && (taLinks >= TA_LINKS || taMs >= TA_DESIGN_MS || panelTop(decQ.b) >= TA_TOP)) taOn = 1;
       // (and while it is searched, the board is left as it is -- a swap played meanwhile changes the rows the design is of -- unless it
       // is dying or raised: a raise only lifts the rows)
       else if (taHave && !R->taDying && !R->up && taHoldNoSooner(P.line, n)) decWhy = __LINE__, P.line = 0;

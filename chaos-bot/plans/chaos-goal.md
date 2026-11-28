@@ -28,7 +28,7 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 | 1 HP | 10 | 29-30 | 238 | **8/8 -- done** |
 | No stop time | 10 | 31-32 | 239 | **8/8 -- done** |
 | BALL | 10 | 33-34 | 241 | **8/8 -- done** |
-| Line Clear (15:3-6) | stage's | 35-36 | 245 | won 5/8 (246, 247 off), being fixed (run 248) |
+| Line Clear (15:3-6) | stage's | 35-36 | 245 | won 5/8 (246-248 off), being fixed (run 249) |
 | Queue limit | 10 | 37-38 | - | to do |
 | training_random | 10 | 39-40 | - | to do (its own pattern: chain and combo garbage mixed at a random balance, Chaos Mode 1 game in 4 -- TrainingMenu.lua createBasicTrainingMode) |
 | Challenge Mode | stage's | 41-42 | - | to do |
@@ -210,6 +210,8 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 248 (00:38-00:42 ET), 10-link designs above six colours: won 4/8 -- off.** The 7-colour games held 40-47 times by the survival
+  rules on a stack raised to TA_TOP. Run 249: time attack raises two rows lower above six colours.
 - **Run 247 (00:32-00:37 ET), the opening raised to time attack's top: won 4/8 -- off** (more rows a minute, one stage fewer). The 7-colour
   stages are a few rows short. Run 248: above six colours a 10-link design is built at once, not 13.
 - **Run 246 (00:26-00:31 ET), pressure: won 1/8 -- off.** Run 247: time attack again, and with nobody across the opening raises to time

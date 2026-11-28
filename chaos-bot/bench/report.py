@@ -59,7 +59,7 @@ def chain_stats(path):
     log/links/swaps/ms/on: the design's state): how often a next link was found, the time given it, and the design's log codes"""
     if not os.path.exists(path):
         return None
-    asked = found = 0; ms = 0; gain = 0; zero = 0; ta = {}
+    asked = found = 0; ms = 0; gain = 0; zero = 0; ta = {}; built = []; last = None
     for line in open(path, errors="replace"):
         if not line.startswith("GAMBITD "):
             continue
@@ -73,12 +73,18 @@ def chain_stats(path):
             if l > b: found += 1; gain += l - b
             if m <= 5: zero += 1
         if "ta" in d:
-            k = d["ta"].split("/")[0]
+            f = d["ta"].split("/")
+            k = f[0]
             ta[k] = ta.get(k, 0) + 1
+            try:
+                if len(f) >= 5 and int(f[1]) > 0: last = (int(f[1]), int(f[2]))
+            except ValueError: pass
+            if k == "2" and last: built.append(last); last = None
     if not asked and not ta:
         return None
-    return "chain going asked %d found %d (%d%%) links +%.1f when found, ms avg %.0f, ms<=5 %d | ta log %s" % (
+    return "chain going asked %d found %d (%d%%) links +%.1f when found, ms avg %.0f, ms<=5 %d | designs fired %d, links avg %.1f swaps avg %.1f | ta log %s" % (
         asked, found, 100 * found // max(1, asked), gain / max(1, found), ms / max(1, asked), zero,
+        len(built), sum(b[0] for b in built) / max(1, len(built)), sum(b[1] for b in built) / max(1, len(built)),
         " ".join("%s:%d" % (k, v) for k, v in sorted(ta.items(), key=lambda kv: -kv[1])[:10]))
 
 def death(path, frames, health, reason):

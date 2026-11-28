@@ -2196,10 +2196,7 @@ static Played playOf(const Read *R, int n) {
     double left = C2.due ? C2.due - C2.margin - nowMs() : 100, ms = left * 0.8; if (ms < 2) ms = 2;
     readyStop();
     List L; memset(&L, 0, sizeof L); L.n = 1; L.aim[0].chain.op = OP_GE; L.aim[0].chain.n = 2; L.aim[0].brk = -1;
-    // (run 267: above six colours 40 lines a level, not 80 -- the search has the decision's time only (a link pressed before the one it
-    // joins lands): deeper was worse (run 259, 9 swaps: 22.2 rows a minute) and shallower too (run 260, 7: 25.6), so each level is made
-    // cheaper instead, to reach 8 swaps within the time)
-    ExtOpts eo = { decQ.b->colors > 6 ? TA_EXT_WIDTH / 2 : TA_EXT_WIDTH, TA_EXT_DEPTH, &L, NOT_ASKED, 0, ms };
+    ExtOpts eo = { TA_EXT_WIDTH, TA_EXT_DEPTH, &L, NOT_ASKED, 0, ms };
     static Ext E; extend(&decQ, &eo, &E);
     taxBase = E.baseChain; taxLong = E.longest.set ? E.longest.chain : 0; taxN = E.longest.set ? E.longest.nseq : 0; taxMs = (int32_t)ms;
     if (E.longest.set && E.longest.nseq > 0) {
@@ -2240,7 +2237,11 @@ static Played playOf(const Read *R, int n) {
       if (taHave && (taLinks >= TA_LINKS || taMs >= (decQ.b->colors > 6 ? TA_DESIGN_MS / 2 : TA_DESIGN_MS) || panelTop(decQ.b) >= TA_TOP)) taOn = 1;
       // (and while it is searched, the board is left as it is -- a swap played meanwhile changes the rows the design is of -- unless it
       // is dying or raised: a raise only lifts the rows)
-      else if (taHave && !R->taDying && !R->up && taHoldNoSooner(P.line, n)) decWhy = __LINE__, P.line = 0;
+      // (run 268: above six colours held whenever the board is not dying (taDying: left alone it stands TA_DANGER frames), not only where
+      // the hold tops out no sooner than the line -- at level 13 the board left alone tops out within the judge's horizon nearly always, so
+      // the rank's line (a flattening, a cut) was played over the design being searched and the design let go: run 267's 7-colour Line
+      // Clears let go 11-16 designs a game (ta=-1) and triggered 10-17)
+      else if (taHave && !R->taDying && !R->up && (decQ.b->colors > 6 || taHoldNoSooner(P.line, n))) decWhy = __LINE__, P.line = 0;
     }
     // (both held to the engine's clock: the hold is put in the line's place only where it tops the board out no sooner -- an uneven stack
     // whose tall column a clear brings down is never held up while the rise takes it to the top)

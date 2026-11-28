@@ -981,6 +981,12 @@
 #   Both 15:5 (23.8, 25.8) and both 15:6 (29.1, 25.3) lost.
 # run 267 -- run 253's bot plus: above six colours the chain going searched 40 lines a level, not 80 (decide.c TA_EXT_WIDTH). The report
 #   now prints each game's chain going and design numbers (bench/report.py chain_stats: tx= and ta=). Line Clear 15:3-6 s35-36
+# run 267 -- (result, 02:35-02:39 ET) the chain going 40 lines a level above six colours: won 5/8 -- worse: OFF, decide.c back to run
+#   253's (3931d36). Won 15:5 s35 (35.2); lost 15:5 s36 (23.3), 15:6 both (28.0, 28.9). The new numbers: the chain going asked 175-184
+#   times a 7-colour game, found a link 65-72% (+2.8-3.8 links), 125-137 ms each; designs fired (ta=2) 8-17 a game and let go (ta=-1) 8-16.
+# run 268 -- run 253's bot plus: above six colours the board is held while a design is searched whenever it is not dying, not only where
+#   the hold tops out no sooner than the rank's line (decide.c; the rank's lines played over the search let the designs go). Line Clear
+#   15:3-6 s35-36
 challenge 35 9 9 1 21600 10 challenge=15:3 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:4 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:5 profile=lineclear

@@ -865,11 +865,13 @@
 # run 238 -- THE NEXT MODE: 1HP (mode=2) at Level 10, 6 colours, on its own seeds 29-30 (never played), run 236's bot. 1HP s29-30
 # run 238 -- (result, 23:25-23:34 ET) survived 8/8, 172800 frames -- 1HP DONE (seeds 29-30).
 # run 239 -- THE NEXT MODE: no stop time (mode=3) at Level 10, 6 colours, on its own seeds 31-32 (never played), run 236's bot. NST s31-32
-chain_garbage 31 9 9 1 21600 10 mode=3
-combo_storm 31 9 9 1 21600 10 mode=3
-thicc_combo_storm 31 9 9 1 21600 10 mode=3
-insane_combo_storm 31 9 9 1 21600 10 mode=3
-chain_garbage 32 9 9 1 21600 10 mode=3
-combo_storm 32 9 9 1 21600 10 mode=3
-thicc_combo_storm 32 9 9 1 21600 10 mode=3
-insane_combo_storm 32 9 9 1 21600 10 mode=3
+# run 239 -- (result, 23:34-23:43 ET) survived 8/8, 172800 frames, full health -- NO STOP TIME DONE (seeds 31-32).
+# run 240 -- THE NEXT MODE: BALL (mode=4) at Level 10, 6 colours, on its own seeds 33-34 (never played), run 236's bot. BALL s33-34
+chain_garbage 33 9 9 1 21600 10 mode=4
+combo_storm 33 9 9 1 21600 10 mode=4
+thicc_combo_storm 33 9 9 1 21600 10 mode=4
+insane_combo_storm 33 9 9 1 21600 10 mode=4
+chain_garbage 34 9 9 1 21600 10 mode=4
+combo_storm 34 9 9 1 21600 10 mode=4
+thicc_combo_storm 34 9 9 1 21600 10 mode=4
+insane_combo_storm 34 9 9 1 21600 10 mode=4

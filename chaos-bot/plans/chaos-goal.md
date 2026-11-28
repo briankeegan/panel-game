@@ -26,8 +26,8 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 | Chaos margin 4 | 10 | 25-26 | 236 | **8/8 -- done** |
 | Chaos mode | 10 | 27-28 | 237 | **8/8 -- done** |
 | 1 HP | 10 | 29-30 | 238 | **8/8 -- done** |
-| No stop time | 10 | 31-32 | 239 | playing |
-| BALL | 10 | 33-34 | - | to do (run 197 on 7-8 cancelled) |
+| No stop time | 10 | 31-32 | 239 | **8/8 -- done** |
+| BALL | 10 | 33-34 | 240 | playing |
 | Line Clear | - | 35-36 | - | to do |
 | Queue limit | 10 | 37-38 | - | to do |
 | training_random | 10 | 39-40 | - | to do (its own pattern: chain and combo garbage mixed at a random balance, Chaos Mode 1 game in 4 -- TrainingMenu.lua createBasicTrainingMode) |
@@ -207,6 +207,7 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 239 (23:34-23:43 ET): NO STOP TIME 8/8, full health -- done.** Run 240: BALL on seeds 33-34.
 - **Run 238 (23:25-23:34 ET): 1HP 8/8 -- done.** Run 239: no stop time on seeds 31-32.
 - **Run 237 (23:16-23:24 ET): CHAOS MODE 8/8, full health -- done.** Run 238: 1HP on seeds 29-30.
 - **Run 236 (23:07-23:15 ET), the opener keeps 30 panels: CHAOS MARGIN 4 8/8 -- done.** Run 237: chaos mode on seeds 27-28.

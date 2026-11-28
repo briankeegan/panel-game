@@ -794,6 +794,11 @@
 #   met it with 18, lost at 1036.
 # run 222 -- run 218's bot plus: above six colours, garbage on its way and none on the board, of two living lines breaking nothing, the one
 #   leaving 30+ panels first (rank.c). 8 colours s21-22
+# run 222 -- (result) survived 3/8, 124232 frames -- worse (5/8): OFF, run 218's rank.c restored by hash (b3967e9). Every first block met
+#   with 32+ panels -- the opening was not what lost. The sooner picks left: the top pair equal (the carry and its twin), a third line
+#   breaking as much and lost later below them (insane s21 13702 211 over a convert at 290; insane s22 4562 240 over 289).
+# run 223 -- run 218's bot plus: above six colours, the top dying, a line breaking at least as much garbage whose own board is lost a
+#   quarter break later moves to the top (rank.c, after outlivingFirst). 8 colours s21-22
 chain_garbage 21 9 9 1 21600 10 colors=8
 combo_storm 21 9 9 1 21600 10 colors=8
 thicc_combo_storm 21 9 9 1 21600 10 colors=8

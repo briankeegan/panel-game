@@ -1064,14 +1064,6 @@ static int compareJudged(const Judge *x, const Judge *y) {
   if (0 && chaosOpenHigh && x->o.lives && y->o.lives && x->apBroke <= 0 && y->apBroke <= 0 &&
       x->o.j.clearedPanels != y->o.j.clearedPanels)
     return (cmpKey = __LINE__, (x->o.j.clearedPanels > y->o.j.clearedPanels ? -1 : 1));
-  // (run 222, ABOVE SIX COLOURS, THE MATERIAL KEPT FOR THE FIRST BLOCK: garbage on its way and none on the board, of two living lines that
-  // break nothing, the one leaving 30 panels or more before one leaving fewer -- under eight colours a break needs material, and the
-  // games lost met their first block with 14-24 panels where the games kept met it with 30-40 (runs 216-221). Run 221 chain s21: the first
-  // block met with 18 panels, lost at 1036)
-  if (decQ.b->colors > 6 && !decF.under && garbageComing() && x->o.lives && y->o.lives && x->apBroke <= 0 && y->apBroke <= 0) {
-    int kx = panelsOn(decQ.b) - x->o.j.clearedPanels >= 30, ky = panelsOn(decQ.b) - y->o.j.clearedPanels >= 30;
-    if (kx != ky) return (cmpKey = __LINE__, (kx ? -1 : 1));
-  }
   // THE LAST CHANCE: the hold lost inside a break's time, beside a line lost no sooner whose next moves promise a break's time more (the
   // readiness break, the survival search after it): the line first -- holding is the loss for certain. Only against the hold: the
   // promise is never weighed against another line's own life. 244 of 419 lost games held, dying, over such a line.
@@ -2009,6 +2001,19 @@ static void outlivingFirst(Judge **a, int n) {
         Judge *e = a[i]; for (int q = i; q > 0; q--) a[q] = a[q - 1]; a[0] = e; moved = 1; rankMoved = -__LINE__; break; }
       if (!moved) break; }
     cmpKey = keep; }
+  // (run 223, ABOVE SIX COLOURS, THE SAME BREAK LOST LATER IS THE TOP: the top dying, a line breaking at least as much garbage whose own board
+  // -- no promise counted -- is lost a quarter of a break's time later moves up, beaten head to head or not: the order kept a sooner loss
+  // through a third line. Run 221 8 colours insane s21 13702 a carry lost at 211 over a convert lost at 290, both breaking 11; combo s21
+  // 19469 199 over 244; insane s22 4562 240 over 289, both breaking 6)
+  if (decQ.b->colors > 6 && n > 1 && !a[0]->o.lives && !a[0]->o.dead) {
+    double t0 = lostAtOf(a[0]->o.lostAt, a[0]->hold); int best = 0; double bt = t0;
+    for (int i = 1; i < n; i++) { const Judge *e = a[i];
+      if (e->o.dead || e->hold || imax(0, e->apBroke) < imax(0, a[0]->apBroke)) continue;
+      double te = e->o.lives ? 1e300 : lostAtOf(e->o.lostAt, 0);
+      if (te >= 1e299 && !e->o.lives) continue;
+      if (te - t0 >= rankSave / 4 && te > bt) { best = i; bt = te; } }
+    if (best > 0) { Judge *e = a[best]; for (int q = best; q > 0; q--) a[q] = a[q - 1]; a[0] = e; rankMoved = -__LINE__; }
+  }
 }
 static void sortJudged(Judge **a, int n) {
   static Judge *tmp[512];

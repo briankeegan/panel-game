@@ -718,9 +718,6 @@ static int twinLines(const Read *R, Cand *out, int n, int cap) {
   // set, go do something else -- the judge plays each on the engine, and one that cuts the board's chain short ranks after the wait)
   int prefixes = !R->topped, setupOnly = !bigAsked && twinTime(R->under, R->topped);
   twinLo = -2;
-  // (run 264: none with nobody across above six colours -- time attack's score is the chain, and a Line Clear stage's rows: an eight sends
-  // 3+4 wide, 7/6 of a row, built over hundreds of frames; run 263's 7-colour Line Clears spent 600-850 frames of 7230 setting them up)
-  if (ruleNoEnemy && b->colors > 6) return n;
   if ((!bigAsked && !setupOnly && !prefixes) || clockOut()) { if (clockOut()) twinNo[1]++; return n; }
   static int32_t g[MAXROWS + 2][W + 2];
   static uint8_t ok[MAXROWS + 2][W + 2];

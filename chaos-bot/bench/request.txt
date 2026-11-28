@@ -966,6 +966,13 @@
 #   to 600-850.
 # run 264 -- run 253's bot plus: no two-column eights offered with nobody across above six colours (propose.c twinLines; an eight sends
 #   7/6 of a row, built over hundreds of frames). Line Clear 15:3-6 s35-36
+# run 264 -- (result, 02:16-02:20 ET) no two-column eights with nobody across above six colours: won 5/8 -- worse: OFF, propose.c back
+#   to run 253's (3931d36). Won 15:5 s36 (29.4); lost 15:5 s35 (21.4), 15:6 both (27.1, 23.0).
+#   (read in the chaos build's ChallengeMode.lua: difficulty 15 asks 10 + 10 a stage -- 50 at 15:5, 60 at 15:6 -- level 13 panels, no
+#   recovery, one frame topped out; a chain sends its rows as N-1 of damage, a combo width x height / 6, so the report's rows a minute
+#   count combos above what they are worth)
+# run 265 -- run 253's bot plus: above six colours a design is built after a third of the search, not half (decide.c; run 252's half sent
+#   more rows than the whole). Line Clear 15:3-6 s35-36
 challenge 35 9 9 1 21600 10 challenge=15:3 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:4 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:5 profile=lineclear

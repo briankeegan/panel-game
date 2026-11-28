@@ -30,7 +30,7 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 | BALL | 10 | 33-34 | 241 | **8/8 -- done** |
 | Line Clear (15:3-6) | stage's | 35-36 | 282 | **8/8 -- done** |
 | Queue limit (qlimit=1) | 10 | 37-38 | 283 | **8/8 -- done** |
-| training_random | 10 | 39-40 | 299 | 6/8 (300-302 off), being fixed (run 303) -- garbage level/speed 8-11 a seed (its own pattern: chain and combo garbage mixed at a random balance, Chaos Mode 1 game in 4 -- TrainingMenu.lua createBasicTrainingMode) |
+| training_random | 10 | 39-40 | 299 | 6/8 (300-303 off), being fixed (run 304) -- garbage level/speed 8-11 a seed (its own pattern: chain and combo garbage mixed at a random balance, Chaos Mode 1 game in 4 -- TrainingMenu.lua createBasicTrainingMode) |
 | Challenge Mode | stage's | 41-42 | - | to do |
 
 (8 colours old: 7/8 on seeds 7-8, run 180 -- does not count.)
@@ -210,6 +210,7 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 303 (07:34-07:42 ET), vanilla's flatness floor: 5/8 -- off.** Run 304: vanilla's perch floor.
 - **Run 302 (07:24-07:32 ET), vanilla's break kept in reach: 5/8 -- off.** Run 303: vanilla's flatness floor (towers of 4+, 6+ a hard floor
   under garbage).
 - **Run 301 (07:15-07:23 ET), the vanilla CPU layout: 4/8 -- off.** Run 302: vanilla's "a break kept in reach under garbage" (7f4d709234 +

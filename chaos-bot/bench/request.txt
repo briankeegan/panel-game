@@ -1148,6 +1148,11 @@
 # run 303 -- run 299 plus vanilla's flatness floor (GameCreator 8de2105d76, dbc07addca, 7882e43c6a, 1b522c7753): of two lines not living, the
 #   one leaving a panel tower 4+ rows over the lowest column goes after the flatter (2 rows apart); with garbage on the board or coming, a
 #   tower of 6+ is a floor decided by one row (rank.c, on pEven). training_random s39-40
+# run 303 -- (result, 07:34-07:42 ET) vanilla's flatness floor: survived 5/8 -- worse: OFF, rank.c back to run 299's (0222399). Lost s39
+#   level 8 at 7532 (starved), level 11 at 13718; s40 level 11 at 19257.
+# run 304 -- run 299 plus vanilla's perch floor (GameCreator 64b8b34c54, 14e8ee600c, 198ad00744): with garbage on the board or coming, of two
+#   lines alike in living, where either leaves the lowest garbage resting on one or two columns 5+ rows over the lowest column under it,
+#   the one leaving it lower first (judge.c restsFewOf, rank.c). training_random s39-40
 training_random 39 8 8 1 21600 10
 training_random 39 9 9 1 21600 10
 training_random 39 10 10 1 21600 10

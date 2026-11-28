@@ -8,3 +8,7 @@ chaos.words (run 95, 2026-11-26): finish them asks combos 4, 5, 6 before 8, 9, 1
 a panel, an eight about 15. The profile before it is chaos-big.words.
 Run 96 (combos 4-6 first always): seeds 13-14 6/8. chaos.words is the eights-first profile again; the order is chosen each decision
 by the panels on the board instead (decide.c, run 97): smallest first at or under the life peak (33 panels), as listed above it.
+
+lineclear.words (run 244, 2026-11-28): chaos.words with the mode in force 3, "big chain", in place of 1, "finish them" (the profile line's
+first number is answer.c gb_profile's modeRule: the mode played all game). A Line Clear stage is won by rows sent in two minutes with
+no garbage coming (ChallengeMode.lua lineHeightToKill), and a chain sends rows where finish them's combos send half-rows.

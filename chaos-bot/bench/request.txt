@@ -881,11 +881,16 @@
 #   profile, which has Gambit's stack-building taken out (no raise, no opener chain, no material floor: profiles/README).
 # run 243 -- the same 8 games with profile=gambit-finish (raise, the opener's 8-chain, the floor) -- the profile only, the bot unchanged
 #   (run 241's). Line Clear 15:3-6 s35-36
-challenge 35 9 9 1 21600 10 challenge=15:3 profile=gambit-finish
-challenge 35 9 9 1 21600 10 challenge=15:4 profile=gambit-finish
-challenge 35 9 9 1 21600 10 challenge=15:5 profile=gambit-finish
-challenge 35 9 9 1 21600 10 challenge=15:6 profile=gambit-finish
-challenge 36 9 9 1 21600 10 challenge=15:3 profile=gambit-finish
-challenge 36 9 9 1 21600 10 challenge=15:4 profile=gambit-finish
-challenge 36 9 9 1 21600 10 challenge=15:5 profile=gambit-finish
-challenge 36 9 9 1 21600 10 challenge=15:6 profile=gambit-finish
+# run 243 -- (result, 00:09-00:13 ET) gambit-finish profile: won 0/8, 11-16 rows a minute sent (gpm is rows SENT: boot.lua sentRows) --
+#   no better. Every decision played "finish them": the profile's first number is the mode in force all game (answer.c gb_profile
+#   modeRule = 1), and finish them asks combos -- half-rows -- where a Line Clear stage is won by rows.
+# run 244 -- the same 8 games on profiles/lineclear.words: chaos.words with the mode in force 3, "big chain" -- the profile only,
+#   run 241's bot. Line Clear 15:3-6 s35-36
+challenge 35 9 9 1 21600 10 challenge=15:3 profile=lineclear
+challenge 35 9 9 1 21600 10 challenge=15:4 profile=lineclear
+challenge 35 9 9 1 21600 10 challenge=15:5 profile=lineclear
+challenge 35 9 9 1 21600 10 challenge=15:6 profile=lineclear
+challenge 36 9 9 1 21600 10 challenge=15:3 profile=lineclear
+challenge 36 9 9 1 21600 10 challenge=15:4 profile=lineclear
+challenge 36 9 9 1 21600 10 challenge=15:5 profile=lineclear
+challenge 36 9 9 1 21600 10 challenge=15:6 profile=lineclear

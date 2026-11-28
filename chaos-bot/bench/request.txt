@@ -1194,11 +1194,15 @@
 #   Lost chain s22 at 16969: the flatness floor's tall-tower clause (run 310) put a flatter entry lost at 144 over a line lost at 359 at
 #   16505, and other sooner picks after.
 # run 314 -- run 313 plus: the flatness floor's tall clause no more than two breaks' time sooner (rank.c). 8 colours s21-22
-chain_garbage 21 9 9 1 21600 10 colors=8
-combo_storm 21 9 9 1 21600 10 colors=8
-thicc_combo_storm 21 9 9 1 21600 10 colors=8
-insane_combo_storm 21 9 9 1 21600 10 colors=8
-chain_garbage 22 9 9 1 21600 10 colors=8
-combo_storm 22 9 9 1 21600 10 colors=8
-thicc_combo_storm 22 9 9 1 21600 10 colors=8
-insane_combo_storm 22 9 9 1 21600 10 colors=8
+# run 314 -- (result, 09:17-09:25 ET) the tall-tower floor capped at two breaks sooner: survived 5/8 -- worse: OFF, rank.c back to run 313's
+#   (d0481f8). Lost chain s21 6094, thicc s22 3447 and insane s22 3173 (early).
+# run 315 -- THE SECOND PASS, mode by mode on the current bot (run 313's, d0481f8: 8 colours 7/8 on it): 7 colours, done at 7/8 (run 234), its
+#   own seeds 23-24 -- each mode's standing on one bot first, then the fixes for 8/8 where it stands lowest. 7 colours s23-24
+chain_garbage 23 9 9 1 21600 10 colors=7
+combo_storm 23 9 9 1 21600 10 colors=7
+thicc_combo_storm 23 9 9 1 21600 10 colors=7
+insane_combo_storm 23 9 9 1 21600 10 colors=7
+chain_garbage 24 9 9 1 21600 10 colors=7
+combo_storm 24 9 9 1 21600 10 colors=7
+thicc_combo_storm 24 9 9 1 21600 10 colors=7
+insane_combo_storm 24 9 9 1 21600 10 colors=7

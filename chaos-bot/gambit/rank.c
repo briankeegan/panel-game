@@ -1203,9 +1203,7 @@ static int compareJudged(const Judge *x, const Judge *y) {
     int differ = (tx >= TOWER_ROWS) != (ty >= TOWER_ROWS) || (tx >= TOWER_ROWS && ty >= TOWER_ROWS && iabs(tx - ty) >= (tall ? 1 : TOWER_STEP));
     if (differ) {
       const Judge *f = tx < ty ? x : y, *t = tx < ty ? y : x;
-      // (run 314: the tall tower's floor no more than two breaks' time sooner -- run 313 8 colours chain s22 at 16505 put a flatter entry lost
-      // at 144 over a line lost at 359, lost at 16969)
-      if (!f->o.dead && diesAt(f) >= rankSave && diesAt(f) < 1e299 && ((tall && lostOf(t) - lostOf(f) <= 2 * rankSave) || lostAlike(f, t) || lostOf(f) >= lostOf(t)) &&
+      if (!f->o.dead && diesAt(f) >= rankSave && diesAt(f) < 1e299 && (tall || lostAlike(f, t) || lostOf(f) >= lostOf(t)) &&
           (imax(0, f->apBroke) >= imax(0, t->apBroke) || !(t->apBroke > 0)) && (f->hold || lineWalk(f) <= WALK_EARN))
         return (cmpKey = __LINE__, (f == x ? -1 : 1));
     }

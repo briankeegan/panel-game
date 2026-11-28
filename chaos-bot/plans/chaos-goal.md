@@ -21,8 +21,8 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 
 | Mode | Level | Seeds | Run | Result |
 |---|---|---|---|---|
-| 8 colours | 10 | 21-22 | 227 | **7/8 -- done**; for 8/8: **7/8 on run 313's bot**, being fixed for 8/8 (run 314) |
-| 7 colours | 10 | 23-24 | 234 | **7/8 -- done** |
+| 8 colours | 10 | 21-22 | 227 | **7/8 -- done**; for 8/8: **7/8 on run 313's bot** (314 off) |
+| 7 colours | 10 | 23-24 | 234 | **7/8 -- done**; on run 313's bot: run 315 |
 | Chaos margin 4 | 10 | 25-26 | 236 | **8/8 -- done** |
 | Chaos mode | 10 | 27-28 | 237 | **8/8 -- done** |
 | 1 HP | 10 | 29-30 | 238 | **8/8 -- done** |
@@ -210,6 +210,8 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 314 (09:17-09:25 ET), the tall-tower floor capped at two breaks sooner: 5/8 -- off.** Run 315: the second pass mode by mode on run
+  313's bot -- 7 colours (seeds 23-24); each mode's standing on one bot first, then fixes where it stands lowest.
 - **Run 313 (09:08-09:15 ET), READY WHEN IT LANDS only where the ready line is lost no sooner: 8 colours 7/8 -- kept (d0481f8).** Lost
   chain s22 (the tall-tower floor put a line lost 215 frames sooner first). Run 314: that clause no more than two breaks sooner.
 - **Run 312 (08:58-09:05 ET), the perch floor at 8 colours: 5/8 -- off.** Run 313: READY WHEN IT LANDS between dying lines only where the

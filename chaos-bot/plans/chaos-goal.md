@@ -23,8 +23,8 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 |---|---|---|---|---|
 | 8 colours | 10 | 21-22 | 227 | **7/8 -- done** |
 | 7 colours | 10 | 23-24 | 234 | **7/8 -- done** |
-| Chaos margin 4 | 10 | 25-26 | 235 | 6/8, being fixed (run 236) |
-| Chaos mode | 10 | 27-28 | - | to redo (old: 8/8 on 7-8, run 192) |
+| Chaos margin 4 | 10 | 25-26 | 236 | **8/8 -- done** |
+| Chaos mode | 10 | 27-28 | 237 | playing |
 | 1 HP | 10 | 29-30 | - | to redo (old: 8/8 on 7-8, run 193) |
 | No stop time | 10 | 31-32 | - | to redo (old: 8/8 on 7-8, run 196) |
 | BALL | 10 | 33-34 | - | to do (run 197 on 7-8 cancelled) |
@@ -207,6 +207,7 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 236 (23:07-23:15 ET), the opener keeps 30 panels: CHAOS MARGIN 4 8/8 -- done.** Run 237: chaos mode on seeds 27-28.
 - **Run 235 (22:57-23:05 ET), CHAOS MARGIN 4 on seeds 25-26, run 234's bot: 6/8.** combo s25: three attack combos spent the opener to 22
   panels. Run 236: the opener keeps 30 panels (every mode).
 - **Run 234 (22:48-22:56 ET), the queue let drop from 15 waiting above six colours: 7/8 -- 7 COLOURS DONE.** Run 235: chaos margin 4 on

@@ -1259,6 +1259,9 @@
 #   Line Clear -- each worked to 7/8 or better, a mode re-run on the same bot to confirm, every change checked on the modes it reaches.
 # run 333 -- 7 colours on the current bot (run 331's, cdd97c5: the dive only from 25 waiting -- run 315's 5/8 had it always on). 7 colours
 #   s23-24
+# run 333 -- (result, 12:02-12:10 ET) 7 colours on the current bot: survived 5/8. Lost thicc s23 at 2515 and thicc s24 at 1284 (both early),
+#   insane s23 at 6579.
+# run 334 -- the current bot with the opening raise cap (run 311, above six colours) off. 7 colours s23-24
 chain_garbage 23 9 9 1 21600 10 colors=7
 combo_storm 23 9 9 1 21600 10 colors=7
 thicc_combo_storm 23 9 9 1 21600 10 colors=7

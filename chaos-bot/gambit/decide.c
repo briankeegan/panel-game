@@ -505,7 +505,8 @@ static int readBoard_(Read *R) {
     // vanilla: a start whose column stood seven rows raised to nine, blocks landing on it at 455, lost by 900. Time attack keeps its own top)
     #define OPEN_TOP 6
     // (run 318: above six colours only -- added at 8 colours (run 311))
-    if (opening && !ruleNoEnemy && rq.b->colors > 6) rows = imin(rows, OPEN_TOP - panelTop(rq.b));
+    // (run 334: off -- run 333 7 colours lost thicc s23 at 2515 and thicc s24 at 1284, both early, with it on)
+    if (0 && opening && !ruleNoEnemy && rq.b->colors > 6) rows = imin(rows, OPEN_TOP - panelTop(rq.b));
     if (rows <= 0) { R->up = R->low = 0; raiseWait = 0; } else to = fullTop(rq.b) + rows;
   }
   R->to = to;

@@ -1216,6 +1216,9 @@
 #   (early, starved), chain s28 17704, combo s28 9220.
 # run 320 -- chaos mode on run 282's bot (43a7572, restored by hash: run 241's rules and the Line Clear work, before the two search workers,
 #   the dig at four waiting and the break-search dive of runs 295-306) -- to find the change that costs chaos mode. chaos mode s27-28
+# run 320 -- (result, 10:13-10:21 ET) chaos mode on run 282's bot: survived 8/8, full health -- the cost is in runs 295-306.
+# run 321 -- chaos mode on run 299's bot (0222399, restored by hash: run 282's plus the two search workers and the dig at four waiting, no
+#   dive) -- the dive (run 306) or the two before it. chaos mode s27-28
 chain_garbage 27 9 9 1 21600 10 chaosmode=1
 combo_storm 27 9 9 1 21600 10 chaosmode=1
 thicc_combo_storm 27 9 9 1 21600 10 chaosmode=1

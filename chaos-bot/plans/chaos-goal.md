@@ -24,7 +24,7 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 | 8 colours | 10 | 21-22 | 227 | **7/8 -- done**; for 8/8: **7/8 on run 313's bot** (314 off) |
 | 7 colours | 10 | 23-24 | 234 | **7/8 -- done**; on run 313's bot 5/8 (run 315) |
 | Chaos margin 4 | 10 | 25-26 | 236 | **8/8 -- done**; on run 313's bot 6/8 (run 316); on run 306's 7/8 (run 317); on run 318's 5/8 -- the same six-colour play as 306's |
-| Chaos mode | 10 | 27-28 | 237 | **8/8 -- done**; on run 318's bot 4/8 (run 319); on run 282's: run 320 |
+| Chaos mode | 10 | 27-28 | 237 | **8/8 -- done**; on run 318's bot 4/8 (run 319); on run 282's 8/8 (run 320); on run 299's: run 321 |
 | 1 HP | 10 | 29-30 | 238 | **8/8 -- done** |
 | No stop time | 10 | 31-32 | 239 | **8/8 -- done** |
 | BALL | 10 | 33-34 | 241 | **8/8 -- done** |
@@ -210,6 +210,8 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 320 (10:13-10:21 ET), chaos mode on run 282's bot: 8/8, full health** -- the cost is in runs 295-306 (two workers, dig at 4, the
+  dive). Run 321: chaos mode on run 299's bot (workers + dig, no dive).
 - **Run 319 (10:04-10:12 ET), chaos mode on run 318's bot: 4/8** (237's: 8/8). Run 320: chaos mode on run 282's bot (before runs 295-306's
   workers, dig and dive), to find what costs it.
 - **Run 318 (09:55-10:03 ET), runs 310-313's rules above six colours only: margin 4 5/8.** At six colours this is run 306's play exactly,

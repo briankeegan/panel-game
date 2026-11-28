@@ -953,6 +953,10 @@
 #   (3931d36). Lost 15:5 s36 (25.2), 15:6 both (23.3, 24.6).
 # run 261 -- run 253's bot, lineclear.words: time attack's list a chain of 8 or more, then of 3 or more (was the 8 alone) -- run 253's 15:5-6
 #   spent 500-1000 frames a game setting up two-column combos between chains. Line Clear 15:3-6 s35-36
+# run 261 -- (result, 01:57-02:01 ET) time attack's list with a chain of 3 after the 8: won 4/8 -- worse: OFF, lineclear.words back to
+#   run 253's (3931d36). Both 15:5 lost (27.6, 26.0) and both 15:6 (24.5, 25.7).
+# run 262 -- run 253's bot plus: with nobody across, of two chain-going lines as long the one sending more first, then fewer swaps
+#   (search/extend.c E->longest; a combo in a link sends its own rows, width x height / 6). Line Clear 15:3-6 s35-36
 challenge 35 9 9 1 21600 10 challenge=15:3 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:4 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:5 profile=lineclear

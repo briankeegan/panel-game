@@ -155,7 +155,9 @@ static void extendIn(const Question *q, const ExtOpts *o, Ext *E) {
         // longest the cascade is taken to, up to 13 (CB_TOP), in the fewest swaps)
         // (and the opener's chain falling: the longest it is taken to, a line that lives -- the list and the floor are the chain's own then)
         if ((ruleNoEnemy || o->longest) && base.ok && base.chain < CB_TOP && g.chain > base.chain && (!E->longest.set || imin(g.chain, CB_TOP) > imin(E->longest.chain, CB_TOP) ||
-            (imin(g.chain, CB_TOP) == imin(E->longest.chain, CB_TOP) && k->nseq < E->longest.nseq))) {
+            (imin(g.chain, CB_TOP) == imin(E->longest.chain, CB_TOP) && (ruleNoEnemy && g.cells != E->longest.cells ? g.cells > E->longest.cells : k->nseq < E->longest.nseq)))) {
+          // (run 262: with nobody across, of two as long the one sending more first, then fewer swaps -- a Line Clear stage is won by rows sent, and a combo in
+          // a link sends its own garbage beside the chain's: width x height / 6 rows (Health.lua receiveGarbage); the beam already ranks so)
           if (o->longest == 2 || (o->longest ? lineLives(kseq, k->nseq, 0) : lineFits(kseq, k->nseq, 0))) XFILL(E->longest, -1); else E->longCut++;
         }
         // (the K longest, any line making the chain longer than left alone: kept by chain, then the garbage broken -- a link that breaks a

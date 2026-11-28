@@ -1175,6 +1175,10 @@
 # run 309 -- run 306's bot plus vanilla's break kept in reach under garbage (GameCreator 7f4d709234 + 16a84cc3b5, as run 302 tried at
 #   training_random): with garbage on the board or coming every line is asked whether a break is in reach once the next block lands, and
 #   the ready one goes first under garbage too (rank.c, decide.c). 8 colours s21-22
+# run 309 -- (result, 08:29-08:36 ET) break kept in reach at 8 colours: survived 5/8 -- worse: OFF, back to run 306's (88a8486). Lost chain s21
+#   10719, insane s21 9849, combo s22 16783.
+# run 310 -- run 306's bot plus vanilla's flatness floor (as run 303 at training_random: a panel tower of 4+ goes after the flatter, 6+ a
+#   floor under garbage; rank.c). 8 colours s21-22
 chain_garbage 21 9 9 1 21600 10 colors=8
 combo_storm 21 9 9 1 21600 10 colors=8
 thicc_combo_storm 21 9 9 1 21600 10 colors=8

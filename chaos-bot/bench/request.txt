@@ -977,6 +977,10 @@
 #   back to run 253's (3931d36). Both 15:5 (26.5, 23.0) and both 15:6 (20.8, 24.1 -- 12 health off the top) lost.
 # run 266 -- run 253's bot plus: above six colours a design may take 12 swaps, not 10 (decide.c cbJMaxSw; run 256's 14 sent the most rows
 #   at seven colours after 253's but lost 15:5 s36). Line Clear 15:3-6 s35-36
+# run 266 -- (result, 02:29-02:32 ET) 12 design swaps above six colours: won 4/8 -- worse: OFF, decide.c back to run 253's (3931d36).
+#   Both 15:5 (23.8, 25.8) and both 15:6 (29.1, 25.3) lost.
+# run 267 -- run 253's bot plus: above six colours the chain going searched 40 lines a level, not 80 (decide.c TA_EXT_WIDTH). The report
+#   now prints each game's chain going and design numbers (bench/report.py chain_stats: tx= and ta=). Line Clear 15:3-6 s35-36
 challenge 35 9 9 1 21600 10 challenge=15:3 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:4 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:5 profile=lineclear

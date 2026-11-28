@@ -54,6 +54,33 @@ def _kv(line):
             d[k] = v
     return d
 
+def chain_stats(path):
+    """TIME ATTACK'S CHAIN GOING AND DESIGN, read off gambit.log (tx=base/longest/swaps/ms: the extension asked while a chain falls; ta=
+    log/links/swaps/ms/on: the design's state): how often a next link was found, the time given it, and the design's log codes"""
+    if not os.path.exists(path):
+        return None
+    asked = found = 0; ms = 0; gain = 0; zero = 0; ta = {}
+    for line in open(path, errors="replace"):
+        if not line.startswith("GAMBITD "):
+            continue
+        d = _kv(line)
+        if "tx" in d:
+            try:
+                b, l, n, m = [int(x) for x in d["tx"].split("/")[:4]]
+            except ValueError:
+                continue
+            asked += 1; ms += m
+            if l > b: found += 1; gain += l - b
+            if m <= 5: zero += 1
+        if "ta" in d:
+            k = d["ta"].split("/")[0]
+            ta[k] = ta.get(k, 0) + 1
+    if not asked and not ta:
+        return None
+    return "chain going asked %d found %d (%d%%) links +%.1f when found, ms avg %.0f, ms<=5 %d | ta log %s" % (
+        asked, found, 100 * found // max(1, asked), gain / max(1, found), ms / max(1, asked), zero,
+        " ".join("%s:%d" % (k, v) for k, v in sorted(ta.items(), key=lambda kv: -kv[1])[:10]))
+
 def death(path, frames, health, reason):
     """WHY A GAME WAS LOST, read off gambit.log's decisions (GAMBITD lines; the decisions' own clock): the cause's tags and the numbers
     behind them, so a loss explains itself without the log being read by hand.
@@ -253,6 +280,10 @@ def main():
             r.get("gpm", -1), s.get("late", "?"), s.get("diverged", "?"), r.get("overruns", "?"), r.get("worstMs", "?"), s.get("surprises", "?"), s.get("arrivals", "?"), s.get("noticeMin", "?"), vl, vl + vd, vr, vf[0], vf[1], vf[2], r.get("reason", "?")))
     for row in rows:
         print(row)
+    for g in asked:
+        cs = chain_stats(os.path.join(games_dir, "chaosbot-game-%d" % g["n"], "gambit.log"))
+        if cs:
+            print("chain game %d: %s" % (g["n"], cs))
     hist = history(os.path.join(os.path.dirname(os.path.abspath(__file__)), "history.txt"))
     for g in asked:
         d = os.path.join(games_dir, "chaosbot-game-%d" % g["n"])

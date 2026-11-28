@@ -2196,7 +2196,10 @@ static Played playOf(const Read *R, int n) {
     double left = C2.due ? C2.due - C2.margin - nowMs() : 100, ms = left * 0.8; if (ms < 2) ms = 2;
     readyStop();
     List L; memset(&L, 0, sizeof L); L.n = 1; L.aim[0].chain.op = OP_GE; L.aim[0].chain.n = 2; L.aim[0].brk = -1;
-    ExtOpts eo = { TA_EXT_WIDTH, TA_EXT_DEPTH, &L, NOT_ASKED, 0, ms };
+    // (run 267: above six colours 40 lines a level, not 80 -- the search has the decision's time only (a link pressed before the one it
+    // joins lands): deeper was worse (run 259, 9 swaps: 22.2 rows a minute) and shallower too (run 260, 7: 25.6), so each level is made
+    // cheaper instead, to reach 8 swaps within the time)
+    ExtOpts eo = { decQ.b->colors > 6 ? TA_EXT_WIDTH / 2 : TA_EXT_WIDTH, TA_EXT_DEPTH, &L, NOT_ASKED, 0, ms };
     static Ext E; extend(&decQ, &eo, &E);
     taxBase = E.baseChain; taxLong = E.longest.set ? E.longest.chain : 0; taxN = E.longest.set ? E.longest.nseq : 0; taxMs = (int32_t)ms;
     if (E.longest.set && E.longest.nseq > 0) {
@@ -2227,9 +2230,7 @@ static Played playOf(const Read *R, int n) {
       static CbGrid D; int32_t tr = 0; int links = 0, sw = 0;
       // (no more swaps than the board lives to press: the frames it has left alone, a swap's frames each, TA_MARGIN to spare)
       int32_t dies = R->F.known[FACT_US_DIES] && R->F.v[FACT_US_DIES] > 0 ? (int32_t)R->F.v[FACT_US_DIES] : NOT_ASKED;
-      // (run 266: above six colours a design may take 12 swaps, not 10 -- run 256's 14 sent the most rows at seven colours after run 253
-      // (15:5 s35 35.7, 15:6 s35 30.2 a minute) but lost 15:5 s36; the board's own life still caps it, as below)
-      cbJMaxSw = imin(decQ.b->colors > 6 ? 12 : TA_MAXSW, dies == NOT_ASKED ? CB_MAXSWAPS : imax(1, (dies - TA_MARGIN) / TA_SWAP_FRAMES - 1));
+      cbJMaxSw = imin(TA_MAXSW, dies == NOT_ASKED ? CB_MAXSWAPS : imax(1, (dies - TA_MARGIN) / TA_SWAP_FRAMES - 1));
       if (taHave && cbSwapsTo(&G, &taD) > cbJMaxSw) { taReset(); taLog = -3; }
       int32_t v = cbDesignAll(&G, taHave ? &taD : 0, ms, &D, &tr, &links, &sw);
       taMs += ms;

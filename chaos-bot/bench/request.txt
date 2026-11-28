@@ -875,11 +875,17 @@
 # run 242 -- THE NEXT MODE: Line Clear -- Challenge Mode difficulty 15 (the hardest Line Clear), stages 3-6 (1-2 won in run 45), on
 #   its own seeds 35-36, run 241's bot. Each stage is a two-minute attack test (7230 frames, then a row a frame, 50 queued ends it):
 #   won when the challenger is beaten. Line Clear 15:3-6 s35-36
-challenge 35 9 9 1 21600 10 challenge=15:3
-challenge 35 9 9 1 21600 10 challenge=15:4
-challenge 35 9 9 1 21600 10 challenge=15:5
-challenge 35 9 9 1 21600 10 challenge=15:6
-challenge 36 9 9 1 21600 10 challenge=15:3
-challenge 36 9 9 1 21600 10 challenge=15:4
-challenge 36 9 9 1 21600 10 challenge=15:5
-challenge 36 9 9 1 21600 10 challenge=15:6
+# run 242 -- (result, 00:02-00:07 ET) Line Clear 15:3-6: won 0/8 -- every game ended at the 2:00 wall (50 queued) at full health.
+#   Difficulty 15 asks 12.5 + 13.5 x (stage-1) rows sent in two minutes (ChallengeMode.lua lineHeightToKill): 39.5, 53, 66.5, 80 for
+#   stages 3-6 -- 20-40 a minute; the bot sent 11-17. A race for attack with no garbage coming for two minutes, played by the chaos
+#   profile, which has Gambit's stack-building taken out (no raise, no opener chain, no material floor: profiles/README).
+# run 243 -- the same 8 games with profile=gambit-finish (raise, the opener's 8-chain, the floor) -- the profile only, the bot unchanged
+#   (run 241's). Line Clear 15:3-6 s35-36
+challenge 35 9 9 1 21600 10 challenge=15:3 profile=gambit-finish
+challenge 35 9 9 1 21600 10 challenge=15:4 profile=gambit-finish
+challenge 35 9 9 1 21600 10 challenge=15:5 profile=gambit-finish
+challenge 35 9 9 1 21600 10 challenge=15:6 profile=gambit-finish
+challenge 36 9 9 1 21600 10 challenge=15:3 profile=gambit-finish
+challenge 36 9 9 1 21600 10 challenge=15:4 profile=gambit-finish
+challenge 36 9 9 1 21600 10 challenge=15:5 profile=gambit-finish
+challenge 36 9 9 1 21600 10 challenge=15:6 profile=gambit-finish

@@ -28,7 +28,7 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 | 1 HP | 10 | 29-30 | 238 | **8/8 -- done** |
 | No stop time | 10 | 31-32 | 239 | **8/8 -- done** |
 | BALL | 10 | 33-34 | 241 | **8/8 -- done** |
-| Line Clear (15:3-6) | stage's | 35-36 | 242 | playing |
+| Line Clear (15:3-6) | stage's | 35-36 | 242 | 0/8 (rows sent short), being fixed (run 243) |
 | Queue limit | 10 | 37-38 | - | to do |
 | training_random | 10 | 39-40 | - | to do (its own pattern: chain and combo garbage mixed at a random balance, Chaos Mode 1 game in 4 -- TrainingMenu.lua createBasicTrainingMode) |
 | Challenge Mode | stage's | 41-42 | - | to do |
@@ -207,6 +207,8 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 242 (00:02-00:07 ET), LINE CLEAR 15:3-6 on seeds 35-36: 0/8** -- every game at the 2:00 wall, full health. Stages 3-6 ask 39.5-80
+  rows in two minutes (20-40 a minute); the bot sent 11-17. Run 243: the same games on profile gambit-finish (stack-building kept).
 - **Run 241 (23:53-00:01 ET), run 231's move in every number of colours: BALL 8/8 -- done.** Run 242: Line Clear, difficulty 15 stages
   3-6, on seeds 35-36.
 - **Run 240 (23:44-23:52 ET), BALL on seeds 33-34: 6/8.** chain s34: the line in progress kept over a break lost 154 frames later. Run 241:

@@ -1190,6 +1190,10 @@
 #   12226, thicc s22 1262 (early: READY WHEN IT LANDS put a ready line lost at 143 over one lost at 192 at 580), insane s22 14278.
 # run 313 -- run 311 plus: READY WHEN IT LANDS between two lines not living only where the ready one is lost no sooner (rank.c). 8 colours
 #   s21-22
+# run 313 -- (result, 09:08-09:15 ET) READY WHEN IT LANDS only where the ready line is lost no sooner: survived 7/8 -- better: KEPT (d0481f8).
+#   Lost chain s22 at 16969: the flatness floor's tall-tower clause (run 310) put a flatter entry lost at 144 over a line lost at 359 at
+#   16505, and other sooner picks after.
+# run 314 -- run 313 plus: the flatness floor's tall clause no more than two breaks' time sooner (rank.c). 8 colours s21-22
 chain_garbage 21 9 9 1 21600 10 colors=8
 combo_storm 21 9 9 1 21600 10 colors=8
 thicc_combo_storm 21 9 9 1 21600 10 colors=8

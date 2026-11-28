@@ -21,7 +21,7 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 
 | Mode | Level | Seeds | Run | Result |
 |---|---|---|---|---|
-| 8 colours | 10 | 21-22 | 227 | **7/8 -- done**; for 8/8: 6/8 on run 311's bot (flatness floor, opening cap; 312 off), being fixed (run 313) |
+| 8 colours | 10 | 21-22 | 227 | **7/8 -- done**; for 8/8: **7/8 on run 313's bot**, being fixed for 8/8 (run 314) |
 | 7 colours | 10 | 23-24 | 234 | **7/8 -- done** |
 | Chaos margin 4 | 10 | 25-26 | 236 | **8/8 -- done** |
 | Chaos mode | 10 | 27-28 | 237 | **8/8 -- done** |
@@ -210,6 +210,8 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 313 (09:08-09:15 ET), READY WHEN IT LANDS only where the ready line is lost no sooner: 8 colours 7/8 -- kept (d0481f8).** Lost
+  chain s22 (the tall-tower floor put a line lost 215 frames sooner first). Run 314: that clause no more than two breaks sooner.
 - **Run 312 (08:58-09:05 ET), the perch floor at 8 colours: 5/8 -- off.** Run 313: READY WHEN IT LANDS between dying lines only where the
   ready one is lost no sooner.
 - **Run 311 (08:48-08:55 ET), vanilla's opening raise cap: 6/8 -- kept (c54c965)** (insane both lived; chain s21 and thicc s21 lost). Run

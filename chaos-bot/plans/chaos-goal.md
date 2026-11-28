@@ -23,7 +23,7 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 |---|---|---|---|---|
 | 8 colours | 10 | 21-22 | 227 | **7/8 -- done**; for 8/8: **7/8 on run 313's bot** (314 off) |
 | 7 colours | 10 | 23-24 | 234 | **7/8 -- done**; on run 313's bot 5/8 (run 315) |
-| Chaos margin 4 | 10 | 25-26 | 236 | **8/8 -- done**; on run 313's bot 6/8 (run 316); on run 306's: run 317 |
+| Chaos margin 4 | 10 | 25-26 | 236 | **8/8 -- done**; on run 313's bot 6/8 (run 316); on run 306's 7/8 (run 317); run 318 |
 | Chaos mode | 10 | 27-28 | 237 | **8/8 -- done** |
 | 1 HP | 10 | 29-30 | 238 | **8/8 -- done** |
 | No stop time | 10 | 31-32 | 239 | **8/8 -- done** |
@@ -210,6 +210,8 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 317 (09:46-09:53 ET), margin 4 on run 306's bot: 7/8** (313's 6/8). Run 318: runs 310-313's three 8-colour rules above six
+  colours only.
 - **Run 316 (09:36-09:44 ET), margin 4 on run 313's bot: 6/8** (run 236's: 8/8). Run 317: margin 4 on run 306's bot (before runs 310-313's
   flatness floor, opening cap and READY fix), to tell which side the cost is on.
 - **Run 315 (09:27-09:34 ET), 7 colours on run 313's bot: 5/8** (run 234's bot 7/8). Run 316: margin 4 on it -- the standings first.

@@ -423,9 +423,7 @@ static int readBoard_(Read *R) {
   // (TIME ATTACK'S RAISE: no design being built and the stack under its top -- the owner: flatten, raise to the top, then the chain; no
   // garbage is coming, so the rows are raised as they are, never held to a break's readiness. The top is TA_TOP less each row the tallest
   // column stands over the shortest past TA_EVEN: an uneven stack raised to TA_TOP puts its tallest column where the rise ends it)
-  // (run 255: above six colours a row higher -- run 249 raised two rows lower there and sent fewer rows (19-26 a minute), run 253 raised the
-  // opening to this top and sent more (6/8); Line Clear 15:6 (7 colours) the stage left at 27-28 rows a minute, about 32 asked)
-  int32_t taTo = imin(TA_TOP + (decQ.b->colors > 6 ? 1 : 0), (decQ.b->height ? decQ.b->height : 12) - 1) - imax(0, evenOf(decQ.b) - TA_EVEN);
+  int32_t taTo = TA_TOP - imax(0, evenOf(decQ.b) - TA_EVEN);
   int taRaise = ruleNoEnemy && !opening && !refill && !R->topped && !R->taDying && !taOn && panelTop(decQ.b) < taTo;
   if (taRaise) to = taTo;
   // (run 253: and with nobody across the opening raises to time attack's top too, not to the chaos ceiling, which keeps room for blocks
@@ -2229,7 +2227,9 @@ static Played playOf(const Read *R, int n) {
       static CbGrid D; int32_t tr = 0; int links = 0, sw = 0;
       // (no more swaps than the board lives to press: the frames it has left alone, a swap's frames each, TA_MARGIN to spare)
       int32_t dies = R->F.known[FACT_US_DIES] && R->F.v[FACT_US_DIES] > 0 ? (int32_t)R->F.v[FACT_US_DIES] : NOT_ASKED;
-      cbJMaxSw = imin(TA_MAXSW, dies == NOT_ASKED ? CB_MAXSWAPS : imax(1, (dies - TA_MARGIN) / TA_SWAP_FRAMES - 1));
+      // (run 256: above six colours a design may take 14 swaps, not 10 -- at seven colours the long designs need more sorting: Line Clear 15:6
+      // the stage left at 27-28 rows a minute (run 253), about 32 asked; the board's own life still caps it, as below)
+      cbJMaxSw = imin(decQ.b->colors > 6 ? 14 : TA_MAXSW, dies == NOT_ASKED ? CB_MAXSWAPS : imax(1, (dies - TA_MARGIN) / TA_SWAP_FRAMES - 1));
       if (taHave && cbSwapsTo(&G, &taD) > cbJMaxSw) { taReset(); taLog = -3; }
       int32_t v = cbDesignAll(&G, taHave ? &taD : 0, ms, &D, &tr, &links, &sw);
       taMs += ms;

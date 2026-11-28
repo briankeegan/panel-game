@@ -1237,7 +1237,9 @@ typedef struct { const Judge *top, *line; int32_t name, nlive, ncands, urgent, w
 // (the hold put in a line's place only where the board it leaves is lost no sooner, as the engine has it: the owner -- you can't choose to
 // die)
 #define TA_WALL 7200          // a Challenge stage's wall: two minutes of the stopwatch
-#define TA_WALL_FRAMES 120    // the frames before it from which a falling chain is let end: a link or two, and the rows' way across
+#define TA_WALL_FRAMES 150    // the frames before it from which a falling chain is let end: a link or two, and the rows' way across --
+                              // a chain's slab leaves the telegraph once finalized and 91 frames past its first link, and lands 60 later
+                              // (GarbageQueue.lua STAGING_DURATION, GARBAGE_DELAY_LAND_TIME; run 271: 150, was 120)
 char *getenv(const char *);
 static int taWallNear(const Board *b) {
   static int stage = -1;
@@ -2280,11 +2282,13 @@ static Played playOf(const Read *R, int n) {
   }
   // (and the rank's own line that takes the falling chain on, near the wall, held -- the chain let end, its rows sent -- where the board
   // lives as long held)
-  if (ruleNoEnemy && taWallNear(decQ.b) && decQ.b->chainCounter > 0 && !R->taDying && P.line && P.line->o.j.made.chain > 0 &&
-      taHoldNoSooner(P.line, n)) decWhy = __LINE__, P.line = 0;
+  // (run 271: any line, not only one the judge counts as lengthening it -- run 270 15:6 s36's 2-chain fired at 7047 was taken to 6 by
+  // 7224 through lines carried on and set-ups; and no line put in the hold's place on the way to the action, below)
+  int wallHold = ruleNoEnemy && taWallNear(decQ.b) && decQ.b->chainCounter > 0 && !R->taDying;
+  if (wallHold && P.line && taHoldNoSooner(P.line, n)) decWhy = __LINE__, P.line = 0;
   // (AND NO WAITING WHERE THERE IS A WAY TO THE ACTION: where the move is the hold or a line in progress waiting for the board, the best
   // line on the way to the action (enRoute) is played instead -- lost no sooner than the hold, the next break's reserve kept)
-  if (!R->up && !P.wait && enOn && (!P.line || P.line->k.play == PLAY_CARRYWAIT)) {
+  if (!R->up && !P.wait && enOn && !wallHold && (!P.line || P.line->k.play == PLAY_CARRYWAIT)) {
     const Judge *H = 0; for (int i = 0; i < n && !H; i++) if (order[i]->hold) H = order[i];
     const Judge *T = P.top ? P.top : H;   // (the line it would take the place of: the order's first, the hold among them)
     for (int i = 0; i < n && H && T && !H->o.dead; i++) { const Judge *J = order[i];

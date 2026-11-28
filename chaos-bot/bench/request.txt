@@ -998,6 +998,13 @@
 # run 270 -- run 253's bot plus: A STAGE'S WALL -- in a Challenge stage, within 120 frames of the two-minute wall the falling chain is no
 #   longer taken on (decide.c taWallNear: the chain going skipped, the rank's line that lengthens it held), so it ends and its rows land.
 #   Line Clear 15:3-6 s35-36
+# run 270 -- (result, 02:55-02:59 ET) the falling chain let end near the wall: WON 6/8 -- as good as run 253, 31.7 rows a minute (the most
+#   yet): KEPT (4b551ab). Both 15:5 won (32.5, 30.8); 15:6 lost both (27.6, 33.5). 15:6 s36 counted 67.5 rows and lost: its 2-chain fired
+#   at 7047 was still taken to 6 by 7224 (lines carried on, set-ups). Read in the chaos build's GarbageQueue.lua: a chain's slab leaves
+#   once finalized and 91 frames past its first link and lands 60 frames later; chain slabs are capped at 12 rows (the report counts every
+#   link).
+# run 271 -- run 270's bot plus: near the wall any line is held while a chain falls, not only one judged to lengthen it, and no line on the
+#   way to the action put in the hold's place; from 150 frames, not 120 (decide.c wallHold). Line Clear 15:3-6 s35-36
 challenge 35 9 9 1 21600 10 challenge=15:3 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:4 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:5 profile=lineclear

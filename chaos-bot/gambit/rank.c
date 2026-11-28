@@ -1198,7 +1198,9 @@ static int compareJudged(const Judge *x, const Judge *y) {
   #define TOWER_STEP 2
   #define TOWER_HIGH 6
   // (run 318: above six colours only -- added at 8 colours (run 310); margin 4, 6 colours, went 8/8 to 6/8 on the bot with it, 7/8 without)
-  if (decQ.b->colors > 6 && !lx && !ly && x->o.j.pEven >= 0 && y->o.j.pEven >= 0) {
+  // (run 330: never with nobody across -- a tower is where garbage rests, and a Line Clear has none; run 329 Line Clear 15:5-6 (7 colours)
+  // on this bot 5/8, run 282's before the floor 8/8)
+  if (decQ.b->colors > 6 && !ruleNoEnemy && !lx && !ly && x->o.j.pEven >= 0 && y->o.j.pEven >= 0) {
     int tx = x->o.j.pEven, ty = y->o.j.pEven;
     int tall = imax(tx, ty) >= TOWER_HIGH && (decF.under || garbageComing());
     int differ = (tx >= TOWER_ROWS) != (ty >= TOWER_ROWS) || (tx >= TOWER_ROWS && ty >= TOWER_ROWS && iabs(tx - ty) >= (tall ? 1 : TOWER_STEP));

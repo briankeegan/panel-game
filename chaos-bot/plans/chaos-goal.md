@@ -29,8 +29,8 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 | No stop time | 10 | 31-32 | 239 | **8/8 -- done** |
 | BALL | 10 | 33-34 | 241 | **8/8 -- done** |
 | Line Clear (15:3-6) | stage's | 35-36 | 282 | **8/8 -- done** |
-| Queue limit (qlimit=1) | 10 | 37-38 | 283 | being played |
-| training_random | 10 | 39-40 | - | to do (its own pattern: chain and combo garbage mixed at a random balance, Chaos Mode 1 game in 4 -- TrainingMenu.lua createBasicTrainingMode) |
+| Queue limit (qlimit=1) | 10 | 37-38 | 283 | **8/8 -- done** |
+| training_random | 10 | 39-40 | 284 | being played -- garbage level/speed 8-11 a seed (its own pattern: chain and combo garbage mixed at a random balance, Chaos Mode 1 game in 4 -- TrainingMenu.lua createBasicTrainingMode) |
 | Challenge Mode | stage's | 41-42 | - | to do |
 
 (8 colours old: 7/8 on seeds 7-8, run 180 -- does not count.)
@@ -210,6 +210,8 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 283 (04:14-04:22 ET), queue limit (qlimit=1): survived 8/8, full health -- QUEUE LIMIT DONE.** Run 284: training_random on seeds
+  39-40, garbage level/speed 8-11 (one pattern, so the level makes the four games a seed).
 - **Run 282 (04:07-04:11 ET), the line in progress kept over a new chain-going line no longer: WON 8/8 -- LINE CLEAR DONE (43a7572).**
   Both 15:6 won (31.1, 33.7 rows a minute). Run 283: the next mode, queue limit (qlimit=1, the attack engine's limit on), seeds 37-38.
 - **Run 281 (04:00-04:04 ET), raise top lowered only past TA_EVEN + 1 above six colours: WON 6/8 -- kept (238061a).** 34.0 rows a minute;

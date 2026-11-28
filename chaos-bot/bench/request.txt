@@ -1060,11 +1060,15 @@
 # run 283 -- THE NEXT MODE: queue limit (qlimit=1: the attack engine's limit on -- a pattern sends only while six or fewer of its attacks
 #   are in transit, AttackEngine.lua; training patterns have it off) at Level 10, 6 colours, on its own seeds 37-38 (never played), run
 #   282's bot. The launcher reads CHAOSBOT_QLIMIT (training.lua), the workflow passes the request's qlimit=. Queue limit s37-38
-chain_garbage 37 9 9 1 21600 10 qlimit=1
-combo_storm 37 9 9 1 21600 10 qlimit=1
-thicc_combo_storm 37 9 9 1 21600 10 qlimit=1
-insane_combo_storm 37 9 9 1 21600 10 qlimit=1
-chain_garbage 38 9 9 1 21600 10 qlimit=1
-combo_storm 38 9 9 1 21600 10 qlimit=1
-thicc_combo_storm 38 9 9 1 21600 10 qlimit=1
-insane_combo_storm 38 9 9 1 21600 10 qlimit=1
+# run 283 -- (result, 04:14-04:22 ET) queue limit: survived 8/8, 172800 frames, full health -- QUEUE LIMIT DONE (seeds 37-38).
+# run 284 -- THE NEXT MODE: training_random (the chaos training menu's random generator: chain and combo garbage at a random balance,
+#   Chaos Mode one game in four) at Level 10, 6 colours, on its own seeds 39-40 (never played), run 282's bot. One pattern, so the four
+#   games a seed are its garbage level/speed 8, 9, 10 and 11. training_random s39-40
+training_random 39 8 8 1 21600 10
+training_random 39 9 9 1 21600 10
+training_random 39 10 10 1 21600 10
+training_random 39 11 11 1 21600 10
+training_random 40 8 8 1 21600 10
+training_random 40 9 9 1 21600 10
+training_random 40 10 10 1 21600 10
+training_random 40 11 11 1 21600 10

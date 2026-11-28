@@ -841,7 +841,7 @@ html.set-chaos #sec-brain, html.set-chaos .gs-nav a[href="#sec-brain"] { display
 
   <details class="gs-card gs-collapse" id="sec-brain">
     <summary><h2>How Ranmaru decides</h2></summary>
-    <p class="gs-note">Ranmaru plays like a person at the controls: it sees only what you see and presses one key at a time. <b>Staying alive always comes first: the mode only chooses between moves that are equally safe.</b> Tap or hover an underlined word for its meaning.</p>
+    <p class="gs-note">Ranmaru is a program (Gambit, written in C). It reads its own board, the opponent's stack height and the garbage already sent, and nothing else: no unseen rows, no future attacks. Its inputs are capped at 76 actions per 10 seconds. <b>Survival comes first: the mode only chooses between moves that are equally safe.</b> Tap or hover an underlined word for its meaning.</p>
 
     <h3>1 · The game plan: which mode it plays</h3>
     <div class="dt">
@@ -873,7 +873,7 @@ html.set-chaos #sec-brain, html.set-chaos .gs-nav a[href="#sec-brain"] { display
       <li><b>Propose</b> short swap sequences: break, attack, carry on, set up, <button type="button" class="dt-t" data-tip="Move a colour to one swap away from its partner, not touching it. Nothing clears now, but a single swap fires the match later, when Ranmaru chooses.">zip</button>, <button type="button" class="dt-t" data-tip="Swaps that clear nothing but even out the columns, so the stack has no towers or holes.">flatten</button>, survive, or hold.</li>
       <li><b>Play each one out</b> on a copy of the game's own engine, garbage landing on time, up to its <button type="button" class="dt-t" data-tip="How far ahead each move is played out: about 4 seconds, and at least 2 seconds past the move's last swap, with the garbage already sent landing on time.">horizon</button>.</li>
       <li><b>Pick</b> one, with the tree below.</li>
-      <li><b>Press</b> the winner's keys within its <button type="button" class="dt-t" data-tip="At most 76 actions every 10 seconds. Every cursor step and every swap costs one, and it waits 12 frames to react and 12 between swaps, like a person.">action budget</button>.</li>
+      <li><b>Press</b> the winner's keys within its <button type="button" class="dt-t" data-tip="At most 76 actions every 10 seconds. Every cursor step and every swap costs one. It also waits 12 frames before reacting and 12 frames between swaps.">action budget</button>.</li>
     </ol>
 
     <h3>3 · How it picks a move</h3>

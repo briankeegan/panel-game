@@ -762,6 +762,10 @@
 #   7635. NO CHANGING MINDS (7 times) kept carries lost 40-100 frames sooner where both counted living by the credit (it skips lostAlike
 #   then): thicc s22 2985-3021 149/131/113 over 222/207/189; chain s22 18350 297 over 397.
 # run 215 -- above six colours, NO CHANGING MINDS holds credited-only pairs to the quarter break, as 1b (rank.c). 8 colours s21-22
+# run 215 -- (result) survived 2/8, 106404 frames -- worse (4/8): OFF, run 214's rank.c restored by hash (21a9ee9).
+# run 216 -- run 214's bot plus: above six colours, THE PLAN KEPT also gives way where the other's own board (no promise either side) is
+#   lost a quarter break later (rank.c). Run 214 insane s22 7060-7100, 11 queued: a carry lost at 213/195/173 promising 369/351/329 kept
+#   over entries lost at 304/286/225 promising 349/331/347, lost at 7635. 8 colours s21-22
 chain_garbage 21 9 9 1 21600 10 colors=8
 combo_storm 21 9 9 1 21600 10 colors=8
 thicc_combo_storm 21 9 9 1 21600 10 colors=8

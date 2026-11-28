@@ -17,7 +17,7 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 
 | Mode | Level | Seeds | Run | Result |
 |---|---|---|---|---|
-| 8 colours | 10 | 21-22 | 214 | 4/8, being fixed (run 215) |
+| 8 colours | 10 | 21-22 | 214 | 4/8 (215: 2/8, off), being fixed (run 216) |
 | 7 colours | 10 | 23-24 | - | to redo (old: 7/8 on seeds 7-8, run 190 -- does not count) |
 | Chaos margin 4 | 10 | 25-26 | - | to redo (old: 7/8 on 7-8, run 191) |
 | Chaos mode | 10 | 27-28 | - | to redo (old: 8/8 on 7-8, run 192) |
@@ -203,6 +203,8 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 215 (2026-11-27 19:26 ET), no changing minds' quarter break: 2/8 -- off** (214 restored by hash). Run 216: THE PLAN KEPT also gives
+  way on own boards a quarter break apart (insane s22 7060-7100, the carry kept on its promise).
 - **Run 214 (2026-11-27 19:17 ET), 1b's quarter break for credited-only pairs: 4/8** -- kept. NO CHANGING MINDS kept carries lost 40-100
   frames sooner the same way (credited pairs skip lostAlike). Run 215: the same quarter break there.
 - **Run 213 (2026-11-27 19:07 ET), the quarter test on the carry's own loss: 2/8 -- off** (212 restored by hash). chain s21: 1b put the hold

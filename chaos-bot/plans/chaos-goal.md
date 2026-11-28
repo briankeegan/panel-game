@@ -28,7 +28,7 @@ modes are that good go back and get them all to 100%"; "Not just the colors... o
 | 1 HP | 10 | 29-30 | 238 | **8/8 -- done** |
 | No stop time | 10 | 31-32 | 239 | **8/8 -- done** |
 | BALL | 10 | 33-34 | 241 | **8/8 -- done** |
-| Line Clear (15:3-6) | stage's | 35-36 | 253 | won 6/8 (254-268 off), being fixed (run 269) |
+| Line Clear (15:3-6) | stage's | 35-36 | 253 | won 6/8 (254-269 off), being fixed (run 270) |
 | Queue limit | 10 | 37-38 | - | to do |
 | training_random | 10 | 39-40 | - | to do (its own pattern: chain and combo garbage mixed at a random balance, Chaos Mode 1 game in 4 -- TrainingMenu.lua createBasicTrainingMode) |
 | Challenge Mode | stage's | 41-42 | - | to do |
@@ -210,6 +210,9 @@ level's. Nothing below Level 9 is tested (the owner, 2026-11-26).
 
 ## 7. Progress log (the last benchmark first)
 
+- **Run 269 (02:48-02:51 ET), a short design waits for the top: won 4/8 -- off.** Its 15:6 s35 counted 64 rows (60 asked) and lost: a
+  chain begun at 7095 was still falling at the wall, and a chain's rows are sent when it ends. Run 270: in a Challenge stage, within 120
+  frames of the wall the falling chain is let end (the chain going skipped, a rank line lengthening it held).
 - **Run 268 (02:42-02:45 ET), the board held while a design is searched: won 5/8 -- off.** The designs fired at seven colours hold ~2
   links (6.5 at six): the design is rows in order, and four full rows at seven colours hold ~3 panels a colour. Run 269: above six colours
   the search's time-out builds only a design of 4+ links; a shorter one waits for the stack at the top.

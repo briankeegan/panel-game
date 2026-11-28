@@ -992,6 +992,12 @@
 #   23.0). Its new numbers: 7-colour designs fired held 1.8-2.4 links (1-1.4 swaps); 6-colour ones 6.5 links.
 # run 269 -- run 253's bot plus: above six colours the search's time builds a design of 4 links or more only; a shorter one waits for the
 #   stack at the top (decide.c taOn). Line Clear 15:3-6 s35-36
+# run 269 -- (result, 02:48-02:51 ET) a short design waits for the top above six colours: won 4/8 -- worse: OFF, decide.c back to run
+#   253's (3931d36). Both 15:5 (26.9, 23.8) and both 15:6 (31.8, 21.0) lost. 15:6 s35 counted 64 rows (60 asked) and lost: a 5-chain
+#   begun at 7095 was still going at the wall -- its rows never sent (a chain sends when it ends).
+# run 270 -- run 253's bot plus: A STAGE'S WALL -- in a Challenge stage, within 120 frames of the two-minute wall the falling chain is no
+#   longer taken on (decide.c taWallNear: the chain going skipped, the rank's line that lengthens it held), so it ends and its rows land.
+#   Line Clear 15:3-6 s35-36
 challenge 35 9 9 1 21600 10 challenge=15:3 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:4 profile=lineclear
 challenge 35 9 9 1 21600 10 challenge=15:5 profile=lineclear

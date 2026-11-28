@@ -1236,6 +1236,14 @@ static int ranked(const Read *R, const Found *S) {
 typedef struct { const Judge *top, *line; int32_t name, nlive, ncands, urgent, wait, deferred; } Played;
 // (the hold put in a line's place only where the board it leaves is lost no sooner, as the engine has it: the owner -- you can't choose to
 // die)
+#define TA_WALL 7200          // a Challenge stage's wall: two minutes of the stopwatch
+#define TA_WALL_FRAMES 120    // the frames before it from which a falling chain is let end: a link or two, and the rows' way across
+char *getenv(const char *);
+static int taWallNear(const Board *b) {
+  static int stage = -1;
+  if (stage < 0) { const char *e = getenv("CHAOSBOT_CHALLENGE"); stage = e && *e ? 1 : 0; }
+  return stage && b->stopWatch >= TA_WALL - TA_WALL_FRAMES;
+}
 static int taHoldNoSooner(const Judge *line, int n) {
   if (!line) return 1;
   for (int i = 0; i < n; i++) if (order[i]->k.play == PLAY_HOLD) return diesAt(order[i]) >= diesAt(line);
@@ -2191,7 +2199,12 @@ static Played playOf(const Read *R, int n) {
   taLog = 0; taxMs = -1;
   // (A CHAIN GOING, TIME ATTACK: the extension given the decision's time, and its longest line -- up to 13 -- played, every decision the
   // chain falls; the panel-game puzzles' way: a chain is taken a link at a time, a swap a link, in the time its own clears stop the rise)
-  if (ruleNoEnemy && !R->under && !R->topped && clockFrameOut && !clockFrameOut() && (cascadeLive(decQ.b) || decQ.b->chainCounter > 0)) {
+  // (run 270: A STAGE'S WALL -- a Challenge stage (CHAOSBOT_CHALLENGE, the launcher's) ends at two minutes of the stopwatch (Match.lua
+  // timeLimit 120), and a chain's rows are sent when it ends: a chain taken on past the wall sends none of them. Run 269 Line Clear 15:6
+  // s35 counted 64 rows (60 asked) with a 5-chain begun at 7095 still going at the wall. Within TA_WALL_FRAMES of it the chain going is
+  // no longer extended, so the chain ends and its rows land)
+  if (ruleNoEnemy && !R->under && !R->topped && clockFrameOut && !clockFrameOut() && (cascadeLive(decQ.b) || decQ.b->chainCounter > 0) &&
+      !taWallNear(decQ.b)) {
     double keepDue = clockDue, keepShare = clockShare; clockDue = 0; clockShare = 0;
     double left = C2.due ? C2.due - C2.margin - nowMs() : 100, ms = left * 0.8; if (ms < 2) ms = 2;
     readyStop();
@@ -2234,11 +2247,7 @@ static Played playOf(const Read *R, int n) {
       if (tr && v > 0 && (!taHave || v >= taVal)) { taD = D; taTr = tr; taLinks = links; taSwaps = sw; taVal = v; taHave = 1; }
       // (run 252: above six colours built after half the search -- searched from 4 full rows now (run 251), the design was let go 18 times in
       // run 251 Line Clear 15:6 s35 (the board no longer held it) and never built, 67 decisions searching; 15:5 s36 built it 11 times and won)
-      // (run 269: above six colours the search's time builds a design of 4 links or more only -- a shorter one waits for the stack to reach
-      // the top (TA_TOP) as it rises: run 268's 7-colour Line Clears fired designs of 1.8-2.4 links (1-1.4 swaps), its 6-colour ones 6.5;
-      // a design is rows in order, and 4 full rows at seven colours hold about 3 panels a colour -- each short one fired keeps the stack low)
-      if (taHave && (taLinks >= TA_LINKS || (taMs >= (decQ.b->colors > 6 ? TA_DESIGN_MS / 2 : TA_DESIGN_MS) && (decQ.b->colors <= 6 || taLinks >= 4)) ||
-                     panelTop(decQ.b) >= TA_TOP)) taOn = 1;
+      if (taHave && (taLinks >= TA_LINKS || taMs >= (decQ.b->colors > 6 ? TA_DESIGN_MS / 2 : TA_DESIGN_MS) || panelTop(decQ.b) >= TA_TOP)) taOn = 1;
       // (and while it is searched, the board is left as it is -- a swap played meanwhile changes the rows the design is of -- unless it
       // is dying or raised: a raise only lifts the rows)
       else if (taHave && !R->taDying && !R->up && taHoldNoSooner(P.line, n)) decWhy = __LINE__, P.line = 0;
@@ -2269,6 +2278,10 @@ static Played playOf(const Read *R, int n) {
     }
     clockDue = keepDue; clockShare = keepShare;
   }
+  // (and the rank's own line that takes the falling chain on, near the wall, held -- the chain let end, its rows sent -- where the board
+  // lives as long held)
+  if (ruleNoEnemy && taWallNear(decQ.b) && decQ.b->chainCounter > 0 && !R->taDying && P.line && P.line->o.j.made.chain > 0 &&
+      taHoldNoSooner(P.line, n)) decWhy = __LINE__, P.line = 0;
   // (AND NO WAITING WHERE THERE IS A WAY TO THE ACTION: where the move is the hold or a line in progress waiting for the board, the best
   // line on the way to the action (enRoute) is played instead -- lost no sooner than the hold, the next break's reserve kept)
   if (!R->up && !P.wait && enOn && (!P.line || P.line->k.play == PLAY_CARRYWAIT)) {
